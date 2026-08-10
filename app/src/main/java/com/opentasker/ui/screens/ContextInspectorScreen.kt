@@ -80,6 +80,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -102,6 +103,18 @@ class ContextInspectorViewModel(
     private val sourceCollectorJobs = mutableMapOf<String, Job>()
     private var refreshJob: Job? = null
     private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
+
+    /** The profile a synthetic-trigger simulation is running against; survives rotation. */
+    private val _simulationProfile = MutableStateFlow<Profile?>(null)
+    val simulationProfile: StateFlow<Profile?> = _simulationProfile.asStateFlow()
+
+    fun openSimulation(profile: Profile) {
+        _simulationProfile.value = profile
+    }
+
+    fun clearSimulation() {
+        _simulationProfile.value = null
+    }
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -242,7 +255,7 @@ fun ContextInspectorScreen(
     val snapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val lintFindings by viewModel.lintFindings.collectAsState()
-    var simulationProfile by remember { mutableStateOf<Profile?>(null) }
+    val simulationProfile by viewModel.simulationProfile.collectAsState()
 
     DisposableEffect(viewModel) {
         viewModel.startObserving()
@@ -319,7 +332,7 @@ fun ContextInspectorScreen(
                     profile = profile,
                     nowMs = snapshot.generatedAtMs,
                     lintFindings = lintFindings[profile.profileId].orEmpty(),
-                    onSimulate = { candidate -> simulationProfile = candidate },
+                    onSimulate = { candidate -> viewModel.openSimulation(candidate) },
                 )
             }
         }
@@ -328,7 +341,7 @@ fun ContextInspectorScreen(
     simulationProfile?.let { profile ->
         SyntheticTriggerSimulationDialog(
             profile = profile,
-            onDismiss = { simulationProfile = null },
+            onDismiss = { viewModel.clearSimulation() },
         )
     }
 }
