@@ -259,16 +259,24 @@ object AutomationSensitivityRegistry {
 data class ImportedProfileEnableReview(
     val risk: AutomationRiskSummary,
     val feedbackLoopRisks: List<FeedbackLoopRisk>,
+    val lintFindings: List<AutomationLintFinding> = emptyList(),
     val unsupportedActionIds: Set<String>,
     val missingTaskIds: Set<Long>,
     val requiresAcknowledgement: Boolean,
 ) {
     val canAcknowledge: Boolean
-        get() = unsupportedActionIds.isEmpty() && risk.unknownActionIds.isEmpty() && missingTaskIds.isEmpty()
+        get() = unsupportedActionIds.isEmpty() &&
+            risk.unknownActionIds.isEmpty() &&
+            missingTaskIds.isEmpty() &&
+            lintFindings.none { it.severity == AutomationLintSeverity.BLOCKING }
 }
 
 object ImportedProfileEnablePolicy {
-    fun review(profile: Profile, tasks: List<Task>): ImportedProfileEnableReview {
+    fun review(
+        profile: Profile,
+        tasks: List<Task>,
+        otherProfiles: List<Profile> = emptyList(),
+    ): ImportedProfileEnableReview {
         val reachable = AutomationSensitivityRegistry.reachableTasks(profile, tasks)
         val unsupported = reachable
             .flatMap { it.actions }
@@ -282,6 +290,7 @@ object ImportedProfileEnablePolicy {
         return ImportedProfileEnableReview(
             risk = AutomationSensitivityRegistry.summarize(profile, tasks),
             feedbackLoopRisks = AutomationFeedbackRiskAnalyzer.analyze(profile, tasks),
+            lintFindings = AutomationLint.analyze(profile.copy(enabled = true), tasks, otherProfiles).forProfile(profile.id),
             unsupportedActionIds = unsupported,
             missingTaskIds = missingTaskIds,
             requiresAcknowledgement = profile.requiresRiskAcknowledgement,

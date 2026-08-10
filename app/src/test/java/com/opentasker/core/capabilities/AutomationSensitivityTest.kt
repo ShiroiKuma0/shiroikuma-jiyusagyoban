@@ -3,6 +3,8 @@ package com.opentasker.core.capabilities
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
@@ -87,5 +89,41 @@ class AutomationSensitivityTest {
 
         assertTrue(ImportedProfileEnablePolicy.review(profile, listOf(task)).canAcknowledge)
         assertFalse(ImportedProfileEnablePolicy.review(profile.copy(enterTaskId = 99), listOf(task)).canAcknowledge)
+    }
+
+    @Test
+    fun importedProfileReviewBlocksEqualPriorityWriterConflictWithPeers() {
+        val importedTask = Task(
+            id = 1,
+            name = "Imported dim",
+            priority = 5,
+            actions = listOf(ActionSpec(type = "brightness.set")),
+        )
+        val peerTask = Task(
+            id = 2,
+            name = "Existing dim",
+            priority = 5,
+            actions = listOf(ActionSpec(type = "brightness.set")),
+        )
+        val imported = Profile(
+            id = 10,
+            name = "Imported",
+            enabled = false,
+            enterTaskId = importedTask.id,
+            contexts = listOf(ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.reader"))),
+            requiresRiskAcknowledgement = true,
+        )
+        val peer = Profile(
+            id = 11,
+            name = "Existing",
+            enabled = true,
+            enterTaskId = peerTask.id,
+            contexts = listOf(ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.reader"))),
+        )
+
+        val review = ImportedProfileEnablePolicy.review(imported, listOf(importedTask, peerTask), listOf(peer))
+
+        assertFalse(review.canAcknowledge)
+        assertTrue(review.lintFindings.any { it.code == AutomationLintCode.PRIORITY_CONFLICT })
     }
 }

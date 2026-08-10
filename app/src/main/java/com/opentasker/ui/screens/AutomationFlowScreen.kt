@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
 import com.opentasker.core.flow.AutomationFlowNode
@@ -162,7 +163,7 @@ private fun FlowOverviewCard(
 ) {
     val contextCount = profiles.sumOf { it.contexts.size }
     val actionCount = tasks.sumOf { it.actions.size }
-    val warningCount = graphs.sumOf { it.warnings.size }
+    val warningCount = graphs.sumOf { it.warnings.size + it.lintFindings.size }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -270,6 +271,27 @@ private fun FlowGraphCard(
                             warning,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+            if (graph.lintFindings.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    graph.lintFindings.forEach { finding ->
+                        Text(
+                            stringResource(
+                                R.string.automation_lint_finding,
+                                finding.title,
+                                finding.detail,
+                                finding.suggestedFix,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (finding.severity == AutomationLintSeverity.BLOCKING) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            },
                         )
                     }
                 }

@@ -711,8 +711,8 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
     resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
-    // Ratchet step: 1,033 is the current passing suite count; raise this floor with each test batch.
-    minimumTests.set(1033)
+    // Ratchet step: 1,040 is the current passing suite count; raise this floor with each test batch.
+    minimumTests.set(1040)
 }
 
 val debugCoverageXml = layout.buildDirectory.file("reports/jacoco/debugCoverage/debugCoverage.xml")
