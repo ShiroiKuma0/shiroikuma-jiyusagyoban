@@ -493,6 +493,7 @@ fun ActiveAutomationUi(
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
     val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
+    val runActionBusy by viewModel.runActionBusy.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
     }
@@ -1210,6 +1211,7 @@ fun ActiveAutomationUi(
                 onPasteTasks = viewModel::pasteTasks,
                 onDeleteTask = { openDeleteTask(it) },
                 onRunTask = { viewModel.runTaskNow(it) },
+                runBusy = runActionBusy,
                 onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
@@ -1336,6 +1338,7 @@ fun ActiveAutomationUi(
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 onReplayHeld = viewModel::replayHeldRun,
+                runBusy = runActionBusy,
                 contentPadding = innerPadding,
             )
 
