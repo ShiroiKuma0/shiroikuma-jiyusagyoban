@@ -49,8 +49,8 @@ object DiagnosticExport {
             sb.appendLine("Process exit description: ${redactSensitive(health.processExitCorrelation.description ?: "none")}")
             sb.appendLine("Process exit timestamp: ${formatTimestamp(health.processExitCorrelation.timestampMillis ?: 0L, dateFormat)}")
             sb.appendLine("Heartbeat gap: ${health.processExitCorrelation.gapMillis?.let(EngineHealthReader::ageLabel) ?: "none"}")
-            sb.appendLine("Last matcher error: ${health.lastMatcherError ?: "none"}")
-            sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason ?: "none"}")
+            sb.appendLine("Last matcher error: ${health.lastMatcherError?.let(::redactSensitive) ?: "none"}")
+            sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason?.let(::redactSensitive) ?: "none"}")
             sb.appendLine("Pending job reasons: ${health.pendingScheduledJobs.currentReasons ?: if (health.pendingScheduledJobs.currentAvailable) "none" else "unavailable"}")
             sb.appendLine("Pending job reason history: ${health.pendingScheduledJobs.history ?: if (health.pendingScheduledJobs.historyAvailable) "none" else "unavailable"}")
             sb.appendLine("Pending job duration stats: ${health.pendingScheduledJobs.aggregateStats ?: if (health.pendingScheduledJobs.aggregateStatsAvailable) "none" else "unavailable"}")
@@ -99,8 +99,8 @@ object DiagnosticExport {
             sb.appendLine("  none")
         } else {
             crashes.forEach { crash ->
-                sb.appendLine("  === ${crash.fileName} (${dateFormat.format(Date(crash.modifiedAtMillis))}) ===")
-                sb.appendLine(crash.redactedContent.take(MAX_EXPORTED_CRASH_CHARS))
+                sb.appendLine("  === ${redactSensitive(crash.fileName)} (${dateFormat.format(Date(crash.modifiedAtMillis))}) ===")
+                sb.appendLine(redactSensitive(crash.redactedContent).take(MAX_EXPORTED_CRASH_CHARS))
                 if (crash.redactedContent.length > MAX_EXPORTED_CRASH_CHARS) sb.appendLine("[export excerpt truncated]")
             }
         }
@@ -115,14 +115,17 @@ object DiagnosticExport {
                 val time = dateFormat.format(Date(entry.timestamp))
                 val status = if (entry.success) "OK" else "FAIL"
                 val source = entry.sourceLabel ?: entry.source ?: ""
-                sb.appendLine("  [$time] $status ${entry.taskName} (${entry.durationMs}ms) $source")
+                sb.appendLine(
+                    "  [$time] $status ${redactSensitive(entry.taskName)} " +
+                        "(${entry.durationMs}ms) ${redactSensitive(source)}",
+                )
                 val firstLine = entry.message.lineSequence().firstOrNull()?.take(200) ?: ""
                 if (firstLine.isNotBlank()) {
                     sb.appendLine("    ${redactSensitive(firstLine)}")
                 }
             }
         } catch (e: Exception) {
-            sb.appendLine("  (failed to read run log: ${e.message})")
+            sb.appendLine("  (failed to read run log: ${redactSensitive(e.message.orEmpty())})")
         }
         sb.appendLine()
 
@@ -138,7 +141,7 @@ object DiagnosticExport {
                 sb.appendLine("  $perm: ${if (isGranted) "granted" else "denied"}")
             }
         } catch (e: Exception) {
-            sb.appendLine("  (failed to read permissions: ${e.message})")
+            sb.appendLine("  (failed to read permissions: ${redactSensitive(e.message.orEmpty())})")
         }
         sb.appendLine()
 
@@ -147,11 +150,7 @@ object DiagnosticExport {
     }
 
     internal fun redactSensitive(text: String): String {
-        return text
-            .replace(Regex("""(?i)\bauthorization\s*:\s*[^\r\n]+"""), "Authorization: [REDACTED]")
-            .replace(Regex("""(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"""), "Bearer [REDACTED]")
-            .replace(Regex("""(?i)(password|secret|token|key|auth)\s*[:=]\s*\S+"""), "$1=[REDACTED]")
-            .replace(Regex("""\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b"""), "[REDACTED-CARD]")
+        return ExportRedactionPolicy.redactText(text)
     }
 
     private fun formatTimestamp(timestampMillis: Long, dateFormat: SimpleDateFormat): String =

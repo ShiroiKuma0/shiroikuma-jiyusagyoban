@@ -50,18 +50,18 @@ class RunLogExporter(private val dao: RunLogDao) {
     private fun RunLogEntity.toExportRow(): RunLogExportRow = RunLogExportRow(
         id = id,
         taskId = taskId,
-        taskName = DiagnosticExport.redactSensitive(taskName),
+        taskName = ExportRedactionPolicy.redactText(taskName),
         timestamp = timestamp,
         timestampIso = Instant.ofEpochMilli(timestamp).toString(),
         durationMs = durationMs,
         outcome = toDomain().outcome().name.lowercase(),
-        message = DiagnosticExport.redactSensitive(message),
-        source = source?.let(DiagnosticExport::redactSensitive),
-        sourceLabel = sourceLabel?.let(DiagnosticExport::redactSensitive),
+        message = ExportRedactionPolicy.redactText(message),
+        source = source?.let(ExportRedactionPolicy::redactText),
+        sourceLabel = sourceLabel?.let(ExportRedactionPolicy::redactText),
         executionId = executionId,
         replayOf = replayOf,
         held = held,
-        heldPolicy = heldPolicy?.let(DiagnosticExport::redactSensitive),
+        heldPolicy = heldPolicy?.let(ExportRedactionPolicy::redactText),
         starred = starred,
     )
 

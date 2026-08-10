@@ -3,6 +3,7 @@ package com.opentasker.core.engine
 import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.diagnostics.ExportRedactionPolicy
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.expressions.TemplateExpressionEngine
@@ -554,14 +555,19 @@ class TaskRunner(
         } catch (e: Exception) {
             ActionResult.Failure("threw: ${e.message}", e)
         }
-        val result = if (rawResult is ActionResult.Failure && expansionReport.hasSecretDerivedValues()) {
-            // Preserve the real error class/context for debuggability but scrub any secret-derived
-            // argument value the action echoed into its message; drop the cause because its message
-            // and stack could also embed the secret and a Throwable cannot be redacted in place.
-            // Only literal echoes of the raw argument are removed — a secret the action transformed
-            // (hashed/encoded/sliced) before failing is not detectable here, so the whole value is
-            // over-redacted rather than partially matched, which errs toward non-disclosure.
-            ActionResult.Failure(expansionReport.redactSecretDerivedValues(rawResult.message))
+        val result = if (rawResult is ActionResult.Failure) {
+            // Preserve useful failure context while applying the same field-aware policy used by
+            // exports. Drop the cause whenever an action received a sensitive value because a
+            // Throwable message/stack cannot be redacted in place.
+            val redactedMessage = expansionReport.redactSensitiveValues(rawResult.message)
+            if (expansionReport.hasSensitiveValues() || redactedMessage != rawResult.message) {
+                ActionResult.Failure(
+                    message = redactedMessage,
+                    structuredError = rawResult.structuredError,
+                )
+            } else {
+                rawResult
+            }
         } else {
             rawResult
         }
@@ -922,17 +928,25 @@ private data class ActionArgumentExpansionReport(
      * redacted placeholder, so it cannot be used for scrubbing. Longest values are replaced first so
      * a secret that contains a shorter secret as a substring is fully removed.
      */
-    fun redactSecretDerivedValues(message: String): String {
-        val secretValues = expansions
-            .filter { it.isSecretDerived }
-            .mapNotNull { args[it.argName]?.takeIf(String::isNotBlank) }
+    fun redactSensitiveValues(message: String): String {
+        val sensitiveValues = args
+            .filter { (name, _) ->
+                ActionArgumentSensitivity.isSensitive(actionType, name, args) ||
+                    expansions.any { it.argName == name && it.isSecretDerived }
+            }
+            .values
+            .mapNotNull { it.takeIf(String::isNotBlank) }
             .distinct()
             .sortedByDescending { it.length }
-        var redacted = message
-        for (value in secretValues) {
-            redacted = redacted.replace(value, REDACTED_VALUE)
-        }
-        return redacted
+        return ExportRedactionPolicy.redactText(message, sensitiveValues, REDACTED_VALUE)
+    }
+
+    /** Compatibility name retained for source-level callers; the policy now covers all fields. */
+    fun redactSecretDerivedValues(message: String): String = redactSensitiveValues(message)
+
+    fun hasSensitiveValues(): Boolean = args.keys.any { name ->
+        ActionArgumentSensitivity.isSensitive(actionType, name, args) ||
+            expansions.any { it.argName == name && it.isSecretDerived }
     }
 
     fun sensitiveArgumentNames(): Set<String> = expansions

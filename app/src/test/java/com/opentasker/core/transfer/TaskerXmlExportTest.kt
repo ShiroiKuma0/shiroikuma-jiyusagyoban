@@ -7,6 +7,7 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -93,6 +94,38 @@ class TaskerXmlExportTest {
         assertTrue(report.xml.contains("silent"))
         assertTrue(!report.xml.contains("must-not-export"))
         assertTrue(report.warnings.any { it.contains("1 secret variable") })
+    }
+
+    @Test
+    fun omitsSensitiveActionValuesAndWarnsForReentry() {
+        val report = TaskerXmlExporter.export(
+            emptyList(),
+            listOf(
+                Task(
+                    id = 1,
+                    name = "Credentials",
+                    actions = listOf(
+                        ActionSpec(
+                            type = "var.set",
+                            args = mapOf("name" to "API_TOKEN", "value" to "sentinel"),
+                        ),
+                        ActionSpec(
+                            type = "url.open",
+                            args = mapOf("url" to "https://example.test/api?token=sentinel"),
+                        ),
+                        ActionSpec(
+                            type = "log",
+                            args = mapOf("message" to "{{ global.API_TOKEN }}"),
+                        ),
+                    ),
+                ),
+            ),
+            variables = listOf(Variable("API_TOKEN", "sentinel", isGlobal = true, isSecret = true)),
+        )
+
+        assertFalse(report.xml.contains("sentinel"))
+        assertTrue(report.redactedActionFieldCount >= 3)
+        assertTrue(report.warnings.any { it.contains("must be re-entered") })
     }
 
     @Test

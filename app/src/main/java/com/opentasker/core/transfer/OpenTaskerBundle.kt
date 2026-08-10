@@ -7,6 +7,7 @@ import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.diff.AutomationSemanticDiff
 import com.opentasker.core.diff.SemanticDiffDocument
+import com.opentasker.core.diagnostics.ExportRedactionPolicy
 import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.model.Profile
@@ -193,10 +194,36 @@ object OpenTaskerBundleCodec {
     }
 
     fun encode(bundle: OpenTaskerBundle): String {
-        require(bundle.variables.none { it.isSecret }) {
+        val sanitized = sanitizeForExport(bundle)
+        require(sanitized.variables.none { it.isSecret }) {
             "Secret variable values cannot be written to an ordinary OpenTasker bundle."
         }
-        return json.encodeToString(bundle)
+        return json.encodeToString(sanitized)
+    }
+
+    /** Applies the same field-aware policy used by diagnostic and Tasker XML serialization. */
+    fun sanitizeForExport(
+        bundle: OpenTaskerBundle,
+        secretVariableNames: Set<String> = emptySet(),
+    ): OpenTaskerBundle {
+        val context = ExportRedactionPolicy.Context(secretNames = secretVariableNames)
+        var redactedFieldCount = 0
+        val tasks = bundle.tasks.map { task ->
+            task.copy(
+                actions = task.actions.map { action ->
+                    val sanitized = ExportRedactionPolicy.sanitizeActionArguments(action.type, action.args, context)
+                    redactedFieldCount += sanitized.redactedFields.size
+                    action.copy(args = sanitized.args)
+                },
+            )
+        }
+        if (redactedFieldCount == 0) return bundle.copy(tasks = tasks)
+        return bundle.copy(
+            tasks = tasks,
+            metadata = bundle.metadata.copy(
+                warnings = bundle.metadata.warnings + ExportRedactionPolicy.SENSITIVE_ACTION_WARNING,
+            ),
+        )
     }
 
     @Throws(SerializationException::class, IllegalArgumentException::class)
@@ -587,17 +614,20 @@ class OpenTaskerBundleRepository(
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
         val projects = db.projectDao().getAll().map { it.toDomain() }
 
-        return OpenTaskerBundleCodec.build(
-            appVersion = appVersion,
-            exportedAtEpochMs = exportedAtEpochMs,
-            profiles = profiles,
-            tasks = tasks,
-            variables = variableExport.variables,
-            scenes = scenes,
-            projects = projects,
-            omittedSecretVariableCount = variableExport.omittedSecretCount,
-            name = name,
-            description = description,
+        return OpenTaskerBundleCodec.sanitizeForExport(
+            OpenTaskerBundleCodec.build(
+                appVersion = appVersion,
+                exportedAtEpochMs = exportedAtEpochMs,
+                profiles = profiles,
+                tasks = tasks,
+                variables = variableExport.variables,
+                scenes = scenes,
+                projects = projects,
+                omittedSecretVariableCount = variableExport.omittedSecretCount,
+                name = name,
+                description = description,
+            ),
+            secretVariableNames = variableExport.omittedSecretNames,
         )
     }
 

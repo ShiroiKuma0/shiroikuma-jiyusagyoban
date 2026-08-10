@@ -8,6 +8,7 @@ import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.diagnostics.ExportRedactionPolicy
 
 data class TaskerXmlExportReport(
     val xml: String,
@@ -16,6 +17,7 @@ data class TaskerXmlExportReport(
     val exportedVariableCount: Int,
     val skippedActions: List<SkippedExportAction>,
     val warnings: List<String>,
+    val redactedActionFieldCount: Int = 0,
 )
 
 data class SkippedExportAction(
@@ -61,14 +63,19 @@ object TaskerXmlExporter {
     ): TaskerXmlExportReport {
         val warnings = mutableListOf<String>()
         val skipped = mutableListOf<SkippedExportAction>()
+        val redactedActionFields = mutableListOf<String>()
         val taskMap = tasks.associateBy { it.id }
+        val redactionContext = ExportRedactionPolicy.Context(
+            secretNames = variables.filter(Variable::isSecret).mapTo(linkedSetOf()) { it.name },
+            secretValues = variables.filter(Variable::isSecret).mapTo(linkedSetOf()) { it.value },
+        )
 
         val sb = StringBuilder()
         sb.appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
         sb.appendLine("""<TaskerData sr="" dvi="1" tv="6.3.13">""")
 
         tasks.forEach { task ->
-            appendTask(sb, task, skipped)
+            appendTask(sb, task, skipped, redactionContext, redactedActionFields)
         }
 
         profiles.forEach { profile ->
@@ -78,6 +85,9 @@ object TaskerXmlExporter {
         val omittedSecretCount = variables.count { it.isSecret }
         if (omittedSecretCount > 0) {
             warnings += "$omittedSecretCount secret variable(s) were omitted and must be re-entered after import."
+        }
+        if (redactedActionFields.isNotEmpty()) {
+            warnings += ExportRedactionPolicy.SENSITIVE_ACTION_WARNING
         }
         variables.filterNot { it.isSecret }.forEach { variable ->
             appendVariable(sb, variable)
@@ -92,6 +102,7 @@ object TaskerXmlExporter {
             exportedVariableCount = variables.count { !it.isSecret },
             skippedActions = skipped,
             warnings = warnings,
+            redactedActionFieldCount = redactedActionFields.size,
         )
     }
 
@@ -99,6 +110,8 @@ object TaskerXmlExporter {
         sb: StringBuilder,
         task: Task,
         skipped: MutableList<SkippedExportAction>,
+        redactionContext: ExportRedactionPolicy.Context,
+        redactedActionFields: MutableList<String>,
     ) {
         sb.appendLine("""  <Task sr="task${task.id}">""")
         sb.appendLine("    <cdate>${System.currentTimeMillis()}</cdate>")
@@ -109,7 +122,7 @@ object TaskerXmlExporter {
         task.actions.forEachIndexed { index, action ->
             val taskerCode = taskerCodeFor(action)
             if (taskerCode != null) {
-                appendAction(sb, index, taskerCode, action)
+                appendAction(sb, index, taskerCode, action, redactionContext, redactedActionFields)
             } else {
                 skipped += SkippedExportAction(
                     taskName = task.name,
@@ -122,52 +135,62 @@ object TaskerXmlExporter {
         sb.appendLine("  </Task>")
     }
 
-    private fun appendAction(sb: StringBuilder, index: Int, code: String, action: ActionSpec) {
+    private fun appendAction(
+        sb: StringBuilder,
+        index: Int,
+        code: String,
+        action: ActionSpec,
+        redactionContext: ExportRedactionPolicy.Context,
+        redactedActionFields: MutableList<String>,
+    ) {
+        val sanitized = ExportRedactionPolicy.sanitizeActionArguments(action.type, action.args, redactionContext)
+        sanitized.redactedFields.forEach { field -> redactedActionFields += "${action.type}.$field" }
+        val args = sanitized.args
         sb.appendLine("""    <Action sr="act$index" ve="7">""")
         sb.appendLine("      <code>$code</code>")
 
         when (action.type) {
             "notify.show", "notify.cancel" -> {
                 if (action.type == "notify.show") {
-                    appendStr(sb, 0, action.args["title"] ?: "Notification")
-                    appendStr(sb, 1, action.args["text"] ?: "")
+                    appendStr(sb, 0, args["title"] ?: "Notification")
+                    appendStr(sb, 1, args["text"] ?: "")
                 } else {
-                    appendStr(sb, 0, action.args["tag"] ?: "")
-                    action.args["id"]?.let { appendStr(sb, 1, it) }
+                    appendStr(sb, 0, args["tag"] ?: "")
+                    args["id"]?.let { appendStr(sb, 1, it) }
                 }
             }
             "flow.wait" -> {
-                val millis = action.args["millis"]?.toLongOrNull() ?: 1000
+                val millis = args["millis"]?.toLongOrNull() ?: 1000
                 val seconds = millis / 1000
                 val remainMs = millis % 1000
                 appendInt(sb, 0, remainMs.toString())
                 appendInt(sb, 1, seconds.toString())
             }
             "log" -> {
-                appendStr(sb, 0, action.args["message"] ?: "")
+                appendStr(sb, 0, args["message"] ?: "")
             }
             "var.set" -> {
-                appendStr(sb, 0, action.args["name"] ?: "%VAR")
-                appendStr(sb, 1, action.args["value"] ?: "")
+                appendStr(sb, 0, args["name"] ?: "%VAR")
+                appendStr(sb, 1, args["value"] ?: "")
             }
-            "tts.speak" -> appendStr(sb, 0, action.args["text"] ?: "")
-            "vibrate" -> appendInt(sb, 0, action.args["millis"] ?: "100")
+            "tts.speak" -> appendStr(sb, 0, args["text"] ?: "")
+            "vibrate" -> appendInt(sb, 0, args["millis"] ?: "100")
             "volume.set" -> {
-                val level = action.args["level"] ?: "0"
+                val level = args["level"] ?: "0"
                 if (level == "mute" || level == "unmute") appendStr(sb, 0, level) else appendInt(sb, 0, level)
             }
-            "torch.set" -> appendStr(sb, 0, action.args["state"] ?: "toggle")
-            "sound.play" -> appendStr(sb, 0, action.args["path"] ?: "")
-            "app.launch" -> appendStr(sb, 0, action.args["package"] ?: "")
-            "url.open" -> appendStr(sb, 0, action.args["url"] ?: "")
-            "flow.if" -> appendStr(sb, 0, action.args["condition"] ?: "true")
+            "torch.set" -> appendStr(sb, 0, args["state"] ?: "toggle")
+            "sound.play" -> appendStr(sb, 0, args["path"] ?: "")
+            "app.launch" -> appendStr(sb, 0, args["package"] ?: "")
+            "url.open" -> appendStr(sb, 0, args["url"] ?: "")
+            "flow.if" -> appendStr(sb, 0, args["condition"] ?: "true")
             "flow.foreach" -> {
-                appendStr(sb, 0, action.args["list"] ?: "")
-                appendStr(sb, 1, action.args["var"] ?: "item")
+                appendStr(sb, 0, args["list"] ?: "")
+                appendStr(sb, 1, args["var"] ?: "item")
             }
-            "task.run" -> appendStr(sb, 0, action.args["task"] ?: action.args["name"] ?: action.args["id"] ?: "")
-            "brightness.set" -> appendStr(sb, 0, action.args["brightness"] ?: "auto")
-            "screen.timeout" -> appendInt(sb, 0, action.args["millis"] ?: "60000")
+            "task.run" -> appendStr(sb, 0, args["task"] ?: args["name"] ?: args["id"] ?: "")
+            "brightness.set" -> appendStr(sb, 0, args["brightness"] ?: "auto")
+            "screen.timeout" -> appendInt(sb, 0, args["millis"] ?: "60000")
         }
 
         sb.appendLine("    </Action>")

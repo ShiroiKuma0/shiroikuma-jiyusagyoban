@@ -164,6 +164,7 @@ data class RuntimeVariableCommitResult(
 data class OrdinaryVariableExport(
     val variables: List<Variable>,
     val omittedSecretCount: Int,
+    val omittedSecretNames: Set<String> = emptySet(),
 )
 
 /**
@@ -273,6 +274,9 @@ class VariableRepository(
                 .filterNot(VariableEntity::isEffectivelySecret)
                 .map(::decodeForDomain),
             omittedSecretCount = entities.count(VariableEntity::isEffectivelySecret),
+            omittedSecretNames = entities
+                .filter(VariableEntity::isEffectivelySecret)
+                .mapTo(linkedSetOf(), VariableEntity::name),
         )
     }
 
