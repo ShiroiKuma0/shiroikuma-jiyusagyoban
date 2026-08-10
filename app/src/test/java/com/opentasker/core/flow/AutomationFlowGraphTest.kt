@@ -164,7 +164,7 @@ class AutomationFlowGraphTest {
             graph.accessibilitySummary(),
         )
         assertEquals(
-            "action. Step 1: notify.show. notify.show. condition if %armed = true",
+            "action. Step 1: notify.show. notify.show with the configured values. condition if %armed = true",
             actionNode.accessibilityLabel(),
         )
     }

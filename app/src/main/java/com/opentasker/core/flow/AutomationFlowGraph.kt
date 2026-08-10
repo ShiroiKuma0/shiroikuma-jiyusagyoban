@@ -265,7 +265,7 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int, strings: Aut
         id = id,
         kind = AutomationFlowNodeKind.ACTION,
         title = title,
-        detail = strings.actionDetail(subTaskRef, type, args.summaryOrNull(actionType = type), continueOnError),
+        detail = strings.actionDetail(subTaskRef, type, strings.actionSummary(type, args), continueOnError),
         target = AutomationFlowTarget.Action(taskId, index),
         condition = condition?.trim()?.takeUnless { it.isBlank() },
         isSubTask = subTaskRef != null,

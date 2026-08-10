@@ -2,6 +2,8 @@ package com.opentasker.core.flow
 
 import android.content.res.Resources
 import com.opentasker.app.R
+import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.actions.ActionSummaryFormatter
 
 /** Presentation copy for the flow graph; production UI supplies the current locale's resources. */
 interface AutomationFlowStrings {
@@ -25,6 +27,7 @@ interface AutomationFlowStrings {
     fun contextTitle(index: Int, type: String): String
     fun contextDetail(inverted: Boolean, summary: String?): String
     fun actionTitle(index: Int, subTaskRef: String?, type: String, customLabel: String?): String
+    fun actionSummary(type: String, args: Map<String, String>): String
     fun actionDetail(subTaskRef: String?, type: String, summary: String?, continuesAfterError: Boolean): String
     fun conditionalEdge(condition: String, index: Int): String
 }
@@ -69,10 +72,13 @@ private class ResourceAutomationFlowStrings(
         else -> resources.getString(R.string.flow_action_title, index, type)
     }
 
+    override fun actionSummary(type: String, args: Map<String, String>): String =
+        ActionSummaryFormatter.format(resources, type, args)
+
     override fun actionDetail(subTaskRef: String?, type: String, summary: String?, continuesAfterError: Boolean): String =
         listOfNotNull(
-            if (subTaskRef != null) resources.getString(R.string.flow_action_subtask_detail, subTaskRef) else type,
-            summary,
+            if (subTaskRef != null) resources.getString(R.string.flow_action_subtask_detail, subTaskRef) else null,
+            summary?.takeUnless(String::isBlank) ?: type,
             if (continuesAfterError) resources.getString(R.string.flow_continues_after_error) else null,
         ).joinToString(" - ")
 
@@ -107,8 +113,23 @@ private object EnglishAutomationFlowStrings : AutomationFlowStrings {
         subTaskRef != null -> "Step $index: run sub-task \"$subTaskRef\""
         else -> "Step $index: $type"
     }
+
+    override fun actionSummary(type: String, args: Map<String, String>): String {
+        val parameters = ActionArgumentSensitivity.summarize(
+            actionType = type,
+            args = args,
+            limit = ActionSummaryFormatter.MAX_ARGUMENTS,
+            maxValueLength = ActionSummaryFormatter.MAX_VALUE_LENGTH,
+        ).ifBlank { "the configured values" }
+        return "$type with $parameters"
+    }
+
     override fun actionDetail(subTaskRef: String?, type: String, summary: String?, continuesAfterError: Boolean) =
-        listOfNotNull(if (subTaskRef != null) "sub-task -> $subTaskRef" else type, summary, "continues after error".takeIf { continuesAfterError }).joinToString(" - ")
+        listOfNotNull(
+            "sub-task -> $subTaskRef".takeIf { subTaskRef != null },
+            summary?.takeUnless(String::isBlank) ?: type,
+            "continues after error".takeIf { continuesAfterError },
+        ).joinToString(" - ")
     override fun conditionalEdge(condition: String, index: Int) = condition.takeIf { it.isNotBlank() }?.let { "if $it" } ?: if (index == 0) "step 1" else "then"
 
     private fun plural(count: Int): String = if (count == 1) "" else "s"
