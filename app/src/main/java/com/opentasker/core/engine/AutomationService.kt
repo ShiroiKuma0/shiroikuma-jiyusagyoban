@@ -721,6 +721,7 @@ class AutomationService : Service() {
             // The profile's own concurrency policy, honoured per run rather than only globally.
             profileLimits = profile.toExecutionAdmissionProfileLimits(),
             overflowPolicy = profile.overflowPolicy,
+            profileFallbackTaskId = profile.fallbackTaskId,
             eventLocals = eventVars,
         )
         if (result.logInserted) {
