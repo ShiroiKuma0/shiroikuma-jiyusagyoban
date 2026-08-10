@@ -4,6 +4,7 @@ import android.content.Context
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
@@ -39,17 +40,27 @@ suspend fun executeAndLogTask(
     logTag: String = TAG,
     admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
     profileId: Long? = null,
+    /** The profile's own active/burst overrides, when it sets any; null falls back to the global limits. */
+    profileLimits: ExecutionAdmissionProfileLimits? = null,
+    /** Whether a rejected run leaves a visible run-log entry (LOG) or is dropped quietly (SILENT). */
+    overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
-    val admission = admissionController.tryAcquire(profileId)
+    val admission = admissionController.tryAcquire(profileId, profileLimits)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
-        val inserted = logSkippedRun(
-            db = db,
-            task = task,
-            source = source,
-            reason = reason,
-            metadata = metadata,
-        )
+        // SILENT is for a profile that is *expected* to overflow — a fast pulse whose rejected runs
+        // are noise rather than news. It suppresses the row, not the rejection itself.
+        val inserted = if (overflowPolicy == ProfileOverflowPolicy.SILENT) {
+            false
+        } else {
+            logSkippedRun(
+                db = db,
+                task = task,
+                source = source,
+                reason = reason,
+                metadata = metadata,
+            )
+        }
         return@withContext TaskExecutionResult(
             report = collisionSkippedReport(task, reason),
             logInserted = inserted,
