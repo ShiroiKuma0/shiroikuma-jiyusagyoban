@@ -763,6 +763,8 @@
     <string name="workspace_task_has_no_actions">Task has no actions</string>
     <string name="workspace_task_has_no_actions_body">Add at least one action before attaching this task to an enabled profile.</string>
     <string name="workspace_no_arguments">No arguments</string>
+    <string name="action_parameter_summary">%1$s with %2$s</string>
+    <string name="action_summary_default_parameters">the configured values</string>
     <string name="workspace_no_matching_profiles">No matching profiles</string>
     <string name="workspace_no_matching_profiles_body">Clear search or switch groups to see more automations.</string>
     <string name="workspace_no_matching_tasks">No matching tasks</string>

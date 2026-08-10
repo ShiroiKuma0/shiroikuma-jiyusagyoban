@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -37,7 +38,7 @@ class ActionSummarySourceGuardTest {
         // `args`/`config` map rendered straight into a string: joinToString over its entries, or a
         // "$key=$value" interpolation of an entry destructuring.
         val rawJoins = Regex(
-            """(args|config)\s*\.\s*(entries\s*\.\s*)?(joinToString|map\s*\{[^}]*\$\{?it\.value)""",
+            """(args|config|expandedArguments)\s*\.\s*(entries\s*\.\s*)?(joinToString|map\s*\{[^}]*\$\{?it\.value)""",
         )
         val offenders = kotlinFiles()
             .filter { it.fileName.toString() !in allowlist }
@@ -62,5 +63,40 @@ class ActionSummarySourceGuardTest {
             "Duplicate redaction placeholder literal in $offenders — use ActionArgumentSensitivity.REDACTED",
             offenders.isEmpty(),
         )
+    }
+
+    @Test
+    fun everyBuiltInActionHasAResourceBackedSummaryDeclaration() {
+        val metadata = mainSourceRoot
+            .resolve("com/opentasker/core/actions/ActionMetadata.kt")
+            .readText()
+        val actionIds = Regex("""(?m)^\s*id = \"([^\"]+)\"""")
+            .findAll(metadata)
+            .map { it.groupValues[1] }
+            .toList()
+        val declaration = metadata
+            .substringAfter("private fun declaredActionSummaryRes")
+            .substringBefore("else -> error")
+
+        assertEquals("Built-in action IDs must be unique", actionIds.size, actionIds.toSet().size)
+        val missing = actionIds.filterNot { id -> "\"$id\"" in declaration }
+        assertTrue("Action summary declarations are missing for $missing", missing.isEmpty())
+        assertTrue("Summary declarations must resolve a string resource", "R.string.action_parameter_summary" in declaration)
+        assertTrue("Action metadata must retain the resolved summary resource", "summaryRes = summaryRes" in metadata)
+    }
+
+    @Test
+    fun everyActionPreviewSurfaceUsesTheSharedSummaryFormatter() {
+        val requiredCalls = mapOf(
+            "com/opentasker/ui/screens/ActiveAutomationLists.kt" to "ActionSummaryFormatter.format",
+            "com/opentasker/ui/screens/PreflightReviewDialog.kt" to "ActionSummaryFormatter.format",
+            "com/opentasker/core/flow/AutomationFlowStrings.kt" to "ActionSummaryFormatter.format",
+            "com/opentasker/core/flow/AutomationFlowGraph.kt" to "strings.actionSummary",
+        )
+        val missing = requiredCalls.filter { (relativePath, call) ->
+            !mainSourceRoot.resolve(relativePath).readText().contains(call)
+        }.keys
+
+        assertTrue("Action preview surfaces bypass the shared formatter: $missing", missing.isEmpty())
     }
 }

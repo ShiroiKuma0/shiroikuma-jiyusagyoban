@@ -64,6 +64,7 @@ data class ActionMetadata(
     val fields: List<ActionField> = emptyList(),
     val pickerVisible: Boolean = true,
     val outputs: List<ActionOutputDefinition> = emptyList(),
+    @get:StringRes val summaryRes: Int? = null,
 )
 
 /**
@@ -73,8 +74,10 @@ object ActionMetadataRegistry {
     private val byId = mutableMapOf<String, ActionMetadata>()
 
     fun register(metadata: ActionMetadata) {
+        val summaryRes = metadata.summaryRes ?: declaredActionSummaryRes(metadata.id)
         byId[metadata.id] = metadata.copy(
             outputs = metadata.outputs.ifEmpty { declaredActionOutputs(metadata.id) },
+            summaryRes = summaryRes,
         )
     }
 
@@ -84,6 +87,99 @@ object ActionMetadataRegistry {
 
     fun byCategory(@StringRes categoryRes: Int): List<ActionMetadata> =
         byId.values.filter { it.categoryRes == categoryRes }
+}
+
+/**
+ * Completeness declaration for built-in action summaries. Keep this exhaustive so adding a new
+ * metadata registration without a summary fails at startup and in the source guard test.
+ */
+private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
+    "notify.show",
+    "notify.progress",
+    "notify.cancel",
+    "var.set",
+    "var.persist",
+    "data.read",
+    "datetime.format",
+    "datetime.parse",
+    "datetime.add",
+    "text.match",
+    "text.replace",
+    "text.split",
+    "text.join",
+    "text.substring",
+    "tts.speak",
+    "flow.wait",
+    "task.run",
+    "flow.if",
+    "flow.else",
+    "flow.endif",
+    "flow.foreach",
+    "flow.endfor",
+    "flow.stop",
+    "intent.launch",
+    "plugin.locale.fire",
+    "plugin.locale.query",
+    "script.termux.run",
+    "tasker.unsupported",
+    "wifi.toggle",
+    "bluetooth.toggle",
+    "brightness.set",
+    "volume.set",
+    "airplane.toggle",
+    "mobile.toggle",
+    "screen.timeout",
+    "dnd.set",
+    "ringer.set",
+    "torch.set",
+    "tile.set",
+    "app.launch",
+    "app.kill",
+    "home.go",
+    "url.open",
+    "sms.send",
+    "screenshot.take",
+    "file.read",
+    "file.write",
+    "file.append",
+    "file.delete",
+    "file.list",
+    "http.request",
+    "zen.rule.set",
+    "zen.rule.clear",
+    "app.archive",
+    "app.unarchive",
+    "shortcut.publish",
+    "flow.try",
+    "flow.catch",
+    "flow.endtry",
+    "state.temporary",
+    "ime.info",
+    "ime.set",
+    "clipboard.get",
+    "clipboard.set",
+    "contacts.lookup",
+    "integration.home_assistant.webhook",
+    "mqtt.publish",
+    "http.get",
+    "http.post",
+    "ping",
+    "download",
+    "wol",
+    "sound.play",
+    "sound.stop",
+    "sound.pause",
+    "track.next",
+    "track.previous",
+    "media.mute",
+    "vibrate",
+    "reboot",
+    "lock",
+    "screen.off",
+    "wake",
+    "log",
+    -> R.string.action_parameter_summary
+    else -> error("No action summary resource declared for $actionId")
 }
 
 private fun option(value: String, @StringRes labelRes: Int) = ActionFieldOption(value, labelRes)

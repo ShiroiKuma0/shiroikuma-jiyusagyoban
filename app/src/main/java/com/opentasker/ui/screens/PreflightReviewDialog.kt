@@ -22,9 +22,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.actions.ActionSummaryFormatter
 import com.opentasker.core.engine.PreflightReport
 import com.opentasker.core.engine.PreflightStep
 import com.opentasker.core.engine.PreflightStepStatus
@@ -144,6 +146,8 @@ internal fun PreflightReviewDialog(
 
 @Composable
 private fun PreflightStepCard(step: PreflightStep) {
+    val resources = LocalContext.current.resources
+    val actionSummary = ActionSummaryFormatter.format(resources, step.actionType, step.expandedArguments)
     val status = when (step.status) {
         PreflightStepStatus.SIMULATED -> stringResource(R.string.preflight_status_simulated)
         PreflightStepStatus.SKIPPED -> stringResource(R.string.preflight_status_skipped)
@@ -165,14 +169,7 @@ private fun PreflightStepCard(step: PreflightStep) {
                 style = MaterialTheme.typography.labelLarge,
             )
             Text(stringResource(R.string.preflight_effect, step.intendedEffect))
-            if (step.expandedArguments.isNotEmpty()) {
-                Text(
-                    stringResource(
-                        R.string.preflight_arguments,
-                        step.expandedArguments.entries.joinToString { (key, value) -> "$key=$value" },
-                    ),
-                )
-            }
+            Text(actionSummary)
             step.branchDecision?.let { Text(stringResource(R.string.preflight_branch, it)) }
             step.warnings.forEach { warning ->
                 Text(stringResource(R.string.preflight_warning_item, warning), color = MaterialTheme.colorScheme.error)

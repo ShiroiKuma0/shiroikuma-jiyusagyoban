@@ -47,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,8 +58,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
-import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.ActionSummaryFormatter
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.contexts.contextConfigSummary
@@ -875,6 +876,7 @@ private fun ActionRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val resources = LocalContext.current.resources
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
     val metadataName = metadata?.let { stringResource(it.nameRes) }
@@ -898,7 +900,7 @@ private fun ActionRow(
             Column(Modifier.weight(1f)) {
                 Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    ActionArgumentSensitivity.summarize(action.type, action.args)
+                    ActionSummaryFormatter.format(resources, action.type, action.args)
                         .ifBlank { metadataDescription ?: stringResource(R.string.workspace_no_arguments) },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
