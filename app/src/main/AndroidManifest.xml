@@ -415,12 +415,32 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.opentasker.core.plugins.locale.LocaleConditionEditActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/locale_condition_edit_title"
+            android:theme="@style/Theme.OpenTasker">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_CONDITION" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name="com.opentasker.core.plugins.locale.LocaleSettingFireReceiver"
             android:exported="true"
             android:intentMatchingFlags="enforceIntentFilter">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver"
+            android:exported="true"
+            android:intentMatchingFlags="enforceIntentFilter">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.QUERY_CONDITION" />
             </intent-filter>
         </receiver>
     </application>

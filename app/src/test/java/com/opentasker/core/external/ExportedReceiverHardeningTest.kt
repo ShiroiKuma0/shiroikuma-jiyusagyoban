@@ -16,6 +16,7 @@ class ExportedReceiverHardeningTest {
     private val hardenedReceivers = setOf(
         "com.opentasker.core.external.AutomationTargetReceiver",
         "com.opentasker.core.plugins.locale.LocaleSettingFireReceiver",
+        "com.opentasker.core.plugins.locale.LocaleConditionQueryReceiver",
     )
 
     private fun manifestRoot(): Element =

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 
 /**
@@ -107,11 +108,15 @@ internal class ProfileMatcher(
                         pulseSequence = pulseObservation?.sequence ?: 0L,
                         event = if (isPulseContext && effectiveMatched) preparedEvent else null,
                     )
+                }.onEach { update ->
+                    AutomationLiveConditionState.updateContext(profile.id, index, update.matched)
                 }
             } else {
                 AppLogger.warn(tag, "No context source registered for ${spec.type}; treating as non-matching")
                 if (spec.type == ContextType.EVENT) markPulseContextSubscribed(index, pulseContextCount)
-                flowOf(ContextMatchUpdate.initial(spec.type == ContextType.EVENT))
+                flowOf(ContextMatchUpdate.initial(spec.type == ContextType.EVENT)).onEach { update ->
+                    AutomationLiveConditionState.updateContext(profile.id, index, update.matched)
+                }
             }
         }
 

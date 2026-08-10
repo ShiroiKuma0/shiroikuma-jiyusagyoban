@@ -41,6 +41,8 @@ object LocalePluginContract {
     const val RESULT_CONDITION_UNSATISFIED = 17
     const val RESULT_CONDITION_UNKNOWN = 18
     const val MAX_BUNDLE_JSON_BYTES = 16 * 1024
+    const val MAX_BUNDLE_ENTRIES = 128
+    const val MAX_BUNDLE_KEY_BYTES = 256
 }
 
 data class LocalePluginRequest(
@@ -159,8 +161,14 @@ object LocalePluginBundleCodec {
         }
         val element = Json.parseToJsonElement(trimmed)
         val obj = element as? JsonObject ?: error("Plugin bundle must be a JSON object.")
+        require(obj.size <= LocalePluginContract.MAX_BUNDLE_ENTRIES) {
+            "Plugin bundle contains too many entries."
+        }
         return obj.entries.associate { (key, value) ->
             require(key.isNotBlank()) { "Plugin bundle keys must not be blank." }
+            require(key.toByteArray(Charsets.UTF_8).size <= LocalePluginContract.MAX_BUNDLE_KEY_BYTES) {
+                "Plugin bundle key is too large."
+            }
             val primitive = value as? JsonPrimitive ?: error("Plugin bundle values must be primitive strings, numbers, or booleans.")
             val stringValue = primitive.contentOrNull
                 ?: primitive.booleanOrNull?.toString()
@@ -168,12 +176,15 @@ object LocalePluginBundleCodec {
                 ?: primitive.intOrNull?.toString()
                 ?: primitive.doubleOrNull?.toString()
                 ?: error("Plugin bundle values must not be null.")
+            require(stringValue.toByteArray(Charsets.UTF_8).size <= LocalePluginContract.MAX_BUNDLE_JSON_BYTES) {
+                "Plugin bundle value is too large."
+            }
             key to stringValue
         }
     }
 
     fun toBundle(values: Map<String, String>): Bundle = Bundle().apply {
-        values.entries.sortedBy { it.key }.forEach { (key, value) ->
+        sanitizeBundleValues(values).entries.sortedBy { it.key }.forEach { (key, value) ->
             putString(key, value)
         }
     }
@@ -191,9 +202,15 @@ object LocalePluginBundleCodec {
             bundle.keySet().associateWith { key -> bundle.get(key) }
         )
 
-    fun sanitizeBundleValues(values: Map<String, Any?>): Map<String, String> =
-        values.entries.associate { (key, value) ->
+    fun sanitizeBundleValues(values: Map<String, Any?>): Map<String, String> {
+        require(values.size <= LocalePluginContract.MAX_BUNDLE_ENTRIES) {
+            "Plugin bundle contains too many entries."
+        }
+        val sanitized = values.entries.associate { (key, value) ->
             require(key.isNotBlank()) { "Plugin bundle keys must not be blank." }
+            require(key.toByteArray(Charsets.UTF_8).size <= LocalePluginContract.MAX_BUNDLE_KEY_BYTES) {
+                "Plugin bundle key is too large."
+            }
             val stringValue = when (value) {
                 is String -> value
                 is Boolean -> value.toString()
@@ -206,8 +223,16 @@ object LocalePluginBundleCodec {
                 null -> error("Plugin bundle values must not be null.")
                 else -> error("Plugin bundle values must be primitive strings, numbers, or booleans.")
             }
+            require(stringValue.toByteArray(Charsets.UTF_8).size <= LocalePluginContract.MAX_BUNDLE_JSON_BYTES) {
+                "Plugin bundle value is too large."
+            }
             key to stringValue
         }
+        require(encodeStringBundle(sanitized).toByteArray(Charsets.UTF_8).size <= LocalePluginContract.MAX_BUNDLE_JSON_BYTES) {
+            "Plugin bundle JSON exceeds ${LocalePluginContract.MAX_BUNDLE_JSON_BYTES} bytes."
+        }
+        return sanitized
+    }
 }
 
 object LocalePluginConditionResultParser {
