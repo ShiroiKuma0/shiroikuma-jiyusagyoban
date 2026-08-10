@@ -33,7 +33,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 2
-private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS = 1..OPEN_TASKER_BUNDLE_SCHEMA_VERSION
+
+/**
+ * Oldest bundle schema still importable. Published in `tools/release-truth.json` and documented in
+ * `docs/OPEN_JSON_BUNDLE.md`; the release gate fails when the three disagree, so dropping support
+ * for a version cannot happen silently.
+ */
+const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 1
+private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS =
+    MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION..OPEN_TASKER_BUNDLE_SCHEMA_VERSION
 private fun projectVariableKey(projectId: Long, name: String): String = "$projectId:$name"
 
 @Serializable

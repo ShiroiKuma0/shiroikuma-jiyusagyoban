@@ -137,6 +137,21 @@ class ReleaseTruthContractTest {
                 .find(database)?.groupValues?.get(1),
             jsonValue(truth, "roomSchemaVersion"),
         )
+        // The bundle compatibility promise lives in three places - the codec, the generated release
+        // truth, and the published format document. A codec change that moves the accepted range
+        // has to move all three.
+        val minimumBundleSchema = Regex("(?m)^\\s*const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)")
+            .find(bundle)?.groupValues?.get(1)
+        val currentBundleSchema = jsonValue(truth, "bundleSchemaVersion")
+        assertEquals(
+            "$minimumBundleSchema..$currentBundleSchema",
+            jsonValue(truth, "bundleSupportedSchemaVersions"),
+        )
+        assertTrue(
+            "docs/OPEN_JSON_BUNDLE.md must publish the same supported import range",
+            read("docs/OPEN_JSON_BUNDLE.md")
+                .contains("Supported for import: `$minimumBundleSchema..$currentBundleSchema`"),
+        )
         assertEquals(
             Regex("(?m)^\\s*define\\(\\\"").findAll(actionCatalog).count().toString(),
             jsonValue(truth, "registeredActions"),

@@ -74,6 +74,7 @@ $truth = [ordered]@{
         contextFamilies = ([regex]::Match($ContextSpec, '(?s)enum class ContextType\s*\{(.*?)\}')).Groups[1].Value.Split("`n") |
             Where-Object { $_ -match '^\s+[A-Z][A-Z_]+\s*(,|//)' } | Measure-Object | Select-Object -ExpandProperty Count
         bundleSchemaVersion = [int](Match-Value $Bundle 'const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\s*=\s*(\d+)' "bundle schema version")
+        bundleSupportedSchemaVersions = "{0}..{1}" -f (Match-Value $Bundle 'const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION\s*=\s*(\d+)' "minimum supported bundle schema version"), (Match-Value $Bundle 'const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\s*=\s*(\d+)' "bundle schema version")
         roomSchemaVersion = [int](Match-Value $AppDatabase 'const val OPEN_TASKER_DATABASE_SCHEMA_VERSION\s*=\s*(\d+)' "Room schema version")
     }
 }

@@ -1,0 +1,148 @@
+{
+    "schemaVersion": 2,
+    "appVersion": "0.2.74",
+    "exportedAtEpochMs": 1722470400000,
+    "metadata": {
+        "name": "Schema 1 golden workspace",
+        "description": "Exercises every top-level bundle collection and reference type.",
+        "capabilityRequirements": [
+            {
+                "actionId": "notify.show",
+                "level": "RequiresSetup",
+                "reason": "Requires notification permission on Android 13+."
+            }
+        ],
+        "powerRequests": [
+            {
+                "taskId": 10,
+                "taskName": "Parent",
+                "profileNames": [
+                    "Golden profile"
+                ],
+                "powers": [
+                    "DEVICE_CONTROL"
+                ],
+                "actionIds": [
+                    "notify.show"
+                ],
+                "dataToExternalChains": [],
+                "unknownActionIds": []
+            }
+        ],
+        "warnings": [
+            "Legacy fixture warning",
+            "Migrated bundle schema 1 to 2; action capability and power manifests were recomputed."
+        ]
+    },
+    "projects": [
+        {
+            "id": 1,
+            "name": "Default",
+            "position": 0
+        }
+    ],
+    "tasks": [
+        {
+            "id": 10,
+            "name": "Parent",
+            "priority": 5,
+            "collisionMode": "ABORT_NEW",
+            "actions": [
+                {
+                    "id": 0,
+                    "type": "task.run",
+                    "args": {
+                        "id": "20"
+                    },
+                    "continueOnError": false
+                },
+                {
+                    "id": 0,
+                    "type": "notify.show",
+                    "args": {
+                        "title": "Done",
+                        "button1_label": "Open",
+                        "button1_task_id": "20"
+                    },
+                    "continueOnError": false
+                }
+            ],
+            "projectId": 1
+        },
+        {
+            "id": 20,
+            "name": "Child",
+            "priority": 5,
+            "collisionMode": "ABORT_NEW",
+            "actions": [
+                {
+                    "id": 0,
+                    "type": "log",
+                    "args": {
+                        "message": "schema one"
+                    },
+                    "continueOnError": false
+                }
+            ],
+            "projectId": 1
+        }
+    ],
+    "profiles": [
+        {
+            "id": 30,
+            "name": "Golden profile",
+            "enabled": true,
+            "contexts": [
+                {
+                    "type": "EVENT",
+                    "config": {
+                        "event": "manual"
+                    },
+                    "invert": false
+                }
+            ],
+            "enterTaskId": 10,
+            "exitTaskId": 20,
+            "cooldownSec": 0,
+            "automationMode": "SINGLE",
+            "requiresRiskAcknowledgement": false,
+            "projectId": 1,
+            "priority": 0,
+            "gracePeriodSec": 0,
+            "lifetime": "NEVER",
+            "lifetimeConsumed": false,
+            "overflowPolicy": "LOG"
+        }
+    ],
+    "variables": [
+        {
+            "name": "COUNT",
+            "value": "7",
+            "isGlobal": true,
+            "isSecret": false,
+            "projectId": 1
+        }
+    ],
+    "scenes": [
+        {
+            "id": 40,
+            "name": "Golden scene",
+            "widthDp": 240,
+            "heightDp": 160,
+            "elements": [
+                {
+                    "id": 41,
+                    "type": "BUTTON",
+                    "xDp": 8,
+                    "yDp": 10,
+                    "widthDp": 96,
+                    "heightDp": 48,
+                    "config": {},
+                    "tapTaskId": 10,
+                    "longPressTaskId": 20
+                }
+            ],
+            "projectId": 1
+        }
+    ]
+}

@@ -25,6 +25,7 @@
     "engineHandledActions": 10,
     "contextFamilies": 7,
     "bundleSchemaVersion": 2,
+    "bundleSupportedSchemaVersions": "1..2",
     "roomSchemaVersion": 15
   }
 }

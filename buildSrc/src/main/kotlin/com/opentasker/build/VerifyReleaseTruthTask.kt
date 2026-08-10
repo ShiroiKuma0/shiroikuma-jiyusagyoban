@@ -84,6 +84,7 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
             "engineHandledActions",
             "contextFamilies",
             "bundleSchemaVersion",
+            "bundleSupportedSchemaVersions",
             "roomSchemaVersion",
         )
         check(truth.keys == expectedKeys) {
@@ -142,6 +143,20 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
                 Regex("(?m)^\\s*const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
                 "bundle schema version",
             ),
+            // The accepted range is a compatibility promise to anything that writes a bundle, so the
+            // gate owns the whole range and not just the current version.
+            "bundleSupportedSchemaVersions" to listOf(
+                sourceValue(
+                    bundle,
+                    Regex("(?m)^\\s*const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
+                    "minimum supported bundle schema version",
+                ),
+                sourceValue(
+                    bundle,
+                    Regex("(?m)^\\s*const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
+                    "bundle schema version",
+                ),
+            ).joinToString(".."),
             "roomSchemaVersion" to sourceValue(
                 database,
                 Regex("(?m)^const val OPEN_TASKER_DATABASE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
