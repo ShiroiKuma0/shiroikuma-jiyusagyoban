@@ -35,7 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -213,6 +215,7 @@ fun ContextInspectorScreen(
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
     val snapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
+    var simulationProfile by remember { mutableStateOf<Profile?>(null) }
 
     DisposableEffect(viewModel) {
         viewModel.startObserving()
@@ -285,9 +288,20 @@ fun ContextInspectorScreen(
             }
         } else {
             items(snapshot.profiles, key = { it.profileId }) { profile ->
-                ProfileInspectorCard(profile = profile, nowMs = snapshot.generatedAtMs)
+                ProfileInspectorCard(
+                    profile = profile,
+                    nowMs = snapshot.generatedAtMs,
+                    onSimulate = { candidate -> simulationProfile = candidate },
+                )
             }
         }
+    }
+
+    simulationProfile?.let { profile ->
+        SyntheticTriggerSimulationDialog(
+            profile = profile,
+            onDismiss = { simulationProfile = null },
+        )
     }
 }
 
@@ -402,7 +416,11 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
 }
 
 @Composable
-private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
+private fun ProfileInspectorCard(
+    profile: ProfileInspection,
+    nowMs: Long,
+    onSimulate: (Profile) -> Unit,
+) {
     val color = when {
         !profile.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         profile.matching -> MaterialTheme.colorScheme.tertiary
@@ -457,6 +475,14 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
             } else {
                 profile.contexts.forEach { check ->
                     ContextCheckRow(check = check, nowMs = nowMs)
+                }
+            }
+            profile.profile?.let { candidate ->
+                OutlinedButton(
+                    onClick = { onSimulate(candidate) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.inspector_simulate_trigger))
                 }
             }
         }

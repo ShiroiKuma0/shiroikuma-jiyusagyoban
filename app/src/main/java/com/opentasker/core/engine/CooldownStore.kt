@@ -10,6 +10,10 @@ class CooldownStore(context: Context) {
     fun get(profileId: Long): Long =
         prefs.getLong(key(profileId), 0L)
 
+    /** Returns the persisted cooldown time left without pruning or writing preferences. */
+    fun remaining(profileId: Long, nowMs: Long = System.currentTimeMillis()): Long =
+        (get(profileId) - nowMs).coerceAtLeast(0L)
+
     fun set(profileId: Long, deadlineMs: Long) {
         prefs.edit().putLong(key(profileId), deadlineMs).apply()
     }

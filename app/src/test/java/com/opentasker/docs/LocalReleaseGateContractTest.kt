@@ -62,7 +62,7 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("resolutionResult.allComponents"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("minimumTests.set(1025)"))
+        assertTrue(build.contains("minimumTests.set(1033)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
 }

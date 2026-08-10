@@ -4,6 +4,11 @@ import com.opentasker.core.model.Task
 import java.util.UUID
 
 /** Stable producer identity for every way a task can enter the execution engine. */
+enum class ExecutionMode {
+    PRODUCTION,
+    SIMULATION,
+}
+
 enum class ExecutionProducer(val wireValue: String) {
     PROFILE("profile"),
     MANUAL("manual"),
@@ -93,6 +98,7 @@ data class ExecutionEnvelope(
     val causalDepth: Int = 0,
     val causalProfileChain: List<String> = emptyList(),
     val createdAtMs: Long,
+    val mode: ExecutionMode = ExecutionMode.PRODUCTION,
 ) {
     init {
         require(isValidExecutionId(executionId)) { "Invalid execution id." }
@@ -128,6 +134,7 @@ data class ExecutionEnvelope(
             causalProfileChain: List<String> = emptyList(),
             executionId: String = UUID.randomUUID().toString(),
             nowMs: Long = System.currentTimeMillis(),
+            mode: ExecutionMode = ExecutionMode.PRODUCTION,
         ): ExecutionEnvelope = ExecutionEnvelope(
             executionId = executionId,
             producer = ExecutionProducer.fromSource(source),
@@ -140,6 +147,7 @@ data class ExecutionEnvelope(
             causalDepth = causalDepth,
             causalProfileChain = causalProfileChain,
             createdAtMs = nowMs,
+            mode = mode,
         )
 
         fun isValidExecutionId(value: String?): Boolean = value != null && idPattern.matches(value.trim())
@@ -152,6 +160,14 @@ data class ExecutionEnvelope(
         executionId = UUID.randomUUID().toString(),
         replayOf = executionId,
         createdAtMs = nowMs,
+        mode = ExecutionMode.PRODUCTION,
+    )
+
+    /** Creates an editor-only envelope for diagnostics. */
+    fun forSimulation(nowMs: Long = System.currentTimeMillis()): ExecutionEnvelope = copy(
+        executionId = UUID.randomUUID().toString(),
+        createdAtMs = nowMs,
+        mode = ExecutionMode.SIMULATION,
     )
 }
 

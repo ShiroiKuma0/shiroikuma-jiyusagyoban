@@ -119,4 +119,29 @@ class ExecutionAdmissionControllerTest {
         assertTrue(afterWindow.accepted)
         afterWindow.lease?.release()
     }
+
+    @Test
+    fun previewDoesNotReserveLeaseOrRecordBurst() {
+        val controller = ExecutionAdmissionController(limits())
+        val before = controller.snapshot()
+
+        val preview = controller.preview(profileId = 7L)
+
+        assertTrue(preview.accepted)
+        assertEquals(before, controller.snapshot())
+        assertEquals(null, preview.lease)
+    }
+
+    @Test
+    fun previewReportsAnActiveProfileLimitWithoutChangingIt() {
+        val controller = ExecutionAdmissionController(limits())
+        val lease = controller.tryAcquire(profileId = 7L).lease
+        assertNotNull(lease)
+
+        val preview = controller.preview(profileId = 7L)
+
+        assertFalse(preview.accepted)
+        assertTrue(preview.reason.orEmpty().contains("Profile execution limit"))
+        lease?.release()
+    }
 }

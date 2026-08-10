@@ -184,8 +184,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 
@@ -209,7 +207,6 @@ private enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
     RunLog(R.string.nav_run_log),
     Diagnostics(R.string.nav_diagnostics),
 }
-
 private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Profiles,
     OpenTaskerScreen.Tasks,
@@ -293,6 +290,7 @@ fun ActiveAutomationUi(
     var showCreateTaskDialog by rememberSaveable { mutableStateOf(false) }
     var profileDialogId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var showCreateProfileDialog by rememberSaveable { mutableStateOf(false) }
+    var simulationProfile by remember { mutableStateOf<Profile?>(null) }
     var showTemplateDialog by rememberSaveable { mutableStateOf(false) }
     var showBundleTextImportDialog by rememberSaveable { mutableStateOf(false) }
     var bundleTextImportDraft by rememberSaveable { mutableStateOf("") }
@@ -440,6 +438,10 @@ fun ActiveAutomationUi(
     }
     fun clearProfileDialog() {
         profileDialogId = NO_DIALOG_ENTITY_ID
+    }
+    fun openSimulation(profile: Profile) { simulationProfile = profile }
+    fun clearSimulation() {
+        simulationProfile = null
     }
     fun openActionPicker(task: Task) {
         actionPickerTaskId = task.id
@@ -1195,6 +1197,17 @@ fun ActiveAutomationUi(
                 )
                 clearProfileDialog()
             },
+            onSimulate = { selectedProfile ->
+                clearProfileDialog()
+                openSimulation(selectedProfile)
+            },
+        )
+    }
+
+    simulationProfile?.let { profile ->
+        SyntheticTriggerSimulationDialog(
+            profile = profile,
+            onDismiss = { clearSimulation() },
         )
     }
 
@@ -1238,6 +1251,23 @@ fun ActiveAutomationUi(
         ContextConfigDialog(
             state = state,
             onDismiss = { clearContextEdit() },
+            onSimulate = { context ->
+                val updatedContexts = state.index?.let { index ->
+                    state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
+                } ?: (state.profile.contexts + context)
+                val updatedExpression = if (state.index == null) {
+                    state.profile.contextExpression?.appendLeaf(updatedContexts.lastIndex)
+                } else {
+                    state.profile.contextExpression
+                }
+                clearContextEdit()
+                openSimulation(
+                    state.profile.copy(
+                        contexts = updatedContexts,
+                        contextExpression = updatedExpression,
+                    ),
+                )
+            },
             onSave = { context ->
                 val updatedContexts = state.index?.let { index ->
                     state.profile.contexts.mapIndexed { i, existing -> if (i == index) context else existing }
@@ -1461,39 +1491,4 @@ internal fun InlineNotice(title: String, body: String, color: Color) {
             }
         }
     }
-}
-
-@Composable
-private fun RunLogRetentionPreviewDialog(
-    preview: RunLogRetentionPreview,
-    onDismiss: () -> Unit,
-    onExportJson: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val oldest = preview.oldestTimestamp?.let { timestamp ->
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
-    } ?: stringResource(R.string.label_none)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.run_log_retention_preview_title)) },
-        text = {
-            Text(
-                stringResource(
-                    R.string.run_log_retention_preview_body,
-                    preview.storedCount,
-                    oldest,
-                    preview.prunableCount,
-                ),
-            )
-        },
-        confirmButton = {
-            Button(onClick = onConfirm) { Text(stringResource(R.string.run_log_retention_confirm)) }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onExportJson) { Text(stringResource(R.string.run_log_export_before_pruning)) }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            }
-        },
-    )
 }
