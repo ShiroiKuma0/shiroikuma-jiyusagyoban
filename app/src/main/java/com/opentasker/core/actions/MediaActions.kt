@@ -9,6 +9,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AudioUsageEligibility
@@ -23,6 +24,7 @@ import com.opentasker.core.platform.AudioUsageEligibility
 class PlaySoundAction : Action {
     override val id = "sound.play"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -64,6 +66,7 @@ class PlaySoundAction : Action {
 class StopSoundAction : Action {
     override val id = "sound.stop"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Stop playback")
@@ -77,6 +80,7 @@ class StopSoundAction : Action {
 class PauseSoundAction : Action {
     override val id = "sound.pause"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Pause playback")
@@ -90,6 +94,7 @@ class PauseSoundAction : Action {
 class NextTrackAction : Action {
     override val id = "track.next"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Next track")
@@ -103,6 +108,7 @@ class NextTrackAction : Action {
 class PreviousTrackAction : Action {
     override val id = "track.previous"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Previous track")
@@ -119,6 +125,7 @@ class PreviousTrackAction : Action {
 class MuteAction : Action {
     override val id = "media.mute"
     override val category = ActionCategory.MEDIA
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val stream = args["stream"] ?: "music"

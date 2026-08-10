@@ -49,6 +49,9 @@ interface Action {
     val category: ActionCategory
     /** Whether the engine may repeat this action after a transient failure. */
     val retrySafety: ActionRetrySafety get() = ActionRetrySafety.NEVER
+
+    /** Allows an action whose safety depends on its arguments to refine its classification. */
+    fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety = retrySafety
     suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult
 }
 

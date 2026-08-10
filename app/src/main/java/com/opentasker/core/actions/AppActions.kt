@@ -10,6 +10,7 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.widget.TaskShortcutHelper
 
@@ -22,6 +23,7 @@ import com.opentasker.widget.TaskShortcutHelper
 class LaunchAppAction : Action {
     override val id = "app.launch"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
@@ -42,6 +44,7 @@ class LaunchAppAction : Action {
 class ShortcutPublishAction : Action {
     override val id = "shortcut.publish"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val shortcutId = args["id"]?.trim().orEmpty()
@@ -69,6 +72,7 @@ class ShortcutPublishAction : Action {
 class KillAppAction : Action {
     override val id = "app.kill"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
@@ -83,6 +87,7 @@ class KillAppAction : Action {
 class GoHomeAction : Action {
     override val id = "home.go"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -104,6 +109,7 @@ class GoHomeAction : Action {
 class OpenUrlAction : Action {
     override val id = "url.open"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
@@ -138,6 +144,7 @@ class OpenUrlAction : Action {
 class SendSmsAction : Action {
     override val id = "sms.send"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (!BuildConfig.SMS_ACTION_AVAILABLE) {
@@ -182,6 +189,7 @@ internal fun maskPhoneNumber(number: String): String {
 class ScreenshotAction : Action {
     override val id = "screenshot.take"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: args["filename"]

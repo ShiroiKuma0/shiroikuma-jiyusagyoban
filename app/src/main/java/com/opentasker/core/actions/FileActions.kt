@@ -9,6 +9,7 @@ import java.nio.file.StandardOpenOption
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -21,6 +22,7 @@ import com.opentasker.core.engine.ActionResult
 class ReadFileAction : Action {
     override val id = "file.read"
     override val category = ActionCategory.FILE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -54,6 +56,7 @@ class ReadFileAction : Action {
 class WriteFileAction : Action {
     override val id = "file.write"
     override val category = ActionCategory.FILE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -84,6 +87,7 @@ class WriteFileAction : Action {
 class AppendFileAction : Action {
     override val id = "file.append"
     override val category = ActionCategory.FILE
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -117,6 +121,7 @@ class AppendFileAction : Action {
 class DeleteFileAction : Action {
     override val id = "file.delete"
     override val category = ActionCategory.FILE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -146,6 +151,7 @@ class DeleteFileAction : Action {
 class ListFilesAction : Action {
     override val id = "file.list"
     override val category = ActionCategory.FILE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")

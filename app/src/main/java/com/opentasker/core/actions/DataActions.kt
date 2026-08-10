@@ -4,6 +4,7 @@ import com.opentasker.core.data.StructuredDataReader
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -21,6 +22,7 @@ import com.opentasker.core.engine.ActionResult
 class DataReadAction : Action {
     override val id = "data.read"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")

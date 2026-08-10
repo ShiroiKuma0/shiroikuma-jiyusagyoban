@@ -6,12 +6,14 @@ import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
 
 class ImeInfoAction : Action {
     override val id = "ime.info"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val baseName = args["var"]?.trim().orEmpty().ifBlank { DEFAULT_VARIABLE }
@@ -41,6 +43,7 @@ class ImeInfoAction : Action {
 class ImeSetAction : Action {
     override val id = "ime.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val requested = args["ime_id"]?.trim().orEmpty()

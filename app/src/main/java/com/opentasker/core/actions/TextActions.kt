@@ -4,6 +4,7 @@ import com.opentasker.core.data.TextOps
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private fun outputVar(args: Map<String, String>, default: String): String =
@@ -17,6 +18,7 @@ private fun outputVar(args: Map<String, String>, default: String): String =
 class TextMatchAction : Action {
     override val id = "text.match"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -35,6 +37,7 @@ class TextMatchAction : Action {
 class TextReplaceAction : Action {
     override val id = "text.replace"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -56,6 +59,7 @@ class TextReplaceAction : Action {
 class TextSplitAction : Action {
     override val id = "text.split"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -79,6 +83,7 @@ class TextSplitAction : Action {
 class TextJoinAction : Action {
     override val id = "text.join"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val arrayName = args["array"]?.trim()?.ifBlank { null } ?: return ActionResult.Failure("missing array name")
@@ -99,6 +104,7 @@ class TextJoinAction : Action {
 class TextSubstringAction : Action {
     override val id = "text.substring"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")

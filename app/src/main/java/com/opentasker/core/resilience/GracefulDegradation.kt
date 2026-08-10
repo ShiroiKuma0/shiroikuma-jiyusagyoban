@@ -7,6 +7,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionRegistry
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.logging.AppLogger
 import android.content.Context
@@ -50,6 +51,7 @@ object GracefulDegradation {
     private class MissingAction(private val actionId: String) : Action {
         override val id: String = actionId
         override val category = ActionCategory.SYSTEM
+        override val retrySafety = ActionRetrySafety.NEVER
         
         override suspend fun run(
             ctx: ActionContext,

@@ -13,6 +13,7 @@ import com.opentasker.app.MainActivity
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private const val AUTOMATIC_ZEN_RULE_API = 35
@@ -96,6 +97,7 @@ class ZenRuleSetAction(
 ) : Action {
     override val id = "zen.rule.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val spec = ZenRuleActionSupport.parse(args).getOrElse {
@@ -179,6 +181,7 @@ class ZenRuleClearAction(
 ) : Action {
     override val id = "zen.rule.clear"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val id = args["id"]?.trim().orEmpty()

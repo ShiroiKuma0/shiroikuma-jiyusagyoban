@@ -36,6 +36,14 @@ class HttpRequestAction(
 ) : Action {
     override val id = ID
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.NEVER
+
+    override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety = when (
+        args["method"]?.trim()?.uppercase() ?: "GET"
+    ) {
+        "GET", "HEAD" -> ActionRetrySafety.IDEMPOTENT
+        else -> ActionRetrySafety.NEVER
+    }
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val config = try {
@@ -201,6 +209,7 @@ class HttpPostAction(
 ) : Action {
     override val id = "http.post"
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")
