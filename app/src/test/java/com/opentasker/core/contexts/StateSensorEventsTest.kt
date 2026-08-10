@@ -5,14 +5,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StateSensorEventsTest {
+    /**
+     * An accelerometer at rest reads +g along whichever device axis points upward, so face-up is
+     * z = +9.8 and a device held normally - top edge up - is y = +9.8. The classifier previously
+     * reported a normally-held phone as `portrait_upside_down`.
+     */
     @Test
-    fun orientationClassifierSeparatesFacePortraitAndLandscape() {
+    fun orientationClassifierFollowsTheAndroidSensorConvention() {
         assertEquals("face_up", DeviceOrientationClassifier.classify(0f, 0f, 9.8f))
         assertEquals("face_down", DeviceOrientationClassifier.classify(0f, 0f, -9.8f))
-        assertEquals("portrait", DeviceOrientationClassifier.classify(0f, -9.8f, 0f))
-        assertEquals("portrait_upside_down", DeviceOrientationClassifier.classify(0f, 9.8f, 0f))
-        assertEquals("landscape_right", DeviceOrientationClassifier.classify(9.8f, 0f, 0f))
-        assertEquals("landscape_left", DeviceOrientationClassifier.classify(-9.8f, 0f, 0f))
+        assertEquals("portrait", DeviceOrientationClassifier.classify(0f, 9.8f, 0f))
+        assertEquals("portrait_upside_down", DeviceOrientationClassifier.classify(0f, -9.8f, 0f))
+        assertEquals("landscape_left", DeviceOrientationClassifier.classify(9.8f, 0f, 0f))
+        assertEquals("landscape_right", DeviceOrientationClassifier.classify(-9.8f, 0f, 0f))
     }
 
     @Test
