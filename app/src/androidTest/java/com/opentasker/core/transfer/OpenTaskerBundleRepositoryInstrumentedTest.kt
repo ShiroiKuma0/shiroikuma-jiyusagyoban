@@ -86,6 +86,12 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
                     ),
                 ).toEntity()
             )
+            val fallbackTaskId = source.taskDao().insert(
+                Task(
+                    name = "Fallback task",
+                    actions = listOf(ActionSpec(type = "log", args = mapOf("message" to "recovered"))),
+                ).toEntity()
+            )
             source.profileDao().insert(
                 Profile(
                     name = "Enabled profile",
@@ -93,6 +99,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
                     contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "manual"))),
                     enterTaskId = enterTaskId,
                     exitTaskId = exitTaskId,
+                    fallbackTaskId = fallbackTaskId,
                 ).toEntity()
             )
             source.variableDao().insert(Variable(name = "FLAG", value = "on", isGlobal = true).toEntity())
@@ -126,7 +133,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
 
             val report = OpenTaskerBundleRepository(target).importBundle(OpenTaskerBundleCodec.decode(encoded))
 
-            assertEquals(2, report.insertedTasks)
+            assertEquals(3, report.insertedTasks)
             assertEquals(1, report.insertedProfiles)
             assertEquals(1, report.insertedVariables)
             assertEquals(1, report.insertedScenes)
@@ -138,6 +145,7 @@ class OpenTaskerBundleRepositoryInstrumentedTest {
             assertTrue(importedProfile.requiresRiskAcknowledgement)
             assertEquals(importedTaskIds.getValue("Log task"), importedProfile.enterTaskId)
             assertEquals(importedTaskIds.getValue("Exit task"), importedProfile.exitTaskId)
+            assertEquals(importedTaskIds.getValue("Fallback task"), importedProfile.fallbackTaskId)
             assertNotEquals(enterTaskId, importedProfile.enterTaskId)
 
             val importedParent = importedTasks.single { it.name == "Log task" }

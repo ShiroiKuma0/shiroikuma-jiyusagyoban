@@ -72,6 +72,7 @@ class ProfileRegistrySignatureTest {
         assertNotEquals(baseSig, profileRegistrySignature(listOf(base.copy(maxActiveExecutions = 3))))
         assertNotEquals(baseSig, profileRegistrySignature(listOf(base.copy(burstLimit = 12))))
         assertNotEquals(baseSig, profileRegistrySignature(listOf(base.copy(overflowPolicy = "SILENT"))))
+        assertNotEquals(baseSig, profileRegistrySignature(listOf(base.copy(fallbackTaskId = 15))))
     }
 
     @Test

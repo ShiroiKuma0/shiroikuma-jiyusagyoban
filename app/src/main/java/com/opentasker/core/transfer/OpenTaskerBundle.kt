@@ -319,6 +319,10 @@ object OpenTaskerBundleCodec {
             if (exitTaskId != null && exitTaskId !in taskIds) {
                 lossyWarnings += "Profile '${profile.name}' references missing exit task $exitTaskId; the exit task will be dropped."
             }
+            val fallbackTaskId = profile.fallbackTaskId
+            if (fallbackTaskId != null && fallbackTaskId !in taskIds) {
+                lossyWarnings += "Profile '${profile.name}' references missing fallback task $fallbackTaskId; the fallback task will be dropped."
+            }
         }
 
         AutomationReferenceIndex.build(bundle.profiles, bundle.tasks, bundle.scenes).forEach { reference ->
@@ -326,6 +330,7 @@ object OpenTaskerBundleCodec {
                 com.opentasker.core.references.TaskReferenceSite.OwnerKind.PROFILE -> profilesById[reference.site.ownerId]?.projectId
                 com.opentasker.core.references.TaskReferenceSite.OwnerKind.TASK -> tasksById[reference.site.ownerId]?.projectId
                 com.opentasker.core.references.TaskReferenceSite.OwnerKind.SCENE -> scenesById[reference.site.ownerId]?.projectId
+                com.opentasker.core.references.TaskReferenceSite.OwnerKind.SETTINGS -> null
             }
             val targets = bundle.tasks.filter { reference.ref.matches(it) }
             if (ownerProjectId != null && targets.any { it.projectId != ownerProjectId }) {
@@ -417,6 +422,7 @@ object OpenTaskerBundleCodec {
                         it.field == "expiresAtMs" ||
                         it.field == "maxActiveExecutions" ||
                         it.field == "burstLimit"
+                        || it.field == "fallbackTaskId"
                 }
                 .forEach { error ->
                     warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."
@@ -669,6 +675,7 @@ class OpenTaskerBundleRepository(
                     lifetimeConsumed = false,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
+                    fallbackTaskId = profile.fallbackTaskId?.let { taskIdMap[it] },
                     projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,
                 )
                 db.profileDao().upsert(remappedProfile.toEntity())

@@ -160,6 +160,8 @@ fun PermissionOnboardingScreen(
     onCancelPendingRestore: () -> Unit = {},
     profiles: List<Profile> = emptyList(),
     tasks: List<Task> = emptyList(),
+    globalFallbackTaskId: Long? = null,
+    onGlobalFallbackTaskChange: (Long?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val advancedProtectionEnabled by AdvancedProtectionReader.enabled.collectAsState()
@@ -314,6 +316,14 @@ fun PermissionOnboardingScreen(
             )
         }
 
+        item {
+            GlobalFallbackTaskCard(
+                taskId = globalFallbackTaskId,
+                tasks = tasks,
+                onTaskChange = onGlobalFallbackTaskChange,
+            )
+        }
+
         item { TermuxScriptAllowlistCard(onMessage) }
         item { PushTriggerSetupCard(onMessage) }
         item { CompanionSetupCard(onMessage) }
@@ -365,6 +375,36 @@ fun PermissionOnboardingScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GlobalFallbackTaskCard(
+    taskId: Long?,
+    tasks: List<Task>,
+    onTaskChange: (Long?) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.setup_global_fallback_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.setup_global_fallback_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TaskActionFieldInput(
+                label = stringResource(R.string.setup_global_fallback_label),
+                hint = stringResource(R.string.setup_global_fallback_hint),
+                value = taskId?.toString().orEmpty(),
+                tasks = tasks,
+                onChange = { onTaskChange(it.toLongOrNull()) },
+            )
         }
     }
 }

@@ -719,6 +719,8 @@ class AutomationService : Service() {
             profileId = profile.id,
             profileLimits = profile.toExecutionAdmissionProfileLimits(),
             overflowPolicy = profile.overflowPolicy,
+            profileName = profile.name,
+            profileFallbackTaskId = profile.fallbackTaskId,
             execution = ExecutionEnvelope.create(
                 task = task,
                 source = source,
@@ -1142,6 +1144,7 @@ internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<Strin
                 p.maxActiveExecutions,
                 p.burstLimit,
                 p.overflowPolicy,
+                p.fallbackTaskId,
             ).joinToString("|")
         }
         .toList()

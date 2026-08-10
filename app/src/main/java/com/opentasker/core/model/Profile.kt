@@ -36,6 +36,8 @@ data class Profile(
     val burstLimit: Int? = null,
     /** Whether admission overflow should leave a replayable run-log entry. */
     val overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
+    /** Optional task to run when this profile's task fails without a lexical flow.catch. */
+    val fallbackTaskId: Long? = null,
 )
 
 @Serializable

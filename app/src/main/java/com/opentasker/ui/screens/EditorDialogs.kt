@@ -281,7 +281,7 @@ internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?, Int?, Int?, ProfileOverflowPolicy) -> Unit,
+    onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?, Int?, Int?, ProfileOverflowPolicy, Long?) -> Unit,
     onSimulate: ((Profile) -> Unit)? = null,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
@@ -314,6 +314,7 @@ internal fun ProfileEditorDialog(
     var overflowPolicyName by rememberSaveable(profile?.id) {
         mutableStateOf((profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG).name)
     }
+    var fallbackTaskId by rememberSaveable(profile?.id) { mutableStateOf(profile?.fallbackTaskId) }
     val parsedCooldown = cooldown.toIntOrNull()
     val parsedPriority = priority.toIntOrNull()
     val parsedGracePeriod = gracePeriod.toIntOrNull()
@@ -324,11 +325,13 @@ internal fun ProfileEditorDialog(
     val overflowPolicy = profileOverflowPolicyFromName(overflowPolicyName)
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
     val selectedExitTaskExists = exitTaskId == null || tasks.any { it.id == exitTaskId }
+    val selectedFallbackTaskExists = fallbackTaskId == null || tasks.any { it.id == fallbackTaskId }
     val canSave = profileEditorCanSave(
         name = name,
         enterTaskId = enterTaskId,
         selectedTaskExists = selectedTaskExists,
         selectedExitTaskExists = selectedExitTaskExists,
+        selectedFallbackTaskExists = selectedFallbackTaskExists,
         cooldown = cooldown,
         parsedCooldown = parsedCooldown,
         parsedPriority = parsedPriority,
@@ -424,6 +427,13 @@ internal fun ProfileEditorDialog(
                     value = exitTaskId?.toString().orEmpty(),
                     tasks = tasks,
                     onChange = { exitTaskId = it.toLongOrNull() },
+                )
+                TaskActionFieldInput(
+                    label = stringResource(R.string.profile_fallback_task),
+                    hint = stringResource(R.string.profile_fallback_task_helper),
+                    value = fallbackTaskId?.toString().orEmpty(),
+                    tasks = tasks,
+                    onChange = { fallbackTaskId = it.toLongOrNull() },
                 )
                 OutlinedTextField(
                     value = cooldown,
@@ -596,6 +606,7 @@ internal fun ProfileEditorDialog(
                         parsedMaxActiveExecutions,
                         parsedBurstLimit,
                         overflowPolicy,
+                        fallbackTaskId,
                     )
                 },
             ) {
@@ -698,9 +709,10 @@ internal fun profileEditorCanSave(
     parsedMaxActiveExecutions: Int? = null,
     burstLimit: String = "",
     parsedBurstLimit: Int? = null,
+    selectedFallbackTaskExists: Boolean = true,
 ): Boolean =
     name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
-        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null) &&
+        selectedExitTaskExists && selectedFallbackTaskExists && (cooldown.isBlank() || parsedCooldown != null) &&
         parsedPriority != null && parsedPriority in InputValidation.MIN_PROFILE_PRIORITY..InputValidation.MAX_PROFILE_PRIORITY &&
         parsedGracePeriod != null && parsedGracePeriod in 0..InputValidation.MAX_GRACE_PERIOD_SEC &&
         (lifetime != ProfileLifetime.UNTIL_DATE || parsedExpiryDate != null) &&

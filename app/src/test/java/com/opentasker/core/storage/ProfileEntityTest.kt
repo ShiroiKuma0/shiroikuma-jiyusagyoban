@@ -30,6 +30,7 @@ class ProfileEntityTest {
             maxActiveExecutions = 3,
             burstLimit = 12,
             overflowPolicy = ProfileOverflowPolicy.SILENT,
+            fallbackTaskId = 44,
         )
 
         assertEquals(profile, profile.toEntity().toDomain())

@@ -4,7 +4,7 @@ import androidx.room.Database
 import androidx.room.AutoMigration
 import androidx.room.RoomDatabase
 
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 13
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 14
 
 @Database(
     entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class],
@@ -19,6 +19,7 @@ const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 13
         AutoMigration(from = 10, to = 11),
         AutoMigration(from = 11, to = 12),
         AutoMigration(from = 12, to = 13),
+        AutoMigration(from = 13, to = 14),
     ],
 )
 abstract class AppDatabase : RoomDatabase() {

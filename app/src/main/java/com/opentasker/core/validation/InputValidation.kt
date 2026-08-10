@@ -36,6 +36,9 @@ object InputValidation {
         if (profile.enterTaskId <= 0) {
             errors.add(ValidationError("enterTaskId", "Enter task must be set"))
         }
+        if (profile.fallbackTaskId != null && profile.fallbackTaskId <= 0L) {
+            errors.add(ValidationError("fallbackTaskId", "Fallback task id must be positive"))
+        }
         if (profile.cooldownSec < 0 || profile.cooldownSec > MAX_COOLDOWN_SEC) {
             errors.add(ValidationError("cooldownSec", "Cooldown must be between 0 and $MAX_COOLDOWN_SEC seconds"))
         }

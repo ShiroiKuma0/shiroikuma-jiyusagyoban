@@ -9,6 +9,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.TaskEntity
 import com.opentasker.core.storage.RuntimeVariableSeed
 import com.opentasker.core.storage.RuntimeVariableValue
@@ -27,6 +28,15 @@ data class TaskExecutionResult(
     val skippedReason: String? = null,
     val held: Boolean = false,
     val execution: ExecutionEnvelope,
+    val fallback: FallbackExecutionResult? = null,
+)
+
+data class FallbackExecutionResult(
+    val taskId: Long,
+    val taskName: String,
+    val source: String,
+    val success: Boolean,
+    val reason: String? = null,
 )
 
 suspend fun executeAndLogTask(
@@ -43,6 +53,9 @@ suspend fun executeAndLogTask(
     profileId: Long? = null,
     profileLimits: ExecutionAdmissionProfileLimits? = null,
     overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
+    profileName: String? = null,
+    profileFallbackTaskId: Long? = null,
+    allowFallback: Boolean = true,
     execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     if (execution.mode == ExecutionMode.SIMULATION) {
@@ -167,6 +180,8 @@ suspend fun executeAndLogTask(
                     onStep = { index, label -> ActiveExecutionRegistry.reportStep(admittedExecutionId, index, label) },
                     collisionCoordinator = collisionCoordinator,
                     executionChain = setOf(task.id).filterTo(linkedSetOf()) { it > 0L },
+                    originatingProfileId = profileId,
+                    originatingProfileName = profileName,
                 ).run(task)
             } finally {
                 ActiveExecutionRegistry.unregister(admittedExecutionId)
@@ -249,9 +264,45 @@ suspend fun executeAndLogTask(
         logTag,
         projectId = task.projectId,
     )
+    val fallback = if (allowFallback && !report.success && report.structuredError != null) {
+        // The failed task no longer owns an active slot while its recovery task runs. Otherwise a
+        // profile with maxActiveExecutions=1 would reject the very fallback intended to diagnose it.
+        admissionLease.release()
+        runFallbackTask(
+            appContext = appContext,
+            db = db,
+            failedTask = task,
+            failedReport = report,
+            source = execution.source,
+            profileName = profileName,
+            profileFallbackTaskId = profileFallbackTaskId,
+            admissionController = admissionController,
+            profileId = profileId,
+            profileLimits = profileLimits,
+            overflowPolicy = overflowPolicy,
+            visibleActivity = visibleActivity,
+            audioForegroundService = audioForegroundService,
+            logTag = logTag,
+            parentExecution = execution,
+        )
+    } else {
+        null
+    }
+    val failureMetadata = report.structuredError?.let(::structuredFailureMetadata).orEmpty()
+    val fallbackMetadata = fallback?.let {
+        listOf(
+            "Fallback task: ${it.taskName} (${it.source})",
+            "Fallback result: ${if (it.success) "succeeded" else "failed"}",
+        ) + it.reason?.let { reason -> listOf("Fallback reason: ${reason.take(256)}") }.orEmpty()
+    }.orEmpty()
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     val terminalReason = ExecutionTerminalReason(
-        if (report.success) ExecutionTerminalReasonCode.COMPLETED else ExecutionTerminalReasonCode.TASK_FAILED,
+        if (report.success) {
+            ExecutionTerminalReasonCode.COMPLETED
+        } else {
+            ExecutionTerminalReasonCode.TASK_FAILED
+        },
+        detail = (failureMetadata + fallbackMetadata).joinToString("; ").takeIf { it.isNotBlank() },
     )
     ExecutionCommandLedger.transition(
         execution.executionId,
@@ -270,7 +321,7 @@ suspend fun executeAndLogTask(
             source = execution.source,
             execution = execution,
             terminalReason = terminalReason,
-            metadata = riskMetadata + metadata + globalCommitMetadata,
+            metadata = riskMetadata + metadata + globalCommitMetadata + failureMetadata + fallbackMetadata,
             traces = report.traces,
         ),
         source = classified.key,
@@ -279,7 +330,7 @@ suspend fun executeAndLogTask(
         replayOf = execution.replayOf,
     )
     val inserted = insertRunLog(db, logEntry)
-    TaskExecutionResult(report, inserted, execution = execution)
+    TaskExecutionResult(report, inserted, execution = execution, fallback = fallback)
     } finally {
         admissionLease.release()
     }
@@ -403,6 +454,116 @@ suspend fun logSkippedRun(
     )
 }
 
+private data class FallbackTaskSelection(
+    val task: Task,
+    val source: String,
+)
+
+private suspend fun runFallbackTask(
+    appContext: Context,
+    db: AppDatabase,
+    failedTask: Task,
+    failedReport: TaskRunReport,
+    source: String,
+    profileName: String?,
+    profileFallbackTaskId: Long?,
+    admissionController: ExecutionAdmissionController,
+    profileId: Long?,
+    profileLimits: ExecutionAdmissionProfileLimits?,
+    overflowPolicy: ProfileOverflowPolicy,
+    visibleActivity: Boolean,
+    audioForegroundService: AudioForegroundServiceEligibility,
+    logTag: String,
+    parentExecution: ExecutionEnvelope,
+): FallbackExecutionResult? {
+    val error = failedReport.structuredError ?: return null
+    val selection = selectFallbackTask(
+        db = db,
+        failedTask = failedTask,
+        profileFallbackTaskId = profileFallbackTaskId,
+        globalFallbackTaskId = FallbackTaskSettings(appContext).loadTaskId(),
+    ) ?: return null
+    val fallbackSource = "Fallback: ${selection.task.name}"
+    val fallbackExecution = ExecutionEnvelope.create(
+        task = selection.task,
+        source = fallbackSource,
+        profileId = profileId,
+        parentExecutionId = parentExecution.executionId,
+        causalDepth = parentExecution.causalDepth + 1,
+        causalProfileChain = parentExecution.causalProfileChain,
+    )
+    return try {
+        val result = executeAndLogTask(
+            appContext = appContext,
+            db = db,
+            task = selection.task,
+            source = fallbackSource,
+            metadata = listOf(
+                "Fallback source: ${selection.source}",
+                "Original task: ${failedTask.name} (${failedTask.id})",
+                "Original execution: ${parentExecution.executionId}",
+            ),
+            initialVariables = error.toFailureVariables(),
+            visibleActivity = visibleActivity,
+            audioForegroundService = audioForegroundService,
+            logTag = logTag,
+            admissionController = admissionController,
+            profileId = profileId,
+            profileLimits = profileLimits,
+            overflowPolicy = overflowPolicy,
+            profileName = profileName,
+            allowFallback = false,
+            execution = fallbackExecution,
+        )
+        FallbackExecutionResult(
+            taskId = selection.task.id,
+            taskName = selection.task.name,
+            source = selection.source,
+            success = result.report.success,
+            reason = result.skippedReason ?: result.report.structuredError?.message,
+        )
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Exception) {
+        FallbackExecutionResult(
+            taskId = selection.task.id,
+            taskName = selection.task.name,
+            source = selection.source,
+            success = false,
+            reason = error.message ?: "Fallback task failed before it could run.",
+        )
+    }
+}
+
+private suspend fun selectFallbackTask(
+    db: AppDatabase,
+    failedTask: Task,
+    profileFallbackTaskId: Long?,
+    globalFallbackTaskId: Long?,
+): FallbackTaskSelection? {
+    val candidates = listOfNotNull(
+        profileFallbackTaskId?.takeIf { it > 0L }?.let { it to "profile" },
+        globalFallbackTaskId?.takeIf { it > 0L }?.let { it to "global" },
+    ).distinctBy { it.first }
+    for ((id, source) in candidates) {
+        if (id == failedTask.id) continue
+        val task = runCatching { db.taskDao().getById(id)?.toDomainDecodeResult() }
+            .getOrNull()
+            ?.takeIf { it.issue == null }
+            ?.value
+        if (task != null) return FallbackTaskSelection(task, source)
+    }
+    return null
+}
+
+private fun structuredFailureMetadata(error: StructuredTaskError): List<String> = listOf(
+    "Failure task: ${error.taskName} (${error.taskId})",
+    "Failure action: id=${error.actionId}, index=${error.actionIndex}, type=${error.actionType}",
+    "Failure attempts: ${error.attemptCount}",
+    "Failure message: ${error.message.take(256)}",
+    "Originating profile: ${error.originatingProfileName.orEmpty()} (${error.originatingProfileId ?: "none"})",
+)
+
 suspend fun logHeldRun(
     db: AppDatabase,
     task: Task,
@@ -488,6 +649,8 @@ suspend fun replayHeldExecution(
         profileId = payload.profileId,
         profileLimits = profile?.toExecutionAdmissionProfileLimits(),
         overflowPolicy = profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG,
+        profileName = profile?.name,
+        profileFallbackTaskId = profile?.fallbackTaskId,
         execution = replayEnvelope,
     )
 }
