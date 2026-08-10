@@ -7,6 +7,8 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 
 /** What to do with the references that point at a task being removed or re-identified. */
 sealed interface ReferenceResolution {
@@ -35,6 +37,17 @@ data class ReferenceRewrite(
     val canCommit: Boolean get() = blocked.isEmpty()
 }
 
+/** Pure result of a variable rename or deletion guard. */
+data class VariableReferenceRewrite(
+    val profiles: List<Profile> = emptyList(),
+    val tasks: List<Task> = emptyList(),
+    val scenes: List<Scene> = emptyList(),
+    val blocked: List<VariableReference> = emptyList(),
+) {
+    val isEmpty: Boolean get() = profiles.isEmpty() && tasks.isEmpty() && scenes.isEmpty()
+    val canCommit: Boolean get() = blocked.isEmpty()
+}
+
 /**
  * The single rewriter for task references. Deletion, reassignment, and bundle-import id remapping
  * all funnel through [retarget]/[remapIds] so no surface can invent a rule the others don't share
@@ -45,6 +58,87 @@ data class ReferenceRewrite(
  * one transaction.
  */
 object AutomationReferenceRewriter {
+
+    /** Returns every dependent site that would break if [target] were deleted. */
+    fun guardVariableDeletion(
+        target: Variable,
+        profiles: List<Profile> = emptyList(),
+        tasks: List<Task> = emptyList(),
+        scenes: List<Scene> = emptyList(),
+    ): VariableReferenceRewrite = VariableReferenceRewrite(
+        blocked = AutomationReferenceIndex.referencesTo(
+            target,
+            profiles = profiles,
+            tasks = tasks,
+            scenes = scenes,
+        ),
+    )
+
+    /**
+     * Rewrites every reference to [target] while retaining local/global scope semantics. The
+     * returned objects are the only records that need to be persisted by the caller.
+     */
+    fun renameVariable(
+        target: Variable,
+        replacementName: String,
+        profiles: List<Profile> = emptyList(),
+        tasks: List<Task> = emptyList(),
+        scenes: List<Scene> = emptyList(),
+    ): VariableReferenceRewrite {
+        val oldName = requireNotNull(VariableNamePolicy.normalizeForScope(target.name, target.isGlobal)) {
+            "Invalid variable name '${target.name}'."
+        }
+        val newName = requireNotNull(VariableNamePolicy.normalizeForScope(replacementName, target.isGlobal)) {
+            "Invalid replacement variable name '$replacementName'."
+        }
+        if (oldName == newName) return VariableReferenceRewrite()
+
+        val references = AutomationReferenceIndex.referencesTo(
+            target,
+            profiles = profiles,
+            tasks = tasks,
+            scenes = scenes,
+        )
+        if (references.isEmpty()) return VariableReferenceRewrite()
+
+        val changedProfiles = profiles.mapNotNull { profile ->
+            if (profile.projectId != target.projectId) return@mapNotNull null
+            val contexts = profile.contexts.map { context ->
+                context.copy(
+                    config = context.config.mapValues { (_, value) ->
+                        VariableReferenceScanner.rewrite(value, target, newName)
+                    },
+                )
+            }
+            profile.copy(contexts = contexts).takeIf { it != profile }
+        }
+        val changedTasks = tasks.mapNotNull { task ->
+            if (task.projectId != target.projectId) return@mapNotNull null
+            val actions = task.actions.map { action ->
+                action.copy(
+                    args = action.args.mapValues { (_, value) ->
+                        VariableReferenceScanner.rewrite(value, target, newName)
+                    },
+                    condition = action.condition?.let { condition ->
+                        VariableReferenceScanner.rewrite(condition, target, newName)
+                    },
+                )
+            }
+            task.copy(actions = actions).takeIf { it != task }
+        }
+        val changedScenes = scenes.mapNotNull { scene ->
+            if (scene.projectId != target.projectId) return@mapNotNull null
+            val elements = scene.elements.map { element ->
+                element.copy(
+                    config = element.config.mapValues { (_, value) ->
+                        VariableReferenceScanner.rewrite(value, target, newName)
+                    },
+                )
+            }
+            scene.copy(elements = elements).takeIf { it != scene }
+        }
+        return VariableReferenceRewrite(changedProfiles, changedTasks, changedScenes)
+    }
 
     /**
      * Applies [resolution] to every reference pointing at [target].
@@ -262,4 +356,15 @@ fun TaskReference.describe(): String = when (val site = site) {
         "Task \"${site.ownerName}\" step ${site.actionIndex + 1} (notification button ${site.buttonIndex})"
     is TaskReferenceSite.SceneTap -> "Scene \"${site.ownerName}\" element ${site.elementIndex + 1} (tap)"
     is TaskReferenceSite.SceneLongPress -> "Scene \"${site.ownerName}\" element ${site.elementIndex + 1} (long press)"
+}
+
+fun VariableReference.describe(): String = when (val site = site) {
+    is VariableReferenceSite.ProfileContextBinding ->
+        "Profile \"${site.ownerName}\" context ${site.contextIndex + 1} binding \"${site.configKey}\""
+    is VariableReferenceSite.TaskActionArgument ->
+        "Task \"${site.ownerName}\" step ${site.actionIndex + 1} argument \"${site.argKey}\""
+    is VariableReferenceSite.TaskCondition ->
+        "Task \"${site.ownerName}\" step ${site.actionIndex + 1} condition"
+    is VariableReferenceSite.SceneBinding ->
+        "Scene \"${site.ownerName}\" element ${site.elementIndex + 1} binding \"${site.configKey}\""
 }

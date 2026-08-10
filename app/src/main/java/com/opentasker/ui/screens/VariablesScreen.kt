@@ -62,7 +62,7 @@ fun VariablesScreen(
     projectId: Long = DEFAULT_PROJECT_ID,
     focusVariableName: String? = null,
     focusVariableProjectId: Long = DEFAULT_PROJECT_ID,
-    onUpdate: (name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long) -> Unit,
+    onUpdate: (previousName: String?, name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long) -> Unit,
     onDelete: (name: String, successMessage: String, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
 ) {
@@ -165,7 +165,7 @@ fun VariablesScreen(
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { showCreateDialog = false },
             onSave = { name, value, isSecret ->
-                onUpdate(name, value, isSecret, createdMsg, projectId)
+                onUpdate(null, name, value, isSecret, createdMsg, projectId)
                 showCreateDialog = false
             },
         )
@@ -215,7 +215,7 @@ fun VariablesScreen(
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { editTargetName = null },
             onSave = { name, newValue, isSecret ->
-                onUpdate(name, newValue, isSecret, updatedMsg, target.projectId)
+                onUpdate(target.name, name, newValue, isSecret, updatedMsg, target.projectId)
                 editTargetName = null
             },
         )
@@ -381,7 +381,9 @@ private fun VariableEditorDialog(
     var isSecret by rememberSaveable(stateKey) { mutableStateOf(variable?.isSecret == true) }
     var revealed by remember(stateKey) { mutableStateOf(false) }
     val normalizedName = VariableNamePolicy.promoteToGlobal(name)
-    val duplicateName = variable == null && normalizedName != null && normalizedName in existingNames
+    val duplicateName = normalizedName != null &&
+        normalizedName != variable?.name &&
+        normalizedName in existingNames
     val valueBytes = value.toByteArray(Charsets.UTF_8).size
     val needsReentry = variable?.isSecret == true && !variable.secretAvailable
     val canSave = normalizedName != null &&
@@ -398,25 +400,23 @@ private fun VariableEditorDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                if (variable == null) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = {
-                            name = it
-                                .filter { char -> char.isLetterOrDigit() || char == '_' || char == '-' }
-                                .take(VariableNamePolicy.MAX_LENGTH)
-                        },
-                        label = { Text(stringResource(R.string.variables_name_label)) },
-                        isError = name.isNotEmpty() && (normalizedName == null || duplicateName),
-                        supportingText = if (duplicateName) {
-                            { Text(stringResource(R.string.variables_name_duplicate)) }
-                        } else {
-                            { Text(stringResource(R.string.variables_name_helper)) }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                            .filter { char -> char.isLetterOrDigit() || char == '_' || char == '-' }
+                            .take(VariableNamePolicy.MAX_LENGTH)
+                    },
+                    label = { Text(stringResource(R.string.variables_name_label)) },
+                    isError = name.isNotEmpty() && (normalizedName == null || duplicateName),
+                    supportingText = if (duplicateName) {
+                        { Text(stringResource(R.string.variables_name_duplicate)) }
+                    } else {
+                        { Text(stringResource(R.string.variables_name_helper)) }
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 if (needsReentry) {
                     Text(
                         stringResource(R.string.variables_secret_reentry_helper),

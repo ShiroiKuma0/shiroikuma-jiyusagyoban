@@ -14,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -64,6 +65,39 @@ class VariableSecretStorageTest {
         assertTrue(runCatching {
             repository.upsert(Variable("localName", "invalid", isGlobal = false))
         }.isFailure)
+    }
+
+    @Test
+    fun projectScopedRenameKeepsProjectAndRekeysSecretCiphertext() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        repository.upsert(
+            Variable(
+                "API_TOKEN",
+                "token-123",
+                isGlobal = true,
+                isSecret = true,
+                projectId = 42,
+            ),
+        )
+        assertEquals(42L, dao.getInProject("API_TOKEN", 42)?.projectId)
+        assertEquals("token-123", repository.get("API_TOKEN", 42)?.value)
+
+        repository.rename(
+            previousName = "API_TOKEN",
+            variable = Variable(
+                "ROTATED_TOKEN",
+                "replacement",
+                isGlobal = true,
+                isSecret = true,
+                projectId = 42,
+            ),
+        )
+
+        assertNull(dao.getInProject("API_TOKEN", 42))
+        assertEquals(42L, dao.getInProject("ROTATED_TOKEN", 42)?.projectId)
+        assertEquals("replacement", repository.runtimeGlobals(42).values["ROTATED_TOKEN"])
     }
 
     @Test

@@ -6,6 +6,8 @@ import com.opentasker.core.engine.SUB_TASK_REF_KEYS
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.Variable
+import com.opentasker.core.model.VariableNamePolicy
 
 /**
  * The one enumeration of every place a task can be referenced from another automation object.
@@ -68,6 +70,62 @@ sealed interface TaskReferenceSite {
         override val ownerKind = OwnerKind.SCENE
     }
 }
+
+/** Every owner field that can contain an executable variable expression. */
+sealed interface VariableReferenceSite {
+    val ownerKind: OwnerKind
+    val ownerId: Long
+    val ownerName: String
+    val projectId: Long
+
+    enum class OwnerKind { PROFILE, TASK, SCENE }
+
+    data class ProfileContextBinding(
+        override val ownerId: Long,
+        override val ownerName: String,
+        override val projectId: Long,
+        val contextIndex: Int,
+        val configKey: String,
+    ) : VariableReferenceSite {
+        override val ownerKind = OwnerKind.PROFILE
+    }
+
+    data class TaskActionArgument(
+        override val ownerId: Long,
+        override val ownerName: String,
+        override val projectId: Long,
+        val actionIndex: Int,
+        val argKey: String,
+    ) : VariableReferenceSite {
+        override val ownerKind = OwnerKind.TASK
+    }
+
+    data class TaskCondition(
+        override val ownerId: Long,
+        override val ownerName: String,
+        override val projectId: Long,
+        val actionIndex: Int,
+    ) : VariableReferenceSite {
+        override val ownerKind = OwnerKind.TASK
+    }
+
+    data class SceneBinding(
+        override val ownerId: Long,
+        override val ownerName: String,
+        override val projectId: Long,
+        val elementIndex: Int,
+        val configKey: String,
+    ) : VariableReferenceSite {
+        override val ownerKind = OwnerKind.SCENE
+    }
+}
+
+data class VariableReference(
+    val site: VariableReferenceSite,
+    val name: String,
+    val syntax: VariableReferenceSyntax,
+    val scope: VariableReferenceScope,
+)
 
 /** How a site names the task it points at. */
 sealed interface TaskRef {
@@ -155,6 +213,126 @@ object AutomationReferenceIndex {
     ): List<TaskReference> = referencesTo(
         build(profiles, tasks.filterNot { it.id == task.id }, scenes),
         task,
+    )
+
+    /** Every variable expression held by a profile, task, or scene, in stable source order. */
+    fun buildVariableReferences(
+        profiles: List<Profile> = emptyList(),
+        tasks: List<Task> = emptyList(),
+        scenes: List<Scene> = emptyList(),
+    ): List<VariableReference> = buildList {
+        profiles.sortedBy { it.id }.forEach { profile ->
+            profile.contexts.forEachIndexed { contextIndex, context ->
+                context.config.entries.sortedBy { it.key }.forEach { (key, value) ->
+                    VariableReferenceScanner.scan(value).forEach { reference ->
+                        add(
+                            VariableReference(
+                                site = VariableReferenceSite.ProfileContextBinding(
+                                    ownerId = profile.id,
+                                    ownerName = profile.name,
+                                    projectId = profile.projectId,
+                                    contextIndex = contextIndex,
+                                    configKey = key,
+                                ),
+                                name = reference.name,
+                                syntax = reference.syntax,
+                                scope = reference.scope,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        tasks.sortedBy { it.id }.forEach { task ->
+            task.actions.forEachIndexed { actionIndex, action ->
+                action.args.entries.sortedBy { it.key }.forEach { (key, value) ->
+                    VariableReferenceScanner.scan(value).forEach { reference ->
+                        add(
+                            VariableReference(
+                                site = VariableReferenceSite.TaskActionArgument(
+                                    ownerId = task.id,
+                                    ownerName = task.name,
+                                    projectId = task.projectId,
+                                    actionIndex = actionIndex,
+                                    argKey = key,
+                                ),
+                                name = reference.name,
+                                syntax = reference.syntax,
+                                scope = reference.scope,
+                            ),
+                        )
+                    }
+                }
+                action.condition?.let { condition ->
+                    VariableReferenceScanner.scan(condition).forEach { reference ->
+                        add(
+                            VariableReference(
+                                site = VariableReferenceSite.TaskCondition(
+                                    ownerId = task.id,
+                                    ownerName = task.name,
+                                    projectId = task.projectId,
+                                    actionIndex = actionIndex,
+                                ),
+                                name = reference.name,
+                                syntax = reference.syntax,
+                                scope = reference.scope,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        scenes.sortedBy { it.id }.forEach { scene ->
+            scene.elements.forEachIndexed { elementIndex, element ->
+                element.config.entries.sortedBy { it.key }.forEach { (key, value) ->
+                    VariableReferenceScanner.scan(value).forEach { reference ->
+                        add(
+                            VariableReference(
+                                site = VariableReferenceSite.SceneBinding(
+                                    ownerId = scene.id,
+                                    ownerName = scene.name,
+                                    projectId = scene.projectId,
+                                    elementIndex = elementIndex,
+                                    configKey = key,
+                                ),
+                                name = reference.name,
+                                syntax = reference.syntax,
+                                scope = reference.scope,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun referencesTo(
+        references: List<VariableReference>,
+        variable: Variable,
+    ): List<VariableReference> {
+        val normalizedName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal) ?: return emptyList()
+        return references.filter { reference ->
+            reference.site.projectId == variable.projectId &&
+                reference.name == normalizedName &&
+                when (reference.scope) {
+                    VariableReferenceScope.GLOBAL -> variable.isGlobal
+                    VariableReferenceScope.LOCAL -> !variable.isGlobal
+                    VariableReferenceScope.INFERRED -> VariableNamePolicy.isGlobal(reference.name) == variable.isGlobal
+                    VariableReferenceScope.EXTERNAL -> false
+                }
+        }
+    }
+
+    fun referencesTo(
+        variable: Variable,
+        profiles: List<Profile> = emptyList(),
+        tasks: List<Task> = emptyList(),
+        scenes: List<Scene> = emptyList(),
+    ): List<VariableReference> = referencesTo(
+        buildVariableReferences(profiles, tasks, scenes),
+        variable,
     )
 
     /** Task references carried by a single action's arguments. */

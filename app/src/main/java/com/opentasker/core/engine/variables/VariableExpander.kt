@@ -390,7 +390,7 @@ class VariableExpander {
         }
     }
 
-    private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_'
+    private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
     private fun isJsonPathSegmentChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 

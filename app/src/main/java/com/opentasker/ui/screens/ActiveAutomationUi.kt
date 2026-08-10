@@ -843,8 +843,8 @@ fun ActiveAutomationUi(
                 projectId = selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID,
                 focusVariableName = focusedVariableName,
                 focusVariableProjectId = focusedVariableProjectId,
-                onUpdate = { name, value, isSecret, successMessage, projectId ->
-                    viewModel.updateVariable(name, value, isSecret, successMessage, projectId)
+                onUpdate = { previousName, name, value, isSecret, successMessage, projectId ->
+                    viewModel.updateVariable(previousName, name, value, isSecret, successMessage, projectId)
                 },
                 onDelete = { name, successMessage, projectId ->
                     viewModel.deleteVariable(name, successMessage, projectId)
