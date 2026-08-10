@@ -462,6 +462,9 @@ class ActiveAutomationViewModel(
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
         }
         viewModelScope.launch {
+            runCatching { reconcileGlobalFallbackTask() }
+        }
+        viewModelScope.launch {
             runCatching { refreshBackupSetupState(busy = false) }
         }
         refreshDiagnostics()
@@ -1286,6 +1289,21 @@ class ActiveAutomationViewModel(
         val normalized = taskId?.takeIf { it > 0L }
         fallbackTaskSettings.saveTaskId(normalized)
         _globalFallbackTaskId.value = normalized
+    }
+
+    /**
+     * Clears the global fallback task when it points at a task that no longer exists.
+     *
+     * The setting lives in SharedPreferences and cannot join the Room transaction that deletes a
+     * task, so process death between the commit and the settings write leaves a dangling id.
+     * Healing it on load keeps that window harmless instead of leaving a fallback that silently
+     * never runs.
+     */
+    private suspend fun reconcileGlobalFallbackTask() {
+        val storedId = fallbackTaskSettings.loadTaskId() ?: return
+        if (db.taskDao().getById(storedId) != null) return
+        fallbackTaskSettings.saveTaskId(null)
+        _globalFallbackTaskId.value = null
     }
 
     private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
