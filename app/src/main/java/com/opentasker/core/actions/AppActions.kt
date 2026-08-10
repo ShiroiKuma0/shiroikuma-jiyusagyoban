@@ -96,9 +96,13 @@ class OpenUrlAction : DeclaredAction(ActionCatalog.require("url.open")) {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
         val uri = Uri.parse(url)
+        // Fail closed on a missing scheme too. Skipping the allowlist when the scheme was null let
+        // a scheme-relative value such as //host/path through to ACTION_VIEW unchecked.
         val scheme = uri.scheme?.lowercase()
-        if (scheme != null && scheme !in ALLOWED_SCHEMES) {
-            return ActionResult.Failure("blocked URI scheme: $scheme (allowed: ${ALLOWED_SCHEMES.joinToString()})")
+        if (scheme == null || scheme !in ALLOWED_SCHEMES) {
+            return ActionResult.Failure(
+                "blocked URI scheme: ${scheme ?: "<none>"} (allowed: ${ALLOWED_SCHEMES.joinToString()})",
+            )
         }
         return try {
             val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

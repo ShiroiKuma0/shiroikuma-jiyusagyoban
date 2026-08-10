@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Cleartext MQTT now requires every address a host resolves to be private, and connects to the address it vetted. Accepting a host because any one record was private, then letting the socket re-resolve the name, could send the connect packet and its credentials to a public address.
+- `url.open` rejects a URI with no scheme instead of passing it through the scheme allowlist unchecked.
 - Pasting something that is not an OpenTasker bundle now explains that in plain language instead of showing the JSON parser's own message and echoing the pasted text back.
 - Out-of-range profile priority and grace period now show an error naming the valid range. Both fields accepted more digits than they allow, so a value like 500 quietly disabled Save with nothing on screen explaining why.
 - An expired profile reports the date it expired rather than a raw millisecond timestamp.
