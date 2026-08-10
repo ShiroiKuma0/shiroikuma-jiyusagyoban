@@ -40,7 +40,6 @@ class OpenTaskerApp_NoHilt : Application() {
                 return requireNotNull(_db)
             }
         }
-    }
 
     @Volatile
     private var unlockedInitialized = false
