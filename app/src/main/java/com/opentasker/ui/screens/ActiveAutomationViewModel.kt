@@ -437,6 +437,15 @@ class ActiveAutomationViewModel(
     private val _openTaskerBundleBusy = MutableStateFlow(false)
     val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
 
+    /**
+     * Guards the one-shot run actions. Their buttons stay enabled while the coroutine is in flight,
+     * so a double tap ran the task — or replayed a held execution — twice, with real side effects
+     * each time. Set and cleared on the main thread before any suspension point, so the second tap
+     * always observes the first one's `true`.
+     */
+    private val _runActionBusy = MutableStateFlow(false)
+    val runActionBusy: StateFlow<Boolean> = _runActionBusy.asStateFlow()
+
     init {
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
@@ -947,48 +956,70 @@ class ActiveAutomationViewModel(
      * is `WHERE id = :id AND held = 1`, so two taps — or two windows — cannot both win and run the
      * work twice. That ordering also means a replay that then fails does not leave the entry
      * re-armed, which is the honest outcome: it was attempted, and the new run has its own log row.
+     *
+     * [_runActionBusy] is held on top of that, so a replay cannot start while a manual run is still
+     * in flight, or the other way round. The consume already defeats two taps on the *same* row; the
+     * flag is what stops two *different* one-shot runs from overlapping.
      */
     fun replayHeldRun(entry: RunLogEntry) {
         viewModelScope.launch {
-            val entryId = entry.id
-            val consumed = runCatching { db.runLogDao().clearHeld(entryId) }.getOrDefault(0)
-            if (consumed == 0) {
-                events.send("That held run has already been replayed.")
-                return@launch
+            if (_runActionBusy.value) return@launch
+            _runActionBusy.value = true
+            // finally, not a trailing assignment: every early return below leaves through it, and
+            // executeAndLogTask is not wrapped in a runCatching here — a throw would otherwise leave
+            // the flag standing and disable both run actions for the rest of the process.
+            try {
+                val entryId = entry.id
+                val consumed = runCatching { db.runLogDao().clearHeld(entryId) }.getOrDefault(0)
+                if (consumed == 0) {
+                    events.send("That held run has already been replayed.")
+                    return@launch
+                }
+                val payload = HeldExecutionPayloadCodec.decode(entry.heldPayload)
+                if (payload == null) {
+                    events.send("That held run no longer carries enough detail to replay.")
+                    return@launch
+                }
+                val task = runCatching { db.taskDao().getById(payload.taskId)?.toDomain() }.getOrNull()
+                if (task == null) {
+                    events.send("${payload.taskName} no longer exists.")
+                    return@launch
+                }
+                val result = executeAndLogTask(
+                    appContext = appContext,
+                    db = db,
+                    task = task,
+                    source = "Replay: ${payload.source}",
+                    metadata = payload.metadata,
+                    initialVariables = payload.initialVariables,
+                )
+                val status = if (result.report.success) "succeeded" else "failed"
+                events.send("${task.name} $status (${result.report.durationMs}ms)")
+            } finally {
+                _runActionBusy.value = false
             }
-            val payload = HeldExecutionPayloadCodec.decode(entry.heldPayload)
-            if (payload == null) {
-                events.send("That held run no longer carries enough detail to replay.")
-                return@launch
-            }
-            val task = runCatching { db.taskDao().getById(payload.taskId)?.toDomain() }.getOrNull()
-            if (task == null) {
-                events.send("${payload.taskName} no longer exists.")
-                return@launch
-            }
-            val result = executeAndLogTask(
-                appContext = appContext,
-                db = db,
-                task = task,
-                source = "Replay: ${payload.source}",
-                metadata = payload.metadata,
-                initialVariables = payload.initialVariables,
-            )
-            val status = if (result.report.success) "succeeded" else "failed"
-            events.send("${task.name} $status (${result.report.durationMs}ms)")
         }
     }
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            val result = executeAndLogTask(
-                appContext = appContext,
-                db = db,
-                task = task,
-                source = "Manual run",
-            )
-            val status = if (result.report.success) "succeeded" else "failed"
-            events.send("${task.name} $status (${result.report.durationMs}ms)")
+            if (_runActionBusy.value) return@launch
+            _runActionBusy.value = true
+            // finally, not a plain trailing assignment: executeAndLogTask is not wrapped in a
+            // runCatching here, so a throw would otherwise leave the flag standing and disable
+            // Run now for the rest of the process.
+            try {
+                val result = executeAndLogTask(
+                    appContext = appContext,
+                    db = db,
+                    task = task,
+                    source = "Manual run",
+                )
+                val status = if (result.report.success) "succeeded" else "failed"
+                events.send("${task.name} $status (${result.report.durationMs}ms)")
+            } finally {
+                _runActionBusy.value = false
+            }
         }
     }
 
