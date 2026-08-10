@@ -253,9 +253,28 @@ object RecoverySource {
         return top.sum() / minutes
     }
 
-    /** Today's per-minute step points, for the peak-cadence measures. */
-    fun today(stepPoints: List<ChartPoint>, zoneOffsetMs: Long, todayEpochDay: Long): List<ChartPoint> =
-        stepPoints.filter { (it.tMs + zoneOffsetMs) / 86_400_000L == todayEpochDay }
+    /**
+     * The most recent day that actually contains a day's walking, with its epoch-day.
+     *
+     * Peak-30 cadence is a DAILY figure and it is meaningless before the day has happened: asked at
+     * 07:57 after a night's sleep it answered "8 steps/min against a norm of 71", which is true of
+     * the four minutes on record and absurd as a statement about 白い熊 (reported 2026-08-10). A
+     * day needs at least [MIN_ACTIVE_MINUTES] minutes with steps in it before its peak means
+     * anything; below that the answer is yesterday's, and the row says which day it is.
+     */
+    const val MIN_ACTIVE_MINUTES = 30
+
+    fun lastCompleteDay(
+        stepPoints: List<ChartPoint>,
+        zoneOffsetMs: Long,
+        todayEpochDay: Long,
+    ): Pair<Long, List<ChartPoint>>? {
+        val byDay = stepPoints.groupBy { (it.tMs + zoneOffsetMs) / 86_400_000L }
+        return (0..7).asSequence()
+            .map { todayEpochDay - it }
+            .mapNotNull { day -> byDay[day]?.let { day to it } }
+            .firstOrNull { (_, pts) -> pts.count { it.value > 0 } >= MIN_ACTIVE_MINUTES }
+    }
 
     /** Polar's published bands for that ratio. */
     fun loadBand(ratio: Double): LoadBand = when {

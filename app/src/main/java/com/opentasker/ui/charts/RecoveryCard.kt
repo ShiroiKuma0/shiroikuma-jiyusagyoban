@@ -30,6 +30,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -58,6 +59,9 @@ fun RecoveryCard(
     sri: Double?,
     sleepScore: SleepScore.Breakdown?,
     peak30Cadence: Double?,
+    peakCadenceDay: Long?,
+    /** Minutes awake inside last night's session, so the two sleep numbers can be reconciled. */
+    awakeMinutes: Int?,
     regime: RecoveryRegime.Regime?,
     feltToday: Int?,
     feltEnabled: Boolean,
@@ -67,28 +71,14 @@ fun RecoveryCard(
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
-    Card(
-        Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    BandText.recoveryTitle[lang],
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                InfoCircle(diameter = 28.dp, onClick = onClick)
-            }
+    SectionCard(onClick = onClick) {
+        SectionTitle(BandText.recoveryTitle[lang]) { InfoCircle(diameter = 28.dp, onClick = onClick) }
 
-            if (recovery == null || !recovery.hasHeadline) {
-                Text(
+        if (recovery == null || !recovery.hasHeadline) {
+                NoteText(
                     BandText.recoveryCollecting[lang].format(
                         (Recovery.MIN_NIGHTS_FOR_ANY - (recovery?.nightsOfHistory ?: 0)).coerceAtLeast(0),
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = style.axisText,
                 )
             } else {
                 Headline(recovery)
@@ -99,6 +89,13 @@ fun RecoveryCard(
                 val width = markerLabelWidth(labels)
                 r.markers.forEach { MarkerRow(it, width) }
 
+                // The 睡眠 card below headlines the whole session; this marker is time ACTUALLY
+                // asleep. 白い熊 read 7h40 against 8h07 as two different nights (2026-08-10) — it is
+                // one night and 27 minutes awake, so the card now says so rather than leaving the
+                // reader to subtract.
+                r.markers.firstOrNull { it.marker == RecoveryMarker.SLEEP }?.value?.let { asleep ->
+                    awakeMinutes?.takeIf { it > 0 }?.let { Note(BandText.sleepAwakeNote[lang].format(it)) }
+                }
                 if (r.confidence == RecoveryConfidence.PROVISIONAL) {
                     Note(BandText.recoveryProvisional[lang].format(r.nightsOfHistory))
                 }
@@ -113,7 +110,7 @@ fun RecoveryCard(
             sleepScore?.let { SleepScoreRow(it) }
             sri?.let { SriRow(it) }
             load?.let { LoadRow(it) }
-            peak30Cadence?.let { PeakCadenceRow(it) }
+            peak30Cadence?.let { PeakCadenceRow(it, peakCadenceDay) }
             // The way into the register. It sits under the load block because that is the number it
             // explains: the weekly figure is a total, and this is what it is made of.
             Text(
@@ -124,9 +121,8 @@ fun RecoveryCard(
             )
             // Regime notes go LAST and in amber: they qualify everything above them, so they read
             // as a caveat on the card rather than as another marker on it.
-            regime?.let { RegimeNotes(it) }
-            if (feltEnabled) FeltRow(feltToday, onFelt)
-        }
+        regime?.let { RegimeNotes(it) }
+        if (feltEnabled) FeltRow(feltToday, onFelt)
     }
 }
 
@@ -147,7 +143,12 @@ private fun Headline(r: RecoveryResult) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(tint))
         Spacer(Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        Text(
+            text,
+            style = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp),
+            fontWeight = FontWeight.Bold,
+            color = sectionInk,
+        )
     }
     if (r.adverseMarkers.isNotEmpty()) {
         Text(
@@ -167,7 +168,7 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             markerLabel(m.marker)[lang],
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -177,9 +178,12 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
         Spacer(Modifier.width(10.dp))
         Text(
             m.value?.let { format(m.marker, it, lang) } ?: "—",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(72.dp),
+            color = sectionInk,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(86.dp),
         )
         BandChip(m)
         Spacer(Modifier.weight(1f))
@@ -208,14 +212,7 @@ private fun BandChip(m: MarkerReading) {
             (if (m.adverse) ChartPalette.BAND_SERIOUS else ChartPalette.BAND_GOOD)
         RecoveryBand.UNKNOWN -> BandText.bandUnknown[lang] to LocalChartStyle.current.axisText
     }
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(tint.copy(alpha = 0.16f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
-    }
+    ValueChip(label, tint)
 }
 
 /**
@@ -243,7 +240,7 @@ private fun SleepScoreRow(b: SleepScore.Breakdown) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(BandText.sleepScoreTitle[lang], style = MaterialTheme.typography.bodySmall)
+            SubHeading(BandText.sleepScoreTitle[lang])
             Spacer(Modifier.width(10.dp))
             Text("${b.total}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(10.dp))
@@ -259,11 +256,15 @@ private fun SleepScoreRow(b: SleepScore.Breakdown) {
 }
 
 @Composable
-private fun PeakCadenceRow(peak: Double) {
+private fun PeakCadenceRow(peak: Double, day: Long?) {
     val lang = LocalBandLanguage.current
+    val label = day?.let {
+        java.time.Instant.ofEpochMilli(it * 86_400_000L)
+            .atZone(java.time.ZoneOffset.UTC).toLocalDate().toString()
+    } ?: "—"
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(BandText.peakCadence[lang], style = MaterialTheme.typography.bodySmall)
+            SubHeading(BandText.peakCadence[lang])
             Spacer(Modifier.width(10.dp))
             Text(
                 "${peak.roundToInt()}",
@@ -271,7 +272,7 @@ private fun PeakCadenceRow(peak: Double) {
                 fontWeight = FontWeight.Bold,
             )
         }
-        Note(BandText.peakCadenceNote[lang].format(peak.roundToInt()))
+        Note(BandText.peakCadenceNote[lang].format(label, peak.roundToInt()))
     }
 }
 
@@ -285,16 +286,7 @@ private fun RegimeNotes(r: RecoveryRegime.Regime) {
 }
 
 @Composable
-private fun Chip(text: String, tint: Color) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(tint.copy(alpha = 0.16f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = tint)
-    }
-}
+private fun Chip(text: String, tint: Color) = ValueChip(text, tint)
 
 @Composable
 private fun SriRow(sri: Double) {
@@ -314,7 +306,7 @@ private fun SriRow(sri: Double) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(BandText.sriTitle[lang], style = MaterialTheme.typography.bodySmall)
+            SubHeading(BandText.sriTitle[lang])
             Spacer(Modifier.width(10.dp))
             Text(
                 "${sri.roundToInt()}",
@@ -343,8 +335,9 @@ private fun LoadRow(load: RecoveryBuild.LoadReading) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 BandText.loadTitle[lang],
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp),
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
             )
             Spacer(Modifier.width(10.dp))
             Text(
@@ -435,13 +428,7 @@ private fun FeltRow(feltToday: Int?, onFelt: (Int) -> Unit) {
 }
 
 @Composable
-private fun Note(text: String, warn: Boolean = false) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelSmall,
-        color = if (warn) ChartPalette.BAND_WARN else LocalChartStyle.current.axisText,
-    )
-}
+private fun Note(text: String, warn: Boolean = false) = NoteText(text, warn = warn)
 
 private val RecoveryLogScale = 1..5
 
@@ -484,7 +471,7 @@ private fun format(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: 
 @Composable
 private fun markerLabelWidth(labels: List<String>): Dp {
     val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.bodySmall
+    val style = MaterialTheme.typography.bodyMedium
     val density = LocalDensity.current
     return remember(labels, style, density, measurer) {
         val widest = labels.maxOfOrNull { measurer.measure(it, style, softWrap = false).size.width } ?: 0

@@ -44,18 +44,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
     val lang = LocalBandLanguage.current
-    Card(
-        Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    SectionCard(onClick = onClick) {
+        SectionTitle(BandText.indexTitle[lang]) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    BandText.indexTitle[lang],
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
                 if (index.partial) {
                     Box(
                         Modifier
@@ -75,12 +66,14 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                 // merely happens to be tappable does not advertise that. The ring does.
                 InfoCircle(diameter = 28.dp, onClick = onClick)
             }
+        }
 
-            Row(verticalAlignment = Alignment.Bottom) {
+        Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     index.value?.toString() ?: "—",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
+                    color = sectionInk,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -89,22 +82,22 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                     color = LocalChartStyle.current.axisText,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
-            }
+        }
 
-            // One label column, wide enough for the LONGEST label there actually is — measured, not
+        // One label column, wide enough for the LONGEST label there actually is — measured, not
             // guessed. See [labelColumnWidth].
-            val labelWidth = labelColumnWidth(index.components.map { it.label[lang] })
-            index.components.forEach { ComponentRow(it, labelWidth) }
+        val labelWidth = labelColumnWidth(index.components.map { it.label[lang] })
+            // The score column has to fit "100" — three digits at bold body weight. It was a 28 dp
+            // guess, which wrapped the moment a component actually scored 100 (白い熊, 2026-08-10).
+        val valueWidth = labelColumnWidth(index.components.map { it.score?.toString() ?: "—" } + "100")
+        index.components.forEach { ComponentRow(it, labelWidth, valueWidth) }
 
-            if (index.partial) {
-                Text(
-                    BandText.indexPartialNote[lang].format(
-                        index.missing.joinToString(if (lang == BandLanguage.EN) ", " else "・") { it[lang] },
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LocalChartStyle.current.axisText,
-                )
-            }
+        if (index.partial) {
+            NoteText(
+                BandText.indexPartialNote[lang].format(
+                    index.missing.joinToString(if (lang == BandLanguage.EN) ", " else "・") { it[lang] },
+                ),
+            )
         }
     }
 }
@@ -129,7 +122,7 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
 @Composable
 private fun labelColumnWidth(labels: List<String>): Dp {
     val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.bodySmall
+    val style = MaterialTheme.typography.bodyMedium
     val density = LocalDensity.current
     return remember(labels, style, density, measurer) {
         val widest = labels.maxOfOrNull { measurer.measure(it, style, softWrap = false).size.width } ?: 0
@@ -138,12 +131,12 @@ private fun labelColumnWidth(labels: List<String>): Dp {
 }
 
 @Composable
-private fun ComponentRow(c: IndexComponent, labelWidth: Dp) {
+private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         val lang = LocalBandLanguage.current
         Text(
             c.label[lang],
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -157,10 +150,12 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp) {
         Spacer(Modifier.width(10.dp))
         Text(
             if (c.score == null) "—" else "${c.score}",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(28.dp),
-            color = if (c.score == null) LocalChartStyle.current.axisText else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(valueWidth),
+            color = if (c.score == null) LocalChartStyle.current.axisText else sectionInk,
         )
     }
 }

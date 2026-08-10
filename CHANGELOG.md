@@ -3,6 +3,37 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.82.2026-08-08.gbd01eebb+029 — 2026-08-10
+
+**Four reported faults, and a visual pass over the whole 「健康」 page.**
+
+**The morning rating attached to the wrong night.** 白い熊 rated 2 on the 10th and the card kept
+showing Normal. The rating was filed under the calendar day it was typed on, while the marker looks a
+night's rating up by the night's own START date — and a night begun at 23:xx on the 9th is never the
+10th. So every morning's answer was filed against a night that had not happened yet and the card
+showed the previous day's for ever. Ratings now attach to the night they describe, and are read back
+by the same key.
+
+**Peak 30-minute cadence read 8 steps/min at 07:57.** True of the four minutes on record and absurd
+as a statement about anybody. It is a daily figure and it is meaningless before the day has happened,
+so it now uses the most recent day carrying at least 30 minutes of walking, and prints which day that
+is. 白い熊's now reads 133 against a population norm of 71.
+
+**7h 40m against 8h 07m was not stale data.** Both are last night: 135 + 254 + 71 deep/light/REM is
+7h 40m asleep, plus 27 minutes awake makes the 8h 07m session the 睡眠 card headlines. The 回復 marker
+is now labelled **Time asleep** and says the difference out loud, rather than leaving the reader to
+subtract two numbers on different cards. Nocturnal heart rate was never stale — it comes from the
+same night.
+
+**The health index wrapped at 100.** The score column was a 28 dp guess and three digits did not fit;
+it now measures itself, like the label column beside it.
+
+**The look.** Every section is a bordered group with a big, bold, underlined header and an accent dot;
+body text is larger and yellow; sub-headings are visibly heavier than prose; value pills are outlined
+rather than flat. The sleep stages become a proper table — stage, minutes right-aligned, share, and a
+total rule under it. It all lives in one file, `SectionChrome.kt`, because the failure mode of "make
+it nicer" is eight cards that are each nice and collectively inconsistent.
+
 ## 0.2.82.2026-08-08.gbd01eebb+027 — 2026-08-09
 
 **`運動と回復` — the session register: a five-week grid and a paired list.** Reached from

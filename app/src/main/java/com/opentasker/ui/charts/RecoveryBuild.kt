@@ -35,8 +35,10 @@ object RecoveryBuild {
         val sri: Double?,
         /** Last night, on Apple's published 50/30/20 weights — see [SleepScore]. */
         val sleepScore: SleepScore.Breakdown?,
-        /** Mean of the day's 30 highest step-count minutes. NHANES norm 71.1. */
+        /** Mean of the 30 highest step-count minutes of [peakCadenceDay]. NHANES norm 71.1. */
         val peak30Cadence: Double?,
+        /** Which day that peak belongs to — today's is meaningless before the day has happened. */
+        val peakCadenceDay: Long?,
         /** Travel and altitude, detected and said out loud — see [RecoveryRegime]. */
         val regime: RecoveryRegime.Regime,
         /** Every marked session beside the night that followed it — see [SessionRegister]. */
@@ -70,7 +72,8 @@ object RecoveryBuild {
         val spotPoints = metrics.firstOrNull { it.spec.key == BandMetric.HEART_RATE }?.spots.orEmpty()
         val load = buildLoad(stepPoints, spotPoints, sessions_, sessionOpen, zoneOffsetMs, todayEpochDay, nowMs)
         val sri = SleepRegularity.of(sessions)
-        val peak30 = RecoverySource.peakCadence(RecoverySource.today(stepPoints, zoneOffsetMs, todayEpochDay), 30)
+        val peakDay = RecoverySource.lastCompleteDay(stepPoints, zoneOffsetMs, todayEpochDay)
+        val peak30 = peakDay?.let { RecoverySource.peakCadence(it.second, 30) }
 
         val nights = RecoverySource.nights(sessions)
         val spo2Points = pointsOf(metrics, BandMetric.SPO2)
@@ -96,7 +99,7 @@ object RecoveryBuild {
         )
 
         if (nights.isEmpty()) {
-            return Assembled(null, load, sri, null, peak30, regime, register)
+            return Assembled(null, load, sri, null, peak30, peakDay?.first, regime, register)
         }
 
         val onsets = nights.map(minuteOfDayOf.let { f -> { n: SleepSession -> f(n.startMs) } })
@@ -155,6 +158,7 @@ object RecoveryBuild {
             sri = sri,
             sleepScore = sleepScore,
             peak30Cadence = peak30,
+            peakCadenceDay = peakDay?.first,
             regime = regime,
             register = register,
         )

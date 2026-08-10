@@ -119,6 +119,8 @@ fun BandDashboardScreen(
                 sri = state.sri,
                 sleepScore = state.sleepScore,
                 peak30Cadence = state.peak30Cadence,
+                peakCadenceDay = state.peakCadenceDay,
+                awakeMinutes = state.sleep?.sessions?.maxByOrNull { it.startMs }?.awake,
                 regime = state.regime,
                 feltToday = state.feltToday,
                 feltEnabled = state.feltEnabled,
@@ -399,43 +401,27 @@ fun ChartCard(
     plot: @Composable () -> Unit,
 ) {
     val style = LocalChartStyle.current
-    Card(
-        Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).clip(CircleShape).background(accent))
-                Spacer(Modifier.width(8.dp))
+    SectionCard(accent = accent, onClick = onClick) {
+        SectionTitle(title, accent) { band?.let { BandChip(it) } }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                headline,
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = style.headlineSize),
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+            if (unit.isNotBlank()) {
+                Spacer(Modifier.width(5.dp))
                 Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
+                    unit,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = style.axisText,
+                    modifier = Modifier.padding(bottom = 5.dp),
                 )
-                band?.let { BandChip(it) }
             }
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    headline,
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = style.headlineSize),
-                    fontWeight = FontWeight.Bold,
-                )
-                if (unit.isNotBlank()) {
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        unit,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = style.axisText,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
-            }
-            plot()
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = style.axisText)
         }
+        plot()
+        NoteText(subtitle)
     }
 }
 

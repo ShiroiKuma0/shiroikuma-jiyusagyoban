@@ -120,7 +120,7 @@ object BandText {
         "暫定値：%d 夜。14 夜になるまでは差の絶対値で比べている。",
     )
     val markerNocturnalHr = Loc("Nocturnal heart rate", "夜間心拍")
-    val markerSleep = Loc("Sleep", "睡眠")
+    val markerSleep = Loc("Time asleep", "実睡眠")
     val markerFelt = Loc("How you felt", "体感")
     val markerTemperature = Loc("Skin temperature", "皮膚温")
     val bandUsual = Loc("usual", "平常")
@@ -214,8 +214,12 @@ object BandText {
     val onsetDrift = Loc("%d min from your usual bedtime", "いつもの就寝時刻から %d 分ずれ")
     val peakCadence = Loc("Peak 30-min cadence", "最も速い30分の歩調")
     val peakCadenceNote = Loc(
-        "%d steps/min, against a population norm of 71. The one intensity measure that predicts outcomes independently of how much you walked.",
-        "毎分 %d 歩（一般的な目安は 71）。総歩数とは独立に結果を予測できる、数少ない強度の指標。",
+        "%s · %d steps/min, against a population norm of 71. The one intensity measure that predicts outcomes independently of how much you walked. A day needs 30 minutes of walking in it before this means anything, so early in the morning it shows the last day that had them.",
+        "%s ・ 毎分 %d 歩（一般的な目安は 71）。総歩数とは独立に結果を予測できる、数少ない強度の指標。歩いた時間が 30 分たまるまで意味を持たないので、朝のうちは直近のそういう日を出す。",
+    )
+    val sleepAwakeNote = Loc(
+        "Time actually asleep. The 睡眠 card below shows the whole session — the difference is the %d min you were awake in it.",
+        "実際に眠っていた時間。下の 睡眠 カードは区間全体を出しているので、その差が途中で起きていた %d 分。",
     )
     val regimeTravel = Loc(
         "You changed time zone %d day(s) ago. Sleep duration re-converges in about two days but timing takes over two weeks, so the comparisons above are still catching up.",
@@ -275,6 +279,10 @@ object BandText {
     // sleep
     val sleep = Loc("Sleep", "睡眠")
     val sleepDuration = Loc("%dh %02dm", "%d時間%d分")
+    val sleepStageHeader = Loc("Stage", "段階")
+    val sleepMinutesHeader = Loc("Minutes", "分")
+    val sleepShareHeader = Loc("Share", "割合")
+    val sleepTotalRow = Loc("Total", "合計")
     val sleepBreakdown = Loc(
         "Deep %dm · Light %dm · REM %dm · Awake %dm",
         "深い %d分 ／ 浅い %d分 ／ REM %d分 ／ 覚醒 %d分",

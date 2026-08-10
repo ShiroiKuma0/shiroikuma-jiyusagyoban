@@ -128,6 +128,8 @@ data class DashboardState(
     val sleepScore: SleepScore.Breakdown? = null,
     /** Mean of the day's 30 highest step-count minutes — NHANES norm 71.1. */
     val peak30Cadence: Double? = null,
+    /** The day [peak30Cadence] belongs to, so the row can say so rather than implying "today". */
+    val peakCadenceDay: Long? = null,
     /** Travel / altitude, annotated rather than silently corrected. */
     val regime: RecoveryRegime.Regime? = null,
     /** Every marked session paired with the night after it — see [SessionRegister]. */
@@ -275,9 +277,14 @@ class BandDashboardModel(
             sri = assembled.sri,
             sleepScore = assembled.sleepScore,
             peak30Cadence = assembled.peak30Cadence,
+            peakCadenceDay = assembled.peakCadenceDay,
             regime = assembled.regime,
             register = assembled.register,
-            feltToday = RecoveryLog.rating(appContext, localDateKey(today)),
+            // Read back by the same key it is written under, so the buttons show what the marker
+            // is actually using.
+            feltToday = assembled.recovery?.nightStartMs
+                ?.let { RecoveryLog.rating(appContext, localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate())) }
+                ?: RecoveryLog.rating(appContext, localDateKey(today)),
             feltEnabled = RecoveryLog.enabled(appContext),
         )
     }
@@ -325,7 +332,16 @@ class BandDashboardModel(
      */
     fun setFeltToday(rating: Int) {
         val zone = ZoneId.systemDefault()
-        val key = localDateKey(LocalDate.now(zone))
+        // Filed against the NIGHT IT DESCRIBES, not against the calendar day it was typed on.
+        //
+        // 白い熊 wakes on the 10th and rates how the night went; that night STARTED on the 9th, and
+        // the marker looks a night's rating up by the night's own start date. Keying on "today"
+        // therefore filed every morning's answer against a night that had not happened yet, and the
+        // card showed the previous day's rating for ever. Reported 2026-08-10: rated 2, card said
+        // Normal.
+        val key = state.value.recovery?.nightStartMs
+            ?.let { localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()) }
+            ?: localDateKey(LocalDate.now(zone))
         // Tapping the value already selected REMOVES it. A rating you can change but never withdraw
         // is a trap: a stray tap becomes permanent data 白い熊 did not author, and the marker would
         // then be counted against a number nobody meant. (Found exactly that way, 2026-08-09.)

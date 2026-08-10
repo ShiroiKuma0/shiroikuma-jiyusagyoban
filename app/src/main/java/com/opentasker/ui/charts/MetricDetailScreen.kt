@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
@@ -359,24 +360,82 @@ private fun BandLadder(bands: List<BandRung>) {
 private fun SleepBreakdown(session: SleepSession) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    // A table rather than four sentences (白い熊, 2026-08-10): the four stages are one quantity read
+    // four ways, and columns are how you compare four of anything. Minutes right-aligned so the
+    // digits line up, percentages beside them, and a total rule underneath to close it.
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row {
+            Spacer(Modifier.width(18.dp))
+            Text(
+                BandText.sleepStageHeader[lang],
+                style = MaterialTheme.typography.labelMedium,
+                color = style.axisText,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                BandText.sleepMinutesHeader[lang],
+                style = MaterialTheme.typography.labelMedium,
+                color = style.axisText,
+                modifier = Modifier.width(64.dp),
+                textAlign = TextAlign.End,
+            )
+            Text(
+                BandText.sleepShareHeader[lang],
+                style = MaterialTheme.typography.labelMedium,
+                color = style.axisText,
+                modifier = Modifier.width(56.dp),
+                textAlign = TextAlign.End,
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(style.grid))
         SleepShape.ROWS.forEach { code ->
             val minutes = session.minutesOf(code)
+            val pct = if (session.totalMinutes > 0) minutes * 100 / session.totalMinutes else 0
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(style.sleepStage(code)))
+                Box(Modifier.size(10.dp).clip(CircleShape).background(style.sleepStage(code)))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     SleepShape.labelOf(code)[lang],
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.width(56.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sectionInk,
+                    modifier = Modifier.weight(1f),
                 )
-                val pct = if (session.totalMinutes > 0) minutes * 100 / session.totalMinutes else 0
                 Text(
-                    if (lang == BandLanguage.EN) "${minutes}m · $pct%" else "${minutes}分 · $pct%",
-                    style = MaterialTheme.typography.bodySmall,
+                    if (lang == BandLanguage.EN) "${minutes}m" else "${minutes}分",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = sectionInk,
+                    modifier = Modifier.width(64.dp),
+                    textAlign = TextAlign.End,
+                )
+                Text(
+                    "$pct%",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = style.axisText,
+                    modifier = Modifier.width(56.dp),
+                    textAlign = TextAlign.End,
                 )
             }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(style.grid))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(18.dp))
+            Text(
+                BandText.sleepTotalRow[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                if (lang == BandLanguage.EN) "${session.totalMinutes}m" else "${session.totalMinutes}分",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+                modifier = Modifier.width(64.dp),
+                textAlign = TextAlign.End,
+            )
+            Spacer(Modifier.width(56.dp))
         }
     }
 }
