@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.opentasker.core.contexts.NotificationTriggerService
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
@@ -17,6 +18,10 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import kotlinx.coroutines.suspendCancellableCoroutine
+// The fork keeps plain Action implementations alongside upstream's DeclaredAction ones in this
+// file, so both symbols stay imported.
+import com.opentasker.core.engine.Action
+import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.isArgumentSensitive
@@ -103,6 +108,24 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             builder.addAction(0, label, pi)
+        }
+
+        // Body tap (contentIntent) runs a task — clickable in the collapsed view too, unlike action
+        // buttons which only show when the notification is expanded.
+        args["tap_task"]?.takeIf { it.isNotBlank() }?.let { taskName ->
+            val req = (notifId.hashCode() * 31 + 99) and 0x7FFFFFFF
+            val tapIntent = Intent(ctx.app, NotificationActionReceiver::class.java).apply {
+                action = NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON
+                putExtra(NotificationActionReceiver.EXTRA_TASK_NAME, taskName)
+                putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, title)
+                putExtra("_req", req)
+            }
+            builder.setContentIntent(
+                PendingIntent.getBroadcast(
+                    ctx.app, req, tapIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
         }
 
         val notification = builder.build()
@@ -227,6 +250,22 @@ class NotifyCancelAction : DeclaredAction(ActionCatalog.require("notify.cancel")
     }
 }
 
+/** Dismiss every clearable notification from another app, by package — needs notification access. */
+class NotifyDismissAction : Action {
+    override val id = "notify.dismiss"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("Specify 'package' to dismiss notifications from")
+        val listener = NotificationTriggerService.instance
+            ?: return ActionResult.Failure("Notification access not granted (listener not connected)")
+        val n = listener.dismissPackage(pkg)
+        ctx.logger("Dismissed $n notification(s) from $pkg")
+        return ActionResult.Success
+    }
+}
+
 internal object NotificationChannels {
     data class ChannelDef(
         val id: String,
@@ -235,9 +274,9 @@ internal object NotificationChannels {
     )
 
     private val channels = mapOf(
-        "quiet" to ChannelDef("opentasker.quiet", "OpenTasker quiet", NotificationManager.IMPORTANCE_LOW),
-        "default" to ChannelDef("opentasker.actions", "OpenTasker actions", NotificationManager.IMPORTANCE_DEFAULT),
-        "urgent" to ChannelDef("opentasker.urgent", "OpenTasker urgent", NotificationManager.IMPORTANCE_HIGH),
+        "quiet" to ChannelDef("opentasker.quiet", "白い熊 自由作業盤 quiet", NotificationManager.IMPORTANCE_LOW),
+        "default" to ChannelDef("opentasker.actions", "白い熊 自由作業盤 actions", NotificationManager.IMPORTANCE_DEFAULT),
+        "urgent" to ChannelDef("opentasker.urgent", "白い熊 自由作業盤 urgent", NotificationManager.IMPORTANCE_HIGH),
     )
 
     fun resolve(key: String): ChannelDef =
@@ -455,24 +494,22 @@ class LaunchIntentAction : DeclaredAction(ActionCatalog.require("intent.launch")
             IntentDispatchMode.ACTIVITY -> intent.resolveActivity(packageManager)
             IntentDispatchMode.BROADCAST, IntentDispatchMode.SERVICE -> null
         }
-        if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
-        if (component != null) {
-            if (component.packageName != plan.packageName) return null
-            if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
-                return null
-            }
-            intent.component = component
+        // Every dispatch has to name one concrete component — an explicit class, a launcher
+        // entry, or (for an activity) whatever the target package's own manifest declares as
+        // the handler for this action. Upstream additionally refused a resolved, exported
+        // activity whenever the class was not typed out by hand; that turns the ordinary
+        // "package + action" launch — android.media.action.STILL_IMAGE_CAMERA and friends —
+        // into a hunt for a vendor-internal class name, so the fork drops that last hurdle.
+        // The guarantees it was standing in for are kept below: same package, exported.
+        if (component == null) return null
+        if (component.packageName != plan.packageName) return null
+        if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
+            return null
         }
+        intent.component = component
         if (plan.mode != IntentDispatchMode.ACTIVITY && plan.packageName != ctx.app.packageName) {
             // Broadcasts and services never use an external package-scoped implicit dispatch.
             if (explicitComponent == null) return null
-        }
-        if (plan.mode == IntentDispatchMode.ACTIVITY && plan.action != null &&
-            plan.packageName != ctx.app.packageName && explicitComponent == null
-        ) {
-            // A package plus arbitrary action is not an approval of a particular exported
-            // component; require the user to choose the class explicitly.
-            return null
         }
         return intent
     }

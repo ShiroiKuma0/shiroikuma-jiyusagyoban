@@ -2,7 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.Context
 
-data class EngineHeartbeat(
+data class EngineHeartbeatSnapshot(
     val lastAliveAtMillis: Long,
     val stoppedCleanly: Boolean,
     val foregroundServiceTypes: Int = 0,
@@ -31,7 +31,7 @@ data class EngineExitCorrelation(
 )
 
 data class EnginePersistedHealth(
-    val heartbeat: EngineHeartbeat,
+    val heartbeat: EngineHeartbeatSnapshot,
     val lastMatcherError: String?,
     val lastMatcherErrorAtMillis: Long,
     val processExitCorrelation: EngineExitCorrelation? = null,
@@ -58,7 +58,7 @@ class EngineHeartbeatStore(context: Context) {
             .apply()
     }
 
-    fun read(): EngineHeartbeat = EngineHeartbeat(
+    fun read(): EngineHeartbeatSnapshot = EngineHeartbeatSnapshot(
         lastAliveAtMillis = preferences.getLong(KEY_LAST_ALIVE, 0L),
         stoppedCleanly = preferences.getBoolean(KEY_STOPPED_CLEANLY, true),
         foregroundServiceTypes = preferences.getInt(KEY_FOREGROUND_SERVICE_TYPES, 0),
@@ -123,7 +123,7 @@ class EngineHeartbeatStore(context: Context) {
  * gap. Kept pure so a JVM test can supply a fake historical exit source without an Android device.
  */
 internal fun correlateProcessExit(
-    heartbeat: EngineHeartbeat,
+    heartbeat: EngineHeartbeatSnapshot,
     nowMillis: Long,
     platformAvailable: Boolean,
     exits: List<HistoricalProcessExit>,
@@ -154,7 +154,7 @@ internal fun correlateProcessExit(
     )
 }
 
-internal fun EngineHeartbeat.needsRecovery(
+internal fun EngineHeartbeatSnapshot.needsRecovery(
     nowMillis: Long,
     staleAfterMillis: Long = EngineHeartbeatStore.STALE_AFTER_MS,
 ): Boolean = stoppedCleanly ||

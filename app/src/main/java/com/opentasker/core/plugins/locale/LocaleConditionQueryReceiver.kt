@@ -74,7 +74,7 @@ class LocaleConditionQueryReceiver : BroadcastReceiver() {
             }
             LocaleConditionKind.VARIABLE_COMPARE -> {
                 val variableName = spec.variableName ?: return LocalePluginConditionState.Unknown
-                val entity = db.variableDao().getInProject(variableName, spec.variableProjectId)
+                val entity = db.variableDao().get(spec.variableProjectId, variableName)
                     ?: return LocalePluginConditionState.Unknown
                 LocaleConditionEvaluator.evaluate(
                     spec,

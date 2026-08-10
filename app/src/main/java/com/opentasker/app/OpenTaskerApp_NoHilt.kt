@@ -9,13 +9,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
-import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.engine.RunLogPruneWorker
@@ -56,7 +55,13 @@ class OpenTaskerApp_NoHilt : Application() {
         }
     }
 
-    /** Initializes credential-protected runtime state after the user has unlocked the device. */
+    /**
+     * Initializes credential-protected runtime state after the user has unlocked the device.
+     *
+     * Upstream's Direct Boot split: before first unlock nothing here may run, because Room, the
+     * secret store and every DataStore live in credential-protected storage. BootReceiver calls
+     * back into this once ACTION_USER_UNLOCKED arrives.
+     */
     fun initializeAfterUnlock() {
         if (!DirectBootTriggerStore.isUserUnlocked(this)) return
         synchronized(this) {
@@ -66,6 +71,15 @@ class OpenTaskerApp_NoHilt : Application() {
             AdvancedProtectionReader.start(this)
             AppVisibilityTracker.register(this)
             ShizukuPowerBackend.initialize(this)
+            // Seed the black-yellow appearance defaults before any Compose code reads the theme.
+            ThemeStore.init(this)
+            com.opentasker.core.icons.TaskIconStore.init(this)
+            com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
+            com.opentasker.core.bubbles.FlashBubbleStore.init(this)
+            com.opentasker.core.share.ShareRelayStore.init(this)
+            com.opentasker.widget.TemplateStore.init(this)
+            com.opentasker.core.storage.ListSortStore.init(this)
+            com.opentasker.core.storage.RunLogSeenStore.init(this)
             registerActionMetadata()
             registerCoreRuntime()
 
@@ -80,23 +94,23 @@ class OpenTaskerApp_NoHilt : Application() {
                     PendingRestoreApplyResult.NoPending -> Unit
                 }
 
-                val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
+                // Plain, unencrypted Room: the fork does not take upstream's SQLCipher database (see
+                // DatabaseSecurity's fork note), and it registers every migration manually, having
+                // never used AutoMigration. Upstream's fresh-install Default-project seed is not
+                // taken either — the fork's projects table has different columns and its projectId
+                // is nullable, so an unfiled workspace is the fork's own valid starting state.
                 _db = Room.databaseBuilder(
                     this,
                     AppDatabase::class.java,
                     DatabaseBackupManager.DATABASE_NAME,
                 )
-                    .addMigrations(*DatabaseMigrations.getManualMigrations())
-                    .addCallback(object : RoomDatabase.Callback() {
-                        override fun onCreate(db: SupportSQLiteDatabase) {
-                            // Fresh installs skip every migration, so the default workspace has to
-                            // be seeded here as well as in MIGRATION_8_9.
-                            db.execSQL(DatabaseMigrations.SEED_DEFAULT_PROJECT)
-                        }
-                    })
-                    .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
+                    .addMigrations(*DatabaseMigrations.getAllMigrations())
                     .build()
             }
+            // Warm the persistent-variable cache (super- and project-globals) before any task runs.
+            com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
+            // Expose the running build as %APPVER so a task can flash it (catch stale installs).
+            com.opentasker.core.engine.variables.PersistentGlobalScope.set(0L, "APPVER", com.opentasker.app.BuildConfig.VERSION_NAME)
 
             applicationScope.launch {
                 runCatching {
@@ -119,6 +133,7 @@ class OpenTaskerApp_NoHilt : Application() {
             }
 
             RunLogPruneWorker.enqueue(this)
+            com.opentasker.core.engine.BandPruneWorker.enqueue(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }

@@ -3,115 +3,69 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.annotation.StringRes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.opentasker.app.R
-import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
-import com.opentasker.core.capabilities.AutomationLint
-import com.opentasker.core.capabilities.AutomationLintReport
-import com.opentasker.core.capabilities.AutomationLintSeverity
-import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
-import com.opentasker.core.diagnostics.AdvancedProtectionReader
-import com.opentasker.core.diagnostics.CrashLogHandler
-import com.opentasker.core.diagnostics.CrashLogRecord
-import com.opentasker.core.diagnostics.EngineHealthReader
-import com.opentasker.core.diagnostics.EngineHealthStatus
-import com.opentasker.core.diagnostics.RunLogExportFormat
-import com.opentasker.core.diagnostics.RunLogExporter
-import com.opentasker.core.engine.ActiveExecution
-import com.opentasker.core.engine.ActiveExecutionRegistry
-import com.opentasker.core.engine.ExecutionEnvelope
-import com.opentasker.core.engine.ExecutionAdmissionRegistry
-import com.opentasker.core.engine.ExecutionAdmissionSnapshot
-import com.opentasker.core.engine.PreflightInputs
-import com.opentasker.core.engine.PreflightReport
-import com.opentasker.core.engine.PreflightRunner
 import com.opentasker.core.engine.executeAndLogTask
-import com.opentasker.core.engine.replayHeldExecution
+import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
-import com.opentasker.core.model.ActionSpec
-import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
-import com.opentasker.core.model.ProfileLifetime
-import com.opentasker.core.model.ProfileLifecyclePolicy
-import com.opentasker.core.model.ProfileOverflowPolicy
-import com.opentasker.core.model.Project
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.validation.InputValidation
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
-import com.opentasker.core.model.VariableNamePolicy
-import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
-import kotlinx.serialization.SerializationException
-import com.opentasker.core.plugins.locale.LocaleGrantStore
-import com.opentasker.core.diff.AutomationSemanticDiff
-import com.opentasker.core.diff.SemanticDiffDocument
-import com.opentasker.core.diff.SemanticDiffEntry
-import com.opentasker.core.references.AutomationReferenceIndex
-import com.opentasker.core.references.AutomationDuplicator
-import com.opentasker.core.references.AutomationReferenceRewriter
-import com.opentasker.core.references.ReferenceResolution
-import com.opentasker.core.references.TaskReference
-import com.opentasker.core.references.describe
-import com.opentasker.core.sharing.ProfileShareDraft
-import com.opentasker.core.sharing.ProfileShareLibrary
-import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.DatabaseBackupManager
-import com.opentasker.core.storage.applyRetention
-import com.opentasker.core.storage.FallbackTaskSettings
-import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
-import com.opentasker.core.storage.EditHistorySnapshotDecoder
+import com.opentasker.core.storage.ItemGroupEntity
+import com.opentasker.core.storage.ItemMetaEntity
+import com.opentasker.core.storage.ListSortStore
+import com.opentasker.core.storage.ProjectSelectionStore
+import com.opentasker.core.storage.SortMethod
+import com.opentasker.core.storage.SortTab
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
-import com.opentasker.core.storage.RunLogQuery
-import com.opentasker.core.storage.RunLogSnapshot
-import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
-import com.opentasker.core.storage.StorageJson
-import com.opentasker.core.storage.VariableRepository
-import com.opentasker.core.storage.ProjectEntity
+import com.opentasker.core.storage.VariableEntity
 import com.opentasker.core.storage.minimumTimestamp
-import com.opentasker.core.storage.loadPage
 import com.opentasker.core.storage.normalized
-import com.opentasker.core.storage.openSnapshot
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.ItemConflictStrategy
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
-import com.opentasker.core.transfer.OpenTaskerBundleTextImport
+import com.opentasker.core.transfer.ProjectConflictStrategy
+import com.opentasker.core.transfer.ProjectImportChoice
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
-import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.widget.TaskShortcutHelper
 import androidx.room.withTransaction
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -136,12 +90,16 @@ internal val DATABASE_BACKUP_MIME_TYPES = arrayOf(
 internal fun databaseBackupExportName(): String =
     "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
 
-internal fun openTaskerBundleExportName(): String =
-    "opentasker_bundle_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.json"
+/** A filesystem-safe timestamp (yyyy-MM-dd_HH-mm-ss) shared by every export's default filename. */
+internal fun exportStamp(): String = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
 
-internal fun runLogExportName(format: RunLogExportFormat): String {
-    val extension = if (format == RunLogExportFormat.JSON) "json" else "csv"
-    return "opentasker_run_log_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.$extension"
+/** The full-workspace ("Export everything") default filename: the app label + the timestamp. */
+internal fun openTaskerBundleExportName(): String = "白い熊 自由作業盤.${exportStamp()}.json"
+
+/** Per-export default filename: the item/category name kept readable (illegal chars stripped) + the stamp. */
+internal fun exportFileName(label: String): String {
+    val clean = label.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "_").trim().ifEmpty { "export" }
+    return "$clean.${exportStamp()}.json"
 }
 
 internal data class TaskerImportReviewState(
@@ -149,98 +107,9 @@ internal data class TaskerImportReviewState(
     val preview: TaskerImportPreview,
 )
 
-/** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
-data class UiMessage(
-    @StringRes val resId: Int,
-    val args: List<Any> = emptyList(),
-) {
-    fun resolve(context: Context): String = context.getString(resId, *args.toTypedArray())
-}
-
 internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
-    val variableResolutions: Map<String, VariableConflictResolution> = emptyMap(),
-)
-
-internal data class SemanticDiffReviewState(
-    val document: SemanticDiffDocument,
-)
-
-private fun documentOf(entry: SemanticDiffEntry): SemanticDiffDocument = SemanticDiffDocument(listOf(entry))
-
-internal data class ProfileShareReviewState(
-    val draft: ProfileShareDraft,
-    val manifest: ProfileShareManifest,
-    val plan: BundleImportPlan,
-    val draftError: String? = null,
-)
-
-internal sealed interface PreflightTarget {
-    data class TaskTarget(val task: Task) : PreflightTarget
-    data class ProfileTarget(val profile: Profile) : PreflightTarget
-}
-
-internal data class PreflightReviewState(
-    val target: PreflightTarget,
-    val inputs: PreflightInputs,
-    val report: PreflightReport,
-)
-
-/**
- * What a task delete would break: every dependent object, plus whether any of them holds a
- * reference that cannot legally be cleared (a profile's enter task).
- */
-data class TaskDeletionPreview(
-    val task: Task,
-    val references: List<TaskReference> = emptyList(),
-    val requiresReassignment: Boolean = false,
-) {
-    val hasDependents: Boolean get() = references.isNotEmpty()
-}
-
-/**
- * A validated restore candidate awaiting an explicit Stage decision, plus whatever restore it
- * would replace, so the user is never silently overwriting an earlier staged restore.
- */
-data class RestoreReviewState(
-    val candidate: RestoreCandidate,
-    val replacesPending: RestoreCandidate? = null,
-)
-
-data class DiagnosticsUiState(
-    val health: EngineHealthStatus? = null,
-    val admission: ExecutionAdmissionSnapshot? = null,
-    val crashLogs: List<CrashLogRecord> = emptyList(),
-    val appLogs: List<AppLogEntry> = emptyList(),
-    val loadedAtMillis: Long = 0L,
-    /** Resolves admission rows to profile names; they previously showed raw Room ids. */
-    val profileNames: Map<Long, String> = emptyMap(),
-)
-
-data class RunLogPageUiState(
-    val entries: ImmutableList<RunLogEntry> = persistentListOf(),
-    val totalCount: Int = 0,
-    val hasMore: Boolean = false,
-    val loading: Boolean = false,
-    internal val snapshot: RunLogSnapshot? = null,
-)
-
-data class RunLogRetentionPreview(
-    val policy: RunLogRetentionPolicy,
-    val storedCount: Int,
-    val prunableCount: Int,
-    val oldestTimestamp: Long?,
-)
-
-/**
- * Thrown when a normal editor save would overwrite a record whose stored payload currently fails
- * to decode. Blocking the write keeps the corrupt bytes intact for recovery instead of clobbering
- * them with an empty fallback (fail closed).
- */
-internal class CorruptRecordOverwriteException(issue: StorageDecodeIssue) : IllegalStateException(
-    "Can't save ${issue.recordType.label.lowercase()} \"${issue.recordName}\": its stored " +
-        "${issue.fieldName} is corrupt. Recover it (undo or restore a backup) or delete it first.",
 )
 
 class ActiveAutomationViewModel(
@@ -248,79 +117,9 @@ class ActiveAutomationViewModel(
     private val appContext: Context,
 ) : ViewModel() {
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
-    private val variableRepository = VariableRepository(db.variableDao())
-    private val bundleRepository = OpenTaskerBundleRepository(db, variableRepository)
+    private val bundleRepository = OpenTaskerBundleRepository(db)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
-    private val fallbackTaskSettings = FallbackTaskSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
-
-    private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
-        UiMessage(resId, args.toList())
-
-    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage =
-        message(R.string.ui_error_message, error.message ?: appContext.getString(fallbackRes))
-
-    private fun legacyMessage(value: String): UiMessage = when {
-        value == "Task created" -> message(R.string.ui_message_task_created)
-        value == "Task updated" -> message(R.string.ui_message_task_updated)
-        value == "Action moved" -> message(R.string.ui_message_action_moved)
-        value == "Scene created" -> message(R.string.ui_message_scene_created)
-        value == "Scene updated" -> message(R.string.ui_message_scene_updated)
-        value == "Scene deleted" -> message(R.string.ui_message_scene_deleted)
-        value == "Profile created" -> message(R.string.ui_message_profile_created)
-        value == "Profile updated" -> message(R.string.ui_message_profile_updated)
-        value == "Profile deleted" -> message(R.string.ui_message_profile_deleted)
-        value == "Project created" -> message(R.string.ui_message_project_created)
-        value == "Project renamed" -> message(R.string.ui_message_project_renamed)
-        value == "Project reordered" -> message(R.string.ui_message_project_reordered)
-        value == "Project deleted" -> message(R.string.ui_message_project_deleted)
-        value == "Imported profile reviewed and enabled" -> message(R.string.ui_message_profile_reviewed)
-        value == "Template installed as a disabled profile" -> message(R.string.ui_message_template_installed)
-        value == "Edit undone" -> message(R.string.ui_message_edit_undone)
-        value == "No edit history available" -> message(R.string.ui_message_no_edit_history)
-        value == "Elements moved" -> message(R.string.ui_message_elements_moved)
-        value == "Element added" -> message(R.string.ui_message_element_added)
-        value == "Element updated" -> message(R.string.ui_message_element_updated)
-        value == "Action added" -> message(R.string.ui_message_action_added)
-        value == "Action updated" -> message(R.string.ui_message_action_updated)
-        value == "Context added" -> message(R.string.ui_message_context_added)
-        value == "Context updated" -> message(R.string.ui_message_context_updated)
-        value == "Variable created" -> message(R.string.ui_message_variable_created)
-        value.startsWith("Updated ") -> message(R.string.variables_updated, value.removePrefix("Updated "))
-        value.startsWith("Deleted ") -> message(R.string.variables_deleted, value.removePrefix("Deleted "))
-        else -> message(R.string.ui_error_message, value)
-    }
-
-    private suspend fun recordEdit(
-        entityType: String,
-        entityId: Long,
-        previousJson: String,
-        nextJson: String,
-    ) {
-        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
-        db.editHistoryDao().insert(
-            EditHistoryEntity(
-                entityType = entityType,
-                entityId = entityId,
-                previousJson = previousJson,
-                nextJson = nextJson,
-            ),
-        )
-        db.editHistoryDao().pruneOld(entityType, entityId)
-    }
-
-    private suspend fun recordCreation(entityType: String, entityId: Long, nextJson: String) {
-        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
-        db.editHistoryDao().insert(
-            EditHistoryEntity(
-                entityType = entityType,
-                entityId = entityId,
-                previousJson = "",
-                nextJson = nextJson,
-            ),
-        )
-        db.editHistoryDao().pruneOld(entityType, entityId)
-    }
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -332,108 +131,297 @@ class ActiveAutomationViewModel(
         .map { entities -> entities.map { it.toDomainDecodeResult() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val profiles: StateFlow<ImmutableList<Profile>> = profileDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase() }
-                .toImmutableList()
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    // Each list tab's order honours the persisted per-tab sort method (ListSortStore): ALPHABETICAL sorts
+    // by name; MANUAL falls back to the saved per-item `position` (the trio 起動[71] → 設定[01] → 無効[37]).
+    val profiles: StateFlow<ImmutableList<Profile>> =
+        combine(profileDecodeResults, ListSortStore.state) { results, sort ->
+            val items = results.map { it.value }
+            (if (sort.profiles == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() }
+            else items.sortedBy { it.position }).toImmutableList()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    val tasks: StateFlow<ImmutableList<Task>> = taskDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase() }
-                .toImmutableList()
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    val tasks: StateFlow<ImmutableList<Task>> =
+        combine(taskDecodeResults, ListSortStore.state) { results, sort ->
+            val items = results.map { it.value }
+            (if (sort.tasks == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() }
+            else items.sortedBy { it.position }).toImmutableList()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    private val sceneDecodeResults = db.sceneDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    /** False until the profile + task DAO flows have each emitted at least once. Gates the list
+     *  empty-states so upstream's "Build your first automation" CTA doesn't FLASH during the initial DB
+     *  load on a populated workspace. Built from the RAW dao flows (which emit only on a real query) so
+     *  it isn't fooled by the stateIn initial value. */
+    val dataLoaded: StateFlow<Boolean> = combine(
+        db.profileDao().getAllAsFlow(),
+        db.taskDao().getAllAsFlow(),
+    ) { _, _ -> true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val storageDecodeIssues: StateFlow<ImmutableList<StorageDecodeIssue>> = combine(
         profileDecodeResults,
         taskDecodeResults,
-        sceneDecodeResults,
-    ) { profileResults, taskResults, sceneResults ->
-        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue } + sceneResults.mapNotNull { it.issue })
+    ) { profileResults, taskResults ->
+        (profileResults.mapNotNull { it.issue } + taskResults.mapNotNull { it.issue })
             .sortedWith(compareBy<StorageDecodeIssue> { it.recordType.label }.thenBy { it.recordName.lowercase() })
             .toImmutableList()
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    val scenes: StateFlow<ImmutableList<Scene>> = sceneDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase() }
-                .toImmutableList()
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
-
-    val projects: StateFlow<ImmutableList<Project>> = db.projectDao()
-        .getAllAsFlow()
-        .map { entities ->
-            entities.map(ProjectEntity::toDomain).sortedWith(compareBy<Project> { it.position }.thenBy { it.id }).toImmutableList()
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    val scenes: StateFlow<ImmutableList<Scene>> =
+        combine(db.sceneDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            (if (sort.scenes == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() }
+            else items.sortedBy { it.position }).toImmutableList()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
     val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()
         .getRecentFlow()
         .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    private val _runLogFilters = MutableStateFlow(RunLogFilterState())
-    val runLogFilters: StateFlow<RunLogFilterState> = _runLogFilters.asStateFlow()
-
-    private val _runLogPage = MutableStateFlow(RunLogPageUiState())
-    val runLogPage: StateFlow<RunLogPageUiState> = _runLogPage.asStateFlow()
-
-    val runLogTaskOptions: StateFlow<ImmutableList<RunLogTaskOption>> = db.runLogDao()
-        .getTaskOptionsFlow()
-        .map { it.toImmutableList() }
+    // The fork persists ONLY global variables (super-global → projectId 0, project-global → projectId > 0);
+    // task-local `%lowercase` vars are never stored. So every row is a "global" — getAllAsFlow() is the set.
+    val globalVariables: StateFlow<ImmutableList<Variable>> = db.variableDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    private var runLogPageJob: Job? = null
+    // ---- Projects (organizational; the engine ignores projectId) + foldable groups ----
+    // The selected project filter persists across restarts (and across tabs); items/groups carry a
+    // nullable projectId (null = Unfiled). Lists filter their rows by this; groups are scoped the same way.
+    private val projectSelectionStore = ProjectSelectionStore(appContext)
+    var projectFilter by mutableStateOf<ProjectFilter>(projectSelectionStore.load())
+        private set
 
-    /** Runs in flight right now, so the Run Log can show and stop them. */
-    val activeExecutions: StateFlow<ImmutableList<ActiveExecution>> = ActiveExecutionRegistry.active
-        .map { it.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    // The last-open tab persists across restarts too — stored by enum NAME (robust to tab reordering), so
+    // re-entering the app after it's been killed returns to where 白い熊 was, not always Profiles.
+    private val uiPrefs = appContext.getSharedPreferences("ui_state", android.content.Context.MODE_PRIVATE)
+    fun loadLastScreen(): String = uiPrefs.getString("last_screen", "").orEmpty()
+    fun saveLastScreen(name: String) { uiPrefs.edit().putString("last_screen", name).apply() }
 
-    fun cancelExecution(executionId: Long) {
-        viewModelScope.launch {
-            val cancelled = ActiveExecutionRegistry.cancel(executionId)
-            events.send(message(if (cancelled) R.string.ui_message_cancelling_automation else R.string.ui_message_automation_finished))
+    val projects: StateFlow<ImmutableList<Project>> =
+        combine(db.projectDao().getAllAsFlow(), ListSortStore.state) { entities, sort ->
+            val items = entities.map { it.toDomain() }
+            (if (sort.projects == SortMethod.ALPHABETICAL) items.sortedBy { it.name.lowercase() }
+            else items.sortedBy { it.sortOrder }).toImmutableList()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
+    // Foldable groups + per-item group membership, shared across every list tab (keyed by tab + itemKey).
+    val itemGroups: StateFlow<List<ItemGroupEntity>> = db.itemGroupDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val itemMeta: StateFlow<List<ItemMetaEntity>> = db.itemMetaDao().getAllAsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun selectProject(filter: ProjectFilter) {
+        projectSelectionStore.save(filter)
+        projectFilter = filter
+    }
+
+    // ---- Project CRUD (used by ProjectsManagementScreen) ----
+    fun createProject(name: String, color: Int?) = launchWithMessage("Project created") {
+        val nextOrder = (db.projectDao().getAll().maxOfOrNull { it.sortOrder } ?: -1) + 1
+        db.projectDao().insert(Project(name = name.trim(), color = color, sortOrder = nextOrder).toEntity())
+    }
+
+    fun updateProject(project: Project) = launchWithMessage("Project updated") {
+        db.projectDao().update(project.toEntity())
+    }
+
+    fun deleteProject(project: Project, deleteItems: Boolean) = launchWithMessage(
+        if (deleteItems) "Project and its items deleted" else "Project deleted; items moved to Unfiled"
+    ) {
+        val pid = project.id
+        db.withTransaction {
+            val profileRows = db.profileDao().getAll().filter { it.projectId == pid }
+            val taskRows = db.taskDao().getAll().filter { it.projectId == pid }
+            val sceneRows = db.sceneDao().getAll().filter { it.projectId == pid }
+            if (deleteItems) {
+                profileRows.forEach { db.profileDao().delete(it); db.itemMetaDao().delete("profiles", it.id.toString()) }
+                taskRows.forEach { db.taskDao().delete(it); db.itemMetaDao().delete("tasks", it.id.toString()) }
+                sceneRows.forEach { db.sceneDao().delete(it); db.itemMetaDao().delete("scenes", it.id.toString()) }
+            } else {
+                profileRows.forEach { db.profileDao().update(it.copy(projectId = null)) }
+                taskRows.forEach { db.taskDao().update(it.copy(projectId = null)) }
+                sceneRows.forEach { db.sceneDao().update(it.copy(projectId = null)) }
+            }
+            // Project-globals can't survive their project: they can't move to Unfiled (variables have no
+            // null scope) and must never become super-globals (the "no MixedCase in super" invariant). So
+            // delete them either way — otherwise they'd dangle (dead projectId, frozen-stale, unreachable).
+            db.variableDao().getAll().filter { it.projectId == pid }.forEach {
+                db.variableDao().delete(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
+            }
+            // The project's foldable groups are project-scoped — delete them with the project so they don't
+            // orphan. (Reassigned items keep their notes; a now-dangling groupId just reads as ungrouped.)
+            db.itemGroupDao().deleteForProject(pid)
+            db.projectDao().delete(project.toEntity())
+        }
+        if ((projectFilter as? ProjectFilter.Of)?.projectId == pid) {
+            selectProject(ProjectFilter.All)
         }
     }
 
-    val globalVariables: StateFlow<ImmutableList<Variable>> = variableRepository
-        .observeGlobals(null)
-        .map { variables -> variables.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+    /** Reorder by reassigning contiguous sortOrder so the moved project shifts one slot. */
+    fun moveProject(project: Project, up: Boolean) = launchWithMessage("Project reordered") {
+        val ordered = db.projectDao().getAll()
+            .sortedWith(compareBy({ it.sortOrder }, { it.name.lowercase() }))
+            .toMutableList()
+        val index = ordered.indexOfFirst { it.id == project.id }
+        val target = if (up) index - 1 else index + 1
+        if (index < 0 || target !in ordered.indices) return@launchWithMessage
+        ordered.add(target, ordered.removeAt(index))
+        db.withTransaction {
+            ordered.forEachIndexed { position, row ->
+                if (row.sortOrder != position) db.projectDao().update(row.copy(sortOrder = position))
+            }
+        }
+    }
 
-    private val events = Channel<UiMessage>(Channel.BUFFERED)
+    /**
+     * Persist a full drag order: reassign contiguous sortOrder to match [orderedIds] and switch the Projects
+     * tab to MANUAL so the dragged order sticks (a drag implies manual, like tasks). Backs both the Projects
+     * tab list and the top project-tabs drag-reorder.
+     */
+    fun reorderProjects(orderedIds: List<Long>) = launchWithMessage("Projects reordered") {
+        val byId = db.projectDao().getAll().associateBy { it.id }
+        db.withTransaction {
+            orderedIds.forEachIndexed { position, id ->
+                val row = byId[id] ?: return@forEachIndexed
+                if (row.sortOrder != position) db.projectDao().update(row.copy(sortOrder = position))
+            }
+        }
+        ListSortStore.set(SortTab.PROJECTS, SortMethod.MANUAL)
+    }
+
+    fun createGroup(tab: String, projectId: Long?, name: String, parentId: Long? = null) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        db.itemGroupDao().upsert(
+            ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos, parentGroupId = parentId),
+        )
+    }
+
+    fun renameGroup(group: ItemGroupEntity, name: String) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(name = name.trim()))
+    }
+
+    fun deleteGroup(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemMetaDao().clearGroup(group.tab, group.id) // orphan its members back to top level
+        db.itemGroupDao().orphanChildren(group.id)       // its sub-groups float up to top level
+        db.itemGroupDao().delete(group.id)
+    }
+
+    fun toggleGroupExpanded(group: ItemGroupEntity) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(expanded = !group.expanded))
+    }
+
+    fun setGroupParent(group: ItemGroupEntity, parentId: Long?) = viewModelScope.launch {
+        db.itemGroupDao().upsert(group.copy(parentGroupId = parentId))
+    }
+
+    fun setItemGroup(tab: String, itemKey: String, groupId: Long?) = viewModelScope.launch {
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = groupId))
+    }
+
+    /**
+     * Persist a drag-to-reorder from a grouped list. [movedKey] is filed into [targetGroupId] (null = top
+     * level), then every visible member's `position` is rewritten to match [orderedKeys] — the tab's members
+     * in their NEW visual order (Members only). Finally the tab is forced to MANUAL sort so the new order is
+     * honoured (Alphabetical would ignore `position`). Unknown tab → no-op; a key with no live row → skipped.
+     */
+    fun reorderItem(tab: String, movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) {
+        val sortTab = when (tab) {
+            "tasks" -> SortTab.TASKS
+            "profiles" -> SortTab.PROFILES
+            "scenes" -> SortTab.SCENES
+            else -> return // unknown tab: nothing to reorder
+        }
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    // 1. File the moved item into the drop target's group (get-or-create its meta row).
+                    val cur = db.itemMetaDao().get(tab, movedKey) ?: ItemMetaEntity(tab = tab, itemKey = movedKey)
+                    db.itemMetaDao().upsert(cur.copy(groupId = targetGroupId))
+                    // 2. Rewrite each member's position to its new index (only when it actually changed).
+                    orderedKeys.forEachIndexed { i, key ->
+                        val id = key.toLongOrNull() ?: return@forEachIndexed
+                        when (tab) {
+                            "tasks" -> db.taskDao().getById(id)?.let { if (it.position != i) db.taskDao().setPosition(id, i) }
+                            "profiles" -> db.profileDao().getById(id)?.let { if (it.position != i) db.profileDao().setPosition(id, i) }
+                            "scenes" -> db.sceneDao().getById(id)?.let { if (it.position != i) db.sceneDao().setPosition(id, i) }
+                        }
+                    }
+                }
+                // 3. Force MANUAL sort so the freshly written positions drive the tab's order.
+                ListSortStore.set(sortTab, SortMethod.MANUAL)
+            }.onFailure { events.send("Error: ${it.message ?: "Reorder failed"}") }
+        }
+    }
+
+    fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
+        val pos = db.itemGroupDao().getForTab(tab).size
+        val gid = db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))
+        val cur = db.itemMetaDao().get(tab, itemKey) ?: ItemMetaEntity(tab = tab, itemKey = itemKey)
+        db.itemMetaDao().upsert(cur.copy(groupId = gid))
+    }
+
+    fun moveProfilesToProject(items: List<Profile>, projectId: Long?) =
+        launchWithMessage("${items.size} profile${plural(items.size)} moved") {
+            items.forEach { db.profileDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveTasksToProject(items: List<Task>, projectId: Long?) =
+        launchWithMessage("${items.size} task${plural(items.size)} moved") {
+            items.forEach { db.taskDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun moveScenesToProject(items: List<Scene>, projectId: Long?) =
+        launchWithMessage("${items.size} scene${plural(items.size)} moved") {
+            items.forEach { db.sceneDao().update(it.copy(projectId = projectId).toEntity()) }
+        }
+
+    fun deleteScenes(items: List<Scene>) =
+        launchWithMessage("Deleted ${items.size} scene${plural(items.size)}") {
+            items.forEach {
+                db.sceneDao().delete(it.toEntity())
+                db.itemMetaDao().delete("scenes", it.id.toString())
+            }
+        }
+
+    fun deleteProfiles(items: List<Profile>) =
+        launchWithMessage("Deleted ${items.size} profile${plural(items.size)}") {
+            items.forEach { db.profileDao().delete(it.toEntity()); locationDwellStateStore.clearProfile(it.id) }
+        }
+
+    /** Delete several tasks at once, skipping any still referenced by a profile (same guard as [deleteTask]). */
+    fun deleteTasks(items: List<Task>) {
+        if (items.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                val usedIds = db.profileDao().getAll().map { it.toDomain() }
+                    .flatMap { listOfNotNull(it.enterTaskId, it.exitTaskId) }.toSet()
+                val (used, free) = items.partition { it.id in usedIds }
+                free.forEach { db.taskDao().delete(it.toEntity()); TaskIconStore.delete(it.iconPath) }
+                buildString {
+                    append("Deleted ${free.size} task${plural(free.size)}")
+                    if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
+                }
+            }
+                .onSuccess { events.send(it) }
+                .onFailure { events.send("Error: ${it.message ?: "Delete failed"}") }
+        }
+    }
+
+    private val events = Channel<String>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
-    private val _globalFallbackTaskId = MutableStateFlow(fallbackTaskSettings.loadTaskId())
-    val globalFallbackTaskId: StateFlow<Long?> = _globalFallbackTaskId.asStateFlow()
-
-    private val _runLogRetentionPreview = MutableStateFlow<RunLogRetentionPreview?>(null)
-    val runLogRetentionPreview: StateFlow<RunLogRetentionPreview?> = _runLogRetentionPreview.asStateFlow()
-
     // Starts with a cheap placeholder; the real state (which enumerates the filesystem) is
     // loaded off the main thread in init and refreshed after each backup operation.
     private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
     val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
-
-    private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
-    val diagnosticsState: StateFlow<DiagnosticsUiState> = _diagnosticsState.asStateFlow()
-    private var diagnosticsRefreshJob: Job? = null
 
     private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
     internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
@@ -447,462 +435,194 @@ class ActiveAutomationViewModel(
     private val _openTaskerBundleBusy = MutableStateFlow(false)
     val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
 
-    private val _semanticDiffReview = MutableStateFlow<SemanticDiffReviewState?>(null)
-    internal val semanticDiffReview: StateFlow<SemanticDiffReviewState?> = _semanticDiffReview.asStateFlow()
-
-    private val _profileShareReview = MutableStateFlow<ProfileShareReviewState?>(null)
-    internal val profileShareReview: StateFlow<ProfileShareReviewState?> = _profileShareReview.asStateFlow()
-
-    private val _preflightReview = MutableStateFlow<PreflightReviewState?>(null)
-    internal val preflightReview: StateFlow<PreflightReviewState?> = _preflightReview.asStateFlow()
-
-    private val _preflightBusy = MutableStateFlow(false)
-    val preflightBusy: StateFlow<Boolean> = _preflightBusy.asStateFlow()
-
     init {
-        refreshRunLogPage()
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
         }
         viewModelScope.launch {
-            runCatching { reconcileGlobalFallbackTask() }
-        }
-        viewModelScope.launch {
             runCatching { refreshBackupSetupState(busy = false) }
         }
-        refreshDiagnostics()
-        viewModelScope.launch {
-            AdvancedProtectionReader.changes.collect {
-                refreshDiagnostics()
-            }
+    }
+
+    fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null, freezeBubble: Boolean = false) = launchWithMessage("Task created") {
+        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, iconPath = iconPath, freezeBubble = freezeBubble).toEntity())
+    }
+
+    fun renameTask(task: Task, name: String) = launchWithMessage("Renamed") {
+        val n = name.trim()
+        if (n.isNotEmpty() && n != task.name) db.taskDao().update(task.copy(name = n).toEntity())
+    }
+
+    /** A name not already taken by another task — "<base>", then "<base> (2)", "<base> (3)"… */
+    private fun uniqueTaskName(base: String, taken: Set<String>): String {
+        if (base !in taken) return base
+        var i = 2
+        while ("$base ($i)" in taken) i++
+        return "$base ($i)"
+    }
+
+    /** Clone tasks in place (same project), each "<name> (copy)". */
+    fun duplicateTasks(items: List<Task>) = launchWithMessage("Duplicated ${items.size} task${plural(items.size)}") {
+        val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
+        items.forEach { t ->
+            val name = uniqueTaskName("${t.name} (copy)", taken)
+            taken += name
+            db.taskDao().insert(t.copy(id = 0, name = name, iconPath = null).toEntity())
         }
     }
 
-    fun refreshDiagnostics() {
-        if (diagnosticsRefreshJob?.isActive == true) return
-        diagnosticsRefreshJob = viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    DiagnosticsUiState(
-                        health = EngineHealthReader.read(appContext),
-                        admission = ExecutionAdmissionRegistry.snapshot(appContext),
-                        crashLogs = CrashLogHandler.listCrashLogs(appContext),
-                        appLogs = AppLogger.snapshot().takeLast(100).map { entry ->
-                            entry.copy(message = DiagnosticExport.redactSensitive(entry.message))
-                        },
-                        loadedAtMillis = System.currentTimeMillis(),
-                        profileNames = db.profileDao().getAll().associate { it.id to it.name },
-                    )
-                }
-            }.onSuccess { state ->
-                _diagnosticsState.value = state
-            }.onFailure { error ->
-                events.send(errorMessage(error, R.string.ui_error_diagnostics_refresh))
-            }
-        }
-    }
-
-    fun createTask(name: String, priority: Int, collisionMode: CollisionMode, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Task created") {
-        db.taskDao().insert(
-            Task(
-                name = name.trim(),
-                priority = priority.coerceIn(0, 10),
-                collisionMode = collisionMode,
-                projectId = projectId,
-            ).toEntity(),
-        )
-    }
-
-    fun duplicateTask(task: Task) {
-        viewModelScope.launch {
-            runCatching {
-                db.withTransaction {
-                    val source = db.taskDao().getById(task.id)?.toDomainDecodeResult()?.also { result ->
-                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                    }?.value ?: error("Task no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.taskDao().getAll().map { it.name })
-                    val staged = AutomationDuplicator.taskPayload(source, name)
-                    val newId = db.taskDao().insert(staged.toEntity())
-                    val duplicate = AutomationReferenceRewriter.remapDuplicateSelfReferences(
-                        original = source,
-                        duplicate = staged.copy(id = newId),
-                    )
-                    db.taskDao().update(duplicate.toEntity())
-                    recordCreation(EditHistoryDao.TYPE_TASK, newId, StorageJson.encodeToString(duplicate))
-                }
-            }.onSuccess { events.send(message(R.string.ui_message_task_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+    /** Paste clipboard tasks into [projectId]. On a Cut, [cutIds] are deleted first so a move keeps its
+     *  original name; on a Copy [cutIds] is empty and same-named pastes get a " (2)" suffix. */
+    fun pasteTasks(items: List<Task>, projectId: Long?, cutIds: List<Long>) = launchWithMessage("Pasted ${items.size} task${plural(items.size)}") {
+        cutIds.forEach { id -> db.taskDao().getById(id)?.let { db.taskDao().delete(it) } }
+        val taken = db.taskDao().getAll().map { it.name }.toMutableSet()
+        items.forEach { t ->
+            val name = uniqueTaskName(t.name, taken)
+            taken += name
+            db.taskDao().insert(t.copy(id = 0, name = name, projectId = projectId, iconPath = null).toEntity())
         }
     }
 
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
-        // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
-        // update must be atomic so a concurrent writer can't interleave and lose a revision.
-        db.withTransaction {
-            val previous = db.taskDao().getById(task.id)
-            if (previous != null) {
-                previous.toDomainDecodeResult().issue?.let { issue ->
-                    throw CorruptRecordOverwriteException(issue)
-                }
-                val previousTask = previous.toDomain()
-                recordEdit(
-                    entityType = EditHistoryDao.TYPE_TASK,
-                    entityId = task.id,
-                    previousJson = StorageJson.encodeToString(previousTask),
-                    nextJson = StorageJson.encodeToString(task),
+        val previous = db.taskDao().getById(task.id)
+        if (previous != null) {
+            // DATA-LOSS GUARD (白い熊 critical): if the STORED actions currently fail to decode, the
+            // in-memory task was built from an empty fallback — writing it would clobber recoverable JSON.
+            // Refuse rather than persist a silent wipe. (Genuine "delete all actions" decodes cleanly →
+            // no issue → allowed.)
+            val prevIssue = previous.toDomainDecodeResult().issue
+            if (prevIssue != null && task.actions.isEmpty() &&
+                previous.actionsJson.isNotBlank() && previous.actionsJson.trim() != "[]") {
+                AppLogger.error(
+                    "ActiveAutomationVM",
+                    "BLOCKED save of task ${task.id} '${task.name}': stored actions unreadable (${prevIssue.message}); not overwriting with empty",
                 )
-
-                // A rename breaks every reference that still names this task ("task.run" targets,
-                // legacy notification bindings). Pin those to the stable id in the same
-                // transaction so they cannot dangle or be captured by a future task that takes the
-                // old name.
-                if (!previousTask.name.equals(task.name, ignoreCase = true)) {
-                    val rewrite = AutomationReferenceRewriter.stabilizeNameReferences(
-                        target = previousTask,
-                        profiles = db.profileDao().getAll().map { it.toDomain() },
-                        tasks = db.taskDao().getAll().map { it.toDomain() },
-                        scenes = db.sceneDao().getAll().map { it.toDomain() },
-                    )
-                    rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }
-                    rewrite.tasks.filterNot { it.id == task.id }.forEach { db.taskDao().update(it.toEntity()) }
-                    rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
-                }
+                events.send("Save blocked: this task's stored actions couldn't be read — not overwriting them")
+                return@launchWithMessage
+            }
+            // Trace every task write so a rogue overwriter (dropping actions) is identifiable in logcat.
+            AppLogger.info(
+                "ActiveAutomationVM",
+                "updateTask id=${task.id} '${task.name}' actions ${previous.let { runCatching { StorageJson.decodeFromString<List<com.opentasker.core.model.ActionSpec>>(it.actionsJson).size }.getOrDefault(-1) }} -> ${task.actions.size}",
+            )
+        }
+        // Atomic snapshot-prune-update (upstream deep-audit): a concurrent writer (dialog save vs.
+        // notification/external path) can't interleave between the history snapshot and the update.
+        db.withTransaction {
+            if (previous != null) {
+                db.editHistoryDao().insert(
+                    EditHistoryEntity(
+                        entityType = EditHistoryDao.TYPE_TASK,
+                        entityId = task.id,
+                        previousJson = previous.actionsJson,
+                    ),
+                )
+                db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_TASK, task.id)
             }
             db.taskDao().update(task.toEntity())
         }
-    }
-
-    fun moveTaskAction(taskId: Long, fromIndex: Int, toIndex: Int) = launchWithMessage("Action moved") {
-        db.withTransaction {
-            val entity = db.taskDao().getById(taskId) ?: error("Task no longer exists.")
-            val decoded = entity.toDomainDecodeResult()
-            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-            val updated = decoded.value.copy(
-                actions = reorderActions(decoded.value.actions, fromIndex, toIndex),
-            )
-            recordEdit(
-                entityType = EditHistoryDao.TYPE_TASK,
-                entityId = taskId,
-                previousJson = StorageJson.encodeToString(decoded.value),
-                nextJson = StorageJson.encodeToString(updated),
-            )
-            db.taskDao().update(updated.toEntity())
+        // A replaced or cleared icon leaves its old PNG behind — remove it once the change is persisted.
+        if (previous != null && previous.iconPath != task.iconPath) {
+            TaskIconStore.delete(previous.iconPath)
         }
     }
 
-    /**
-     * Every object that still points at [task], resolved through the shared reference index so
-     * `task.run` arguments, notification buttons, and scene gestures are surfaced alongside the
-     * profile columns that used to be the only thing checked.
-     */
-    suspend fun taskDeletionPreview(task: Task): TaskDeletionPreview = withContext(Dispatchers.IO) {
-        val references = runCatching {
-            AutomationReferenceIndex.referencesTo(
-                task = task,
-                profiles = db.profileDao().getAll().map { it.toDomain() },
-                tasks = db.taskDao().getAll().map { it.toDomain() },
-                scenes = db.sceneDao().getAll().map { it.toDomain() },
-                globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
-            )
-        }.getOrElse { emptyList() }
-        TaskDeletionPreview(
-            task = task,
-            references = references,
-            requiresReassignment = references.any { it.isRequired },
-        )
-    }
-
-    /**
-     * Deletes [task] and applies [resolution] to every dependent reference in one transaction, so
-     * the workspace can never be observed with a dangling or half-rewritten reference.
-     */
-    fun deleteTask(task: Task, resolution: ReferenceResolution = ReferenceResolution.Block) {
+    fun deleteTask(task: Task) {
         viewModelScope.launch {
             runCatching {
-                var blockedCount = 0
-                var rewrittenGlobalFallbackTaskId: Long? = null
-                var globalFallbackChanged = false
-                db.withTransaction {
-                    val profiles = db.profileDao().getAll().map { it.toDomain() }
-                    val tasks = db.taskDao().getAll().map { it.toDomain() }
-                    val scenes = db.sceneDao().getAll().map { it.toDomain() }
-                    val rewrite = AutomationReferenceRewriter.retarget(
-                        target = task,
-                        resolution = resolution,
-                        profiles = profiles,
-                        tasks = tasks,
-                        scenes = scenes,
-                        globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
-                    )
-                    if (!rewrite.canCommit) {
-                        blockedCount = rewrite.blocked.size
-                        return@withTransaction
-                    }
-                    rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }
-                    rewrite.tasks.forEach { db.taskDao().update(it.toEntity()) }
-                    rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
-                    db.taskDao().delete(task.toEntity())
-                    rewrittenGlobalFallbackTaskId = rewrite.globalFallbackTaskId
-                    globalFallbackChanged = rewrite.globalFallbackChanged
+                val profilesUsingTask = db.profileDao().getAll().map { it.toDomain() }
+                    .filter { it.enterTaskId == task.id || it.exitTaskId == task.id }
+                if (profilesUsingTask.isNotEmpty()) {
+                    events.send("Task is used by ${profilesUsingTask.size} profile(s). Reassign or delete those profiles first.")
+                    return@launch
                 }
-                if (blockedCount == 0 && globalFallbackChanged) {
-                    fallbackTaskSettings.saveTaskId(rewrittenGlobalFallbackTaskId)
-                    _globalFallbackTaskId.value = rewrittenGlobalFallbackTaskId
-                }
-                blockedCount
+                db.taskDao().delete(task.toEntity())
+                TaskIconStore.delete(task.iconPath)
             }
-                .onSuccess { blocked ->
-                    if (blocked > 0) {
-                        events.send(message(R.string.ui_task_still_used, blocked))
-                    } else {
-                        LocaleGrantStore(appContext).revokeAllForTask(task.id)
-                        events.send(message(R.string.ui_message_task_deleted))
-                    }
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_task_delete)) }
+                .onSuccess { events.send("Task deleted") }
+                .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Scene created") {
+    fun createScene(
+        name: String, widthDp: Int, heightDp: Int, projectId: Long? = null,
+        bgColor: String? = null, cornerRadiusDp: Int = 16, scrimAlpha: Int = 55,
+        borderColor: String? = null, borderWidth: Int = 0,
+        defaultPosition: String = "center", defaultModal: Boolean = true, defaultDismissOnOutside: Boolean = true,
+    ) = launchWithMessage("Scene created") {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
                 widthDp = widthDp.coerceIn(120, 1440),
                 heightDp = heightDp.coerceIn(80, 2560),
                 projectId = projectId,
+                bgColor = bgColor,
+                cornerRadiusDp = cornerRadiusDp,
+                scrimAlpha = scrimAlpha,
+                borderColor = borderColor,
+                borderWidth = borderWidth,
+                defaultPosition = defaultPosition,
+                defaultModal = defaultModal,
+                defaultDismissOnOutside = defaultDismissOnOutside,
             ).toEntity()
         )
     }
 
-    fun duplicateScene(scene: Scene) {
-        viewModelScope.launch {
-            runCatching {
-                db.withTransaction {
-                    val source = db.sceneDao().getById(scene.id)?.toDomainDecodeResult()?.also { result ->
-                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                    }?.value ?: error("Scene no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.sceneDao().getAll().map { it.name })
-                    val duplicate = AutomationDuplicator.scenePayload(source, name)
-                    val newId = db.sceneDao().insert(duplicate.toEntity())
-                    val persisted = duplicate.copy(id = newId)
-                    db.sceneDao().update(persisted.toEntity())
-                    recordCreation(EditHistoryDao.TYPE_SCENE, newId, StorageJson.encodeToString(persisted))
-                }
-            }.onSuccess { events.send(message(R.string.ui_message_scene_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
-        }
-    }
-
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
-        db.withTransaction {
-            val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
-            if (previous != null) {
-                previous.toDomainDecodeResult().issue?.let { issue ->
-                    throw CorruptRecordOverwriteException(issue)
-                }
-                recordEdit(
-                    entityType = EditHistoryDao.TYPE_SCENE,
-                    entityId = scene.id,
-                    previousJson = StorageJson.encodeToString(previous.toDomain()),
-                    nextJson = StorageJson.encodeToString(scene),
-                )
-            }
-            db.sceneDao().update(scene.toEntity())
-        }
+        db.sceneDao().update(scene.toEntity())
     }
 
     fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(
-        name: String,
-        enabled: Boolean,
-        enterTaskId: Long,
-        exitTaskId: Long?,
-        cooldownSec: Int,
-        automationMode: AutomationMode,
-        group: String? = null,
-        projectId: Long = DEFAULT_PROJECT_ID,
-        priority: Int = 0,
-        gracePeriodSec: Int = 0,
-        lifetime: ProfileLifetime = ProfileLifetime.NEVER,
-        expiresAtMs: Long? = null,
-        maxActiveExecutions: Int? = null,
-        burstLimit: Int? = null,
-        overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
-        fallbackTaskId: Long? = null,
-    ) =
+    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null, projectId: Long? = null) =
         launchWithMessage("Profile created") {
-            val profile = ProfileLifecyclePolicy.normalize(
-                Profile(
+            val profile = Profile(
                 name = name.trim(),
                 enabled = enabled,
                 enterTaskId = enterTaskId,
-                exitTaskId = exitTaskId,
                 cooldownSec = cooldownSec.coerceAtLeast(0),
                 automationMode = automationMode,
                 group = group,
                 projectId = projectId,
-                priority = priority,
-                gracePeriodSec = gracePeriodSec,
-                lifetime = lifetime,
-                expiresAtMs = expiresAtMs,
-                maxActiveExecutions = maxActiveExecutions,
-                burstLimit = burstLimit,
-                overflowPolicy = overflowPolicy,
-                fallbackTaskId = fallbackTaskId,
-                ),
             )
             requireValidProfileFieldLimits(profile)
-            val lint = requireAutomationLint(profile)
-            db.profileDao().upsert(reviewFeedbackRisk(profile).toEntity())
-            emitLintWarnings(profile, lint)
+            db.profileDao().insert(profile.toEntity())
         }
-
-    fun duplicateProfile(profile: Profile) {
-        viewModelScope.launch {
-            runCatching {
-                db.withTransaction {
-                    val source = db.profileDao().getById(profile.id)?.toDomainDecodeResult()?.also { result ->
-                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                    }?.value ?: error("Profile no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.profileDao().getAll().map { it.name })
-                    val duplicate = AutomationDuplicator.profilePayload(source, name)
-                    requireValidProfileFieldLimits(duplicate)
-                    val newId = db.profileDao().insert(duplicate.toEntity())
-                    val persisted = duplicate.copy(id = newId)
-                    recordCreation(EditHistoryDao.TYPE_PROFILE, newId, StorageJson.encodeToString(persisted))
-                }
-            }.onSuccess { events.send(message(R.string.ui_message_profile_duplicated)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
-        }
-    }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
-            val reviewedProfile = reviewFeedbackRisk(ProfileLifecyclePolicy.normalize(profile))
-            requireValidProfileFieldLimits(reviewedProfile)
-            val lint = requireAutomationLint(reviewedProfile)
-            // Atomic read-check-snapshot-update, matching updateScene, so racing writers
+            requireValidProfileFieldLimits(profile)
+            // Atomic read-check-snapshot-update (upstream deep-audit), so racing writers
             // (dialog save vs. notification/external-intent path) can't lose a revision.
+            // The fork drops upstream's corrupt-record throw here: corrupt rows surface via the
+            // storageDecodeIssues banner instead of blocking every profile save path.
             db.withTransaction {
                 val previousEntity = profile.id.takeIf { it > 0L }
                     ?.let { db.profileDao().getById(it) }
-                previousEntity?.toDomainDecodeResult()?.issue?.let { issue ->
-                    throw CorruptRecordOverwriteException(issue)
-                }
                 val previous = previousEntity?.toDomain()
                 if (
                     previous?.requiresRiskAcknowledgement == true &&
-                    (reviewedProfile.enabled || !reviewedProfile.requiresRiskAcknowledgement)
+                    (profile.enabled || !profile.requiresRiskAcknowledgement)
                 ) {
                     throw IllegalStateException("Review imported automation powers before enabling this profile.")
                 }
                 if (previousEntity != null) {
-                    recordEdit(
-                        entityType = EditHistoryDao.TYPE_PROFILE,
-                        entityId = profile.id,
-                        previousJson = StorageJson.encodeToString(previous),
-                        nextJson = StorageJson.encodeToString(reviewedProfile),
+                    db.editHistoryDao().insert(
+                        EditHistoryEntity(
+                            entityType = EditHistoryDao.TYPE_PROFILE,
+                            entityId = profile.id,
+                            previousJson = previousEntity.contextsJson,
+                        ),
                     )
+                    db.editHistoryDao().pruneOld(EditHistoryDao.TYPE_PROFILE, profile.id)
                 }
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
                 }
-                db.profileDao().upsert(reviewedProfile.toEntity())
+                db.profileDao().update(profile.toEntity())
             }
-            emitLintWarnings(reviewedProfile, lint)
-        }
-
-    fun createProject(name: String) = launchWithMessage("Project created") {
-        val normalized = validateProjectName(name)
-        require(db.projectDao().getAll().none { it.name.equals(normalized, ignoreCase = true) }) {
-            "A project with that name already exists."
-        }
-        val nextPosition = (db.projectDao().getAll().maxOfOrNull { it.position } ?: -1) + 1
-        db.projectDao().insert(ProjectEntity(name = normalized, position = nextPosition))
-    }
-
-    fun renameProject(project: Project, name: String) = launchWithMessage("Project renamed") {
-        require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be renamed." }
-        val normalized = validateProjectName(name)
-        require(db.projectDao().getAll().none { it.id != project.id && it.name.equals(normalized, ignoreCase = true) }) {
-            "A project with that name already exists."
-        }
-        db.projectDao().update(ProjectEntity(project.id, normalized, project.position))
-    }
-
-    fun reorderProject(project: Project, direction: Int) = launchWithMessage("Project reordered") {
-        val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
-        val index = ordered.indexOfFirst { it.id == project.id }
-        val targetIndex = (index + direction.coerceIn(-1, 1)).coerceIn(0, ordered.lastIndex)
-        if (index < 0 || targetIndex == index) return@launchWithMessage
-        val other = ordered[targetIndex]
-        db.projectDao().update(other.copy(position = project.position))
-        db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
-    }
-
-    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage("Project deleted") {
-        require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be deleted." }
-        require(project.id != targetProject.id) { "Choose a different destination project." }
-        db.withTransaction {
-            val sourceVariables = db.variableDao().getAllInProject(project.id)
-            val targetNames = db.variableDao().getAllInProject(targetProject.id).map { it.name }.toSet()
-            val collisions = sourceVariables.map { it.name }.filter { it in targetNames }
-            require(collisions.isEmpty()) {
-                "Reassignment would overwrite variables: ${collisions.joinToString()}. Rename or remove them first."
-            }
-            db.taskDao().reassignProject(project.id, targetProject.id)
-            db.profileDao().reassignProject(project.id, targetProject.id)
-            db.sceneDao().reassignProject(project.id, targetProject.id)
-            sourceVariables.forEach { db.variableDao().insert(it.copy(projectId = targetProject.id)) }
-            db.variableDao().deleteAllInProject(project.id)
-            check(db.projectDao().deleteIfNotDefault(project.id) == 1) { "Project no longer exists." }
-        }
-    }
-
-    private fun validateProjectName(name: String): String {
-        val normalized = name.trim()
-        require(normalized.isNotEmpty()) { "Project name cannot be empty." }
-        require(normalized.length <= 64) { "Project names must be 64 characters or fewer." }
-        return normalized
-    }
-
-    private suspend fun reviewFeedbackRisk(profile: Profile): Profile {
-        if (!profile.enabled || profile.requiresRiskAcknowledgement) return profile
-        val tasks = db.taskDao().getAll().map { it.toDomain() }
-        return if (AutomationFeedbackRiskAnalyzer.analyze(profile, tasks).isEmpty()) {
-            profile
-        } else {
-            profile.copy(enabled = false, requiresRiskAcknowledgement = true)
-        }
-    }
-
-    fun acknowledgeAndEnableImportedProfile(profileId: Long) =
-        launchWithMessage("Imported profile reviewed and enabled") {
-            val current = db.profileDao().getById(profileId)?.toDomain()
-                ?: throw IllegalStateException("Profile no longer exists.")
-            check(current.requiresRiskAcknowledgement) { "Profile review is no longer required." }
-            val tasks = db.taskDao().getAll().map { it.toDomain() }
-            val peers = db.profileDao().getAll().map { entity ->
-                entity.toDomainDecodeResult().also { result ->
-                    result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                }.value
-            }
-            val review = ImportedProfileEnablePolicy.review(current, tasks, peers)
-            check(review.canAcknowledge) {
-                "Resolve unsupported actions, missing references, and blocking automation lint findings before enabling this imported profile."
-            }
-            val enabledProfile = current.copy(
-                enabled = true,
-                requiresRiskAcknowledgement = false,
-            )
-            val lint = requireAutomationLint(enabledProfile)
-            db.profileDao().upsert(
-                enabledProfile.toEntity(),
-            )
-            emitLintWarnings(enabledProfile, lint)
         }
 
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
@@ -915,29 +635,9 @@ class ActiveAutomationViewModel(
             val applied = template.instantiate(slotValues)
             db.withTransaction {
                 val taskId = db.taskDao().insert(applied.task.toEntity())
-                db.profileDao().upsert(applied.profile.copy(enterTaskId = taskId).toEntity())
+                db.profileDao().insert(applied.profile.copy(enterTaskId = taskId).toEntity())
             }
         }
-
-    fun previewLocalProfileShare(appVersion: String) {
-        viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val bundle = bundleRepository.exportBundle(
-                        appVersion = appVersion,
-                        name = "OpenTasker Community Share",
-                        description = "A local OpenTasker profile share draft.",
-                    )
-                    buildProfileShareReview(bundle)
-                }
-            }
-                .onSuccess { _profileShareReview.value = it }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_share_preview)) }
-            _openTaskerBundleBusy.value = false
-        }
-    }
 
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         viewModelScope.launch {
@@ -952,9 +652,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send(message(R.string.ui_message_tasker_xml_ready))
+                    events.send("Tasker XML ready for review")
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_preview)) }
+                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
             _taskerImportBusy.value = false
         }
     }
@@ -977,14 +677,11 @@ class ActiveAutomationViewModel(
                 .onSuccess { importReport ->
                     _taskerImportReview.value = null
                     events.send(
-                        message(
-                            R.string.ui_message_tasker_imported,
-                            importReport.insertedTasks,
-                            importReport.insertedProfiles,
-                        ),
+                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
+                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
                     )
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_import)) }
+                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
             _taskerImportBusy.value = false
         }
     }
@@ -997,8 +694,8 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     val bundle = bundleRepository.exportBundle(
                         appVersion = appVersion,
-                        name = "OpenTasker Workspace Export",
-                        description = "Profiles, tasks, variables, and scenes exported from OpenTasker.",
+                        name = "白い熊 自由作業盤 Workspace Export",
+                        description = "Profiles, tasks, variables, and scenes exported from 白い熊 自由作業盤.",
                     )
                     val encoded = OpenTaskerBundleCodec.encode(bundle)
                     val stream = appContext.contentResolver.openOutputStream(uri)
@@ -1009,120 +706,87 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { bundle ->
                     events.send(
-                        message(
-                            R.string.ui_message_bundle_exported,
-                            bundle.tasks.size,
-                            bundle.profiles.size,
-                            bundle.scenes.size,
-                        ),
+                        "Exported ${bundle.tasks.size} task${plural(bundle.tasks.size)}, " +
+                            "${bundle.profiles.size} profile${plural(bundle.profiles.size)}, " +
+                            "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
                     )
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_export)) }
+                .onFailure { events.send("Error: ${it.message ?: "export failed"}") }
             _openTaskerBundleBusy.value = false
         }
     }
 
-    fun previewOpenTaskerBundle(uri: Uri) {
-        previewOpenTaskerBundleSource {
-            OpenTaskerBundleCodec.decode(readBoundedOpenTaskerBundle(appContext, uri))
-        }
-    }
-
-    fun previewOpenTaskerBundleText(rawText: String) {
-        previewOpenTaskerBundleSource {
-            OpenTaskerBundleTextImport.decode(rawText)
-        }
-    }
-
-    private fun previewOpenTaskerBundleSource(load: suspend () -> OpenTaskerBundle) {
+    /**
+     * Export exactly the chosen items as a bundle (the fork's selective export — Export profiles/tasks/
+     * scenes/templates/variables, and per-project export). Reuses [OpenTaskerBundleRepository.exportSelection];
+     * variables are included only when [includeVariables] or specific [variableKeys] are given.
+     */
+    fun exportSelectionBundle(
+        uri: Uri,
+        appVersion: String,
+        profileIds: Set<Long>,
+        taskIds: Set<Long>,
+        sceneIds: Set<Long>,
+        includeVariables: Boolean,
+        name: String,
+        templateNames: Set<String> = emptySet(),
+        variableKeys: Set<String> = emptySet(),
+    ) {
         viewModelScope.launch {
             if (_openTaskerBundleBusy.value) return@launch
             _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    buildProfileShareReview(load())
+                    val bundle = bundleRepository.exportSelection(
+                        appVersion = appVersion,
+                        profileIds = profileIds,
+                        taskIds = taskIds,
+                        sceneIds = sceneIds,
+                        includeVariables = includeVariables,
+                        name = name,
+                        templateNames = templateNames,
+                        variableKeys = variableKeys,
+                    )
+                    val encoded = OpenTaskerBundleCodec.encode(bundle)
+                    val stream = appContext.contentResolver.openOutputStream(uri)
+                        ?: error("Unable to open export destination")
+                    stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(encoded) }
+                    bundle
                 }
             }
-                .onSuccess {
-                    _profileShareReview.value = it
-                    events.send(message(R.string.ui_message_bundle_ready))
-                }
-                .onFailure { error ->
-                    // A decode failure means the input is not an OpenTasker bundle. Surfacing the
-                    // serializer's own text put "Unexpected JSON token at offset 0: Expected start
-                    // of the object '{'" in front of the user, along with their raw input.
-                    if (error is SerializationException) {
-                        AppLogger.warn("OpenTasker", "Rejected an OpenTasker bundle that failed to decode", error)
-                        events.send(message(R.string.ui_error_message, appContext.getString(R.string.ui_error_bundle_not_recognized)))
-                    } else {
-                        events.send(errorMessage(error, R.string.ui_error_bundle_preview))
+                .onSuccess { bundle ->
+                    val parts = buildList {
+                        if (bundle.profiles.isNotEmpty()) add("${bundle.profiles.size} profile${plural(bundle.profiles.size)}")
+                        if (bundle.tasks.isNotEmpty()) add("${bundle.tasks.size} task${plural(bundle.tasks.size)}")
+                        if (bundle.scenes.isNotEmpty()) add("${bundle.scenes.size} scene${plural(bundle.scenes.size)}")
+                        if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
+                        if (bundle.templates.isNotEmpty()) add("${bundle.templates.size} template${plural(bundle.templates.size)}")
                     }
+                    events.send("Exported ${parts.joinToString().ifEmpty { "nothing" }}")
                 }
+                .onFailure { events.send("Error: ${it.message ?: "Export failed"}") }
             _openTaskerBundleBusy.value = false
         }
     }
 
-    fun updateProfileShareDraft(draft: ProfileShareDraft) {
-        val current = _profileShareReview.value ?: return
-        runCatching { ProfileShareLibrary.buildManifest(draft) }
-            .onSuccess { manifest ->
-                _profileShareReview.value = current.copy(
-                    draft = draft,
-                    manifest = manifest,
-                    draftError = null,
-                )
+    fun previewOpenTaskerBundle(uri: Uri) {
+        viewModelScope.launch {
+            if (_openTaskerBundleBusy.value) return@launch
+            _openTaskerBundleBusy.value = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
+                    val bundle = OpenTaskerBundleCodec.decode(rawJson)
+                    OpenTaskerBundleReviewState(bundle = bundle, plan = OpenTaskerBundleCodec.validate(bundle))
+                }
             }
-            .onFailure { error ->
-                _profileShareReview.value = current.copy(
-                    draft = draft,
-                    draftError = error.message ?: "Invalid share details.",
-                )
-            }
-    }
-
-    fun addProfileShareScreenshots(uris: List<Uri>) {
-        val current = _profileShareReview.value ?: return
-        val screenshots = (current.draft.screenshots + uris.map(Uri::toString))
-            .distinct()
-            .take(PROFILE_SHARE_MAX_SCREENSHOTS)
-        updateProfileShareDraft(current.draft.copy(screenshots = screenshots))
-    }
-
-    fun removeProfileShareScreenshot(uri: String) {
-        val current = _profileShareReview.value ?: return
-        updateProfileShareDraft(current.draft.copy(screenshots = current.draft.screenshots - uri))
-    }
-
-    fun clearProfileShareReview() {
-        if (!_openTaskerBundleBusy.value) {
-            _profileShareReview.value = null
+                .onSuccess {
+                    _openTaskerBundleReview.value = it
+                    events.send("Import ready to review")
+                }
+                .onFailure { events.send("Error: ${it.message ?: "import preview failed"}") }
+            _openTaskerBundleBusy.value = false
         }
-    }
-
-    fun continueProfileShareImportReview() {
-        val share = _profileShareReview.value ?: return
-        if (share.draftError != null || share.manifest.hasBlockingFindings || !share.plan.canImport) return
-        _openTaskerBundleReview.value = OpenTaskerBundleReviewState(
-            bundle = share.draft.bundle,
-            plan = share.plan,
-        )
-        _profileShareReview.value = null
-    }
-
-    private suspend fun buildProfileShareReview(bundle: OpenTaskerBundle): ProfileShareReviewState {
-        val draft = ProfileShareDraft(
-            slug = defaultProfileShareSlug(bundle.metadata.name),
-            title = bundle.metadata.name.ifBlank { "OpenTasker Share" },
-            summary = bundle.metadata.description.ifBlank {
-                "A local OpenTasker profile share draft."
-            },
-            bundle = bundle,
-        )
-        return ProfileShareReviewState(
-            draft = draft,
-            manifest = ProfileShareLibrary.buildManifest(draft),
-            plan = bundleRepository.planImport(bundle),
-        )
     }
 
     fun clearOpenTaskerBundleReview() {
@@ -1131,151 +795,34 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun resolveOpenTaskerVariableConflict(name: String, resolution: VariableConflictResolution) {
-        if (_openTaskerBundleBusy.value) return
-        val review = _openTaskerBundleReview.value ?: return
-        if (review.plan.variableConflicts.none { it.name == name }) return
-        _openTaskerBundleReview.value = review.copy(
-            variableResolutions = review.variableResolutions + (name to resolution),
-        )
-    }
-
-    fun confirmOpenTaskerBundleImport() {
-        val review = _openTaskerBundleReview.value ?: return
-        if (review.plan.variableConflicts.any { it.name !in review.variableResolutions }) return
+    fun confirmOpenTaskerBundleImport(
+        bundle: OpenTaskerBundle,
+        projectConflictStrategy: ProjectConflictStrategy = ProjectConflictStrategy.MERGE,
+        itemConflictStrategy: ItemConflictStrategy = ItemConflictStrategy.OVERWRITE_DELETE,
+        itemStrategyOverrides: Map<String, ItemConflictStrategy> = emptyMap(),
+        projectChoices: Map<String, ProjectImportChoice> = emptyMap(),
+    ) {
         viewModelScope.launch {
             if (_openTaskerBundleBusy.value) return@launch
             _openTaskerBundleBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(review.bundle, review.variableResolutions)
+                    bundleRepository.importBundle(
+                        bundle, projectConflictStrategy, itemConflictStrategy, itemStrategyOverrides, projectChoices,
+                    )
                 }
             }
                 .onSuccess { importReport ->
                     _openTaskerBundleReview.value = null
                     events.send(
-                        message(
-                            R.string.ui_message_bundle_imported,
-                            importReport.insertedTasks,
-                            importReport.insertedProfiles,
-                            importReport.insertedScenes,
-                        ),
+                        "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
+                            "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
+                            "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
                     )
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_import)) }
+                .onFailure { events.send("Error: ${it.message ?: "import failed"}") }
             _openTaskerBundleBusy.value = false
         }
-    }
-
-    fun updateRunLogFilters(filters: RunLogFilterState) {
-        if (_runLogFilters.value == filters) return
-        _runLogFilters.value = filters
-        refreshRunLogPage()
-    }
-
-    fun refreshRunLogPage() {
-        runLogPageJob?.cancel()
-        _runLogPage.value = RunLogPageUiState(loading = true)
-        val filters = _runLogFilters.value
-        runLogPageJob = viewModelScope.launch {
-            try {
-                val (snapshot, page) = withContext(Dispatchers.IO) {
-                    val opened = db.runLogDao().openSnapshot(filters.toStorageQuery())
-                    opened to db.runLogDao().loadPage(opened)
-                }
-                _runLogPage.value = RunLogPageUiState(
-                    entries = page.entries.map { it.toDomain() }.toImmutableList(),
-                    totalCount = snapshot.totalCount,
-                    hasMore = page.hasMore,
-                    loading = false,
-                    snapshot = snapshot,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _runLogPage.value = _runLogPage.value.copy(loading = false)
-                events.send(errorMessage(error, R.string.ui_error_run_logs_load))
-            }
-        }
-    }
-
-    fun loadNextRunLogPage() {
-        val current = _runLogPage.value
-        val snapshot = current.snapshot ?: return
-        if (current.loading || !current.hasMore) return
-        val cursor = current.entries.lastOrNull()?.let { com.opentasker.core.storage.RunLogKey(it.timestamp, it.id) }
-            ?: return
-        _runLogPage.value = current.copy(loading = true)
-        runLogPageJob = viewModelScope.launch {
-            try {
-                val page = withContext(Dispatchers.IO) { db.runLogDao().loadPage(snapshot, cursor) }
-                val existingIds = current.entries.mapTo(mutableSetOf()) { it.id }
-                val appended = page.entries.map { it.toDomain() }.filterNot { it.id in existingIds }
-                _runLogPage.value = current.copy(
-                    entries = (current.entries + appended).toImmutableList(),
-                    hasMore = page.hasMore,
-                    loading = false,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _runLogPage.value = current.copy(loading = false)
-                events.send(errorMessage(error, R.string.ui_error_run_logs_more))
-            }
-        }
-    }
-
-    fun exportRunLogs(uri: Uri, format: RunLogExportFormat, allRetained: Boolean = false) {
-        viewModelScope.launch {
-            try {
-                val exported = withContext(Dispatchers.IO) {
-                    val snapshot = if (allRetained) {
-                        db.runLogDao().openSnapshot(RunLogQuery())
-                    } else {
-                        _runLogPage.value.snapshot ?: db.runLogDao().openSnapshot(_runLogFilters.value.toStorageQuery())
-                    }
-                    val output = appContext.contentResolver.openOutputStream(uri, "w")
-                        ?: error("Could not open the export destination")
-                    output.use { RunLogExporter(db.runLogDao()).export(snapshot, format, it) }
-                }
-                events.send(message(R.string.ui_message_run_logs_exported, exported, if (exported == 1) "y" else "ies"))
-            } catch (error: Exception) {
-                events.send(errorMessage(error, R.string.ui_error_run_log_export))
-            }
-        }
-    }
-
-    fun requestRunLogRetention(policy: RunLogRetentionPolicy) {
-        viewModelScope.launch {
-            val normalized = policy.normalized()
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val dao = db.runLogDao()
-                    RunLogRetentionPreview(
-                        policy = normalized,
-                        storedCount = dao.count(),
-                        prunableCount = dao.countPrunable(
-                            maxEntries = normalized.maxEntries,
-                            minimumTimestamp = normalized.minimumTimestamp(System.currentTimeMillis()),
-                        ),
-                        oldestTimestamp = dao.oldestTimestamp(),
-                    )
-                }
-            }.onSuccess { preview ->
-                if (preview.prunableCount == 0) updateRunLogRetention(preview.policy)
-                else _runLogRetentionPreview.value = preview
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_retention_preview)) }
-        }
-    }
-
-    fun dismissRunLogRetentionPreview() {
-        _runLogRetentionPreview.value = null
-    }
-
-    fun confirmRunLogRetention() {
-        val preview = _runLogRetentionPreview.value ?: return
-        _runLogRetentionPreview.value = null
-        updateRunLogRetention(preview.policy)
     }
 
     fun updateRunLogRetention(policy: RunLogRetentionPolicy) {
@@ -1287,41 +834,18 @@ class ActiveAutomationViewModel(
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
-                    val suffix = if (deleted > 0) {
-                        appContext.getString(R.string.ui_message_retention_pruned, deleted, plural(deleted))
-                    } else {
-                        ""
-                    }
-                    events.send(message(R.string.ui_message_retention_updated, suffix))
-                    refreshRunLogPage()
+                    val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
+                    events.send("Run log retention updated$suffix")
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
+                .onFailure { events.send("Error: ${it.message ?: "Run log retention update failed"}") }
         }
     }
 
-    fun updateGlobalFallbackTask(taskId: Long?) {
-        val normalized = taskId?.takeIf { it > 0L }
-        fallbackTaskSettings.saveTaskId(normalized)
-        _globalFallbackTaskId.value = normalized
-    }
-
-    /**
-     * Clears the global fallback task when it points at a task that no longer exists.
-     *
-     * The setting lives in SharedPreferences and cannot join the Room transaction that deletes a
-     * task, so process death between the commit and the settings write leaves a dangling id.
-     * Healing it on load keeps that window harmless instead of leaving a fallback that silently
-     * never runs.
-     */
-    private suspend fun reconcileGlobalFallbackTask() {
-        val storedId = fallbackTaskSettings.loadTaskId() ?: return
-        if (db.taskDao().getById(storedId) != null) return
-        fallbackTaskSettings.saveTaskId(null)
-        _globalFallbackTaskId.value = null
-    }
-
     private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
-        db.runLogDao().applyRetention(policy, System.currentTimeMillis())
+        db.runLogDao().pruneRetention(
+            maxEntries = policy.maxEntries,
+            minimumTimestamp = policy.minimumTimestamp(System.currentTimeMillis()),
+        )
 
     fun shareDiagnosticReport() {
         viewModelScope.launch {
@@ -1329,13 +853,13 @@ class ActiveAutomationViewModel(
                 val report = DiagnosticExport.buildReport(appContext, db)
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "OpenTasker Diagnostic Report")
+                    putExtra(Intent.EXTRA_SUBJECT, "白い熊 自由作業盤 Diagnostic Report")
                     putExtra(Intent.EXTRA_TEXT, report)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
-                events.send(errorMessage(ex, R.string.ui_error_share_diagnostics))
+                events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
             }
         }
     }
@@ -1344,68 +868,29 @@ class ActiveAutomationViewModel(
         launchBackupOperation {
             databaseBackupManager.backup()
                 .onSuccess { backup ->
-                    events.send(message(R.string.ui_message_backup_created, backup.name))
+                    events.send("Backup created: ${backup.name}")
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup)) }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup failed"}") }
         }
     }
 
     fun exportDatabaseBackup(uri: Uri) {
         launchBackupOperation {
             val backup = databaseBackupManager.backup().getOrElse {
-                events.send(errorMessage(it, R.string.ui_error_backup))
+                events.send("Error: ${it.message ?: "Database backup failed"}")
                 return@launchBackupOperation
             }
             databaseBackupManager.exportBackup(backup, uri)
-                .onSuccess { events.send(message(R.string.ui_message_backup_exported, backup.name)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_export)) }
+                .onSuccess { events.send("Backup exported: ${backup.name}") }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup export failed"}") }
         }
     }
 
-    private val _restoreReview = MutableStateFlow<RestoreReviewState?>(null)
-    val restoreReview: StateFlow<RestoreReviewState?> = _restoreReview.asStateFlow()
-
-    /**
-     * Validates and summarizes the selected database, then waits for an explicit Stage decision.
-     * Nothing is staged here: selection used to replace the pending journal outright, so a user
-     * could not inspect the candidate, tell it apart from an earlier staged restore, or back out.
-     */
     fun importDatabaseBackup(uri: Uri) {
         launchBackupOperation {
-            databaseBackupManager.inspectRestore(uri)
-                .onSuccess { candidate ->
-                    _restoreReview.value = RestoreReviewState(
-                        candidate = candidate,
-                        replacesPending = databaseBackupManager.pendingRestoreSummary(),
-                    )
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_import)) }
-        }
-    }
-
-    fun confirmStageRestore() {
-        launchBackupOperation {
-            databaseBackupManager.stageInspectedRestore()
-                .onSuccess {
-                    _restoreReview.value = null
-                    events.send(message(R.string.ui_message_restore_staged))
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_restore_stage)) }
-        }
-    }
-
-    fun dismissRestoreReview() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { databaseBackupManager.discardInspectedRestore() }
-            _restoreReview.value = null
-        }
-    }
-
-    /** Removes only the validated pending journal; backups and the live database are untouched. */
-    fun cancelPendingRestore() {
-        launchBackupOperation {
-            val cancelled = withContext(Dispatchers.IO) { databaseBackupManager.cancelPendingRestore() }
-            events.send(message(if (cancelled) R.string.ui_message_restore_cancelled else R.string.ui_message_no_staged_restore))
+            databaseBackupManager.stageRestore(uri)
+                .onSuccess { events.send("Backup imported. Restart 白い熊 自由作業盤 to apply the restore.") }
+                .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
         }
     }
 
@@ -1428,7 +913,6 @@ class ActiveAutomationViewModel(
                 busy = busy,
                 latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
-                pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
             )
         }
         _backupSetupState.value = loaded
@@ -1436,429 +920,81 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            runCatching {
-                executeAndLogTask(
-                    appContext = appContext,
-                    db = db,
-                    task = task,
-                    source = "Manual run",
-                    // Admit against the engine's live controller. The default is a separate
-                    // in-memory one that admits even while the profile is saturated.
-                    admissionController = ExecutionAdmissionRegistry.current(appContext),
-                    execution = ExecutionEnvelope.create(task, "Manual run"),
-                )
-            }.onSuccess { result ->
-                val status = when {
-                    result.held -> "held"
-                    result.skippedReason != null -> "skipped"
-                    result.report.success -> "succeeded"
-                    else -> "failed"
-                }
-                events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
-                // A manual run can be held, which adds a row the run-log page should show.
-                refreshRunLogPage()
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_task)) }
-        }
-    }
-
-    fun replayHeldRun(entry: RunLogEntry) {
-        viewModelScope.launch {
-            runCatching {
-                replayHeldExecution(
-                    appContext = appContext,
-                    db = db,
-                    heldEntry = entry,
-                    admissionController = ExecutionAdmissionRegistry.current(appContext),
-                )
-            }.onSuccess { result ->
-                val status = when {
-                    result.held -> "held"
-                    result.report.success -> "succeeded"
-                    else -> "failed"
-                }
-                events.send(message(R.string.ui_message_run_replayed, entry.taskName, status, result.report.durationMs))
-                refreshRunLogPage()
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_log_replay)) }
-        }
-    }
-
-    fun setRunLogStarred(entry: RunLogEntry, starred: Boolean = !entry.starred) {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { db.runLogDao().setStarred(entry.id, starred) }
-            }.onSuccess { refreshRunLogPage() }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
-        }
-    }
-
-    fun previewTaskPreflight(task: Task) {
-        startPreflight(PreflightTarget.TaskTarget(task), PreflightInputs())
-    }
-
-    fun previewProfilePreflight(profile: Profile) {
-        startPreflight(PreflightTarget.ProfileTarget(profile), PreflightInputs())
-    }
-
-    fun rerunPreflight(eventVariables: Map<String, String>) {
-        val current = _preflightReview.value ?: return
-        startPreflight(
-            target = current.target,
-            inputs = current.inputs.copy(eventVariables = eventVariables),
-        )
-    }
-
-    fun clearPreflightReview() {
-        if (!_preflightBusy.value) _preflightReview.value = null
-    }
-
-    private fun startPreflight(target: PreflightTarget, inputs: PreflightInputs) {
-        viewModelScope.launch {
-            if (_preflightBusy.value) return@launch
-            _preflightBusy.value = true
-            runCatching {
-                withContext(Dispatchers.Default) {
-                    val availableTasks = tasks.value.toList()
-                    val report = when (target) {
-                        is PreflightTarget.TaskTarget -> PreflightRunner.preflightTask(
-                            task = target.task,
-                            tasks = availableTasks,
-                            inputs = inputs,
-                        )
-                        is PreflightTarget.ProfileTarget -> PreflightRunner.preflightProfile(
-                            profile = target.profile,
-                            tasks = availableTasks,
-                            inputs = inputs,
-                        )
-                    }
-                    PreflightReviewState(target, inputs, report)
-                }
-            }.onSuccess { _preflightReview.value = it }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_preflight)) }
-            _preflightBusy.value = false
+            val result = executeAndLogTask(
+                appContext = appContext,
+                db = db,
+                task = task,
+                source = "Manual run",
+            )
+            val status = if (result.report.success) "succeeded" else "failed"
+            events.send("${task.name} $status (${result.report.durationMs}ms)")
         }
     }
 
     fun pinTaskShortcut(task: Task) {
         viewModelScope.launch {
             if (!TaskShortcutHelper.canPinShortcut(appContext)) {
-                events.send(message(R.string.ui_message_shortcut_unsupported))
+                events.send("Launcher does not support pinned shortcuts")
                 return@launch
             }
             val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
             if (requested) {
-                events.send(message(R.string.ui_message_shortcut_pinning, task.name))
+                events.send("Pinning \"${task.name}\" to home screen")
             } else {
-                events.send(message(R.string.ui_message_shortcut_failed))
+                events.send("Failed to pin shortcut")
             }
         }
     }
 
-    private suspend fun transitionEdit(entityType: String, entityId: Long, redo: Boolean): SemanticDiffDocument? = db.withTransaction {
-        val history = db.editHistoryDao()
-        val snapshot = if (redo) {
-            history.getRedoCandidate(entityType, entityId)
-        } else {
-            history.getUndoCandidate(entityType, entityId)
-        } ?: return@withTransaction null
-
-        if (snapshot.previousJson.isBlank()) {
-            if (redo) {
-                when (entityType) {
-                    EditHistoryDao.TYPE_TASK -> {
-                        if (db.taskDao().getById(entityId) != null) return@withTransaction null
-                        val restored = EditHistorySnapshotDecoder.task(snapshot.nextJson, entityId)
-                        db.taskDao().insert(restored.toEntity())
-                        history.markRedone(snapshot.id)
-                        return@withTransaction AutomationSemanticDiff.compareTask(null, restored)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    EditHistoryDao.TYPE_PROFILE -> {
-                        if (db.profileDao().getById(entityId) != null) return@withTransaction null
-                        val restored = EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId)
-                        db.profileDao().insert(restored.toEntity())
-                        history.markRedone(snapshot.id)
-                        return@withTransaction AutomationSemanticDiff.compareProfile(null, restored)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    EditHistoryDao.TYPE_SCENE -> {
-                        if (db.sceneDao().getById(entityId) != null) return@withTransaction null
-                        val restored = EditHistorySnapshotDecoder.scene(snapshot.nextJson, entityId)
-                        db.sceneDao().insert(restored.toEntity())
-                        history.markRedone(snapshot.id)
-                        return@withTransaction AutomationSemanticDiff.compareScene(null, restored)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    else -> return@withTransaction null
-                }
-            } else {
-                when (entityType) {
-                    EditHistoryDao.TYPE_TASK -> {
-                        val current = db.taskDao().getById(entityId) ?: return@withTransaction null
-                        val currentTask = current.toDomainDecodeResult().also { result ->
-                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                        }.value
-                        val references = AutomationReferenceIndex.referencesTo(
-                            task = currentTask,
-                            profiles = db.profileDao().getAll().map { it.toDomain() },
-                            tasks = db.taskDao().getAll().map { it.toDomain() },
-                            scenes = db.sceneDao().getAll().map { it.toDomain() },
-                            globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
-                        )
-                        if (references.isNotEmpty()) return@withTransaction null
-                        db.taskDao().delete(current)
-                        history.markUndone(snapshot.id, snapshot.nextJson)
-                        return@withTransaction AutomationSemanticDiff.compareTask(currentTask, null)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    EditHistoryDao.TYPE_PROFILE -> {
-                        val current = db.profileDao().getById(entityId) ?: return@withTransaction null
-                        val currentProfile = current.toDomainDecodeResult().also { result ->
-                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                        }.value
-                        db.profileDao().delete(current)
-                        locationDwellStateStore.clearProfile(entityId)
-                        history.markUndone(snapshot.id, snapshot.nextJson)
-                        return@withTransaction AutomationSemanticDiff.compareProfile(currentProfile, null)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    EditHistoryDao.TYPE_SCENE -> {
-                        val current = db.sceneDao().getById(entityId) ?: return@withTransaction null
-                        val currentScene = current.toDomainDecodeResult().also { result ->
-                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-                        }.value
-                        db.sceneDao().delete(current)
-                        history.markUndone(snapshot.id, snapshot.nextJson)
-                        return@withTransaction AutomationSemanticDiff.compareScene(currentScene, null)
-                            ?.let(::documentOf)
-                            ?: SemanticDiffDocument()
-                    }
-                    else -> return@withTransaction null
-                }
-            }
-        }
-
-        val targetJson = if (redo) snapshot.nextJson else snapshot.previousJson
-        if (targetJson.isBlank()) return@withTransaction null
-
-        when (entityType) {
-            EditHistoryDao.TYPE_TASK -> {
-                val current = db.taskDao().getById(entityId) ?: return@withTransaction null
-                val currentDecoded = current.toDomainDecodeResult()
-                val currentJson = if (currentDecoded.issue == null) {
-                    StorageJson.encodeToString(currentDecoded.value)
-                } else {
-                    current.actionsJson
-                }
-                val target = EditHistorySnapshotDecoder.task(targetJson, entityId)
-                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
-                    ?: AutomationSemanticDiff.compareTask(currentDecoded.value, target)?.let(::documentOf)
-                    ?: SemanticDiffDocument()
-                db.taskDao().update(target.toEntity())
-                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
-                return@withTransaction diff
-            }
-
-            EditHistoryDao.TYPE_PROFILE -> {
-                val current = db.profileDao().getById(entityId) ?: return@withTransaction null
-                val currentDecoded = current.toDomainDecodeResult()
-                val currentJson = if (currentDecoded.issue == null) {
-                    StorageJson.encodeToString(currentDecoded.value)
-                } else {
-                    current.contextsJson
-                }
-                val target = EditHistorySnapshotDecoder.profile(targetJson, entityId)
-                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
-                    ?: AutomationSemanticDiff.compareProfile(currentDecoded.value, target)?.let(::documentOf)
-                    ?: SemanticDiffDocument()
-                db.profileDao().upsert(target.toEntity())
-                locationDwellStateStore.clearProfile(entityId)
-                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
-                return@withTransaction diff
-            }
-
-            EditHistoryDao.TYPE_SCENE -> {
-                val current = db.sceneDao().getById(entityId) ?: return@withTransaction null
-                val currentDecoded = current.toDomainDecodeResult()
-                val currentJson = if (currentDecoded.issue == null) {
-                    StorageJson.encodeToString(currentDecoded.value)
-                } else {
-                    current.elementsJson
-                }
-                val target = EditHistorySnapshotDecoder.scene(targetJson, entityId)
-                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
-                    ?: AutomationSemanticDiff.compareScene(currentDecoded.value, target)?.let(::documentOf)
-                    ?: SemanticDiffDocument()
-                db.sceneDao().update(target.toEntity())
-                if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
-                return@withTransaction diff
-            }
-
-            else -> return@withTransaction null
-        }
-    }
-
-    private fun transitionEditAsync(entityType: String, entityId: Long, redo: Boolean) {
-        viewModelScope.launch {
-            runCatching { transitionEdit(entityType, entityId, redo) }
-                .onSuccess { diff ->
-                    val changed = diff != null
-                    if (diff != null && !diff.isEmpty) {
-                        _semanticDiffReview.value = SemanticDiffReviewState(diff)
-                    }
-                    val messageRes = when {
-                        changed && redo -> R.string.ui_message_edit_redone
-                        changed -> R.string.ui_message_edit_undone
-                        redo -> R.string.ui_message_no_redo_history
-                        else -> R.string.ui_message_no_edit_history
-                    }
-                    events.send(message(messageRes))
-                }
-                .onFailure { events.send(errorMessage(it, if (redo) R.string.ui_error_redo else R.string.ui_error_undo)) }
-        }
-    }
-
-    fun clearSemanticDiffReview() {
-        _semanticDiffReview.value = null
-    }
-
-    fun undoLastTaskEdit(taskId: Long) = transitionEditAsync(EditHistoryDao.TYPE_TASK, taskId, redo = false)
-    fun redoLastTaskEdit(taskId: Long) = transitionEditAsync(EditHistoryDao.TYPE_TASK, taskId, redo = true)
-    fun undoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = false)
-    fun redoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = true)
-    fun undoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = false)
-    fun redoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = true)
-
-    fun updateVariable(
-        previousName: String?,
-        name: String,
-        value: String,
-        isSecret: Boolean,
-        successMessage: String,
-        projectId: Long = DEFAULT_PROJECT_ID,
-    ) {
+    fun undoLastTaskEdit(taskId: Long) {
         viewModelScope.launch {
             runCatching {
-                val globalName = requireNotNull(VariableNamePolicy.promoteToGlobal(name)) {
-                    appContext.getString(R.string.ui_error_invalid_variable_name)
-                }
-                val updated = Variable(
-                    globalName,
-                    value,
-                    isGlobal = true,
-                    isSecret = isSecret,
-                    projectId = projectId,
-                )
-                val previous = previousName?.let {
-                    variableRepository.get(it, projectId)
-                        ?: throw IllegalStateException("Variable '%$it' no longer exists.")
-                }
-                if (previous == null || previous.name == globalName) {
-                    variableRepository.upsert(updated)
-                } else {
-                    db.withTransaction {
-                        val profiles = db.profileDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val tasks = db.taskDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val scenes = db.sceneDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val rewrite = AutomationReferenceRewriter.renameVariable(
-                            target = previous,
-                            replacementName = globalName,
-                            profiles = profiles,
-                            tasks = tasks,
-                            scenes = scenes,
-                        )
-                        rewrite.profiles.forEach { rewritten ->
-                            val current = profiles.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_PROFILE,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
-                            )
-                            db.profileDao().upsert(rewritten.toEntity())
-                        }
-                        rewrite.tasks.forEach { rewritten ->
-                            val current = tasks.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_TASK,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
-                            )
-                            db.taskDao().update(rewritten.toEntity())
-                        }
-                        rewrite.scenes.forEach { rewritten ->
-                            val current = scenes.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_SCENE,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
-                            )
-                            db.sceneDao().update(rewritten.toEntity())
-                        }
-                        variableRepository.rename(previous.name, updated)
-                    }
-                }
-                events.send(legacyMessage(successMessage))
-            }.onFailure { error ->
-                events.send(errorMessage(error, R.string.ui_error_variable_save))
-            }
+                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_TASK, taskId)
+                    ?: return@runCatching false
+                val current = db.taskDao().getById(taskId) ?: return@runCatching false
+                db.taskDao().update(current.copy(actionsJson = snapshot.previousJson))
+                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
+                true
+            }.onSuccess { undone ->
+                events.send(if (undone) "Edit undone" else "No edit history available")
+            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
         }
     }
 
-    fun deleteVariable(name: String, successMessage: String, projectId: Long = DEFAULT_PROJECT_ID) {
+    fun undoLastProfileEdit(profileId: Long) {
         viewModelScope.launch {
             runCatching {
-                db.withTransaction {
-                    val variable = variableRepository.get(name, projectId)
-                        ?: throw IllegalStateException("Variable '%$name' no longer exists.")
-                    val profiles = db.profileDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
-                    }
-                    val tasks = db.taskDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
-                    }
-                    val scenes = db.sceneDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
-                    }
-                    val guard = AutomationReferenceRewriter.guardVariableDeletion(
-                        target = variable,
-                        profiles = profiles,
-                        tasks = tasks,
-                        scenes = scenes,
-                    )
-                    if (!guard.canCommit) {
-                        val sites = guard.blocked.map { it.describe() }.distinct().joinToString("; ")
-                        throw IllegalStateException("Cannot delete %${variable.name}; it is referenced by: $sites")
-                    }
-                    variableRepository.delete(variable.name, projectId)
-                }
+                val snapshot = db.editHistoryDao().getLatest(EditHistoryDao.TYPE_PROFILE, profileId)
+                    ?: return@runCatching false
+                val current = db.profileDao().getById(profileId) ?: return@runCatching false
+                db.profileDao().update(current.copy(contextsJson = snapshot.previousJson))
+                db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
+                true
+            }.onSuccess { undone ->
+                events.send(if (undone) "Edit undone" else "No edit history available")
+            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
+        }
+    }
+
+    // Variables are keyed by (projectId, name) in the fork — the VariablesScreen supplies the scope's
+    // projectId (0 = super-global, >0 = project-global), so we thread it straight through to the DAO.
+    fun updateVariable(projectId: Long, name: String, value: String) {
+        viewModelScope.launch {
+            db.variableDao().insert(VariableEntity(projectId = projectId, name = name, value = value))
+            // Keep the runtime cache in sync (it warms once at startup; UI edits must route through it too).
+            com.opentasker.core.engine.variables.PersistentGlobalScope.set(projectId, name, value)
+        }
+    }
+
+    fun deleteVariable(projectId: Long, name: String) {
+        viewModelScope.launch {
+            // Report real success/failure (upstream deep-audit): no optimistic toast on a failed delete.
+            runCatching {
+                db.variableDao().delete(projectId, name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
             }
-                .onSuccess { events.send(legacyMessage(successMessage)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
+                .onSuccess { events.send("Variable deleted") }
+                .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
         }
     }
 
@@ -1869,74 +1005,29 @@ class ActiveAutomationViewModel(
      */
     private fun requireValidProfileFieldLimits(profile: Profile) {
         val violation = InputValidation.validateProfile(profile)
-            .firstOrNull {
-                it.field == "name" ||
-                    it.field == "cooldownSec" ||
-                    it.field == "priority" ||
-                    it.field == "gracePeriodSec" ||
-                    it.field == "expiresAtMs" ||
-                    it.field == "maxActiveExecutions" ||
-                    it.field == "burstLimit"
-            }
+            .firstOrNull { it.field == "name" || it.field == "cooldownSec" }
         if (violation != null) {
             throw IllegalArgumentException(violation.message)
         }
     }
 
-    private suspend fun requireAutomationLint(profile: Profile): AutomationLintReport {
-        val peers = db.profileDao().getAll().map { entity ->
-            entity.toDomainDecodeResult().also { result ->
-                result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-            }.value
-        }.filterNot { it.id == profile.id }
-        val tasks = db.taskDao().getAll().map { entity ->
-            entity.toDomainDecodeResult().also { result ->
-                result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
-            }.value
-        }
-        val report = AutomationLint.analyze(peers + profile, tasks)
-        val blockers = report.blockingFor(profile.id)
-        require(blockers.isEmpty()) {
-            blockers.joinToString(" ") { finding ->
-                "${finding.title}: ${finding.detail} ${finding.suggestedFix}"
+    /** Remove the dead super-globals the Variables-tab analyzer found (shadow-copies + orphans). Each is a
+     *  super-global (projectId 0); deleting the exact row leaves every project's live copy untouched. The
+     *  runtime cache is unset too, so it never lingers with a stale copy (which diverged the export). */
+    fun deleteDeadGlobals(vars: List<com.opentasker.core.model.Variable>) =
+        launchWithMessage("Removed ${vars.size} dead global${plural(vars.size)}") {
+            vars.forEach {
+                db.variableDao().delete(it.projectId, it.name)
+                com.opentasker.core.engine.variables.PersistentGlobalScope.unset(it.projectId, it.name)
             }
         }
-        return report
-    }
-
-    private suspend fun emitLintWarnings(profile: Profile, report: AutomationLintReport) {
-        val warningCount = report.forProfile(profile.id).count { it.severity == AutomationLintSeverity.WARNING }
-        if (warningCount > 0) {
-            events.send(message(R.string.ui_profile_lint_warnings, warningCount))
-        }
-    }
 
     private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
-                .onSuccess { events.send(legacyMessage(successMessage)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+                .onSuccess { events.send(successMessage) }
+                .onFailure { events.send("Error: ${it.message ?: "Operation failed"}") }
         }
-    }
-}
-
-internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
-
-internal fun defaultProfileShareSlug(name: String): String {
-    val slug = name
-        .lowercase(Locale.US)
-        .replace(Regex("[^a-z0-9]+"), "-")
-        .trim('-')
-        .take(64)
-    return slug.takeIf { it.length >= 3 } ?: "opentasker-share"
-}
-
-internal fun reorderActions(actions: List<ActionSpec>, fromIndex: Int, toIndex: Int): List<ActionSpec> {
-    require(fromIndex in actions.indices) { "Source action index is out of range." }
-    require(toIndex in actions.indices) { "Destination action index is out of range." }
-    if (fromIndex == toIndex) return actions
-    return actions.toMutableList().apply {
-        add(toIndex, removeAt(fromIndex))
     }
 }
 
@@ -1963,15 +1054,25 @@ internal fun readBoundedTaskerXml(context: Context, uri: Uri): String {
 }
 
 internal fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
-    return readBoundedDocumentText(
+    val bytes = readBoundedDocumentBytes(
         context = context,
         uri = uri,
         maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
-        label = "OpenTasker bundle",
+        label = "import",
     )
+    // A settings ZIP (白い熊 自由作業盤-…-export_….zip) is accepted here too: its workspace.json
+    // entry IS the standard full export, so picking the ZIP behaves exactly like picking that JSON.
+    return if (com.opentasker.core.transfer.SettingsBackup.isZip(bytes)) {
+        com.opentasker.core.transfer.SettingsBackup.workspaceJsonFrom(bytes)
+    } else {
+        String(bytes, Charsets.UTF_8)
+    }
 }
 
-internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String {
+internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String =
+    String(readBoundedDocumentBytes(context, uri, maxBytes, label), Charsets.UTF_8)
+
+internal fun readBoundedDocumentBytes(context: Context, uri: Uri, maxBytes: Int, label: String): ByteArray {
     val stream = context.contentResolver.openInputStream(uri)
         ?: error("Unable to open selected $label")
     ByteArrayOutputStream().use { output ->
@@ -1988,7 +1089,7 @@ internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, 
                 output.write(buffer, 0, read)
             }
         }
-        return output.toString(Charsets.UTF_8.name())
+        return output.toByteArray()
     }
 }
 

@@ -3,143 +3,30 @@ package com.opentasker.core.storage
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
-import java.io.File
-import java.io.FileInputStream
-import java.io.IOException
 import java.io.Closeable
-import java.nio.charset.StandardCharsets
-import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
+import java.io.File
 
-/** Loads SQLCipher and upgrades an existing plaintext Room file before Room can open it. */
+/**
+ * Read-only access to a candidate database file for backup validation.
+ *
+ * Fork note: upstream 0.2.80 encrypts the whole Room database with SQLCipher, and this object owned
+ * the plaintext→encrypted conversion. The fork deliberately keeps the database in plaintext (白い熊,
+ * 2026-08-03), so only the read-only opener that upstream's backup review depends on survives here.
+ * The app sandbox and Android's file-based encryption already protect the live file, while a
+ * plaintext database keeps backups portable across installs and inspectable offline — neither of
+ * which survives a per-install Keystore key that fails closed.
+ */
 internal object DatabaseSecurity {
-    private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(StandardCharsets.US_ASCII)
-    private const val TEMP_SUFFIX = ".encrypted.tmp"
-
-    @Volatile
-    private var cipherLoaded = false
-
-    @Synchronized
-    fun prepareEncryptedDatabase(context: Context, databaseName: String): ByteArray {
-        loadCipher()
-        val databaseKey = DatabaseKeyStore.getOrCreate(context)
-        val databaseFile = context.getDatabasePath(databaseName)
-        if (databaseFile.exists() && isPlaintext(databaseFile)) {
-            migratePlaintextDatabase(databaseFile, databaseKey)
-        }
-        return databaseKey
-    }
-
-    fun openEncryptedReadOnly(file: File, context: Context): CipherDatabase {
-        loadCipher()
-        return CipherDatabase.openDatabase(
+    internal fun openReadOnly(file: File, @Suppress("UNUSED_PARAMETER") context: Context): ReadOnlyDatabase {
+        val database = SQLiteDatabase.openDatabase(
             file.absolutePath,
-            DatabaseKeyStore.getOrCreate(context),
             null,
-            CipherDatabase.OPEN_READONLY,
-            null,
+            SQLiteDatabase.OPEN_READONLY,
         )
-    }
-
-    internal fun openReadOnly(file: File, context: Context): ReadOnlyDatabase {
-        if (isPlaintext(file)) {
-            val database = SQLiteDatabase.openDatabase(
-                file.absolutePath,
-                null,
-                SQLiteDatabase.OPEN_READONLY,
-            )
-            return ReadOnlyDatabase(
-                query = { sql -> database.rawQuery(sql, null) },
-                closeAction = database::close,
-            )
-        }
-
-        val database = openEncryptedReadOnly(file, context)
         return ReadOnlyDatabase(
             query = { sql -> database.rawQuery(sql, null) },
             closeAction = database::close,
         )
-    }
-
-    internal fun isPlaintext(file: File): Boolean {
-        if (!file.isFile || file.length() < SQLITE_HEADER.size) return false
-        return FileInputStream(file).use { input ->
-            val header = ByteArray(SQLITE_HEADER.size)
-            var offset = 0
-            while (offset < header.size) {
-                val count = input.read(header, offset, header.size - offset)
-                if (count < 0) return@use false
-                if (count == 0) continue
-                offset += count
-            }
-            header.contentEquals(SQLITE_HEADER)
-        }
-    }
-
-    internal fun deleteDatabaseSidecars(databaseFile: File) {
-        listOf(
-            File("${databaseFile.path}-wal"),
-            File("${databaseFile.path}-shm"),
-            File("${databaseFile.path}-journal"),
-        ).forEach { sidecar ->
-            if (sidecar.exists() && !sidecar.delete()) {
-                throw IOException("Could not remove stale database sidecar ${sidecar.name}")
-            }
-        }
-    }
-
-    private fun loadCipher() {
-        if (cipherLoaded) return
-        synchronized(this) {
-            if (!cipherLoaded) {
-                System.loadLibrary("sqlcipher")
-                cipherLoaded = true
-            }
-        }
-    }
-
-    private fun migratePlaintextDatabase(databaseFile: File, databaseKey: ByteArray) {
-        val sourceVersion = SQLiteDatabase.openDatabase(
-            databaseFile.absolutePath,
-            null,
-            SQLiteDatabase.OPEN_READWRITE,
-        ).use { source ->
-            source.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { it.moveToFirst() }
-            source.version
-        }
-
-        val temporaryFile = File(databaseFile.parentFile, databaseFile.name + TEMP_SUFFIX)
-        if (temporaryFile.exists() && !temporaryFile.delete()) {
-            throw IOException("Could not clear interrupted encrypted database migration")
-        }
-
-        try {
-            CipherDatabase.openDatabase(
-                temporaryFile.absolutePath,
-                databaseKey.copyOf(),
-                null,
-                CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
-                null,
-            ).use { encrypted ->
-                encrypted.execSQL(
-                    "ATTACH DATABASE ? AS plaintext KEY ?",
-                    arrayOf(databaseFile.absolutePath, ""),
-                )
-                try {
-                    encrypted.rawQuery("SELECT sqlcipher_export('main')", null).use { it.moveToFirst() }
-                } finally {
-                    encrypted.execSQL("DETACH DATABASE plaintext")
-                }
-                encrypted.version = sourceVersion
-                check(encrypted.isDatabaseIntegrityOk) { "Migrated database failed SQLCipher integrity check" }
-            }
-
-            deleteDatabaseSidecars(databaseFile)
-            replaceFileAtomically(temporaryFile, databaseFile, "encrypted database migration")
-            deleteDatabaseSidecars(databaseFile)
-        } catch (error: Throwable) {
-            temporaryFile.delete()
-            throw error
-        }
     }
 }
 

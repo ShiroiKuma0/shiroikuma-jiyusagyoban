@@ -16,12 +16,21 @@ class AppLoggerBoundarySourceTest {
         Path.of("app/src/main/java/com/opentasker"),
     ).first(Files::exists)
 
-    private val allowedLoggerFile = sourceRoot.resolve("core/logging/AppLogger.kt").normalize()
+    /**
+     * [AppLogger] itself, plus the Shizuku key-grabber — which runs in a **separate privileged process**
+     * spawned by Shizuku (uid 2000). AppLogger's value is its in-app ring, and that ring lives in the
+     * app's process; logging there from the grabber would write into a buffer nothing can read. Platform
+     * logging is the only channel it has.
+     */
+    private val allowedFiles = listOf(
+        "core/logging/AppLogger.kt",
+        "core/input/KeyGrabberService.kt",
+    ).map { sourceRoot.resolve(it).normalize() }
 
     @Test
     fun androidPlatformLoggingOnlyHappensInsideAppLogger() {
         val offenders = kotlinFiles()
-            .filter { it.normalize() != allowedLoggerFile }
+            .filter { it.normalize() !in allowedFiles }
             .filter { source ->
                 val text = source.readText()
                 text.contains(platformLogImport) || platformLogCallPattern.containsMatchIn(text)

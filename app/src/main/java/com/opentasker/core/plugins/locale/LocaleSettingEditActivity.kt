@@ -32,8 +32,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.map
 
 class LocaleSettingEditActivity : ComponentActivity() {
@@ -49,15 +48,9 @@ class LocaleSettingEditActivity : ComponentActivity() {
 
         setContent {
             // Honor the persisted theme like MainActivity and the widget config activity,
-            // instead of defaulting to the system theme.
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            val darkTheme = when (themeMode) {
-                ThemeMode.Dark -> true
-                ThemeMode.Light -> false
-                ThemeMode.HighContrast -> true
-                ThemeMode.System -> isSystemInDarkTheme()
-            }
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            // instead of defaulting to the system theme (fork: ThemePrefs-driven OpenTaskerTheme).
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 val tasks by tasksFlow.collectAsState(initial = emptyList())
                 Scaffold(
                     topBar = {
