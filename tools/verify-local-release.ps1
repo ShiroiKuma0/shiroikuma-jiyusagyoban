@@ -11,6 +11,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Gradlew = Join-Path $Root "gradlew.bat"
 $GradleWrapperProperties = Join-Path $Root "gradle\wrapper\gradle-wrapper.properties"
 $GradleWrapperJar = Join-Path $Root "gradle\wrapper\gradle-wrapper.jar"
+$DependencyVerificationScript = Join-Path $Root "tools\verify-dependency-verification.ps1"
 $ReportDirectory = Join-Path $Root "build\reports\opentasker"
 $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
@@ -83,6 +84,14 @@ Assert-GradleBootstrapIntegrity
 if ($BootstrapOnly) {
     Write-Host "Gradle bootstrap-only verification passed."
     return
+}
+
+if (-not (Test-Path -LiteralPath $DependencyVerificationScript -PathType Leaf)) {
+    throw "Dependency verification script not found at $DependencyVerificationScript"
+}
+& $DependencyVerificationScript
+if ($LASTEXITCODE -ne 0) {
+    throw "Independent dependency verification failed with exit code $LASTEXITCODE"
 }
 
 function Invoke-Gradle {
