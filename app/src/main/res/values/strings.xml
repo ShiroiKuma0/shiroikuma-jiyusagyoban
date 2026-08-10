@@ -450,6 +450,10 @@
     <string name="imported_profile_review_required">Review required</string>
     <string name="imported_profile_missing_task_reference">missing task #%1$d</string>
     <string name="imported_profile_no_tasks">No resolvable tasks.</string>
+    <string name="automation_lint_title">Automation lint</string>
+    <string name="automation_lint_blocked_prefix">Blocked:</string>
+    <string name="automation_lint_warning_prefix">Warning:</string>
+    <string name="automation_lint_finding">%1$s: %2$s %3$s</string>
 
     <!-- Scenes screen -->
     <string name="scenes_create">Create Scene</string>
@@ -465,6 +469,7 @@
     <string name="inspector_no_contexts">No contexts</string>
     <string name="inspector_no_contexts_body">This profile cannot match because it has no context entries configured.</string>
     <string name="inspector_simulate_trigger">Simulate trigger</string>
+    <string name="inspector_lint_title">Automation lint findings</string>
 
     <!-- Import -->
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
@@ -969,6 +974,7 @@
     <string name="ui_message_scene_deleted">Scene deleted</string>
     <string name="ui_message_profile_created">Profile created</string>
     <string name="ui_message_profile_updated">Profile updated</string>
+    <string name="ui_profile_lint_warnings">Profile saved with %1$d lint warning(s); review Automation lint in Context Inspector.</string>
     <string name="ui_message_profile_deleted">Profile deleted</string>
     <string name="ui_message_profile_reviewed">Imported profile reviewed and enabled</string>
     <string name="ui_message_template_installed">Template installed as a disabled profile</string>

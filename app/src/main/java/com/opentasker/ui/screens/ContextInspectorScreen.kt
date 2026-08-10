@@ -61,11 +61,15 @@ import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.observationStatus
+import com.opentasker.core.capabilities.AutomationLint
+import com.opentasker.core.capabilities.AutomationLintFinding
+import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -110,6 +114,23 @@ class ContextInspectorViewModel(
                 .sortedBy { it.name.lowercase(Locale.US) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val taskDecodeResults = db.taskDao()
+        .getAllAsFlow()
+        .map { entities -> entities.map { it.toDomainDecodeResult() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val tasks: StateFlow<List<Task>> = taskDecodeResults
+        .map { results ->
+            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val lintFindings: StateFlow<Map<Long, List<AutomationLintFinding>>> = combine(profiles, tasks) { profiles, tasks ->
+        AutomationLint.analyze(profiles, tasks).findings
+            .flatMap { finding -> finding.profileIds.map { profileId -> profileId to finding } }
+            .groupBy({ it.first }, { it.second })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val storageDecodeIssues: StateFlow<List<StorageDecodeIssue>> = profileDecodeResults
         .map { results -> results.mapNotNull { it.issue } }
@@ -215,6 +236,7 @@ fun ContextInspectorScreen(
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
     val snapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
+    val lintFindings by viewModel.lintFindings.collectAsState()
     var simulationProfile by remember { mutableStateOf<Profile?>(null) }
 
     DisposableEffect(viewModel) {
@@ -291,6 +313,7 @@ fun ContextInspectorScreen(
                 ProfileInspectorCard(
                     profile = profile,
                     nowMs = snapshot.generatedAtMs,
+                    lintFindings = lintFindings[profile.profileId].orEmpty(),
                     onSimulate = { candidate -> simulationProfile = candidate },
                 )
             }
@@ -419,6 +442,7 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
 private fun ProfileInspectorCard(
     profile: ProfileInspection,
     nowMs: Long,
+    lintFindings: List<AutomationLintFinding>,
     onSimulate: (Profile) -> Unit,
 ) {
     val color = when {
@@ -476,6 +500,19 @@ private fun ProfileInspectorCard(
                 profile.contexts.forEach { check ->
                     ContextCheckRow(check = check, nowMs = nowMs)
                 }
+            }
+            if (lintFindings.isNotEmpty()) {
+                InspectorNotice(
+                    title = stringResource(R.string.inspector_lint_title),
+                    body = lintFindings.joinToString("\n") { finding ->
+                        "${finding.title}: ${finding.detail} ${finding.suggestedFix}"
+                    },
+                    color = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    },
+                )
             }
             profile.profile?.let { candidate ->
                 OutlinedButton(

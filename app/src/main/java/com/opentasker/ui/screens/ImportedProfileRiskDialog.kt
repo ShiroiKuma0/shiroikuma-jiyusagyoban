@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
+import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -31,10 +32,11 @@ import com.opentasker.ui.theme.DesignSystem
 internal fun ImportedProfileRiskDialog(
     profile: Profile,
     tasks: List<Task>,
+    otherProfiles: List<Profile> = emptyList(),
     onDismiss: () -> Unit,
     onAcknowledgeAndEnable: () -> Unit,
 ) {
-    val review = ImportedProfileEnablePolicy.review(profile, tasks)
+    val review = ImportedProfileEnablePolicy.review(profile, tasks, otherProfiles)
     val reachableTasks = AutomationSensitivityRegistry.reachableTasks(profile, tasks)
     var acknowledged by rememberSaveable(profile.id) { mutableStateOf(false) }
     val powerLabels = review.risk.powers.map { power -> automationPowerLabel(power) }
@@ -49,6 +51,14 @@ internal fun ImportedProfileRiskDialog(
             R.string.imported_profile_feedback_body,
             risk.taskPath.joinToString(" → "),
         )
+    }
+    val lintLabels = review.lintFindings.map { finding ->
+        val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
+            stringResource(R.string.automation_lint_blocked_prefix)
+        } else {
+            stringResource(R.string.automation_lint_warning_prefix)
+        }
+        "$prefix ${finding.detail} ${finding.suggestedFix}"
     }
 
     AlertDialog(
@@ -103,6 +113,19 @@ internal fun ImportedProfileRiskDialog(
                             title = stringResource(R.string.imported_profile_feedback_title),
                             body = feedbackLabels.joinToString("\n"),
                             color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (lintLabels.isNotEmpty()) {
+                    item {
+                        InlineNotice(
+                            title = stringResource(R.string.automation_lint_title),
+                            body = lintLabels.joinToString("\n"),
+                            color = if (review.lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.secondary
+                            },
                         )
                     }
                 }

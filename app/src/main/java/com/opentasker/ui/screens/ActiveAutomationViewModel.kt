@@ -9,6 +9,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
+import com.opentasker.core.capabilities.AutomationLint
+import com.opentasker.core.capabilities.AutomationLintReport
+import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
@@ -628,13 +631,16 @@ class ActiveAutomationViewModel(
                 projectId = projectId,
             )
             requireValidProfileFieldLimits(profile)
+            val lint = requireAutomationLint(profile)
             db.profileDao().upsert(reviewFeedbackRisk(profile).toEntity())
+            emitLintWarnings(profile, lint)
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
             val reviewedProfile = reviewFeedbackRisk(profile)
             requireValidProfileFieldLimits(reviewedProfile)
+            val lint = requireAutomationLint(reviewedProfile)
             // Atomic read-check-snapshot-update, matching updateScene, so racing writers
             // (dialog save vs. notification/external-intent path) can't lose a revision.
             db.withTransaction {
@@ -661,8 +667,9 @@ class ActiveAutomationViewModel(
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
                 }
-                    db.profileDao().upsert(reviewedProfile.toEntity())
+                db.profileDao().upsert(reviewedProfile.toEntity())
             }
+            emitLintWarnings(reviewedProfile, lint)
         }
 
     fun createProject(name: String) = launchWithMessage("Project created") {
@@ -735,16 +742,24 @@ class ActiveAutomationViewModel(
                 ?: throw IllegalStateException("Profile no longer exists.")
             check(current.requiresRiskAcknowledgement) { "Profile review is no longer required." }
             val tasks = db.taskDao().getAll().map { it.toDomain() }
-            val review = ImportedProfileEnablePolicy.review(current, tasks)
-            check(review.canAcknowledge) {
-                "Remove unsupported or unknown actions before enabling this imported profile."
+            val peers = db.profileDao().getAll().map { entity ->
+                entity.toDomainDecodeResult().also { result ->
+                    result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                }.value
             }
-            db.profileDao().upsert(
-                current.copy(
-                    enabled = true,
-                    requiresRiskAcknowledgement = false,
-                ).toEntity(),
+            val review = ImportedProfileEnablePolicy.review(current, tasks, peers)
+            check(review.canAcknowledge) {
+                "Resolve unsupported actions, missing references, and blocking automation lint findings before enabling this imported profile."
+            }
+            val enabledProfile = current.copy(
+                enabled = true,
+                requiresRiskAcknowledgement = false,
             )
+            val lint = requireAutomationLint(enabledProfile)
+            db.profileDao().upsert(
+                enabledProfile.toEntity(),
+            )
+            emitLintWarnings(enabledProfile, lint)
         }
 
     fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
@@ -1573,6 +1588,34 @@ class ActiveAutomationViewModel(
             .firstOrNull { it.field == "name" || it.field == "cooldownSec" }
         if (violation != null) {
             throw IllegalArgumentException(violation.message)
+        }
+    }
+
+    private suspend fun requireAutomationLint(profile: Profile): AutomationLintReport {
+        val peers = db.profileDao().getAll().map { entity ->
+            entity.toDomainDecodeResult().also { result ->
+                result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+            }.value
+        }.filterNot { it.id == profile.id }
+        val tasks = db.taskDao().getAll().map { entity ->
+            entity.toDomainDecodeResult().also { result ->
+                result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+            }.value
+        }
+        val report = AutomationLint.analyze(peers + profile, tasks)
+        val blockers = report.blockingFor(profile.id)
+        require(blockers.isEmpty()) {
+            blockers.joinToString(" ") { finding ->
+                "${finding.title}: ${finding.detail} ${finding.suggestedFix}"
+            }
+        }
+        return report
+    }
+
+    private suspend fun emitLintWarnings(profile: Profile, report: AutomationLintReport) {
+        val warningCount = report.forProfile(profile.id).count { it.severity == AutomationLintSeverity.WARNING }
+        if (warningCount > 0) {
+            events.send(message(R.string.ui_profile_lint_warnings, warningCount))
         }
     }
 

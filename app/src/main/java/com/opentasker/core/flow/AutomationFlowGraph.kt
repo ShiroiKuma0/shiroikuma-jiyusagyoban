@@ -1,6 +1,8 @@
 package com.opentasker.core.flow
 
 import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.capabilities.AutomationLint
+import com.opentasker.core.capabilities.AutomationLintFinding
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
@@ -13,6 +15,7 @@ data class AutomationFlowGraph(
     val edges: List<AutomationFlowEdge>,
     val warnings: List<String> = emptyList(),
     val strings: AutomationFlowStrings = AutomationFlowStrings.English,
+    val lintFindings: List<AutomationLintFinding> = emptyList(),
 ) {
     val contextNodes: List<AutomationFlowNode>
         get() = nodes.filter { it.kind == AutomationFlowNodeKind.CONTEXT }
@@ -175,6 +178,7 @@ object AutomationFlowGraphBuilder {
             edges = edges,
             warnings = warnings.distinct(),
             strings = strings,
+            lintFindings = AutomationLint.analyze(profile, tasksById.values.toList()).forProfile(profile.id),
         )
     }
 

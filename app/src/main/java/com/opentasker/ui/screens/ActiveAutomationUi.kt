@@ -988,6 +988,7 @@ fun ActiveAutomationUi(
         ImportedProfileRiskDialog(
             profile = profile,
             tasks = tasks,
+            otherProfiles = profiles,
             onDismiss = { importedProfileReviewId = NO_DIALOG_ENTITY_ID },
             onAcknowledgeAndEnable = {
                 viewModel.acknowledgeAndEnableImportedProfile(profile.id)
