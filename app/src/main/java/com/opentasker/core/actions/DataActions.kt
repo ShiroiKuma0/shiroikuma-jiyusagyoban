@@ -1,10 +1,7 @@
 package com.opentasker.core.actions
 
 import com.opentasker.core.data.StructuredDataReader
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -19,10 +16,7 @@ import com.opentasker.core.engine.ActionResult
  * Sets `%var` to the first extracted value, stores all values as the `var` array (`%var(#)` /
  * `%var(0)` / `%var()`), and sets `%var_count` to the number of values.
  */
-class DataReadAction : Action {
-    override val id = "data.read"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DataReadAction : DeclaredAction(ActionCatalog.require("data.read")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")

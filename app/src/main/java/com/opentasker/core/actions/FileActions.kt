@@ -6,10 +6,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.OpenOption
 import java.nio.file.StandardOpenOption
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -19,10 +16,7 @@ import com.opentasker.core.engine.ActionResult
  *   - "path": file path
  *   - "var": variable name to store contents
  */
-class ReadFileAction : Action {
-    override val id = "file.read"
-    override val category = ActionCategory.FILE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ReadFileAction : DeclaredAction(ActionCatalog.require("file.read")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -53,10 +47,7 @@ class ReadFileAction : Action {
  *   - "path": file path
  *   - "text": content to write
  */
-class WriteFileAction : Action {
-    override val id = "file.write"
-    override val category = ActionCategory.FILE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class WriteFileAction : DeclaredAction(ActionCatalog.require("file.write")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -84,10 +75,7 @@ class WriteFileAction : Action {
  *   - "path": file path
  *   - "text": content to append
  */
-class AppendFileAction : Action {
-    override val id = "file.append"
-    override val category = ActionCategory.FILE
-    override val retrySafety = ActionRetrySafety.NEVER
+class AppendFileAction : DeclaredAction(ActionCatalog.require("file.append")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -118,10 +106,7 @@ class AppendFileAction : Action {
  * Args:
  *   - "path": file path
  */
-class DeleteFileAction : Action {
-    override val id = "file.delete"
-    override val category = ActionCategory.FILE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DeleteFileAction : DeclaredAction(ActionCatalog.require("file.delete")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -148,10 +133,7 @@ class DeleteFileAction : Action {
  *   - "var": variable name to store list
  *   - "pattern": optional glob pattern
  */
-class ListFilesAction : Action {
-    override val id = "file.list"
-    override val category = ActionCategory.FILE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ListFilesAction : DeclaredAction(ActionCatalog.require("file.list")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")

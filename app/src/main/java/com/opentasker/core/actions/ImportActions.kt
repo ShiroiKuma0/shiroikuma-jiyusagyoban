@@ -1,15 +1,9 @@
 package com.opentasker.core.actions
 
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
-class TaskerUnsupportedAction : Action {
-    override val id = "tasker.unsupported"
-    override val category = ActionCategory.SYSTEM
-    override val retrySafety = ActionRetrySafety.NEVER
+class TaskerUnsupportedAction : DeclaredAction(ActionCatalog.require("tasker.unsupported")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val code = args["taskerCode"].orEmpty().ifBlank { "unknown" }

@@ -1,10 +1,7 @@
 package com.opentasker.core.actions
 
 import com.opentasker.core.data.TextOps
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private fun outputVar(args: Map<String, String>, default: String): String =
@@ -15,10 +12,7 @@ private fun outputVar(args: Map<String, String>, default: String): String =
  * [full, group1, ...] as the `var` array (`%var(1)` = first group), and `%var_count` to the group
  * count (0 when there is no match).
  */
-class TextMatchAction : Action {
-    override val id = "text.match"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TextMatchAction : DeclaredAction(ActionCatalog.require("text.match")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -34,10 +28,7 @@ class TextMatchAction : Action {
 }
 
 /** Replace-all. Args: `source`, `pattern`, `replacement`, `var`. */
-class TextReplaceAction : Action {
-    override val id = "text.replace"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -56,10 +47,7 @@ class TextReplaceAction : Action {
  * Split into an array. Args: `source`, `delimiter` (literal) or `pattern` (regex), `var`. Sets the
  * `var` array and `%var_count`, and `%var` to the first element.
  */
-class TextSplitAction : Action {
-    override val id = "text.split"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TextSplitAction : DeclaredAction(ActionCatalog.require("text.split")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")
@@ -80,10 +68,7 @@ class TextSplitAction : Action {
 }
 
 /** Join an array variable into a string. Args: `array` (array var name), `delimiter`, `var`. */
-class TextJoinAction : Action {
-    override val id = "text.join"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TextJoinAction : DeclaredAction(ActionCatalog.require("text.join")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val arrayName = args["array"]?.trim()?.ifBlank { null } ?: return ActionResult.Failure("missing array name")
@@ -101,10 +86,7 @@ class TextJoinAction : Action {
 }
 
 /** Substring. Args: `source`, `start`, `end` (optional), `var`. Bounds are clamped. */
-class TextSubstringAction : Action {
-    override val id = "text.substring"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TextSubstringAction : DeclaredAction(ActionCatalog.require("text.substring")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val source = args["source"] ?: return ActionResult.Failure("missing source")

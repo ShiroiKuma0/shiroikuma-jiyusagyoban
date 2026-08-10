@@ -15,10 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.contexts.QuickSettingsTileStore
 import com.opentasker.core.contexts.requestRefresh
@@ -34,10 +31,7 @@ import kotlin.coroutines.resume
  * Args:
  *   - "state": "on", "off", or "toggle"
  */
-class WiFiToggleAction : Action {
-    override val id = "wifi.toggle"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class WiFiToggleAction : DeclaredAction(ActionCatalog.require("wifi.toggle")) {
 
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -65,10 +59,7 @@ class WiFiToggleAction : Action {
  * Args:
  *   - "state": "on", "off", or "toggle"
  */
-class BluetoothToggleAction : Action {
-    override val id = "bluetooth.toggle"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class BluetoothToggleAction : DeclaredAction(ActionCatalog.require("bluetooth.toggle")) {
 
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -103,10 +94,7 @@ class BluetoothToggleAction : Action {
  * Args:
  *   - "brightness": 0-255 (or auto)
  */
-class BrightnessAction : Action {
-    override val id = "brightness.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class BrightnessAction : DeclaredAction(ActionCatalog.require("brightness.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val brightness = args["brightness"] ?: args["level"] ?: return ActionResult.Failure("missing brightness")
@@ -137,10 +125,7 @@ class BrightnessAction : Action {
  *   - "stream": "music", "alarm", "ring", "notification", etc.
  *   - "level": 0-15 (or "mute", "unmute")
  */
-class VolumeAction : Action {
-    override val id = "volume.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
@@ -179,10 +164,7 @@ class VolumeAction : Action {
  * Args:
  *   - "state": "on", "off", or "toggle"
  */
-class AirplaneModeAction : Action {
-    override val id = "airplane.toggle"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -197,10 +179,7 @@ class AirplaneModeAction : Action {
  * Args:
  *   - "state": "on", "off", or "toggle"
  */
-class MobileDataAction : Action {
-    override val id = "mobile.toggle"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class MobileDataAction : DeclaredAction(ActionCatalog.require("mobile.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -209,10 +188,7 @@ class MobileDataAction : Action {
     }
 }
 
-class DoNotDisturbAction : Action {
-    override val id = "dnd.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DoNotDisturbAction : DeclaredAction(ActionCatalog.require("dnd.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val nm = ctx.app.getSystemService(NotificationManager::class.java)
@@ -238,10 +214,7 @@ class DoNotDisturbAction : Action {
     }
 }
 
-class RingerModeAction : Action {
-    override val id = "ringer.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class RingerModeAction : DeclaredAction(ActionCatalog.require("ringer.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"] ?: return ActionResult.Failure("missing mode argument")
@@ -264,10 +237,7 @@ class RingerModeAction : Action {
     }
 }
 
-class TorchAction : Action {
-    override val id = "torch.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class TorchAction : DeclaredAction(ActionCatalog.require("torch.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -366,10 +336,7 @@ private fun safelyUnregisterTorchCallback(cameraManager: CameraManager, callback
     }
 }
 
-class TileStateAction : Action {
-    override val id = "tile.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class TileStateAction : DeclaredAction(ActionCatalog.require("tile.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: return ActionResult.Failure("missing state argument")
@@ -418,10 +385,7 @@ private fun streamType(name: String): Int? = when (name.lowercase()) {
  * (near-)immediately on real devices, the opposite of what "never" suggests, so
  * zero and sub-second values are rejected.
  */
-class ScreenTimeoutAction : Action {
-    override val id = "screen.timeout"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ScreenTimeoutAction : DeclaredAction(ActionCatalog.require("screen.timeout")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")

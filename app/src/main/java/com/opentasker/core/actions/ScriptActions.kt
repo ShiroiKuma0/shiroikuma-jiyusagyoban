@@ -1,9 +1,6 @@
 package com.opentasker.core.actions
 
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scripting.TermuxCommandBroker
@@ -16,10 +13,7 @@ import com.opentasker.core.scripting.TermuxScriptPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 
-class TermuxScriptAction : Action {
-    override val id = TermuxScriptBackend.ACTION_ID
-    override val category = ActionCategory.PLUGIN
-    override val retrySafety = ActionRetrySafety.NEVER
+class TermuxScriptAction : DeclaredAction(ActionCatalog.require(TermuxScriptBackend.ACTION_ID)) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val executable = args["executable"]?.trim()

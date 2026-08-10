@@ -9,10 +9,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
 import kotlinx.coroutines.withTimeoutOrNull
@@ -22,10 +19,7 @@ private const val MAX_CONTACT_QUERY_CHARS = 128
 private const val MAX_CONTACT_RESULTS = 50
 private const val CONTACT_PICKER_TIMEOUT_MS = 120_000L
 
-class ClipboardGetAction : Action {
-    override val id = "clipboard.get"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ClipboardGetAction : DeclaredAction(ActionCatalog.require("clipboard.get")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val output = outputVariable(args, "Clipboard") ?: return ActionResult.Failure("invalid output variable")
@@ -48,10 +42,7 @@ class ClipboardGetAction : Action {
     }
 }
 
-class ClipboardSetAction : Action {
-    override val id = "clipboard.set"
-    override val category = ActionCategory.SYSTEM
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ClipboardSetAction : DeclaredAction(ActionCatalog.require("clipboard.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val text = args["text"] ?: return ActionResult.Failure("missing text")
@@ -68,10 +59,7 @@ class ClipboardSetAction : Action {
     }
 }
 
-class ContactsLookupAction : Action {
-    override val id = "contacts.lookup"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ContactsLookupAction : DeclaredAction(ActionCatalog.require("contacts.lookup")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val query = args["query"]?.trim()?.takeIf(String::isNotBlank)

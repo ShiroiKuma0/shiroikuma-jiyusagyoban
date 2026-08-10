@@ -12,10 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
@@ -34,10 +31,7 @@ import java.util.concurrent.TimeUnit
  *   - key: stable channel name; a later temporary state on the same key replaces the old timer
  *   - duration_sec: 1..604800 seconds
  */
-class TemporaryStateAction : Action {
-    override val id = ACTION_ID
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+class TemporaryStateAction : DeclaredAction(ActionCatalog.require(ACTION_ID)) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val plan = TemporaryStatePlan.parse(args).getOrElse { return ActionResult.Failure(it.message ?: "invalid temporary state") }

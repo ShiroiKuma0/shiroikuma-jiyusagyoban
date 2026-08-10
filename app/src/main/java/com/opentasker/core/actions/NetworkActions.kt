@@ -4,10 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -22,10 +19,7 @@ import java.net.URL
  *   - "timeout_sec": optional timeout (default: 5)
  *   - "var": variable to store result (true/false)
  */
-class PingAction : Action {
-    override val id = "ping"
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class PingAction : DeclaredAction(ActionCatalog.require("ping")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
@@ -64,10 +58,7 @@ private val HOST_PATTERN = Regex("^[A-Za-z0-9.-]{1,253}$")
  */
 class DownloadAction(
     private val delegate: HttpRequestAction = HttpRequestAction(),
-) : Action {
-    override val id = "download"
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+) : DeclaredAction(ActionCatalog.require("download")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")
@@ -105,10 +96,7 @@ class DownloadAction(
  *   - "broadcast": broadcast IP (default: "255.255.255.255")
  *   - "port": UDP port (default: 9)
  */
-class WakeOnLanAction : Action {
-    override val id = "wol"
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class WakeOnLanAction : DeclaredAction(ActionCatalog.require("wol")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val macStr = args["mac"] ?: return ActionResult.Failure("missing mac")

@@ -1,9 +1,6 @@
 package com.opentasker.core.actions
 
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import java.io.EOFException
 import java.io.InputStream
@@ -218,10 +215,7 @@ object MqttWireCodec {
 
 class MqttPublishAction(
     private val transport: MqttPublishTransport = SocketMqttPublishTransport(),
-) : Action {
-    override val id = ID
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.NEVER
+) : DeclaredAction(ActionCatalog.require(ID)) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val config = MqttPublishProtocol.parse(args).getOrElse { error ->

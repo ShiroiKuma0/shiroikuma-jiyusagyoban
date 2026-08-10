@@ -1,6 +1,7 @@
 package com.opentasker.core.capabilities
 
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.ActionCatalog
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionRetrySafety
@@ -9,6 +10,7 @@ import com.opentasker.core.engine.SUB_TASK_ACTION_ID
 import com.opentasker.core.registerCoreRuntime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -97,16 +99,23 @@ class ActionContractCompletenessTest {
     }
 
     @Test
+    fun runtimeMetadataAndCapabilitiesResolveFromTheCanonicalDeclaration() {
+        assertEquals(74, ActionCatalog.all.size)
+        ActionCatalog.all.forEach { definition ->
+            val action = definition.factory()
+            assertSame(definition, action.definition)
+            assertSame(definition, ActionRegistry.get(definition.id)?.definition)
+            assertEquals(definition.metadata, ActionMetadataRegistry.get(definition.id))
+            assertEquals(definition.capability(), ActionCapabilityRegistry.get(definition.id))
+        }
+    }
+
+    @Test
     fun everyRegisteredBuiltInSourceDeclaresRetrySafety() {
-        val runtime = repoRoot.resolve("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt").readText()
-        val actionSources = repoRoot.resolve("app/src/main/java/com/opentasker/core/actions")
-            .toFile()
-            .walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .joinToString("\n") { it.readText() }
-        val registeredCount = Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(runtime).count()
-        val classifiedCount = Regex("override val retrySafety = ActionRetrySafety\\.(?:NEVER|IDEMPOTENT)")
-            .findAll(actionSources)
+        val catalog = repoRoot.resolve("app/src/main/java/com/opentasker/core/actions/ActionCatalog.kt").readText()
+        val registeredCount = Regex("(?m)^\\s*define\\(\\\"").findAll(catalog).count()
+        val classifiedCount = Regex("(?m)^\\s*define\\(\\\"[^\"]+\",\\s*ActionCategory\\.[A-Z]+,\\s*ActionRetrySafety\\.(?:NEVER|IDEMPOTENT)")
+            .findAll(catalog)
             .count()
 
         assertEquals(
