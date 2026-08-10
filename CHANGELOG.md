@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.83
 
 - The pre-unlock time trigger setting is now a single toggleable row, so a screen reader announces its name along with its state instead of an unnamed on/off switch.
 - Trigger lint findings name their severity in text, and the profile editor's option groups expose radio-button selection state, so neither depends on colour alone.
