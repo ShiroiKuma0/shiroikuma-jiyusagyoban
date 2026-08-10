@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 
 class StateContextSourceImplTest {
     @Test
@@ -127,5 +129,40 @@ class StateContextSourceImplTest {
         assertTrue(stateMatches("network_type=wifi", state))
         assertTrue(stateMatches("vpn=false", state))
         assertFalse(stateMatches("internet=false", state))
+    }
+
+    @Test
+    fun sensorPredicatesMatchAliasesAndBroadOrientationCategories() {
+        val state = mapOf(
+            "orientation" to "portrait_upside_down",
+            "proximity" to "near",
+            "activity" to "walking",
+            "speed" to "12.5",
+            "roaming" to "true",
+            "tethering" to "false",
+            "call_state" to "ringing",
+        )
+
+        assertTrue(stateMatches("device_orientation=portrait", state))
+        assertTrue(stateMatches("proximity_state=covered", state))
+        assertTrue(stateMatches("activity_detection=walk", state))
+        assertTrue(stateMatches("velocity>=10", state))
+        assertTrue(stateMatches("roaming_state=on", state))
+        assertTrue(stateMatches("hotspot=off", state))
+        assertTrue(stateMatches("phone_call=ring", state))
+        assertFalse(stateMatches("orientation=landscape", state))
+        assertFalse(stateMatches("speed>20", state))
+    }
+
+    @Test
+    fun stateContextKeyExtractsPredicateAndCanonicalizesAliases() {
+        assertEquals(
+            "speed",
+            stateContextKey(ContextSpec(ContextType.STATE, mapOf("predicate" to "velocity >= 10"))),
+        )
+        assertEquals(
+            "call_state",
+            stateContextKey(ContextSpec(ContextType.STATE, mapOf("key" to "phone_call", "value" to "ringing"))),
+        )
     }
 }

@@ -46,6 +46,20 @@ interface EventDemandContextSource : SubscriptionReadyContextSource {
         events(app, requestedEvent = null, onSubscribed = onSubscribed)
 }
 
+/**
+ * A level source whose upstream work can be narrowed to the state key requested by one matcher.
+ *
+ * The Inspector calls the regular [events] overload with no key so it can show the complete live
+ * state snapshot. Production matchers pass their predicate key and avoid starting unrelated
+ * sensors, GPS, or telephony callbacks.
+ */
+interface StateDemandContextSource : ContextSource {
+    fun events(app: Context, requestedStateKey: String?): Flow<ContextEvent>
+
+    override fun events(app: Context): Flow<ContextEvent> =
+        events(app, requestedStateKey = null)
+}
+
 object ContextSourceRegistry {
     private val byType = Collections.synchronizedMap(mutableMapOf<String, ContextSource>())
 

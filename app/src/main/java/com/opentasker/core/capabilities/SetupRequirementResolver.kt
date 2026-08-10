@@ -27,6 +27,8 @@ enum class SetupRequirement {
     DND,
     CONTACTS,
     SCREEN_RECORDING,
+    PHYSICAL_ACTIVITY,
+    PHONE_STATE,
 }
 
 object SetupRequirementResolver {
@@ -77,6 +79,13 @@ object SetupRequirementResolver {
                 ContextType.STATE -> {
                     if (tokens.containsAny("wifi", "ssid", "network")) add(SetupRequirement.NEARBY_WIFI)
                     if (tokens.containsAny("bluetooth", "bt")) add(SetupRequirement.BLUETOOTH)
+                    if (tokens.containsAny("activity", "physical_activity", "motion")) {
+                        add(SetupRequirement.PHYSICAL_ACTIVITY)
+                    }
+                    if (tokens.containsAny("speed", "velocity")) add(SetupRequirement.FOREGROUND_LOCATION)
+                    if (tokens.containsAny("roaming", "phone_call", "call_state", "phone", "call")) {
+                        add(SetupRequirement.PHONE_STATE)
+                    }
                 }
                 ContextType.EVENT -> when {
                     tokens.contains("screen_recording") -> add(SetupRequirement.SCREEN_RECORDING)

@@ -87,4 +87,28 @@ class SetupRequirementResolverTest {
             SetupRequirementResolver.resolve(listOf(profile), emptyList()),
         )
     }
+
+    @Test
+    fun physicalStateContextsAddMatchingSensorSetupRequirements() {
+        val profile = Profile(
+            id = 8,
+            name = "Physical state",
+            contexts = listOf(
+                ContextSpec(ContextType.STATE, mapOf("key" to "activity", "value" to "walking")),
+                ContextSpec(ContextType.STATE, mapOf("predicate" to "speed>=10")),
+                ContextSpec(ContextType.STATE, mapOf("key" to "roaming", "value" to "true")),
+                ContextSpec(ContextType.STATE, mapOf("key" to "phone_call", "value" to "ringing")),
+            ),
+            enterTaskId = 1,
+        )
+
+        assertEquals(
+            setOf(
+                SetupRequirement.PHYSICAL_ACTIVITY,
+                SetupRequirement.FOREGROUND_LOCATION,
+                SetupRequirement.PHONE_STATE,
+            ),
+            SetupRequirementResolver.resolve(listOf(profile), emptyList()),
+        )
+    }
 }

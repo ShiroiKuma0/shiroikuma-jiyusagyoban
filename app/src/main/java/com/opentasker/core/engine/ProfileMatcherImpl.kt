@@ -5,6 +5,8 @@ import com.opentasker.core.contexts.ContextMatchEvaluator
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventDemandContextSource
+import com.opentasker.core.contexts.StateDemandContextSource
+import com.opentasker.core.contexts.stateContextKey
 import com.opentasker.core.contexts.SubscriptionReadyContextSource
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.logging.AppLogger
@@ -70,6 +72,8 @@ internal class ProfileMatcher(
                     source.events(app, spec.config["event"]) {
                         markPulseContextSubscribed(index, pulseContextCount)
                     }
+                } else if (spec.type == ContextType.STATE && source is StateDemandContextSource) {
+                    source.events(app, stateContextKey(spec))
                 } else if (isPulseContext && source is SubscriptionReadyContextSource) {
                     source.events(app) { markPulseContextSubscribed(index, pulseContextCount) }
                 } else {

@@ -188,6 +188,14 @@ internal fun ContextConfigDialog(
                             },
                         )
                     }
+                    if (state.type == ContextType.STATE) {
+                        item("state-presets") {
+                            StateContextPresetRow(
+                                presets = StateContextPresets.all,
+                                onApply = { preset -> config = StateContextPresets.apply(config, preset) },
+                            )
+                        }
+                    }
                     if (state.type == ContextType.EVENT && config["event"].equals("nfc", ignoreCase = true)) {
                         item("nfc-write-helper") {
                             NfcWriteHelperCard(
@@ -530,6 +538,44 @@ internal fun NfcWriteHelperCard(
 internal fun EventPresetRow(
     presets: List<EventContextPreset>,
     onApply: (EventContextPreset) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Text(stringResource(R.string.context_presets), style = MaterialTheme.typography.labelLarge)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            items(presets, key = { it.id }) { preset ->
+                OutlinedButton(onClick = { onApply(preset) }) {
+                    Text(stringResource(preset.labelRes))
+                }
+            }
+        }
+    }
+}
+
+internal data class StateContextPreset(
+    val id: String,
+    @StringRes val labelRes: Int,
+    val config: Map<String, String>,
+)
+
+internal object StateContextPresets {
+    val all = listOf(
+        StateContextPreset("orientation", R.string.context_state_preset_orientation, mapOf("key" to "orientation", "operator" to "=", "value" to "portrait")),
+        StateContextPreset("proximity", R.string.context_state_preset_proximity, mapOf("key" to "proximity", "operator" to "=", "value" to "near")),
+        StateContextPreset("activity", R.string.context_state_preset_activity, mapOf("key" to "activity", "operator" to "=", "value" to "walking")),
+        StateContextPreset("speed", R.string.context_state_preset_speed, mapOf("key" to "speed", "operator" to ">=", "value" to "10")),
+        StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")),
+        StateContextPreset("tethering", R.string.context_state_preset_tethering, mapOf("key" to "tethering", "operator" to "=", "value" to "true")),
+        StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")),
+    )
+
+    fun apply(current: Map<String, String>, preset: StateContextPreset): Map<String, String> =
+        current + preset.config
+}
+
+@Composable
+internal fun StateContextPresetRow(
+    presets: List<StateContextPreset>,
+    onApply: (StateContextPreset) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
         Text(stringResource(R.string.context_presets), style = MaterialTheme.typography.labelLarge)

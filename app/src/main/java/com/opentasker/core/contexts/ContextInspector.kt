@@ -291,6 +291,11 @@ private fun contextReason(
     }
     if (observation == null) return "Waiting for the first ${snapshot.label} event."
     if (observation.event.type != sourceKey) return "Latest event came from ${observation.event.type}, not $sourceKey."
+    if (spec.type == ContextType.STATE) {
+        observation.event.metadata["_setup_${stateContextKey(spec)}"]
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+    }
     if (spec.type == ContextType.EVENT) {
         return when {
             spec.invert && effectiveMatched -> "Latest event does not satisfy the configuration, so the inverted event context can trigger on this pulse."

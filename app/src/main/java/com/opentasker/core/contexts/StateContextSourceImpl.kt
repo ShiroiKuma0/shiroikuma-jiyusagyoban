@@ -11,6 +11,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.Display
 import androidx.core.content.ContextCompat
+import com.opentasker.core.model.ContextSpec
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -25,10 +26,10 @@ import kotlinx.coroutines.launch
  *   - "headphones=connected" or "headphones=true" (headphones plugged in)
  *   - "screen=on" (display state)
  */
-class StateContextSourceImpl : ContextSource {
+class StateContextSourceImpl : StateDemandContextSource {
     override val type = "state"
 
-    override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
+    override fun events(app: Context, requestedStateKey: String?): Flow<ContextEvent> = callbackFlow {
         // Patches arrive from two threads: the BroadcastReceiver (main) and the
         // DeviceStateEvents collector. Serialize the read-modify-write so a concurrent
         // battery broadcast cannot drop a Wi-Fi patch computed against a stale map.
@@ -100,10 +101,14 @@ class StateContextSourceImpl : ContextSource {
         val mediaPlaybackJob = launch {
             MediaPlaybackStateEvents.events(app).collect(::publishPatch)
         }
+        val sensorJob = launch {
+            StateSensorEvents.events(app, requestedStateKey).collect(::publishPatch)
+        }
 
         awaitClose {
             deviceStateJob.cancel()
             mediaPlaybackJob.cancel()
+            sensorJob.cancel()
             runCatching { app.unregisterReceiver(receiver) }
         }
     }
@@ -119,24 +124,7 @@ class StateContextSourceImpl : ContextSource {
  *   - "screen=on" / "screen=off"
  */
 fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
-    val (key, op, value) = if (">=" in predicate) {
-        val parts = predicate.split(">=", limit = 2)
-        Triple(parts[0], ">=", parts[1])
-    } else if ("<=" in predicate) {
-        val parts = predicate.split("<=", limit = 2)
-        Triple(parts[0], "<=", parts[1])
-    } else if (">" in predicate) {
-        val parts = predicate.split(">", limit = 2)
-        Triple(parts[0], ">", parts[1])
-    } else if ("<" in predicate) {
-        val parts = predicate.split("<", limit = 2)
-        Triple(parts[0], "<", parts[1])
-    } else if ("=" in predicate) {
-        val parts = predicate.split("=", limit = 2)
-        Triple(parts[0], "=", parts[1])
-    } else {
-        return false
-    }
+    val (key, op, value) = parseStatePredicate(predicate) ?: return false
 
     val normalizedKey = normalizeStateKey(key)
     if (normalizedKey == "wifi") return wifiMatches(op, value, state)
@@ -148,6 +136,10 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
         return MediaPlaybackStateEvents.packageMatches(actualValue, expectedValue)
     }
 
+    if (normalizedKey == "orientation" && op == "=") {
+        return orientationMatches(actualValue, expectedValue)
+    }
+
     return when (op) {
         "=" -> actualValue == expectedValue
         ">=" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual >= expected }
@@ -156,6 +148,13 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
         "<" -> numericCompare(actualValue, expectedValue) { actual, expected -> actual < expected }
         else -> false
     }
+}
+
+/** Extract the physical state key used by a matcher, preserving compatibility with predicate form. */
+internal fun stateContextKey(spec: ContextSpec): String? {
+    val rawKey = spec.config["predicate"]?.let(::parseStatePredicate)?.first
+        ?: spec.config["key"]
+    return rawKey?.let(::normalizeStateKey)?.takeIf(String::isNotBlank)
 }
 
 internal fun seedInitialState(app: Context): Map<String, String> {
@@ -215,6 +214,13 @@ internal fun normalizeStateKey(key: String): String = when (key.trim().lowercase
     "battery_saver", "powersave", "power_saver" -> "power_save"
     "airplane_mode", "flight_mode" -> "airplane"
     "device_unlocked" -> "unlocked"
+    "device_orientation", "orientation_state" -> "orientation"
+    "proximity_state" -> "proximity"
+    "activity_detection", "physical_activity", "motion" -> "activity"
+    "velocity", "speed_mps" -> "speed"
+    "roaming_state" -> "roaming"
+    "tether", "hotspot", "wifi_hotspot", "tethering_state" -> "tethering"
+    "call", "phone_call", "phone_call_state" -> "call_state"
     else -> key.trim().lowercase()
 }
 
@@ -250,9 +256,47 @@ private fun normalizeStateExpectedValue(key: String, value: String): String? {
             "off", "disabled", "false", "no" -> "false"
             else -> null
         }
+        "orientation" -> when (normalized) {
+            "portrait", "portrait_upside_down", "landscape_left", "landscape_right", "face_up", "face_down" -> normalized
+            "landscape" -> "landscape"
+            else -> null
+        }
+        "proximity" -> when (normalized) {
+            "near", "close", "covered", "on", "true", "yes" -> "near"
+            "far", "away", "open", "off", "false", "no" -> "far"
+            else -> null
+        }
+        "activity" -> when (normalized) {
+            "stationary", "still", "idle" -> "stationary"
+            "walking", "walk" -> "walking"
+            "running", "run" -> "running"
+            else -> null
+        }
+        "roaming", "tethering" -> when (normalized) {
+            "on", "enabled", "true", "yes", "active" -> "true"
+            "off", "disabled", "false", "no", "inactive" -> "false"
+            else -> null
+        }
+        "call_state" -> when (normalized) {
+            "idle", "none", "off" -> "idle"
+            "ringing", "ring" -> "ringing"
+            "offhook", "off_hook", "active", "in_call" -> "offhook"
+            else -> null
+        }
         else -> value.trim()
     }
 }
+
+private fun orientationMatches(actual: String, expected: String): Boolean = when (expected) {
+    "portrait" -> actual == "portrait" || actual == "portrait_upside_down"
+    "landscape" -> actual == "landscape_left" || actual == "landscape_right"
+    else -> actual == expected
+}
+
+private fun parseStatePredicate(predicate: String): Triple<String, String, String>? =
+    STATE_PREDICATE_PATTERN.matchEntire(predicate.trim())?.let { match ->
+        Triple(match.groupValues[1], match.groupValues[2], match.groupValues[3])
+    }
 
 private fun wifiMatches(
     op: String,
@@ -286,9 +330,11 @@ internal fun batteryPercent(level: Int, scale: Int): Int? {
 private inline fun numericCompare(
     actualValue: String,
     expectedValue: String,
-    compare: (actual: Int, expected: Int) -> Boolean,
+    compare: (actual: Double, expected: Double) -> Boolean,
 ): Boolean {
-    val actual = actualValue.toIntOrNull() ?: return false
-    val expected = expectedValue.toIntOrNull() ?: return false
+    val actual = actualValue.toDoubleOrNull() ?: return false
+    val expected = expectedValue.toDoubleOrNull() ?: return false
     return compare(actual, expected)
 }
+
+private val STATE_PREDICATE_PATTERN = Regex("^\\s*([^<>=]+?)\\s*(>=|<=|=|>|<)\\s*(.*?)\\s*$")
