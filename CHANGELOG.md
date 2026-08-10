@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The JSON bundle format document describes schema v2 rather than v1, including what importing a v1 bundle does and which versions are accepted. It had claimed v1 since the v2 migration shipped.
+- The bundle's supported import range is published in `tools/release-truth.json` and checked against the codec and the format document, so narrowing or widening what OpenTasker will import can no longer happen without updating the published contract.
+- Two checked-in bundle fixtures pin the compatibility contract: a v1 document and exactly the v2 document the codec produces from it.
+
 ## v0.2.84
 
 - Upgrading a database created before OpenTasker encrypted its storage no longer discards it. The conversion copied the new empty file onto itself instead of reading the old one, leaving a database with no tables; the app then refused to open it. The migration now verifies it carried the tables across before publishing the result.
