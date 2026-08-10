@@ -109,6 +109,41 @@ class TaskRunnerFlowControlTest {
     }
 
     @Test
+    fun foreachAcceptsCanonicalArrayTemplateReferences() {
+        val variables = VariableStore().apply { setArray("xs", listOf("a", "b")) }
+        val report = run(
+            variables,
+            ctrl(FlowControl.FOREACH, mapOf("list" to "{{ array.xs }}", "var" to "item")),
+            record("%item"),
+            ctrl(FlowControl.ENDFOR),
+        )
+
+        assertTrue(report.success)
+        assertEquals(listOf("a", "b"), recorded)
+    }
+
+    @Test
+    fun eventScopedTemplateReferencesResolveWithoutExposingEventValuesToEditorMetadata() {
+        val report = runBlocking {
+            TaskRunner(
+                ActionContext(
+                    ContextWrapper(null),
+                    VariableStore(),
+                    eventVariables = mapOf("share_text" to "hello"),
+                ),
+            ).run(
+                Task(
+                    name = "Event input",
+                    actions = listOf(record("{{ event.share_text }}")),
+                ),
+            )
+        }
+
+        assertTrue(report.success)
+        assertEquals(listOf("hello"), recorded)
+    }
+
+    @Test
     fun foreachEmptyArraySkipsBody() {
         val variables = VariableStore().apply { setArray("xs", emptyList()) }
         val report = run(

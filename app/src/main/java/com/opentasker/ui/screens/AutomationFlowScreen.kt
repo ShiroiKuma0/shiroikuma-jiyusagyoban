@@ -537,6 +537,18 @@ private fun FlowNodeView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            node.outputs.takeIf { it.isNotEmpty() }?.let { outputs ->
+                Text(
+                    stringResource(
+                        R.string.flow_output_variables,
+                        outputs.joinToString(", ") { output -> output.name },
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (node.isSubTask) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

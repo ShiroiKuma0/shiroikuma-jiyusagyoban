@@ -129,7 +129,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - Compact-safe profile, task, and run-log cards with horizontally safe status chips and filtered empty states
 - Variable vault, Flow, Scenes, and Inspector surfaces with summary metrics, clear status language, and polished empty states
 - Shared installed-app picker across application, notification, action, and Locale plugin editors, with label/package search, app icons, validated manual entry, and a latest-observed Inspector shortcut
-- Metadata-driven action forms with stable-value selectors, bounded number validation, task/app/file pickers, and forward-compatible preservation of unfamiliar imported arguments
+- Metadata-driven action forms with stable-value selectors, bounded number validation, task/app/file pickers, typed output variable chips for safe step chaining, and forward-compatible preservation of unfamiliar imported arguments
 - Guided profile templates with variable slots and safety notes
 - Scene element editor with drag-to-move, resize handles, multi-select, alignment guides, scaled canvas previews, overlay launch, accessible image metadata, validated sliders, and tap/long-press task bindings
 - Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers, node deep links, and picker-backed add commands

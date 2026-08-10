@@ -22,6 +22,7 @@ data class ActionField(
     val options: List<ActionFieldOption> = emptyList(),
     val numberRule: ActionNumberRule? = null,
     val fileRule: ActionFileRule? = null,
+    val inputType: ActionValueType? = null,
 )
 
 data class ActionFieldOption(
@@ -62,6 +63,7 @@ data class ActionMetadata(
     @get:StringRes val categoryRes: Int,
     val fields: List<ActionField> = emptyList(),
     val pickerVisible: Boolean = true,
+    val outputs: List<ActionOutputDefinition> = emptyList(),
 )
 
 /**
@@ -71,7 +73,9 @@ object ActionMetadataRegistry {
     private val byId = mutableMapOf<String, ActionMetadata>()
 
     fun register(metadata: ActionMetadata) {
-        byId[metadata.id] = metadata
+        byId[metadata.id] = metadata.copy(
+            outputs = metadata.outputs.ifEmpty { declaredActionOutputs(metadata.id) },
+        )
     }
 
     fun get(id: String): ActionMetadata? = byId[id]
@@ -316,7 +320,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_text_join_description,
             categoryRes = R.string.catalog_category_variable,
             fields = listOf(
-                ActionField("array", R.string.catalog_action_text_join_field_array_label, required = true, hintRes = R.string.catalog_action_text_join_field_array_hint),
+                ActionField("array", R.string.catalog_action_text_join_field_array_label, required = true, hintRes = R.string.catalog_action_text_join_field_array_hint, inputType = ActionValueType.ARRAY),
                 ActionField("delimiter", R.string.catalog_action_text_join_field_delimiter_label, hintRes = R.string.catalog_action_text_join_field_delimiter_hint),
                 ActionField("var", R.string.catalog_action_text_join_field_var_label, hintRes = R.string.catalog_action_text_join_field_var_hint),
             )
@@ -411,7 +415,7 @@ fun registerActionMetadata() {
             descriptionRes = R.string.catalog_action_flow_foreach_description,
             categoryRes = R.string.catalog_category_flow,
             fields = listOf(
-                ActionField("list", R.string.catalog_action_flow_foreach_field_list_label, required = true, hintRes = R.string.catalog_action_flow_foreach_field_list_hint),
+                ActionField("list", R.string.catalog_action_flow_foreach_field_list_label, required = true, hintRes = R.string.catalog_action_flow_foreach_field_list_hint, inputType = ActionValueType.ARRAY),
                 ActionField("var", R.string.catalog_action_flow_foreach_field_var_label, hintRes = R.string.catalog_action_flow_foreach_field_var_hint),
             )
         )

@@ -8,6 +8,7 @@ import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.VariableNamePolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -296,7 +297,11 @@ class TaskRunner(
             FlowControl.ENDIF -> outcome("endif", pc + 1)
             FlowControl.FOREACH -> {
                 val listName = listOf("list", "in", "array", "items")
-                    .firstNotNullOfOrNull { spec.args[it]?.trim()?.takeIf(String::isNotBlank) }
+                    .firstNotNullOfOrNull { key ->
+                        spec.args[key]?.trim()?.takeIf(String::isNotBlank)?.let { raw ->
+                            arrayReferenceName(spec.type, key, raw) ?: raw
+                        }
+                    }
                 val itemVar = spec.args["var"]?.trim()?.takeIf { it.isNotBlank() } ?: "item"
                 val items = listName?.let { ctx.variables.getArrayItems(it) }.orEmpty()
                 val endfor = structure.foreachToEndfor.getValue(pc)
@@ -675,6 +680,9 @@ class TaskRunner(
         val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
+            arrayReferenceName(actionType, name, rawValue)?.let { arrayName ->
+                return@mapValues arrayName
+            }
             val legacy = ctx.variables.expandTracked(rawValue)
             if (!legacy.value.contains("{{")) {
                 if (legacy.isSecretDerived) {
@@ -708,6 +716,26 @@ class TaskRunner(
         }
 
         return ActionArgumentExpansionReport(expandedArgs, expansions, actionType)
+    }
+
+    /**
+     * Array inputs consume a variable name, not the array's rendered contents. A typed chip uses
+     * `{{ array.parts }}` so the reference remains explicit in stored text; preserve that exact
+     * name for the two actions whose contracts expect an array slot.
+     */
+    private fun arrayReferenceName(actionType: String, argumentName: String, rawValue: String): String? {
+        val validArgument = when (actionType) {
+            "text.join" -> argumentName == "array"
+            FlowControl.FOREACH -> argumentName in setOf("list", "in", "array", "items")
+            else -> false
+        }
+        if (!validArgument) return null
+        val match = ARRAY_REFERENCE.matchEntire(rawValue.trim()) ?: return null
+        return VariableNamePolicy.normalize(match.groupValues[1])
+    }
+
+    private companion object {
+        val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*}}")
     }
 }
 

@@ -1231,6 +1231,7 @@ fun ActiveAutomationUi(
             state = state,
             tasks = tasks,
             enclosingActions = state.task.actions,
+            globalVariables = projectVariables,
             onDismiss = { clearActionEdit() },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->
@@ -1241,7 +1242,6 @@ fun ActiveAutomationUi(
             },
         )
     }
-
     contextPickerProfile?.let { profile ->
         ContextTypePickerDialog(
             onDismiss = { clearContextPicker() },
