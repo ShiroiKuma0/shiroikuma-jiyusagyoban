@@ -143,6 +143,7 @@
     <string name="capability_unknown_action">Unknown actions are not classified and cannot be added, imported, or enabled.</string>
     <string name="capability_notification_permission" formatted="false">Requires notification permission on Android 13+.</string>
     <string name="capability_notification_cancel_permission" formatted="false">Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.</string>
+    <string name="capability_notification_progress" formatted="false">Requires notification permission on Android 13+; uses ProgressStyle on Android 16+ and requests optional promoted ongoing treatment while progress is active, with a standard progress bar fallback.</string>
     <string name="capability_locale_fire_setup" formatted="false">Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.</string>
     <string name="capability_locale_query_setup" formatted="false">Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.</string>
     <string name="capability_wifi_unsupported" formatted="false">Android 10+ blocks direct Wi-Fi toggles for normal apps.</string>

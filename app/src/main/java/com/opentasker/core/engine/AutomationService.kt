@@ -13,10 +13,12 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.room.withTransaction
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.app.R
 import com.opentasker.automation.app.AppUsageMonitor
 import com.opentasker.automation.network.ConnectivityMonitor
 import com.opentasker.automation.network.WiFiNetworkMonitor
@@ -49,9 +51,11 @@ import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
+import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -175,6 +179,8 @@ class AutomationService : Service() {
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
     private val queuedProfileTasks = Collections.synchronizedMap(mutableMapOf<Long, ArrayDeque<QueuedProfileTask>>())
+    private val activeTaskNames = Collections.synchronizedMap(mutableMapOf<Long, String>())
+    private val nextActiveTaskToken = AtomicLong()
     private val profileReloadMutex = Mutex()
     @Volatile private var lastRunLogPruneAt = 0L
     @Volatile private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
@@ -327,6 +333,7 @@ class AutomationService : Service() {
         ExecutionAdmissionRegistry.detach(executionAdmission)
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
+        activeTaskNames.clear()
         pulseContinuities.clear()
         engineHeartbeatStore.recordStopped()
         PluginConditionSubscriptions.clear()
@@ -707,29 +714,31 @@ class AutomationService : Service() {
         causal: CausalExecutionDecision,
     ) {
         val source = "Profile: ${profile.name}"
-        val result = executeAndLogTask(
-            appContext = this,
-            db = db,
-            task = task,
-            source = source,
-            metadata = profileRunMetadata(profile),
-            initialVariables = initialVariables,
-            audioForegroundService = audioForegroundServiceEligibility,
-            admissionController = executionAdmission,
-            profileId = profile.id,
-            profileLimits = profile.toExecutionAdmissionProfileLimits(),
-            overflowPolicy = profile.overflowPolicy,
-            profileName = profile.name,
-            profileFallbackTaskId = profile.fallbackTaskId,
-            execution = ExecutionEnvelope.create(
+        val result = withTaskPresence(task) {
+            executeAndLogTask(
+                appContext = this,
+                db = db,
                 task = task,
                 source = source,
+                metadata = profileRunMetadata(profile),
+                initialVariables = initialVariables,
+                audioForegroundService = audioForegroundServiceEligibility,
+                admissionController = executionAdmission,
                 profileId = profile.id,
-                parentExecutionId = causal.parentExecutionId,
-                causalDepth = causal.depth,
-                causalProfileChain = causal.profileChain,
-            ),
-        )
+                profileLimits = profile.toExecutionAdmissionProfileLimits(),
+                overflowPolicy = profile.overflowPolicy,
+                profileName = profile.name,
+                profileFallbackTaskId = profile.fallbackTaskId,
+                execution = ExecutionEnvelope.create(
+                    task = task,
+                    source = source,
+                    profileId = profile.id,
+                    parentExecutionId = causal.parentExecutionId,
+                    causalDepth = causal.depth,
+                    causalProfileChain = causal.profileChain,
+                ),
+            )
+        }
         if (result.logInserted) {
             pruneRunLogs(force = false)
         }
@@ -829,18 +838,20 @@ class AutomationService : Service() {
                 return fail(reason)
             }
             ExternalExecutions.update(this, executionId, ExternalExecutionState.RUNNING)
-            val result = executeAndLogTask(
-                appContext = this,
-                db = db,
-                task = decoded.value,
-                source = execution.source,
-                metadata = listOf("Variables: ${variables.size} provided"),
-                initialVariables = variables,
-                audioForegroundService = audioForegroundServiceEligibility,
-                logTag = TAG,
-                admissionController = executionAdmission,
-                execution = execution.copy(taskName = decoded.value.name),
-            )
+            val result = withTaskPresence(decoded.value) {
+                executeAndLogTask(
+                    appContext = this,
+                    db = db,
+                    task = decoded.value,
+                    source = execution.source,
+                    metadata = listOf("Variables: ${variables.size} provided"),
+                    initialVariables = variables,
+                    audioForegroundService = audioForegroundServiceEligibility,
+                    logTag = TAG,
+                    admissionController = executionAdmission,
+                    execution = execution.copy(taskName = decoded.value.name),
+                )
+            }
             ExternalExecutions.update(
                 context = this,
                 executionId = executionId,
@@ -906,19 +917,21 @@ class AutomationService : Service() {
                 return
             }
             val task = decoded.value
-            val result = executeAndLogTask(
-                appContext = this,
-                db = db,
-                task = task,
-                source = NotificationActionReceiver.SOURCE,
-                metadata = listOf("button=$buttonLabel"),
-                audioForegroundService = audioForegroundServiceEligibility,
-                admissionController = executionAdmission,
-                execution = ExecutionEnvelope.create(
+            val result = withTaskPresence(task) {
+                executeAndLogTask(
+                    appContext = this,
+                    db = db,
                     task = task,
                     source = NotificationActionReceiver.SOURCE,
-                ),
-            )
+                    metadata = listOf("button=$buttonLabel"),
+                    audioForegroundService = audioForegroundServiceEligibility,
+                    admissionController = executionAdmission,
+                    execution = ExecutionEnvelope.create(
+                        task = task,
+                        source = NotificationActionReceiver.SOURCE,
+                    ),
+                )
+            }
             if (result.logInserted) pruneRunLogs(force = false)
             val status = when {
                 result.held -> "held"
@@ -1044,23 +1057,85 @@ class AutomationService : Service() {
         return if (seconds == 1L) "1 second" else "$seconds seconds"
     }
 
-    private fun startForegroundCompat() {
+    private suspend fun <T> withTaskPresence(task: Task, block: suspend () -> T): T {
+        val token = nextActiveTaskToken.incrementAndGet()
+        synchronized(activeTaskNames) {
+            activeTaskNames[token] = task.name.trim().takeIf(String::isNotBlank) ?: "Task ${task.id}"
+        }
+        updateForegroundNotification()
+        return try {
+            block()
+        } finally {
+            activeTaskNames.remove(token)
+            updateForegroundNotification()
+        }
+    }
+
+    private fun updateForegroundNotification() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        runCatching {
+            NotificationManagerCompat.from(this).notify(NOTIF_ID, buildForegroundNotification())
+        }.onFailure { error ->
+            AppLogger.warn(TAG, "Unable to refresh foreground task notification: ${error.message}")
+        }
+    }
+
+    private fun buildForegroundNotification(): Notification {
         val nm = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(CHANNEL, "OpenTasker engine", NotificationManager.IMPORTANCE_MIN)
+        val channel = NotificationChannel(
+            PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID,
+            getString(R.string.service_notification_channel_name),
+            PromotedOngoingNotificationSupport.ENGINE_CHANNEL_IMPORTANCE,
+        )
         nm.createNotificationChannel(channel)
+        val channelImportance = nm.getNotificationChannel(channel.id)?.importance ?: channel.importance
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val n: Notification = NotificationCompat.Builder(this, CHANNEL)
-            .setContentTitle("OpenTasker is running")
-            .setContentText("Tap to open automation status")
+        val activeTasks = synchronized(activeTaskNames) { activeTaskNames.values.toList() }
+        val activeTask = activeTasks.firstOrNull()
+        val title = if (activeTask == null) {
+            getString(R.string.service_notification_idle_title)
+        } else {
+            getString(R.string.service_notification_active_title, activeTask)
+        }
+        val text = when {
+            activeTasks.size <= 1 -> getString(R.string.service_notification_open_status)
+            else -> getString(R.string.service_notification_multiple_tasks, activeTasks.size - 1)
+        }
+        val builder = NotificationCompat.Builder(this, channel.id)
+            .setContentTitle(title)
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentIntent(pendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .build()
+        if (activeTask != null) {
+            builder.setShortCriticalText(activeTask.take(24))
+        }
+        return if (activeTask == null) {
+            builder.build()
+        } else {
+            PromotedOngoingNotificationSupport.build(
+                builder = builder,
+                manager = nm,
+                channelImportance = channelImportance,
+                title = title,
+                ongoing = true,
+            )
+        }
+    }
+
+    private fun startForegroundCompat() {
+        val n = buildForegroundNotification()
         val activeTypes = foregroundServiceTypes()
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIF_ID, n, activeTypes)
@@ -1109,7 +1184,6 @@ class AutomationService : Service() {
         const val ACTION_RUN_NOTIFICATION_TASK = "com.opentasker.action.RUN_NOTIFICATION_TASK"
         const val ACTION_RUN_EXTERNAL_TASK = "com.opentasker.action.RUN_EXTERNAL_TASK"
         const val EXTRA_STARTED_FROM_VISIBLE_UI = "com.opentasker.extra.STARTED_FROM_VISIBLE_UI"
-        private const val CHANNEL = "opentasker.engine"
         private const val NOTIF_ID = 1001
         private const val MAX_QUEUED_TASKS = 50
         private const val MONITOR_SUBSCRIPTION_TIMEOUT_MS = 2_000L

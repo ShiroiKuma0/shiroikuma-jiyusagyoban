@@ -25,6 +25,7 @@ import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.isArgumentSensitive
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.platform.AndroidAudioHardening
+import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -149,6 +150,7 @@ class ProgressNotificationAction : Action {
         val id = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
         val tag = args["tag"]?.takeIf { it.isNotBlank() }
         val segments = parseSegmentLengths(args["segments"])
+        val channelImportance = manager.getNotificationChannel(channelDef.id)?.importance ?: channelDef.importance
 
         val notification = if (Build.VERSION.SDK_INT >= 36) {
             val style = Notification.ProgressStyle()
@@ -157,15 +159,22 @@ class ProgressNotificationAction : Action {
             if (segments.isNotEmpty()) {
                 style.setProgressSegments(segments.map { Notification.ProgressStyle.Segment(it) })
             }
-            Notification.Builder(ctx.app, channelDef.id)
+            val builder = Notification.Builder(ctx.app, channelDef.id)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setOnlyAlertOnce(true)
                 .setOngoing(progress < 100)
+                .setShortCriticalText("$progress%")
                 .setStyle(style)
-                .build()
+            PromotedOngoingNotificationSupport.build(
+                builder = builder,
+                manager = manager,
+                channelImportance = channelImportance,
+                title = title,
+                ongoing = progress < 100,
+            )
         } else {
             NotificationCompat.Builder(ctx.app, channelDef.id)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)

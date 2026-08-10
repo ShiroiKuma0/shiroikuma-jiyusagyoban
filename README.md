@@ -103,6 +103,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
 - Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, modify system settings, Shizuku, and Termux
+- Optional Android 16+ promoted ongoing notifications for active tasks, with standard foreground-notification fallback when promotion is unavailable or denied
 - Context inspector with live source health, latest values, per-profile match explanations, and
   Loading/Ready/Stale/Error observation status with age-aware reporting
 - Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, reviewed retention reductions, held admission rows with safe manual replay, and user-pinned history

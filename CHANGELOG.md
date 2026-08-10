@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Active tasks now request Android 16+ promoted ongoing notifications with short status text when eligible; the standard foreground notification remains the fallback when promotion is unavailable, denied, or unsupported.
 - Action rows, flow nodes, and preflight cards now render localized one-line parameter summaries through a shared redaction-aware formatter; every built-in action is covered by a summary completeness guard.
 - Action metadata now declares typed outputs; action-editor text fields offer compatible outputs from earlier steps, event data, and globals as variable chips that persist as ordinary `{{ }}` templates, with array references preserved for loop/join inputs and flow nodes showing produced names.
 - Unhandled task failures can now run a per-profile or global fallback task with bounded structured error variables, terminal diagnostics, and non-recursive recovery; retry state is cleared when an action eventually succeeds.

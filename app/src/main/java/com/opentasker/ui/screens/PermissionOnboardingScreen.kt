@@ -94,6 +94,7 @@ import com.opentasker.core.scripting.TermuxScriptBackend
 import com.opentasker.core.scripting.TermuxScriptState
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
+import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.contexts.PushTriggerTokenStore
 import com.opentasker.core.contexts.CompanionAssociationResult
 import com.opentasker.core.contexts.CompanionDeviceAssociation
@@ -979,6 +980,12 @@ private fun buildPermissionItems(
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
     val request = context.getString(R.string.setup_action_request)
     val openSettings = context.getString(R.string.setup_action_open_settings)
+    val promotedSupported = PromotedOngoingNotificationSupport.isPlatformSupported()
+    val promotedGranted = !promotedSupported || (
+        context.getSystemService(NotificationManager::class.java)
+            ?.let { manager -> PromotedOngoingNotificationSupport.canPostPromotedNotifications(manager) }
+            == true
+        )
     return listOfNotNull(
         PermissionSetupItem(
             title = context.getString(R.string.setup_notifications_card_title),
@@ -992,6 +999,19 @@ private fun buildPermissionItems(
             },
             requiredFor = context.getString(R.string.setup_notifications_required_for),
         ),
+        if (promotedSupported) PermissionSetupItem(
+            title = context.getString(R.string.setup_promoted_notifications_title),
+            body = context.getString(R.string.setup_promoted_notifications_body),
+            granted = promotedGranted,
+            actionLabel = openSettings,
+            action = PermissionAction.SettingsIntent(
+                Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+            ),
+            requiredFor = context.getString(R.string.setup_promoted_notifications_required_for),
+            optional = true,
+            section = SetupSection.RELIABILITY,
+        ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_exact_alarm_card_title),
             body = context.getString(R.string.setup_exact_alarm_card_body),

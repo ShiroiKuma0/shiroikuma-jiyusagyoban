@@ -298,6 +298,14 @@
     <string name="setup_notifications_card_title">Notifications</string>
     <string name="setup_notifications_card_body">Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.</string>
     <string name="setup_notifications_required_for">Foreground service, notification actions</string>
+    <string name="setup_promoted_notifications_title">Promoted running-task notifications</string>
+    <string name="setup_promoted_notifications_body">Optional on Android 16 and newer. When enabled, an active task can appear as a status-bar live update; the standard foreground notification remains available when promotion is unavailable or disabled.</string>
+    <string name="setup_promoted_notifications_required_for">Optional live update for active tasks</string>
+    <string name="service_notification_channel_name">OpenTasker engine</string>
+    <string name="service_notification_idle_title">OpenTasker is running</string>
+    <string name="service_notification_active_title">Task running: %1$s</string>
+    <string name="service_notification_open_status">Tap to open automation status</string>
+    <string name="service_notification_multiple_tasks">%1$d other task(s) running</string>
     <string name="setup_exact_alarm_card_title">Exact alarms</string>
     <string name="setup_exact_alarm_card_body">Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.</string>
     <string name="setup_exact_alarm_required_for">Time triggers, schedules</string>

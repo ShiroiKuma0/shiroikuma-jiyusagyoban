@@ -96,7 +96,7 @@ object ActionCapabilityRegistry {
     private val capabilities = mapOf(
         "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", R.string.capability_notification_permission),
         "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.", R.string.capability_notification_cancel_permission),
-        "notify.progress" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+; uses ProgressStyle on Android 16+ and a standard progress bar below it.", R.string.capability_notification_permission),
+        "notify.progress" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+; uses ProgressStyle on Android 16+ and requests optional promoted ongoing treatment while progress is active, with a standard progress bar fallback.", R.string.capability_notification_progress),
         "contacts.lookup" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an explicit Contacts permission for unattended lookup, or Android 17 field-scoped picker mode.", R.string.capability_contacts_permission),
         "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.", R.string.capability_locale_fire_setup),
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.", R.string.capability_locale_query_setup),
