@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Undo/redo and OpenTasker bundle import review now show typed semantic diffs for profiles, contexts, tasks, actions, scenes, and variables with sensitive values masked; changed Flow nodes are highlighted during review.
 - Profiles, tasks, and scenes can now be duplicated from their overflow menus with collision-safe names, fresh nested IDs, disabled profile copies, remapped self-bindings, and undo/redo support.
 - Add an opt-in Direct Boot path for the app-owned minute time trigger: a device-protected DataStore arms one bounded pending pulse before first unlock, while profiles, tasks, Room, secrets, and all other trigger families remain post-unlock only; Setup now discloses the exact scope.
 - Diagnostics now reports API 36 pending-job reason history and API 37 aggregate pending durations where available, labels expanded WorkManager stop reasons including abandoned timeouts, and explains standby buckets as delivery consequences with explicit unavailable states on older Android versions.

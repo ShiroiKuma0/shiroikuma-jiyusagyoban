@@ -139,6 +139,14 @@ internal fun OpenTaskerBundleReviewDialog(
                         SummaryMetric("${reviewWarnings.size}", stringResource(R.string.import_count_warnings), Modifier.weight(1f))
                     }
                 }
+                if (!plan.semanticDiff.isEmpty) {
+                    item {
+                        SemanticDiffSummary(plan.semanticDiff)
+                    }
+                    item {
+                        SemanticDiffDetails(plan.semanticDiff)
+                    }
+                }
                 if (!plan.canImport) {
                     item {
                         TaskerImportListSection(

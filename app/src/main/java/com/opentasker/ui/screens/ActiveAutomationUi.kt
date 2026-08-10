@@ -319,10 +319,8 @@ fun ActiveAutomationUi(
     var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
-    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState()
-    val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState()
-    val profileShareReview by viewModel.profileShareReview.collectAsState()
-    val preflightReview by viewModel.preflightReview.collectAsState()
+    val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState()
+    val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
     val taskerXmlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
@@ -818,7 +816,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
                 profiles = projectProfiles,
                 tasks = projectTasks,
-                contentPadding = innerPadding,
+                contentPadding = innerPadding, changedNodeKeys = semanticDiffReview?.document?.flowNodeKeys.orEmpty(),
                 onNodeTargetSelected = openFlowTarget,
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
@@ -1208,6 +1206,8 @@ fun ActiveAutomationUi(
             },
         )
     }
+
+    semanticDiffReview?.let { SemanticDiffDialog(it.document, viewModel::clearSemanticDiffReview) }
 
     simulationProfile?.let { profile ->
         SyntheticTriggerSimulationDialog(

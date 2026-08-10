@@ -60,6 +60,7 @@ data class AutomationFlowNode(
     val title: String,
     val detail: String? = null,
     val muted: Boolean = false,
+    val changed: Boolean = false,
     val target: AutomationFlowTarget? = null,
     val condition: String? = null,
     /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
@@ -100,12 +101,14 @@ object AutomationFlowGraphBuilder {
         profile: Profile,
         tasks: List<Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
-    ): AutomationFlowGraph = build(profile, tasks.associateBy { it.id }, strings)
+        changedNodeKeys: Set<String> = emptySet(),
+    ): AutomationFlowGraph = build(profile, tasks.associateBy { it.id }, strings, changedNodeKeys)
 
     fun build(
         profile: Profile,
         tasksById: Map<Long, Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
+        changedNodeKeys: Set<String> = emptySet(),
     ): AutomationFlowGraph {
         val nodes = mutableListOf<AutomationFlowNode>()
         val edges = mutableListOf<AutomationFlowEdge>()
@@ -120,6 +123,7 @@ object AutomationFlowGraphBuilder {
                 strings.profileDetail(profile.enabled, profile.automationMode.name.lowercase(), profile.cooldownSec),
             ).joinToString(" - "),
             muted = !profile.enabled,
+            changed = "profile:${profile.id}" in changedNodeKeys,
             target = AutomationFlowTarget.Profile(profile.id),
             strings = strings,
         )
@@ -130,7 +134,7 @@ object AutomationFlowGraphBuilder {
 
         profile.contexts.forEachIndexed { index, context ->
             val contextNodeId = "profile:${profile.id}:context:$index"
-            nodes += context.toNode(contextNodeId, profile.id, index, strings)
+            nodes += context.toNode(contextNodeId, profile.id, index, strings, changedNodeKeys)
             edges += AutomationFlowEdge(
                 fromId = contextNodeId,
                 toId = profileNodeId,
@@ -150,6 +154,7 @@ object AutomationFlowGraphBuilder {
             kind = AutomationFlowNodeKind.ENTER_TASK,
             edgeLabel = "enter",
             strings = strings,
+            changedNodeKeys = changedNodeKeys,
         )
 
         if (enterTaskNodeId == null) {
@@ -169,6 +174,7 @@ object AutomationFlowGraphBuilder {
                 kind = AutomationFlowNodeKind.EXIT_TASK,
                 edgeLabel = "exit",
                 strings = strings,
+                changedNodeKeys = changedNodeKeys,
             )
             if (exitTaskNodeId == null) {
                 warnings += strings.missingTaskWarning("exit", exitTaskId)
@@ -198,6 +204,7 @@ object AutomationFlowGraphBuilder {
         kind: AutomationFlowNodeKind,
         edgeLabel: String,
         strings: AutomationFlowStrings,
+        changedNodeKeys: Set<String>,
     ): String? {
         val taskNodeId = "${edgeLabel}-task:$taskId"
         if (task == null) {
@@ -207,6 +214,7 @@ object AutomationFlowGraphBuilder {
                 title = "Missing ${edgeLabel} task",
                 detail = strings.missingTaskDetail(taskId, profileName),
                 muted = true,
+                changed = "task:$taskId" in changedNodeKeys || "profile:$profileId" in changedNodeKeys,
                 target = AutomationFlowTarget.Profile(profileId),
                 strings = strings,
             )
@@ -218,9 +226,10 @@ object AutomationFlowGraphBuilder {
             id = taskNodeId,
             kind = kind,
             title = task.name,
-                detail = strings.taskDetail(task.actions.size, task.priority),
-                target = AutomationFlowTarget.Task(taskId),
-                strings = strings,
+            detail = strings.taskDetail(task.actions.size, task.priority),
+            changed = "task:$taskId" in changedNodeKeys,
+            target = AutomationFlowTarget.Task(taskId),
+            strings = strings,
         )
         edges += AutomationFlowEdge(sourceNodeId, taskNodeId, edgeLabel)
 
@@ -231,7 +240,7 @@ object AutomationFlowGraphBuilder {
         var previousNodeId = taskNodeId
         task.actions.forEachIndexed { index, action ->
             val actionNodeId = "$taskNodeId:action:$index"
-            nodes += action.toNode(actionNodeId, taskId, index, strings)
+            nodes += action.toNode(actionNodeId, taskId, index, strings, changedNodeKeys)
             edges += AutomationFlowEdge(
                 fromId = previousNodeId,
                 toId = actionNodeId,
@@ -243,18 +252,31 @@ object AutomationFlowGraphBuilder {
     }
 }
 
-private fun ContextSpec.toNode(id: String, profileId: Long, index: Int, strings: AutomationFlowStrings): AutomationFlowNode =
+private fun ContextSpec.toNode(
+    id: String,
+    profileId: Long,
+    index: Int,
+    strings: AutomationFlowStrings,
+    changedNodeKeys: Set<String>,
+): AutomationFlowNode =
     AutomationFlowNode(
         id = id,
         kind = AutomationFlowNodeKind.CONTEXT,
         title = strings.contextTitle(index + 1, type.name.lowercase().replaceFirstChar { it.uppercase() }),
         detail = strings.contextDetail(invert, config.summaryOrNull(actionType = null)),
         muted = invert,
+        changed = "profile:$profileId:context:$index" in changedNodeKeys,
         target = AutomationFlowTarget.Context(profileId, index),
         strings = strings,
     )
 
-private fun ActionSpec.toNode(id: String, taskId: Long, index: Int, strings: AutomationFlowStrings): AutomationFlowNode {
+private fun ActionSpec.toNode(
+    id: String,
+    taskId: Long,
+    index: Int,
+    strings: AutomationFlowStrings,
+    changedNodeKeys: Set<String>,
+): AutomationFlowNode {
     val subTaskRef = if (type == "task.run") {
         listOf("task", "name", "id").firstNotNullOfOrNull { args[it]?.trim()?.takeUnless(String::isBlank) }
     } else {
@@ -266,6 +288,7 @@ private fun ActionSpec.toNode(id: String, taskId: Long, index: Int, strings: Aut
         kind = AutomationFlowNodeKind.ACTION,
         title = title,
         detail = strings.actionDetail(subTaskRef, type, strings.actionSummary(type, args), continueOnError),
+        changed = "task:$taskId:action:$index" in changedNodeKeys || "task:$taskId" in changedNodeKeys,
         target = AutomationFlowTarget.Action(taskId, index),
         condition = condition?.trim()?.takeUnless { it.isBlank() },
         isSubTask = subTaskRef != null,
