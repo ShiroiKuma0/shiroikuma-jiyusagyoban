@@ -474,6 +474,7 @@
     <string name="run_log_replay">Replay</string>
     <string name="run_log_star">Keep</string>
     <string name="run_log_unstar">Unkeep</string>
+    <string name="run_log_kept">Kept</string>
     <string name="run_log_held_policy">Admission policy: %1$s</string>
     <string name="run_log_export_json">Export JSON</string>
     <string name="run_log_export_csv">Export CSV</string>
@@ -954,11 +955,11 @@
     <string name="diagnostics_admission_active">Global active executions</string>
     <string name="diagnostics_admission_burst">Global burst starts</string>
     <string name="diagnostics_admission_count">%1$d / %2$d</string>
-    <string name="diagnostics_admission_profile_active">Profile %1$d active executions</string>
+    <string name="diagnostics_admission_profile_active">%1$s active executions</string>
     <string name="diagnostics_admission_circuits">Circuit breakers</string>
     <string name="diagnostics_admission_no_circuits">No tripped circuit state recorded.</string>
     <string name="diagnostics_admission_global">Global circuit</string>
-    <string name="diagnostics_admission_profile">Profile %1$d circuit</string>
+    <string name="diagnostics_admission_profile">%1$s circuit</string>
     <string name="diagnostics_admission_open">Open for about %1$d more seconds (%2$d strike(s))</string>
     <string name="diagnostics_admission_closed">Closed; %1$d recorded strike(s)</string>
     <string name="diagnostics_admission_trip_reason">Trip reason: %1$s</string>
@@ -1079,6 +1080,7 @@
     <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
     <string name="ui_error_run_logs_more">More run logs could not be loaded</string>
     <string name="ui_error_run_log_export">Run log export failed</string>
+    <string name="ui_error_bundle_not_recognized">That does not look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code.</string>
     <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
     <string name="ui_error_retention_preview">Retention preview failed</string>

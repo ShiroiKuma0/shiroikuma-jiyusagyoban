@@ -1,5 +1,9 @@
 package com.opentasker.core.model
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
 /** Pure lifecycle rules shared by the matcher, Inspector, editor validation, and simulations. */
 object ProfileLifecyclePolicy {
     fun suppressionReason(profile: Profile, nowMs: Long): String? = when {
@@ -8,9 +12,20 @@ object ProfileLifecyclePolicy {
         profile.lifetime == ProfileLifetime.UNTIL_DATE && profile.expiresAtMs == null ->
             "This profile has no valid expiry date."
         profile.lifetime == ProfileLifetime.UNTIL_DATE && nowMs >= requireNotNull(profile.expiresAtMs) ->
-            "This profile expired at ${profile.expiresAtMs}."
+            "This profile expired on ${formatExpiry(profile.expiresAtMs)}."
         else -> null
     }
+
+    /**
+     * The Inspector renders this reason verbatim, so an expired profile used to report a raw epoch
+     * value ("expired at 1770693599999"). Matches the date the profile editor shows.
+     */
+    private fun formatExpiry(expiresAtMs: Long): String = runCatching {
+        Instant.ofEpochMilli(expiresAtMs)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+    }.getOrDefault(expiresAtMs.toString())
 
     fun isSuppressed(profile: Profile, nowMs: Long): Boolean = suppressionReason(profile, nowMs) != null
 

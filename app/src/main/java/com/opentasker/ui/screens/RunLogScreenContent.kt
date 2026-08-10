@@ -591,7 +591,7 @@ private fun RunLogCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill(outcome.localizedLabel(), accent) }
                 item { StatusPill(stringResource(R.string.run_log_duration, entry.durationMs), accent) }
-                if (entry.starred) item { StatusPill(stringResource(R.string.run_log_unstar), MaterialTheme.colorScheme.primary) }
+                if (entry.starred) item { StatusPill(stringResource(R.string.run_log_kept), MaterialTheme.colorScheme.primary) }
             }
             if (entry.heldPolicy != null) {
                 Text(
