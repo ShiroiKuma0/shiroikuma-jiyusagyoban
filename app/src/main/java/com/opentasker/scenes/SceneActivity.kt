@@ -465,6 +465,13 @@ internal fun SceneElementView(
     val styleAlign = sceneAlign(v("align"))
     val styleBorderW = v("borderWidth").toIntOrNull() ?: 0
     val styleBorderColor = sceneColor(v("borderColor"))
+    // Optional per-character outline, shared by TEXT and BUTTON: a stroked copy of the glyphs drawn UNDER
+    // the fill, so the characters get a border (e.g. black around yellow) and stay legible over any
+    // background. strokeWidth is in PIXELS and the stroke is centred on the glyph path, so ~half of it
+    // shows outside. Both knobs go through v(), so a %var can drive them (the 相撲字時計's %SC_StrokeColor
+    // /%SC_StrokeW, the 音楽端灯 buttons' %Ongaku_Btnstrokecolor/%Ongaku_Btnstrokew).
+    val styleStrokeColor = sceneColor(v("strokeColor"))
+    val styleStrokeWpx = v("strokeWidth").toFloatOrNull()?.takeIf { it > 0f }
     // Optional custom font: an imported .ttf/.otf filename, OR a built-in keyword (serif/明朝, sans/ゴシック).
     val styleFont = v("font").trim().takeIf { it.isNotEmpty() }?.let { ThemeStore.fontFamily(it) }
     // Optional swipe target: a task id run when the element is dragged/slid (e.g. an edge-bar strip).
@@ -475,11 +482,8 @@ internal fun SceneElementView(
             val shape = RoundedCornerShape(8.dp)
             val annotated = sceneSpans(v("text"))
             val fillColor = sceneColor(v("textColor")) ?: MaterialTheme.colorScheme.onSurface
-            // Optional per-character outline: a stroked copy drawn UNDER the fill so the glyph edges get a
-            // border (e.g. 3px black), keeping yellow text legible over a yellow background. strokeWidth is
-            // in PIXELS; the stroke is centred on the glyph path, so ~half shows outside.
-            val strokeColor = sceneColor(v("strokeColor"))
-            val strokeWpx = v("strokeWidth").toFloatOrNull()?.takeIf { it > 0f }
+            val strokeColor = styleStrokeColor
+            val strokeWpx = styleStrokeWpx
             Box(
                 Modifier.fillMaxSize()
                     .then(if (bg != null) Modifier.background(bg, shape) else Modifier)
@@ -579,8 +583,23 @@ internal fun SceneElementView(
                     } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
+                val label = v("label", "Button")
+                // Same per-character outline as TEXT: the stroked copy first, the fill on top. Lets the
+                // 音楽端灯 良/削 buttons carry the 相撲字時計 date's black glyph border (%Ongaku_Btnstrokecolor
+                // /%Ongaku_Btnstrokew) so they read over album art of any colour.
+                if (styleStrokeColor != null && styleStrokeWpx != null) {
+                    Text(
+                        label,
+                        color = styleStrokeColor,
+                        fontFamily = styleFont,
+                        fontSize = styleSize,
+                        fontWeight = styleWeight,
+                        textAlign = styleAlign ?: TextAlign.Center,
+                        style = TextStyle(drawStyle = Stroke(width = styleStrokeWpx, join = StrokeJoin.Round)),
+                    )
+                }
                 Text(
-                    v("label", "Button"),
+                    label,
                     // Via styleLabelColor (v()-expanded) like every other element, so a %var can drive
                     // the colour/alpha live (e.g. the 音楽端灯 buttons' fade knob %Ongaku_Btncolor).
                     color = styleLabelColor ?: MaterialTheme.colorScheme.onPrimary,
