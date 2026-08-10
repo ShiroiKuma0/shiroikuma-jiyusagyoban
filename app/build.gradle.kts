@@ -36,7 +36,7 @@ import com.opentasker.build.VerifyRoomSchemaTask
 // duplication and semantic-diff wiring) and adds its own for the band, OCR, charts and scenes.
 // Kept close under the current count, as upstream keeps theirs: a floor far below it lets a large
 // batch of tests be deleted silently, and the headroom only absorbs intentional consolidation.
-private val JVM_TEST_FLOOR = 1324
+private val JVM_TEST_FLOOR = 1332
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)

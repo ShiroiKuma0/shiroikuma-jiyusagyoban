@@ -5,6 +5,7 @@ import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.ProfileOverflowPolicy
+import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
@@ -44,6 +45,13 @@ suspend fun executeAndLogTask(
     profileLimits: ExecutionAdmissionProfileLimits? = null,
     /** Whether a rejected run leaves a visible run-log entry (LOG) or is dropped quietly (SILENT). */
     overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
+    /** The profile's own recovery task, tried before the global one. */
+    profileFallbackTaskId: Long? = null,
+    /**
+     * False inside a fallback run, so a failing recovery task cannot trigger its own recovery. One
+     * level is the whole contract — recursion here would turn one broken task into a loop.
+     */
+    allowFallback: Boolean = true,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     val admission = admissionController.tryAcquire(profileId, profileLimits)
     if (!admission.accepted) {
@@ -53,12 +61,18 @@ suspend fun executeAndLogTask(
         val inserted = if (overflowPolicy == ProfileOverflowPolicy.SILENT) {
             false
         } else {
-            logSkippedRun(
+            // A HELD row rather than a plain skipped one: it carries enough of the trigger to run the
+            // work later, so a run refused by a burst limit is a postponement the user can act on
+            // instead of a loss they can only read about.
+            logHeldRun(
                 db = db,
                 task = task,
                 source = source,
                 reason = reason,
                 metadata = metadata,
+                profileId = profileId,
+                initialVariables = initialVariables + eventLocals,
+                policy = admission.rejection?.kind?.name ?: "ADMISSION",
             )
         }
         return@withContext TaskExecutionResult(
@@ -163,8 +177,35 @@ suspend fun executeAndLogTask(
     }
     AppLogger.info(logTag, "Task ${report.taskName} completed: ${report.success} (${report.durationMs}ms)")
     maybeQueueFreezeBubble(appContext, task, variables)
+    // A run that failed with a nameable error gets one recovery attempt. The lease is released first:
+    // a profile capped at one active run would otherwise refuse the very task meant to diagnose it.
+    val fallback = if (allowFallback && !report.success && report.structuredError != null) {
+        admissionLease.release()
+        runFallbackTask(
+            appContext = appContext,
+            db = db,
+            failedTask = task,
+            error = requireNotNull(report.structuredError),
+            profileFallbackTaskId = profileFallbackTaskId,
+            admissionController = admissionController,
+            profileId = profileId,
+            profileLimits = profileLimits,
+            overflowPolicy = overflowPolicy,
+            visibleActivity = visibleActivity,
+            audioForegroundService = audioForegroundService,
+            logTag = logTag,
+        )
+    } else {
+        null
+    }
     val classified = RunLogSource.classify(source)
     val riskMetadata = taskPowerRunLogMetadata(task)
+    val fallbackMetadata = fallback?.let {
+        listOf(
+            "Fallback task: ${it.taskName} (${it.source})",
+            "Fallback result: ${if (it.success) "succeeded" else "failed"}",
+        ) + (it.reason?.let { reason -> listOf("Fallback reason: ${reason.take(256)}") } ?: emptyList())
+    } ?: emptyList()
     val logEntry = RunLogEntry(
         taskId = task.id,
         taskName = task.name,
@@ -173,7 +214,7 @@ suspend fun executeAndLogTask(
         success = report.success,
         message = runLogMessage(
             source = source,
-            metadata = riskMetadata + metadata,
+            metadata = riskMetadata + metadata + fallbackMetadata,
             traces = report.traces,
         ),
         source = classified.key,
@@ -184,6 +225,115 @@ suspend fun executeAndLogTask(
     } finally {
         admissionLease.release()
     }
+}
+
+/** What a recovery attempt did, folded into the failed run's own log entry. */
+private data class FallbackExecutionResult(
+    val taskId: Long,
+    val taskName: String,
+    val source: String,
+    val success: Boolean,
+    val reason: String? = null,
+)
+
+private data class FallbackTaskSelection(val task: Task, val source: String)
+
+/**
+ * Runs the recovery task for a failed run, if one is configured and usable.
+ *
+ * The profile's own fallback wins over the global one, and a task never falls back to ITSELF — that
+ * would re-run the thing that just failed, with its own failure as input.
+ */
+private suspend fun runFallbackTask(
+    appContext: Context,
+    db: AppDatabase,
+    failedTask: Task,
+    error: StructuredTaskError,
+    profileFallbackTaskId: Long?,
+    admissionController: ExecutionAdmissionController,
+    profileId: Long?,
+    profileLimits: ExecutionAdmissionProfileLimits?,
+    overflowPolicy: ProfileOverflowPolicy,
+    visibleActivity: Boolean,
+    audioForegroundService: AudioForegroundServiceEligibility,
+    logTag: String,
+): FallbackExecutionResult? {
+    val selection = selectFallbackTask(
+        db = db,
+        failedTask = failedTask,
+        profileFallbackTaskId = profileFallbackTaskId,
+        globalFallbackTaskId = runCatching { FallbackTaskSettings(appContext).loadTaskId() }.getOrNull(),
+    ) ?: return null
+    val fallbackSource = "Fallback: ${selection.task.name}"
+    return try {
+        val result = executeAndLogTask(
+            appContext = appContext,
+            db = db,
+            task = selection.task,
+            source = fallbackSource,
+            metadata = listOf(
+                "Fallback source: ${selection.source}",
+                "Original task: ${failedTask.name} (${failedTask.id})",
+            ),
+            // The failure arrives as ordinary task-local variables, so the recovery task can branch
+            // on what broke without parsing a log line.
+            initialVariables = error.toFailureVariables(),
+            visibleActivity = visibleActivity,
+            audioForegroundService = audioForegroundService,
+            logTag = logTag,
+            admissionController = admissionController,
+            profileId = profileId,
+            profileLimits = profileLimits,
+            overflowPolicy = overflowPolicy,
+            allowFallback = false,
+        )
+        FallbackExecutionResult(
+            taskId = selection.task.id,
+            taskName = selection.task.name,
+            source = selection.source,
+            success = result.report.success,
+            reason = result.skippedReason ?: result.report.structuredError?.message,
+        )
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Exception) {
+        FallbackExecutionResult(
+            taskId = selection.task.id,
+            taskName = selection.task.name,
+            source = selection.source,
+            success = false,
+            reason = failure.message ?: "Fallback task failed before it could run.",
+        )
+    }
+}
+
+/**
+ * The recovery tasks to try, in order, for a task that just failed.
+ *
+ * Pure, and separate from the lookup, so the rule is testable without a database: the profile's own
+ * choice outranks the global one, the same id is not tried twice under two names, and a task is never
+ * its own recovery — that would re-run the thing that just failed, handed its own failure as input.
+ */
+internal fun fallbackCandidateIds(
+    profileFallbackTaskId: Long?,
+    globalFallbackTaskId: Long?,
+    failedTaskId: Long,
+): List<Pair<Long, String>> = listOfNotNull(
+    profileFallbackTaskId?.takeIf { it > 0L }?.let { it to "profile" },
+    globalFallbackTaskId?.takeIf { it > 0L }?.let { it to "global" },
+).distinctBy { it.first }.filterNot { (id, _) -> id == failedTaskId }
+
+private suspend fun selectFallbackTask(
+    db: AppDatabase,
+    failedTask: Task,
+    profileFallbackTaskId: Long?,
+    globalFallbackTaskId: Long?,
+): FallbackTaskSelection? {
+    for ((id, origin) in fallbackCandidateIds(profileFallbackTaskId, globalFallbackTaskId, failedTask.id)) {
+        val task = runCatching { db.taskDao().getById(id)?.toDomain() }.getOrNull()
+        if (task != null) return FallbackTaskSelection(task, origin)
+    }
+    return null
 }
 
 private fun collisionSkippedReport(task: Task, reason: String): TaskRunReport {
@@ -248,6 +398,58 @@ private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: V
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
     com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
+}
+
+/**
+ * Writes an admission-refused run as a HELD entry: a skipped row that also carries a redacted
+ * snapshot of what would have run, so the Run Log can offer to replay it.
+ *
+ * The payload goes through HeldExecutionPayloadCodec, which caps its size and redacts anything whose
+ * name or value looks like a credential — a held row is durable and readable, so it must not become
+ * the place a token comes to rest.
+ */
+suspend fun logHeldRun(
+    db: AppDatabase,
+    task: Task,
+    source: String,
+    reason: String,
+    metadata: List<String>,
+    profileId: Long?,
+    initialVariables: Map<String, String>,
+    policy: String,
+): Boolean {
+    val classified = RunLogSource.classify(source)
+    val payload = runCatching {
+        HeldExecutionPayloadCodec.encode(
+            HeldExecutionPayload(
+                taskId = task.id,
+                taskName = task.name,
+                source = source,
+                profileId = profileId,
+                metadata = metadata,
+                initialVariables = initialVariables,
+            ),
+        )
+    }.onFailure { AppLogger.error(TAG, "Could not encode held payload for task ${task.id}", it) }
+        .getOrNull()
+    return insertRunLog(
+        db,
+        RunLogEntry(
+            taskId = task.id,
+            taskName = task.name,
+            timestamp = System.currentTimeMillis(),
+            durationMs = 0,
+            success = false,
+            message = runLogMessage(source = source, metadata = metadata + listOf("Skipped: $reason"), traces = emptyList()),
+            source = classified.key,
+            sourceLabel = classified.label,
+            // Only a row that actually carries a payload is offered for replay; without one there is
+            // nothing to re-run, and a Replay button that cannot work is worse than none.
+            held = payload != null,
+            heldPayload = payload,
+            heldPolicy = policy,
+        ),
+    )
 }
 
 suspend fun logSkippedRun(

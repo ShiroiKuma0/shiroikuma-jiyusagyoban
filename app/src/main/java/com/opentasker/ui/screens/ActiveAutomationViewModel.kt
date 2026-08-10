@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
+import com.opentasker.core.engine.HeldExecutionPayloadCodec
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.location.LocationDwellStateStore
@@ -970,6 +971,45 @@ class ActiveAutomationViewModel(
             )
         }
         _backupSetupState.value = loaded
+    }
+
+    /**
+     * Re-runs a refused execution from its held run-log row.
+     *
+     * The row is consumed FIRST, and only a consume that actually changed a row proceeds: `clearHeld`
+     * is `WHERE id = :id AND held = 1`, so two taps — or two windows — cannot both win and run the
+     * work twice. That ordering also means a replay that then fails does not leave the entry
+     * re-armed, which is the honest outcome: it was attempted, and the new run has its own log row.
+     */
+    fun replayHeldRun(entry: RunLogEntry) {
+        viewModelScope.launch {
+            val entryId = entry.id
+            val consumed = runCatching { db.runLogDao().clearHeld(entryId) }.getOrDefault(0)
+            if (consumed == 0) {
+                events.send("That held run has already been replayed.")
+                return@launch
+            }
+            val payload = HeldExecutionPayloadCodec.decode(entry.heldPayload)
+            if (payload == null) {
+                events.send("That held run no longer carries enough detail to replay.")
+                return@launch
+            }
+            val task = runCatching { db.taskDao().getById(payload.taskId)?.toDomain() }.getOrNull()
+            if (task == null) {
+                events.send("${payload.taskName} no longer exists.")
+                return@launch
+            }
+            val result = executeAndLogTask(
+                appContext = appContext,
+                db = db,
+                task = task,
+                source = "Replay: ${payload.source}",
+                metadata = payload.metadata,
+                initialVariables = payload.initialVariables,
+            )
+            val status = if (result.report.success) "succeeded" else "failed"
+            events.send("${task.name} $status (${result.report.durationMs}ms)")
+        }
     }
 
     fun runTaskNow(task: Task) {

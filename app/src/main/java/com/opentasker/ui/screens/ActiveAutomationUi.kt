@@ -1335,6 +1335,7 @@ fun ActiveAutomationUi(
                 retentionPolicy = runLogRetentionPolicy,
                 onRetentionPolicyChange = viewModel::updateRunLogRetention,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
+                onReplayHeld = viewModel::replayHeldRun,
                 contentPadding = innerPadding,
             )
 
