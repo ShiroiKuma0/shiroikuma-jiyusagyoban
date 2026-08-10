@@ -41,7 +41,7 @@
 - **Offline bundle import** - paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
 
 - Time/day schedules with presets, aliases, and ranges
-- Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID)
+- Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, and phone-call state); sensor/GPS/phone callbacks are demand-gated per profile
 - App foreground detection via UsageStats, with optional exact/glob Activity component matching and explicit unavailable-component reporting
 - Wi-Fi and data/internet connectivity via NetworkCallback
 - Notification listener with package/title/body filters
@@ -102,7 +102,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 
 - OEM battery-killer detection with per-vendor remediation (Samsung, Xiaomi, OnePlus, Oppo, Realme, Vivo, Huawei, etc.)
 - Alarm-backed time/day reevaluation through Doze, with a persisted engine heartbeat and periodic WorkManager watchdog that re-arms dropped ticks and foreground-service timeout recovery
-- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, Bluetooth, SMS, DND, modify system settings, Shizuku, and Termux
+- Setup checklist covering notifications, exact alarms, battery optimization, usage access, overlays, location, physical activity, Bluetooth, SMS, phone state, DND, modify system settings, Shizuku, and Termux
 - Optional Android 16+ promoted ongoing notifications for active tasks, with standard foreground-notification fallback when promotion is unavailable or denied
 - Context inspector with live source health, latest values, per-profile match explanations, and
   Loading/Ready/Stale/Error observation status with age-aware reporting
