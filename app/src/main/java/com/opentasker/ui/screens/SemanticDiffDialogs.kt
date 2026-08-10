@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,9 +43,7 @@ internal fun SemanticDiffDialog(
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item { SemanticDiffSummary(document) }
-                item {
-                    SemanticDiffDetails(document)
-                }
+                SemanticDiffDetails(document)
             }
         },
         confirmButton = {
@@ -52,11 +52,12 @@ internal fun SemanticDiffDialog(
     )
 }
 
-@Composable
-internal fun SemanticDiffDetails(document: SemanticDiffDocument) {
-    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-        document.entries.forEach { entry -> SemanticDiffEntryView(entry) }
-    }
+/**
+ * Emits one lazy row per entry. This used to build every entry inside a single `item`, so a large
+ * bundle import composed hundreds of rows at once inside a dialog with no recycling.
+ */
+internal fun LazyListScope.SemanticDiffDetails(document: SemanticDiffDocument) {
+    items(document.entries) { entry -> SemanticDiffEntryView(entry) }
 }
 
 @Composable

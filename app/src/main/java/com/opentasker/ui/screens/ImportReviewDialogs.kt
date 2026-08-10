@@ -143,9 +143,7 @@ internal fun OpenTaskerBundleReviewDialog(
                     item {
                         SemanticDiffSummary(plan.semanticDiff)
                     }
-                    item {
-                        SemanticDiffDetails(plan.semanticDiff)
-                    }
+                    SemanticDiffDetails(plan.semanticDiff)
                 }
                 if (!plan.canImport) {
                     item {

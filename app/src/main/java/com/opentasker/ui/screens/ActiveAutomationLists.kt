@@ -90,6 +90,7 @@ internal fun ProfilesScreen(
     onImportOpenTaskerBundleText: () -> Unit,
     openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
+    onExportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
     onEditProfile: (Profile) -> Unit,
     onUndoProfileEdit: (Profile) -> Unit = {},
@@ -174,6 +175,7 @@ internal fun ProfilesScreen(
                 onImportOpenTaskerBundleText = onImportOpenTaskerBundleText,
                 openTaskerBundleBusy = openTaskerBundleBusy,
                 onImportTaskerXml = onImportTaskerXml,
+                onExportTaskerXml = onExportTaskerXml,
                 taskerImportBusy = taskerImportBusy,
             )
         }
@@ -261,6 +263,7 @@ private fun WorkspaceSummaryCard(
     onImportOpenTaskerBundleText: () -> Unit,
     openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
+    onExportTaskerXml: () -> Unit,
     taskerImportBusy: Boolean,
 ) {
     val enabledProfiles = profiles.count { it.enabled }
@@ -335,6 +338,19 @@ private fun WorkspaceSummaryCard(
                 ) {
                     Text(if (openTaskerBundleBusy) stringResource(R.string.import_reading_json) else stringResource(R.string.import_import_json))
                 }
+            }
+            OutlinedButton(
+                onClick = onExportTaskerXml,
+                enabled = !taskerImportBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (taskerImportBusy) {
+                        stringResource(R.string.action_working)
+                    } else {
+                        stringResource(R.string.import_export_tasker_xml)
+                    },
+                )
             }
             OutlinedButton(
                 onClick = onImportOpenTaskerBundleText,

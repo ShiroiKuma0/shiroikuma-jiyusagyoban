@@ -17,6 +17,12 @@
 - The home-screen widget follows the app's palette and the light/dark setting instead of shipping the retired purple-on-navy colours in permanent dark.
 - One name for the simulation feature, "Profile lifetime" instead of "Automation lifetime" beside the other profile settings, and real plurals in place of "(s)" in the diff, lint, and admission summaries.
 - The locale completeness gate no longer counts non-locale resource folders such as values-night as untranslated languages.
+- Tasker XML export is reachable: the workspace card has an Export Tasker XML button. The exporter shipped with no caller at all, so the changelog announced a feature nobody could run and its redaction path never ran outside tests.
+- A JSON export now redacts an action argument that contains a literal copy of a secret variable's value, matching what the Tasker XML exporter already did. `docs/OPEN_JSON_BUNDLE.md` describes what export redaction does and does not cover.
+- Secret variables are encrypted with the project bound into the authenticated data, so an envelope can no longer be moved between two same-named secrets in different projects and still decrypt. Existing secrets keep working and are rewritten in the new format the next time they are saved.
+- Opening the trigger simulation no longer reads preferences on the UI thread, and long diff or import lists render only the rows on screen.
+- Execution journal progress writes are rate-bounded instead of one database update per action, which a long flow could repeat tens of thousands of times in a single run.
+- The import boundary corpus covers the DOCTYPE internal-subset scanner, the share-intent payload boundary, and the secret-variable refusal in the Locale condition receiver.
 
 ## v0.2.83
 

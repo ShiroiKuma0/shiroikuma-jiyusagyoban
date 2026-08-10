@@ -22,12 +22,18 @@ class VariableSecretStorageTest {
     @Test
     fun aesGcmEnvelopeAuthenticatesValueAndVariableName() {
         val codec = codec(newKey())
-        val envelope = codec.encrypt("API_TOKEN", "super-secret-value")
+        val envelope = codec.encrypt(DEFAULT_PROJECT_ID, "API_TOKEN", "super-secret-value")
 
-        assertTrue(envelope.startsWith("otsec:v1:"))
+        assertTrue(envelope.startsWith("otsec:v2:"))
         assertFalse(envelope.contains("super-secret-value"))
-        assertEquals("super-secret-value", codec.decrypt("API_TOKEN", envelope).getOrThrow())
-        assertTrue(codec.decrypt("OTHER_TOKEN", envelope).isFailure)
+        assertEquals(
+            "super-secret-value",
+            codec.decrypt(DEFAULT_PROJECT_ID, "API_TOKEN", envelope).getOrThrow(),
+        )
+        assertTrue(codec.decrypt(DEFAULT_PROJECT_ID, "OTHER_TOKEN", envelope).isFailure)
+        // The project is part of the variable's identity, so the same name in another project
+        // must not be able to borrow this envelope.
+        assertTrue(codec.decrypt(DEFAULT_PROJECT_ID + 1, "API_TOKEN", envelope).isFailure)
 
         val tamperIndex = envelope.lastIndex - 2
         val tampered = envelope.replaceRange(
@@ -35,7 +41,7 @@ class VariableSecretStorageTest {
             tamperIndex + 1,
             if (envelope[tamperIndex] == 'A') "B" else "A",
         )
-        assertTrue(codec.decrypt("API_TOKEN", tampered).isFailure)
+        assertTrue(codec.decrypt(DEFAULT_PROJECT_ID, "API_TOKEN", tampered).isFailure)
     }
 
     @Test
@@ -220,10 +226,11 @@ class VariableSecretStorageTest {
         val repository = VariableRepository(
             dao,
             object : VariableSecretCodec {
-                override fun encrypt(variableName: String, plaintext: String): String = error("Keystore unavailable")
-                override fun decrypt(variableName: String, envelope: String): Result<String> = Result.failure(
-                    IllegalStateException("Keystore unavailable"),
-                )
+                override fun encrypt(projectId: Long, variableName: String, plaintext: String): String =
+                    error("Keystore unavailable")
+
+                override fun decrypt(projectId: Long, variableName: String, envelope: String): Result<String> =
+                    Result.failure(IllegalStateException("Keystore unavailable"))
             },
         )
 

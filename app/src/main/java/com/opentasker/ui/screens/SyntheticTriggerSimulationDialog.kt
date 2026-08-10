@@ -18,6 +18,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,8 +33,11 @@ import com.opentasker.core.engine.toExecutionAdmissionProfileLimits
 import com.opentasker.core.engine.SyntheticContextResult
 import com.opentasker.core.engine.SyntheticContextStatus
 import com.opentasker.core.engine.SyntheticGateResult
+import com.opentasker.core.engine.SyntheticTriggerSimulation
 import com.opentasker.core.engine.SyntheticTriggerSimulator
 import com.opentasker.core.model.Profile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -44,42 +49,56 @@ internal fun SyntheticTriggerSimulationDialog(
     val resources = LocalContext.current.resources
     val cooldownClear = stringResource(R.string.synthetic_trigger_cooldown_clear)
     val admissionRejected = stringResource(R.string.synthetic_trigger_admission_rejected)
-    val simulation = remember(profile) {
-        val nowMs = System.currentTimeMillis()
-        val remainingCooldownMs = CooldownStore(context).remaining(profile.id, nowMs)
-        val cooldown = if (profile.cooldownSec <= 0 || remainingCooldownMs == 0L) {
-            SyntheticGateResult.pass(cooldownClear)
-        } else {
-            val seconds = ((remainingCooldownMs + 999L) / 1_000L).coerceAtLeast(1L)
-            SyntheticGateResult.block(
-                resources.getQuantityString(
-                    R.plurals.synthetic_trigger_cooldown_remaining,
-                    seconds.toInt(),
-                    seconds.toInt(),
-                ),
+    // CooldownStore and the admission registry are SharedPreferences-backed, and first access
+    // to a prefs file blocks on disk. Building the preview in composition therefore stalled
+    // the UI thread every time the dialog opened.
+    val simulation by produceState<SyntheticTriggerSimulation?>(initialValue = null, profile) {
+        value = withContext(Dispatchers.IO) {
+            val nowMs = System.currentTimeMillis()
+            val remainingCooldownMs = CooldownStore(context).remaining(profile.id, nowMs)
+            val cooldown = if (profile.cooldownSec <= 0 || remainingCooldownMs == 0L) {
+                SyntheticGateResult.pass(cooldownClear)
+            } else {
+                val seconds = ((remainingCooldownMs + 999L) / 1_000L).coerceAtLeast(1L)
+                SyntheticGateResult.block(
+                    resources.getQuantityString(
+                        R.plurals.synthetic_trigger_cooldown_remaining,
+                        seconds.toInt(),
+                        seconds.toInt(),
+                    ),
+                )
+            }
+            val admissionDecision = ExecutionAdmissionRegistry.preview(
+                context = context,
+                profileId = profile.id,
+                profileLimits = profile.toExecutionAdmissionProfileLimits(),
+            )
+            val admission = SyntheticGateResult(
+                accepted = admissionDecision.accepted,
+                reason = admissionDecision.reason ?: admissionRejected,
+            )
+            SyntheticTriggerSimulator.simulate(
+                profile = profile,
+                nowMs = nowMs,
+                cooldown = cooldown,
+                admission = admission,
             )
         }
-        val admissionDecision = ExecutionAdmissionRegistry.preview(
-            context = context,
-            profileId = profile.id,
-            profileLimits = profile.toExecutionAdmissionProfileLimits(),
-        )
-        val admission = SyntheticGateResult(
-            accepted = admissionDecision.accepted,
-            reason = admissionDecision.reason ?: admissionRejected,
-        )
-        SyntheticTriggerSimulator.simulate(
-            profile = profile,
-            nowMs = nowMs,
-            cooldown = cooldown,
-            admission = admission,
-        )
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.synthetic_trigger_title)) },
         text = {
+            val ready = simulation
+            if (ready == null) {
+                Text(
+                    stringResource(R.string.synthetic_trigger_loading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@AlertDialog
+            }
             LazyColumn(
                 modifier = Modifier.heightIn(max = 580.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
@@ -94,33 +113,33 @@ internal fun SyntheticTriggerSimulationDialog(
                 item {
                     SimulationGateCard(
                         title = stringResource(R.string.synthetic_trigger_profile_match),
-                        accepted = simulation.profileMatched,
-                        reason = simulation.profileReason,
+                        accepted = ready.profileMatched,
+                        reason = ready.profileReason,
                     )
                 }
                 item {
                     SimulationGateCard(
                         title = stringResource(R.string.synthetic_trigger_cooldown),
-                        accepted = simulation.cooldown.accepted,
-                        reason = simulation.cooldown.reason,
+                        accepted = ready.cooldown.accepted,
+                        reason = ready.cooldown.reason,
                     )
                 }
                 item {
                     SimulationGateCard(
                         title = stringResource(R.string.synthetic_trigger_admission),
-                        accepted = simulation.admission.accepted,
-                        reason = simulation.admission.reason,
+                        accepted = ready.admission.accepted,
+                        reason = ready.admission.reason,
                     )
                 }
                 item {
                     Text(
-                        if (simulation.wouldTrigger) {
+                        if (ready.wouldTrigger) {
                             stringResource(R.string.synthetic_trigger_would_trigger)
                         } else {
                             stringResource(R.string.synthetic_trigger_would_not_trigger)
                         },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (simulation.wouldTrigger) {
+                        color = if (ready.wouldTrigger) {
                             MaterialTheme.colorScheme.tertiary
                         } else {
                             MaterialTheme.colorScheme.error
@@ -129,11 +148,11 @@ internal fun SyntheticTriggerSimulationDialog(
                 }
                 item {
                     Text(
-                        stringResource(R.string.synthetic_trigger_contexts, simulation.contexts.size),
+                        stringResource(R.string.synthetic_trigger_contexts, ready.contexts.size),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
-                if (simulation.contexts.isEmpty()) {
+                if (ready.contexts.isEmpty()) {
                     item {
                         Text(
                             stringResource(R.string.synthetic_trigger_no_contexts),
@@ -141,7 +160,7 @@ internal fun SyntheticTriggerSimulationDialog(
                         )
                     }
                 } else {
-                    items(simulation.contexts, key = { it.index }) { result ->
+                    items(ready.contexts, key = { it.index }) { result ->
                         SyntheticContextCard(result)
                     }
                 }

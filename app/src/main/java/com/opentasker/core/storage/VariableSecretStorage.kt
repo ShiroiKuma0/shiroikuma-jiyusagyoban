@@ -23,20 +23,26 @@ import kotlinx.coroutines.sync.withLock
 
 /** Authenticated encryption boundary for values marked as first-class secrets. */
 interface VariableSecretCodec {
-    fun encrypt(variableName: String, plaintext: String): String
-    fun decrypt(variableName: String, envelope: String): Result<String>
+    fun encrypt(projectId: Long, variableName: String, plaintext: String): String
+    fun decrypt(projectId: Long, variableName: String, envelope: String): Result<String>
 }
 
 /**
- * AES-256-GCM envelope codec. The variable name is authenticated as AAD so ciphertext cannot be
- * copied to a different variable and still decrypt. The key itself is supplied by Android
+ * AES-256-GCM envelope codec. The variable's identity is authenticated as AAD so ciphertext cannot
+ * be copied to a different variable and still decrypt. The key itself is supplied by Android
  * Keystore in production and by an in-memory key in JVM tests.
+ *
+ * v2 envelopes bind both the project and the name. v1 bound the name alone, which stopped being
+ * the variable's identity when variables became keyed by `(projectId, name)`: two secrets called
+ * `apikey` in different projects shared AAD, so an envelope moved between those rows decrypted
+ * cleanly. v1 envelopes still decrypt so existing secrets keep working, and each is rewritten as
+ * v2 the next time its value is saved.
  */
 class AesGcmVariableSecretCodec(
     private val keyProvider: () -> SecretKey,
     private val secureRandom: SecureRandom = SecureRandom(),
 ) : VariableSecretCodec {
-    override fun encrypt(variableName: String, plaintext: String): String {
+    override fun encrypt(projectId: Long, variableName: String, plaintext: String): String {
         val plaintextBytes = plaintext.toByteArray(StandardCharsets.UTF_8)
         require(plaintextBytes.size <= MAX_SECRET_PLAINTEXT_BYTES) {
             "Secret value exceeds $MAX_SECRET_PLAINTEXT_BYTES UTF-8 bytes."
@@ -47,7 +53,7 @@ class AesGcmVariableSecretCodec(
         cipher.init(Cipher.ENCRYPT_MODE, keyProvider(), secureRandom)
         val iv = cipher.iv
         require(iv.size == GCM_IV_BYTES) { "Secret cipher generated an invalid IV." }
-        cipher.updateAAD(variableName.toByteArray(StandardCharsets.UTF_8))
+        cipher.updateAAD(associatedData(ENVELOPE_VERSION, projectId, variableName))
         val encrypted = cipher.doFinal(plaintextBytes)
         return listOf(
             ENVELOPE_PREFIX,
@@ -56,12 +62,13 @@ class AesGcmVariableSecretCodec(
         ).joinToString(ENVELOPE_SEPARATOR)
     }
 
-    override fun decrypt(variableName: String, envelope: String): Result<String> = runCatching {
+    override fun decrypt(projectId: Long, variableName: String, envelope: String): Result<String> = runCatching {
         require(envelope.length <= MAX_SECRET_ENVELOPE_CHARS) { "Secret envelope is oversized." }
         val parts = envelope.split(ENVELOPE_SEPARATOR)
-        require(parts.size == 4 && parts[0] == "otsec" && parts[1] == "v1") {
+        require(parts.size == 4 && parts[0] == "otsec" && parts[1] in SUPPORTED_VERSIONS) {
             "Secret envelope is malformed or unsupported."
         }
+        val version = parts[1]
         val iv = decoder.decode(parts[2])
         val encrypted = decoder.decode(parts[3])
         require(iv.size == GCM_IV_BYTES) { "Secret envelope IV is invalid." }
@@ -70,7 +77,7 @@ class AesGcmVariableSecretCodec(
         }
         val cipher = Cipher.getInstance(ALGORITHM)
         cipher.init(Cipher.DECRYPT_MODE, keyProvider(), GCMParameterSpec(GCM_TAG_BITS, iv))
-        cipher.updateAAD(variableName.toByteArray(StandardCharsets.UTF_8))
+        cipher.updateAAD(associatedData(version, projectId, variableName))
         cipher.doFinal(encrypted).toString(StandardCharsets.UTF_8)
     }
 
@@ -82,15 +89,27 @@ class AesGcmVariableSecretCodec(
         private const val GCM_IV_BYTES = 12
         private const val GCM_TAG_BITS = 128
         private const val ALGORITHM = "AES/GCM/NoPadding"
-        private const val ENVELOPE_PREFIX = "otsec:v1"
+        private const val ENVELOPE_VERSION = "v2"
+        /** NUL, so a project id cannot be confused with the start of a name. */
+        private const val AAD_SEPARATOR = "\u0000"
+        private const val ENVELOPE_PREFIX = "otsec:v2"
+        private val SUPPORTED_VERSIONS = setOf("v1", "v2")
         private const val ENVELOPE_SEPARATOR = ":"
         private val encoder = Base64.getUrlEncoder().withoutPadding()
         private val decoder = Base64.getUrlDecoder()
 
+        /** v1 authenticated the bare name; v2 authenticates the project scope with it. */
+        private fun associatedData(version: String, projectId: Long, variableName: String): ByteArray =
+            if (version == "v1") {
+                variableName.toByteArray(StandardCharsets.UTF_8)
+            } else {
+                ("$projectId$AAD_SEPARATOR$variableName").toByteArray(StandardCharsets.UTF_8)
+            }
+
         internal fun isEnvelope(value: String): Boolean = runCatching {
             if (value.length > MAX_SECRET_ENVELOPE_CHARS) return@runCatching false
             val parts = value.split(ENVELOPE_SEPARATOR)
-            if (parts.size != 4 || parts[0] != "otsec" || parts[1] != "v1") {
+            if (parts.size != 4 || parts[0] != "otsec" || parts[1] !in SUPPORTED_VERSIONS) {
                 return@runCatching false
             }
             val iv = decoder.decode(parts[2])
@@ -104,11 +123,11 @@ class AesGcmVariableSecretCodec(
 class AndroidKeystoreVariableSecretCodec : VariableSecretCodec {
     private val delegate = AesGcmVariableSecretCodec(::getOrCreateKey)
 
-    override fun encrypt(variableName: String, plaintext: String): String =
-        delegate.encrypt(variableName, plaintext)
+    override fun encrypt(projectId: Long, variableName: String, plaintext: String): String =
+        delegate.encrypt(projectId, variableName, plaintext)
 
-    override fun decrypt(variableName: String, envelope: String): Result<String> =
-        delegate.decrypt(variableName, envelope)
+    override fun decrypt(projectId: Long, variableName: String, envelope: String): Result<String> =
+        delegate.decrypt(projectId, variableName, envelope)
 
     @Synchronized
     private fun getOrCreateKey(): SecretKey {
@@ -280,6 +299,19 @@ class VariableRepository(
         )
     }
 
+    /**
+     * Every variable decoded for domain use, secret plaintext included.
+     *
+     * Only for building an export redaction context: it is what lets an exporter notice that an
+     * action argument holds a literal copy of a secret's value. Secrets themselves are still
+     * filtered out of the exported document by the exporter.
+     */
+    suspend fun decodedForExportRedaction(projectId: Long? = null): List<Variable> {
+        migrateLegacySensitiveVariables()
+        val entities = projectId?.let { dao.getAllInProject(it) } ?: dao.getAll()
+        return entities.map(::decodeForDomain)
+    }
+
     suspend fun runtimeGlobals(projectId: Long = DEFAULT_PROJECT_ID): RuntimeVariableSeed {
         migrateLegacySensitiveVariables()
         return readRuntimeGlobals(projectId)
@@ -297,7 +329,7 @@ class VariableRepository(
             }
 
             secretNames += entity.name
-            secretCodec.decrypt(entity.name, entity.value)
+            secretCodec.decrypt(entity.projectId, entity.name, entity.value)
                 .onSuccess { values[entity.name] = it }
                 .onFailure { unavailable += entity.name }
         }
@@ -355,7 +387,7 @@ class VariableRepository(
                         runCatching {
                             dao.upsert(
                                 entity.copy(
-                                    value = secretCodec.encrypt(entity.name, entity.value),
+                                    value = secretCodec.encrypt(entity.projectId, entity.name, entity.value),
                                     isSecret = true,
                                 ),
                             )
@@ -384,7 +416,7 @@ class VariableRepository(
         if (!entity.isSecret) {
             return Variable(entity.name, entity.value, entity.isGlobal, projectId = entity.projectId)
         }
-        val decoded = secretCodec.decrypt(entity.name, entity.value)
+        val decoded = secretCodec.decrypt(entity.projectId, entity.name, entity.value)
         return Variable(
             name = entity.name,
             value = decoded.getOrDefault(""),
@@ -438,7 +470,7 @@ internal fun Variable.normalizedForStorage(): Variable {
 
 internal fun Variable.toStoredEntity(codec: VariableSecretCodec): VariableEntity = VariableEntity(
     name = name,
-    value = if (isSecret) codec.encrypt(name, value) else value,
+    value = if (isSecret) codec.encrypt(projectId, name, value) else value,
     isGlobal = isGlobal,
     isSecret = isSecret,
     projectId = projectId,

@@ -3,6 +3,7 @@ package com.opentasker.core.engine
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ExecutionJournalEntity
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
 /** Wire states stored in the durable execution journal. */
@@ -27,6 +28,9 @@ enum class ExecutionJournalState(val wireValue: String) {
  * arguments, variable values, or arbitrary metadata. It is a recovery record, not an audit dump.
  */
 internal object ExecutionJournal {
+    /** Last step-write timestamp per execution, so step journaling stays rate-bounded. */
+    private val lastStepWriteMs = ConcurrentHashMap<String, Long>()
+
     /** Returns false when this execution id was already journaled, i.e. a re-delivered command. */
     suspend fun start(
         db: AppDatabase,
@@ -61,19 +65,33 @@ internal object ExecutionJournal {
         return inserted != -1L
     }
 
+    /**
+     * Records progress, at most once per [STEP_JOURNAL_INTERVAL_MS] per execution.
+     *
+     * Every executed action used to issue its own row UPDATE, and a flow may run up to
+     * [TaskRunner.MAX_FLOW_STEPS] of them. The journal only has to be good enough to name a
+     * plausible last step after process death, so a bounded write rate costs nothing that matters.
+     * The first step of an execution always writes. Returns true when a write was issued.
+     */
     suspend fun recordStep(
         db: AppDatabase,
         executionId: String,
         stepIndex: Int,
         stepLabel: String,
         nowMs: Long = System.currentTimeMillis(),
-    ) {
+    ): Boolean {
+        val previous = lastStepWriteMs.put(executionId, nowMs)
+        if (previous != null && nowMs - previous < STEP_JOURNAL_INTERVAL_MS) {
+            lastStepWriteMs[executionId] = previous
+            return false
+        }
         db.executionJournalDao().recordStep(
             executionId = executionId,
             stepIndex = stepIndex.coerceAtLeast(0),
             stepLabel = boundedJournalText(stepLabel),
             updatedAtMs = nowMs,
         )
+        return true
     }
 
     suspend fun markTerminal(
@@ -82,12 +100,14 @@ internal object ExecutionJournal {
         state: ExecutionJournalState,
         reason: ExecutionTerminalReason?,
         nowMs: Long = System.currentTimeMillis(),
-    ): Boolean = db.executionJournalDao().markTerminal(
-        executionId = executionId,
-        state = state.wireValue,
-        terminalReason = reason?.render()?.let(::boundedJournalText),
-        terminalAtMs = nowMs,
-    ) == 1
+    ): Boolean = lastStepWriteMs.remove(executionId).let {
+        db.executionJournalDao().markTerminal(
+            executionId = executionId,
+            state = state.wireValue,
+            terminalReason = reason?.render()?.let(::boundedJournalText),
+            terminalAtMs = nowMs,
+        ) == 1
+    }
 
     suspend fun markRunLogWritten(
         db: AppDatabase,
@@ -219,3 +239,4 @@ private fun boundedJournalText(value: String?, maxChars: Int = 256): String? = v
 
 private const val MAX_RECOVERY_BATCH = 1_024
 private const val MAX_RETAINED_JOURNAL_ENTRIES = 256
+internal const val STEP_JOURNAL_INTERVAL_MS = 1_000L
