@@ -146,7 +146,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 - F-Droid readiness profile with dependency-policy and metadata verification
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
-- Environment-driven release signing
+- Environment-driven release signing, falling back to the repo-owned self-host key so a published artifact keeps a stable identity; the F-Droid distribution builds unsigned because F-Droid signs what it builds
 - SQLite database backup/restore with WAL-safe validation and atomic staged restore, reviewed before staging (source, schema version, compatibility, entity counts) and cancellable afterwards; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
 - SQLCipher native libraries are included in both standard and F-Droid source builds; the release gate audits their 16 KB page alignment and keeps the dependency checksum-pinned
@@ -189,7 +189,7 @@ cd OpenTasker
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Release build (unsigned without keystore env vars):
+Release build (signed with the repo-owned self-host key when no keystore env vars are set):
 ```bash
 ./gradlew :app:assembleRelease
 ```
