@@ -31,9 +31,12 @@ import com.opentasker.build.VerifyRoomSchemaTask
 // The fork's own floor, not upstream's 1200: this tree drops the upstream tests whose subject the
 // fork does not ship (direct-boot setup UI, promoted notifications, dependency verification, the
 // duplication and semantic-diff wiring) and adds its own for the band, OCR, charts and scenes.
+// The fork's own floor, not upstream's 1200: this tree drops the upstream tests whose subject the
+// fork does not ship (direct-boot setup UI, promoted notifications, dependency verification, the
+// duplication and semantic-diff wiring) and adds its own for the band, OCR, charts and scenes.
 // Kept close under the current count, as upstream keeps theirs: a floor far below it lets a large
 // batch of tests be deleted silently, and the headroom only absorbs intentional consolidation.
-private val JVM_TEST_FLOOR = 1320
+private val JVM_TEST_FLOOR = 1324
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)

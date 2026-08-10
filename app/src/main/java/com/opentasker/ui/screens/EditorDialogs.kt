@@ -30,7 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +65,10 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileConcurrencyPolicy
+import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -411,13 +415,58 @@ internal fun TaskIconEditorRow(iconPath: String?, onStage: (String?) -> Unit, ta
     }
 }
 
+/**
+ * The profile-policy fields the engine arbitrates on, carried out of the dialog as one value.
+ *
+ * They travel together rather than as seven more `onSave` parameters because they are one decision —
+ * how this profile behaves when it competes with others — and because a positional lambda that long
+ * is a standing invitation to transpose two arguments.
+ */
+data class ProfilePolicyDraft(
+    val priority: Int,
+    val gracePeriodSec: Int,
+    val lifetime: ProfileLifetime,
+    val expiresAtMs: Long?,
+    val maxActiveExecutions: Int?,
+    val burstLimit: Int?,
+    val overflowPolicy: ProfileOverflowPolicy,
+) {
+    companion object {
+        fun from(profile: Profile?): ProfilePolicyDraft = ProfilePolicyDraft(
+            priority = profile?.priority ?: 0,
+            gracePeriodSec = profile?.gracePeriodSec ?: 0,
+            lifetime = profile?.lifetime ?: ProfileLifetime.NEVER,
+            expiresAtMs = profile?.expiresAtMs,
+            maxActiveExecutions = profile?.maxActiveExecutions,
+            burstLimit = profile?.burstLimit,
+            overflowPolicy = profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG,
+        )
+    }
+}
+
+/** Applies a draft to a profile, normalising it through the same policy the engine reads. */
+fun Profile.withPolicy(draft: ProfilePolicyDraft): Profile = ProfileLifecyclePolicy.normalize(
+    copy(
+        priority = draft.priority,
+        gracePeriodSec = draft.gracePeriodSec,
+        lifetime = draft.lifetime,
+        expiresAtMs = draft.expiresAtMs,
+        maxActiveExecutions = draft.maxActiveExecutions,
+        burstLimit = draft.burstLimit,
+        overflowPolicy = draft.overflowPolicy,
+        // Re-arming a spent one-shot is the point of editing it back to ONCE; a profile that is no
+        // longer ONCE cannot stay "consumed" either.
+        lifetimeConsumed = lifetimeConsumed && draft.lifetime == ProfileLifetime.ONCE && lifetime == ProfileLifetime.ONCE,
+    ),
+)
+
 @Composable
 internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Int, AutomationMode, String?) -> Unit,
+    onSave: (String, Boolean, Long, Int, AutomationMode, String?, ProfilePolicyDraft) -> Unit,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
@@ -432,12 +481,46 @@ internal fun ProfileEditorDialog(
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
     val parsedCooldown = cooldown.toIntOrNull()
+
+    // ── Arbitration policy ────────────────────────────────────────────────────────────────────
+    var priorityText by rememberSaveable(profile?.id) { mutableStateOf((profile?.priority ?: 0).toString()) }
+    var graceText by rememberSaveable(profile?.id) { mutableStateOf((profile?.gracePeriodSec ?: 0).toString()) }
+    var lifetime by rememberSaveable(profile?.id) { mutableStateOf(profile?.lifetime ?: ProfileLifetime.NEVER) }
+    var expiryText by rememberSaveable(profile?.id) { mutableStateOf(profile?.expiresAtMs?.let(::isoDate).orEmpty()) }
+    var maxActiveText by rememberSaveable(profile?.id) { mutableStateOf(profile?.maxActiveExecutions?.toString().orEmpty()) }
+    var burstText by rememberSaveable(profile?.id) { mutableStateOf(profile?.burstLimit?.toString().orEmpty()) }
+    var overflowPolicy by rememberSaveable(profile?.id) { mutableStateOf(profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG) }
+
+    val parsedPriority = priorityText.trim().toIntOrNull()
+    val priorityValid = parsedPriority != null &&
+        parsedPriority in ProfileLifecyclePolicy.MIN_PRIORITY..ProfileLifecyclePolicy.MAX_PRIORITY
+    val parsedGrace = graceText.trim().toIntOrNull()
+    val graceValid = parsedGrace != null && parsedGrace in 0..ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC
+    val parsedExpiry = expiryText.trim().takeIf(String::isNotEmpty)?.let(::epochMillisAtStartOfDay)
+    // An expiry is required for UNTIL_DATE and meaningless otherwise, so it only blocks Save there.
+    val expiryValid = lifetime != ProfileLifetime.UNTIL_DATE || parsedExpiry != null
+    val parsedMaxActive = maxActiveText.trim().takeIf(String::isNotEmpty)?.toIntOrNull()
+    val maxActiveValid = maxActiveText.isBlank() || (parsedMaxActive != null &&
+        parsedMaxActive in ProfileConcurrencyPolicy.MIN_MAX_ACTIVE..ProfileConcurrencyPolicy.MAX_MAX_ACTIVE)
+    val parsedBurst = burstText.trim().takeIf(String::isNotEmpty)?.toIntOrNull()
+    val burstValid = burstText.isBlank() || (parsedBurst != null &&
+        parsedBurst in ProfileConcurrencyPolicy.MIN_BURST_LIMIT..ProfileConcurrencyPolicy.MAX_BURST_LIMIT)
+    val policyValid = priorityValid && graceValid && expiryValid && maxActiveValid && burstValid
+    val policyDraft = ProfilePolicyDraft(
+        priority = parsedPriority ?: 0,
+        gracePeriodSec = parsedGrace ?: 0,
+        lifetime = lifetime,
+        expiresAtMs = parsedExpiry.takeIf { lifetime == ProfileLifetime.UNTIL_DATE },
+        maxActiveExecutions = parsedMaxActive,
+        burstLimit = parsedBurst,
+        overflowPolicy = overflowPolicy,
+    )
     // Names are unique within a project (siblingNames = other profiles in the same project, lowercased).
     val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
     // The picked enter task must still exist (upstream deep-audit: no saving a dangling binding).
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
     val canSave = name.isNotBlank() && !nameClash && enterTaskId > 0 && selectedTaskExists &&
-        (cooldown.isBlank() || parsedCooldown != null)
+        (cooldown.isBlank() || parsedCooldown != null) && policyValid
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
 
@@ -540,10 +623,149 @@ internal fun ProfileEditorDialog(
                         onClick = { automationMode = mode },
                     )
                 }
+
+                HorizontalDivider()
+                Text("Arbitration", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "How this profile behaves when it competes with others. Everything here is off by " +
+                        "default — a profile left alone runs exactly as before.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                OutlinedTextField(
+                    value = priorityText,
+                    onValueChange = { priorityText = it.filter { c -> c.isDigit() || c == '-' }.take(4) },
+                    label = { Text("Priority") },
+                    supportingText = {
+                        Text(
+                            if (!priorityValid) {
+                                "Whole number between ${ProfileLifecyclePolicy.MIN_PRIORITY} and ${ProfileLifecyclePolicy.MAX_PRIORITY}."
+                            } else {
+                                "While this profile matches, it suppresses any matching profile with a STRICTLY lower " +
+                                    "priority — their tasks are skipped and logged, and they run again the moment this " +
+                                    "one stops matching. Equal priorities never suppress each other, so leaving every " +
+                                    "profile at 0 keeps them all independent."
+                            }
+                        )
+                    },
+                    isError = !priorityValid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                OutlinedTextField(
+                    value = graceText,
+                    onValueChange = { graceText = it.filter(Char::isDigit).take(4) },
+                    label = { Text("Grace period (seconds)") },
+                    supportingText = {
+                        Text(
+                            if (!graceValid) {
+                                "Whole number of seconds, 0 to ${ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC}."
+                            } else {
+                                "The conditions must hold this long before an activation OR a deactivation is " +
+                                    "accepted — it debounces a flapping trigger. 0 reacts immediately."
+                            }
+                        )
+                    },
+                    isError = !graceValid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Text("Lifetime", style = MaterialTheme.typography.labelLarge)
+                SelectableOption(
+                    title = "Always",
+                    body = "Runs for as long as it stays enabled.",
+                    selected = lifetime == ProfileLifetime.NEVER,
+                    onClick = { lifetime = ProfileLifetime.NEVER },
+                )
+                SelectableOption(
+                    title = "Until a date",
+                    body = "Stops matching at the start of the day you name, and disables itself.",
+                    selected = lifetime == ProfileLifetime.UNTIL_DATE,
+                    onClick = { lifetime = ProfileLifetime.UNTIL_DATE },
+                )
+                SelectableOption(
+                    title = "Once",
+                    body = "Runs a single time, then disables itself. Re-enabling it here arms it again.",
+                    selected = lifetime == ProfileLifetime.ONCE,
+                    onClick = { lifetime = ProfileLifetime.ONCE },
+                )
+                if (lifetime == ProfileLifetime.UNTIL_DATE) {
+                    OutlinedTextField(
+                        value = expiryText,
+                        onValueChange = { expiryText = it.take(10) },
+                        label = { Text("Expires on (YYYY-MM-DD)") },
+                        supportingText = {
+                            Text(
+                                if (!expiryValid) "Enter a real date as YYYY-MM-DD, e.g. 2026-12-31."
+                                else "The profile stops matching at 00:00 local time on this day."
+                            )
+                        },
+                        isError = !expiryValid,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
+                OutlinedTextField(
+                    value = maxActiveText,
+                    onValueChange = { maxActiveText = it.filter(Char::isDigit).take(1) },
+                    label = { Text("Max concurrent runs (optional)") },
+                    supportingText = {
+                        Text(
+                            if (!maxActiveValid) {
+                                "${ProfileConcurrencyPolicy.MIN_MAX_ACTIVE}–${ProfileConcurrencyPolicy.MAX_MAX_ACTIVE}, or blank for the engine default."
+                            } else {
+                                "Caps how many of this profile's runs may be in flight at once."
+                            }
+                        )
+                    },
+                    isError = !maxActiveValid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                OutlinedTextField(
+                    value = burstText,
+                    onValueChange = { burstText = it.filter(Char::isDigit).take(2) },
+                    label = { Text("Burst limit (optional)") },
+                    supportingText = {
+                        Text(
+                            if (!burstValid) {
+                                "${ProfileConcurrencyPolicy.MIN_BURST_LIMIT}–${ProfileConcurrencyPolicy.MAX_BURST_LIMIT}, or blank for the engine default."
+                            } else {
+                                "Caps how many runs this profile may START inside the engine's burst window."
+                            }
+                        )
+                    },
+                    isError = !burstValid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Text("When a run is refused", style = MaterialTheme.typography.labelLarge)
+                SelectableOption(
+                    title = "Log it",
+                    body = "A refused run leaves a skipped entry in the Run Log, saying which limit refused it.",
+                    selected = overflowPolicy == ProfileOverflowPolicy.LOG,
+                    onClick = { overflowPolicy = ProfileOverflowPolicy.LOG },
+                )
+                SelectableOption(
+                    title = "Drop it quietly",
+                    body = "No Run Log entry. For a fast trigger whose refusals are noise rather than news.",
+                    selected = overflowPolicy == ProfileOverflowPolicy.SILENT,
+                    onClick = { overflowPolicy = ProfileOverflowPolicy.SILENT },
+                )
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
+            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }, policyDraft) }) {
                 Text(stringResource(R.string.action_save))
             }
         },
@@ -859,3 +1081,24 @@ internal fun TaskIconPickerDialog(
         dismissButton = { TextButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
+
+/** Renders an expiry instant as the ISO date the editor and ProfileLifecyclePolicy both show. */
+private fun isoDate(epochMillis: Long): String = runCatching {
+    java.time.Instant.ofEpochMilli(epochMillis)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDate()
+        .toString()
+}.getOrDefault("")
+
+/**
+ * Parses `YYYY-MM-DD` to midnight local time, or null if it is not a real date.
+ *
+ * Start-of-day, not end: "expires on the 1st" then means it stops matching as the 1st begins, which
+ * is what ProfileLifecyclePolicy's own "expired on <date>" message goes on to say.
+ */
+private fun epochMillisAtStartOfDay(text: String): Long? = runCatching {
+    java.time.LocalDate.parse(text)
+        .atStartOfDay(java.time.ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+}.getOrNull()

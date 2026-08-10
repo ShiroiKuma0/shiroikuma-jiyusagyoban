@@ -1491,8 +1491,8 @@ fun ActiveAutomationUi(
             siblingNames = profiles.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
                 .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group, currentProjectId)
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group, policy ->
+                viewModel.createProfile(name, enabled, enterTaskId, cooldown, automationMode, group, currentProjectId, policy)
                 showCreateProfileDialog = false
             },
         )
@@ -1527,7 +1527,7 @@ fun ActiveAutomationUi(
             siblingNames = profiles.filter { (it.projectId ?: 0L) == (profile.projectId ?: 0L) && it.id != profile.id }
                 .map { it.name.trim().lowercase() }.toSet(),
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group ->
+            onSave = { name, enabled, enterTaskId, cooldown, automationMode, group, policy ->
                 viewModel.updateProfile(
                     profile.copy(
                         name = name.trim(),
@@ -1536,7 +1536,7 @@ fun ActiveAutomationUi(
                         cooldownSec = cooldown.coerceAtLeast(0),
                         automationMode = automationMode,
                         group = group,
-                    )
+                    ).withPolicy(policy)
                 )
                 clearProfileDialog()
             },
