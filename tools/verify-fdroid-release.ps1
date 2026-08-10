@@ -192,7 +192,7 @@ if ($metadataCommits.Count -ne 1) {
     throw "Expected exactly one metadata commit, found $($metadataCommits.Count)"
 }
 $metadataCommit = $metadataCommits[0]
-if ($metadataCommit -notmatch "^[0-9a-f]{40}$") {
+if ($metadataCommit -cnotmatch "^[0-9a-f]{40}$") {
     throw "Metadata commit must be a full 40-character lowercase SHA: $metadataCommit"
 }
 if ($metadataText -notmatch "openTaskerDistribution=fdroid") {
