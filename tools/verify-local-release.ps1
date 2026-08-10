@@ -16,9 +16,9 @@ $ReportDirectory = Join-Path $Root "build\reports\opentasker"
 $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
 $SummaryPath = Join-Path $ReportDirectory "local-release-gate.json"
-$ExpectedGradleVersion = "9.4.1"
-$ExpectedGradleDistributionSha256 = "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb"
-$ExpectedGradleWrapperJarSha256 = "55243ef57851f12b070ad14f7f5bb8302daceeebc5bce5ece5fa6edb23e1145c"
+$ExpectedGradleVersion = "9.6.1"
+$ExpectedGradleDistributionSha256 = "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14"
+$ExpectedGradleWrapperJarSha256 = "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7"
 
 function Resolve-GitSafeDirectory {
     $rootPath = [IO.Path]::GetFullPath($Root)
@@ -90,8 +90,9 @@ if (-not (Test-Path -LiteralPath $DependencyVerificationScript -PathType Leaf)) 
     throw "Dependency verification script not found at $DependencyVerificationScript"
 }
 & $DependencyVerificationScript
-if ($LASTEXITCODE -ne 0) {
-    throw "Independent dependency verification failed with exit code $LASTEXITCODE"
+$dependencyVerificationExitCode = if (Test-Path variable:LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
+if ($dependencyVerificationExitCode -ne 0) {
+    throw "Independent dependency verification failed with exit code $dependencyVerificationExitCode"
 }
 
 function Invoke-Gradle {

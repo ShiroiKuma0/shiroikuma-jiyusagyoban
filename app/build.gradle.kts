@@ -1,4 +1,5 @@
 import java.net.URLEncoder
+import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
@@ -14,7 +15,9 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import com.opentasker.build.VerifyLocaleResourcesTask
 import com.opentasker.build.VerifyReleaseTruthTask
+import com.opentasker.build.VerifyRoomSchemaTask
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)
@@ -40,30 +43,6 @@ private fun deriveRoomSchemaVersion(databaseFile: java.io.File): Int =
     ).toInt()
 
 private val LOCALE_COMPLETION_THRESHOLD = 0.80
-
-private fun localeXmlFiles(directory: java.io.File): List<java.io.File> =
-    directory.listFiles()
-        ?.filter { it.isFile && it.extension == "xml" }
-        .orEmpty()
-        .sortedBy { it.name }
-
-private fun localeStringValues(files: List<java.io.File>): Map<String, String> {
-    val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
-        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-        setFeature("http://xml.org/sax/features/external-general-entities", false)
-        setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        isXIncludeAware = false
-        isExpandEntityReferences = false
-    }
-    return files.flatMap { file ->
-        val document = factory.newDocumentBuilder().parse(file)
-        val strings = document.getElementsByTagName("string")
-        (0 until strings.length).map { index ->
-            val node = strings.item(index)
-            node.attributes.getNamedItem("name").nodeValue to node.textContent.trim()
-        }
-    }.toMap()
-}
 
 abstract class VerifyDocumentationTruthTask : DefaultTask() {
     @get:InputFile
@@ -353,6 +332,13 @@ abstract class VerifyResolvedDependencyPolicyTask : org.gradle.api.DefaultTask()
     fun verify() {
         val resolved = components.get().distinct().sorted()
         check(resolved.isNotEmpty()) { "Release runtime dependency graph is empty." }
+
+        val forbiddenNetty = resolved.filter { coordinate ->
+            coordinate.startsWith("io.netty:") || coordinate.startsWith("io.grpc:grpc-netty:")
+        }
+        check(forbiddenNetty.isEmpty()) {
+            "Release runtime must not ship Netty or grpc-netty components: ${forbiddenNetty.joinToString()}"
+        }
 
         val invalidResolved = resolved.filter { coordinate ->
             val version = coordinate.split(':', limit = 3).getOrNull(2).orEmpty()
@@ -759,53 +745,11 @@ val verifyCoverageFloor = tasks.register<VerifyCoverageFloorTask>("verifyCoverag
     )
 }
 
-val verifyLocaleResources = tasks.register("verifyLocaleResources") {
+val verifyLocaleResources = tasks.register<VerifyLocaleResourcesTask>("verifyLocaleResources") {
     group = "verification"
     description = "Fails if an alternate locale is below the release translation threshold."
-    val resourcesDirectory = layout.projectDirectory.dir("src/main/res")
-    inputs.dir(resourcesDirectory)
-    inputs.property("completionThreshold", LOCALE_COMPLETION_THRESHOLD)
-    doLast {
-        val resources = resourcesDirectory.asFile
-        val defaultValues = localeStringValues(localeXmlFiles(resources.resolve("values")))
-        check(defaultValues.isNotEmpty()) { "Default Android string resources are missing." }
-
-        val localeDirectories = resources.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("values-") }
-            ?.filter { localeXmlFiles(it).isNotEmpty() }
-            .orEmpty()
-            .sortedBy { it.name }
-        val failures = localeDirectories.mapNotNull { directory ->
-            val localeValues = localeStringValues(localeXmlFiles(directory))
-            val unknownNames = localeValues.keys - defaultValues.keys
-            if (unknownNames.isNotEmpty()) {
-                return@mapNotNull "${directory.name} defines unknown string(s): ${unknownNames.sorted().joinToString()}"
-            }
-            val translated = defaultValues.count { (name, english) ->
-                localeValues.containsKey(name) && localeValues.getValue(name) != english
-            }
-            val completion = translated.toDouble() / defaultValues.size
-            if (completion < LOCALE_COMPLETION_THRESHOLD) {
-                "${directory.name} is ${"%.0f%%".format(completion * 100.0)} complete; " +
-                    "the release threshold is ${"%.0f%%".format(LOCALE_COMPLETION_THRESHOLD * 100.0)} " +
-                    "($translated/${defaultValues.size} translated strings)."
-            } else {
-                null
-            }
-        }
-        check(failures.isEmpty()) {
-            "Locale resource completeness gate failed:\n${failures.joinToString("\n")}"
-        }
-        val shipped = localeDirectories.joinToString { it.name.removePrefix("values-") }
-        println(
-            if (shipped.isBlank()) {
-                "Locale resource gate passed: English is the only shipped locale; no incomplete locale directories found."
-            } else {
-                "Locale resource gate passed: shipped locales $shipped meet the " +
-                    "${"%.0f%%".format(LOCALE_COMPLETION_THRESHOLD * 100.0)} completion threshold."
-            },
-        )
-    }
+    resourcesDirectory.set(layout.projectDirectory.dir("src/main/res"))
+    completionThreshold.set(LOCALE_COMPLETION_THRESHOLD)
 }
 
 val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
@@ -817,27 +761,15 @@ val verifyQualityGateSeed = tasks.register<VerifyQualityGateSeedTask>("verifyQua
     seedFailure.set(qualityGateSeedFailure)
 }
 
-tasks.register("verifyRoomSchema") {
+tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     group = "verification"
     description = "Checks that all Room schema versions up to the current are exported and tracked."
 
     dependsOn("kspDebugKotlin")
-    val schemaDir = file("$projectDir/schemas/com.opentasker.core.storage.AppDatabase")
-    inputs.dir(schemaDir)
-    val databaseFile = rootProject.layout.projectDirectory.file(
+    schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
+    databaseFile.set(rootProject.layout.projectDirectory.file(
         "app/src/main/java/com/opentasker/core/storage/AppDatabase.kt",
-    )
-    inputs.file(databaseFile)
-
-    doLast {
-        check(schemaDir.isDirectory) { "Room schema directory missing: $schemaDir" }
-        val currentVersion = deriveRoomSchemaVersion(databaseFile.asFile)
-        val missing = (1..currentVersion).filter { !File(schemaDir, "$it.json").isFile }
-        check(missing.isEmpty()) {
-            "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to regenerate, then commit."
-        }
-        println("Room schema drift gate passed: versions 1..$currentVersion present.")
-    }
+    ))
 }
 
 val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
