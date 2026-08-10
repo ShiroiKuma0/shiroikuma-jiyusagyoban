@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import com.opentasker.core.engine.CausalLoopDiagnostic
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextExpressionNode
@@ -59,6 +60,7 @@ data class ContextInspectionSnapshot(
     val generatedAtMs: Long,
     val sources: List<ContextSourceSnapshot>,
     val profiles: List<ProfileInspection>,
+    val causalLoop: CausalLoopDiagnostic? = null,
 )
 
 data class ProfileInspection(

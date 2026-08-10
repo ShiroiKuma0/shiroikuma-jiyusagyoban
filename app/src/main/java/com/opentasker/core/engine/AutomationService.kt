@@ -177,6 +177,9 @@ class AutomationService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        // A recreated service starts a new causal attribution lifetime; do not connect a fresh
+        // Android process callback to a profile execution from a prior service instance.
+        ExecutionCausality.reset()
         startForegroundCompat()
         timeEventScheduler.scheduleNextMinute()
         engineHeartbeatStore.recordAlive()
@@ -466,6 +469,14 @@ class AutomationService : Service() {
         isExit: Boolean,
         initialVariables: Map<String, String> = emptyMap(),
     ) {
+        val causal = ExecutionCausality.nextForProfile(profile.id, profile.name)
+        if (!causal.allowed) {
+            val reason = requireNotNull(causal.blockedReason)
+            AppLogger.warn(TAG, reason)
+            ExecutionCausality.recordBlocked(causal)
+            logProfileCausalLoop(profile, task, causal, reason)
+            return
+        }
         val slot = taskSlotKey(profile.id, isExit)
 
         // QUEUED decides and enqueues under one lock so a task can never be appended to a queue
@@ -482,7 +493,7 @@ class AutomationService : Service() {
                 )
                 if (decision.step == DispatchStep.ENQUEUE) {
                     queuedProfileTasks.getOrPut(slot) { ArrayDeque() }
-                        .add(QueuedProfileTask(task, initialVariables))
+                        .add(QueuedProfileTask(task, initialVariables, causal))
                 }
                 decision
             }
@@ -521,17 +532,17 @@ class AutomationService : Service() {
         }
 
         when (plan.step) {
-            DispatchStep.START -> profileTaskJobs[slot] = launchTrackedTask(profile, slot, task, initialVariables)
+            DispatchStep.START -> profileTaskJobs[slot] = launchTrackedTask(profile, slot, task, initialVariables, causal)
             DispatchStep.RESTART -> {
                 profileTaskJobs[slot]?.cancel()
-                profileTaskJobs[slot] = launchTrackedTask(profile, slot, task, initialVariables)
+                profileTaskJobs[slot] = launchTrackedTask(profile, slot, task, initialVariables, causal)
             }
             DispatchStep.START_QUEUE -> profileTaskJobs[slot] = launchQueuedTasks(
                 profile,
                 slot,
-                QueuedProfileTask(task, initialVariables),
+                QueuedProfileTask(task, initialVariables, causal),
             )
-            DispatchStep.LAUNCH_PARALLEL -> scope.launch { runTask(task, profile, initialVariables) }
+            DispatchStep.LAUNCH_PARALLEL -> scope.launch { runTask(task, profile, initialVariables, causal) }
             else -> Unit
         }
     }
@@ -544,11 +555,12 @@ class AutomationService : Service() {
         slot: Long,
         task: Task,
         initialVariables: Map<String, String>,
+        causal: CausalExecutionDecision,
     ): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profile, initialVariables)
+                runTask(task, profile, initialVariables, causal)
             } finally {
                 synchronized(profileTaskJobs) {
                     if (profileTaskJobs[slot] == thisJob) {
@@ -565,7 +577,7 @@ class AutomationService : Service() {
             try {
                 while (isActive && nextTask != null) {
                     val queuedTask = requireNotNull(nextTask)
-                    runTask(queuedTask.task, profile, queuedTask.initialVariables)
+                    runTask(queuedTask.task, profile, queuedTask.initialVariables, queuedTask.causal)
                     nextTask = synchronized(queuedProfileTasks) {
                         val polled = queuedProfileTasks[slot]?.poll()
                         if (polled == null) {
@@ -600,12 +612,14 @@ class AutomationService : Service() {
         task: Task,
         profile: Profile,
         initialVariables: Map<String, String> = emptyMap(),
+        causal: CausalExecutionDecision,
     ) {
+        val source = "Profile: ${profile.name}"
         val result = executeAndLogTask(
             appContext = this,
             db = db,
             task = task,
-            source = "Profile: ${profile.name}",
+            source = source,
             metadata = profileRunMetadata(profile),
             initialVariables = initialVariables,
             audioForegroundService = audioForegroundServiceEligibility,
@@ -613,8 +627,11 @@ class AutomationService : Service() {
             profileId = profile.id,
             execution = ExecutionEnvelope.create(
                 task = task,
-                source = "Profile: ${profile.name}",
+                source = source,
                 profileId = profile.id,
+                parentExecutionId = causal.parentExecutionId,
+                causalDepth = causal.depth,
+                causalProfileChain = causal.profileChain,
             ),
         )
         if (result.logInserted) {
@@ -638,6 +655,7 @@ class AutomationService : Service() {
     private data class QueuedProfileTask(
         val task: Task,
         val initialVariables: Map<String, String>,
+        val causal: CausalExecutionDecision,
     )
 
     /** Variable extras a validated external request forwarded, already name-checked and capped. */
@@ -817,6 +835,38 @@ class AutomationService : Service() {
 
     private fun logCooldownSkip(profile: Profile, task: Task, remainingMs: Long) {
         logProfileSkippedRun(profile, task, "Cooldown active for ${formatRemainingCooldown(remainingMs)}.")
+    }
+
+    private fun logProfileCausalLoop(
+        profile: Profile,
+        task: Task,
+        causal: CausalExecutionDecision,
+        reason: String,
+    ) {
+        engineHeartbeatStore.recordMatcherError(reason)
+        scope.launch {
+            val source = "Profile: ${profile.name}"
+            val inserted = logSkippedRun(
+                db = db,
+                task = task,
+                source = source,
+                reason = reason,
+                metadata = profileRunMetadata(profile),
+                execution = ExecutionEnvelope.create(
+                    task = task,
+                    source = source,
+                    profileId = profile.id,
+                    parentExecutionId = causal.parentExecutionId,
+                    causalDepth = causal.depth,
+                    causalProfileChain = causal.profileChain,
+                ),
+                terminalReason = ExecutionTerminalReason(
+                    ExecutionTerminalReasonCode.CAUSAL_LOOP,
+                    reason,
+                ),
+            )
+            if (inserted) pruneRunLogs(force = false)
+        }
     }
 
     private fun logProfileSkippedRun(profile: Profile, task: Task, reason: String) {

@@ -49,6 +49,7 @@ enum class ExecutionTerminalReasonCode {
     TASK_FAILED,
     ADMISSION_REJECTED,
     COLLISION_SKIPPED,
+    CAUSAL_LOOP,
     CANCELLED,
     TASK_NOT_FOUND,
     TASK_CORRUPT,
@@ -87,10 +88,16 @@ data class ExecutionEnvelope(
     val source: String,
     val profileId: Long? = null,
     val parentExecutionId: String? = null,
+    val causalDepth: Int = 0,
+    val causalProfileChain: List<String> = emptyList(),
     val createdAtMs: Long,
 ) {
     init {
         require(isValidExecutionId(executionId)) { "Invalid execution id." }
+        require(causalDepth >= 0) { "Causal depth cannot be negative." }
+        require(causalProfileChain.size <= MAX_CAUSAL_PROFILE_CHAIN_LENGTH) {
+            "Causal profile chain is too long."
+        }
     }
 
     fun metadataLines(): List<String> = buildList {
@@ -98,6 +105,10 @@ data class ExecutionEnvelope(
         add("Producer: ${producer.wireValue}")
         profileId?.let { add("Profile ID: $it") }
         parentExecutionId?.let { add("Parent execution ID: $it") }
+        if (causalDepth > 0 || causalProfileChain.isNotEmpty()) add("Causal depth: $causalDepth")
+        if (causalProfileChain.isNotEmpty()) {
+            add("Causal profile chain: ${causalProfileChain.joinToString(" -> ")}")
+        }
     }
 
     companion object {
@@ -108,6 +119,8 @@ data class ExecutionEnvelope(
             source: String,
             profileId: Long? = null,
             parentExecutionId: String? = null,
+            causalDepth: Int = 0,
+            causalProfileChain: List<String> = emptyList(),
             executionId: String = UUID.randomUUID().toString(),
             nowMs: Long = System.currentTimeMillis(),
         ): ExecutionEnvelope = ExecutionEnvelope(
@@ -118,10 +131,14 @@ data class ExecutionEnvelope(
             source = source.trim(),
             profileId = profileId,
             parentExecutionId = parentExecutionId,
+            causalDepth = causalDepth,
+            causalProfileChain = causalProfileChain,
             createdAtMs = nowMs,
         )
 
         fun isValidExecutionId(value: String?): Boolean = value != null && idPattern.matches(value.trim())
+
+        private const val MAX_CAUSAL_PROFILE_CHAIN_LENGTH = 32
     }
 }
 

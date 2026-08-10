@@ -59,6 +59,7 @@ import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.observationStatus
+import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
@@ -117,7 +118,8 @@ class ContextInspectorViewModel(
         latestEvents,
         sourceErrors,
         refreshTick,
-    ) { profiles, observations, errors, now ->
+        CausalLoopDiagnostics.latest,
+    ) { profiles, observations, errors, now, causalLoop ->
         val sources = buildContextSourceSnapshots(appContext, observations, errors)
         ContextInspectionSnapshot(
             generatedAtMs = now,
@@ -131,6 +133,7 @@ class ContextInspectorViewModel(
                     observation
                 }
             },
+            causalLoop = causalLoop,
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyContextInspectionSnapshot(clock()))
@@ -232,6 +235,18 @@ fun ContextInspectorScreen(
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
+        }
+        snapshot.causalLoop?.let { causalLoop ->
+            item {
+                InspectorNotice(
+                    title = stringResource(R.string.inspector_causal_loop_title),
+                    body = stringResource(
+                        R.string.inspector_causal_loop_body,
+                        causalLoop.profileChain.joinToString(" -> "),
+                    ),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
         if (storageDecodeIssues.isNotEmpty()) {
             item {

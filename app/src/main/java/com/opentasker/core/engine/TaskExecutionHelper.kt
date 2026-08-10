@@ -80,6 +80,9 @@ suspend fun executeAndLogTask(
         )
     }
     val admissionLease = requireNotNull(admission.lease)
+    // Only admitted work becomes a causal parent. A capacity or collision skip must not make a
+    // later unrelated profile appear to be a child of work that never ran.
+    ExecutionCausality.remember(execution)
     try {
     ExecutionCommandLedger.transition(execution.executionId, ExecutionLedgerState.RUNNING)
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and

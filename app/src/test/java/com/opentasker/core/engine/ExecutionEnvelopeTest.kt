@@ -42,6 +42,8 @@ class ExecutionEnvelopeTest {
             source = "External intent",
             executionId = "child-1",
             parentExecutionId = "parent-1",
+            causalDepth = 2,
+            causalProfileChain = listOf("Home", "Work", "Home"),
         )
         val message = skippedRunLogMessage(
             source = envelope.source,
@@ -56,6 +58,8 @@ class ExecutionEnvelopeTest {
 
         assertEquals("child-1", diagnostics.executionId)
         assertEquals("parent-1", diagnostics.parentExecutionId)
+        assertEquals(2, diagnostics.causalDepth)
+        assertEquals(listOf("Home", "Work", "Home"), diagnostics.causalProfileChain)
         assertEquals("external", diagnostics.producer)
         assertEquals("ADMISSION_REJECTED: line one line two", diagnostics.terminalReason)
     }
