@@ -55,6 +55,7 @@
     <string name="action_export">Export</string>
     <string name="action_close">Close</string>
     <string name="action_edit">Edit</string>
+    <string name="action_duplicate">Duplicate</string>
     <string name="action_run">Run</string>
     <string name="action_undo">Undo</string>
     <string name="action_redo">Redo</string>
@@ -679,11 +680,14 @@
     <string name="a11y_edit_profile">Edit profile %1$s</string>
     <string name="a11y_add_context_to_profile">Add context to profile %1$s</string>
     <string name="a11y_delete_profile">Delete profile %1$s</string>
+    <string name="a11y_duplicate_profile">More actions for profile %1$s</string>
     <string name="a11y_edit_task">Edit task %1$s</string>
     <string name="a11y_add_action_to_task">Add action to task %1$s</string>
     <string name="a11y_run_task">Run task %1$s</string>
     <string name="a11y_pin_task">Pin task %1$s</string>
     <string name="a11y_delete_task">Delete task %1$s</string>
+    <string name="a11y_duplicate_task">More actions for task %1$s</string>
+    <string name="a11y_duplicate_scene">More actions for scene %1$s</string>
     <string name="a11y_edit_action">Edit action %1$d, %2$s</string>
     <string name="a11y_delete_action">Delete action %1$d, %2$s</string>
     <string name="a11y_edit_context">Edit context %1$d, %2$s</string>
@@ -1045,6 +1049,7 @@
     <string name="ui_message_cancelling_automation">Cancelling automation</string>
     <string name="ui_message_automation_finished">That automation already finished</string>
     <string name="ui_message_task_created">Task created</string>
+    <string name="ui_message_task_duplicated">Task duplicated</string>
     <string name="ui_message_task_updated">Task updated</string>
     <string name="ui_message_action_moved">Action moved</string>
     <string name="ui_message_action_added">Action added</string>
@@ -1056,9 +1061,11 @@
     <string name="ui_message_element_updated">Element updated</string>
     <string name="ui_message_task_deleted">Task deleted</string>
     <string name="ui_message_scene_created">Scene created</string>
+    <string name="ui_message_scene_duplicated">Scene duplicated</string>
     <string name="ui_message_scene_updated">Scene updated</string>
     <string name="ui_message_scene_deleted">Scene deleted</string>
     <string name="ui_message_profile_created">Profile created</string>
+    <string name="ui_message_profile_duplicated">Profile duplicated as a disabled copy</string>
     <string name="ui_message_profile_updated">Profile updated</string>
     <string name="ui_profile_lint_warnings">Profile saved with %1$d lint warning(s); review Automation lint in Context Inspector.</string>
     <string name="ui_message_profile_deleted">Profile deleted</string>

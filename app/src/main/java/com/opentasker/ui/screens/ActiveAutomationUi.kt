@@ -758,7 +758,7 @@ fun ActiveAutomationUi(
                 onEditProfile = { openProfileDialog(it) },
                 onUndoProfileEdit = { viewModel.undoLastProfileEdit(it.id) },
                 onRedoProfileEdit = { viewModel.redoLastProfileEdit(it.id) },
-                onDeleteProfile = { openDeleteProfile(it) },
+                onDeleteProfile = { openDeleteProfile(it) }, onDuplicateProfile = viewModel::duplicateProfile,
                 onToggleProfile = { profile, enabled ->
                     if (enabled && profile.requiresRiskAcknowledgement) {
                         importedProfileReviewId = profile.id
@@ -787,7 +787,7 @@ fun ActiveAutomationUi(
                 onEditTask = { openTaskDialog(it) },
                 onUndoTaskEdit = { viewModel.undoLastTaskEdit(it.id) },
                 onRedoTaskEdit = { viewModel.redoLastTaskEdit(it.id) },
-                onDeleteTask = { openDeleteTask(it) },
+                onDeleteTask = { openDeleteTask(it) }, onDuplicateTask = viewModel::duplicateTask,
                 onRunTask = { viewModel.runTaskNow(it) },
                 onPreflightTask = viewModel::previewTaskPreflight,
                 onPinTask = { viewModel.pinTaskShortcut(it) },
@@ -865,7 +865,7 @@ fun ActiveAutomationUi(
                 onUpdateScene = viewModel::updateScene,
                 onUndoSceneEdit = { viewModel.undoLastSceneEdit(it.id) },
                 onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },
-                onDeleteScene = { openDeleteScene(it) },
+                onDeleteScene = { openDeleteScene(it) }, onDuplicateScene = viewModel::duplicateScene,
                 contentPadding = innerPadding,
             )
 

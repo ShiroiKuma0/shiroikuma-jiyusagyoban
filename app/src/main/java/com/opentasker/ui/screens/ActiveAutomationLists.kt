@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,12 +26,15 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -91,6 +95,7 @@ internal fun ProfilesScreen(
     onUndoProfileEdit: (Profile) -> Unit = {},
     onRedoProfileEdit: (Profile) -> Unit = {},
     onDeleteProfile: (Profile) -> Unit,
+    onDuplicateProfile: (Profile) -> Unit = {},
     onToggleProfile: (Profile, Boolean) -> Unit,
     onAddContext: (Profile) -> Unit,
     onEditContextLogic: (Profile) -> Unit,
@@ -232,6 +237,7 @@ internal fun ProfilesScreen(
                 onUndo = { onUndoProfileEdit(profile) },
                 onRedo = { onRedoProfileEdit(profile) },
                 onDelete = { onDeleteProfile(profile) },
+                onDuplicate = { onDuplicateProfile(profile) },
                 onToggle = { onToggleProfile(profile, it) },
                 onAddContext = { onAddContext(profile) },
                 onEditContextLogic = { onEditContextLogic(profile) },
@@ -438,6 +444,7 @@ private fun ProfileCard(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
     onToggle: (Boolean) -> Unit,
     onPreflight: () -> Unit,
     onAddContext: () -> Unit,
@@ -477,6 +484,10 @@ private fun ProfileCard(
                         contentDescription = toggleDescription
                         stateDescription = profileState
                     },
+                )
+                DuplicateMenu(
+                    contentDescription = stringResource(R.string.a11y_duplicate_profile, profile.name),
+                    onDuplicate = onDuplicate,
                 )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -605,6 +616,7 @@ internal fun TasksScreen(
     onUndoTaskEdit: (Task) -> Unit = {},
     onRedoTaskEdit: (Task) -> Unit = {},
     onDeleteTask: (Task) -> Unit,
+    onDuplicateTask: (Task) -> Unit = {},
     onRunTask: (Task) -> Unit,
     onPreflightTask: (Task) -> Unit,
     onPinTask: (Task) -> Unit,
@@ -673,6 +685,7 @@ internal fun TasksScreen(
                 onUndo = { onUndoTaskEdit(task) },
                 onRedo = { onRedoTaskEdit(task) },
                 onDelete = { onDeleteTask(task) },
+                onDuplicate = { onDuplicateTask(task) },
                 onRun = { onRunTask(task) },
                 onPreflight = { onPreflightTask(task) },
                 onPin = { onPinTask(task) },
@@ -692,6 +705,7 @@ private fun TaskCard(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
     onRun: () -> Unit,
     onPreflight: () -> Unit,
     onPin: () -> Unit,
@@ -751,6 +765,10 @@ private fun TaskCard(
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.action_run))
                 }
+                DuplicateMenu(
+                    contentDescription = stringResource(R.string.a11y_duplicate_task, task.name),
+                    onDuplicate = onDuplicate,
+                )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill(stringResource(R.string.label_action_count, task.actions.size), MaterialTheme.colorScheme.primary) }
@@ -843,6 +861,38 @@ private fun TaskCard(
                 }
             }
             HistoryButtons(onUndo = onUndo, onRedo = onRedo)
+        }
+    }
+}
+
+@Composable
+internal fun DuplicateMenu(
+    contentDescription: String,
+    onDuplicate: () -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { this.contentDescription = contentDescription },
+        ) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = contentDescription,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_duplicate)) },
+                onClick = {
+                    expanded = false
+                    onDuplicate()
+                },
+            )
         }
     }
 }

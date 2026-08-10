@@ -62,6 +62,13 @@ data class VariableReferenceRewrite(
  */
 object AutomationReferenceRewriter {
 
+    /** Rebinds references to [original] inside a copied task to that copy's stable id. */
+    fun remapDuplicateSelfReferences(original: Task, duplicate: Task): Task = duplicate.copy(
+        actions = duplicate.actions.map { action ->
+            action.retargetTaskArgs(original, duplicate.id)
+        },
+    )
+
     /** Returns every dependent site that would break if [target] were deleted. */
     fun guardVariableDeletion(
         target: Variable,

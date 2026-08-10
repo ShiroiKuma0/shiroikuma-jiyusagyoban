@@ -163,6 +163,7 @@ internal fun SceneCard(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
     onShowOverlay: () -> Unit = {},
 ) {
     val taskNames = remember(tasks) { tasks.associate { it.id to it.name } }
@@ -197,6 +198,10 @@ internal fun SceneCard(
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.scenes_delete), tint = MaterialTheme.colorScheme.error)
                 }
+                DuplicateMenu(
+                    contentDescription = stringResource(R.string.a11y_duplicate_scene, scene.name),
+                    onDuplicate = onDuplicate,
+                )
             }
 
             ScenePreviewBox(
