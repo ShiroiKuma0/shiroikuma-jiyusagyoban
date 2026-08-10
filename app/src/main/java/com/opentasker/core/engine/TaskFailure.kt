@@ -60,5 +60,23 @@ object StructuredTaskErrorCodec {
     )
 }
 
+/** Initial variable payload for a user-authored fallback task. */
+fun StructuredTaskError.toFailureVariables(): Map<String, String> = mapOf(
+    TaskFailureVariables.JSON to StructuredTaskErrorCodec.encode(this),
+    TaskFailureVariables.TASK_ID to taskId.toString(),
+    TaskFailureVariables.TASK_NAME to taskName,
+    TaskFailureVariables.ACTION_ID to actionId.toString(),
+    TaskFailureVariables.ACTION to actionType,
+    TaskFailureVariables.ACTION_INDEX to actionIndex.toString(),
+    TaskFailureVariables.ACTION_TYPE to actionType,
+    TaskFailureVariables.MESSAGE to message,
+    TaskFailureVariables.ATTEMPT to attemptCount.toString(),
+    TaskFailureVariables.RETRYING to "false",
+    TaskFailureVariables.RETRY_REASON to "",
+    TaskFailureVariables.ORIGINATING_PROFILE_ID to originatingProfileId?.toString().orEmpty(),
+    TaskFailureVariables.ORIGINATING_PROFILE_NAME to originatingProfileName.orEmpty(),
+    TaskFailureVariables.CAUGHT to "false",
+)
+
 private const val MAX_ERROR_NAME_LENGTH = 160
 private const val MAX_ERROR_MESSAGE_LENGTH = 2_048

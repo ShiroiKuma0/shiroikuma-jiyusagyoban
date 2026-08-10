@@ -126,7 +126,7 @@ class CriticalFlowComposeTest {
                     profile = null,
                     tasks = listOf(task),
                     onDismiss = {},
-                    onSave = { name, _, enterTaskId, _, _, _, _, _, _, _, _, _, _, _ ->
+                    onSave = { name, _, enterTaskId, _, _, _, _, _, _, _, _, _, _, _, _ ->
                         savedName = "$name:$enterTaskId"
                     },
                 )
@@ -153,7 +153,7 @@ class CriticalFlowComposeTest {
                     profile = Profile(id = 7, name = "Work", enterTaskId = enter.id),
                     tasks = listOf(enter, cleanup),
                     onDismiss = {},
-                    onSave = { _, _, _, exitTaskId, _, _, _, _, _, _, _, _, _, _ -> savedExitTaskId = exitTaskId },
+                    onSave = { _, _, _, exitTaskId, _, _, _, _, _, _, _, _, _, _, _ -> savedExitTaskId = exitTaskId },
                 )
             }
         }

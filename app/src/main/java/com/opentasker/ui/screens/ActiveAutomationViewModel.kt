@@ -61,6 +61,7 @@ import com.opentasker.core.sharing.ProfileShareLibrary
 import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
+import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
@@ -236,6 +237,7 @@ class ActiveAutomationViewModel(
     private val variableRepository = VariableRepository(db.variableDao())
     private val bundleRepository = OpenTaskerBundleRepository(db, variableRepository)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
+    private val fallbackTaskSettings = FallbackTaskSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
     private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
@@ -391,6 +393,9 @@ class ActiveAutomationViewModel(
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
+    private val _globalFallbackTaskId = MutableStateFlow(fallbackTaskSettings.loadTaskId())
+    val globalFallbackTaskId: StateFlow<Long?> = _globalFallbackTaskId.asStateFlow()
+
     private val _runLogRetentionPreview = MutableStateFlow<RunLogRetentionPreview?>(null)
     val runLogRetentionPreview: StateFlow<RunLogRetentionPreview?> = _runLogRetentionPreview.asStateFlow()
 
@@ -541,6 +546,7 @@ class ActiveAutomationViewModel(
                 profiles = db.profileDao().getAll().map { it.toDomain() },
                 tasks = db.taskDao().getAll().map { it.toDomain() },
                 scenes = db.sceneDao().getAll().map { it.toDomain() },
+                globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
             )
         }.getOrElse { emptyList() }
         TaskDeletionPreview(
@@ -558,6 +564,8 @@ class ActiveAutomationViewModel(
         viewModelScope.launch {
             runCatching {
                 var blockedCount = 0
+                var rewrittenGlobalFallbackTaskId: Long? = null
+                var globalFallbackChanged = false
                 db.withTransaction {
                     val profiles = db.profileDao().getAll().map { it.toDomain() }
                     val tasks = db.taskDao().getAll().map { it.toDomain() }
@@ -568,6 +576,7 @@ class ActiveAutomationViewModel(
                         profiles = profiles,
                         tasks = tasks,
                         scenes = scenes,
+                        globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
                     )
                     if (!rewrite.canCommit) {
                         blockedCount = rewrite.blocked.size
@@ -577,6 +586,12 @@ class ActiveAutomationViewModel(
                     rewrite.tasks.forEach { db.taskDao().update(it.toEntity()) }
                     rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
                     db.taskDao().delete(task.toEntity())
+                    rewrittenGlobalFallbackTaskId = rewrite.globalFallbackTaskId
+                    globalFallbackChanged = rewrite.globalFallbackChanged
+                }
+                if (blockedCount == 0 && globalFallbackChanged) {
+                    fallbackTaskSettings.saveTaskId(rewrittenGlobalFallbackTaskId)
+                    _globalFallbackTaskId.value = rewrittenGlobalFallbackTaskId
                 }
                 blockedCount
             }
@@ -641,6 +656,7 @@ class ActiveAutomationViewModel(
         maxActiveExecutions: Int? = null,
         burstLimit: Int? = null,
         overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
+        fallbackTaskId: Long? = null,
     ) =
         launchWithMessage("Profile created") {
             val profile = ProfileLifecyclePolicy.normalize(
@@ -660,6 +676,7 @@ class ActiveAutomationViewModel(
                 maxActiveExecutions = maxActiveExecutions,
                 burstLimit = burstLimit,
                 overflowPolicy = overflowPolicy,
+                fallbackTaskId = fallbackTaskId,
                 ),
             )
             requireValidProfileFieldLimits(profile)
@@ -1176,6 +1193,12 @@ class ActiveAutomationViewModel(
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
         }
+    }
+
+    fun updateGlobalFallbackTask(taskId: Long?) {
+        val normalized = taskId?.takeIf { it > 0L }
+        fallbackTaskSettings.saveTaskId(normalized)
+        _globalFallbackTaskId.value = normalized
     }
 
     private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =

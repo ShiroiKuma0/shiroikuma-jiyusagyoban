@@ -139,6 +139,37 @@ class AutomationReferenceTest {
     }
 
     @Test
+    fun fallbackReferencesAreIndexedAndRetargetedWithTheRestOfTheWorkspace() {
+        val profile = Profile(
+            id = 1,
+            name = "Home",
+            enterTaskId = other.id,
+            fallbackTaskId = target.id,
+        )
+        val references = AutomationReferenceIndex.referencesTo(
+            task = target,
+            profiles = listOf(profile),
+            globalFallbackTaskId = target.id,
+        )
+
+        assertEquals(
+            listOf("ProfileFallbackTask", "GlobalFallbackTask"),
+            references.map { it.site::class.simpleName },
+        )
+
+        val rewrite = AutomationReferenceRewriter.retarget(
+            target = target,
+            resolution = ReferenceResolution.Reassign(other),
+            profiles = listOf(profile),
+            globalFallbackTaskId = target.id,
+        )
+        assertTrue(rewrite.canCommit)
+        assertEquals(other.id, rewrite.profiles.single().fallbackTaskId)
+        assertEquals(other.id, rewrite.globalFallbackTaskId)
+        assertTrue(rewrite.globalFallbackChanged)
+    }
+
+    @Test
     fun clearDropsOptionalReferencesAndTheButtonThatWouldHaveNothingToRun() {
         val profile = Profile(id = 1, name = "Home", enterTaskId = other.id, exitTaskId = target.id)
         val caller = caller(

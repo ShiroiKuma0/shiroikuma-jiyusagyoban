@@ -32,8 +32,11 @@ data class ReferenceRewrite(
     val scenes: List<Scene> = emptyList(),
     /** References the chosen resolution cannot satisfy; a non-empty list means "do not commit". */
     val blocked: List<TaskReference> = emptyList(),
+    /** New global fallback id when the per-install setting was changed by this rewrite. */
+    val globalFallbackTaskId: Long? = null,
+    val globalFallbackChanged: Boolean = false,
 ) {
-    val isEmpty: Boolean get() = profiles.isEmpty() && tasks.isEmpty() && scenes.isEmpty()
+    val isEmpty: Boolean get() = profiles.isEmpty() && tasks.isEmpty() && scenes.isEmpty() && !globalFallbackChanged
     val canCommit: Boolean get() = blocked.isEmpty()
 }
 
@@ -152,10 +155,11 @@ object AutomationReferenceRewriter {
         profiles: List<Profile> = emptyList(),
         tasks: List<Task> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        globalFallbackTaskId: Long? = null,
     ): ReferenceRewrite {
         val others = tasks.filterNot { it.id == target.id }
         val references = AutomationReferenceIndex.referencesTo(
-            AutomationReferenceIndex.build(profiles, others, scenes),
+            AutomationReferenceIndex.build(profiles, others, scenes, globalFallbackTaskId),
             target,
         )
         if (references.isEmpty()) return ReferenceRewrite()
@@ -167,13 +171,13 @@ object AutomationReferenceRewriter {
                 if (resolution.replacement.id == target.id) {
                     return ReferenceRewrite(blocked = references)
                 }
-                rewrite(target, profiles, others, scenes) { resolution.replacement.id }
+                rewrite(target, profiles, others, scenes, globalFallbackTaskId) { resolution.replacement.id }
             }
 
             ReferenceResolution.Clear -> {
                 val required = references.filter { it.isRequired }
                 if (required.isNotEmpty()) return ReferenceRewrite(blocked = required)
-                rewrite(target, profiles, others, scenes) { null }
+                rewrite(target, profiles, others, scenes, globalFallbackTaskId) { null }
             }
         }
     }
@@ -197,7 +201,7 @@ object AutomationReferenceRewriter {
             .referencesTo(AutomationReferenceIndex.build(profiles, others, scenes), target)
             .filter { it.ref is TaskRef.ByName }
         if (nameReferences.isEmpty()) return ReferenceRewrite()
-        return rewrite(target, profiles, others, scenes) { target.id }
+        return rewrite(target, profiles, others, scenes, null) { target.id }
     }
 
     /**
@@ -210,13 +214,16 @@ object AutomationReferenceRewriter {
         profiles: List<Profile> = emptyList(),
         tasks: List<Task> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        globalFallbackTaskId: Long? = null,
     ): ReferenceRewrite {
         if (idMap.isEmpty()) return ReferenceRewrite()
 
         val changedProfiles = profiles.mapNotNull { profile ->
             val enter = idMap[profile.enterTaskId] ?: profile.enterTaskId
             val exit = profile.exitTaskId?.let { idMap[it] ?: it }
-            profile.copy(enterTaskId = enter, exitTaskId = exit).takeIf { it != profile }
+            val fallback = profile.fallbackTaskId?.let { idMap[it] ?: it }
+            profile.copy(enterTaskId = enter, exitTaskId = exit, fallbackTaskId = fallback)
+                .takeIf { it != profile }
         }
         val changedTasks = tasks.mapNotNull { task ->
             val actions = task.actions.map { action -> action.mapTaskArgs { id -> idMap[id] ?: id } }
@@ -231,7 +238,14 @@ object AutomationReferenceRewriter {
             }
             scene.copy(elements = elements).takeIf { it != scene }
         }
-        return ReferenceRewrite(changedProfiles, changedTasks, changedScenes)
+        val remappedGlobal = globalFallbackTaskId?.let { idMap[it] ?: it }
+        return ReferenceRewrite(
+            profiles = changedProfiles,
+            tasks = changedTasks,
+            scenes = changedScenes,
+            globalFallbackTaskId = remappedGlobal,
+            globalFallbackChanged = remappedGlobal != globalFallbackTaskId,
+        )
     }
 
     /** [newId] `null` clears the reference; a value retargets it. */
@@ -240,6 +254,7 @@ object AutomationReferenceRewriter {
         profiles: List<Profile>,
         tasks: List<Task>,
         scenes: List<Scene>,
+        globalFallbackTaskId: Long?,
         newId: () -> Long?,
     ): ReferenceRewrite {
         val replacement = newId()
@@ -247,10 +262,12 @@ object AutomationReferenceRewriter {
         val changedProfiles = profiles.mapNotNull { profile ->
             val enterMatches = profile.enterTaskId == target.id
             val exitMatches = profile.exitTaskId == target.id
-            if (!enterMatches && !exitMatches) return@mapNotNull null
+            val fallbackMatches = profile.fallbackTaskId == target.id
+            if (!enterMatches && !exitMatches && !fallbackMatches) return@mapNotNull null
             profile.copy(
                 enterTaskId = if (enterMatches) replacement ?: profile.enterTaskId else profile.enterTaskId,
                 exitTaskId = if (exitMatches) replacement else profile.exitTaskId,
+                fallbackTaskId = if (fallbackMatches) replacement else profile.fallbackTaskId,
             ).takeIf { it != profile }
         }
 
@@ -269,7 +286,14 @@ object AutomationReferenceRewriter {
             scene.copy(elements = elements).takeIf { it != scene }
         }
 
-        return ReferenceRewrite(changedProfiles, changedTasks, changedScenes)
+        val globalMatches = globalFallbackTaskId == target.id
+        return ReferenceRewrite(
+            profiles = changedProfiles,
+            tasks = changedTasks,
+            scenes = changedScenes,
+            globalFallbackTaskId = if (globalMatches) replacement else globalFallbackTaskId,
+            globalFallbackChanged = globalMatches,
+        )
     }
 
     /** Applies [mapId] to every numeric task id an action stores; name references are left alone. */
@@ -351,6 +375,8 @@ object AutomationReferenceRewriter {
 fun TaskReference.describe(): String = when (val site = site) {
     is TaskReferenceSite.ProfileEnterTask -> "Profile \"${site.ownerName}\" enter task"
     is TaskReferenceSite.ProfileExitTask -> "Profile \"${site.ownerName}\" exit task"
+    is TaskReferenceSite.ProfileFallbackTask -> "Profile \"${site.ownerName}\" fallback task"
+    TaskReferenceSite.GlobalFallbackTask -> "Global settings fallback task"
     is TaskReferenceSite.SubTaskRun -> "Task \"${site.ownerName}\" step ${site.actionIndex + 1} (run sub-task)"
     is TaskReferenceSite.NotificationButton ->
         "Task \"${site.ownerName}\" step ${site.actionIndex + 1} (notification button ${site.buttonIndex})"

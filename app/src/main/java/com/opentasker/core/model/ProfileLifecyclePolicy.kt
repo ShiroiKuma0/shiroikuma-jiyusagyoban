@@ -21,6 +21,7 @@ object ProfileLifecyclePolicy {
         lifetimeConsumed = profile.lifetimeConsumed && profile.lifetime == ProfileLifetime.ONCE,
         maxActiveExecutions = ProfileConcurrencyPolicy.normalizeMaxActive(profile.maxActiveExecutions),
         burstLimit = ProfileConcurrencyPolicy.normalizeBurstLimit(profile.burstLimit),
+        fallbackTaskId = profile.fallbackTaskId?.takeIf { it > 0L },
     )
 
     /** Returns the deterministic winner; lower IDs break equal-priority ties. */

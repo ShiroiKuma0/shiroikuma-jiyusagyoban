@@ -265,6 +265,7 @@ fun ActiveAutomationUi(
     val activeExecutions by viewModel.activeExecutions.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
+    val globalFallbackTaskId by viewModel.globalFallbackTaskId.collectAsState()
     val runLogRetentionPreview by viewModel.runLogRetentionPreview.collectAsState()
     val backupSetupState by viewModel.backupSetupState.collectAsState()
     val restoreReview by viewModel.restoreReview.collectAsState()
@@ -878,6 +879,8 @@ fun ActiveAutomationUi(
                 onCancelPendingRestore = viewModel::cancelPendingRestore,
                 profiles = profiles,
                 tasks = tasks,
+                globalFallbackTaskId = globalFallbackTaskId,
+                onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
@@ -1123,14 +1126,13 @@ fun ActiveAutomationUi(
             },
         )
     }
-
     if (showCreateProfileDialog) {
         ProfileEditorDialog(
             profile = null,
             tasks = projectTasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy ->
-                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy)
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId ->
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId)
                 showCreateProfileDialog = false
             },
         )
@@ -1184,7 +1186,7 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy ->
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId ->
                 viewModel.updateProfile(profile.copy(
                         name = name.trim(),
                         enabled = enabled,
@@ -1195,6 +1197,7 @@ fun ActiveAutomationUi(
                         group = group,
                         priority = priority, gracePeriodSec = gracePeriod, lifetime = lifetime, expiresAtMs = expiresAtMs,
                         maxActiveExecutions = maxActiveExecutions, burstLimit = burstLimit, overflowPolicy = overflowPolicy,
+                        fallbackTaskId = fallbackTaskId,
                         lifetimeConsumed = if (lifetime == profile.lifetime) profile.lifetimeConsumed else false,
                     ))
                 clearProfileDialog()

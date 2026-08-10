@@ -542,6 +542,7 @@ class DatabaseBackupManager(
             if (schemaVersion >= 2) profiles += "automationMode"
             if (schemaVersion >= 5) profiles += "profileGroup"
             if (schemaVersion >= 7) profiles += "requiresRiskAcknowledgement"
+            if (schemaVersion >= 14) profiles += "fallbackTaskId"
 
             val variables = mutableSetOf("name", "value", "isGlobal")
             if (schemaVersion >= 6) variables += "isSecret"

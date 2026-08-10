@@ -23,7 +23,7 @@ sealed interface TaskReferenceSite {
     val ownerId: Long
     val ownerName: String
 
-    enum class OwnerKind { PROFILE, TASK, SCENE }
+    enum class OwnerKind { PROFILE, TASK, SCENE, SETTINGS }
 
     data class ProfileEnterTask(override val ownerId: Long, override val ownerName: String) : TaskReferenceSite {
         override val ownerKind = OwnerKind.PROFILE
@@ -31,6 +31,16 @@ sealed interface TaskReferenceSite {
 
     data class ProfileExitTask(override val ownerId: Long, override val ownerName: String) : TaskReferenceSite {
         override val ownerKind = OwnerKind.PROFILE
+    }
+
+    data class ProfileFallbackTask(override val ownerId: Long, override val ownerName: String) : TaskReferenceSite {
+        override val ownerKind = OwnerKind.PROFILE
+    }
+
+    data object GlobalFallbackTask : TaskReferenceSite {
+        override val ownerKind = OwnerKind.SETTINGS
+        override val ownerId: Long = 0L
+        override val ownerName: String = "Global settings"
     }
 
     /** A `task.run` action inside another task. */
@@ -154,6 +164,7 @@ object AutomationReferenceIndex {
         profiles: List<Profile> = emptyList(),
         tasks: List<Task> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        globalFallbackTaskId: Long? = null,
     ): List<TaskReference> = buildList {
         profiles.sortedBy { it.id }.forEach { profile ->
             add(
@@ -170,6 +181,18 @@ object AutomationReferenceIndex {
                     ),
                 )
             }
+            profile.fallbackTaskId?.let { fallbackId ->
+                add(
+                    TaskReference(
+                        TaskReferenceSite.ProfileFallbackTask(profile.id, profile.name),
+                        TaskRef.ById(fallbackId),
+                    ),
+                )
+            }
+        }
+
+        globalFallbackTaskId?.let { fallbackId ->
+            add(TaskReference(TaskReferenceSite.GlobalFallbackTask, TaskRef.ById(fallbackId)))
         }
 
         tasks.sortedBy { it.id }.forEach { task ->
@@ -210,8 +233,9 @@ object AutomationReferenceIndex {
         profiles: List<Profile> = emptyList(),
         tasks: List<Task> = emptyList(),
         scenes: List<Scene> = emptyList(),
+        globalFallbackTaskId: Long? = null,
     ): List<TaskReference> = referencesTo(
-        build(profiles, tasks.filterNot { it.id == task.id }, scenes),
+        build(profiles, tasks.filterNot { it.id == task.id }, scenes, globalFallbackTaskId),
         task,
     )
 

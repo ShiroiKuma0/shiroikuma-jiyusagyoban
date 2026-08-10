@@ -138,6 +138,8 @@
     <string name="profile_enter_task">Enter task</string>
     <string name="profile_exit_task">Exit task</string>
     <string name="profile_exit_task_helper">Optional cleanup task to run when this profile stops matching.</string>
+    <string name="profile_fallback_task">Profile fallback task</string>
+    <string name="profile_fallback_task_helper">Optional task to run when the profile task fails without a flow.catch.</string>
     <string name="profile_cooldown_label">Cooldown seconds</string>
     <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 0 (no cooldown).</string>
     <string name="profile_priority_label">Profile priority</string>
@@ -262,6 +264,10 @@
     <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$d profiles, %4$d tasks, %5$d scenes. Restart OpenTasker to apply it.</string>
     <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
     <string name="setup_backup_restore_cancel">Cancel staged restore</string>
+    <string name="setup_global_fallback_title">Global failure fallback</string>
+    <string name="setup_global_fallback_body">When a task fails without a flow.catch or profile fallback, run this task once with the structured FLOW_ERROR_JSON payload.</string>
+    <string name="setup_global_fallback_label">Global fallback task</string>
+    <string name="setup_global_fallback_hint">Optional final recovery task</string>
     <string name="restore_review_title">Review restore</string>
     <string name="restore_review_summary">%1$s · %2$s · schema v%3$d</string>
     <string name="restore_review_counts">%1$d profiles · %2$d tasks · %3$d scenes · %4$d variables · %5$d run log entries</string>
