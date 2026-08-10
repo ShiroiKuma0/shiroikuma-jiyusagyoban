@@ -11,6 +11,7 @@
 - Scheduled triggers now persist expected fire times; the watchdog records overdue delivery once with delay, standby bucket, and battery/exact-alarm remediation in the Run Log.
 - Variable renames now rewrite legacy and template references across action arguments, conditions, profile context bindings, and scenes atomically; referenced variables cannot be deleted without showing their dependent sites.
 - The local quality gate now emits a JaCoCo debug report, enforces per-area instruction floors for scheduling, resilience, receivers, and UI utilities, and ratchets the JVM test floor to 1,020 passing tests; the newly covered areas include exact-alarm decisions, graceful degradation, time-event routing, and notification message formatting.
+- Locale packaging now uses AGP's generated per-app language configuration with an explicit `en-US` default; incomplete locale placeholders are removed, and the release gate rejects alternate locales below the documented 80% translated-string threshold.
 - Record the current evaluation decisions to wait on Glance and Navigation3 stability, and to keep unrestricted accessibility automation out of the product.
 
 ## v0.2.82
