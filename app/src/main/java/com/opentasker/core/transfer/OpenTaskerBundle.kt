@@ -5,6 +5,8 @@ import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.diff.AutomationSemanticDiff
+import com.opentasker.core.diff.SemanticDiffDocument
 import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.model.Profile
@@ -86,6 +88,7 @@ data class BundleImportPlan(
     val capabilityRequirements: List<CapabilityRequirement> = emptyList(),
     val powerRequests: List<RecipePowerRequest> = emptyList(),
     val variableConflicts: List<VariableImportConflict> = emptyList(),
+    val semanticDiff: SemanticDiffDocument = SemanticDiffDocument(),
 )
 
 enum class VariableConflictAction {
@@ -547,7 +550,29 @@ class OpenTaskerBundleRepository(
                     suggestedRename = nextImportedVariableName(storageName, variable.isGlobal, reservedNames),
                 ).also { reservedNames += it.suggestedRename }
             }
-        return base.copy(variableConflicts = conflicts)
+        val existingTasks = db.taskDao().getAll().mapNotNull { record ->
+            record.toDomainDecodeResult().takeUnless { it.issue != null }?.value
+        }
+        val existingProfiles = db.profileDao().getAll().mapNotNull { record ->
+            record.toDomainDecodeResult().takeUnless { it.issue != null }?.value
+        }
+        val existingScenes = db.sceneDao().getAll().mapNotNull { record ->
+            record.toDomainDecodeResult().takeUnless { it.issue != null }?.value
+        }
+        val existingVariables = db.variableDao().getAll()
+            .filterNot { it.isEffectivelySecret() }
+            .map { it.toDomain() }
+        return base.copy(
+            variableConflicts = conflicts,
+            semanticDiff = AutomationSemanticDiff.compareBundle(
+                bundle = bundle,
+                existingTasks = existingTasks,
+                existingProfiles = existingProfiles,
+                existingVariables = existingVariables,
+                existingScenes = existingScenes,
+                projectIdMap = projectIdMap,
+            ),
+        )
     }
 
     suspend fun exportBundle(

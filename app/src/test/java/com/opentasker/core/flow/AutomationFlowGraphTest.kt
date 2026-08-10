@@ -7,6 +7,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -167,6 +168,28 @@ class AutomationFlowGraphTest {
             "action. Step 1: notify.show. notify.show with the configured values. condition if %armed = true",
             actionNode.accessibilityLabel(),
         )
+    }
+
+    @Test
+    fun changedNodeKeysMarkProfileContextTaskAndActionNodes() {
+        val task = Task(id = 21, name = "Changed task", actions = listOf(ActionSpec(type = "notify.show")))
+        val profile = Profile(
+            id = 5,
+            name = "Changed profile",
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "armed"))),
+            enterTaskId = task.id,
+        )
+
+        val graph = AutomationFlowGraphBuilder.build(
+            profile,
+            listOf(task),
+            changedNodeKeys = setOf("profile:5:context:0", "task:21:action:0"),
+        )
+
+        assertFalse(graph.nodes.first { it.kind == AutomationFlowNodeKind.PROFILE }.changed)
+        assertTrue(graph.contextNodes.single().changed)
+        assertFalse(graph.enterTaskNode?.changed == true)
+        assertTrue(graph.actionNodesFor("enter-task:21").single().changed)
     }
 
     @Test

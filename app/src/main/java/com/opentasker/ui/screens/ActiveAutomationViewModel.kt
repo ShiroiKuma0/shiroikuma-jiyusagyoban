@@ -51,6 +51,9 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleGrantStore
+import com.opentasker.core.diff.AutomationSemanticDiff
+import com.opentasker.core.diff.SemanticDiffDocument
+import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.references.AutomationDuplicator
 import com.opentasker.core.references.AutomationReferenceRewriter
@@ -157,6 +160,12 @@ internal data class OpenTaskerBundleReviewState(
     val plan: BundleImportPlan,
     val variableResolutions: Map<String, VariableConflictResolution> = emptyMap(),
 )
+
+internal data class SemanticDiffReviewState(
+    val document: SemanticDiffDocument,
+)
+
+private fun documentOf(entry: SemanticDiffEntry): SemanticDiffDocument = SemanticDiffDocument(listOf(entry))
 
 internal data class ProfileShareReviewState(
     val draft: ProfileShareDraft,
@@ -433,6 +442,9 @@ class ActiveAutomationViewModel(
 
     private val _openTaskerBundleBusy = MutableStateFlow(false)
     val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
+
+    private val _semanticDiffReview = MutableStateFlow<SemanticDiffReviewState?>(null)
+    internal val semanticDiffReview: StateFlow<SemanticDiffReviewState?> = _semanticDiffReview.asStateFlow()
 
     private val _profileShareReview = MutableStateFlow<ProfileShareReviewState?>(null)
     internal val profileShareReview: StateFlow<ProfileShareReviewState?> = _profileShareReview.asStateFlow()
@@ -1502,36 +1514,50 @@ class ActiveAutomationViewModel(
         }
     }
 
-    private suspend fun transitionEdit(entityType: String, entityId: Long, redo: Boolean): Boolean = db.withTransaction {
+    private suspend fun transitionEdit(entityType: String, entityId: Long, redo: Boolean): SemanticDiffDocument? = db.withTransaction {
         val history = db.editHistoryDao()
         val snapshot = if (redo) {
             history.getRedoCandidate(entityType, entityId)
         } else {
             history.getUndoCandidate(entityType, entityId)
-        } ?: return@withTransaction false
+        } ?: return@withTransaction null
 
         if (snapshot.previousJson.isBlank()) {
             if (redo) {
                 when (entityType) {
                     EditHistoryDao.TYPE_TASK -> {
-                        if (db.taskDao().getById(entityId) != null) return@withTransaction false
-                        db.taskDao().insert(EditHistorySnapshotDecoder.task(snapshot.nextJson, entityId).toEntity())
+                        if (db.taskDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.task(snapshot.nextJson, entityId)
+                        db.taskDao().insert(restored.toEntity())
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareTask(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
                     EditHistoryDao.TYPE_PROFILE -> {
-                        if (db.profileDao().getById(entityId) != null) return@withTransaction false
-                        db.profileDao().insert(EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId).toEntity())
+                        if (db.profileDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId)
+                        db.profileDao().insert(restored.toEntity())
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareProfile(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
                     EditHistoryDao.TYPE_SCENE -> {
-                        if (db.sceneDao().getById(entityId) != null) return@withTransaction false
-                        db.sceneDao().insert(EditHistorySnapshotDecoder.scene(snapshot.nextJson, entityId).toEntity())
+                        if (db.sceneDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.scene(snapshot.nextJson, entityId)
+                        db.sceneDao().insert(restored.toEntity())
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareScene(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
-                    else -> return@withTransaction false
+                    else -> return@withTransaction null
                 }
-                history.markRedone(snapshot.id)
             } else {
                 when (entityType) {
                     EditHistoryDao.TYPE_TASK -> {
-                        val current = db.taskDao().getById(entityId) ?: return@withTransaction false
+                        val current = db.taskDao().getById(entityId) ?: return@withTransaction null
                         val currentTask = current.toDomainDecodeResult().also { result ->
                             result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
                         }.value
@@ -1542,75 +1568,109 @@ class ActiveAutomationViewModel(
                             scenes = db.sceneDao().getAll().map { it.toDomain() },
                             globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
                         )
-                        if (references.isNotEmpty()) return@withTransaction false
+                        if (references.isNotEmpty()) return@withTransaction null
                         db.taskDao().delete(current)
+                        history.markUndone(snapshot.id, snapshot.nextJson)
+                        return@withTransaction AutomationSemanticDiff.compareTask(currentTask, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
                     EditHistoryDao.TYPE_PROFILE -> {
-                        val current = db.profileDao().getById(entityId) ?: return@withTransaction false
+                        val current = db.profileDao().getById(entityId) ?: return@withTransaction null
+                        val currentProfile = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
                         db.profileDao().delete(current)
                         locationDwellStateStore.clearProfile(entityId)
+                        history.markUndone(snapshot.id, snapshot.nextJson)
+                        return@withTransaction AutomationSemanticDiff.compareProfile(currentProfile, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
                     EditHistoryDao.TYPE_SCENE -> {
-                        val current = db.sceneDao().getById(entityId) ?: return@withTransaction false
+                        val current = db.sceneDao().getById(entityId) ?: return@withTransaction null
+                        val currentScene = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
                         db.sceneDao().delete(current)
+                        history.markUndone(snapshot.id, snapshot.nextJson)
+                        return@withTransaction AutomationSemanticDiff.compareScene(currentScene, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
                     }
-                    else -> return@withTransaction false
+                    else -> return@withTransaction null
                 }
-                history.markUndone(snapshot.id, snapshot.nextJson)
             }
-            return@withTransaction true
         }
 
         val targetJson = if (redo) snapshot.nextJson else snapshot.previousJson
-        if (targetJson.isBlank()) return@withTransaction false
+        if (targetJson.isBlank()) return@withTransaction null
 
         when (entityType) {
             EditHistoryDao.TYPE_TASK -> {
-                val current = db.taskDao().getById(entityId) ?: return@withTransaction false
+                val current = db.taskDao().getById(entityId) ?: return@withTransaction null
                 val currentDecoded = current.toDomainDecodeResult()
                 val currentJson = if (currentDecoded.issue == null) {
                     StorageJson.encodeToString(currentDecoded.value)
                 } else {
                     current.actionsJson
                 }
-                db.taskDao().update(EditHistorySnapshotDecoder.task(targetJson, entityId).toEntity())
+                val target = EditHistorySnapshotDecoder.task(targetJson, entityId)
+                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
+                    ?: AutomationSemanticDiff.compareTask(currentDecoded.value, target)?.let(::documentOf)
+                    ?: SemanticDiffDocument()
+                db.taskDao().update(target.toEntity())
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+                return@withTransaction diff
             }
 
             EditHistoryDao.TYPE_PROFILE -> {
-                val current = db.profileDao().getById(entityId) ?: return@withTransaction false
+                val current = db.profileDao().getById(entityId) ?: return@withTransaction null
                 val currentDecoded = current.toDomainDecodeResult()
                 val currentJson = if (currentDecoded.issue == null) {
                     StorageJson.encodeToString(currentDecoded.value)
                 } else {
                     current.contextsJson
                 }
-                db.profileDao().upsert(EditHistorySnapshotDecoder.profile(targetJson, entityId).toEntity())
+                val target = EditHistorySnapshotDecoder.profile(targetJson, entityId)
+                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
+                    ?: AutomationSemanticDiff.compareProfile(currentDecoded.value, target)?.let(::documentOf)
+                    ?: SemanticDiffDocument()
+                db.profileDao().upsert(target.toEntity())
                 locationDwellStateStore.clearProfile(entityId)
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+                return@withTransaction diff
             }
 
             EditHistoryDao.TYPE_SCENE -> {
-                val current = db.sceneDao().getById(entityId) ?: return@withTransaction false
+                val current = db.sceneDao().getById(entityId) ?: return@withTransaction null
                 val currentDecoded = current.toDomainDecodeResult()
                 val currentJson = if (currentDecoded.issue == null) {
                     StorageJson.encodeToString(currentDecoded.value)
                 } else {
                     current.elementsJson
                 }
-                db.sceneDao().update(EditHistorySnapshotDecoder.scene(targetJson, entityId).toEntity())
+                val target = EditHistorySnapshotDecoder.scene(targetJson, entityId)
+                val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
+                    ?: AutomationSemanticDiff.compareScene(currentDecoded.value, target)?.let(::documentOf)
+                    ?: SemanticDiffDocument()
+                db.sceneDao().update(target.toEntity())
                 if (redo) history.markRedone(snapshot.id) else history.markUndone(snapshot.id, currentJson)
+                return@withTransaction diff
             }
 
-            else -> return@withTransaction false
+            else -> return@withTransaction null
         }
-        true
     }
 
     private fun transitionEditAsync(entityType: String, entityId: Long, redo: Boolean) {
         viewModelScope.launch {
             runCatching { transitionEdit(entityType, entityId, redo) }
-                .onSuccess { changed ->
+                .onSuccess { diff ->
+                    val changed = diff != null
+                    if (diff != null && !diff.isEmpty) {
+                        _semanticDiffReview.value = SemanticDiffReviewState(diff)
+                    }
                     val messageRes = when {
                         changed && redo -> R.string.ui_message_edit_redone
                         changed -> R.string.ui_message_edit_undone
@@ -1621,6 +1681,10 @@ class ActiveAutomationViewModel(
                 }
                 .onFailure { events.send(errorMessage(it, if (redo) R.string.ui_error_redo else R.string.ui_error_undo)) }
         }
+    }
+
+    fun clearSemanticDiffReview() {
+        _semanticDiffReview.value = null
     }
 
     fun undoLastTaskEdit(taskId: Long) = transitionEditAsync(EditHistoryDao.TYPE_TASK, taskId, redo = false)

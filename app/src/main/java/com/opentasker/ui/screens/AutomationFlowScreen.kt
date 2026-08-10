@@ -75,12 +75,13 @@ fun AutomationFlowScreen(
     onNodeTargetSelected: (AutomationFlowTarget) -> Unit = {},
     onAddContext: (Long) -> Unit = {},
     onAddAction: (Long) -> Unit = {},
+    changedNodeKeys: Set<String> = emptySet(),
 ) {
     val resources = LocalContext.current.resources
-    val graphs = remember(profiles, tasks, resources) {
+    val graphs = remember(profiles, tasks, resources, changedNodeKeys) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
-        profiles.map { profile -> AutomationFlowGraphBuilder.build(profile, tasksById, strings) }
+        profiles.map { profile -> AutomationFlowGraphBuilder.build(profile, tasksById, strings, changedNodeKeys) }
     }
 
     if (profiles.isEmpty()) {
@@ -448,7 +449,10 @@ private fun FlowCanvasNode(
             ),
         color = color.copy(alpha = if (node.muted) 0.07f else 0.10f),
         shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = if (node.muted) 0.20f else 0.30f)),
+        border = BorderStroke(
+            if (node.changed) 2.dp else 1.dp,
+            if (node.changed) MaterialTheme.colorScheme.tertiary else color.copy(alpha = if (node.muted) 0.20f else 0.30f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -515,7 +519,10 @@ private fun FlowNodeView(
             ),
         color = color.copy(alpha = if (node.muted) 0.08f else 0.12f),
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = if (node.muted) 0.22f else 0.34f)),
+        border = BorderStroke(
+            if (node.changed) 2.dp else 1.dp,
+            if (node.changed) MaterialTheme.colorScheme.tertiary else color.copy(alpha = if (node.muted) 0.22f else 0.34f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -528,6 +535,12 @@ private fun FlowNodeView(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (node.changed) {
+                FlowStatusPill(
+                    label = stringResource(R.string.flow_changed_node),
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             node.detail?.takeUnless { it.isBlank() }?.let { detail ->
                 Text(
                     detail,
