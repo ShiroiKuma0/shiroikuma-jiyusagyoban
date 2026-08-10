@@ -220,6 +220,8 @@ The gate writes the debug JaCoCo XML report to `app/build/reports/jacoco/debugCo
 
 Before it executes Gradle, the gate checks that `distributionSha256Sum` matches the configured binary distribution and that the checked-in `gradle-wrapper.jar` matches Gradle's published SHA-256. It also independently checks every dependency checksum against its recorded upstream Maven evidence, requires signature verification with an explicit trusted-key set, and rejects Gradle-generated or blanket-trust metadata. Use `.\tools\verify-dependency-verification.ps1 -UpdateOrigins` only after deliberately reviewing a dependency change; the normal verifier must pass without that switch. Use `.\tools\verify-local-release.ps1 -BootstrapOnly` for the fast bootstrap preflight alone. The full gate writes those verified hashes into the machine-readable report under `build/reports/opentasker/`. To prove failure propagation without running the full build, run `.\tools\verify-local-release.ps1 -SeedFailure`; success is a nonzero exit with `Seeded local quality-gate failure`.
 
+The repository uses Gradle's local build cache only; do not configure an untrusted remote build cache while Kotlin build-cache metadata is affected by [GHSA-r937-wjx7-w2jp](https://github.com/advisories/GHSA-r937-wjx7-w2jp). Revisit the Kotlin/Compose compiler batch when Kotlin `2.4.20` is stable.
+
 Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-version <version> --distribution-type bin --gradle-distribution-sha256-sum <official-bin-sha256>`, verify the regenerated JAR against Gradle's published wrapper-JAR checksum, update both expected hashes in `tools/verify-local-release.ps1` and `ReleaseTruthContractTest`, then run a clean wrapper bootstrap and the full local release gate. Never update only the distribution URL or only the executable JAR.
 
 ---
@@ -229,8 +231,8 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | Property | Value |
 |----------|-------|
 | Kotlin | 2.4.10 |
-| Gradle | 9.4.1 |
-| AGP | 9.2.1 |
+| Gradle | 9.6.1 |
+| AGP | 9.3.1 |
 | KSP | 2.3.10 |
 | Build Tools | 36.0.0 |
 | Macrobenchmark | 1.5.0-alpha07 |

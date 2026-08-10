@@ -19,11 +19,13 @@
             <trusting group="androidx.activity" />
             <trusting group="androidx.benchmark" />
             <trusting group="androidx.core" />
+            <trusting group="androidx.databinding" />
             <trusting group="androidx.datastore" />
             <trusting group="androidx.lifecycle" />
             <trusting group="androidx.test.uiautomator" />
             <trusting group="androidx.work" />
             <trusting group="^androidx[.]compose($|([.].*))" regex="true" />
+            <trusting group="^com[.]android($|([.].*))" regex="true" />
          </trusted-key>
          <trusted-key id="0F06FF86BEEAF4E71866EE5232EE5355A6BC6E42">
             <trusting group="androidx.annotation" />
@@ -126,7 +128,10 @@
          <trusted-key id="E7DC75FC24FB3C8DFE8086AD3D5839A2262CBBFB" group="org.jetbrains.kotlinx" />
          <trusted-key id="EB1B3DE71713C9EC2E87CC26EE92349AD86DE446" group="com.google.j2objc" name="j2objc-annotations" version="2.8" />
          <trusted-key id="EE0CA873074092F806F59B65D364ABAA39A47320" group="com.google.errorprone" />
-         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9" group="org.jsoup" name="jsoup" version="1.22.2" />
+         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9">
+            <trusting group="org.jsoup" name="jsoup" version="1.22.2" />
+            <trusting group="org.jsoup" name="jsoup" version="1.23.1" />
+         </trusted-key>
          <trusted-key id="FA77DCFEF2EE6EB2DEBEDD2C012579464D01C06A" group="org.apache" name="apache" />
          <trusted-key id="FA7929F83AD44C4590F6CC6815C71C0A4E0B8EDD" group="net.java.dev.jna" />
          <trusted-key id="FAABC3738B1F58DA2D776FA2EB380DC13C39F675" group="com.intellij" name="annotations" version="12.0" />
@@ -4024,22 +4029,6 @@
             <sha256 value="968098f4a8451bbcd3d7b88c6a8ab5b7a74ef80dfdee7a6052f352fff783b2c5" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
-      <component group="io.grpc" name="grpc-netty" version="1.57.2">
-         <artifact name="grpc-netty-1.57.2.jar">
-            <sha256 value="9809d4c10c94d11e7b2946cdeb5b2884be20a09510289544f37569f02c877a21" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-         <artifact name="grpc-netty-1.57.2.pom">
-            <sha256 value="8b12161cf2aacfbf398fb5afc3b0d73a21af206ba50c3d8f7bf4f6c4b375ebf8" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-      </component>
-      <component group="io.grpc" name="grpc-netty" version="1.69.1">
-         <artifact name="grpc-netty-1.69.1.jar">
-            <sha256 value="52a86ed66f78933e83d1a3fb7162ad1667489564c4556366b7a3579c7024a447" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-         <artifact name="grpc-netty-1.69.1.pom">
-            <sha256 value="8f06650cc91428cc513111bfebbeabf79994185d72444b02e5dfaca38be43714" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-      </component>
       <component group="io.grpc" name="grpc-protobuf" version="1.57.2">
          <artifact name="grpc-protobuf-1.57.2.jar">
             <sha256 value="31630d8a9e9f08a959862015e30a4863908be3680c3a686f4c1f08d2ffeaf706" origin="OpenTasker: Maven Central published .sha256" />
@@ -4102,197 +4091,6 @@
          </artifact>
          <artifact name="grpc-util-1.69.1.pom">
             <sha256 value="d20d3468cb74d56be55ed3d46f63ca38ee4bca0918d9aad7277a448f6e07a5b4" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-bom" version="4.2.12.Final">
-         <artifact name="netty-bom-4.2.12.Final.pom">
-            <sha256 value="4b1eac8791c931a33d9e2fb8c083432552cf87469db419b7d2434178e34f070c" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-buffer" version="4.1.110.Final">
-         <artifact name="netty-buffer-4.1.110.Final.jar">
-            <sha256 value="46d74e79125aacc055c31f18152fdc5d4a569aa8d60091203d0baa833973ac3c" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-buffer-4.1.110.Final.pom">
-            <sha256 value="710ac19cc01cd80df6be9a3faad3c222b4a1a32f4b55137be07b6099d5da3562" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-buffer" version="4.1.93.Final">
-         <artifact name="netty-buffer-4.1.93.Final.jar">
-            <sha256 value="007c7d9c378df02d390567d0d7ddf542ffddb021b7313dbf502392113ffabb08" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-buffer-4.1.93.Final.pom">
-            <sha256 value="83fbc54e2b73b86d55b208f618d1a2a156910ec146f7ece57565007b750add78" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec" version="4.1.110.Final">
-         <artifact name="netty-codec-4.1.110.Final.jar">
-            <sha256 value="9eccce9a8d827bb8ce84f9c3183fec58bd1c96a51010cf711297746034af3701" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-4.1.110.Final.pom">
-            <sha256 value="a806bb536bb323665baff7cd1223f2b272a2d4717ab4f9b12361086daae5df3e" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec" version="4.1.93.Final">
-         <artifact name="netty-codec-4.1.93.Final.jar">
-            <sha256 value="990c378168dc6364c6ff569701f4f2f122fffe8998b3e189eba4c4d868ed1084" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-4.1.93.Final.pom">
-            <sha256 value="19cded267a070dff1abc9d029b552fad262acc1aba5c6c67b2278fca113a26ab" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-http" version="4.1.110.Final">
-         <artifact name="netty-codec-http-4.1.110.Final.jar">
-            <sha256 value="dc0d6af5054630a70ff0ef354f20aa7a6e46738c9fc5636ed3d4fe77e38bd48d" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-http-4.1.110.Final.pom">
-            <sha256 value="51ae990af14a321db6d3d6884b917b7d4363eb60dddc0f1493b18021a142e7ad" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-http" version="4.1.93.Final">
-         <artifact name="netty-codec-http-4.1.93.Final.jar">
-            <sha256 value="dacf78ce78ab2d29570325db4cd2451ea589639807de95881a0fa7155a9e6b55" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-http-4.1.93.Final.pom">
-            <sha256 value="a3dafff071b6d284e8063d96843de2bb83cf3b889eae0cc9e0adb64a57a31b82" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-http2" version="4.1.110.Final">
-         <artifact name="netty-codec-http2-4.1.110.Final.jar">
-            <sha256 value="b546c75445a487bb7bcd5a94779caecce33582cf7be31b8b39fc0e65b1ee26fc" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-http2-4.1.110.Final.pom">
-            <sha256 value="29d2f6c26c3cca9fe8393671707fe8ef9c3e31020a2dfe06b82c426499c25837" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-http2" version="4.1.93.Final">
-         <artifact name="netty-codec-http2-4.1.93.Final.jar">
-            <sha256 value="d96cc09045a1341c6d47494352aa263b87b72fb1d2ea9eca161aa73820bfe8bb" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-http2-4.1.93.Final.pom">
-            <sha256 value="084433b42d541f7ac4b59287dd253285cfda3a3d65de72e7368bb7ec3d367271" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-socks" version="4.1.110.Final">
-         <artifact name="netty-codec-socks-4.1.110.Final.jar">
-            <sha256 value="976052a3c9bb280bc6d99f3a29e6404677cf958c3de05b205093d38c006b880c" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-socks-4.1.110.Final.pom">
-            <sha256 value="ffe57b316191dd4f96bee66c5709c13cbdb4ecab085c010c8db0c6aa809abf6c" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-codec-socks" version="4.1.93.Final">
-         <artifact name="netty-codec-socks-4.1.93.Final.jar">
-            <sha256 value="0ea47b5ba23ca1da8eb9146c8fc755c1271414633b1e2be2ce1df764ba0fff2a" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-codec-socks-4.1.93.Final.pom">
-            <sha256 value="8cd816ed991a946041bab4cb24bd9c8e41ee0692512511f2d83cef538eb605d7" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-common" version="4.1.110.Final">
-         <artifact name="netty-common-4.1.110.Final.jar">
-            <sha256 value="9851ec66548b9e0d41164ce98943cdd4bbe305f68ddbd24eae52e4501a0d7b1a" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-common-4.1.110.Final.pom">
-            <sha256 value="7d417f5335304dae1ea08a06586038c83fe8ad84c1d35baa15ed11921cef7920" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-common" version="4.1.93.Final">
-         <artifact name="netty-common-4.1.93.Final.jar">
-            <sha256 value="443bb316599fb16e3baeba2fb58881814d7ff0b7af176fe76e38071a6e86f8c0" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-common-4.1.93.Final.pom">
-            <sha256 value="42d883b13eb38cabf549616462c5f331f5333bf0c8fc9215744f83c0180a4f6b" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-handler" version="4.1.110.Final">
-         <artifact name="netty-handler-4.1.110.Final.jar">
-            <sha256 value="d5a08d7de364912e4285968de4d4cce3f01da4bb048d5c6937e5f2af1f8e148a" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-handler-4.1.110.Final.pom">
-            <sha256 value="4d43c13d14f5635a2f8b0d5094d7a31c509ee0f52c724eba0ef30cffe3ea1555" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-handler" version="4.1.93.Final">
-         <artifact name="netty-handler-4.1.93.Final.jar">
-            <sha256 value="4e5f563ae14ed713381816d582f5fcfd0615aefb29203486cdfb782d8a00a02b" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-handler-4.1.93.Final.pom">
-            <sha256 value="84a1525cac0b4759efaef2997a47fe19b9b5642f9273fa0fd58a2e76c7a059fe" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-handler-proxy" version="4.1.110.Final">
-         <artifact name="netty-handler-proxy-4.1.110.Final.jar">
-            <sha256 value="ad54ab4fe9c47ef3e723d71251126db53e8db543871adb9eafc94446539eff52" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-handler-proxy-4.1.110.Final.pom">
-            <sha256 value="c613cb4e7e06f42efa31db8d8b2a339ed8bf41f00c46d38d0909a4c06c656dcf" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-handler-proxy" version="4.1.93.Final">
-         <artifact name="netty-handler-proxy-4.1.93.Final.jar">
-            <sha256 value="2ac5f7fbefa0b73ef783889069344d5515505a14b2303be693c5002c486df2b4" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-handler-proxy-4.1.93.Final.pom">
-            <sha256 value="6dc50da0e67f597812874f81eaa45404f7d076b8199ea9088932a85c1b610245" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-parent" version="4.1.110.Final">
-         <artifact name="netty-parent-4.1.110.Final.pom">
-            <sha256 value="685adaf373666fc15427c810f8aff3a4fe194a97c7ed74b69d07c548f0d42f1c" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-parent" version="4.1.93.Final">
-         <artifact name="netty-parent-4.1.93.Final.pom">
-            <sha256 value="b109cb76f375fedb8a9ef75ac58063170deb7ea2ddd024f466fef6dc65cdfcee" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-resolver" version="4.1.110.Final">
-         <artifact name="netty-resolver-4.1.110.Final.jar">
-            <sha256 value="a2e9b4ae7caa92fc5bd747e11d1dec20d81b18fc00959554302244ac5c56ce70" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-resolver-4.1.110.Final.pom">
-            <sha256 value="655f34192e8c7618b3c5a79e488e4daa35def41b0d16d45fa36523c3b4c9f641" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-resolver" version="4.1.93.Final">
-         <artifact name="netty-resolver-4.1.93.Final.jar">
-            <sha256 value="e59770b66e81822e5d111ac4e544d7eb0c543e0a285f52628e53941acd8ed759" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-resolver-4.1.93.Final.pom">
-            <sha256 value="5b350c3c91e9e55d29cbe68cfe4ef2116cc1f0328677ebf9f615bab7082c79f4" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-transport" version="4.1.110.Final">
-         <artifact name="netty-transport-4.1.110.Final.jar">
-            <sha256 value="a42dd68390ca14b4ff2d40628a096c76485b4adb7c19602d5289321a0669e704" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-transport-4.1.110.Final.pom">
-            <sha256 value="30f5da0e7646f1840d632f88615c8b9d8205499d68559b9c4547b3b04a0683cd" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-transport" version="4.1.93.Final">
-         <artifact name="netty-transport-4.1.93.Final.jar">
-            <sha256 value="a5a78019bc1cd43dbc3c7b7cdd3801912ca26d1f498fb560514fee497864ba96" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-transport-4.1.93.Final.pom">
-            <sha256 value="0dd62a0eb3cb1ea001a4d0426e4f5c08df1c70d9265675bffa5c583613422d43" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-transport-native-unix-common" version="4.1.110.Final">
-         <artifact name="netty-transport-native-unix-common-4.1.110.Final.jar">
-            <sha256 value="51717bb7471141950390c6713a449fdb1054d07e60737ee7dda7083796cdee48" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-transport-native-unix-common-4.1.110.Final.pom">
-            <sha256 value="ea18ce04c9a97ac0c51f4e397b185229fd95997e90b11339adcf7c51946d53d8" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-      </component>
-      <component group="io.netty" name="netty-transport-native-unix-common" version="4.1.93.Final">
-         <artifact name="netty-transport-native-unix-common-4.1.93.Final.jar">
-            <sha256 value="774165a1c4dbaacb17f9c1ad666b3569a6a59715ae828e7c3d47703f479a53e7" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
-         </artifact>
-         <artifact name="netty-transport-native-unix-common-4.1.93.Final.pom">
-            <sha256 value="15bc25b67ff0a49272b270ef2b8cffd620057ca16cb29dff7ad5661adca2ae12" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
       <component group="io.opencensus" name="opencensus-api" version="0.31.0">
@@ -4699,9 +4497,22 @@
             <sha256 value="3159c5417845a96993c789d42dec435707fbb848979cfd11d0b833059e5120a3" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
          </artifact>
       </component>
+      <component group="org.gradle.kotlin" name="gradle-kotlin-dsl-plugins" version="6.6.4">
+         <artifact name="gradle-kotlin-dsl-plugins-6.6.4.jar">
+            <sha256 value="2d7e76a0df263fdce7ef450c78936217812eed548e8dfc2b6d237d2db50e56d4" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
+         </artifact>
+         <artifact name="gradle-kotlin-dsl-plugins-6.6.4.module">
+            <sha256 value="f7d9c2cb045422afc8d0cdc1427a9cec1cd75b3d28675be50525490986eec453" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
+         </artifact>
+      </component>
       <component group="org.gradle.kotlin.kotlin-dsl" name="org.gradle.kotlin.kotlin-dsl.gradle.plugin" version="6.5.2">
          <artifact name="org.gradle.kotlin.kotlin-dsl.gradle.plugin-6.5.2.pom">
             <sha256 value="e5a6af17b58560d746cab42c795fe3a42a1ebe4050e55a4f00d8cf54cf31f1ea" origin="OpenTasker: Gradle Plugin Portal direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
+         </artifact>
+      </component>
+      <component group="org.gradle.kotlin.kotlin-dsl" name="org.gradle.kotlin.kotlin-dsl.gradle.plugin" version="6.6.4">
+         <artifact name="org.gradle.kotlin.kotlin-dsl.gradle.plugin-6.6.4.pom">
+            <sha256 value="3e9412faf093fce6f9459837c8b3fd367ee3ffc2c77d0d7d343e13ecdd9075eb" origin="OpenTasker: Gradle Plugin Portal direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
          </artifact>
       </component>
       <component group="org.hamcrest" name="hamcrest-core" version="1.3">
