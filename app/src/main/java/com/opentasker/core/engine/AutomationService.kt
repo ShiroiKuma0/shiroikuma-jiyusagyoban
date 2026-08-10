@@ -574,7 +574,7 @@ class AutomationService : Service() {
         isExit: Boolean,
         initialVariables: Map<String, String> = emptyMap(),
     ) {
-        val causal = ExecutionCausality.nextForProfile(profile.id, profile.name)
+        val causal = ExecutionCausality.nextForProfile(profile.id, profile.name, isExit = isExit)
         if (!causal.allowed) {
             val reason = requireNotNull(causal.blockedReason)
             AppLogger.warn(TAG, reason)
