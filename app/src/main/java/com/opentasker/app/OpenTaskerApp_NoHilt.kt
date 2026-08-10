@@ -17,6 +17,7 @@ import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.engine.RunLogPruneWorker
 import com.opentasker.core.engine.EngineWatchdogWorker
+import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.power.ShizukuPowerBackend
 import kotlinx.coroutines.CoroutineScope
@@ -38,50 +39,67 @@ class OpenTaskerApp_NoHilt : Application() {
                 }
                 return requireNotNull(_db)
             }
+        }
     }
+
+    @Volatile
+    private var unlockedInitialized = false
 
     override fun onCreate() {
         super.onCreate()
         installStrictModeInDebug()
-        CrashLogHandler.install(this)
-        AdvancedProtectionReader.start(this)
-        AppVisibilityTracker.register(this)
-        ShizukuPowerBackend.initialize(this)
-        registerActionMetadata()
-        registerCoreRuntime()
-         
-        if (_db == null) {
-            when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
-                is PendingRestoreApplyResult.Applied -> {
-                    AppLogger.info("OpenTasker", "Applied pending database restore from ${restoreResult.databaseFile.name}")
+        if (DirectBootTriggerStore.isUserUnlocked(this)) {
+            initializeAfterUnlock()
+        }
+    }
+
+    /** Initializes credential-protected runtime state after the user has unlocked the device. */
+    fun initializeAfterUnlock() {
+        if (!DirectBootTriggerStore.isUserUnlocked(this)) return
+        synchronized(this) {
+            if (unlockedInitialized) return
+
+            CrashLogHandler.install(this)
+            AdvancedProtectionReader.start(this)
+            AppVisibilityTracker.register(this)
+            ShizukuPowerBackend.initialize(this)
+            registerActionMetadata()
+            registerCoreRuntime()
+
+            if (_db == null) {
+                when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
+                    is PendingRestoreApplyResult.Applied -> {
+                        AppLogger.info("OpenTasker", "Applied pending database restore from ${restoreResult.databaseFile.name}")
+                    }
+                    is PendingRestoreApplyResult.Failed -> {
+                        AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
+                    }
+                    PendingRestoreApplyResult.NoPending -> Unit
                 }
-                is PendingRestoreApplyResult.Failed -> {
-                    AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
-                }
-                PendingRestoreApplyResult.NoPending -> Unit
+
+                val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
+                _db = Room.databaseBuilder(
+                    this,
+                    AppDatabase::class.java,
+                    DatabaseBackupManager.DATABASE_NAME,
+                )
+                    .addMigrations(*DatabaseMigrations.getManualMigrations())
+                    .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
+                    .build()
             }
 
-            val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
-            _db = Room.databaseBuilder(
-                this,
-                AppDatabase::class.java,
-                DatabaseBackupManager.DATABASE_NAME,
-            )
-                .addMigrations(*DatabaseMigrations.getManualMigrations())
-                .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
-                .build()
-        }
-
-        applicationScope.launch {
-            runCatching {
-                VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
-            }.onFailure { error ->
-                AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
+            applicationScope.launch {
+                runCatching {
+                    VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
+                }.onFailure { error ->
+                    AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
+                }
             }
-        }
 
-        RunLogPruneWorker.enqueue(this)
-        EngineWatchdogWorker.enqueue(this)
+            RunLogPruneWorker.enqueue(this)
+            EngineWatchdogWorker.enqueue(this)
+            unlockedInitialized = true
+        }
     }
 
     /**

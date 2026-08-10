@@ -262,6 +262,10 @@
     <string name="setup_checklist_body">OpenTasker can run with missing access, but affected automations stay gated until setup is complete.</string>
     <string name="setup_item_already_ready">%1$s is already ready.</string>
     <string name="setup_theme_helper_full">Choose the display mode used across navigation, setup, and runtime review surfaces.</string>
+    <string name="setup_direct_boot_title">Pre-unlock time triggers</string>
+    <string name="setup_direct_boot_body">Optional and off by default. When enabled, OpenTasker arms only its app-owned minute time trigger before first unlock and queues one time pulse in device-protected storage. Profiles, tasks, Room, secrets, and every other trigger family wait until you unlock the device.</string>
+    <string name="setup_direct_boot_enabled">Enabled: one time pulse may be queued before unlock.</string>
+    <string name="setup_direct_boot_disabled">Disabled: all triggers wait until unlock.</string>
     <string name="setup_backup_helper_full">Create a local database snapshot, export a copy, or stage an import for the next restart.</string>
     <string name="setup_backup_working">Working…</string>
     <string name="setup_backup_restore_body">Restart OpenTasker to apply the staged restore before the database opens.</string>

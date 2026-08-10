@@ -206,9 +206,21 @@
 
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
+            android:directBootAware="true"
             android:exported="false">
             <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.opentasker.core.engine.DirectBootTimeReceiver"
+            android:directBootAware="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.opentasker.action.DIRECT_BOOT_TIME_TICK" />
             </intent-filter>
         </receiver>
 

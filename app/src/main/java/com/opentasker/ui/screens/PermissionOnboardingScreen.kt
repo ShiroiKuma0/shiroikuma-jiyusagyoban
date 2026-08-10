@@ -50,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -96,6 +97,7 @@ import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.contexts.PushTriggerTokenStore
+import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.contexts.CompanionAssociationResult
 import com.opentasker.core.contexts.CompanionDeviceAssociation
 import com.opentasker.core.plugins.locale.LocaleGrantStore
@@ -176,6 +178,8 @@ fun PermissionOnboardingScreen(
     val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
     val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
     var refreshTick by remember { mutableIntStateOf(0) }
+    val directBootEnabled by DirectBootTriggerStore.observe(context).collectAsState(initial = false)
+    val setupScope = rememberCoroutineScope()
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermission?.let { permission ->
@@ -286,6 +290,18 @@ fun PermissionOnboardingScreen(
         }
 
         item { ThemeSetupCard() }
+
+        item {
+            DirectBootSetupCard(
+                enabled = directBootEnabled,
+                onEnabledChange = { enabled ->
+                    setupScope.launch {
+                        DirectBootTriggerStore.setEnabled(context, enabled)
+                        refreshTick++
+                    }
+                },
+            )
+        }
 
         if (advancedProtectionEnabled) {
             item {
@@ -639,6 +655,53 @@ private fun ThemeSetupCard() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DirectBootSetupCard(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    val stateDescription = stringResource(
+        if (enabled) R.string.setup_direct_boot_enabled else R.string.setup_direct_boot_disabled,
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(stringResource(R.string.setup_direct_boot_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.setup_direct_boot_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stateDescription,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.semantics { this.stateDescription = stateDescription },
+            )
         }
     }
 }
