@@ -752,7 +752,11 @@ class AutomationService : Service() {
             ExternalExecutions.update(
                 context = this,
                 executionId = executionId,
-                state = if (result.report.success) ExternalExecutionState.SUCCEEDED else ExternalExecutionState.FAILED,
+                state = when {
+                    result.held -> ExternalExecutionState.HELD
+                    result.report.success -> ExternalExecutionState.SUCCEEDED
+                    else -> ExternalExecutionState.FAILED
+                },
                 durationMs = result.report.durationMs,
                 error = when {
                     result.report.success -> null
@@ -825,6 +829,7 @@ class AutomationService : Service() {
             )
             if (result.logInserted) pruneRunLogs(force = false)
             val status = when {
+                result.held -> "held"
                 result.skippedReason != null -> "skipped"
                 result.report.success -> "succeeded"
                 else -> "failed"

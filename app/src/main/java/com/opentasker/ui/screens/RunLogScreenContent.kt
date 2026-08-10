@@ -97,6 +97,8 @@ internal fun RunLogScreenContent(
     onExportCsv: () -> Unit = {},
     activeExecutions: List<ActiveExecution> = emptyList(),
     onCancelExecution: (Long) -> Unit = {},
+    onReplayHeldRun: (RunLogEntry) -> Unit = {},
+    onToggleRunLogStar: (RunLogEntry) -> Unit = {},
 ) {
     val hasFilters = filters != RunLogFilterState()
     LazyColumn(
@@ -159,7 +161,11 @@ internal fun RunLogScreenContent(
             }
         }
         items(logs, key = { it.id }) { entry ->
-            RunLogCard(entry)
+            RunLogCard(
+                entry = entry,
+                onReplayHeldRun = onReplayHeldRun,
+                onToggleRunLogStar = onToggleRunLogStar,
+            )
         }
         if (loading) {
             item { Text(stringResource(R.string.run_log_loading), color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -409,6 +415,7 @@ private fun RunLogSummaryCard(
     val outcomes = remember(logs) { logs.map { it.outcome() } }
     val failures = outcomes.count { it == RunLogOutcome.Failed }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
+    val held = outcomes.count { it == RunLogOutcome.Held }
     val latest = logs.firstOrNull()
 
     Card(
@@ -430,11 +437,13 @@ private fun RunLogSummaryCard(
                 StatusPill(
                     when {
                         failures > 0 -> stringResource(R.string.run_log_summary_failed, failures)
+                        held > 0 -> stringResource(R.string.status_held)
                         skipped > 0 -> stringResource(R.string.run_log_summary_skipped, skipped)
                         else -> stringResource(R.string.run_log_summary_healthy)
                     },
                     when {
                         failures > 0 -> MaterialTheme.colorScheme.error
+                        held > 0 -> MaterialTheme.colorScheme.tertiary
                         skipped > 0 -> MaterialTheme.colorScheme.secondary
                         else -> MaterialTheme.colorScheme.tertiary
                     },
@@ -446,6 +455,7 @@ private fun RunLogSummaryCard(
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
                 item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
+                item { SummaryMetric("$held", stringResource(R.string.status_held), Modifier.width(104.dp)) }
             }
             latest?.let {
                 Text(
@@ -481,7 +491,11 @@ private fun RunLogSummaryCard(
 }
 
 @Composable
-private fun RunLogCard(entry: RunLogEntry) {
+private fun RunLogCard(
+    entry: RunLogEntry,
+    onReplayHeldRun: (RunLogEntry) -> Unit,
+    onToggleRunLogStar: (RunLogEntry) -> Unit,
+) {
     val time = remember(entry.timestamp) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
@@ -493,6 +507,7 @@ private fun RunLogCard(entry: RunLogEntry) {
         RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
         RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
+        RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary
         RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
     }
     val sourceText = entry.source?.let { key ->
@@ -506,6 +521,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
             }
         ),
@@ -515,6 +531,7 @@ private fun RunLogCard(entry: RunLogEntry) {
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
             },
         ),
@@ -533,12 +550,14 @@ private fun RunLogCard(entry: RunLogEntry) {
                         RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
                         RunLogOutcome.Failed -> Icons.Filled.Error
                         RunLogOutcome.Skipped -> Icons.Filled.Info
+                        RunLogOutcome.Held -> Icons.Filled.Info
                         RunLogOutcome.Cancelled -> Icons.Filled.Cancel
                     },
                     contentDescription = when (outcome) {
                         RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
                         RunLogOutcome.Failed -> stringResource(R.string.status_failed)
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
+                        RunLogOutcome.Held -> stringResource(R.string.status_held)
                         RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
                     },
                     tint = accent,
@@ -563,6 +582,33 @@ private fun RunLogCard(entry: RunLogEntry) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill(outcome.localizedLabel(), accent) }
                 item { StatusPill(stringResource(R.string.run_log_duration, entry.durationMs), accent) }
+                if (entry.starred) item { StatusPill(stringResource(R.string.run_log_unstar), MaterialTheme.colorScheme.primary) }
+            }
+            if (entry.heldPolicy != null) {
+                Text(
+                    stringResource(R.string.run_log_held_policy, entry.heldPolicy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = accent,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                if (entry.held) {
+                    OutlinedButton(
+                        onClick = { onReplayHeldRun(entry) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.run_log_replay))
+                    }
+                }
+                TextButton(
+                    onClick = { onToggleRunLogStar(entry) },
+                    modifier = if (entry.held) Modifier.weight(1f) else Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(if (entry.starred) R.string.run_log_unstar else R.string.run_log_star))
+                }
             }
             Column(Modifier.fillMaxWidth()) {
                 if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
@@ -980,6 +1026,7 @@ private fun RunLogOutcome.localizedLabel(): String = stringResource(
         RunLogOutcome.Succeeded -> R.string.status_succeeded
         RunLogOutcome.Failed -> R.string.status_failed
         RunLogOutcome.Skipped -> R.string.status_skipped
+        RunLogOutcome.Held -> R.string.status_held
         RunLogOutcome.Cancelled -> R.string.status_cancelled
     },
 )

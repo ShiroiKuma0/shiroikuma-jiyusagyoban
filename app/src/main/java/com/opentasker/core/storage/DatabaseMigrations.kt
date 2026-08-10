@@ -139,6 +139,17 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_10_11 = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN executionId TEXT")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN replayOf TEXT")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN held INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN heldPayload TEXT")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN heldPolicy TEXT")
+            db.execSQL("ALTER TABLE run_logs ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -150,6 +161,7 @@ object DatabaseMigrations {
             MIGRATION_7_8,
             MIGRATION_8_9,
             MIGRATION_9_10,
+            MIGRATION_10_11,
         )
     }
 
@@ -208,6 +220,10 @@ object DatabaseMigrations {
  *
  * Version 10:
  *   - edit_history: adds nextJson and isUndone so five-entry per-entity stacks support redo
+ *
+ * Version 11:
+ *   - run_logs: adds execution identity, replay links, bounded held-trigger payload/policy, and
+ *     a user star that is exempt from retention pruning
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

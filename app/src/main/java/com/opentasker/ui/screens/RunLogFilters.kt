@@ -11,6 +11,7 @@ enum class RunLogStatusFilter(@StringRes val labelRes: Int) {
     Succeeded(R.string.run_log_filter_succeeded),
     Failed(R.string.run_log_filter_failed),
     Skipped(R.string.run_log_filter_skipped),
+    Held(R.string.run_log_filter_held),
     Cancelled(R.string.run_log_filter_cancelled),
 }
 
@@ -34,6 +35,7 @@ fun RunLogFilterState.toStorageQuery(nowMillis: Long = System.currentTimeMillis(
         RunLogStatusFilter.Succeeded -> RunLogStatusQuery.SUCCEEDED
         RunLogStatusFilter.Failed -> RunLogStatusQuery.FAILED
         RunLogStatusFilter.Skipped -> RunLogStatusQuery.SKIPPED
+        RunLogStatusFilter.Held -> RunLogStatusQuery.HELD
         RunLogStatusFilter.Cancelled -> RunLogStatusQuery.CANCELLED
     },
     taskId = taskId,

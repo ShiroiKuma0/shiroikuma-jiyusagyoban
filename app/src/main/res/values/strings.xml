@@ -79,6 +79,7 @@
     <string name="status_succeeded">Succeeded</string>
     <string name="status_failed">Failed</string>
     <string name="status_skipped">Skipped</string>
+    <string name="status_held">Held</string>
     <string name="status_cancelled">Cancelled</string>
     <string name="status_timeout">Timed out</string>
     <string name="run_log_active_execution_detail">%1$s · step %2$d: %3$s · %4$ds elapsed</string>
@@ -387,6 +388,10 @@
     <string name="run_log_loading">Loading run logs…</string>
     <string name="run_log_load_more">Load more</string>
     <string name="run_log_refresh">Refresh</string>
+    <string name="run_log_replay">Replay</string>
+    <string name="run_log_star">Keep</string>
+    <string name="run_log_unstar">Unkeep</string>
+    <string name="run_log_held_policy">Admission policy: %1$s</string>
     <string name="run_log_export_json">Export JSON</string>
     <string name="run_log_export_csv">Export CSV</string>
     <string name="run_log_show_all_actions">Show all %1$d actions</string>
@@ -930,6 +935,7 @@
     <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
     <string name="ui_error_run_logs_more">More run logs could not be loaded</string>
     <string name="ui_error_run_log_export">Run log export failed</string>
+    <string name="ui_error_run_log_replay">Held run could not be replayed</string>
     <string name="ui_error_retention_preview">Retention preview failed</string>
     <string name="ui_error_retention_update">Run log retention update failed</string>
     <string name="ui_error_share_diagnostics">Failed to share diagnostic report</string>
@@ -979,6 +985,7 @@
     <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
     <string name="ui_message_run_status">%1$s %2$s (%3$dms)</string>
+    <string name="ui_message_run_replayed">Replayed %1$s: %2$s (%3$dms)</string>
     <string name="ui_message_import_summary">Imported %1$d task(s), %2$d profile(s), %3$d warning(s)</string>
     <string name="ui_message_tasker_imported">Imported %1$d task(s), %2$d disabled profile(s)</string>
     <string name="ui_message_export_summary">Exported %1$d task(s), %2$d profile(s), %3$d variable(s), %4$d scene(s)</string>
@@ -994,6 +1001,7 @@
     <string name="run_log_filter_succeeded">Succeeded</string>
     <string name="run_log_filter_failed">Failed</string>
     <string name="run_log_filter_skipped">Skipped</string>
+    <string name="run_log_filter_held">Held</string>
     <string name="run_log_filter_cancelled">Cancelled</string>
     <string name="run_log_date_any">Any date</string>
     <string name="run_log_date_day">24 hours</string>

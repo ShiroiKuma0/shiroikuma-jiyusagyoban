@@ -58,6 +58,11 @@ class RunLogExporter(private val dao: RunLogDao) {
         message = DiagnosticExport.redactSensitive(message),
         source = source?.let(DiagnosticExport::redactSensitive),
         sourceLabel = sourceLabel?.let(DiagnosticExport::redactSensitive),
+        executionId = executionId,
+        replayOf = replayOf,
+        held = held,
+        heldPolicy = heldPolicy?.let(DiagnosticExport::redactSensitive),
+        starred = starred,
     )
 
     private fun RunLogExportRow.toCsv(): String = listOf(
@@ -71,6 +76,11 @@ class RunLogExporter(private val dao: RunLogDao) {
         message,
         source.orEmpty(),
         sourceLabel.orEmpty(),
+        executionId.orEmpty(),
+        replayOf.orEmpty(),
+        held.toString(),
+        heldPolicy.orEmpty(),
+        starred.toString(),
     ).joinToString(",", transform = ::csvCell)
 
     private fun csvCell(value: String): String {
@@ -81,7 +91,7 @@ class RunLogExporter(private val dao: RunLogDao) {
     private companion object {
         val JSON = Json { encodeDefaults = true; explicitNulls = true }
         const val EXPORT_PAGE_SIZE = 250
-        const val CSV_HEADER = "id,task_id,task_name,timestamp_ms,timestamp_iso,duration_ms,outcome,message,source,source_label"
+        const val CSV_HEADER = "id,task_id,task_name,timestamp_ms,timestamp_iso,duration_ms,outcome,message,source,source_label,execution_id,replay_of,held,held_policy,starred"
         val CSV_FORMULA_PREFIXES = setOf('=', '+', '-', '@')
     }
 }
@@ -98,4 +108,9 @@ private data class RunLogExportRow(
     val message: String,
     val source: String?,
     val sourceLabel: String?,
+    val executionId: String?,
+    val replayOf: String?,
+    val held: Boolean,
+    val heldPolicy: String?,
+    val starred: Boolean,
 )

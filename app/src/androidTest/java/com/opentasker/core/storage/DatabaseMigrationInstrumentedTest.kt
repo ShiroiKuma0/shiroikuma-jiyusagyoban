@@ -293,6 +293,38 @@ class DatabaseMigrationInstrumentedTest {
     }
 
     @Test
+    fun appDatabaseMigratesFrom10To11WithHeldExecutionColumns() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 10).apply {
+            execSQL(
+                """
+                INSERT INTO run_logs (id, taskId, taskName, timestamp, durationMs, success, message)
+                VALUES (1, 7, 'Held task', 1000, 0, 0, 'Decision: Held')
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            11,
+            true,
+            DatabaseMigrations.MIGRATION_10_11,
+        )
+
+        migrated.query(
+            "SELECT executionId, replayOf, held, heldPayload, heldPolicy, starred FROM run_logs WHERE id = 1",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
+            assertTrue(cursor.isNull(1))
+            assertEquals(0, cursor.getInt(2))
+            assertTrue(cursor.isNull(3))
+            assertTrue(cursor.isNull(4))
+            assertEquals(0, cursor.getInt(5))
+        }
+    }
+
+    @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
             execSQL(
@@ -309,7 +341,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            10,
+            11,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

@@ -71,6 +71,27 @@ class RunLogDiagnosticsTest {
     }
 
     @Test
+    fun heldRunLogMessageClassifiesOutcomeAsHeld() {
+        val entry = RunLogEntry(
+            taskId = 1,
+            taskName = "Held task",
+            durationMs = 0,
+            success = false,
+            held = true,
+            message = heldRunLogMessage(
+                source = "Profile: Work",
+                reason = "Global admission limit reached.",
+            ),
+        )
+
+        val diagnostics = entry.message.toRunLogDiagnostics()
+
+        assertTrue(diagnostics.isHeld)
+        assertEquals("Global admission limit reached.", diagnostics.reason)
+        assertEquals(RunLogOutcome.Held, entry.outcome())
+    }
+
+    @Test
     fun traceParserExtractsTemplateArgumentDetails() {
         val diagnostics = (
             "Source: Profile: Morning\n" +

@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.Insert
@@ -22,8 +23,30 @@ data class RunLogEntity(
     val message: String,
     val source: String? = null,
     val sourceLabel: String? = null,
+    val executionId: String? = null,
+    val replayOf: String? = null,
+    @ColumnInfo(defaultValue = "0") val held: Boolean = false,
+    val heldPayload: String? = null,
+    val heldPolicy: String? = null,
+    @ColumnInfo(defaultValue = "0") val starred: Boolean = false,
 ) {
-    fun toDomain() = RunLogEntry(id, taskId, taskName, timestamp, durationMs, success, message, source, sourceLabel)
+    fun toDomain() = RunLogEntry(
+        id = id,
+        taskId = taskId,
+        taskName = taskName,
+        timestamp = timestamp,
+        durationMs = durationMs,
+        success = success,
+        message = message,
+        source = source,
+        sourceLabel = sourceLabel,
+        executionId = executionId,
+        replayOf = replayOf,
+        held = held,
+        heldPayload = heldPayload,
+        heldPolicy = heldPolicy,
+        starred = starred,
+    )
 }
 
 data class RunLogKey(
@@ -36,7 +59,7 @@ data class RunLogTaskOption(
     val taskName: String,
 )
 
-enum class RunLogStatusQuery { ALL, SUCCEEDED, FAILED, SKIPPED, CANCELLED }
+enum class RunLogStatusQuery { ALL, SUCCEEDED, FAILED, SKIPPED, CANCELLED, HELD }
 
 data class RunLogQuery(
     val status: RunLogStatusQuery = RunLogStatusQuery.ALL,
@@ -62,6 +85,12 @@ fun RunLogEntry.toEntity() = RunLogEntity(
     message = message,
     source = source,
     sourceLabel = sourceLabel,
+    executionId = executionId,
+    replayOf = replayOf,
+    held = held,
+    heldPayload = heldPayload,
+    heldPolicy = heldPolicy,
+    starred = starred,
 )
 
 @Dao
@@ -73,15 +102,24 @@ interface RunLogDao {
     fun getRecentFlow(): Flow<List<RunLogEntity>>
     @Query("SELECT * FROM run_logs WHERE taskId = :taskId ORDER BY timestamp DESC, id DESC LIMIT 50")
     suspend fun getByTask(taskId: Long): List<RunLogEntity>
+    @Query("SELECT * FROM run_logs WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): RunLogEntity?
+    @Query("UPDATE run_logs SET starred = :starred WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean)
     @Query(
         """
         DELETE FROM run_logs
-        WHERE timestamp < :minimumTimestamp
+        WHERE held = 0
+          AND starred = 0
+          AND (
+            timestamp < :minimumTimestamp
             OR id NOT IN (
                 SELECT id FROM run_logs
+                WHERE held = 0 AND starred = 0
                 ORDER BY timestamp DESC, id DESC
                 LIMIT :maxEntries
             )
+          )
         """
     )
     suspend fun pruneRetention(maxEntries: Int, minimumTimestamp: Long): Int
@@ -104,10 +142,13 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
             OR (:status = 'FAILED' AND success = 0
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
           )
@@ -141,10 +182,13 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
             OR (:status = 'FAILED' AND success = 0
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
           )
@@ -183,10 +227,13 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
             OR (:status = 'FAILED' AND success = 0
+                AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
                 AND instr(lower(message), 'decision: cancelled') = 0)
           )
@@ -223,12 +270,17 @@ interface RunLogDao {
     @Query(
         """
         SELECT COUNT(*) FROM run_logs
-        WHERE timestamp < :minimumTimestamp
-           OR id NOT IN (
+        WHERE held = 0
+          AND starred = 0
+          AND (
+            timestamp < :minimumTimestamp
+            OR id NOT IN (
                 SELECT id FROM run_logs
+                WHERE held = 0 AND starred = 0
                 ORDER BY timestamp DESC, id DESC
                 LIMIT :maxEntries
-           )
+            )
+          )
         """
     )
     suspend fun countPrunable(maxEntries: Int, minimumTimestamp: Long): Int

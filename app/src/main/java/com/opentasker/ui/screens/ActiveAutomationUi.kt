@@ -905,6 +905,8 @@ fun ActiveAutomationUi(
                 contentPadding = innerPadding,
                 activeExecutions = activeExecutions,
                 onCancelExecution = viewModel::cancelExecution,
+                onReplayHeldRun = viewModel::replayHeldRun,
+                onToggleRunLogStar = { entry -> viewModel.setRunLogStarred(entry) },
             )
 
             OpenTaskerScreen.Diagnostics -> DiagnosticsScreen(

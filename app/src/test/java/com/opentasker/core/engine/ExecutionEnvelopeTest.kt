@@ -65,6 +65,23 @@ class ExecutionEnvelopeTest {
     }
 
     @Test
+    fun replayEnvelopeUsesFreshIdAndRecordsOriginalCommand() {
+        val original = ExecutionEnvelope.create(
+            task = Task(id = 3, name = "Replayable"),
+            source = "Profile: Home",
+            executionId = "original-1",
+            nowMs = 100,
+        )
+
+        val replay = original.forReplay(nowMs = 200)
+
+        assertFalse(replay.executionId == original.executionId)
+        assertEquals(original.executionId, replay.replayOf)
+        assertEquals(200, replay.createdAtMs)
+        assertTrue(replay.metadataLines().contains("Replay of: original-1"))
+    }
+
+    @Test
     fun duplicateDeliveryIsAcceptedOnceAndTerminalStateCannotMoveBackwards() {
         val envelope = ExecutionEnvelope.create(
             task = Task(id = 2, name = "Once"),

@@ -26,6 +26,7 @@ import com.opentasker.core.engine.PreflightInputs
 import com.opentasker.core.engine.PreflightReport
 import com.opentasker.core.engine.PreflightRunner
 import com.opentasker.core.engine.executeAndLogTask
+import com.opentasker.core.engine.replayHeldExecution
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ActionSpec
@@ -1257,11 +1258,41 @@ class ActiveAutomationViewModel(
                 execution = ExecutionEnvelope.create(task, "Manual run"),
             )
             val status = when {
+                result.held -> "held"
                 result.skippedReason != null -> "skipped"
                 result.report.success -> "succeeded"
                 else -> "failed"
             }
             events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
+        }
+    }
+
+    fun replayHeldRun(entry: RunLogEntry) {
+        viewModelScope.launch {
+            runCatching {
+                replayHeldExecution(
+                    appContext = appContext,
+                    db = db,
+                    heldEntry = entry,
+                )
+            }.onSuccess { result ->
+                val status = when {
+                    result.held -> "held"
+                    result.report.success -> "succeeded"
+                    else -> "failed"
+                }
+                events.send(message(R.string.ui_message_run_replayed, entry.taskName, status, result.report.durationMs))
+                refreshRunLogPage()
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_log_replay)) }
+        }
+    }
+
+    fun setRunLogStarred(entry: RunLogEntry, starred: Boolean = !entry.starred) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { db.runLogDao().setStarred(entry.id, starred) }
+            }.onSuccess { refreshRunLogPage() }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
 
