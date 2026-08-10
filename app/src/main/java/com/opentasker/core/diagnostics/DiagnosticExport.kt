@@ -42,6 +42,7 @@ object DiagnosticExport {
             sb.appendLine("Last heartbeat: ${formatTimestamp(health.lastHeartbeatAtMillis, dateFormat)}")
             sb.appendLine("Foreground service types: ${health.activeForegroundServiceTypes}")
             sb.appendLine("Standby bucket: ${health.standbyBucket}")
+            sb.appendLine("Standby consequence: ${health.standbyConsequence}")
             sb.appendLine("Exact alarm: ${health.exactAlarmStatus}")
             sb.appendLine("Process exit correlation: ${health.processExitCorrelation.state}")
             sb.appendLine("Process exit reason: ${redactSensitive(health.processExitCorrelation.reason ?: "none")}")
@@ -50,6 +51,9 @@ object DiagnosticExport {
             sb.appendLine("Heartbeat gap: ${health.processExitCorrelation.gapMillis?.let(EngineHealthReader::ageLabel) ?: "none"}")
             sb.appendLine("Last matcher error: ${health.lastMatcherError ?: "none"}")
             sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason ?: "none"}")
+            sb.appendLine("Pending job reasons: ${health.pendingScheduledJobs.currentReasons ?: if (health.pendingScheduledJobs.currentAvailable) "none" else "unavailable"}")
+            sb.appendLine("Pending job reason history: ${health.pendingScheduledJobs.history ?: if (health.pendingScheduledJobs.historyAvailable) "none" else "unavailable"}")
+            sb.appendLine("Pending job duration stats: ${health.pendingScheduledJobs.aggregateStats ?: if (health.pendingScheduledJobs.aggregateStatsAvailable) "none" else "unavailable"}")
             sb.appendLine("Active executions: ${health.activeExecutionCount}")
             sb.appendLine("Pending external executions: ${health.pendingExecutionCount}")
             health.signals.forEach { signal ->

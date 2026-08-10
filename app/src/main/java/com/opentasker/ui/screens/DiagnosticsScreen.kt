@@ -207,8 +207,8 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 health?.activeForegroundServiceTypes ?: stringResource(R.string.diagnostics_loading),
             )
             HealthRow(
-                stringResource(R.string.diagnostics_standby_bucket),
-                health?.standbyBucket ?: stringResource(R.string.diagnostics_loading),
+                stringResource(R.string.diagnostics_standby_consequence),
+                health?.standbyConsequence ?: stringResource(R.string.diagnostics_loading),
             )
             if (health?.standbyThrottled == true) {
                 Text(
@@ -247,7 +247,30 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             )
             HealthRow(
                 stringResource(R.string.diagnostics_pending_jobs),
-                health?.pendingScheduledJobReasons ?: stringResource(R.string.diagnostics_pending_jobs_none),
+                when {
+                    health == null -> stringResource(R.string.diagnostics_loading)
+                    !health.pendingScheduledJobs.currentAvailable -> stringResource(R.string.diagnostics_pending_jobs_unavailable)
+                    else -> health.pendingScheduledJobs.currentReasons
+                        ?: stringResource(R.string.diagnostics_pending_jobs_none)
+                },
+            )
+            HealthRow(
+                stringResource(R.string.diagnostics_pending_job_history),
+                when {
+                    health == null -> stringResource(R.string.diagnostics_loading)
+                    !health.pendingScheduledJobs.historyAvailable -> stringResource(R.string.diagnostics_pending_job_history_unavailable)
+                    else -> health.pendingScheduledJobs.history
+                        ?: stringResource(R.string.diagnostics_pending_job_history_none)
+                },
+            )
+            HealthRow(
+                stringResource(R.string.diagnostics_pending_job_stats),
+                when {
+                    health == null -> stringResource(R.string.diagnostics_loading)
+                    !health.pendingScheduledJobs.aggregateStatsAvailable -> stringResource(R.string.diagnostics_pending_job_stats_unavailable)
+                    else -> health.pendingScheduledJobs.aggregateStats
+                        ?: stringResource(R.string.diagnostics_pending_job_stats_none)
+                },
             )
             HealthRow(
                 stringResource(R.string.diagnostics_active_executions),

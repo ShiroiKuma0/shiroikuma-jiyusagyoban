@@ -109,6 +109,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, reviewed retention reductions, held admission rows with safe manual replay, and user-pinned history
 - Live view of in-flight automations — task, origin, current step, and elapsed time — with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
 - In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, execution admission limits and circuit trips, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
+- Scheduling diagnostics include API 36 pending-job reason history, API 37 aggregate pending durations, expanded WorkManager stop reasons, and plain-language standby delivery consequences with honest unsupported states
 - Crash log capture and local diagnostic export
 
 ### Interoperability

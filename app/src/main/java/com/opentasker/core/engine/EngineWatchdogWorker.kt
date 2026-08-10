@@ -29,8 +29,8 @@ class EngineWatchdogWorker(
         return runCatching {
             val expectedTriggers = ExpectedTriggerLedger(applicationContext)
             expectedTriggers.consumeMissed(now)?.let { missed ->
-                val bucket = EngineHealthReader.standbyBucketLabel(applicationContext)
-                if (!recordMissedTrigger(missed, bucket)) {
+                val consequence = EngineHealthReader.standbyConsequence(applicationContext)
+                if (!recordMissedTrigger(missed, consequence)) {
                     expectedTriggers.requeue(missed)
                 }
             }
@@ -50,7 +50,7 @@ class EngineWatchdogWorker(
 
     private suspend fun recordMissedTrigger(
         missed: com.opentasker.core.scheduling.MissedTrigger,
-        standbyBucket: String,
+        standbyConsequence: String,
     ): Boolean {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.ROOT)
         val entry = RunLogEntry(
@@ -67,7 +67,7 @@ class EngineWatchdogWorker(
                 appendLine("Expected fire: ${dateFormat.format(Date(missed.expectedAtMillis))}")
                 appendLine("Trigger kind: ${missed.kind.wireValue}")
                 appendLine("Delay: ${EngineHealthReader.ageLabel(missed.delayMillis)}")
-                appendLine("Standby bucket: $standbyBucket")
+                appendLine("Standby consequence: $standbyConsequence")
                 append("Remediation: Open Setup, exempt OpenTasker from battery optimization, and allow exact alarms.")
             },
             source = RunLogSource.SCHEDULER,
