@@ -488,17 +488,14 @@ class AutomationService : Service() {
             return
         }
 
-        val winner = synchronized(matchedProfiles) {
+        // Read the candidate set once under the lock: the matcher runs a coroutine per profile, so
+        // iterating the synchronized map outside it can throw ConcurrentModificationException.
+        val suppressedBy = synchronized(matchedProfiles) {
             if (!pulseProfile) matchedProfiles[profile.id] = profile
-            ProfileLifecyclePolicy.winner(matchedProfiles.values + profile)
+            ProfileLifecyclePolicy.suppressionByPriority(profile, matchedProfiles.values + profile)
         }
-        if (winner?.id != profile.id) {
-            logProfileSkippedRun(
-                profile,
-                decoded.value,
-                ProfileLifecyclePolicy.suppressionByPriority(profile, matchedProfiles.values + profile)
-                    ?: "A higher-priority profile is currently active.",
-            )
+        if (suppressedBy != null) {
+            logProfileSkippedRun(profile, decoded.value, suppressedBy)
             return
         }
         if (profile.lifetime == ProfileLifetime.ONCE && !consumeOneShotProfile(profile)) {
@@ -511,40 +508,44 @@ class AutomationService : Service() {
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
         AutomationLiveConditionState.updateProfile(profile.id, false)
-        val wasWinner: Boolean
         val wasDispatched: Boolean
-        val nextWinner: Profile?
+        // Profiles this one was outranking; they become eligible now that it has deactivated.
+        val released: List<Profile>
         synchronized(matchedProfiles) {
-            wasWinner = ProfileLifecyclePolicy.winner(matchedProfiles.values)?.id == profile.id
+            val before = matchedProfiles.values.toList()
             matchedProfiles.remove(profile.id)
             wasDispatched = synchronized(dispatchedProfiles) {
                 dispatchedProfiles.remove(profile.id)
             }
-            nextWinner = ProfileLifecyclePolicy.winner(matchedProfiles.values)
+            val remaining = matchedProfiles.values.toList()
+            released = remaining.filter { candidate ->
+                ProfileLifecyclePolicy.suppressor(candidate, before) != null &&
+                    ProfileLifecyclePolicy.suppressor(candidate, remaining) == null
+            }
         }
         if (!wasDispatched) {
-            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            released.forEach { onProfileActivated(it, null) }
             return
         }
         if (profile.exitTaskId == null || profile.exitTaskId <= 0) {
-            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            released.forEach { onProfileActivated(it, null) }
             return
         }
         val task = db.taskDao().getById(profile.exitTaskId)
         if (task == null) {
             AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
-            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            released.forEach { onProfileActivated(it, null) }
             return
         }
         val decoded = task.toDomainDecodeResult()
         if (decoded.issue != null) {
             AppLogger.error(TAG, "Exit task ${profile.exitTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
             logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
-            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            released.forEach { onProfileActivated(it, null) }
             return
         }
         dispatchTask(profile, decoded.value, isExit = true)
-        if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+        released.forEach { onProfileActivated(it, null) }
     }
 
     private suspend fun consumeOneShotProfile(profile: Profile): Boolean = db.withTransaction {
