@@ -6,6 +6,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextExpressionNode
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -95,6 +96,56 @@ class ProfileMatcherTest {
             listOf(ProfileStateChange.Activated(null), ProfileStateChange.Deactivated),
             changes,
         )
+    }
+
+    @Test
+    fun lifecycleSuppressionPreventsACurrentlyMatchingProfileFromActivating() = runBlocking {
+        val profile = com.opentasker.core.model.Profile(
+            id = 11,
+            name = "Expired",
+            enterTaskId = 1,
+            lifetime = com.opentasker.core.model.ProfileLifetime.UNTIL_DATE,
+            expiresAtMs = 100L,
+        )
+        val changes = profileStateChangesFromSnapshots(
+            snapshots = stabilizeProfileSnapshots(
+                snapshots = flowOf(ProfileMatchSnapshot(allMatched = true, pulseSequence = 0)),
+                lifecycleTicks = flowOf(Unit),
+                profile = profile,
+                clock = { 100L },
+                hasPulseContexts = false,
+            ),
+            hasPulseContexts = false,
+        ).toList()
+
+        assertTrue(changes.isEmpty())
+    }
+
+    @Test
+    fun gracePeriodSuppressesATransientLevelMatch() = runBlocking {
+        val profile = com.opentasker.core.model.Profile(
+            id = 12,
+            name = "Stable",
+            enterTaskId = 1,
+            gracePeriodSec = 1,
+        )
+        val snapshots = flow {
+            emit(ProfileMatchSnapshot(allMatched = false, pulseSequence = 0))
+            emit(ProfileMatchSnapshot(allMatched = true, pulseSequence = 0))
+            emit(ProfileMatchSnapshot(allMatched = false, pulseSequence = 0))
+        }
+        val changes = profileStateChangesFromSnapshots(
+            snapshots = stabilizeProfileSnapshots(
+                snapshots = snapshots,
+                lifecycleTicks = flowOf(Unit),
+                profile = profile,
+                clock = { 0L },
+                hasPulseContexts = false,
+            ),
+            hasPulseContexts = false,
+        ).toList()
+
+        assertTrue(changes.isEmpty())
     }
 
     private fun match(matched: Boolean) = ContextMatchUpdate(matched, pulseContext = false, pulseSequence = 0)

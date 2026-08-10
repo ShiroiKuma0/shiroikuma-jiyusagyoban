@@ -6,6 +6,7 @@ import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -21,6 +22,10 @@ class ProfileEntityTest {
             enterTaskId = 42,
             exitTaskId = 43,
             automationMode = AutomationMode.QUEUED,
+            priority = 7,
+            gracePeriodSec = 30,
+            lifetime = ProfileLifetime.UNTIL_DATE,
+            expiresAtMs = 1_700_000_000_000L,
         )
 
         assertEquals(profile, profile.toEntity().toDomain())

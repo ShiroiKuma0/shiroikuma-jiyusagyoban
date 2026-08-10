@@ -2,6 +2,8 @@ package com.opentasker.core.validation
 
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.Task
 
 /**
@@ -11,6 +13,9 @@ object InputValidation {
     const val MAX_NAME_LENGTH = 200
     const val MIN_NAME_LENGTH = 1
     const val MAX_COOLDOWN_SEC = 3600 // 1 hour
+    const val MIN_PROFILE_PRIORITY = ProfileLifecyclePolicy.MIN_PRIORITY
+    const val MAX_PROFILE_PRIORITY = ProfileLifecyclePolicy.MAX_PRIORITY
+    const val MAX_GRACE_PERIOD_SEC = ProfileLifecyclePolicy.MAX_GRACE_PERIOD_SEC
     
     data class ValidationError(val field: String, val message: String)
     
@@ -28,6 +33,28 @@ object InputValidation {
         }
         if (profile.cooldownSec < 0 || profile.cooldownSec > MAX_COOLDOWN_SEC) {
             errors.add(ValidationError("cooldownSec", "Cooldown must be between 0 and $MAX_COOLDOWN_SEC seconds"))
+        }
+        if (profile.priority !in MIN_PROFILE_PRIORITY..MAX_PROFILE_PRIORITY) {
+            errors.add(
+                ValidationError(
+                    "priority",
+                    "Profile priority must be between $MIN_PROFILE_PRIORITY and $MAX_PROFILE_PRIORITY",
+                ),
+            )
+        }
+        if (profile.gracePeriodSec < 0 || profile.gracePeriodSec > MAX_GRACE_PERIOD_SEC) {
+            errors.add(
+                ValidationError(
+                    "gracePeriodSec",
+                    "Grace period must be between 0 and $MAX_GRACE_PERIOD_SEC seconds",
+                ),
+            )
+        }
+        when (profile.lifetime) {
+            ProfileLifetime.UNTIL_DATE -> if (profile.expiresAtMs == null || profile.expiresAtMs <= 0L) {
+                errors.add(ValidationError("expiresAtMs", "An expiry date is required for date-limited profiles"))
+            }
+            ProfileLifetime.NEVER, ProfileLifetime.ONCE -> Unit
         }
         if (profile.contexts.isEmpty()) {
             errors.add(ValidationError("contexts", "Profile must have at least one context"))

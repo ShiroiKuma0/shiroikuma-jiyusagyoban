@@ -105,8 +105,8 @@ class AutomationLintTest {
         assertTrue(blocking.suggestedFix.contains("priority"))
 
         val warning = AutomationLint.analyze(
-            listOf(first, second.copy(id = 2, name = "Reader focus", enterTaskId = 12)),
-            listOf(firstTask, secondTask.copy(id = 12, priority = 7)),
+            listOf(first, second.copy(id = 2, name = "Reader focus", enterTaskId = 12, priority = 7)),
+            listOf(firstTask, secondTask.copy(id = 12, priority = 5)),
         ).findings.single { it.code == AutomationLintCode.PRIORITY_CONFLICT }
         assertEquals(AutomationLintSeverity.WARNING, warning.severity)
     }

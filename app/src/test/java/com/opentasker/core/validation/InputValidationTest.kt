@@ -4,6 +4,7 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.Task
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,6 +37,24 @@ class InputValidationTest {
         )
 
         assertTrue(errors.any { it.field == "cooldownSec" })
+    }
+
+    @Test
+    fun validateProfileRequiresValidLifecycleFields() {
+        val errors = InputValidation.validateProfile(
+            Profile(
+                name = "Limited",
+                enterTaskId = 1,
+                contexts = listOf(ContextSpec(ContextType.STATE)),
+                priority = InputValidation.MAX_PROFILE_PRIORITY + 1,
+                gracePeriodSec = InputValidation.MAX_GRACE_PERIOD_SEC + 1,
+                lifetime = ProfileLifetime.UNTIL_DATE,
+            ),
+        )
+
+        assertTrue(errors.any { it.field == "priority" })
+        assertTrue(errors.any { it.field == "gracePeriodSec" })
+        assertTrue(errors.any { it.field == "expiresAtMs" })
     }
 
     @Test

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Profiles now support deterministic priority arbitration, symmetric activation/deactivation grace periods, and never/date/once lifetimes with expiry and one-shot persistence; the editor, profile cards, Inspector, bundle codec, and Tasker mapping expose the policy and explain suppressions.
 - Undo/redo now validates every Task, Profile, and Scene snapshot before the Room write; malformed or wrong-entity history fails closed and leaves the current record untouched.
 - Release truth now derives and verifies SDK/toolchain, capability, bundle, Room schema, README, and F-Droid artifact claims from shipped sources; the generator also derives engine-handled actions from FlowControl and subtask execution.
 - `flow.try` now classifies all built-in actions for retry safety, previews retryable and non-retryable actions in the editor, and records skipped-retry reasons in the run log.
@@ -13,7 +14,7 @@
 - Profile editors and the Context Inspector can now simulate triggers with pinned synthetic events for every context family, showing predicate, expression, cooldown, and admission decisions without running a task or writing production run-log state.
 - Automation lint now reports missing reversals, repeated state triggers, conflicting setting writers, and inter-profile loops during saves, imports, flow inspection, and Context Inspector review; equal-priority writer conflicts block while other findings remain actionable warnings.
 - Variable renames now rewrite legacy and template references across action arguments, conditions, profile context bindings, and scenes atomically; referenced variables cannot be deleted without showing their dependent sites.
-- The local quality gate now emits a JaCoCo debug report, enforces per-area instruction floors for scheduling, resilience, receivers, and UI utilities, and ratchets the JVM test floor to 1,040 passing tests; the newly covered areas include exact-alarm decisions, graceful degradation, time-event routing, notification message formatting, side-effect-free trigger simulation, and automation lint.
+- The local quality gate now emits a JaCoCo debug report, enforces per-area instruction floors for scheduling, resilience, receivers, and UI utilities, and ratchets the JVM test floor to 1,049 passing tests; the newly covered areas include exact-alarm decisions, graceful degradation, time-event routing, notification message formatting, side-effect-free trigger simulation, automation lint, and profile lifecycle policy.
 - Locale packaging now uses AGP's generated per-app language configuration with an explicit `en-US` default; incomplete locale placeholders are removed, and the release gate rejects alternate locales below the documented 80% translated-string threshold.
 - Record the current evaluation decisions to wait on Glance and Navigation3 stability, and to keep unrestricted accessibility automation out of the product.
 

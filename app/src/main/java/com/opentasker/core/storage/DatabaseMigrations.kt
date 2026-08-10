@@ -150,6 +150,16 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_11_12 = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE profiles ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN gracePeriodSec INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN lifetime TEXT NOT NULL DEFAULT 'NEVER'")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN expiresAtMs INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN lifetimeConsumed INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -162,6 +172,7 @@ object DatabaseMigrations {
             MIGRATION_8_9,
             MIGRATION_9_10,
             MIGRATION_10_11,
+            MIGRATION_11_12,
         )
     }
 
@@ -224,6 +235,10 @@ object DatabaseMigrations {
  * Version 11:
  *   - run_logs: adds execution identity, replay links, bounded held-trigger payload/policy, and
  *     a user star that is exempt from retention pruning
+ *
+ * Version 12:
+ *   - profiles: adds priority, symmetric grace period, lifetime/expiry policy, and persisted
+ *     one-shot consumption state
  *
  * To add a migration:
  * 1. Increment database version in @Database annotation

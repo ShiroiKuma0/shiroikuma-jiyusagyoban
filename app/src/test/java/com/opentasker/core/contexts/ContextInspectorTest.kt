@@ -5,6 +5,7 @@ import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -56,6 +57,42 @@ class ContextInspectorTest {
         assertTrue(result.matching)
         assertEquals("All contexts currently match.", result.summary)
         assertEquals(listOf(true, true), result.contexts.map { it.effectiveMatched })
+    }
+
+    @Test
+    fun profileInspectionExplainsPrioritySuppressionAndExpiry() {
+        val source = ContextSourceSnapshot(
+            key = "state",
+            label = "Device state",
+            registered = true,
+            lastObservation = ContextEventObservation(
+                ContextEvent("state", true, mapOf("charging" to "true")),
+                observedAtMs = 1000L,
+            ),
+        )
+        val lower = Profile(
+            id = 2,
+            name = "Lower",
+            enterTaskId = 1,
+            priority = 1,
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "charging", "value" to "true"))),
+        )
+        val higher = lower.copy(id = 3, name = "Higher", priority = 5)
+        val expired = lower.copy(
+            id = 4,
+            name = "Expired",
+            lifetime = ProfileLifetime.UNTIL_DATE,
+            expiresAtMs = 999L,
+        )
+
+        val results = inspectProfiles(listOf(lower, higher, expired), listOf(source), nowMs = 1000L)
+            .associateBy { it.profileId }
+
+        assertTrue(results.getValue(higher.id).matching)
+        assertFalse(results.getValue(lower.id).matching)
+        assertTrue(results.getValue(lower.id).suppressionReason.orEmpty().contains("higher-priority"))
+        assertFalse(results.getValue(expired.id).matching)
+        assertTrue(results.getValue(expired.id).summary.contains("expired"))
     }
 
     @Test

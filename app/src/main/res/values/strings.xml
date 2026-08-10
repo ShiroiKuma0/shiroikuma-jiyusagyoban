@@ -140,6 +140,23 @@
     <string name="profile_exit_task_helper">Optional cleanup task to run when this profile stops matching.</string>
     <string name="profile_cooldown_label">Cooldown seconds</string>
     <string name="profile_cooldown_helper">Minimum seconds between triggers. Default is 0 (no cooldown).</string>
+    <string name="profile_priority_label">Profile priority</string>
+    <string name="profile_priority_helper">Higher priority wins when enabled profiles match at the same time. Equal priorities use the lower profile ID.</string>
+    <string name="profile_priority_invalid">Enter a whole number from -100 to 100.</string>
+    <string name="profile_grace_period_label">Activation grace seconds</string>
+    <string name="profile_grace_period_helper">Require the contexts to stay matched or unmatched for this long before changing state. Default is 0.</string>
+    <string name="profile_grace_period_invalid">Enter a whole number from 0 to 3600.</string>
+    <string name="profile_lifetime_label">Automation lifetime</string>
+    <string name="profile_lifetime_never_title">Always available</string>
+    <string name="profile_lifetime_never_body">The profile remains eligible until you disable or edit it.</string>
+    <string name="profile_lifetime_date_title">Until a date</string>
+    <string name="profile_lifetime_date_body">Stop matching after the selected calendar date ends.</string>
+    <string name="profile_lifetime_once_title">Run once</string>
+    <string name="profile_lifetime_once_body">Disable the profile after its first accepted activation.</string>
+    <string name="profile_expiry_date_label">Expiry date</string>
+    <string name="profile_expiry_date_hint">YYYY-MM-DD</string>
+    <string name="profile_expiry_date_helper">Use the local calendar date. The profile remains available through that day.</string>
+    <string name="profile_expiry_date_invalid">Enter a valid date as YYYY-MM-DD.</string>
     <string name="profile_retrigger_label">Re-trigger behavior</string>
     <string name="profile_new">New profile</string>
     <string name="profile_delete">Delete Profile</string>
@@ -470,6 +487,9 @@
     <string name="inspector_no_contexts_body">This profile cannot match because it has no context entries configured.</string>
     <string name="inspector_simulate_trigger">Simulate trigger</string>
     <string name="inspector_lint_title">Automation lint findings</string>
+    <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
+    <string name="inspector_profile_expiry">Expires after %1$s</string>
+    <string name="inspector_profile_suppressed_title">Profile suppressed</string>
 
     <!-- Import -->
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
@@ -652,6 +672,9 @@
     <string name="label_action_count">%1$d action(s)</string>
     <string name="label_cooldown_seconds">%1$ds cooldown</string>
     <string name="label_priority_short">Priority %1$d</string>
+    <string name="label_profile_priority">Profile priority %1$d</string>
+    <string name="label_profile_grace_seconds">%1$ds grace</string>
+    <string name="label_profile_expiry_date">Until %1$s</string>
     <string name="label_more_count">%1$d more</string>
 
     <string name="dialog_remove_element">Remove element?</string>

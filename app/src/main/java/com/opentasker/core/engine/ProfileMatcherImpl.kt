@@ -13,11 +13,15 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.isValidForContextCount
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -34,6 +38,7 @@ internal class ProfileMatcher(
     private val app: Context,
     private val profile: Profile,
     private val pulseContinuity: PulseEventContinuity = PulseEventContinuity(),
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     private val tag = "ProfileMatcher[${profile.name}]"
     private val performanceThresholdMs = 1000L // Warn if evaluation takes > 1 second
@@ -45,8 +50,9 @@ internal class ProfileMatcher(
         monitorSubscriptionsReady.await()
     }
     
+    @OptIn(kotlinx.coroutines.FlowPreview::class)
     fun stateChanges(): Flow<ProfileStateChange> {
-        if (profile.contexts.isEmpty()) {
+        if (profile.contexts.isEmpty() || ProfileLifecyclePolicy.isSuppressed(profile, clock())) {
             monitorSubscriptionsReady.complete(Unit)
             return emptyFlow()
         }
@@ -115,8 +121,15 @@ internal class ProfileMatcher(
             combine(flows) { allMatches ->
                 evaluateSnapshot(allMatches)
             }.let { snapshots ->
-                profileStateChangesFromSnapshots(
+                val stabilizedSnapshots = stabilizeProfileSnapshots(
                     snapshots = snapshots,
+                    lifecycleTicks = lifecycleTicks(),
+                    profile = profile,
+                    clock = clock,
+                    hasPulseContexts = hasPulseContexts,
+                )
+                profileStateChangesFromSnapshots(
+                    snapshots = stabilizedSnapshots,
                     hasPulseContexts = hasPulseContexts,
                     initialPulseSequence = pulseContinuity.currentSequence(),
                 ) { change ->
@@ -132,6 +145,16 @@ internal class ProfileMatcher(
                     AppLogger.debug(tag, "State transition evaluated in ${duration}ms")
                 }
             }
+        }
+    }
+
+    private fun lifecycleTicks(): Flow<Unit> = flow {
+        emit(Unit)
+        val expiry = profile.expiresAtMs?.takeIf { profile.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE }
+        val remaining = expiry?.minus(clock()) ?: 0L
+        if (remaining > 0L) {
+            delay(remaining)
+            emit(Unit)
         }
     }
 
@@ -188,6 +211,28 @@ internal class ProfileMatcher(
         }
     }
 
+}
+
+@OptIn(kotlinx.coroutines.FlowPreview::class)
+internal fun stabilizeProfileSnapshots(
+    snapshots: Flow<ProfileMatchSnapshot>,
+    lifecycleTicks: Flow<Unit>,
+    profile: Profile,
+    clock: () -> Long,
+    hasPulseContexts: Boolean,
+): Flow<ProfileMatchSnapshot> {
+    val lifecycleSnapshots = combine(snapshots, lifecycleTicks) { snapshot, _ ->
+        if (ProfileLifecyclePolicy.isSuppressed(profile, clock())) {
+            ProfileMatchSnapshot(allMatched = false, pulseSequence = 0L)
+        } else {
+            snapshot
+        }
+    }
+    return if (!hasPulseContexts && profile.gracePeriodSec > 0) {
+        lifecycleSnapshots.debounce(profile.gracePeriodSec * 1_000L)
+    } else {
+        lifecycleSnapshots
+    }
 }
 
 internal data class ContextMatchUpdate(

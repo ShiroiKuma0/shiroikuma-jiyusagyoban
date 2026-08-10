@@ -7,6 +7,7 @@ import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.isValidForContextCount
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import java.util.Locale
 
 typealias ContextObservationTransformer = (
@@ -72,6 +73,8 @@ data class ProfileInspection(
     val contexts: List<ContextCheck>,
     val logicExplanation: String = "",
     val profile: Profile? = null,
+    val priority: Int = 0,
+    val suppressionReason: String? = null,
 )
 
 data class ContextCheck(
@@ -90,26 +93,44 @@ data class ContextCheck(
 fun inspectProfiles(
     profiles: List<Profile>,
     sourceSnapshots: Collection<ContextSourceSnapshot>,
+    nowMs: Long = System.currentTimeMillis(),
     observationTransformer: ContextObservationTransformer = { _, _, _, observation -> observation },
 ): List<ProfileInspection> {
     val sourcesByKey = sourceSnapshots.associateBy { it.key }
-    return profiles
-        .map { profile -> inspectProfile(profile, sourcesByKey, observationTransformer) }
+    val inspections = profiles
+        .map { profile -> inspectProfile(profile, sourcesByKey, nowMs, observationTransformer) }
         .sortedWith(compareBy<ProfileInspection> { !it.enabled }.thenBy { it.profileName.lowercase(Locale.US) })
+    val profileById = profiles.associateBy(Profile::id)
+    val matchingProfiles = inspections.mapNotNull { inspection ->
+        inspection.profile
+            ?.takeIf { inspection.matching }
+    }
+    return inspections.map { inspection ->
+        val profile = profileById[inspection.profileId] ?: return@map inspection
+        val suppression = ProfileLifecyclePolicy.suppressionByPriority(profile, matchingProfiles)
+        if (inspection.matching && suppression != null) {
+            inspection.copy(matching = false, summary = suppression, suppressionReason = suppression)
+        } else {
+            inspection
+        }
+    }
 }
 
 fun inspectProfile(
     profile: Profile,
     sourcesByKey: Map<String, ContextSourceSnapshot>,
+    nowMs: Long = System.currentTimeMillis(),
     observationTransformer: ContextObservationTransformer = { _, _, _, observation -> observation },
 ): ProfileInspection {
     val checks = profile.contexts.mapIndexed { index, spec ->
         inspectContextForProfile(profile, index, spec, sourcesByKey, observationTransformer)
     }
     val contextsMatch = checks.isNotEmpty() && evaluateChecks(checks, profile.contextExpression)
-    val matching = profile.enabled && contextsMatch
+    val lifecycleSuppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs)
+    val matching = profile.enabled && contextsMatch && lifecycleSuppression == null
     val summary = when {
         !profile.enabled -> "Profile is disabled."
+        lifecycleSuppression != null -> lifecycleSuppression
         checks.isEmpty() -> "No contexts are configured."
         contextsMatch -> "All contexts currently match."
         else -> checks.firstOrNull { !it.effectiveMatched }?.reason ?: "At least one context does not match."
@@ -124,6 +145,8 @@ fun inspectProfile(
         contexts = checks,
         logicExplanation = profile.contextExpression?.let { explainContextExpression(it, checks) }.orEmpty(),
         profile = profile,
+        priority = profile.priority,
+        suppressionReason = lifecycleSuppression,
     )
 }
 

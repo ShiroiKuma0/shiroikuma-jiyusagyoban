@@ -8,6 +8,7 @@ import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -339,6 +340,35 @@ class OpenTaskerBundleCodecTest {
         val decoded = OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle))
 
         assertEquals(bundle, decoded)
+    }
+
+    @Test
+    fun lifecycleConfigurationRoundTripsAndConsumedOneShotStateIsNotExported() {
+        val profile = Profile(
+            id = 7,
+            name = "Temporary focus",
+            enterTaskId = 1,
+            contexts = listOf(ContextSpec(ContextType.STATE)),
+            priority = 12,
+            gracePeriodSec = 45,
+            lifetime = ProfileLifetime.UNTIL_DATE,
+            expiresAtMs = 1_800_000_000_000L,
+            lifetimeConsumed = true,
+        )
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.82",
+            exportedAtEpochMs = 123L,
+            profiles = listOf(profile),
+            tasks = listOf(Task(id = 1, name = "Task", actions = listOf(ActionSpec(type = "log")))),
+        )
+
+        val exportedProfile = bundle.profiles.single()
+        assertEquals(profile.priority, exportedProfile.priority)
+        assertEquals(profile.gracePeriodSec, exportedProfile.gracePeriodSec)
+        assertEquals(profile.lifetime, exportedProfile.lifetime)
+        assertEquals(profile.expiresAtMs, exportedProfile.expiresAtMs)
+        assertFalse(exportedProfile.lifetimeConsumed)
+        assertEquals(bundle, OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle)))
     }
 
     @Test

@@ -101,8 +101,8 @@ object AutomationLint {
                 val rightWrites = settingWrites(right, tasks).mapTo(hashSetOf(), SettingWrite::key)
                 val overlap = (leftWrites intersect rightWrites).toList().sorted()
                 if (overlap.isEmpty()) continue
-                val leftPriority = taskById[left.enterTaskId]?.priority ?: 0
-                val rightPriority = taskById[right.enterTaskId]?.priority ?: 0
+                val leftPriority = left.priority
+                val rightPriority = right.priority
                 val equalPriority = leftPriority == rightPriority
                 findings += AutomationLintFinding(
                     code = AutomationLintCode.PRIORITY_CONFLICT,
@@ -110,7 +110,7 @@ object AutomationLint {
                     profileIds = listOf(left.id, right.id).sorted(),
                     profileNames = listOf(left.name, right.name),
                     title = "Priority conflict",
-                    detail = "${left.name} and ${right.name} can both write ${overlap.joinToString()} while their enter-task priorities are $leftPriority and $rightPriority.",
+                    detail = "${left.name} and ${right.name} can both write ${overlap.joinToString()} while their profile priorities are $leftPriority and $rightPriority.",
                     suggestedFix = if (equalPriority) {
                         "Raise one task priority or make the contexts mutually exclusive."
                     } else {
@@ -137,6 +137,7 @@ object AutomationLint {
 
     private fun hasRetriggerGuard(profile: Profile, enterTask: Task?): Boolean {
         if (profile.cooldownSec > 0) return true
+        if (profile.gracePeriodSec > 0) return true
         if (profile.contexts.any { spec ->
                 val dwell = listOf("dwellMillis", "dwellMs", "dwellSeconds", "dwellSec")
                     .firstNotNullOfOrNull { spec.config[it]?.toLongOrNull() }

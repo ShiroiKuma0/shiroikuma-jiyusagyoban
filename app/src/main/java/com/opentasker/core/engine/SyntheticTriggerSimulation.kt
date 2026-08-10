@@ -8,6 +8,7 @@ import com.opentasker.core.contexts.SunEventCalculator
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -123,13 +124,17 @@ object SyntheticTriggerSimulator {
                 profile.contextExpression,
             )
         }
-        val profileMatched = profile.enabled && aggregateMatch
+        val lifecycleSuppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs)
+        val graceSuppression = profile.gracePeriodSec > 0 && aggregateMatch
+        val profileMatched = profile.enabled && lifecycleSuppression == null && aggregateMatch && !graceSuppression
         val profileReason = when {
             !profile.enabled -> "Profile is disabled."
+            lifecycleSuppression != null -> lifecycleSuppression
             profile.contexts.isEmpty() -> "No contexts are configured."
             !aggregateMatch -> results.firstOrNull { !it.effectiveMatched }?.let {
                 "Context ${it.index + 1} blocks the profile: ${it.explanation}"
             } ?: "The configured context expression is invalid or did not match."
+            profile.gracePeriodSec > 0 -> "All pinned predicates pass; the ${profile.gracePeriodSec}s activation/deactivation grace period still applies."
             else -> "All pinned predicates pass the configured context logic."
         }
         return SyntheticTriggerSimulation(
