@@ -1187,6 +1187,16 @@ private fun buildPermissionItems(
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.FOREGROUND_LOCATION),
         ),
+        if (Build.VERSION.SDK_INT >= 29) PermissionSetupItem(
+            title = context.getString(R.string.setup_activity_recognition_title),
+            body = context.getString(R.string.setup_activity_recognition_body),
+            granted = hasPermission(context, Manifest.permission.ACTIVITY_RECOGNITION),
+            actionLabel = request,
+            action = PermissionAction.RuntimePermission(Manifest.permission.ACTIVITY_RECOGNITION),
+            requiredFor = context.getString(R.string.setup_activity_recognition_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.PHYSICAL_ACTIVITY),
+        ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_nearby_wifi_title),
             body = context.getString(R.string.setup_nearby_wifi_body),
@@ -1265,6 +1275,16 @@ private fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_sms_receive_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.SMS),
+        ) else null,
+        if (BuildConfig.SMS_ACTION_AVAILABLE) PermissionSetupItem(
+            title = context.getString(R.string.setup_phone_state_title),
+            body = context.getString(R.string.setup_phone_state_body),
+            granted = hasPermission(context, Manifest.permission.READ_PHONE_STATE),
+            actionLabel = request,
+            action = PermissionAction.RuntimePermission(Manifest.permission.READ_PHONE_STATE),
+            requiredFor = context.getString(R.string.setup_phone_state_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.PHONE_STATE),
         ) else null,
         PermissionSetupItem(
             title = context.getString(R.string.setup_dnd_title),

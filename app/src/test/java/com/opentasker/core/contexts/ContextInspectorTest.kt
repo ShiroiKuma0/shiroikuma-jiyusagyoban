@@ -282,6 +282,36 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun stateSensorSetupMarkerPointsToSetupAndFailsClosed() {
+        val profile = Profile(
+            id = 6,
+            name = "Walking",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "activity", "value" to "walking"))),
+        )
+        val source = ContextSourceSnapshot(
+            key = "state",
+            label = "Device state",
+            registered = true,
+            lastObservation = ContextEventObservation(
+                ContextEvent(
+                    "state",
+                    true,
+                    mapOf("_setup_activity" to "Open Setup and grant Physical activity permission."),
+                ),
+                observedAtMs = 1000L,
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+
+        assertFalse(result.matching)
+        assertFalse(result.contexts.single().effectiveMatched)
+        assertEquals("Open Setup and grant Physical activity permission.", result.contexts.single().reason)
+    }
+
+    @Test
     fun profileInspectionCanUseTransformedLocationDwellObservation() {
         val profile = Profile(
             id = 5,

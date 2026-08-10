@@ -365,6 +365,9 @@
     <string name="setup_foreground_location_title">Foreground location</string>
     <string name="setup_foreground_location_body">Needed for live Location contexts and Wi-Fi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; background precision cannot exceed the foreground precision the user grants.</string>
     <string name="setup_foreground_location_required_for">Location and Wi-Fi contexts</string>
+    <string name="setup_activity_recognition_title">Physical activity</string>
+    <string name="setup_activity_recognition_body">Needed for Activity context values. OpenTasker uses Android’s step detector or accelerometer and does not record microphone audio or movement history.</string>
+    <string name="setup_activity_recognition_required_for">Activity contexts</string>
     <string name="setup_nearby_wifi_title">Nearby Wi-Fi devices</string>
     <string name="setup_nearby_wifi_body">Needed on Android 13 and newer for Wi-Fi-aware automations. SSID visibility can still require location access.</string>
     <string name="setup_nearby_wifi_required_for">Wi-Fi contexts</string>
@@ -387,6 +390,9 @@
     <string name="setup_sms_receive_title">SMS and MMS receive</string>
     <string name="setup_sms_receive_body">Allows event=sms_received automations to receive sanitized sender and body values. Android 17 may delay standard OTP SMS delivery for up to three hours unless the app is exempt.</string>
     <string name="setup_sms_receive_required_for">SMS/MMS-received event contexts</string>
+    <string name="setup_phone_state_title">Phone state</string>
+    <string name="setup_phone_state_body">Needed for roaming and phone-call state contexts. OpenTasker reads only the current state needed for matching and does not store phone numbers or call history.</string>
+    <string name="setup_phone_state_required_for">Roaming and phone-call contexts</string>
     <string name="setup_dnd_title">Do Not Disturb access</string>
     <string name="setup_dnd_body">Needed before OpenTasker can change interruption filters or create, update, and remove owned Zen rules.</string>
     <string name="setup_dnd_required_for">DND and Zen rule actions</string>
@@ -1224,8 +1230,8 @@
     <string name="inspector_setup_usage_missing">Usage access is missing; application contexts cannot report foreground packages.</string>
     <string name="inspector_setup_clock_exact">Clock source is registered and exact alarms are available for scheduled engine ticks.</string>
     <string name="inspector_setup_clock_inexact">Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback.</string>
-    <string name="inspector_setup_state_ready">Battery, charging, screen, headset, and WiFi-related state checks have required runtime access.</string>
-    <string name="inspector_setup_state_partial">Battery, charging, screen, and headset checks are available; WiFi state may need location or nearby WiFi setup.</string>
+    <string name="inspector_setup_state_ready">Battery, charging, media, screen, headset, and sensor-backed state checks are available when their device sensors and permissions are present.</string>
+    <string name="inspector_setup_state_partial">Basic state checks are available. Wi-Fi, speed, activity, roaming, and phone-call values may need Setup permission or device-provider access.</string>
     <string name="inspector_setup_calendar_ready">Calendar events can be matched with redacted metadata.</string>
     <string name="inspector_setup_calendar_missing">Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates.</string>
     <string name="inspector_setup_event_ready">Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. %1$s</string>

@@ -652,7 +652,7 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
                 )
             }
             event.event.metadata.entries
-                .filterNot { it.key == "component" || it.key == "component_status" }
+                .filterNot { it.key == "component" || it.key == "component_status" || it.key.startsWith("_setup_") }
                 .sortedBy { it.key }
                 .forEach { (key, value) ->
                     Text(
