@@ -72,6 +72,60 @@ class RunLogDaoInstrumentedTest {
         }
     }
 
+    /**
+     * Held rows are skipped by [RunLogDao.pruneRetention] so a pending replay is never deleted out
+     * from under the user, which left them growing without bound - one 16 KB row per admission
+     * rejection, forever, exactly when a profile is misfiring.
+     */
+    @Test
+    fun heldRetentionAgesOutHeldRowsButKeepsStarredOnes() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.runLogDao()
+            dao.insert(run(taskId = 1, timestamp = 1_000L, held = true))
+            dao.insert(run(taskId = 2, timestamp = 2_000L, held = true))
+            dao.insert(run(taskId = 3, timestamp = 3_000L, held = true, starred = true))
+            dao.insert(run(taskId = 4, timestamp = 9_000L, held = true))
+            dao.insert(run(taskId = 5, timestamp = 9_500L))
+
+            // Ages out everything held before the cutoff except the starred row.
+            assertEquals(2, dao.pruneHeldRetention(maxHeldEntries = 100, minimumTimestamp = 5_000L))
+            assertEquals(listOf(5L, 4L, 3L), dao.getRecent().map { it.taskId })
+
+            // The count cap keeps only the newest held rows. Starred held rows are exempt from the
+            // cap as well as the age window, and ordinary rows are never touched here.
+            dao.insert(run(taskId = 6, timestamp = 9_800L, held = true))
+            assertEquals(1, dao.pruneHeldRetention(maxHeldEntries = 1, minimumTimestamp = 0L))
+            assertEquals(listOf(6L, 5L, 3L), dao.getRecent().map { it.taskId })
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun clearHeldConsumesAReplayedRowOnlyOnce() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.runLogDao()
+            dao.insert(run(taskId = 1, timestamp = 1_000L, held = true))
+            val heldId = dao.getRecent().single().id
+
+            assertEquals(1, dao.clearHeld(heldId))
+            assertEquals(false, dao.getById(heldId)?.held)
+            assertEquals(null, dao.getById(heldId)?.heldPayload)
+            // A second replay of the same row must find nothing left to consume.
+            assertEquals(0, dao.clearHeld(heldId))
+        } finally {
+            db.close()
+        }
+    }
+
     @Test
     fun keysetPagesStayStableWhenANewerRowArrives() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

@@ -53,6 +53,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -1017,10 +1018,7 @@ class AutomationService : Service() {
 
         val policy = runLogRetentionSettings.load()
         runCatching {
-            db.runLogDao().pruneRetention(
-                maxEntries = policy.maxEntries,
-                minimumTimestamp = policy.minimumTimestamp(now),
-            )
+            db.runLogDao().applyRetention(policy, now)
         }
             .onSuccess { deleted ->
                 lastRunLogPruneAt = now

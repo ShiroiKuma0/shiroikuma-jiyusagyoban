@@ -125,6 +125,39 @@ interface RunLogDao {
         """
     )
     suspend fun pruneRetention(maxEntries: Int, minimumTimestamp: Long): Int
+
+    /**
+     * Bounds held rows, which [pruneRetention] deliberately skips so a pending replay is never
+     * deleted out from under the user.
+     *
+     * Held rows are written on every admission rejection under the default LOG overflow policy and
+     * each carries up to 16 KB of payload, so the exact situation that produces them - a burst
+     * storm or an open circuit on a misfiring profile - produced them continuously with nothing
+     * ever removing them. They now age out on the same retention window, with their own count cap,
+     * and starred rows are still kept.
+     */
+    @Query(
+        """
+        DELETE FROM run_logs
+        WHERE held = 1
+          AND starred = 0
+          AND (
+            timestamp < :minimumTimestamp
+            OR id NOT IN (
+                SELECT id FROM run_logs
+                WHERE held = 1 AND starred = 0
+                ORDER BY timestamp DESC, id DESC
+                LIMIT :maxHeldEntries
+            )
+          )
+        """
+    )
+    suspend fun pruneHeldRetention(maxHeldEntries: Int, minimumTimestamp: Long): Int
+
+    /** Clears the held marker and its payload once a replay has been admitted. */
+    @Query("UPDATE run_logs SET held = 0, heldPayload = NULL WHERE id = :id AND held = 1")
+    suspend fun clearHeld(id: Long): Int
+
     @Query("SELECT COUNT(*) FROM run_logs")
     suspend fun count(): Int
 

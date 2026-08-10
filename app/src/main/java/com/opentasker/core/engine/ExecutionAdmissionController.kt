@@ -543,6 +543,17 @@ object ExecutionAdmissionRegistry {
         if (activeController === controller) activeController = null
     }
 
+    /**
+     * The controller an execution must be admitted by.
+     *
+     * Manual runs and held-execution replays previously fell back to
+     * [ExecutionAdmissionController.Default] - a separate in-memory controller with zero active
+     * counts and its own circuit store - so they were admitted even while the profile was
+     * saturated or its circuit was open. That is a check wired to the wrong data source.
+     */
+    fun current(context: Context): ExecutionAdmissionController =
+        activeController ?: ExecutionAdmissionController.persisted(context.applicationContext)
+
     fun preview(
         context: Context,
         profileId: Long,

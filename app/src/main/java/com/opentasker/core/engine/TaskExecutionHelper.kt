@@ -718,6 +718,10 @@ suspend fun replayHeldExecution(
         profileId = payload.profileId,
         replayOf = originalExecutionId,
     )
+    // Consume the held entry before running it. Nothing else cleared the marker, so the Replay
+    // button stayed on the row forever and every tap ran the task again with real side effects.
+    // Clearing it first also means a crash mid-replay cannot leave a row that replays twice.
+    db.runLogDao().clearHeld(heldEntry.id)
     return executeAndLogTask(
         appContext = appContext,
         db = db,
