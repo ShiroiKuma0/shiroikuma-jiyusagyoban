@@ -290,10 +290,11 @@ class AutomationService : Service() {
         engineHeartbeatStore.recordAlive()
         scope.launch {
             if (!timeTickTrigger || !engineLoaded) reloadProfiles()
+            val replayedDirectBootTick = DirectBootTriggerStore.consumePendingTimeTick(this@AutomationService)
             if (bootCompletedTrigger) {
                 BootContextEvents.publishBootCompleted()
             }
-            if (timeTickTrigger) {
+            if (timeTickTrigger || replayedDirectBootTick) {
                 TimeContextEvents.publish()
             }
         }
