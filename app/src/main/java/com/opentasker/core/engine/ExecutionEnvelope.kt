@@ -50,6 +50,7 @@ enum class ExecutionTerminalReasonCode {
     ADMISSION_REJECTED,
     COLLISION_SKIPPED,
     CAUSAL_LOOP,
+    MISSED_TRIGGER,
     CANCELLED,
     TASK_NOT_FOUND,
     TASK_CORRUPT,

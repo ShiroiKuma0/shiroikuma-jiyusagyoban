@@ -18,6 +18,7 @@ object RunLogSource {
     const val SHORTCUT = "shortcut"
     const val LOCALE_PLUGIN = "locale_plugin"
     const val SCENE_OVERLAY = "scene_overlay"
+    const val SCHEDULER = "scheduler"
     const val OTHER = "other"
 
     data class Classified(val key: String, val label: String?)
@@ -43,6 +44,8 @@ object RunLogSource {
                 Classified(LOCALE_PLUGIN, null)
             trimmed.equals("Scene overlay", ignoreCase = true) ->
                 Classified(SCENE_OVERLAY, null)
+            trimmed.equals("Scheduled trigger", ignoreCase = true) ->
+                Classified(SCHEDULER, "Missed trigger")
             trimmed.isBlank() ->
                 Classified(OTHER, null)
             else ->
@@ -61,6 +64,7 @@ object RunLogSource {
         SHORTCUT -> "Shortcut"
         LOCALE_PLUGIN -> "Locale plugin"
         SCENE_OVERLAY -> "Scene overlay"
+        SCHEDULER -> "Scheduler"
         OTHER -> "Other"
         else -> "Unknown"
     }
