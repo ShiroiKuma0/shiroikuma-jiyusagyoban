@@ -43,9 +43,12 @@ build_output.txt
 build_*.bat
 build.sh
 
-# Markdown files local-only (except README)
+# Markdown files local-only (except README and the changelog).
+# ROADMAP.md and RESEARCH.md were tracked for a while despite this rule; they are untracked
+# now so working-tree churn stops being published.
 *.md
 !README.md
+!CHANGELOG.md
 
 # AI config
 AGENTS.md
