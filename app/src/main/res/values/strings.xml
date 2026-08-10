@@ -825,6 +825,11 @@
     <string name="diagnostics_service_running">Running</string>
     <string name="diagnostics_service_stopped">Stopped or heartbeat stale</string>
     <string name="diagnostics_last_heartbeat">Last heartbeat</string>
+    <string name="diagnostics_process_exit">Previous process exit</string>
+    <string name="diagnostics_process_exit_unavailable">ApplicationExitInfo is unavailable below Android 11 (API 30), so the process-exit reason cannot be reported.</string>
+    <string name="diagnostics_process_exit_no_gap">No unexpected heartbeat gap is pending.</string>
+    <string name="diagnostics_process_exit_no_match">Heartbeat gap detected (%1$s), but no matching historical process-exit record was reported.</string>
+    <string name="diagnostics_process_exit_matched">Reason: %1$s; description: %2$s; exited: %3$s; heartbeat gap: %4$s</string>
     <string name="diagnostics_fgs_types">Foreground service types</string>
     <string name="diagnostics_standby_bucket">App standby bucket</string>
     <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add OpenTasker to the battery-optimization exemption list in Setup to keep it responsive.</string>

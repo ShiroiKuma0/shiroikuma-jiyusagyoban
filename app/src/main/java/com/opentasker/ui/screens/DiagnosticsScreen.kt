@@ -38,6 +38,9 @@ import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.HealthSignalState
 import com.opentasker.core.diagnostics.assessment
 import com.opentasker.core.diagnostics.healthy
+import com.opentasker.core.engine.EngineExitCorrelation
+import com.opentasker.core.engine.EngineExitCorrelationState
+import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
@@ -189,6 +192,11 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                     ?: stringResource(R.string.diagnostics_never),
             )
             HealthRow(
+                stringResource(R.string.diagnostics_process_exit),
+                health?.let { processExitSummary(it.processExitCorrelation, formatter) }
+                    ?: stringResource(R.string.diagnostics_loading),
+            )
+            HealthRow(
                 stringResource(R.string.diagnostics_fgs_types),
                 health?.activeForegroundServiceTypes ?: stringResource(R.string.diagnostics_loading),
             )
@@ -271,6 +279,23 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             }
         }
     }
+}
+
+@Composable
+private fun processExitSummary(correlation: EngineExitCorrelation, formatter: SimpleDateFormat): String = when (correlation.state) {
+    EngineExitCorrelationState.UNAVAILABLE -> stringResource(R.string.diagnostics_process_exit_unavailable)
+    EngineExitCorrelationState.NO_GAP -> stringResource(R.string.diagnostics_process_exit_no_gap)
+    EngineExitCorrelationState.NO_MATCH -> stringResource(
+        R.string.diagnostics_process_exit_no_match,
+        correlation.gapMillis?.let(EngineHealthReader::ageLabel) ?: stringResource(R.string.diagnostics_none),
+    )
+    EngineExitCorrelationState.MATCHED -> stringResource(
+        R.string.diagnostics_process_exit_matched,
+        correlation.reason ?: stringResource(R.string.diagnostics_none),
+        correlation.description ?: stringResource(R.string.diagnostics_none),
+        correlation.timestampMillis?.let { formatter.format(Date(it)) } ?: stringResource(R.string.diagnostics_never),
+        correlation.gapMillis?.let(EngineHealthReader::ageLabel) ?: stringResource(R.string.diagnostics_none),
+    )
 }
 
 @Composable
