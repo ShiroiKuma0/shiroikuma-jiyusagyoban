@@ -50,6 +50,29 @@ class RunLogDaoInstrumentedTest {
     }
 
     @Test
+    fun pruneRetentionNeverDeletesHeldOrStarredRows() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.runLogDao()
+            dao.insert(run(taskId = 1, timestamp = 1_000L, held = true))
+            dao.insert(run(taskId = 2, timestamp = 2_000L, starred = true))
+            dao.insert(run(taskId = 3, timestamp = 3_000L))
+            dao.insert(run(taskId = 4, timestamp = 4_000L))
+            dao.insert(run(taskId = 5, timestamp = 5_000L))
+
+            assertEquals(3, dao.countPrunable(maxEntries = 1, minimumTimestamp = 10_000L))
+            assertEquals(3, dao.pruneRetention(maxEntries = 1, minimumTimestamp = 10_000L))
+            assertEquals(2, dao.count())
+            assertEquals(listOf(2L, 1L), dao.getRecent().map { it.taskId })
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun keysetPagesStayStableWhenANewerRowArrives() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).allowMainThreadQueries().build()
@@ -84,6 +107,7 @@ class RunLogDaoInstrumentedTest {
             dao.insert(run(3, 3_000, taskName = "Ordinary", success = false, message = "Decision: Cancelled"))
             dao.insert(run(4, 4_000, taskName = "Ordinary", success = false, message = "Failure"))
             dao.insert(run(4, 5_000, taskName = "Ordinary", success = true, message = "Later success"))
+            dao.insert(run(5, 6_000, taskName = "Held", success = false, message = "Decision: Held", held = true))
 
             val literalPercent = dao.openSnapshot(
                 RunLogQuery(escapedSearch = escapeRunLogLikeQuery("%")),
@@ -93,10 +117,12 @@ class RunLogDaoInstrumentedTest {
             val skipped = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.SKIPPED))
             val cancelled = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.CANCELLED))
             val failed = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.FAILED))
+            val held = dao.openSnapshot(RunLogQuery(status = RunLogStatusQuery.HELD))
             val taskAndDate = dao.openSnapshot(RunLogQuery(taskId = 4, minimumTimestamp = 4_500))
             assertEquals(listOf(2L), dao.loadPage(skipped).entries.map { it.taskId })
             assertEquals(listOf(3L), dao.loadPage(cancelled).entries.map { it.taskId })
             assertEquals(listOf(4L), dao.loadPage(failed).entries.map { it.taskId })
+            assertEquals(listOf(5L), dao.loadPage(held).entries.map { it.taskId })
             assertEquals(listOf(5_000L), dao.loadPage(taskAndDate).entries.map { it.timestamp })
         } finally {
             db.close()
@@ -136,6 +162,8 @@ class RunLogDaoInstrumentedTest {
         taskName: String = "Task $taskId",
         success: Boolean = true,
         message: String = "Completed",
+        held: Boolean = false,
+        starred: Boolean = false,
     ) = RunLogEntity(
         taskId = taskId,
         taskName = taskName,
@@ -143,5 +171,7 @@ class RunLogDaoInstrumentedTest {
         durationMs = 10,
         success = success,
         message = message,
+        held = held,
+        starred = starred,
     )
 }

@@ -556,6 +556,9 @@ class DatabaseBackupManager(
                 "message",
             )
             if (schemaVersion >= 4) runLogs += setOf("source", "sourceLabel")
+            if (schemaVersion >= 11) {
+                runLogs += setOf("executionId", "replayOf", "held", "heldPayload", "heldPolicy", "starred")
+            }
 
             return buildMap {
                 put("profiles", profiles)

@@ -88,6 +88,7 @@ data class ExecutionEnvelope(
     val taskName: String,
     val source: String,
     val profileId: Long? = null,
+    val replayOf: String? = null,
     val parentExecutionId: String? = null,
     val causalDepth: Int = 0,
     val causalProfileChain: List<String> = emptyList(),
@@ -95,6 +96,7 @@ data class ExecutionEnvelope(
 ) {
     init {
         require(isValidExecutionId(executionId)) { "Invalid execution id." }
+        require(replayOf == null || isValidExecutionId(replayOf)) { "Invalid replay execution id." }
         require(causalDepth >= 0) { "Causal depth cannot be negative." }
         require(causalProfileChain.size <= MAX_CAUSAL_PROFILE_CHAIN_LENGTH) {
             "Causal profile chain is too long."
@@ -105,6 +107,7 @@ data class ExecutionEnvelope(
         add("Execution ID: $executionId")
         add("Producer: ${producer.wireValue}")
         profileId?.let { add("Profile ID: $it") }
+        replayOf?.let { add("Replay of: $it") }
         parentExecutionId?.let { add("Parent execution ID: $it") }
         if (causalDepth > 0 || causalProfileChain.isNotEmpty()) add("Causal depth: $causalDepth")
         if (causalProfileChain.isNotEmpty()) {
@@ -119,6 +122,7 @@ data class ExecutionEnvelope(
             task: Task,
             source: String,
             profileId: Long? = null,
+            replayOf: String? = null,
             parentExecutionId: String? = null,
             causalDepth: Int = 0,
             causalProfileChain: List<String> = emptyList(),
@@ -131,6 +135,7 @@ data class ExecutionEnvelope(
             taskName = task.name,
             source = source.trim(),
             profileId = profileId,
+            replayOf = replayOf,
             parentExecutionId = parentExecutionId,
             causalDepth = causalDepth,
             causalProfileChain = causalProfileChain,
@@ -141,6 +146,13 @@ data class ExecutionEnvelope(
 
         private const val MAX_CAUSAL_PROFILE_CHAIN_LENGTH = 32
     }
+
+    /** Creates a fresh command id while retaining a machine-readable link to this execution. */
+    fun forReplay(nowMs: Long = System.currentTimeMillis()): ExecutionEnvelope = copy(
+        executionId = UUID.randomUUID().toString(),
+        replayOf = executionId,
+        createdAtMs = nowMs,
+    )
 }
 
 enum class ExecutionLedgerState {
@@ -149,11 +161,12 @@ enum class ExecutionLedgerState {
     SUCCEEDED,
     FAILED,
     SKIPPED,
+    HELD,
     CANCELLED,
     ;
 
     val isTerminal: Boolean
-        get() = this == SUCCEEDED || this == FAILED || this == SKIPPED || this == CANCELLED
+        get() = this == SUCCEEDED || this == FAILED || this == SKIPPED || this == HELD || this == CANCELLED
 }
 
 data class ExecutionLedgerRecord(

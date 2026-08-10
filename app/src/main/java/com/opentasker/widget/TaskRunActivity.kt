@@ -52,6 +52,7 @@ class TaskRunActivity : Activity() {
                             visibleActivity = true,
                         )
                         val status = when {
+                            result.held -> "held"
                             result.skippedReason != null -> "skipped"
                             result.report.success -> "succeeded"
                             else -> "failed"

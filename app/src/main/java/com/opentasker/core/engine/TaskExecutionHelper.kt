@@ -24,6 +24,7 @@ data class TaskExecutionResult(
     val report: TaskRunReport,
     val logInserted: Boolean,
     val skippedReason: String? = null,
+    val held: Boolean = false,
     val execution: ExecutionEnvelope,
 )
 
@@ -60,15 +61,16 @@ suspend fun executeAndLogTask(
         val terminalReason = ExecutionTerminalReason(ExecutionTerminalReasonCode.ADMISSION_REJECTED, reason)
         ExecutionCommandLedger.transition(
             execution.executionId,
-            ExecutionLedgerState.SKIPPED,
+            ExecutionLedgerState.HELD,
             terminalReason,
         )
-        val inserted = logSkippedRun(
+        val inserted = logHeldRun(
             db = db,
             task = task,
             source = execution.source,
             reason = reason,
             metadata = metadata,
+            initialVariables = initialVariables,
             execution = execution,
             terminalReason = terminalReason,
         )
@@ -76,6 +78,7 @@ suspend fun executeAndLogTask(
             report = collisionSkippedReport(task, reason),
             logInserted = inserted,
             skippedReason = reason,
+            held = true,
             execution = execution,
         )
     }
@@ -183,6 +186,8 @@ suspend fun executeAndLogTask(
                     ),
                     source = RunLogSource.classify(execution.source).key,
                     sourceLabel = RunLogSource.classify(execution.source).label,
+                    executionId = execution.executionId,
+                    replayOf = execution.replayOf,
                 ),
             )
         }
@@ -253,6 +258,8 @@ suspend fun executeAndLogTask(
         ),
         source = classified.key,
         sourceLabel = classified.label,
+        executionId = execution.executionId,
+        replayOf = execution.replayOf,
     )
     val inserted = insertRunLog(db, logEntry)
     TaskExecutionResult(report, inserted, execution = execution)
@@ -373,7 +380,93 @@ suspend fun logSkippedRun(
             ),
             source = classified.key,
             sourceLabel = classified.label,
+            executionId = envelope.executionId,
+            replayOf = envelope.replayOf,
         ),
+    )
+}
+
+suspend fun logHeldRun(
+    db: AppDatabase,
+    task: Task,
+    source: String,
+    reason: String,
+    metadata: List<String> = emptyList(),
+    initialVariables: Map<String, String> = emptyMap(),
+    execution: ExecutionEnvelope? = null,
+    terminalReason: ExecutionTerminalReason? = null,
+): Boolean {
+    val envelope = execution ?: ExecutionEnvelope.create(task, source)
+    ExecutionCommandLedger.accept(envelope)
+    val resolvedReason = terminalReason ?: ExecutionTerminalReason(
+        ExecutionTerminalReasonCode.ADMISSION_REJECTED,
+        reason,
+    )
+    ExecutionCommandLedger.transition(envelope.executionId, ExecutionLedgerState.HELD, resolvedReason)
+    val classified = RunLogSource.classify(envelope.source)
+    return insertRunLog(
+        db,
+        RunLogEntry(
+            taskId = task.id,
+            taskName = task.name,
+            durationMs = 0,
+            success = false,
+            message = heldRunLogMessage(
+                source = envelope.source,
+                reason = reason,
+                execution = envelope,
+                terminalReason = resolvedReason,
+                metadata = metadata,
+            ),
+            source = classified.key,
+            sourceLabel = classified.label,
+            executionId = envelope.executionId,
+            replayOf = envelope.replayOf,
+            held = true,
+            heldPayload = HeldExecutionPayloadCodec.encode(task, envelope, metadata, initialVariables),
+            heldPolicy = reason,
+        ),
+    )
+}
+
+/** Re-admits a held trigger against the current task definition and creates a new command id. */
+suspend fun replayHeldExecution(
+    appContext: Context,
+    db: AppDatabase,
+    heldEntry: RunLogEntry,
+    visibleActivity: Boolean = false,
+    audioForegroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,
+    admissionController: ExecutionAdmissionController = ExecutionAdmissionController.Default,
+): TaskExecutionResult {
+    require(heldEntry.held) { "Only held executions can be replayed." }
+    val originalExecutionId = requireNotNull(heldEntry.executionId) { "Held execution has no command id." }
+    val payload = requireNotNull(HeldExecutionPayloadCodec.decode(heldEntry.heldPayload)) {
+        "Held execution payload is invalid or unavailable."
+    }
+    require(payload.taskId == heldEntry.taskId) { "Held execution task identity does not match its payload." }
+    val task = db.taskDao().getById(payload.taskId)
+        ?.toDomainDecodeResult()
+        ?.takeIf { it.issue == null }
+        ?.value
+        ?: error("The task for this held execution no longer exists or is corrupt.")
+    val replayEnvelope = ExecutionEnvelope.create(
+        task = task,
+        source = payload.source,
+        profileId = payload.profileId,
+        replayOf = originalExecutionId,
+    )
+    return executeAndLogTask(
+        appContext = appContext,
+        db = db,
+        task = task,
+        source = payload.source,
+        metadata = payload.metadata,
+        initialVariables = payload.initialVariables,
+        visibleActivity = visibleActivity,
+        audioForegroundService = audioForegroundService,
+        admissionController = admissionController,
+        profileId = payload.profileId,
+        execution = replayEnvelope,
     )
 }
 

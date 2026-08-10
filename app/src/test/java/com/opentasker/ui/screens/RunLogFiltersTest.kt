@@ -40,6 +40,7 @@ class RunLogFiltersTest {
             RunLogStatusFilter.Succeeded to RunLogStatusQuery.SUCCEEDED,
             RunLogStatusFilter.Failed to RunLogStatusQuery.FAILED,
             RunLogStatusFilter.Skipped to RunLogStatusQuery.SKIPPED,
+            RunLogStatusFilter.Held to RunLogStatusQuery.HELD,
             RunLogStatusFilter.Cancelled to RunLogStatusQuery.CANCELLED,
         )
 

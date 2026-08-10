@@ -12,13 +12,15 @@ enum class ExternalExecutionState {
 
     SUCCEEDED,
     FAILED,
+    /** Admission rejected the trigger; the Run Log retains it for a user-initiated replay. */
+    HELD,
 
     /** The id is unknown here: never issued, or evicted after the ledger's retention. */
     UNKNOWN,
     ;
 
     val isTerminal: Boolean
-        get() = this == SUCCEEDED || this == FAILED
+        get() = this == SUCCEEDED || this == FAILED || this == HELD
 }
 
 data class ExternalExecutionRecord(
