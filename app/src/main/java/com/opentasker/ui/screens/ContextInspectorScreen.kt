@@ -542,11 +542,21 @@ private fun ProfileInspectorCard(
                     ContextCheckRow(check = check, nowMs = nowMs)
                 }
             }
+            val blockedPrefix = stringResource(R.string.automation_lint_blocked_prefix)
+            val warningPrefix = stringResource(R.string.automation_lint_warning_prefix)
             if (lintFindings.isNotEmpty()) {
                 InspectorNotice(
                     title = stringResource(R.string.inspector_lint_title),
+                    // Name the severity in the text. A mixed list collapses to a single colour
+                    // chosen by "any blocking", so colour alone cannot tell the rows apart - and
+                    // conveys nothing to a colour-blind reader either.
                     body = lintFindings.joinToString("\n") { finding ->
-                        "${finding.title}: ${finding.detail} ${finding.suggestedFix}"
+                        val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
+                            blockedPrefix
+                        } else {
+                            warningPrefix
+                        }
+                        "$prefix ${finding.title}: ${finding.detail} ${finding.suggestedFix}"
                     },
                     color = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
                         MaterialTheme.colorScheme.error

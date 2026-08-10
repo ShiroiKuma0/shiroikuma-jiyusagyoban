@@ -456,6 +456,14 @@ class ActiveAutomationViewModel(
     private val _preflightReview = MutableStateFlow<PreflightReviewState?>(null)
     internal val preflightReview: StateFlow<PreflightReviewState?> = _preflightReview.asStateFlow()
 
+    /**
+     * Guards the one-shot run actions. Their buttons stay enabled while the coroutine is in
+     * flight, so a double tap ran the task - or replayed a held execution - twice, with real
+     * side effects each time.
+     */
+    private val _runActionBusy = MutableStateFlow(false)
+    val runActionBusy: StateFlow<Boolean> = _runActionBusy.asStateFlow()
+
     private val _preflightBusy = MutableStateFlow(false)
     val preflightBusy: StateFlow<Boolean> = _preflightBusy.asStateFlow()
 
@@ -1436,6 +1444,8 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
+            if (_runActionBusy.value) return@launch
+            _runActionBusy.value = true
             runCatching {
                 executeAndLogTask(
                     appContext = appContext,
@@ -1458,11 +1468,14 @@ class ActiveAutomationViewModel(
                 // A manual run can be held, which adds a row the run-log page should show.
                 refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_task)) }
+            _runActionBusy.value = false
         }
     }
 
     fun replayHeldRun(entry: RunLogEntry) {
         viewModelScope.launch {
+            if (_runActionBusy.value) return@launch
+            _runActionBusy.value = true
             runCatching {
                 replayHeldExecution(
                     appContext = appContext,
@@ -1479,6 +1492,7 @@ class ActiveAutomationViewModel(
                 events.send(message(R.string.ui_message_run_replayed, entry.taskName, status, result.report.durationMs))
                 refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_log_replay)) }
+            _runActionBusy.value = false
         }
     }
 

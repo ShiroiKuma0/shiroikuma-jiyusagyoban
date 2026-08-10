@@ -19,6 +19,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -677,6 +678,15 @@ private fun DirectBootSetupCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Toggle the whole row, the pattern every other switch in the app uses. A bare
+                // Switch is its own focus target with no name, so a screen reader announced only
+                // "on/off" and never said which setting it belonged to.
+                .toggleable(
+                    value = enabled,
+                    onValueChange = onEnabledChange,
+                    role = Role.Switch,
+                )
+                .semantics(mergeDescendants = true) { this.stateDescription = stateDescription }
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -697,11 +707,8 @@ private fun DirectBootSetupCard(
                     color = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onEnabledChange,
-                modifier = Modifier.semantics { this.stateDescription = stateDescription },
-            )
+            // The row owns the toggle semantics now, so the switch itself is decorative.
+            Switch(checked = enabled, onCheckedChange = null)
         }
     }
 }
