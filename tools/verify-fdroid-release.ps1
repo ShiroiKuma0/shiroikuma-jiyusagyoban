@@ -209,7 +209,25 @@ if (-not $SkipTagCheck) {
     Invoke-Checked -FilePath "git" -ArgumentList @("rev-parse", "--verify", "$tagName^{commit}")
     $tagCommit = (& git -C $Root rev-list -n 1 $tagName).Trim()
     if ($tagCommit -ne $metadataCommit) {
-        throw "Tag $tagName points to $tagCommit, but metadata points to $metadataCommit"
+        # The documented release flow points the metadata `commit:` at the build commit and then
+        # adds a "sync release artifact metadata" commit that the tag lands on. Requiring an exact
+        # match therefore threw on every real release, so the tag gate was permanently bypassed
+        # with -SkipTagCheck. Accept a tag that descends from the metadata commit as long as
+        # nothing but the release metadata changed in between.
+        & git -C $Root merge-base --is-ancestor $metadataCommit $tagCommit
+        if ($LASTEXITCODE -ne 0) {
+            throw "Tag $tagName points to $tagCommit, which does not descend from metadata commit $metadataCommit"
+        }
+        $allowedSyncPaths = @("tools/release-truth.json")
+        $changedPaths = (& git -C $Root diff --name-only $metadataCommit $tagCommit) |
+            Where-Object { $_ -ne "" }
+        $unexpected = $changedPaths | Where-Object {
+            ($_ -notlike "fdroid/metadata/*.yml") -and ($allowedSyncPaths -notcontains $_)
+        }
+        if ($unexpected) {
+            throw ("Tag $tagName adds non-metadata changes after the build commit $metadataCommit`: " +
+                ($unexpected -join ", "))
+        }
     }
 }
 

@@ -11,6 +11,8 @@
 - Testing a synthetic event from the context editor keeps the editor open, so a fully configured context is no longer lost the moment its simulation is dismissed.
 - A simulation dialog survives rotation instead of vanishing.
 - Nodes changed by an undo or redo stay highlighted on the Flow tab after the review dialog closes. The highlight was tied to the dialog that covered Flow, so the dialog's own "highlighted in Flow" note pointed at something no one could ever see.
+- `verifyDocumentationTruth` now checks the CHANGELOG and release-truth files it already declared as inputs, so a release with no matching changelog section fails instead of passing silently.
+- The F-Droid release verifier's tag check accepts the repository's documented two-commit release flow, so it no longer has to be skipped on every release. An always-true assertion in the F-Droid readiness check is gone.
 
 ## v0.2.83
 
