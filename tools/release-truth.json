@@ -1,33 +1,33 @@
 {
-  "schemaVersion": 1,
-  "requiredArtifactCommit": "5a97f53eba08a9dc1c12d7076ed6e2983c2848da",
-  "releaseTag": "v0.2.85",
-  "releaseTagCommit": "3e16e7556ee18529c71837c9477a358bc9151198",
-  "application": {
-    "versionName": "0.2.85",
-    "versionCode": 87
-  },
-  "android": {
-    "minSdk": 26,
-    "compileSdk": 37,
-    "targetSdk": 37,
-    "buildTools": "36.0.0"
-  },
-  "dependencies": {
-    "kotlin": "2.4.10",
-    "gradle": "9.7.0",
-    "agp": "9.3.1",
-    "ksp": "2.3.11",
-    "room": "2.8.4",
-    "composeBom": "2026.06.01",
-    "work": "2.11.2"
-  },
-  "capabilities": {
-    "registeredActions": 74,
-    "engineHandledActions": 10,
-    "contextFamilies": 7,
-    "bundleSchemaVersion": 2,
-    "bundleSupportedSchemaVersions": "1..2",
-    "roomSchemaVersion": 15
-  }
+    "schemaVersion": 1,
+    "requiredArtifactCommit": "5a97f53eba08a9dc1c12d7076ed6e2983c2848da",
+    "releaseTag": "v0.2.85",
+    "releaseTagCommit": "3e16e7556ee18529c71837c9477a358bc9151198",
+    "application": {
+        "versionName": "0.2.85",
+        "versionCode": 87
+    },
+    "android": {
+        "minSdk": 26,
+        "compileSdk": 37,
+        "targetSdk": 37,
+        "buildTools": "36.0.0"
+    },
+    "dependencies": {
+        "kotlin": "2.4.10",
+        "gradle": "9.7.0",
+        "agp": "9.3.1",
+        "ksp": "2.3.11",
+        "room": "2.8.4",
+        "composeBom": "2026.06.01",
+        "work": "2.11.2"
+    },
+    "capabilities": {
+        "registeredActions": 172,
+        "engineHandledActions": 10,
+        "contextFamilies": 7,
+        "bundleSchemaVersion": 5,
+        "bundleSupportedSchemaVersions": "1..5",
+        "roomSchemaVersion": 27
+    }
 }

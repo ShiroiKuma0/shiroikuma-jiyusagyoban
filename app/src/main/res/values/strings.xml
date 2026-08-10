@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <string name="app_name">OpenTasker</string>
     <string name="qs_tile_subtitle_default">Tap to run task</string>
     <string name="qs_tile_config_title">Configure Quick Settings tile</string>
     <string name="qs_tile_config_subtitle">Bind a task, label, subtitle, and icon for tile slot %1$d.</string>
@@ -15,11 +14,12 @@
     <string name="qs_tile_save">Save tile</string>
     <string name="qs_tile_saved">Quick Settings tile saved.</string>
     <string name="qs_tile_default_label">Task tile %1$d</string>
-    <string name="permission_automation_label">Control OpenTasker automations</string>
-    <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
+    <string name="app_name">白い熊 自由作業盤</string>
+    <string name="permission_automation_label">Control 白い熊 自由作業盤 automations</string>
+    <string name="permission_automation_description">Allows same-signer integrations to run 白い熊 自由作業盤 tasks, toggle profiles, and query automation status through documented intents.</string>
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
-    <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+    <string name="widget_task_description">Run an 白い熊 自由作業盤 task with one tap</string>
 
     <!-- Navigation -->
     <string name="locale_select_task_title">Select task for Locale plugin</string>
@@ -161,7 +161,7 @@
     <string name="context_picker_clear_search">Clear context search</string>
     <string name="context_picker_no_results">No contexts match your search.</string>
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
-    <string name="dialog_review_bundle">Review OpenTasker bundle</string>
+    <string name="dialog_review_bundle">Review import</string>
     <string name="dialog_review_tasker">Review Tasker import</string>
     <string name="dialog_profile_share_review">Review community share</string>
 
@@ -289,7 +289,7 @@
     <string name="setup_usage_body">Needed for app-open triggers. Without it, profile contexts that watch for foreground apps will not fire.</string>
     <string name="setup_local_network_title">Local network access</string>
     <string name="setup_local_network_body">Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.</string>
-    <string name="setup_intro">OpenTasker can run with missing access but some features may not work.</string>
+    <string name="setup_intro">白い熊 自由作業盤 can run with missing access but some features may not work.</string>
     <string name="setup_pending_required">Pending required items must be completed before automations will trigger reliably.</string>
     <string name="setup_status_order">Pending required items are listed first. Optional integrations are listed after required setup.</string>
     <string name="setup_review_settings">Review app settings</string>
@@ -297,7 +297,7 @@
 
     <!-- Setup - Theme -->
     <string name="setup_theme_label">Theme</string>
-    <string name="setup_theme_helper">Choose the display mode for OpenTasker.</string>
+    <string name="setup_theme_helper">Choose the display mode for 白い熊 自由作業盤.</string>
 
     <!-- Setup - Backup -->
     <string name="setup_backup_label">Backup and restore</string>
@@ -651,7 +651,7 @@
     <string name="import_schema_info">Schema %1$d</string>
     <string name="import_schema_app">Schema %1$d — exported by app %2$s</string>
     <string name="import_incompatible">Cannot import</string>
-    <string name="import_incompatible_body">Bundle schema is not compatible with this version of OpenTasker.</string>
+    <string name="import_incompatible_body">Import schema is not compatible with this version of 白い熊 自由作業盤.</string>
     <string name="import_capability_review">Capability review</string>
     <string name="import_capability_item">%1$s — %2$s: %3$s</string>
     <string name="import_warnings">Import warnings</string>
@@ -671,7 +671,7 @@
     <string name="import_paste_json_body">Paste exported JSON here, or use a QR scanner that types the decoded text. Nothing is written until the existing import review is confirmed.</string>
     <string name="import_paste_json_hint">OpenTasker bundle JSON</string>
     <string name="import_paste_json_review">Review bundle</string>
-    <string name="import_opentasker_bundle">OpenTasker bundle</string>
+    <string name="import_opentasker_bundle">Import</string>
     <string name="import_count_tasks">Tasks</string>
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
@@ -896,7 +896,7 @@
     <string name="inspector_unavailable_title">Context inspector unavailable</string>
     <string name="inspector_waiting_for_sources">Waiting for sources</string>
 
-    <string name="import_reading_bundle">Reading Bundle...</string>
+    <string name="import_reading_bundle">Reading import...</string>
 
     <string name="workspace_review_readiness_templates">Review readiness before enabling profiles. Templates stay disabled until you approve them.</string>
     <string name="workspace_task_library_ready_body">Build reusable action sequences, then attach them to profiles when the order and permissions are ready.</string>
@@ -904,7 +904,7 @@
     <string name="workspace_recent_failure">Recent failure</string>
     <string name="workspace_review_run_log_details">Review the run log for details.</string>
     <string name="workspace_stored_data_review">Stored data needs review</string>
-    <string name="workspace_stored_data_review_body">OpenTasker blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
+    <string name="workspace_stored_data_review_body">白い熊 自由作業盤 blocked affected records from execution and editing. %1$s%2$s. Restore a database backup before continuing; the raw stored data remains untouched.</string>
     <string name="workspace_runs_task">Runs: %1$s</string>
     <string name="workspace_missing_task">Missing task #%1$d</string>
     <string name="workspace_profile_cannot_match">Profile cannot match yet</string>
@@ -1115,8 +1115,8 @@
     <string name="context_invert_helper">Run when this context is not true.</string>
     <string name="context_days_select_one">Select at least one day.</string>
     <string name="context_days_invalid_helper">Use weekdays, weekends, every day, or day tokens/ranges.</string>
-    <string name="context_nfc_trigger_label">OpenTasker NFC trigger</string>
-    <string name="context_nfc_trigger_label_with_tag">OpenTasker NFC trigger %1$s</string>
+    <string name="context_nfc_trigger_label">白い熊 自由作業盤 NFC trigger</string>
+    <string name="context_nfc_trigger_label_with_tag">白い熊 自由作業盤 NFC trigger %1$s</string>
     <string name="context_nfc_write_helper_body">Arms a one-time NDEF text write for the next scanned tag.</string>
 
     <string name="label_scenes">Scenes</string>
@@ -1616,4 +1616,9 @@
     <string name="ui_message_project_renamed">Project renamed</string>
     <string name="ui_message_project_reordered">Project reordered</string>
     <string name="ui_message_project_deleted">Project deleted</string>
+    <!-- Fork additions (白い熊 自由作業盤) -->
+    <string name="accessibility_service_description">Lets 白い熊 自由作業盤 actions perform system gestures — Back, Recents, the notification and quick-settings panels, the power dialog, and lock screen. No screen content is read.</string>
+    <string name="widget_task_label">白い熊 自由作業盤 (Task)</string>
+    <string name="widget_styled_label">白い熊 自由作業盤 (Styled)</string>
+    <string name="widget_styled_description">Designable widget — a styled layout a task can update (e.g. a clock).</string>
 </resources>

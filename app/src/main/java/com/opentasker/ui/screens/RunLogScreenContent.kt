@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,9 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -59,9 +58,7 @@ import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
 import com.opentasker.core.engine.RunLogOutcome
 import com.opentasker.core.engine.RunLogSource
-import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.RunLogTemplateDiagnostic
-import com.opentasker.core.engine.RunLogVariableChange
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 import com.opentasker.core.engine.outcome
@@ -75,8 +72,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal const val RUN_LOG_LIST_TAG = "run_log_list"
-
 @Composable
 internal fun RunLogScreenContent(
     logs: List<RunLogEntry>,
@@ -85,56 +80,51 @@ internal fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     onShareDiagnostic: () -> Unit,
     contentPadding: PaddingValues,
-    totalCount: Int = logs.size,
-    hasMore: Boolean = false,
-    loading: Boolean = false,
-    filters: RunLogFilterState = RunLogFilterState(),
-    taskOptions: List<Pair<Long, String>> = runLogTaskOptions(logs, tasks),
-    onFiltersChange: (RunLogFilterState) -> Unit = {},
-    onLoadMore: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onExportJson: () -> Unit = {},
-    onExportCsv: () -> Unit = {},
-    activeExecutions: List<ActiveExecution> = emptyList(),
-    onCancelExecution: (Long) -> Unit = {},
-    onReplayHeldRun: (RunLogEntry) -> Unit = {},
-    onToggleRunLogStar: (RunLogEntry) -> Unit = {},
 ) {
-    val hasFilters = filters != RunLogFilterState()
+    var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    val statusFilter = RunLogStatusFilter.entries.getOrElse(statusFilterOrdinal) { RunLogStatusFilter.All }
+    var taskIdFilter by rememberSaveable { mutableStateOf<Long?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val taskOptions = remember(logs, tasks) { runLogTaskOptions(logs, tasks) }
+    val filteredLogs = remember(logs, statusFilter, taskIdFilter, query) {
+        filterRunLogs(logs, RunLogFilterState(status = statusFilter, taskId = taskIdFilter, query = query))
+    }
+    // The latest failure (logs are timestamp-DESC) gets a banner atop the Log tab — this is where
+    // run failures surface now that the Profiles workspace card is gone.
+    //
+    // Classify with outcome(), NOT the raw success flag: a Skipped run never started (the collision
+    // or admission gate turned it away) and a Cancelled one was stopped on purpose, yet both are
+    // stored with success = false. Since the collision policy became live at the shared execution
+    // boundary, an ordinary slider drag skips a few mid-drag fires — on the raw flag that painted a
+    // red "failure" banner over a workspace in which nothing had actually failed.
+    val latestFailure = logs.firstOrNull { it.outcome() == RunLogOutcome.Failed }
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding)
-            .testTag(RUN_LOG_LIST_TAG),
+            .padding(contentPadding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
-        if (activeExecutions.isNotEmpty()) {
+        if (latestFailure != null) {
             item {
-                ActiveExecutionsCard(
-                    executions = activeExecutions,
-                    onCancel = onCancelExecution,
+                InlineNotice(
+                    title = "Last failure: ${latestFailure.taskName}",
+                    body = latestFailure.message.ifBlank { "Tap the matching entry below for the full trace." },
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
-        if (logs.isEmpty() && totalCount == 0 && !loading) {
+        if (logs.isEmpty()) {
             item {
                 InlineNotice(
-                    title = stringResource(if (hasFilters) R.string.empty_run_log_search_title else R.string.empty_run_log_title),
-                    body = stringResource(if (hasFilters) R.string.empty_run_log_search_body else R.string.empty_run_log_body),
+                    title = stringResource(R.string.empty_run_log_title),
+                    body = stringResource(R.string.empty_run_log_body),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-        } else if (logs.isNotEmpty()) {
+        } else {
             item {
-                RunLogSummaryCard(
-                    logs = logs,
-                    totalCount = totalCount,
-                    onShareDiagnostic = onShareDiagnostic,
-                    onRefresh = onRefresh,
-                    onExportJson = onExportJson,
-                    onExportCsv = onExportCsv,
-                )
+                RunLogSummaryCard(logs, onShareDiagnostic)
             }
         }
         item {
@@ -143,38 +133,32 @@ internal fun RunLogScreenContent(
                 onPolicyChange = onRetentionPolicyChange,
             )
         }
-        if (logs.isNotEmpty() || taskOptions.isNotEmpty() || hasFilters) {
+        if (logs.isNotEmpty()) {
             item {
                 RunLogFilterCard(
-                    totalCount = totalCount,
-                    visibleCount = logs.size,
-                    statusFilter = filters.status,
-                    onStatusFilterChange = { onFiltersChange(filters.copy(status = it)) },
+                    totalCount = logs.size,
+                    visibleCount = filteredLogs.size,
+                    statusFilter = statusFilter,
+                    onStatusFilterChange = { statusFilterOrdinal = it.ordinal },
                     taskOptions = taskOptions,
-                    selectedTaskId = filters.taskId,
-                    onTaskFilterChange = { onFiltersChange(filters.copy(taskId = it)) },
-                    query = filters.query,
-                    onQueryChange = { onFiltersChange(filters.copy(query = it)) },
-                    dateFilter = filters.date,
-                    onDateFilterChange = { onFiltersChange(filters.copy(date = it)) },
+                    selectedTaskId = taskIdFilter,
+                    onTaskFilterChange = { taskIdFilter = it },
+                    query = query,
+                    onQueryChange = { query = it },
                 )
             }
         }
-        items(logs, key = { it.id }) { entry ->
-            RunLogCard(
-                entry = entry,
-                onReplayHeldRun = onReplayHeldRun,
-                onToggleRunLogStar = onToggleRunLogStar,
-            )
-        }
-        if (loading) {
-            item { Text(stringResource(R.string.run_log_loading), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        } else if (hasMore) {
+        if (logs.isNotEmpty() && filteredLogs.isEmpty()) {
             item {
-                OutlinedButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.run_log_load_more))
-                }
+                InlineNotice(
+                    title = stringResource(R.string.empty_run_log_search_title),
+                    body = stringResource(R.string.empty_run_log_search_body),
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
+        }
+        items(filteredLogs, key = { it.id }) { entry ->
+            RunLogCard(entry)
         }
     }
 }
@@ -280,8 +264,6 @@ private fun RunLogFilterCard(
     onTaskFilterChange: (Long?) -> Unit,
     query: String,
     onQueryChange: (String) -> Unit,
-    dateFilter: RunLogDateFilter,
-    onDateFilterChange: (RunLogDateFilter) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -303,16 +285,12 @@ private fun RunLogFilterCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (
-                    statusFilter != RunLogStatusFilter.All || selectedTaskId != null ||
-                    query.isNotBlank() || dateFilter != RunLogDateFilter.All
-                ) {
+                if (statusFilter != RunLogStatusFilter.All || selectedTaskId != null || query.isNotBlank()) {
                     TextButton(
                         onClick = {
                             onStatusFilterChange(RunLogStatusFilter.All)
                             onTaskFilterChange(null)
                             onQueryChange("")
-                            onDateFilterChange(RunLogDateFilter.All)
                         },
                     ) {
                         Text(stringResource(R.string.action_clear))
@@ -338,18 +316,9 @@ private fun RunLogFilterCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
                     RunLogFilterChip(
-                        label = stringResource(filter.labelRes),
+                        label = filter.label,
                         selected = statusFilter == filter,
                         onClick = { onStatusFilterChange(filter) },
-                    )
-                }
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                items(RunLogDateFilter.entries.toList(), key = { it.name }) { filter ->
-                    RunLogFilterChip(
-                        label = stringResource(filter.labelRes),
-                        selected = dateFilter == filter,
-                        onClick = { onDateFilterChange(filter) },
                     )
                 }
             }
@@ -404,19 +373,10 @@ private fun RunLogFilterChip(
 }
 
 @Composable
-private fun RunLogSummaryCard(
-    logs: List<RunLogEntry>,
-    totalCount: Int,
-    onShareDiagnostic: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onExportJson: () -> Unit = {},
-    onExportCsv: () -> Unit = {},
-) {
+private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> Unit = {}) {
     val outcomes = remember(logs) { logs.map { it.outcome() } }
     val failures = outcomes.count { it == RunLogOutcome.Failed }
-    val interrupted = outcomes.count { it == RunLogOutcome.Interrupted }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
-    val held = outcomes.count { it == RunLogOutcome.Held }
     val latest = logs.firstOrNull()
 
     Card(
@@ -437,82 +397,56 @@ private fun RunLogSummaryCard(
                 }
                 StatusPill(
                     when {
-                        interrupted > 0 -> stringResource(R.string.status_interrupted)
-                        failures > 0 -> stringResource(R.string.run_log_summary_failed, failures)
-                        held > 0 -> stringResource(R.string.status_held)
-                        skipped > 0 -> stringResource(R.string.run_log_summary_skipped, skipped)
-                        else -> stringResource(R.string.run_log_summary_healthy)
+                        failures > 0 -> "$failures failed"
+                        skipped > 0 -> "$skipped skipped"
+                        else -> "Healthy"
                     },
                     when {
-                        interrupted > 0 -> MaterialTheme.colorScheme.error
                         failures > 0 -> MaterialTheme.colorScheme.error
-                        held > 0 -> MaterialTheme.colorScheme.tertiary
                         skipped > 0 -> MaterialTheme.colorScheme.secondary
                         else -> MaterialTheme.colorScheme.tertiary
                     },
                 )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { SummaryMetric("$totalCount", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
-                item { SummaryMetric("${logs.size}", stringResource(R.string.run_log_loaded), Modifier.width(104.dp)) }
+                item { SummaryMetric("${logs.size}", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
-                item { SummaryMetric("$interrupted", stringResource(R.string.status_interrupted), Modifier.width(104.dp)) }
                 item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
-                item { SummaryMetric("$held", stringResource(R.string.status_held), Modifier.width(104.dp)) }
             }
             latest?.let {
                 Text(
-                    stringResource(R.string.run_log_latest, it.taskName),
+                    "Latest: ${it.taskName}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
+            OutlinedButton(
+                onClick = onShareDiagnostic,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
-                OutlinedButton(onClick = onShareDiagnostic, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.run_log_share_diagnostic), maxLines = 1)
-                }
-                OutlinedButton(onClick = onRefresh, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.run_log_refresh), maxLines = 1)
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                OutlinedButton(onClick = onExportJson, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.run_log_export_json))
-                }
-                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.run_log_export_csv))
-                }
+                Text(stringResource(R.string.run_log_share_diagnostic))
             }
         }
     }
 }
 
 @Composable
-private fun RunLogCard(
-    entry: RunLogEntry,
-    onReplayHeldRun: (RunLogEntry) -> Unit,
-    onToggleRunLogStar: (RunLogEntry) -> Unit,
-) {
+private fun RunLogCard(entry: RunLogEntry) {
     val time = remember(entry.timestamp) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
     val diagnostics = remember(entry.message) { entry.message.toRunLogDiagnostics() }
-    var tracesExpanded by rememberSaveable(entry.id) { mutableStateOf(false) }
     val hasStructuredDiagnostics = diagnostics.source != null || diagnostics.decision != null || diagnostics.traces.isNotEmpty()
     val outcome = remember(entry.success, entry.message) { entry.outcome() }
     val accent = when (outcome) {
         RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.primary
         RunLogOutcome.Failed -> MaterialTheme.colorScheme.error
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
-        RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary
         RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
+        // Upstream's two new terminal outcomes: a run admission held back for replay, and one whose
+        // process died before it could write its own record.
+        RunLogOutcome.Held -> MaterialTheme.colorScheme.secondary
         RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
     val sourceText = entry.source?.let { key ->
@@ -526,9 +460,9 @@ private fun RunLogCard(
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
-                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
-                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
             }
         ),
         border = BorderStroke(
@@ -537,9 +471,9 @@ private fun RunLogCard(
                 RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
                 RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
-                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
-                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error.copy(alpha = 0.42f)
+                RunLogOutcome.Held -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
             },
         ),
         shape = RoundedCornerShape(16.dp),
@@ -557,16 +491,16 @@ private fun RunLogCard(
                         RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
                         RunLogOutcome.Failed -> Icons.Filled.Error
                         RunLogOutcome.Skipped -> Icons.Filled.Info
-                        RunLogOutcome.Held -> Icons.Filled.Info
                         RunLogOutcome.Cancelled -> Icons.Filled.Cancel
+                        RunLogOutcome.Held -> Icons.Filled.Info
                         RunLogOutcome.Interrupted -> Icons.Filled.Error
                     },
                     contentDescription = when (outcome) {
                         RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
                         RunLogOutcome.Failed -> stringResource(R.string.status_failed)
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
-                        RunLogOutcome.Held -> stringResource(R.string.status_held)
                         RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
+                        RunLogOutcome.Held -> stringResource(R.string.status_held)
                         RunLogOutcome.Interrupted -> stringResource(R.string.status_interrupted)
                     },
                     tint = accent,
@@ -589,35 +523,8 @@ private fun RunLogCard(
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill(outcome.localizedLabel(), accent) }
-                item { StatusPill(stringResource(R.string.run_log_duration, entry.durationMs), accent) }
-                if (entry.starred) item { StatusPill(stringResource(R.string.run_log_kept), MaterialTheme.colorScheme.primary) }
-            }
-            if (entry.heldPolicy != null) {
-                Text(
-                    stringResource(R.string.run_log_held_policy, entry.heldPolicy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = accent,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                if (entry.held) {
-                    OutlinedButton(
-                        onClick = { onReplayHeldRun(entry) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.run_log_replay))
-                    }
-                }
-                TextButton(
-                    onClick = { onToggleRunLogStar(entry) },
-                    modifier = if (entry.held) Modifier.weight(1f) else Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(if (entry.starred) R.string.run_log_unstar else R.string.run_log_star))
-                }
+                item { StatusPill(outcome.label, accent) }
+                item { StatusPill("${entry.durationMs} ms", accent) }
             }
             Column(Modifier.fillMaxWidth()) {
                 if (hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
@@ -635,30 +542,15 @@ private fun RunLogCard(
                 if (diagnostics.traces.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val visibleTraces = if (tracesExpanded) {
-                            diagnostics.traces
-                        } else {
-                            diagnostics.traces.subList(0, minOf(COLLAPSED_TRACE_COUNT, diagnostics.traces.size))
-                        }
-                        visibleTraces.forEach { trace ->
+                        diagnostics.traces.take(4).forEach { trace ->
                             RunLogTraceRow(trace)
                         }
-                        if (diagnostics.traces.size > COLLAPSED_TRACE_COUNT) {
-                            val stateLabel = stringResource(
-                                if (tracesExpanded) R.string.a11y_expanded else R.string.a11y_collapsed,
+                        if (diagnostics.traces.size > 4) {
+                            Text(
+                                stringResource(R.string.run_log_more_actions, diagnostics.traces.size - 4),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            TextButton(
-                                onClick = { tracesExpanded = !tracesExpanded },
-                                modifier = Modifier.semantics { stateDescription = stateLabel },
-                            ) {
-                                Text(
-                                    stringResource(
-                                        if (tracesExpanded) R.string.run_log_show_fewer_actions
-                                        else R.string.run_log_show_all_actions,
-                                        diagnostics.traces.size,
-                                    ),
-                                )
-                            }
                         }
                     }
                 } else if (!hasStructuredDiagnostics && diagnostics.detailLines.isNotEmpty()) {
@@ -689,16 +581,16 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
     ) {
-        StatusPill(trace.status.localizedName(), color)
+        StatusPill(trace.status.readableName(), color)
         Column(Modifier.weight(1f)) {
             Text(
-                stringResource(R.string.run_log_trace_indexed, trace.index + 1, trace.label),
+                "${trace.index + 1}. ${trace.label}",
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                stringResource(R.string.run_log_trace_detail, trace.actionType, trace.durationMs, trace.message),
+                "${trace.actionType} - ${trace.durationMs} ms - ${trace.message}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -706,7 +598,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             )
             trace.argumentSummary?.let { summary ->
                 Text(
-                    stringResource(R.string.run_log_trace_expanded, summary),
+                    "Expanded: $summary",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -716,7 +608,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             if (trace.templateWarningCount > 0) {
                 Spacer(Modifier.height(4.dp))
                 StatusPill(
-                    stringResource(R.string.run_log_template_warnings, trace.templateWarningCount),
+                    "${trace.templateWarningCount} template warning${plural(trace.templateWarningCount)}",
                     MaterialTheme.colorScheme.error,
                 )
             }
@@ -724,13 +616,6 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
                 Spacer(Modifier.height(4.dp))
                 ExpressionDebugger(
                     expressions = trace.templateExpressions,
-                    traceLabel = trace.label,
-                )
-            }
-            if (trace.variableChanges.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                VariableChangeInspector(
-                    changes = trace.variableChanges,
                     traceLabel = trace.label,
                 )
             }
@@ -794,7 +679,7 @@ private fun ExpressionDebugger(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    stringResource(R.string.run_log_expression_count, expressions.size),
+                    "${expressions.size} expression${plural(expressions.size)}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -821,7 +706,7 @@ private fun ExpressionDebugger(
                         )
                     }
                     Text(
-                        stringResource(R.string.run_log_expression_value, expr.expression, expr.value),
+                        "${expr.expression}  →  ${expr.value}",
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -841,181 +726,10 @@ private fun ExpressionDebugger(
             }
             if (!expanded && expressions.size > 3) {
                 Text(
-                    stringResource(R.string.run_log_expression_more, expressions.size - 3),
+                    "${expressions.size - 3} more",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        }
-    }
-}
-
-/**
- * What this step actually wrote. Traces show the values that went *into* an action; without this,
- * a finished run never answers "what did the task set?".
- *
- * Values arrive already redacted from the engine when the variable is secret-derived, so nothing
- * here can reveal a secret it was not already allowed to show.
- */
-@Composable
-private fun VariableChangeInspector(
-    changes: List<RunLogVariableChange>,
-    traceLabel: String,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val visible = if (expanded) changes else changes.take(3)
-    val stateLabel = if (expanded) stringResource(R.string.a11y_expanded) else stringResource(R.string.a11y_collapsed)
-    val actionLabel = if (expanded) stringResource(R.string.action_collapse) else stringResource(R.string.action_expand)
-    val inspectorDescription = stringResource(R.string.a11y_variable_changes, traceLabel)
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = DesignSystem.ComponentSize.touchTargetMin)
-                    .semantics {
-                        contentDescription = inspectorDescription
-                        stateDescription = stateLabel
-                    }
-                    .clickable(role = Role.Button, onClickLabel = actionLabel) { expanded = !expanded },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    pluralStringResource(R.plurals.run_log_variable_changes, changes.size, changes.size),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    actionLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            visible.forEach { change ->
-                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            change.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            maxLines = 1,
-                        )
-                        Text(
-                            change.scope,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                        Text(
-                            if (change.added) {
-                                stringResource(R.string.run_log_variable_added)
-                            } else {
-                                stringResource(R.string.run_log_variable_updated)
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                    Text(
-                        change.value,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = if (expanded) 4 else 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (!expanded && changes.size > 3) {
-                Text(
-                    stringResource(R.string.run_log_variable_more, changes.size - 3),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/**
- * What the engine is running right now, and the only way to stop it. Completed runs were the only
- * thing the UI ever showed, so a runaway automation — a long wait, a hung request, an accidental
- * loop — was invisible and unstoppable short of force-stopping the app.
- */
-@Composable
-private fun ActiveExecutionsCard(
-    executions: List<ActiveExecution>,
-    onCancel: (Long) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                pluralStringResource(R.plurals.run_log_active_executions, executions.size, executions.size),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            executions.forEach { execution ->
-                val elapsedSeconds = ((System.currentTimeMillis() - execution.startedAtMs) / 1000).coerceAtLeast(0)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            execution.taskName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            stringResource(
-                                R.string.run_log_active_execution_detail,
-                                execution.source,
-                                execution.stepIndex + 1,
-                                execution.stepLabel ?: stringResource(R.string.run_log_active_execution_starting),
-                                elapsedSeconds,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    TextButton(
-                        onClick = { onCancel(execution.id) },
-                        enabled = !execution.cancelling,
-                        modifier = Modifier.heightIn(min = DesignSystem.ComponentSize.touchTargetMin),
-                    ) {
-                        Text(
-                            if (execution.cancelling) {
-                                stringResource(R.string.run_log_active_execution_cancelling)
-                            } else {
-                                stringResource(R.string.action_cancel)
-                            },
-                        )
-                    }
-                }
             }
         }
     }
@@ -1029,28 +743,7 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
         .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
 
-@Composable
-private fun RunLogOutcome.localizedLabel(): String = stringResource(
-    when (this) {
-        RunLogOutcome.Succeeded -> R.string.status_succeeded
-        RunLogOutcome.Failed -> R.string.status_failed
-        RunLogOutcome.Skipped -> R.string.status_skipped
-        RunLogOutcome.Held -> R.string.status_held
-        RunLogOutcome.Cancelled -> R.string.status_cancelled
-        RunLogOutcome.Interrupted -> R.string.status_interrupted
-    },
-)
-
-@Composable
-private fun ActionTraceStatus.localizedName(): String = stringResource(
-    when (this) {
-        ActionTraceStatus.SUCCESS -> R.string.status_succeeded
-        ActionTraceStatus.FAILURE -> R.string.status_failed
-        ActionTraceStatus.TIMEOUT -> R.string.status_timeout
-        ActionTraceStatus.SKIPPED -> R.string.status_skipped
-    },
-)
+private fun ActionTraceStatus.readableName(): String =
+    name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
-
-private const val COLLAPSED_TRACE_COUNT = 4

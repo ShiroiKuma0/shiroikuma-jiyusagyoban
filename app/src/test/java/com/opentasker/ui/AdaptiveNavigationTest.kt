@@ -27,27 +27,7 @@ class AdaptiveNavigationTest {
         assertTrue(usesNavigationRail(599, fontScale = 2f))
     }
 
-    @Test
-    fun resizeAndFoldStateUsesSaveableStateAndAccessibleNavigationSemantics() {
-        val repoRoot = listOf(Path.of("."), Path.of(".."))
-            .first { Files.exists(it.resolve("README.md")) && Files.exists(it.resolve("app/build.gradle.kts")) }
-            .toAbsolutePath()
-            .normalize()
-        val source = repoRoot.resolve("app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
 
-        assertTrue(source.contains("LocalConfiguration.current"))
-        listOf(
-            "screenOrdinal",
-            "selectedProjectId",
-            "taskDialogId",
-            "profileDialogId",
-            "contextEditProfileId",
-            "bundleTextImportDraft",
-        ).forEach { stateKey ->
-            assertTrue("$stateKey must survive resize/fold recreation", source.contains("$stateKey by rememberSaveable"))
-        }
-        assertTrue(source.contains("clickable(role = Role.Tab"))
-        assertTrue(source.contains("stateDescription = if (selected)"))
-        assertTrue(source.contains("heightIn(min = 56.dp)"))
-    }
+    // Dropped in the 0.2.81 upstream sync: upstream's adaptive navigation shell (rail on medium and
+    // expanded widths, saveable resize/fold state) is not adopted — the fork keeps its own app shell.
 }

@@ -113,8 +113,12 @@ internal class ProfileMatcher(
                     ContextMatchUpdate(
                         matched = effectiveMatched,
                         pulseContext = isPulseContext,
+                        // Upstream 0.2.80 pulse continuity: the sequence comes from the observer so it
+                        // survives matcher rebuilds and suppresses replayed deliveries.
                         pulseSequence = pulseObservation?.sequence ?: 0L,
-                        event = if (isPulseContext && effectiveMatched) preparedEvent else null,
+                        // Fork: carry the event's per-invocation variable snapshot (e.g. %NOTIF_*) so a
+                        // burst cannot race on a shared super-global.
+                        vars = preparedEvent.vars,
                     )
                 }.onEach { update ->
                     AutomationLiveConditionState.updateContext(profile.id, index, update.matched)
@@ -180,7 +184,9 @@ internal class ProfileMatcher(
                 matched = if (spec.invert) !rawMatched else rawMatched,
                 pulseContext = spec.type == ContextType.EVENT,
                 pulseSequence = if (spec.type == ContextType.EVENT && rawMatched) 1L else 0L,
-                event = event?.takeIf { rawMatched },
+                // The fork threads each event's own variable snapshot rather than the event object,
+                // so a simulated trigger reports exactly what a real one would hand the task.
+                vars = if (rawMatched) event?.vars.orEmpty() else emptyMap(),
             )
         }
         return ProfileMatchSnapshot(
@@ -190,7 +196,7 @@ internal class ProfileMatcher(
                 profile.contextExpression,
             ),
             pulseSequence = updates.maxOfOrNull { it.pulseSequence } ?: 0L,
-            event = updates.lastOrNull { it.event != null }?.event,
+            vars = updates.lastOrNull { it.vars.isNotEmpty() }?.vars.orEmpty(),
         )
     }
 
@@ -209,10 +215,15 @@ internal class ProfileMatcher(
             AppLogger.warn(tag, "Slow profile evaluation: ${duration}ms (threshold: ${performanceThresholdMs}ms)")
         }
 
+        // Carry the firing context's per-invocation snapshot: prefer a matched pulse (event) context,
+        // else any matched context. Level (STATE) profiles have none — they keep the shared globals.
+        val eventVars = contextMatches.lastOrNull { it.pulseContext && it.matched }?.vars
+            ?: contextMatches.lastOrNull { it.matched }?.vars
+            ?: emptyMap()
         return ProfileMatchSnapshot(
             allMatched = allMatched,
             pulseSequence = pulseSequence,
-            event = contextMatches.lastOrNull { it.event != null }?.event,
+            vars = eventVars,
         )
     }
 
@@ -252,7 +263,7 @@ internal data class ContextMatchUpdate(
     val matched: Boolean,
     val pulseContext: Boolean,
     val pulseSequence: Long,
-    val event: ContextEvent? = null,
+    val vars: Map<String, String> = emptyMap(),
 ) {
     companion object {
         fun initial(pulseContext: Boolean, pulseSequence: Long = 0L): ContextMatchUpdate =
@@ -263,7 +274,7 @@ internal data class ContextMatchUpdate(
 internal data class ProfileMatchSnapshot(
     val allMatched: Boolean,
     val pulseSequence: Long,
-    val event: ContextEvent? = null,
+    val vars: Map<String, String> = emptyMap(),
 )
 
 private data class PulseAccumulator(
@@ -281,7 +292,7 @@ internal fun profileStateChangesFromSnapshots(
         snapshots.scan(PulseAccumulator(lastPulseSequence = initialPulseSequence, change = null)) { previous, snapshot ->
             val pulseChanged = snapshot.pulseSequence != previous.lastPulseSequence
             val change = if (pulseChanged && snapshot.pulseSequence > 0 && snapshot.allMatched) {
-                ProfileStateChange.Activated(snapshot.event)
+                ProfileStateChange.Activated(snapshot.vars)
             } else {
                 null
             }
@@ -295,7 +306,7 @@ internal fun profileStateChangesFromSnapshots(
             .scan(Pair(false, false)) { (_, prev), now -> Pair(prev, now) }
             .mapNotNull { (prev, now) ->
                 val change = when {
-                    !prev && now -> ProfileStateChange.Activated(null)
+                    !prev && now -> ProfileStateChange.Activated()
                     prev && !now -> ProfileStateChange.Deactivated
                     else -> null
                 }
@@ -333,6 +344,7 @@ internal fun evaluateContextExpression(
 }
 
 sealed class ProfileStateChange {
-    data class Activated(val event: ContextEvent?) : ProfileStateChange()
+    /** [vars] = the triggering event's per-invocation snapshot (e.g. notification %NOTIF_*), or empty. */
+    data class Activated(val vars: Map<String, String> = emptyMap()) : ProfileStateChange()
     data object Deactivated : ProfileStateChange()
 }
