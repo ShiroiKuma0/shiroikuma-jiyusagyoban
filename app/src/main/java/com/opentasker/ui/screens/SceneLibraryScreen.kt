@@ -32,6 +32,7 @@ fun SceneLibraryScreen(
     onUndoSceneEdit: (Scene) -> Unit = {},
     onRedoSceneEdit: (Scene) -> Unit = {},
     onDeleteScene: (Scene) -> Unit,
+    onDuplicateScene: (Scene) -> Unit = {},
     contentPadding: PaddingValues,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -166,6 +167,7 @@ fun SceneLibraryScreen(
                 onUndo = { onUndoSceneEdit(scene) },
                 onRedo = { onRedoSceneEdit(scene) },
                 onDelete = { onDeleteScene(scene) },
+                onDuplicate = { onDuplicateScene(scene) },
                 onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
             )
         }

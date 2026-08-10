@@ -52,6 +52,7 @@ import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.references.AutomationReferenceIndex
+import com.opentasker.core.references.AutomationDuplicator
 import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.TaskReference
@@ -295,6 +296,19 @@ class ActiveAutomationViewModel(
         db.editHistoryDao().pruneOld(entityType, entityId)
     }
 
+    private suspend fun recordCreation(entityType: String, entityId: Long, nextJson: String) {
+        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
+        db.editHistoryDao().insert(
+            EditHistoryEntity(
+                entityType = entityType,
+                entityId = entityId,
+                previousJson = "",
+                nextJson = nextJson,
+            ),
+        )
+        db.editHistoryDao().pruneOld(entityType, entityId)
+    }
+
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomainDecodeResult() } }
@@ -479,6 +493,28 @@ class ActiveAutomationViewModel(
         )
     }
 
+    fun duplicateTask(task: Task) {
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    val source = db.taskDao().getById(task.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Task no longer exists.")
+                    val name = AutomationDuplicator.copyName(source.name, db.taskDao().getAll().map { it.name })
+                    val staged = AutomationDuplicator.taskPayload(source, name)
+                    val newId = db.taskDao().insert(staged.toEntity())
+                    val duplicate = AutomationReferenceRewriter.remapDuplicateSelfReferences(
+                        original = source,
+                        duplicate = staged.copy(id = newId),
+                    )
+                    db.taskDao().update(duplicate.toEntity())
+                    recordCreation(EditHistoryDao.TYPE_TASK, newId, StorageJson.encodeToString(duplicate))
+                }
+            }.onSuccess { events.send(message(R.string.ui_message_task_duplicated)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+        }
+    }
+
     fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
         // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
         // update must be atomic so a concurrent writer can't interleave and lose a revision.
@@ -618,6 +654,25 @@ class ActiveAutomationViewModel(
         )
     }
 
+    fun duplicateScene(scene: Scene) {
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    val source = db.sceneDao().getById(scene.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Scene no longer exists.")
+                    val name = AutomationDuplicator.copyName(source.name, db.sceneDao().getAll().map { it.name })
+                    val duplicate = AutomationDuplicator.scenePayload(source, name)
+                    val newId = db.sceneDao().insert(duplicate.toEntity())
+                    val persisted = duplicate.copy(id = newId)
+                    db.sceneDao().update(persisted.toEntity())
+                    recordCreation(EditHistoryDao.TYPE_SCENE, newId, StorageJson.encodeToString(persisted))
+                }
+            }.onSuccess { events.send(message(R.string.ui_message_scene_duplicated)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+        }
+    }
+
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
         db.withTransaction {
             val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
@@ -684,6 +739,25 @@ class ActiveAutomationViewModel(
             db.profileDao().upsert(reviewFeedbackRisk(profile).toEntity())
             emitLintWarnings(profile, lint)
         }
+
+    fun duplicateProfile(profile: Profile) {
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    val source = db.profileDao().getById(profile.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Profile no longer exists.")
+                    val name = AutomationDuplicator.copyName(source.name, db.profileDao().getAll().map { it.name })
+                    val duplicate = AutomationDuplicator.profilePayload(source, name)
+                    requireValidProfileFieldLimits(duplicate)
+                    val newId = db.profileDao().insert(duplicate.toEntity())
+                    val persisted = duplicate.copy(id = newId)
+                    recordCreation(EditHistoryDao.TYPE_PROFILE, newId, StorageJson.encodeToString(persisted))
+                }
+            }.onSuccess { events.send(message(R.string.ui_message_profile_duplicated)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+        }
+    }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
@@ -1435,6 +1509,58 @@ class ActiveAutomationViewModel(
         } else {
             history.getUndoCandidate(entityType, entityId)
         } ?: return@withTransaction false
+
+        if (snapshot.previousJson.isBlank()) {
+            if (redo) {
+                when (entityType) {
+                    EditHistoryDao.TYPE_TASK -> {
+                        if (db.taskDao().getById(entityId) != null) return@withTransaction false
+                        db.taskDao().insert(EditHistorySnapshotDecoder.task(snapshot.nextJson, entityId).toEntity())
+                    }
+                    EditHistoryDao.TYPE_PROFILE -> {
+                        if (db.profileDao().getById(entityId) != null) return@withTransaction false
+                        db.profileDao().insert(EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId).toEntity())
+                    }
+                    EditHistoryDao.TYPE_SCENE -> {
+                        if (db.sceneDao().getById(entityId) != null) return@withTransaction false
+                        db.sceneDao().insert(EditHistorySnapshotDecoder.scene(snapshot.nextJson, entityId).toEntity())
+                    }
+                    else -> return@withTransaction false
+                }
+                history.markRedone(snapshot.id)
+            } else {
+                when (entityType) {
+                    EditHistoryDao.TYPE_TASK -> {
+                        val current = db.taskDao().getById(entityId) ?: return@withTransaction false
+                        val currentTask = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
+                        val references = AutomationReferenceIndex.referencesTo(
+                            task = currentTask,
+                            profiles = db.profileDao().getAll().map { it.toDomain() },
+                            tasks = db.taskDao().getAll().map { it.toDomain() },
+                            scenes = db.sceneDao().getAll().map { it.toDomain() },
+                            globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
+                        )
+                        if (references.isNotEmpty()) return@withTransaction false
+                        db.taskDao().delete(current)
+                    }
+                    EditHistoryDao.TYPE_PROFILE -> {
+                        val current = db.profileDao().getById(entityId) ?: return@withTransaction false
+                        db.profileDao().delete(current)
+                        locationDwellStateStore.clearProfile(entityId)
+                    }
+                    EditHistoryDao.TYPE_SCENE -> {
+                        val current = db.sceneDao().getById(entityId) ?: return@withTransaction false
+                        db.sceneDao().delete(current)
+                    }
+                    else -> return@withTransaction false
+                }
+                history.markUndone(snapshot.id, snapshot.nextJson)
+            }
+            return@withTransaction true
+        }
+
         val targetJson = if (redo) snapshot.nextJson else snapshot.previousJson
         if (targetJson.isBlank()) return@withTransaction false
 
