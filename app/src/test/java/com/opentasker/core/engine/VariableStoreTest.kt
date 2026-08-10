@@ -54,6 +54,34 @@ class VariableStoreTest {
         assertEquals("present", store.expand("%api-token"))
     }
 
+    /**
+     * Accepting `-` in variable names made `%count-1` scan as the single name "count-1", so text
+     * that used to expand `%count` and keep `-1` silently collapsed to an empty string. A defined
+     * hyphenated name still wins; only an undefined one falls back to its longest defined prefix.
+     */
+    @Test
+    fun hyphenatedTextFallsBackToTheLongestDefinedPrefix() {
+        val store = VariableStore().apply {
+            set("count", "5")
+            set("battery", "20")
+        }
+
+        // The hyphen and everything after it stay in the text, exactly as before.
+        assertEquals("5-1", store.expand("%count-1"))
+        assertEquals("20-20 > 0", store.expand("%battery-20 > 0"))
+        assertEquals("", store.expand("%unknown-thing"))
+    }
+
+    @Test
+    fun aDefinedHyphenatedNameStillWinsOverItsPrefix() {
+        val store = VariableStore().apply {
+            set("api", "prefix")
+            set("api-token", "full")
+        }
+
+        assertEquals("full", store.expand("%api-token"))
+    }
+
     @Test
     fun expandsEmbeddedOperatorsInText() {
         val store = VariableStore().apply {

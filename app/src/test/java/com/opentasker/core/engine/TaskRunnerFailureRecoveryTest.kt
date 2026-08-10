@@ -159,3 +159,92 @@ class TaskRunnerFailureRecoveryTest {
         assertEquals("", variables.globalSnapshot()[TaskFailureVariables.RETRY_REASON])
     }
 }
+
+/**
+ * A retry restarts the whole try body, so retry safety has to be judged across every action in it,
+ * and entering a catch handler has to record that the failure was caught.
+ */
+class TaskRunnerRetryBodySafetyTest {
+
+    private var sideEffects = 0
+    private var flakyCalls = 0
+
+    @Before
+    fun setUp() {
+        sideEffects = 0
+        flakyCalls = 0
+        ActionRegistry.register(object : Action {
+            override val id = "test.body.sideeffect"
+            override val category = ActionCategory.FLOW
+            override val retrySafety = ActionRetrySafety.NEVER
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                sideEffects++
+                return ActionResult.Success
+            }
+        })
+        ActionRegistry.register(object : Action {
+            override val id = "test.body.flaky"
+            override val category = ActionCategory.FLOW
+            override val retrySafety = ActionRetrySafety.IDEMPOTENT
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                flakyCalls++
+                return ActionResult.Failure("transient failure")
+            }
+        })
+    }
+
+    private fun runWith(variables: VariableStore, vararg actions: ActionSpec): TaskRunReport = runBlocking {
+        TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+            Task(name = "retry-body", actions = actions.toList()),
+        )
+    }
+
+    private fun marker(type: String, args: Map<String, String> = emptyMap()) =
+        ActionSpec(type = type, args = args)
+
+    @Test
+    fun aNonRetrySafeActionInTheBodyPreventsReplayingTheWholeBody() {
+        // Body is [NEVER-safe side effect, IDEMPOTENT failure]. Retrying restarts at the top, so
+        // the side effect would run again for every attempt.
+        runWith(
+            VariableStore(),
+            marker(FlowControl.TRY, mapOf("max_attempts" to "3")),
+            ActionSpec(type = "test.body.sideeffect"),
+            ActionSpec(type = "test.body.flaky"),
+            marker(FlowControl.CATCH),
+            marker(FlowControl.ENDTRY),
+        )
+
+        assertEquals("the non-retry-safe action must run exactly once", 1, sideEffects)
+        assertEquals("the body must not be replayed", 1, flakyCalls)
+    }
+
+    @Test
+    fun anAllIdempotentBodyStillRetries() {
+        runWith(
+            VariableStore(),
+            marker(FlowControl.TRY, mapOf("max_attempts" to "3")),
+            ActionSpec(type = "test.body.flaky"),
+            marker(FlowControl.CATCH),
+            marker(FlowControl.ENDTRY),
+        )
+
+        assertEquals(3, flakyCalls)
+    }
+
+    @Test
+    fun flowErrorCaughtIsTrueInsideTheCatchHandler() {
+        val variables = VariableStore()
+        runWith(
+            variables,
+            marker(FlowControl.TRY),
+            ActionSpec(type = "test.body.flaky"),
+            marker(FlowControl.CATCH),
+            ActionSpec(type = "test.body.sideeffect"),
+            marker(FlowControl.ENDTRY),
+        )
+
+        assertEquals("the handler must run", 1, sideEffects)
+        assertEquals("true", variables.get(TaskFailureVariables.CAUGHT))
+    }
+}

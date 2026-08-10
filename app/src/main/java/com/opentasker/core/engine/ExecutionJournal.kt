@@ -27,11 +27,12 @@ enum class ExecutionJournalState(val wireValue: String) {
  * arguments, variable values, or arbitrary metadata. It is a recovery record, not an audit dump.
  */
 internal object ExecutionJournal {
+    /** Returns false when this execution id was already journaled, i.e. a re-delivered command. */
     suspend fun start(
         db: AppDatabase,
         execution: ExecutionEnvelope,
         nowMs: Long = System.currentTimeMillis(),
-    ) {
+    ): Boolean {
         val classified = RunLogSource.classify(execution.source)
         val inserted = db.executionJournalDao().insert(
             ExecutionJournalEntity(
@@ -53,7 +54,11 @@ internal object ExecutionJournal {
                 terminalAtMs = null,
             ),
         )
-        check(inserted != -1L) { "Execution ${execution.executionId} was already journaled." }
+        // A conflicting id means this command has already been journaled, which is a re-delivery,
+        // not a fault. The external contract calls re-delivery an acknowledgement rather than a
+        // second run, so report it and let the caller ack instead of throwing - the throw surfaced
+        // to callers as a FAILED execution once the id aged out of the external ledger.
+        return inserted != -1L
     }
 
     suspend fun recordStep(

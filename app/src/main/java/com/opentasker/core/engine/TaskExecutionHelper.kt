@@ -120,7 +120,28 @@ suspend fun executeAndLogTask(
     ExecutionCommandLedger.transition(execution.executionId, ExecutionLedgerState.RUNNING)
     // Journal admission before hydrating variables or invoking any action. If the process dies
     // after this point, startup can prove that the command began and must not be retried blindly.
-    ExecutionJournal.start(db, execution)
+    if (!ExecutionJournal.start(db, execution)) {
+        // The id is already journaled, so this is a re-delivery of a command that already ran.
+        // Acknowledge it as a skip rather than running the task a second time.
+        val duplicateReason = "Duplicate delivery: this command has already run."
+        val terminalReason = ExecutionTerminalReason(
+            ExecutionTerminalReasonCode.DUPLICATE_DELIVERY,
+            duplicateReason,
+        )
+        ExecutionCommandLedger.transition(
+            execution.executionId,
+            ExecutionLedgerState.SKIPPED,
+            terminalReason,
+        )
+        admissionLease.release()
+        ExecutionCausality.forget(execution.executionId)
+        return@withContext TaskExecutionResult(
+            report = collisionSkippedReport(task, duplicateReason),
+            logInserted = false,
+            skippedReason = duplicateReason,
+            execution = execution,
+        )
+    }
     // Run the whole task off the caller's thread. Manual runs (ViewModel), widget/shortcut, and
     // notification-action paths call this from the main thread; without this hop, blocking actions
     // (HTTP, file, ping) would throw NetworkOnMainThreadException and fail silently.

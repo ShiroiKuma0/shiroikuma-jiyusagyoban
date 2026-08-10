@@ -128,7 +128,22 @@ class VariableExpander {
             }
         }
 
-        return TokenExpansion(variableStore.get(name) ?: "", cursor)
+        variableStore.get(name)?.let { return TokenExpansion(it, cursor) }
+
+        // A hyphen is a legal name character, so `%count-1` scans greedily as the name "count-1".
+        // When no such variable exists, fall back to the longest defined prefix so ordinary text
+        // keeps expanding `%count` and leaving `-1` behind, the way it did before hyphens were
+        // accepted in names. Tasker does not allow hyphens either, so imported tasks rely on this.
+        var separator = name.lastIndexOf('-')
+        while (separator > 0) {
+            val prefix = name.substring(0, separator)
+            variableStore.get(prefix)?.let { value ->
+                return TokenExpansion(value, start + 1 + separator)
+            }
+            separator = name.lastIndexOf('-', separator - 1)
+        }
+
+        return TokenExpansion("", cursor)
     }
 
     private fun findOperatorClose(expr: String, openIndex: Int): Int {

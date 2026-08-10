@@ -394,6 +394,24 @@ class TaskRunner(
         }
     }
 
+    /**
+     * Whether replaying the whole try body is safe.
+     *
+     * A retry restarts at `tryIndex + 1`, so every action in the body runs again - not just the one
+     * that failed. Checking only the failing action let a body like `[sms.send, http.get]` re-send
+     * the message each time the HTTP call failed. Control markers carry no side effects and are
+     * skipped; an unknown action id is treated as unsafe.
+     */
+    private fun tryBodyIsRetrySafe(task: Task, frame: TryFrame): Boolean {
+        val bodyEnd = frame.catchIndex ?: frame.endIndex
+        return ((frame.tryIndex + 1) until bodyEnd)
+            .mapNotNull { index -> task.actions.getOrNull(index) }
+            .filterNot { bodySpec -> FlowControl.isControl(bodySpec.type) }
+            .all { bodySpec ->
+                ActionRegistry.get(bodySpec.type)?.retrySafetyFor(bodySpec.args) == ActionRetrySafety.IDEMPOTENT
+            }
+    }
+
     private suspend fun recoverFailure(
         task: Task,
         pc: Int,
@@ -412,9 +430,7 @@ class TaskRunner(
 
             while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
             lastAttempt = frame.attempt
-            if (frame.attempt < frame.config.maxAttempts &&
-                ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args) == ActionRetrySafety.IDEMPOTENT
-            ) {
+            if (frame.attempt < frame.config.maxAttempts && tryBodyIsRetrySafe(task, frame)) {
                 setFailureVariables(task, pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
                 frame.attempt++
                 clearLoopsToDepth(loopStack, frame.loopDepth)
@@ -439,11 +455,13 @@ class TaskRunner(
                     retrying = false,
                     retryReason = nonRetryReason,
                 )
-                ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                 frame.phase = TryPhase.CATCH
                 clearLoopsToDepth(loopStack, frame.loopDepth)
+                // Resume on the CATCH marker itself, not past it. Jumping to catchIndex + 1 skipped
+                // the only place that records the failure as caught, so %FLOW_ERROR_CAUGHT read
+                // "false" inside every flow.catch handler and the marker's branch was dead code.
                 return FailureRecovery(
-                    nextPc = catchIndex + 1,
+                    nextPc = catchIndex,
                     reason = nonRetryReason,
                     attemptCount = frame.attempt,
                 )

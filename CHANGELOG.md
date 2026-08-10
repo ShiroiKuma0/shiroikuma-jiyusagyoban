@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `flow.try` retries now require every action in the try body to be retry-safe, not just the one that failed. A retry restarts the whole body, so a body such as send-message then fetch-URL re-sent the message on each attempt.
+- `%FLOW_ERROR_CAUGHT` is now `true` inside a `flow.catch` handler; it was always `false` because the catch marker that records it was skipped.
+- Text such as `%count-1` expands the `%count` variable again and keeps the rest. Allowing hyphens in variable names had made the whole token scan as one undefined name and collapse to an empty string; a variable that really is named with a hyphen still wins.
+- Re-delivering an external command whose id has aged out of the dedupe ledger is acknowledged as a duplicate delivery instead of reported as a failed execution.
+- A global fallback task that no longer exists is cleared on load rather than left dangling.
 - Held run-log entries and the execution journal are now bounded. Held rows were skipped by retention so a pending replay survived, but nothing else ever removed them - one entry per admission rejection, each up to 16 KB - and the journal was only trimmed at process start, so it grew for as long as the foreground service stayed up.
 - Replaying a held entry consumes it, so the Replay action can no longer run the same held execution repeatedly.
 - Manual runs and held replays are now admitted by the engine's live admission controller instead of a separate in-memory one, so they respect a saturated profile and an open circuit breaker. A failure during a manual run now reports an error instead of crashing.
