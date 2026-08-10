@@ -82,6 +82,9 @@ internal fun RunLogScreenContent(
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     onShareDiagnostic: () -> Unit,
     onReplayHeld: (RunLogEntry) -> Unit,
+    // True while a manual run or a held replay is in flight; disables every Replay button, since the
+    // guard behind onReplayHeld would otherwise drop the tap with nothing on screen to say why.
+    runBusy: Boolean = false,
     contentPadding: PaddingValues,
 ) {
     var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
@@ -161,7 +164,7 @@ internal fun RunLogScreenContent(
             }
         }
         items(filteredLogs, key = { it.id }) { entry ->
-            RunLogCard(entry, onReplayHeld)
+            RunLogCard(entry, onReplayHeld, runBusy)
         }
     }
 }
@@ -450,7 +453,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
 }
 
 @Composable
-private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit) {
+private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, runBusy: Boolean = false) {
     val time = remember(entry.timestamp) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
@@ -596,7 +599,7 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit) 
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { onReplayHeld(entry) }) { Text("Replay") }
+                        TextButton(enabled = !runBusy, onClick = { onReplayHeld(entry) }) { Text("Replay") }
                     }
                 }
             }

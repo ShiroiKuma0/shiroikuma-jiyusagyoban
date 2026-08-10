@@ -830,6 +830,10 @@ internal fun TasksScreen(
     onPasteTasks: (List<Task>, Long?, List<Long>) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onRunTask: (Task) -> Unit,
+    // True while a manual run or a held replay is in flight. Greys out every Run arrow, because the
+    // guard behind onRunTask drops a second run silently — an arrow that still looks live but does
+    // nothing is worse than one that plainly says "not now".
+    runBusy: Boolean = false,
     onSetTaskFreeze: (Task, Boolean) -> Unit,
     onPinTask: (Task) -> Unit,
     onAddAction: (Task) -> Unit,
@@ -923,6 +927,7 @@ internal fun TasksScreen(
                     onRename = { newName -> onRenameTask(task, newName) },
                     onDelete = { onDeleteTask(task) },
                     onRun = { onRunTask(task) },
+                    runBusy = runBusy,
                     onToggleFreeze = { onSetTaskFreeze(task, it) },
                     onPin = { onPinTask(task) },
                     onAddAction = { onAddAction(task) },
@@ -1063,6 +1068,7 @@ private fun TaskCard(
     onRename: (String) -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
+    runBusy: Boolean = false,
     onToggleFreeze: (Boolean) -> Unit,
     onPin: () -> Unit,
     onAddAction: () -> Unit,
@@ -1127,13 +1133,19 @@ private fun TaskCard(
                     // sides (白い熊): a 32dp box centers the icon at card-pad + 16dp, then a 16dp spacer keeps
                     // the app icon at its original indent.
                     Box(
-                        modifier = Modifier.size(width = 32.dp, height = 36.dp).clickable(onClick = onRun),
+                        modifier = Modifier
+                            .size(width = 32.dp, height = 36.dp)
+                            .clickable(enabled = !runBusy, onClick = onRun),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Filled.PlayArrow,
                             contentDescription = stringResource(R.string.action_run),
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = if (runBusy) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                         )
                     }
                     Spacer(Modifier.width(16.dp))
