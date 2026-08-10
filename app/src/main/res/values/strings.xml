@@ -1079,6 +1079,7 @@
     <string name="ui_error_run_logs_load">Run logs could not be loaded</string>
     <string name="ui_error_run_logs_more">More run logs could not be loaded</string>
     <string name="ui_error_run_log_export">Run log export failed</string>
+    <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
     <string name="ui_error_retention_preview">Retention preview failed</string>
     <string name="ui_error_retention_update">Run log retention update failed</string>

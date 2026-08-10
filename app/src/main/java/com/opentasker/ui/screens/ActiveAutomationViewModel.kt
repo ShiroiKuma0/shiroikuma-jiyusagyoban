@@ -65,6 +65,7 @@ import com.opentasker.core.sharing.ProfileShareLibrary
 import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DatabaseBackupManager
+import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
@@ -1288,10 +1289,7 @@ class ActiveAutomationViewModel(
     }
 
     private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
-        db.runLogDao().pruneRetention(
-            maxEntries = policy.maxEntries,
-            minimumTimestamp = policy.minimumTimestamp(System.currentTimeMillis()),
-        )
+        db.runLogDao().applyRetention(policy, System.currentTimeMillis())
 
     fun shareDiagnosticReport() {
         viewModelScope.launch {
@@ -1406,20 +1404,28 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            val result = executeAndLogTask(
-                appContext = appContext,
-                db = db,
-                task = task,
-                source = "Manual run",
-                execution = ExecutionEnvelope.create(task, "Manual run"),
-            )
-            val status = when {
-                result.held -> "held"
-                result.skippedReason != null -> "skipped"
-                result.report.success -> "succeeded"
-                else -> "failed"
-            }
-            events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
+            runCatching {
+                executeAndLogTask(
+                    appContext = appContext,
+                    db = db,
+                    task = task,
+                    source = "Manual run",
+                    // Admit against the engine's live controller. The default is a separate
+                    // in-memory one that admits even while the profile is saturated.
+                    admissionController = ExecutionAdmissionRegistry.current(appContext),
+                    execution = ExecutionEnvelope.create(task, "Manual run"),
+                )
+            }.onSuccess { result ->
+                val status = when {
+                    result.held -> "held"
+                    result.skippedReason != null -> "skipped"
+                    result.report.success -> "succeeded"
+                    else -> "failed"
+                }
+                events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
+                // A manual run can be held, which adds a row the run-log page should show.
+                refreshRunLogPage()
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_task)) }
         }
     }
 
@@ -1430,6 +1436,7 @@ class ActiveAutomationViewModel(
                     appContext = appContext,
                     db = db,
                     heldEntry = entry,
+                    admissionController = ExecutionAdmissionRegistry.current(appContext),
                 )
             }.onSuccess { result ->
                 val status = when {

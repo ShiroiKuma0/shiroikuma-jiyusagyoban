@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Held run-log entries and the execution journal are now bounded. Held rows were skipped by retention so a pending replay survived, but nothing else ever removed them - one entry per admission rejection, each up to 16 KB - and the journal was only trimmed at process start, so it grew for as long as the foreground service stayed up.
+- Replaying a held entry consumes it, so the Replay action can no longer run the same held execution repeatedly.
+- Manual runs and held replays are now admitted by the engine's live admission controller instead of a separate in-memory one, so they respect a saturated profile and an open circuit breaker. A failure during a manual run now reports an error instead of crashing.
 - The F-Droid distribution builds unsigned again, restoring the `app-release-unsigned.apk` artifact its build recipe and the reproducibility harness both name; adding the repo-owned signing fallback had silently renamed it to `app-release.apk`. The metadata gate now derives the expected artifact path from the signing decision and refuses to run against a non-F-Droid distribution instead of reporting a pass.
 - Device orientation now follows the Android sensor convention: a normally held phone reports `portrait` rather than `portrait_upside_down`, and the landscape sub-values are no longer swapped.
 - Tethering state now reports the union of Wi-Fi hotspot and interface tethering and publishes an initial value on registration. Any delivery of the legacy tethering broadcast previously latched the state to on, so it stayed on after tethering stopped, and a `tethering=false` predicate could never match.

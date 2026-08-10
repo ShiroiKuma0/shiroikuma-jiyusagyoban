@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.RunLogRetentionSettings
+import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 
@@ -22,12 +23,15 @@ class RunLogPruneWorker(
         val policy = RunLogRetentionSettings(applicationContext).load()
         val now = System.currentTimeMillis()
         return try {
-            val deleted = db.runLogDao().pruneRetention(
-                maxEntries = policy.maxEntries,
-                minimumTimestamp = policy.minimumTimestamp(now),
-            )
+            val deleted = db.runLogDao().applyRetention(policy, now)
             if (deleted > 0) {
                 AppLogger.info(TAG, "Periodic prune removed $deleted old run log entries")
+            }
+            // The execution journal was only trimmed by startup recovery, so it grew without
+            // bound for as long as the service stayed up.
+            val journalPruned = pruneExecutionJournal(db)
+            if (journalPruned > 0) {
+                AppLogger.info(TAG, "Periodic prune removed $journalPruned completed journal entries")
             }
             Result.success()
         } catch (e: Exception) {

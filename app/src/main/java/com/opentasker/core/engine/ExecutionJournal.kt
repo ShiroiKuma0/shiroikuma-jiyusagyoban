@@ -126,7 +126,7 @@ suspend fun reconcileExecutionJournal(
         if (inserted && dao.markRunLogWritten(row.executionId, nowMs) == 1) logsWritten++
     }
 
-    val pruned = dao.pruneTerminal(MAX_RETAINED_JOURNAL_ENTRIES)
+    val pruned = pruneExecutionJournal(db)
     return ExecutionJournalRecoverySummary(
         inspected = stale.size,
         interrupted = interrupted,
@@ -134,6 +134,17 @@ suspend fun reconcileExecutionJournal(
         pruned = pruned,
     )
 }
+
+/**
+ * Trims completed journal rows to the retained window.
+ *
+ * Every execution inserts a row, and this used to run only from startup recovery. The engine is a
+ * foreground service designed to stay up for weeks, so a frequent automation accumulated tens of
+ * thousands of rows - and their indexes - between process restarts. The periodic run-log prune
+ * calls this too.
+ */
+suspend fun pruneExecutionJournal(db: AppDatabase): Int =
+    db.executionJournalDao().pruneTerminal(MAX_RETAINED_JOURNAL_ENTRIES)
 
 data class ExecutionJournalRecoverySummary(
     val inspected: Int,

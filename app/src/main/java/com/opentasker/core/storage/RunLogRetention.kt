@@ -17,9 +17,17 @@ data class RunLogRetentionPolicy(
     val maxEntries: Int = DEFAULT_MAX_ENTRIES,
     val maxAgeDays: Int = DEFAULT_MAX_AGE_DAYS,
 ) {
+    /**
+     * Held rows are kept for replay and carry up to 16 KB of payload each, so they get a much
+     * smaller count cap than ordinary entries while ageing out on the same window.
+     */
+    val maxHeldEntries: Int get() = (maxEntries / HELD_ENTRIES_DIVISOR).coerceAtLeast(MIN_HELD_ENTRIES)
+
     companion object {
         const val DEFAULT_MAX_ENTRIES = 1_000
         const val DEFAULT_MAX_AGE_DAYS = 30
+        private const val HELD_ENTRIES_DIVISOR = 10
+        private const val MIN_HELD_ENTRIES = 25
     }
 }
 
@@ -85,3 +93,16 @@ fun RunLogRetentionPolicy.displayLabel(): String {
 private fun dayLabel(days: Int): String = if (days == 1) "day" else "days"
 
 private fun entryLabel(entries: Int): String = if (entries == 1) "entry" else "entries"
+
+/**
+ * Applies the retention policy to ordinary and held rows in one step.
+ *
+ * [RunLogDao.pruneRetention] deliberately skips held rows so a pending replay is never deleted out
+ * from under the user, which left them growing without bound. Pruning both here keeps the three
+ * call sites - the service, the periodic worker, and the run-log screen - from drifting apart.
+ */
+suspend fun RunLogDao.applyRetention(policy: RunLogRetentionPolicy, nowMillis: Long): Int {
+    val cutoff = policy.minimumTimestamp(nowMillis)
+    return pruneRetention(maxEntries = policy.maxEntries, minimumTimestamp = cutoff) +
+        pruneHeldRetention(maxHeldEntries = policy.maxHeldEntries, minimumTimestamp = cutoff)
+}
