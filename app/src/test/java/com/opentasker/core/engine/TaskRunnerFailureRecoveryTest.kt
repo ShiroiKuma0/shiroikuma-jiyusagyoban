@@ -6,6 +6,7 @@ import com.opentasker.core.model.Task
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -105,12 +106,56 @@ class TaskRunnerFailureRecoveryTest {
 
     @Test
     fun uncaughtFailureStillFailsTask() {
-        val report = run(
-            marker(FlowControl.TRY),
-            marker("test.flow.fail"),
-            marker(FlowControl.ENDTRY),
-        )
+        val variables = VariableStore()
+        val report = runBlocking {
+            TaskRunner(
+                ActionContext(ContextWrapper(null), variables),
+                originatingProfileId = 41L,
+                originatingProfileName = "Work profile",
+            ).run(
+                Task(
+                    id = 19L,
+                    name = "Broken task",
+                    actions = listOf(
+                        ActionSpec(id = 77L, type = "test.flow.fail"),
+                    ),
+                ),
+            )
+        }
 
         assertFalse(report.success)
+        assertNotNull(report.structuredError)
+        val error = report.structuredError!!
+        assertEquals(19L, error.taskId)
+        assertEquals(77L, error.actionId)
+        assertEquals(1, error.actionIndex)
+        assertEquals("test.flow.fail", error.actionType)
+        assertEquals("permanent failure", error.message)
+        assertEquals(1, error.attemptCount)
+        assertEquals(41L, error.originatingProfileId)
+        assertEquals("Work profile", error.originatingProfileName)
+        assertTrue(variables.globalSnapshot()[TaskFailureVariables.JSON].orEmpty().contains("test.flow.fail"))
+    }
+
+    @Test
+    fun retrySuccessClearsRetryingFlag() {
+        val variables = VariableStore()
+        val report = runBlocking {
+            TaskRunner(ActionContext(ContextWrapper(null), variables)).run(
+                Task(
+                    name = "Eventually healthy",
+                    actions = listOf(
+                        marker(FlowControl.TRY, mapOf("max_attempts" to "2")),
+                        ActionSpec(type = "test.flow.flaky", args = mapOf("failures" to "1")),
+                        marker(FlowControl.CATCH),
+                        marker(FlowControl.ENDTRY),
+                    ),
+                ),
+            )
+        }
+
+        assertTrue(report.success)
+        assertEquals("false", variables.globalSnapshot()[TaskFailureVariables.RETRYING])
+        assertEquals("", variables.globalSnapshot()[TaskFailureVariables.RETRY_REASON])
     }
 }

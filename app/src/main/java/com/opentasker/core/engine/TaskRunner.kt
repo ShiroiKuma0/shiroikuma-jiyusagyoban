@@ -35,6 +35,8 @@ class TaskRunner(
     private val onStep: ((index: Int, label: String) -> Unit)? = null,
     private val collisionCoordinator: TaskCollisionCoordinator? = null,
     private val executionChain: Set<Long> = emptySet(),
+    private val originatingProfileId: Long? = null,
+    private val originatingProfileName: String? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -75,24 +77,7 @@ class TaskRunner(
             val failure = ActionResult.Failure(
                 "task contains unknown unclassified actions: ${unknownActionIds.joinToString()}",
             )
-            return TaskRunReport(
-                taskId = task.id,
-                taskName = task.name,
-                startedAt = started,
-                durationMs = System.currentTimeMillis() - started,
-                results = listOf(failure),
-                traces = listOf(
-                    ActionExecutionTrace(
-                        index = 0,
-                        actionType = "preflight",
-                        label = "action classification",
-                        durationMs = 0,
-                        status = ActionTraceStatus.FAILURE,
-                        message = failure.message,
-                    ),
-                ),
-                success = false,
-            )
+            return preflightFailureReport(task, started, failure, "preflight", "action classification")
         }
 
         val unsupportedActionIds = task.actions
@@ -108,54 +93,21 @@ class TaskRunner(
             val failure = ActionResult.Failure(
                 "task contains unsupported actions: ${unsupportedActionIds.joinToString()}",
             )
-            return TaskRunReport(
-                taskId = task.id,
-                taskName = task.name,
-                startedAt = started,
-                durationMs = System.currentTimeMillis() - started,
-                results = listOf(failure),
-                traces = listOf(
-                    ActionExecutionTrace(
-                        index = 0,
-                        actionType = "preflight",
-                        label = "action capability",
-                        durationMs = 0,
-                        status = ActionTraceStatus.FAILURE,
-                        message = failure.message,
-                    ),
-                ),
-                success = false,
-            )
+            return preflightFailureReport(task, started, failure, "preflight", "action capability")
         }
 
         val structure = FlowStructure.analyze(task.actions)
         if (structure.error != null) {
             ctx.variables.popScope()
             val failure = ActionResult.Failure("flow control error: ${structure.error}")
-            return TaskRunReport(
-                taskId = task.id,
-                taskName = task.name,
-                startedAt = started,
-                durationMs = System.currentTimeMillis() - started,
-                results = listOf(failure),
-                traces = listOf(
-                    ActionExecutionTrace(
-                        index = 0,
-                        actionType = "flow",
-                        label = "flow control",
-                        durationMs = 0,
-                        status = ActionTraceStatus.FAILURE,
-                        message = failure.message,
-                    ),
-                ),
-                success = false,
-            )
+            return preflightFailureReport(task, started, failure, "flow", "flow control")
         }
 
         val loopStack = ArrayDeque<LoopFrame>()
         val tryStack = ArrayDeque<TryFrame>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
+        var structuredFailure: StructuredTaskError? = null
         try {
             var pc = 0
             var steps = 0
@@ -164,6 +116,16 @@ class TaskRunner(
                     val failure = ActionResult.Failure("flow step budget ($MAX_FLOW_STEPS) exceeded")
                     results += failure
                     traces += markerTrace(pc, task.actions[pc], failure, ActionTraceStatus.FAILURE)
+                    structuredFailure = setFailureVariables(
+                        task = task,
+                        pc = pc,
+                        spec = task.actions[pc],
+                        failure = failure,
+                        attempt = 1,
+                        retrying = false,
+                        retryReason = null,
+                    )
+                    ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                     unhandledFailure = true
                     break
                 }
@@ -173,7 +135,19 @@ class TaskRunner(
                     results += outcome.result
                     traces += outcome.trace
                     if (outcome.halt) {
-                        if (outcome.result is ActionResult.Failure) unhandledFailure = true
+                        if (outcome.result is ActionResult.Failure) {
+                            structuredFailure = setFailureVariables(
+                                task = task,
+                                pc = pc,
+                                spec = spec,
+                                failure = outcome.result,
+                                attempt = 1,
+                                retrying = false,
+                                retryReason = null,
+                            )
+                            ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
+                            unhandledFailure = true
+                        }
                         break
                     }
                     pc = outcome.nextPc
@@ -184,8 +158,15 @@ class TaskRunner(
                 val (result, trace) = runOne(pc, spec)
                 results += result
                 traces += trace
+                if (result !is ActionResult.Failure &&
+                    tryStack.any { frame ->
+                        frame.phase == TryPhase.BODY && pc > frame.tryIndex && pc < frame.endIndex
+                    }
+                ) {
+                    clearRetryVariables()
+                }
                 if (result is ActionResult.Failure) {
-                    val recovery = recoverFailure(pc, spec, result, structure, loopStack, tryStack)
+                    val recovery = recoverFailure(task, pc, spec, result, structure, loopStack, tryStack)
                     recovery.reason?.let { reason ->
                         traces[traces.lastIndex] = traces.last().copy(
                             message = "${traces.last().message}; $reason",
@@ -195,6 +176,18 @@ class TaskRunner(
                         handledFailureIndices += results.lastIndex
                         pc = recovery.nextPc
                         continue
+                    }
+                    if (structuredFailure == null) {
+                        structuredFailure = setFailureVariables(
+                            task = task,
+                            pc = pc,
+                            spec = spec,
+                            failure = result,
+                            attempt = recovery.attemptCount,
+                            retrying = false,
+                            retryReason = recovery.reason,
+                        )
+                        ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                     }
                     if (!spec.continueOnError) {
                         unhandledFailure = true
@@ -215,7 +208,46 @@ class TaskRunner(
             traces = traces,
             success = !unhandledFailure && results.withIndex().all { (index, result) ->
                 result !is ActionResult.Failure || index in handledFailureIndices
-            }
+            },
+            structuredError = structuredFailure,
+        )
+    }
+
+    private fun preflightFailureReport(
+        task: Task,
+        started: Long,
+        failure: ActionResult.Failure,
+        actionType: String,
+        label: String,
+    ): TaskRunReport {
+        return TaskRunReport(
+            taskId = task.id,
+            taskName = task.name,
+            startedAt = started,
+            durationMs = System.currentTimeMillis() - started,
+            results = listOf(failure),
+            traces = listOf(
+                ActionExecutionTrace(
+                    index = 0,
+                    actionType = actionType,
+                    label = label,
+                    durationMs = 0,
+                    status = ActionTraceStatus.FAILURE,
+                    message = failure.message,
+                ),
+            ),
+            success = false,
+            structuredError = StructuredTaskError(
+                taskId = task.id,
+                taskName = task.name,
+                actionId = 0L,
+                actionIndex = 0,
+                actionType = actionType,
+                message = failure.message,
+                attemptCount = 1,
+                originatingProfileId = originatingProfileId,
+                originatingProfileName = originatingProfileName,
+            ),
         )
     }
 
@@ -229,6 +261,7 @@ class TaskRunner(
     private data class FailureRecovery(
         val nextPc: Int?,
         val reason: String? = null,
+        val attemptCount: Int = 1,
     )
 
     private fun stepControl(
@@ -352,6 +385,7 @@ class TaskRunner(
     }
 
     private suspend fun recoverFailure(
+        task: Task,
         pc: Int,
         spec: ActionSpec,
         failure: ActionResult.Failure,
@@ -360,27 +394,34 @@ class TaskRunner(
         tryStack: ArrayDeque<TryFrame>,
     ): FailureRecovery {
         var nonRetryReason: String? = null
+        var lastAttempt = 1
         while (true) {
             val frame = tryStack.asReversed().firstOrNull { candidate ->
                 candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
-            } ?: return FailureRecovery(nextPc = null, reason = nonRetryReason)
+            } ?: return FailureRecovery(nextPc = null, reason = nonRetryReason, attemptCount = lastAttempt)
 
             while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
+            lastAttempt = frame.attempt
             if (frame.attempt < frame.config.maxAttempts &&
                 ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args) == ActionRetrySafety.IDEMPOTENT
             ) {
-                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
+                setFailureVariables(task, pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
                 frame.attempt++
                 clearLoopsToDepth(loopStack, frame.loopDepth)
                 val waitMs = retryBackoffMs(frame.config.backoffMs, frame.attempt - 1)
                 if (waitMs > 0) delay(waitMs)
-                return FailureRecovery(nextPc = frame.tryIndex + 1, reason = nonRetryReason)
+                return FailureRecovery(
+                    nextPc = frame.tryIndex + 1,
+                    reason = nonRetryReason,
+                    attemptCount = frame.attempt - 1,
+                )
             } else if (frame.attempt < frame.config.maxAttempts || frame.config.maxAttempts > 1) {
                 nonRetryReason = retryReason(spec, ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args))
             }
 
             frame.catchIndex?.let { catchIndex ->
                 setFailureVariables(
+                    task,
                     pc,
                     spec,
                     failure,
@@ -391,7 +432,11 @@ class TaskRunner(
                 ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                 frame.phase = TryPhase.CATCH
                 clearLoopsToDepth(loopStack, frame.loopDepth)
-                return FailureRecovery(nextPc = catchIndex + 1, reason = nonRetryReason)
+                return FailureRecovery(
+                    nextPc = catchIndex + 1,
+                    reason = nonRetryReason,
+                    attemptCount = frame.attempt,
+                )
             }
 
             // An uncaught nested failure propagates to the enclosing try block.
@@ -409,19 +454,45 @@ class TaskRunner(
     }
 
     private fun setFailureVariables(
+        task: Task,
         pc: Int,
         spec: ActionSpec,
         failure: ActionResult.Failure,
         attempt: Int,
         retrying: Boolean,
         retryReason: String?,
-    ) {
-        ctx.variables.set(FLOW_ERROR_MESSAGE, failure.message)
-        ctx.variables.set(FLOW_ERROR_ACTION, spec.type)
-        ctx.variables.set(FLOW_ERROR_INDEX, (pc + 1).toString())
-        ctx.variables.set(FLOW_ERROR_ATTEMPT, attempt.toString())
+        structuredError: StructuredTaskError? = null,
+    ): StructuredTaskError {
+        val error = structuredError ?: failure.structuredError ?: StructuredTaskError(
+            taskId = task.id,
+            taskName = task.name,
+            actionId = spec.id,
+            actionIndex = pc + 1,
+            actionType = spec.type,
+            message = failure.message,
+            attemptCount = attempt.coerceAtLeast(1),
+            originatingProfileId = originatingProfileId,
+            originatingProfileName = originatingProfileName,
+        )
+        ctx.variables.set(FLOW_ERROR_JSON, StructuredTaskErrorCodec.encode(error))
+        ctx.variables.set(FLOW_ERROR_TASK_ID, error.taskId.toString())
+        ctx.variables.set(FLOW_ERROR_TASK_NAME, error.taskName)
+        ctx.variables.set(FLOW_ERROR_ACTION_ID, error.actionId.toString())
+        ctx.variables.set(FLOW_ERROR_MESSAGE, error.message)
+        ctx.variables.set(FLOW_ERROR_ACTION, error.actionType)
+        ctx.variables.set(FLOW_ERROR_INDEX, error.actionIndex.toString())
+        ctx.variables.set(FLOW_ERROR_TYPE, error.actionType)
+        ctx.variables.set(FLOW_ERROR_ATTEMPT, error.attemptCount.toString())
         ctx.variables.set(FLOW_ERROR_RETRYING, retrying.toString())
         ctx.variables.set(FLOW_ERROR_RETRY_REASON, retryReason.orEmpty())
+        ctx.variables.set(FLOW_ERROR_PROFILE_ID, error.originatingProfileId?.toString().orEmpty())
+        ctx.variables.set(FLOW_ERROR_PROFILE_NAME, error.originatingProfileName.orEmpty())
+        return error
+    }
+
+    private fun clearRetryVariables() {
+        ctx.variables.set(FLOW_ERROR_RETRYING, "false")
+        ctx.variables.set(FLOW_ERROR_RETRY_REASON, "")
     }
 
     private fun clearLoopsToDepth(loopStack: ArrayDeque<LoopFrame>, depth: Int) {
@@ -526,6 +597,8 @@ class TaskRunner(
             onStep = onStep,
             collisionCoordinator = collisionCoordinator,
             executionChain = executionChain + target.id,
+            originatingProfileId = originatingProfileId,
+            originatingProfileName = originatingProfileName,
         )
         ctx.variables.pushScope()
         val report = try {
@@ -545,7 +618,10 @@ class TaskRunner(
         val result = if (report.success) {
             ActionResult.Success
         } else {
-            ActionResult.Failure("sub-task '${target.name}' failed")
+            ActionResult.Failure(
+                "sub-task '${target.name}' failed",
+                structuredError = report.structuredError,
+            )
         }
         return result to traceFor(index, spec, started, result, expansionReport)
     }
@@ -643,6 +719,8 @@ data class TaskRunReport(
     val results: List<ActionResult>,
     val traces: List<ActionExecutionTrace>,
     val success: Boolean,
+    /** Present only when the task completed with an unhandled failure. */
+    val structuredError: StructuredTaskError? = null,
 )
 
 enum class ActionTraceStatus {
@@ -676,13 +754,20 @@ val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000
-private const val FLOW_ERROR_MESSAGE = "FLOW_ERROR_MESSAGE"
-private const val FLOW_ERROR_ACTION = "FLOW_ERROR_ACTION"
-private const val FLOW_ERROR_INDEX = "FLOW_ERROR_INDEX"
-private const val FLOW_ERROR_ATTEMPT = "FLOW_ERROR_ATTEMPT"
-private const val FLOW_ERROR_RETRYING = "FLOW_ERROR_RETRYING"
-private const val FLOW_ERROR_RETRY_REASON = "FLOW_ERROR_RETRY_REASON"
-private const val FLOW_ERROR_CAUGHT = "FLOW_ERROR_CAUGHT"
+private const val FLOW_ERROR_JSON = TaskFailureVariables.JSON
+private const val FLOW_ERROR_TASK_ID = TaskFailureVariables.TASK_ID
+private const val FLOW_ERROR_TASK_NAME = TaskFailureVariables.TASK_NAME
+private const val FLOW_ERROR_ACTION_ID = TaskFailureVariables.ACTION_ID
+private const val FLOW_ERROR_MESSAGE = TaskFailureVariables.MESSAGE
+private const val FLOW_ERROR_ACTION = TaskFailureVariables.ACTION
+private const val FLOW_ERROR_INDEX = TaskFailureVariables.ACTION_INDEX
+private const val FLOW_ERROR_TYPE = TaskFailureVariables.ACTION_TYPE
+private const val FLOW_ERROR_ATTEMPT = TaskFailureVariables.ATTEMPT
+private const val FLOW_ERROR_RETRYING = TaskFailureVariables.RETRYING
+private const val FLOW_ERROR_RETRY_REASON = TaskFailureVariables.RETRY_REASON
+private const val FLOW_ERROR_PROFILE_ID = TaskFailureVariables.ORIGINATING_PROFILE_ID
+private const val FLOW_ERROR_PROFILE_NAME = TaskFailureVariables.ORIGINATING_PROFILE_NAME
+private const val FLOW_ERROR_CAUGHT = TaskFailureVariables.CAUGHT
 
 private fun retryBackoffMs(baseMs: Long, retryNumber: Int): Long {
     if (baseMs <= 0L) return 0L
