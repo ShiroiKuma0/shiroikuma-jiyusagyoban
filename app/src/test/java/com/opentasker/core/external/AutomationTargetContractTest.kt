@@ -69,7 +69,8 @@ class AutomationTargetContractTest {
         assertTrue(scene.contains("InternalTaskRunSource.SCENE_OVERLAY"))
         assertTrue(service.contains("AutomationTargetContract.EXTRA_RUN_SOURCE"))
         assertTrue(service.contains("runExternalTask("))
-        assertTrue(service.contains("parentExecutionId = parentExecutionId"))
+        // The fork does not carry upstream 0.2.80's ExecutionEnvelope, so AutomationService does not
+        // re-thread a causal parent id; the rest of the canonical-builder contract still holds.
 
         val mainSourceRoot = listOf(
             File("src/main/java"),

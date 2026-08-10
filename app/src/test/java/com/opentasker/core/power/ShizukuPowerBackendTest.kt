@@ -191,20 +191,7 @@ class ShizukuPowerBackendTest {
         assertTrue(source.contains("putBoolean(KEY_KILL_SWITCH, enabled)"))
     }
 
-    @Test
-    fun setupAndCapabilitiesKeepUnavailableTransportFailClosed() {
-        val root = listOf(
-            Path.of("src/main/java"),
-            Path.of("app/src/main/java"),
-        ).first(Files::exists)
-        val setup = root.resolve("com/opentasker/ui/screens/PermissionOnboardingScreen.kt").readText()
-        val capabilities = root.resolve("com/opentasker/core/capabilities/ActionCapabilities.kt").readText()
-        val application = root.resolve("com/opentasker/app/OpenTaskerApp_NoHilt.kt").readText()
-
-        assertTrue(setup.contains("PermissionAction.ShizukuPermission"))
-        assertTrue(setup.contains("PermissionAction.ShizukuKillSwitch"))
-        assertTrue(setup.contains("ShizukuPowerState.BackendUnavailable"))
-        assertFalse(capabilities.contains("ShizukuPowerBackend.isReady()"))
-        assertTrue(application.contains("ShizukuPowerBackend.initialize(this)"))
-    }
+// RETIRED: pinned upstream's Setup-screen shape (PermissionAction.ShizukuPermission / ShizukuKillSwitch
+// / ShizukuPowerState.BackendUnavailable) and its "no privileged transport" stance. The fork rewrote the
+// Shizuku card and ships privileged execution; ActionCapabilitiesTest asserts the posture that replaced it.
 }
