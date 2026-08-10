@@ -56,6 +56,16 @@ private val Amoled = darkColorScheme(
     onSurfaceVariant = TextSecondary,
     outline = GraphiteOutline,
     outlineVariant = Color(0xFF252B28),
+    // AlertDialog uses surfaceContainerHigh and DropdownMenu uses surfaceContainer. Leaving these
+    // unset fell back to Material's purple-tinted baseline tokens, so every editor dialog and menu
+    // in this dialog-heavy app rendered off-palette.
+    surfaceContainerLowest = Color(0xFF0D0F0E),
+    surfaceContainerLow = Color(0xFF131615),
+    surfaceContainer = GraphiteSurface,
+    surfaceContainerHigh = GraphiteElevated,
+    surfaceContainerHighest = Color(0xFF222825),
+    surfaceBright = Color(0xFF2A312E),
+    surfaceDim = GraphiteBackground,
 )
 
 // Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
@@ -97,6 +107,15 @@ private val Light = lightColorScheme(
     onSurfaceVariant = LightSubtext,
     outline = LightOutline,
     outlineVariant = Color(0xFFD7DDD5),
+    // Without these, dialogs and menus fall back to Material's lavender baseline
+    // containers, which read as clearly off-palette against the warm cream surfaces.
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = LightSurface,
+    surfaceContainer = Color(0xFFF1EFE8),
+    surfaceContainerHigh = LightElevated,
+    surfaceContainerHighest = Color(0xFFE1E5DC),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceDim = Color(0xFFE4E2DB),
 )
 
 private val HighContrast = darkColorScheme(
@@ -124,6 +143,14 @@ private val HighContrast = darkColorScheme(
     onSurfaceVariant = Color(0xFFF5F5F5),
     outline = Color.White,
     outlineVariant = Color(0xFFE0E0E0),
+    // High contrast keeps dialogs black rather than Material's #2B2930 baseline.
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color.Black,
+    surfaceContainer = Color.Black,
+    surfaceContainerHigh = Color(0xFF0D0D0D),
+    surfaceContainerHighest = Color(0xFF171717),
+    surfaceBright = Color(0xFF171717),
+    surfaceDim = Color.Black,
 )
 
 private val OpenTaskerTypography = Typography(

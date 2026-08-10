@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dialogs and dropdown menus now use the app's own surfaces in all three themes. The surfaceContainer roles were never defined, so Material's purple-tinted baseline showed through on every editor dialog - lavender against the light theme's cream, and purple-grey against the dark theme's graphite.
 - `flow.try` retries now require every action in the try body to be retry-safe, not just the one that failed. A retry restarts the whole body, so a body such as send-message then fetch-URL re-sent the message on each attempt.
 - `%FLOW_ERROR_CAUGHT` is now `true` inside a `flow.catch` handler; it was always `false` because the catch marker that records it was skipped.
 - Text such as `%count-1` expands the `%count` variable again and keeps the rest. Allowing hyphens in variable names had made the whole token scan as one undefined name and collapse to an empty string; a variable that really is named with a hyphen still wins.
