@@ -35,6 +35,8 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.validation.InputValidation
@@ -618,9 +620,23 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, exitTaskId: Long?, cooldownSec: Int, automationMode: AutomationMode, group: String? = null, projectId: Long = DEFAULT_PROJECT_ID) =
+    fun createProfile(
+        name: String,
+        enabled: Boolean,
+        enterTaskId: Long,
+        exitTaskId: Long?,
+        cooldownSec: Int,
+        automationMode: AutomationMode,
+        group: String? = null,
+        projectId: Long = DEFAULT_PROJECT_ID,
+        priority: Int = 0,
+        gracePeriodSec: Int = 0,
+        lifetime: ProfileLifetime = ProfileLifetime.NEVER,
+        expiresAtMs: Long? = null,
+    ) =
         launchWithMessage("Profile created") {
-            val profile = Profile(
+            val profile = ProfileLifecyclePolicy.normalize(
+                Profile(
                 name = name.trim(),
                 enabled = enabled,
                 enterTaskId = enterTaskId,
@@ -629,6 +645,11 @@ class ActiveAutomationViewModel(
                 automationMode = automationMode,
                 group = group,
                 projectId = projectId,
+                priority = priority,
+                gracePeriodSec = gracePeriodSec,
+                lifetime = lifetime,
+                expiresAtMs = expiresAtMs,
+                ),
             )
             requireValidProfileFieldLimits(profile)
             val lint = requireAutomationLint(profile)
@@ -638,7 +659,7 @@ class ActiveAutomationViewModel(
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
         launchWithMessage(message) {
-            val reviewedProfile = reviewFeedbackRisk(profile)
+            val reviewedProfile = reviewFeedbackRisk(ProfileLifecyclePolicy.normalize(profile))
             requireValidProfileFieldLimits(reviewedProfile)
             val lint = requireAutomationLint(reviewedProfile)
             // Atomic read-check-snapshot-update, matching updateScene, so racing writers
@@ -1585,7 +1606,13 @@ class ActiveAutomationViewModel(
      */
     private fun requireValidProfileFieldLimits(profile: Profile) {
         val violation = InputValidation.validateProfile(profile)
-            .firstOrNull { it.field == "name" || it.field == "cooldownSec" }
+            .firstOrNull {
+                it.field == "name" ||
+                    it.field == "cooldownSec" ||
+                    it.field == "priority" ||
+                    it.field == "gracePeriodSec" ||
+                    it.field == "expiresAtMs"
+            }
         if (violation != null) {
             throw IllegalArgumentException(violation.message)
         }

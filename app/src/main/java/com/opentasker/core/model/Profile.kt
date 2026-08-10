@@ -21,7 +21,23 @@ data class Profile(
     val requiresRiskAcknowledgement: Boolean = false,
     val projectId: Long = DEFAULT_PROJECT_ID,
     val contextExpression: ContextExpressionNode? = null,
+    /** Higher-priority profiles win deterministic arbitration when multiple profiles match. */
+    val priority: Int = 0,
+    /** Stable time in seconds required before either an activation or deactivation is accepted. */
+    val gracePeriodSec: Int = 0,
+    val lifetime: ProfileLifetime = ProfileLifetime.NEVER,
+    /** Absolute epoch-millis expiry for [ProfileLifetime.UNTIL_DATE]. */
+    val expiresAtMs: Long? = null,
+    /** Internal persisted state for one-shot profiles; it is never user-authored directly. */
+    val lifetimeConsumed: Boolean = false,
 )
+
+@Serializable
+enum class ProfileLifetime {
+    NEVER,
+    UNTIL_DATE,
+    ONCE,
+}
 
 @Serializable
 enum class AutomationMode {

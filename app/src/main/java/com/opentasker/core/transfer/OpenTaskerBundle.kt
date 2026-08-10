@@ -145,7 +145,11 @@ object OpenTaskerBundleCodec {
         description: String = "",
     ): OpenTaskerBundle {
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
-        val sortedProfiles = profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id })
+        // A consumed one-shot is runtime state, not portable configuration. Export its declared
+        // lifetime while making the imported copy eligible to run once in the destination.
+        val sortedProfiles = profiles
+            .map { it.copy(lifetimeConsumed = false) }
+            .sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id })
         val omittedSecretCount = omittedSecretVariableCount + variables.count { it.isSecret }
         val sortedVariables = variables
             .filterNot { it.isSecret }
@@ -405,7 +409,13 @@ object OpenTaskerBundleCodec {
         }
         bundle.profiles.forEach { profile ->
             InputValidation.validateProfile(profile)
-                .filter { it.field == "name" || it.field == "cooldownSec" }
+                .filter {
+                    it.field == "name" ||
+                        it.field == "cooldownSec" ||
+                        it.field == "priority" ||
+                        it.field == "gracePeriodSec" ||
+                        it.field == "expiresAtMs"
+                }
                 .forEach { error ->
                     warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."
                 }
@@ -654,6 +664,7 @@ class OpenTaskerBundleRepository(
                     id = 0,
                     enabled = false,
                     requiresRiskAcknowledgement = true,
+                    lifetimeConsumed = false,
                     enterTaskId = enterTaskId,
                     exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
                     projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,

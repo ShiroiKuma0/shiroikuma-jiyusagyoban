@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.room.withTransaction
 import com.opentasker.app.MainActivity
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.automation.app.AppUsageMonitor
@@ -44,6 +45,8 @@ import com.opentasker.core.contexts.UsbDeviceContextEvents
 import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.storage.RunLogRetentionSettings
@@ -66,6 +69,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import com.opentasker.core.storage.ProfileEntity
+import com.opentasker.core.storage.toEntity
 import java.util.ArrayDeque
 import java.util.Collections
 
@@ -165,6 +169,8 @@ class AutomationService : Service() {
     private val executionAdmission by lazy { ExecutionAdmissionController.persisted(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
     private val pulseContinuities = Collections.synchronizedMap(mutableMapOf<Long, PulseEventContinuity>())
+    private val matchedProfiles = Collections.synchronizedMap(mutableMapOf<Long, Profile>())
+    private val dispatchedProfiles = Collections.synchronizedSet(mutableSetOf<Long>())
     private val cooldowns = CooldownReservations(persist = { profileId, deadline -> cooldownStore.set(profileId, deadline) })
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
@@ -315,6 +321,8 @@ class AutomationService : Service() {
         taskJobSnapshot.forEach { it.cancel() }
         matcherJobs.clear()
         matchers.clear()
+        matchedProfiles.clear()
+        dispatchedProfiles.clear()
         cooldowns.clear()
         ExecutionAdmissionRegistry.detach(executionAdmission)
         profileTaskJobs.clear()
@@ -335,6 +343,7 @@ class AutomationService : Service() {
         oldJobs.joinAll()
 
         val profileEntities = db.profileDao().getAllEnabled()
+        val nowMs = System.currentTimeMillis()
         val profiles = profileEntities.mapNotNull { entity ->
             val decoded = entity.toDomainDecodeResult()
             decoded.issue?.let { issue ->
@@ -344,9 +353,24 @@ class AutomationService : Service() {
                 )
                 return@mapNotNull null
             }
-            decoded.value
+            val profile = decoded.value
+            val suppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs)
+            if (suppression != null) {
+                AppLogger.info(TAG, "Profile ${profile.id} is not registered: $suppression")
+                db.profileDao().upsert(profile.copy(enabled = false).toEntity())
+                null
+            } else {
+                profile
+            }
         }
         val activeIds = profiles.map { it.id }.toSet()
+        synchronized(matchedProfiles) {
+            matchedProfiles.keys.retainAll(activeIds)
+            profiles.forEach { profile ->
+                if (profile.id in matchedProfiles) matchedProfiles[profile.id] = profile
+            }
+        }
+        synchronized(dispatchedProfiles) { dispatchedProfiles.retainAll(activeIds) }
         synchronized(pulseContinuities) {
             pulseContinuities.keys.removeAll { it !in activeIds }
         }
@@ -431,6 +455,12 @@ class AutomationService : Service() {
     }
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, event: ContextEvent?) {
+        val suppression = ProfileLifecyclePolicy.suppressionReason(profile, System.currentTimeMillis())
+        if (suppression != null) {
+            AppLogger.info(TAG, "Profile ${profile.id} activation suppressed: $suppression")
+            if (profile.enabled) db.profileDao().upsert(profile.copy(enabled = false).toEntity())
+            return
+        }
         if (profile.enterTaskId <= 0) return
 
         val task = db.taskDao().getById(profile.enterTaskId)
@@ -444,23 +474,79 @@ class AutomationService : Service() {
             logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
             return
         }
+
+        val pulseProfile = profile.contexts.any { it.type == com.opentasker.core.model.ContextType.EVENT }
+        val winner = synchronized(matchedProfiles) {
+            if (!pulseProfile) matchedProfiles[profile.id] = profile
+            ProfileLifecyclePolicy.winner(matchedProfiles.values + profile)
+        }
+        if (winner?.id != profile.id) {
+            logProfileSkippedRun(
+                profile,
+                decoded.value,
+                ProfileLifecyclePolicy.suppressionByPriority(profile, matchedProfiles.values + profile)
+                    ?: "A higher-priority profile is currently active.",
+            )
+            return
+        }
+        if (profile.lifetime == ProfileLifetime.ONCE && !consumeOneShotProfile(profile)) {
+            if (!pulseProfile) synchronized(matchedProfiles) { matchedProfiles.remove(profile.id) }
+            return
+        }
+        if (!pulseProfile) synchronized(dispatchedProfiles) { dispatchedProfiles += profile.id }
         dispatchTask(profile, decoded.value, isExit = false, initialVariables = eventVariables(event))
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.exitTaskId == null || profile.exitTaskId <= 0) return
+        val wasWinner: Boolean
+        val wasDispatched: Boolean
+        val nextWinner: Profile?
+        synchronized(matchedProfiles) {
+            wasWinner = ProfileLifecyclePolicy.winner(matchedProfiles.values)?.id == profile.id
+            matchedProfiles.remove(profile.id)
+            wasDispatched = synchronized(dispatchedProfiles) {
+                dispatchedProfiles.remove(profile.id)
+            }
+            nextWinner = ProfileLifecyclePolicy.winner(matchedProfiles.values)
+        }
+        if (!wasDispatched) {
+            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            return
+        }
+        if (profile.exitTaskId == null || profile.exitTaskId <= 0) {
+            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+            return
+        }
         val task = db.taskDao().getById(profile.exitTaskId)
         if (task == null) {
             AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
             return
         }
         val decoded = task.toDomainDecodeResult()
         if (decoded.issue != null) {
             AppLogger.error(TAG, "Exit task ${profile.exitTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
             logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
+            if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
             return
         }
         dispatchTask(profile, decoded.value, isExit = true)
+        if (wasWinner) nextWinner?.let { onProfileActivated(it, null) }
+    }
+
+    private suspend fun consumeOneShotProfile(profile: Profile): Boolean = db.withTransaction {
+        val entity = db.profileDao().getById(profile.id) ?: return@withTransaction false
+        val decoded = entity.toDomainDecodeResult()
+        if (decoded.issue != null) {
+            AppLogger.error(TAG, "One-shot profile ${profile.id} is corrupt: ${decoded.issue.message}")
+            return@withTransaction false
+        }
+        val current = decoded.value
+        if (!current.enabled || current.lifetime != ProfileLifetime.ONCE || current.lifetimeConsumed) {
+            return@withTransaction false
+        }
+        db.profileDao().upsert(current.copy(enabled = false, lifetimeConsumed = true).toEntity())
+        true
     }
 
     /**
@@ -935,6 +1021,13 @@ class AutomationService : Service() {
     private fun profileRunMetadata(profile: Profile): List<String> = buildList {
         add("Mode: ${profile.automationMode.name.lowercase()}")
         if (profile.cooldownSec > 0) add("Cooldown: ${profile.cooldownSec}s")
+        if (profile.priority != 0) add("Profile priority: ${profile.priority}")
+        if (profile.gracePeriodSec > 0) add("Grace period: ${profile.gracePeriodSec}s")
+        when (profile.lifetime) {
+            ProfileLifetime.NEVER -> Unit
+            ProfileLifetime.UNTIL_DATE -> add("Lifetime: until ${profile.expiresAtMs}")
+            ProfileLifetime.ONCE -> add("Lifetime: once")
+        }
     }
 
     private fun formatRemainingCooldown(remainingMs: Long): String {
@@ -1034,6 +1127,11 @@ internal fun profileRegistrySignature(profiles: List<ProfileEntity>): List<Strin
                 p.cooldownSec,
                 p.automationMode,
                 p.contextsJson,
+                p.priority,
+                p.gracePeriodSec,
+                p.lifetime,
+                p.expiresAtMs,
+                p.lifetimeConsumed,
             ).joinToString("|")
         }
         .toList()

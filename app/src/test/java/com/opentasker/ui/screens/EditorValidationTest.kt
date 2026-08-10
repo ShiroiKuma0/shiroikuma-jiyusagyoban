@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.core.model.ProfileLifetime
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,5 +21,45 @@ class EditorValidationTest {
         assertFalse(profileEditorCanSave("Work", 1, true, true, "later", null))
         assertTrue(profileEditorCanSave("Work", 1, true, true, "", null))
         assertTrue(profileEditorCanSave("Work", 1, true, true, "15", 15))
+    }
+
+    @Test
+    fun profileEditorSaveRequiresBoundedPriorityGraceAndDateLifetimeExpiry() {
+        assertFalse(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                parsedPriority = 101,
+            ),
+        )
+        assertFalse(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                lifetime = ProfileLifetime.UNTIL_DATE,
+            ),
+        )
+        assertTrue(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                parsedPriority = -5,
+                parsedGracePeriod = 20,
+                lifetime = ProfileLifetime.UNTIL_DATE,
+                parsedExpiryDate = 1_700_000_000_000L,
+            ),
+        )
     }
 }

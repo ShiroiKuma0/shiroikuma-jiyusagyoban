@@ -491,6 +491,19 @@ private fun ProfileCard(
                 }
                 item { StatusPill(stringResource(R.string.label_context_count, profile.contexts.size), MaterialTheme.colorScheme.primary) }
                 item { StatusPill(stringResource(R.string.label_cooldown_seconds, profile.cooldownSec), MaterialTheme.colorScheme.secondary) }
+                item { StatusPill(stringResource(R.string.label_profile_priority, profile.priority), MaterialTheme.colorScheme.primary) }
+                if (profile.gracePeriodSec > 0) {
+                    item { StatusPill(stringResource(R.string.label_profile_grace_seconds, profile.gracePeriodSec), MaterialTheme.colorScheme.secondary) }
+                }
+                item { StatusPill(profileLifetimeTitle(profile.lifetime), MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (profile.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && profile.expiresAtMs != null) {
+                    item {
+                        StatusPill(
+                            stringResource(R.string.label_profile_expiry_date, formatProfileExpiryDate(profile.expiresAtMs)),
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
                 profile.group?.let { group ->
                     item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }

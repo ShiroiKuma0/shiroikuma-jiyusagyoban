@@ -1129,8 +1129,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = projectTasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group ->
-                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs ->
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs)
                 showCreateProfileDialog = false
             },
         )
@@ -1184,9 +1184,8 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group ->
-                viewModel.updateProfile(
-                    profile.copy(
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs ->
+                viewModel.updateProfile(profile.copy(
                         name = name.trim(),
                         enabled = enabled,
                         enterTaskId = enterTaskId,
@@ -1194,8 +1193,9 @@ fun ActiveAutomationUi(
                         cooldownSec = cooldown.coerceAtLeast(0),
                         automationMode = automationMode,
                         group = group,
-                    )
-                )
+                        priority = priority, gracePeriodSec = gracePeriod, lifetime = lifetime, expiresAtMs = expiresAtMs,
+                        lifetimeConsumed = if (lifetime == profile.lifetime) profile.lifetimeConsumed else false,
+                    ))
                 clearProfileDialog()
             },
             onSimulate = { selectedProfile ->

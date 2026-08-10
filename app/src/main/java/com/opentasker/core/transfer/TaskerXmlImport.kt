@@ -4,6 +4,8 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
@@ -12,6 +14,7 @@ import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
 import java.io.StringReader
+import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
 data class TaskerXmlImportReport(
@@ -137,13 +140,35 @@ object TaskerXmlImporter {
                 return@mapIndexedNotNull null
             }
 
-            Profile(
-                id = id,
-                name = name,
-                enabled = !element.childText("off").equals("true", ignoreCase = true),
-                enterTaskId = enterTaskId,
-                exitTaskId = element.childText("mid1", "exitTaskId").toLongOrNull()?.takeIf { it in taskIds },
-                contexts = contexts,
+            val rawLifetime = element.childText("lifetime").uppercase(Locale.US)
+            val importedExpiry = element.childText("expiresAtMs", "expiresAt").toLongOrNull()?.takeIf { it > 0L }
+            val importedLifetime = when (rawLifetime) {
+                ProfileLifetime.ONCE.name -> ProfileLifetime.ONCE
+                ProfileLifetime.UNTIL_DATE.name -> if (importedExpiry != null) {
+                    ProfileLifetime.UNTIL_DATE
+                } else {
+                    lossyWarnings += "Profile '$name' had a date lifetime without a valid expiry; it was reset to always available."
+                    ProfileLifetime.NEVER
+                }
+                ProfileLifetime.NEVER.name, "" -> ProfileLifetime.NEVER
+                else -> {
+                    lossyWarnings += "Profile '$name' had an unknown lifetime '$rawLifetime'; it was reset to always available."
+                    ProfileLifetime.NEVER
+                }
+            }
+            ProfileLifecyclePolicy.normalize(
+                Profile(
+                    id = id,
+                    name = name,
+                    enabled = !element.childText("off").equals("true", ignoreCase = true),
+                    enterTaskId = enterTaskId,
+                    exitTaskId = element.childText("mid1", "exitTaskId").toLongOrNull()?.takeIf { it in taskIds },
+                    contexts = contexts,
+                    priority = element.childText("priority").toIntOrNull() ?: 0,
+                    gracePeriodSec = element.childText("gracePeriodSec", "grace").toIntOrNull() ?: 0,
+                    lifetime = importedLifetime,
+                    expiresAtMs = importedExpiry,
+                ),
             )
         }
     }

@@ -13,6 +13,7 @@ import kotlinx.serialization.encodeToString
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 
@@ -29,6 +30,11 @@ data class ProfileEntity(
     val profileGroup: String? = null,
     val requiresRiskAcknowledgement: Boolean = false,
     @androidx.room.ColumnInfo(defaultValue = "1") val projectId: Long = DEFAULT_PROJECT_ID,
+    @androidx.room.ColumnInfo(defaultValue = "0") val priority: Int = 0,
+    @androidx.room.ColumnInfo(defaultValue = "0") val gracePeriodSec: Int = 0,
+    @androidx.room.ColumnInfo(defaultValue = "'NEVER'") val lifetime: String = ProfileLifetime.NEVER.name,
+    val expiresAtMs: Long? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val lifetimeConsumed: Boolean = false,
 ) {
     fun toDomain(): Profile = toDomainDecodeResult().requireDecoded()
 
@@ -68,20 +74,27 @@ data class ProfileEntity(
             }
         val contexts = decodedContexts.contexts
 
+        val profileLifetime = runCatching { ProfileLifetime.valueOf(lifetime) }
+            .getOrDefault(ProfileLifetime.NEVER)
         return StorageDecodeResult(
             value = Profile(
-                id,
-                name,
-                enabled,
-                contexts,
-                enterTaskId,
-                exitTaskId,
-                cooldownSec,
-                mode,
-                profileGroup,
-                requiresRiskAcknowledgement,
-                projectId,
-                decodedContexts.expression,
+                id = id,
+                name = name,
+                enabled = enabled,
+                contexts = contexts,
+                enterTaskId = enterTaskId,
+                exitTaskId = exitTaskId,
+                cooldownSec = cooldownSec,
+                automationMode = mode,
+                group = profileGroup,
+                requiresRiskAcknowledgement = requiresRiskAcknowledgement,
+                projectId = projectId,
+                contextExpression = decodedContexts.expression,
+                priority = priority,
+                gracePeriodSec = gracePeriodSec,
+                lifetime = profileLifetime,
+                expiresAtMs = expiresAtMs,
+                lifetimeConsumed = lifetimeConsumed,
             ),
         )
     }
@@ -103,6 +116,11 @@ fun Profile.toEntity() = ProfileEntity(
     group,
     requiresRiskAcknowledgement,
     projectId,
+    priority,
+    gracePeriodSec,
+    lifetime.name,
+    expiresAtMs,
+    lifetimeConsumed,
 )
 
 @kotlinx.serialization.Serializable

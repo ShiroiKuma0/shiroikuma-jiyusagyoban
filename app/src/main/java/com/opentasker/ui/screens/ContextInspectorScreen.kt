@@ -147,15 +147,20 @@ class ContextInspectorViewModel(
         ContextInspectionSnapshot(
             generatedAtMs = now,
             sources = sources,
-            profiles = inspectProfiles(profiles, sources) { profile, index, spec, observation ->
-                if (spec.type == ContextType.LOCATION) {
-                    // observe() is read-only: the Inspector must never persist or clear the
-                    // engine's dwell timers from its own independent location stream.
-                    observation.copy(event = locationDwellStateStore.observe(profile.id, index, spec, observation.event))
-                } else {
-                    observation
-                }
-            },
+            profiles = inspectProfiles(
+                profiles = profiles,
+                sourceSnapshots = sources,
+                observationTransformer = { profile, index, spec, observation ->
+                    if (spec.type == ContextType.LOCATION) {
+                        // observe() is read-only: the Inspector must never persist or clear the
+                        // engine's dwell timers from its own independent location stream.
+                        observation.copy(event = locationDwellStateStore.observe(profile.id, index, spec, observation.event))
+                    } else {
+                        observation
+                    }
+                },
+                nowMs = now,
+            ),
             causalLoop = causalLoop,
         )
     }
@@ -481,6 +486,32 @@ private fun ProfileInspectorCard(
                         else -> stringResource(R.string.status_blocked)
                     },
                     color = color,
+                )
+            }
+            profile.profile?.let { candidate ->
+                Text(
+                    stringResource(
+                        R.string.inspector_profile_policy,
+                        candidate.priority,
+                        candidate.gracePeriodSec,
+                        profileLifetimeTitle(candidate.lifetime),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (candidate.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && candidate.expiresAtMs != null) {
+                    Text(
+                        stringResource(R.string.inspector_profile_expiry, formatProfileExpiryDate(candidate.expiresAtMs)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            profile.suppressionReason?.let { reason ->
+                InspectorNotice(
+                    title = stringResource(R.string.inspector_profile_suppressed_title),
+                    body = reason,
+                    color = MaterialTheme.colorScheme.secondary,
                 )
             }
             if (profile.logicExplanation.isNotBlank()) {

@@ -46,6 +46,10 @@ class TaskerXmlImporterTest {
                         <id>20</id>
                         <nme>Work window</nme>
                         <mid0>10</mid0>
+                        <priority>9</priority>
+                        <gracePeriodSec>20</gracePeriodSec>
+                        <lifetime>UNTIL_DATE</lifetime>
+                        <expiresAtMs>1800000000000</expiresAtMs>
                         <Time>
                             <from>09:00</from>
                             <to>17:00</to>
@@ -83,6 +87,10 @@ class TaskerXmlImporterTest {
         assertEquals(10L, profile.enterTaskId)
         assertEquals(ContextType.TIME, profile.contexts.single().type)
         assertEquals("09:00", profile.contexts.single().config["start"])
+        assertEquals(9, profile.priority)
+        assertEquals(20, profile.gracePeriodSec)
+        assertEquals(com.opentasker.core.model.ProfileLifetime.UNTIL_DATE, profile.lifetime)
+        assertEquals(1_800_000_000_000L, profile.expiresAtMs)
 
         val variable = report.bundle.variables.single()
         assertEquals("%FOO", variable.name)

@@ -69,6 +69,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
@@ -76,8 +77,15 @@ import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.TemplateAvailability
+import com.opentasker.core.validation.InputValidation
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 @Composable
 internal fun TemplatePickerDialog(
@@ -272,7 +280,7 @@ internal fun ProfileEditorDialog(
     profile: Profile?,
     tasks: List<Task>,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Long, Long?, Int, AutomationMode, String?) -> Unit,
+    onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?) -> Unit,
     onSimulate: ((Profile) -> Unit)? = null,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
@@ -286,9 +294,21 @@ internal fun ProfileEditorDialog(
     var enterTaskId by rememberSaveable(profile?.id) { mutableLongStateOf(initialTaskId) }
     var exitTaskId by rememberSaveable(profile?.id) { mutableStateOf(profile?.exitTaskId) }
     var cooldown by rememberSaveable(profile?.id) { mutableStateOf((profile?.cooldownSec ?: 0).toString()) }
+    var priority by rememberSaveable(profile?.id) { mutableStateOf((profile?.priority ?: 0).toString()) }
+    var gracePeriod by rememberSaveable(profile?.id) { mutableStateOf((profile?.gracePeriodSec ?: 0).toString()) }
     var automationMode by rememberSaveable(profile?.id) { mutableStateOf(profile?.automationMode ?: AutomationMode.SINGLE) }
     var group by rememberSaveable(profile?.id) { mutableStateOf(profile?.group.orEmpty()) }
+    var lifetimeName by rememberSaveable(profile?.id) {
+        mutableStateOf((profile?.lifetime ?: ProfileLifetime.NEVER).name)
+    }
+    var expiryDate by rememberSaveable(profile?.id) {
+        mutableStateOf(formatProfileExpiryDate(profile?.expiresAtMs))
+    }
     val parsedCooldown = cooldown.toIntOrNull()
+    val parsedPriority = priority.toIntOrNull()
+    val parsedGracePeriod = gracePeriod.toIntOrNull()
+    val lifetime = profileLifetimeFromName(lifetimeName)
+    val parsedExpiryDate = parseProfileExpiryDate(expiryDate)
     val selectedTaskExists = tasks.any { it.id == enterTaskId }
     val selectedExitTaskExists = exitTaskId == null || tasks.any { it.id == exitTaskId }
     val canSave = profileEditorCanSave(
@@ -298,6 +318,10 @@ internal fun ProfileEditorDialog(
         selectedExitTaskExists = selectedExitTaskExists,
         cooldown = cooldown,
         parsedCooldown = parsedCooldown,
+        parsedPriority = parsedPriority,
+        parsedGracePeriod = parsedGracePeriod,
+        lifetime = lifetime,
+        parsedExpiryDate = parsedExpiryDate,
     )
     val importedReviewRequired = profile?.requiresRiskAcknowledgement == true
     val onLabel = stringResource(R.string.label_on)
@@ -402,6 +426,71 @@ internal fun ProfileEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = priority,
+                    onValueChange = { priority = signedIntegerInput(it, maxDigits = 3) },
+                    label = { Text(stringResource(R.string.profile_priority_label)) },
+                    supportingText = {
+                        Text(
+                            if (priority.isNotBlank() && parsedPriority == null) {
+                                stringResource(R.string.profile_priority_invalid)
+                            } else {
+                                stringResource(R.string.profile_priority_helper)
+                            },
+                        )
+                    },
+                    isError = priority.isNotBlank() && parsedPriority == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = gracePeriod,
+                    onValueChange = { gracePeriod = it.filter(Char::isDigit).take(4) },
+                    label = { Text(stringResource(R.string.profile_grace_period_label)) },
+                    supportingText = {
+                        Text(
+                            if (gracePeriod.isNotBlank() && parsedGracePeriod == null) {
+                                stringResource(R.string.profile_grace_period_invalid)
+                            } else {
+                                stringResource(R.string.profile_grace_period_helper)
+                            },
+                        )
+                    },
+                    isError = gracePeriod.isNotBlank() && parsedGracePeriod == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(stringResource(R.string.profile_lifetime_label), style = MaterialTheme.typography.labelLarge)
+                ProfileLifetime.entries.forEach { option ->
+                    SelectableOption(
+                        title = profileLifetimeTitle(option),
+                        body = profileLifetimeDescription(option),
+                        selected = option == lifetime,
+                        onClick = { lifetimeName = option.name },
+                    )
+                }
+                if (lifetime == ProfileLifetime.UNTIL_DATE) {
+                    OutlinedTextField(
+                        value = expiryDate,
+                        onValueChange = { expiryDate = it.take(10) },
+                        label = { Text(stringResource(R.string.profile_expiry_date_label)) },
+                        placeholder = { Text(stringResource(R.string.profile_expiry_date_hint)) },
+                        supportingText = {
+                            Text(
+                                if (expiryDate.isNotBlank() && parsedExpiryDate == null) {
+                                    stringResource(R.string.profile_expiry_date_invalid)
+                                } else {
+                                    stringResource(R.string.profile_expiry_date_helper)
+                                },
+                            )
+                        },
+                        isError = expiryDate.isNotBlank() && parsedExpiryDate == null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Text(stringResource(R.string.profile_retrigger_label), style = MaterialTheme.typography.labelLarge)
                 AutomationMode.entries.forEach { mode ->
                     val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -415,7 +504,24 @@ internal fun ProfileEditorDialog(
             }
         },
         confirmButton = {
-            Button(enabled = canSave, onClick = { onSave(name, enabled, enterTaskId, exitTaskId, parsedCooldown ?: 0, automationMode, group.trim().ifBlank { null }) }) {
+            Button(
+                enabled = canSave,
+                onClick = {
+                    onSave(
+                        name,
+                        enabled,
+                        enterTaskId,
+                        exitTaskId,
+                        parsedCooldown ?: 0,
+                        parsedPriority ?: 0,
+                        parsedGracePeriod ?: 0,
+                        automationMode,
+                        group.trim().ifBlank { null },
+                        lifetime,
+                        parsedExpiryDate.takeIf { lifetime == ProfileLifetime.UNTIL_DATE },
+                    )
+                },
+            ) {
                 Text(stringResource(R.string.action_save))
             }
         },
@@ -507,9 +613,60 @@ internal fun profileEditorCanSave(
     selectedExitTaskExists: Boolean,
     cooldown: String,
     parsedCooldown: Int?,
+    parsedPriority: Int? = 0,
+    parsedGracePeriod: Int? = 0,
+    lifetime: ProfileLifetime = ProfileLifetime.NEVER,
+    parsedExpiryDate: Long? = null,
 ): Boolean =
     name.isNotBlank() && enterTaskId > 0 && selectedTaskExists &&
-        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null)
+        selectedExitTaskExists && (cooldown.isBlank() || parsedCooldown != null) &&
+        parsedPriority != null && parsedPriority in InputValidation.MIN_PROFILE_PRIORITY..InputValidation.MAX_PROFILE_PRIORITY &&
+        parsedGracePeriod != null && parsedGracePeriod in 0..InputValidation.MAX_GRACE_PERIOD_SEC &&
+        (lifetime != ProfileLifetime.UNTIL_DATE || parsedExpiryDate != null)
+
+internal fun profileLifetimeFromName(name: String): ProfileLifetime =
+    runCatching { ProfileLifetime.valueOf(name) }.getOrDefault(ProfileLifetime.NEVER)
+
+internal fun signedIntegerInput(value: String, maxDigits: Int): String {
+    val negative = value.trimStart().startsWith('-')
+    val digits = value.filter(Char::isDigit).take(maxDigits)
+    return if (negative) "-$digits" else digits
+}
+
+internal fun parseProfileExpiryDate(value: String): Long? = try {
+    LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE)
+        .atTime(LocalTime.MAX)
+        .atZone(ZoneId.systemDefault())
+        .toInstant()
+        .toEpochMilli()
+} catch (_: DateTimeParseException) {
+    null
+}
+
+internal fun formatProfileExpiryDate(value: Long?): String = value?.let {
+    Instant.ofEpochMilli(it)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .format(DateTimeFormatter.ISO_LOCAL_DATE)
+}.orEmpty()
+
+@Composable
+internal fun profileLifetimeTitle(lifetime: ProfileLifetime): String = stringResource(
+    when (lifetime) {
+        ProfileLifetime.NEVER -> R.string.profile_lifetime_never_title
+        ProfileLifetime.UNTIL_DATE -> R.string.profile_lifetime_date_title
+        ProfileLifetime.ONCE -> R.string.profile_lifetime_once_title
+    },
+)
+
+@Composable
+internal fun profileLifetimeDescription(lifetime: ProfileLifetime): String = stringResource(
+    when (lifetime) {
+        ProfileLifetime.NEVER -> R.string.profile_lifetime_never_body
+        ProfileLifetime.UNTIL_DATE -> R.string.profile_lifetime_date_body
+        ProfileLifetime.ONCE -> R.string.profile_lifetime_once_body
+    },
+)
 
 @Composable
 internal fun EmptyState(
