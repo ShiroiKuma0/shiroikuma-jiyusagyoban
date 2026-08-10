@@ -8,6 +8,52 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.82.2026-08-10.ga481b77a+034 — 2026-08-10
+
+**Profile arbitration is enforced, and settable.** The 0.2.82 sync brought upstream's profile policy
+into the database and left the engine ignoring it. This wires it in — and adds the editor it turned
+out to be missing entirely.
+
+**The editor first, because there wasn't one.** The fork had no profile-policy UI at all: the
+`priority` field in the profile dialog is the *task* priority, a different, older thing. So none of
+these values could be set, which would have made enforcing them dead code. The profile dialog now
+carries an **Arbitration** section — priority, grace period, lifetime (Always / Until a date / Once,
+with a date field), optional max-concurrent and burst caps, and whether a refused run is logged or
+dropped quietly — each validated against the same bounds the engine normalises to.
+
+**The engine.** `AutomationService` keeps the matched set and arbitrates on it. While a profile
+matches it suppresses any matching profile of *strictly* lower priority — their runs are skipped and
+logged naming the suppressor — and when it stops matching, exactly those profiles that nothing else
+still outranks are released and activated. One-shot profiles are consumed inside a transaction, so
+two contexts matching in the same instant cannot both win the single run; an expired profile is
+disabled rather than re-evaluated for ever. A profile's own `maxActiveExecutions` and `burstLimit`
+now reach the admission controller — they were being dropped, so only the global limits ever
+applied — and `overflowPolicy` decides whether a refused run leaves a Run Log entry.
+
+Grace periods and lifetime suppression needed no work here: they were already live in
+`ProfileMatcherImpl`, which merged cleanly during the sync.
+
+**The exit task is owed on admission, not on dispatch.** The first cut of this gated the exit task on
+whether the enter side actually dispatched — which silently breaks a profile carrying *only* an exit
+task, an ordinary way to write one. (Upstream gates it that way too.) The rule is now: a profile that
+passed the lifetime and priority checks owes its exit task whether or not it had an enter task to
+run, while one that was outranked never acted and has nothing to undo.
+
+The release decision moved into `ProfileLifecyclePolicy.released(before, remaining)` so it can be
+tested at all — the engine calling it is an Android Service. Four tests cover the release chain
+(High → Middle → Low frees them one at a time, not all at once), that equal priorities never suppress
+each other, that a profile which merely stopped matching is not "released", and that a disabled
+profile outranks nothing.
+
+**Nothing changes until a priority is set.** Every existing profile sits at 0, equal priorities never
+suppress, and the caps are blank. Arbitrating equal priorities by database id would make every
+profile mutually exclusive with every other one by default, which is why it does not.
+
+**Still not wired:** `fallbackTaskId` remains stored and unenforced, and is deliberately absent from
+the editor rather than offered as a control that does nothing. It and held-run replay both need
+upstream's reworked execution helper (structured errors, ledger states, the journal), which is its
+own job.
+
 ## 0.2.82.2026-08-10.ga481b77a+033 — 2026-08-10
 
 **Upstream sync: 50 commits, 247 files.** The largest batch this fork has taken. Upstream did not
