@@ -182,7 +182,7 @@
     <string name="profile_overflow_log_body">Record rejected runs in the Run Log so they can be replayed after capacity returns.</string>
     <string name="profile_overflow_silent_title">Skip silently</string>
     <string name="profile_overflow_silent_body">Skip rejected runs without creating a Run Log entry.</string>
-    <string name="profile_lifetime_label">Automation lifetime</string>
+    <string name="profile_lifetime_label">Profile lifetime</string>
     <string name="profile_lifetime_never_title">Always available</string>
     <string name="profile_lifetime_never_body">The profile remains eligible until you disable or edit it.</string>
     <string name="profile_lifetime_date_title">Until a date</string>
@@ -199,7 +199,7 @@
     <string name="profile_add_context">Add Context</string>
     <string name="profile_edit_context_logic">Edit context logic</string>
     <string name="profile_simulate_trigger">Simulate trigger</string>
-    <string name="context_simulate_trigger">Test synthetic event</string>
+    <string name="context_simulate_trigger">Simulate trigger</string>
 
     <!-- Task editor -->
     <string name="task_name_label">Task name</string>
@@ -847,9 +847,20 @@
     <string name="flow_no_exit_task">no exit task</string>
 
     <string name="semantic_diff_title">Review semantic changes</string>
-    <string name="semantic_diff_summary">%1$d change(s) across %2$d automation(s)</string>
+    <string name="semantic_diff_summary">%1$s across %2$s</string>
+    <plurals name="semantic_diff_summary_changes">
+        <item quantity="one">%1$d change</item>
+        <item quantity="other">%1$d changes</item>
+    </plurals>
+    <plurals name="semantic_diff_summary_profiles">
+        <item quantity="one">%1$d profile</item>
+        <item quantity="other">%1$d profiles</item>
+    </plurals>
     <string name="semantic_diff_no_changes">No semantic changes detected.</string>
-    <string name="semantic_diff_flow_note">%1$d flow node(s) are highlighted in Flow.</string>
+    <plurals name="semantic_diff_flow_note">
+        <item quantity="one">%1$d flow node is highlighted in Flow.</item>
+        <item quantity="other">%1$d flow nodes are highlighted in Flow.</item>
+    </plurals>
     <string name="semantic_diff_entry_title">%1$s: %2$s</string>
     <string name="semantic_diff_added">Added</string>
     <string name="semantic_diff_removed">Removed</string>
@@ -862,6 +873,7 @@
     <string name="semantic_diff_entity_scene">Scene</string>
     <string name="semantic_diff_entity_variable">Variable</string>
     <string name="flow_node_accessibility">%1$s</string>
+    <string name="flow_outputs_accessibility">Outputs: %1$s</string>
     <string name="flow_profile_detail">%1$s - Mode %2$s - Cooldown %3$ds</string>
     <string name="flow_warning_no_contexts">Profile has no contexts.</string>
     <string name="flow_edge_match">must match</string>
@@ -960,8 +972,15 @@
     <string name="diagnostics_admission_no_circuits">No tripped circuit state recorded.</string>
     <string name="diagnostics_admission_global">Global circuit</string>
     <string name="diagnostics_admission_profile">%1$s circuit</string>
-    <string name="diagnostics_admission_open">Open for about %1$d more seconds (%2$d strike(s))</string>
-    <string name="diagnostics_admission_closed">Closed; %1$d recorded strike(s)</string>
+    <plurals name="diagnostics_admission_open">
+        <item quantity="one">Open for about %1$d more second (%2$s)</item>
+        <item quantity="other">Open for about %1$d more seconds (%2$s)</item>
+    </plurals>
+    <plurals name="diagnostics_admission_strikes">
+        <item quantity="one">%1$d strike</item>
+        <item quantity="other">%1$d strikes</item>
+    </plurals>
+    <string name="diagnostics_admission_closed">Closed; %1$s recorded</string>
     <string name="diagnostics_admission_trip_reason">Trip reason: %1$s</string>
     <string name="diagnostics_service">Automation service</string>
     <string name="diagnostics_service_running">Running</string>
@@ -1122,7 +1141,10 @@
     <string name="ui_message_profile_created">Profile created</string>
     <string name="ui_message_profile_duplicated">Profile duplicated as a disabled copy</string>
     <string name="ui_message_profile_updated">Profile updated</string>
-    <string name="ui_profile_lint_warnings">Profile saved with %1$d lint warning(s); review Automation lint in Context Inspector.</string>
+    <plurals name="ui_profile_lint_warnings">
+        <item quantity="one">Profile saved with %1$d lint warning; review Automation lint in Context Inspector.</item>
+        <item quantity="other">Profile saved with %1$d lint warnings; review Automation lint in Context Inspector.</item>
+    </plurals>
     <string name="ui_message_profile_deleted">Profile deleted</string>
     <string name="ui_message_profile_reviewed">Imported profile reviewed and enabled</string>
     <string name="ui_message_template_installed">Template installed as a disabled profile</string>

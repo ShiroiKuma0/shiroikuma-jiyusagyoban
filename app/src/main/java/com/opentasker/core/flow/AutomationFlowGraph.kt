@@ -70,7 +70,15 @@ data class AutomationFlowNode(
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
-        return strings.nodeAccessibility(kindName, title, detail, condition, muted)
+        return strings.nodeAccessibility(
+            kind = kindName,
+            title = title,
+            detail = detail,
+            condition = condition,
+            muted = muted,
+            changed = changed,
+            outputs = outputs.map { it.name },
+        )
     }
 }
 

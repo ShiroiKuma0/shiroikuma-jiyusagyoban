@@ -465,6 +465,15 @@ private fun FlowCanvasNode(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            // The list variant already carries this pill. On the canvas the only marker used to be
+            // a 2dp tertiary border, which in the dark theme sits a few percent away from the sage
+            // node outline and is invisible to anyone who cannot compare two similar colours.
+            if (node.changed) {
+                FlowStatusPill(
+                    label = stringResource(R.string.flow_changed_node),
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             node.condition?.let {
                 Text(
                     stringResource(R.string.flow_if),

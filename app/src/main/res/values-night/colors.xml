@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark widget colours, mirroring the app's graphite/sage dark scheme in ui/theme/Theme.kt. -->
+<resources>
+    <color name="widget_background">#151817</color>
+    <color name="widget_border">#39413D</color>
+    <color name="widget_primary">#B7C7B0</color>
+    <color name="widget_text_primary">#F4F1EA</color>
+    <color name="widget_text_secondary">#A9AEA8</color>
+</resources>

@@ -14,7 +14,15 @@ interface AutomationFlowStrings {
 
     fun accessibilitySummary(title: String, contextCount: Int, actionCount: Int, enterTask: String, exitTask: String, warningText: String): String
     fun noExitTask(): String
-    fun nodeAccessibility(kind: String, title: String, detail: String?, condition: String?, muted: Boolean): String
+    fun nodeAccessibility(
+        kind: String,
+        title: String,
+        detail: String?,
+        condition: String?,
+        muted: Boolean,
+        changed: Boolean,
+        outputs: List<String>,
+    ): String
     fun profileDetail(enabled: Boolean, mode: String, cooldownSeconds: Int): String
     fun noContextsWarning(): String
     fun contextEdge(inverted: Boolean): String
@@ -39,10 +47,27 @@ private class ResourceAutomationFlowStrings(
         resources.getString(R.string.flow_accessibility_summary, title, contextCount, actionCount, enterTask, exitTask, warningText)
     override fun noExitTask(): String = resources.getString(R.string.flow_no_exit_task)
 
-    override fun nodeAccessibility(kind: String, title: String, detail: String?, condition: String?, muted: Boolean): String =
+    override fun nodeAccessibility(
+        kind: String,
+        title: String,
+        detail: String?,
+        condition: String?,
+        muted: Boolean,
+        changed: Boolean,
+        outputs: List<String>,
+    ): String =
         resources.getString(
             R.string.flow_node_accessibility,
-            listOf(kind, title, detail.orEmpty(), condition?.let { resources.getString(R.string.flow_if_condition, it) }.orEmpty(), muted).joinToString(". "),
+            listOfNotNull(
+                kind,
+                title,
+                detail.orEmpty(),
+                condition?.let { resources.getString(R.string.flow_if_condition, it) }.orEmpty(),
+                muted.toString(),
+                resources.getString(R.string.flow_changed_node).takeIf { changed },
+                outputs.takeIf { it.isNotEmpty() }
+                    ?.let { resources.getString(R.string.flow_outputs_accessibility, it.joinToString(", ")) },
+            ).joinToString(". "),
         )
 
     override fun profileDetail(enabled: Boolean, mode: String, cooldownSeconds: Int): String =
@@ -94,8 +119,23 @@ private object EnglishAutomationFlowStrings : AutomationFlowStrings {
     override fun accessibilitySummary(title: String, contextCount: Int, actionCount: Int, enterTask: String, exitTask: String, warningText: String) =
         "$title: $contextCount context${plural(contextCount)}, $actionCount action${plural(actionCount)}, enter task $enterTask, exit task $exitTask, $warningText."
     override fun noExitTask() = "no exit task"
-    override fun nodeAccessibility(kind: String, title: String, detail: String?, condition: String?, muted: Boolean) =
-        listOfNotNull(kind, title, detail?.takeUnless(String::isBlank), condition?.let { "condition if $it" }, "inactive".takeIf { muted }).joinToString(". ")
+    override fun nodeAccessibility(
+        kind: String,
+        title: String,
+        detail: String?,
+        condition: String?,
+        muted: Boolean,
+        changed: Boolean,
+        outputs: List<String>,
+    ) = listOfNotNull(
+        kind,
+        title,
+        detail?.takeUnless(String::isBlank),
+        condition?.let { "condition if $it" },
+        "inactive".takeIf { muted },
+        "changed".takeIf { changed },
+        outputs.takeIf { it.isNotEmpty() }?.let { "outputs ${it.joinToString(", ")}" },
+    ).joinToString(". ")
     override fun profileDetail(enabled: Boolean, mode: String, cooldownSeconds: Int) =
         "${if (enabled) "Enabled" else "Disabled"} - Mode $mode - Cooldown ${cooldownSeconds}s"
     override fun noContextsWarning() = "Profile has no contexts."

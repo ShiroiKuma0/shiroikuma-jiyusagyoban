@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -393,14 +394,16 @@ private fun AdmissionCircuitRow(
         stringResource(R.string.diagnostics_admission_profile, profileNames[it] ?: it.toString())
     }
         ?: stringResource(R.string.diagnostics_admission_global)
+    val strikes = pluralStringResource(
+        R.plurals.diagnostics_admission_strikes,
+        state.strikeCount,
+        state.strikeCount,
+    )
     val status = if (remainingMs > 0L) {
-        stringResource(
-            R.string.diagnostics_admission_open,
-            (remainingMs / 1_000L).coerceAtLeast(1L),
-            state.strikeCount,
-        )
+        val seconds = (remainingMs / 1_000L).coerceAtLeast(1L)
+        pluralStringResource(R.plurals.diagnostics_admission_open, seconds.toInt(), seconds, strikes)
     } else {
-        stringResource(R.string.diagnostics_admission_closed, state.strikeCount)
+        stringResource(R.string.diagnostics_admission_closed, strikes)
     }
     HealthRow(label, status)
     state.lastReason?.takeIf(String::isNotBlank)?.let { reason ->

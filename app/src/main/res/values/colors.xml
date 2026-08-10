@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Widget colours mirror the app's light graphite/sage palette (ui/theme/Theme.kt). The dark
+    variant lives in values-night. They used to be the retired Catppuccin Mocha palette and were
+    permanently dark, so the one surface a user sees without opening the app was the only one that
+    never matched it.
+-->
 <resources>
     <color name="ic_launcher_background">#090C12</color>
-    <color name="widget_background">#11111B</color>
-    <color name="widget_border">#45475A</color>
-    <color name="widget_primary">#CBA6F7</color>
-    <color name="widget_text_primary">#CDD6F4</color>
-    <color name="widget_text_secondary">#A6ADC8</color>
+    <color name="widget_background">#FBFAF6</color>
+    <color name="widget_border">#89928A</color>
+    <color name="widget_primary">#4D6653</color>
+    <color name="widget_text_primary">#20241F</color>
+    <color name="widget_text_secondary">#606960</color>
 </resources>

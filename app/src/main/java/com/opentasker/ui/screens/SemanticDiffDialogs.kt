@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
@@ -70,12 +71,20 @@ internal fun SemanticDiffSummary(document: SemanticDiffDocument) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
         Text(
-            stringResource(R.string.semantic_diff_summary, document.changeCount, document.entries.size),
+            stringResource(
+                R.string.semantic_diff_summary,
+                pluralStringResource(R.plurals.semantic_diff_summary_changes, document.changeCount, document.changeCount),
+                pluralStringResource(R.plurals.semantic_diff_summary_profiles, document.entries.size, document.entries.size),
+            ),
             style = MaterialTheme.typography.bodyMedium,
         )
         if (document.flowNodeKeys.isNotEmpty()) {
             Text(
-                stringResource(R.string.semantic_diff_flow_note, document.flowNodeKeys.size),
+                pluralStringResource(
+                    R.plurals.semantic_diff_flow_note,
+                    document.flowNodeKeys.size,
+                    document.flowNodeKeys.size,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.tertiary,
             )
