@@ -39,7 +39,7 @@ class TemporaryStateAction : DeclaredAction(ActionCatalog.require(ACTION_ID)) {
             ?: return ActionResult.Failure("temporary state does not support ${plan.targetAction}")
         val targetAction = ActionRegistry.get(plan.targetAction)
             ?: return ActionResult.Failure("unknown target action: ${plan.targetAction}")
-        val restoreArgs = target.capture(ctx.app, plan.targetArgs)
+        val restoreArgs = target.capture(ctx.app, plan.targetAction, plan.targetArgs)
             ?: return ActionResult.Failure("current ${plan.targetAction} state is unavailable")
 
         when (val result = targetAction.run(ctx, plan.targetArgs)) {
@@ -108,6 +108,10 @@ internal object TemporaryStateTarget {
     fun forAction(actionId: String): TemporaryStateTarget? =
         actionId.takeIf { it in SUPPORTED_ACTIONS }?.let { this }
 
+    /**
+     * [args] carries the target action's own arguments, so the action id must be passed
+     * separately; there is deliberately no overload that reads it back out of [args].
+     */
     fun capture(context: Context, actionId: String, args: Map<String, String>): Map<String, String>? = when (actionId) {
         "brightness.set" -> captureBrightness(context)
         "volume.set" -> captureVolume(context, args["stream"] ?: "music")
@@ -115,9 +119,6 @@ internal object TemporaryStateTarget {
         "dnd.set" -> captureDnd(context)
         else -> null
     }
-
-    fun capture(context: Context, args: Map<String, String>): Map<String, String>? =
-        capture(context, args["target_action"].orEmpty(), args)
 
     private fun captureBrightness(context: Context): Map<String, String>? {
         val resolver = context.contentResolver

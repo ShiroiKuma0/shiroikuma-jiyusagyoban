@@ -54,4 +54,24 @@ class TemporaryStateActionTest {
         assertTrue(TemporaryStateTarget.forAction("brightness.set") != null)
         assertTrue(TemporaryStateTarget.forAction("torch.set") == null)
     }
+
+    /**
+     * `target_args` holds the *target action's* arguments and never carries `target_action`, so a
+     * `capture(context, args)` overload silently resolves the action id to "" and returns null for
+     * every invocation. Keep the action id an explicit parameter so that overload cannot come back.
+     */
+    @Test
+    fun captureAlwaysRequiresAnExplicitActionId() {
+        val captureOverloads = TemporaryStateTarget::class.java.methods.filter { it.name == "capture" }
+
+        assertTrue("capture(context, actionId, args) must exist", captureOverloads.isNotEmpty())
+        captureOverloads.forEach { method ->
+            assertEquals(
+                "capture must take the action id explicitly, not read it back out of the target args",
+                3,
+                method.parameterCount,
+            )
+            assertEquals(String::class.java, method.parameterTypes[1])
+        }
+    }
 }
