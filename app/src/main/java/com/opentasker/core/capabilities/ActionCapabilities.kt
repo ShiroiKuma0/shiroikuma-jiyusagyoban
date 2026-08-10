@@ -1,11 +1,7 @@
 package com.opentasker.core.capabilities
 
-import androidx.annotation.StringRes
 import com.opentasker.app.BuildConfig
-import com.opentasker.app.R
-import com.opentasker.core.actions.ActionCatalog
 import com.opentasker.core.platform.AndroidAudioHardening
-import com.opentasker.core.platform.AndroidAudioHardening.ANDROID_17_API
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scripting.TermuxScriptBackend
 
@@ -15,213 +11,213 @@ enum class CapabilityLevel {
     Unsupported,
 }
 
+/** The OS permission / service an action needs, so the editor can check it live and deep-link the fix. */
+enum class CapabilityRequirement {
+    None,
+    Accessibility,
+    Shizuku,
+    WriteSettings,
+    PostNotifications,
+    NotificationListener,
+    Overlay,
+    Dnd,
+    AllFiles,
+    DeviceAdmin,
+    Microphone,
+    Location,
+    Bluetooth,
+}
+
 data class ActionCapability(
     val level: CapabilityLevel,
     val reason: String,
-    @get:StringRes val reasonRes: Int,
+    val requirement: CapabilityRequirement = CapabilityRequirement.None,
+    /**
+     * When true, a task is HARD-BLOCKED (with a dialog, won't run) if [requirement] isn't granted at run
+     * time. Default false: most actions degrade gracefully (e.g. flash → toast) and must not block. Only
+     * actions that genuinely do nothing — and silently break things — without their special access opt in.
+     */
+    val blocking: Boolean = false,
 ) {
     val canAdd: Boolean
         get() = level != CapabilityLevel.Unsupported
 }
 
 object ActionCapabilityRegistry {
-    private val supported = ActionCapability(CapabilityLevel.Supported, "Ready", R.string.capability_ready)
-    private val unknown = ActionCapability(
-        CapabilityLevel.Unsupported,
-        "Unknown actions are not classified and cannot be added, imported, or enabled.",
-        R.string.capability_unknown_action,
-    )
-
-    /**
-     * Actions reviewed as ordinary: they run under the app's own manifest permissions with no
-     * special access, no distribution gate, and no permanent platform block.
-     *
-     * This set exists so [get] has no permissive default. An action that is registered but appears
-     * in neither this set nor [capabilities] resolves to [unknown] and cannot be added, imported,
-     * or executed — the contract fails closed while it is unreviewed instead of silently
-     * advertising itself as Ready.
-     */
-    private val ordinaryActionIds = setOf(
-        // Variables, text, and date-time: pure in-process transforms.
-        "var.set",
-        "var.persist",
-        "clipboard.get",
-        "clipboard.set",
-        "data.read",
-        "datetime.format",
-        "datetime.parse",
-        "datetime.add",
-        "text.match",
-        "text.replace",
-        "text.split",
-        "text.join",
-        "text.substring",
-        // Flow control: engine-handled markers plus the runtime wait.
-        "flow.wait",
-        "task.run",
-        "flow.if",
-        "flow.else",
-        "flow.endif",
-        "flow.foreach",
-        "flow.endfor",
-        "flow.try",
-        "flow.catch",
-        "flow.endtry",
-        "flow.stop",
-        // App and intent dispatch: uses ordinary intent resolution.
-        "intent.launch",
-        "app.launch",
-        "shortcut.publish",
-        "home.go",
-        "url.open",
-        // Scoped file access inside the app's own sandbox.
-        "file.read",
-        "file.write",
-        "file.append",
-        "file.delete",
-        "file.list",
-        // Network: INTERNET is a normal permission. Private-LAN destinations are gated at
-        // runtime by the ACCESS_LOCAL_NETWORK policy, which fails closed with a Setup pointer.
-        "http.request",
-        "http.get",
-        "http.post",
-        "integration.home_assistant.webhook",
-        "mqtt.publish",
-        "ping",
-        "download",
-        // Device feedback covered by normal manifest permissions.
-        "vibrate",
-        "log",
-    )
+    private val supported = ActionCapability(CapabilityLevel.Supported, "Ready")
 
     private val capabilities = mapOf(
-        "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", R.string.capability_notification_permission),
-        "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.", R.string.capability_notification_cancel_permission),
-        "notify.progress" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+; uses ProgressStyle on Android 16+ and requests optional promoted ongoing treatment while progress is active, with a standard progress bar fallback.", R.string.capability_notification_progress),
-        "contacts.lookup" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an explicit Contacts permission for unattended lookup, or Android 17 field-scoped picker mode.", R.string.capability_contacts_permission),
-        "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package.", R.string.capability_locale_fire_setup),
-        "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling.", R.string.capability_locale_query_setup),
-        "wifi.toggle" to ActionCapability(CapabilityLevel.Unsupported, "Android 10+ blocks direct WiFi toggles for normal apps.", R.string.capability_wifi_unsupported),
+        "notify.show" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires notification permission on Android 13+.", CapabilityRequirement.PostNotifications),
+        "notify.cancel" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels a posted notification by tag and/or ID. Requires notification permission on Android 13+.", CapabilityRequirement.PostNotifications),
+        "notify.dismiss" to ActionCapability(CapabilityLevel.RequiresSetup, "Cancels another app's notifications by package. Requires notification-access (listener) permission.", CapabilityRequirement.NotificationListener, blocking = true),
+        "plugin.locale.fire" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible plugin; requests are dispatched only to an explicit package."),
+        "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling."),
+        "wifi.toggle" to shizukuCapability("WiFi toggle on Android 10+"),
         "bluetooth.toggle" to bluetoothCapability(),
-        "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
-        "screen.timeout" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
-        "app.kill" to ActionCapability(CapabilityLevel.Unsupported, "Force-stopping another app requires privileged app-management access that no normal app can hold.", R.string.capability_app_kill_unsupported),
-        "app.archive" to packageArchiveCapability("Archive installed packages while retaining their user data."),
-        "app.unarchive" to packageArchiveCapability("Request restoration of an archived package through its responsible installer."),
-        "wol" to wakeOnLanCapability(),
+        "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", CapabilityRequirement.WriteSettings, blocking = true),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
-        "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", R.string.capability_dnd_access),
-        "zen.rule.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access; uses Android 15+ owned Zen rules and falls back to transient DND below Android 15.", R.string.capability_zen_rule_access),
-        "zen.rule.clear" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access; removes an OpenTasker-owned Zen rule or clears transient DND below Android 15.", R.string.capability_zen_rule_access),
-        "ringer.set" to volumeCapability("May require Do Not Disturb access on some devices when switching to silent mode."),
-        "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight.", R.string.capability_torch_ready),
-        "airplane.toggle" to elevatedUnsupported("airplane.toggle", "Airplane mode changes require system or device-owner privileges.", R.string.capability_airplane_unsupported),
-        "mobile.toggle" to elevatedUnsupported("mobile.toggle", "Mobile data changes require carrier, system, or device-owner privileges.", R.string.capability_mobile_data_unsupported),
-        "aod.set" to elevatedUnsupported("aod.set", "Always-on display is a protected secure setting, and not every build honours it.", R.string.capability_aod_unsupported),
-        "wifi.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires location access, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so results may be a cached scan.", R.string.capability_wifi_scan_setup),
+        "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", CapabilityRequirement.Dnd),
+        "ringer.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May require Do Not Disturb access on some devices when switching to silent mode."),
+        "torch.set" to ActionCapability(CapabilityLevel.Supported, "Uses camera flashlight."),
+        "airplane.toggle" to shizukuCapability("Airplane mode"),
+        "mobile.toggle" to shizukuCapability("Mobile data"),
         "sms.send" to smsCapability(),
-        "screenshot.take" to elevatedUnsupported("screenshot.take", "Screenshots require MediaProjection consent or privileged shell access.", R.string.capability_screenshot_unsupported),
-        "sound.play" to audioOutputCapability("Plays audio from a file path or content URI."),
+        "screenshot.take" to shizukuCapability("Screenshot"),
+        "location.mode" to shizukuCapability("Location mode"),
+        "ime.set" to shizukuCapability("Set keyboard"),
+        "sound.play" to audioOutputCapability("Plays audio from a file path or content URI; a file outside the app's own folders needs All files access.")
+            .let { if (it.level == CapabilityLevel.Supported) it.copy(requirement = CapabilityRequirement.AllFiles) else it },
         "sound.stop" to mediaKeyCapability("Stop playback via media key dispatch."),
         "sound.pause" to mediaKeyCapability("Pause playback via media key dispatch."),
+        "media.playpause" to mediaKeyCapability("Toggle play/pause via media key dispatch."),
         "track.next" to mediaKeyCapability("Next track via media key dispatch."),
         "track.previous" to mediaKeyCapability("Previous track via media key dispatch."),
         "media.mute" to volumeCapability("Mutes a stream. May be blocked by Do Not Disturb policy."),
         "tts.speak" to audioOutputCapability("Uses Android TTS engine to speak text aloud."),
-        "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access.", R.string.capability_reboot_unsupported),
-        "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support.", R.string.capability_lock_unsupported),
-        "tile.set" to ActionCapability(CapabilityLevel.Supported, "Updates a configured OpenTasker Quick Settings tile.", R.string.capability_tile_ready),
-        "state.temporary" to ActionCapability(CapabilityLevel.Supported, "Applies a reversible setting and schedules a durable restore.", R.string.capability_temporary_state_ready),
-        "ime.info" to ActionCapability(CapabilityLevel.Supported, "Reports the current and enabled input methods.", R.string.capability_ime_info_ready),
-        "ime.set" to ActionCapability(CapabilityLevel.Unsupported, "Android requires user selection before a normal app can switch the active input method.", R.string.capability_ime_set_unsupported),
-        "screen.off" to elevatedUnsupported("screen.off", "Screen-off requires privileged power management access.", R.string.capability_screen_off_unsupported),
-        "wake" to elevatedUnsupported("wake", "Wake requires a foreground activity or privileged wake flow.", R.string.capability_wake_unsupported),
+        "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access."),
+        "power.off" to ActionCapability(CapabilityLevel.RequiresSetup, "Powers off the device through Shizuku — install and start Shizuku, then grant this app access.", CapabilityRequirement.Shizuku, blocking = true),
+        "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support."),
+        "tile.set" to ActionCapability(CapabilityLevel.Unsupported, "Quick Settings tile updates are not functional yet; per-task tiles are a planned feature."),
+        "screen.off" to accessibilityCapability(),
+        // Fork: WakeAction runs `input keyevent 224` through ShizukuShell — a plain Shizuku-gated
+        // action like shell.run, NOT upstream's (never-shipped) privileged transport. Upstream's
+        // elevatedUnsupported() here made the pre-flight hard-fail every task containing a wake.
+        "wake" to shizukuCapability("Screen wake (KEYCODE_WAKEUP)"),
+        "app.freeze" to shizukuCapability("Freeze app (pm disable-user)"),
+        "share.relays" to shizukuCapability("Generate + install per-app share relays"),
+        "app.unfreeze" to shizukuCapability("Unfreeze app (pm enable)"),
+        "tasks.launchers" to shizukuCapability("Create launcher tasks"),
         TermuxScriptBackend.ACTION_ID to ActionCapability(
             CapabilityLevel.RequiresSetup,
             TermuxScriptBackend.hintForAction(TermuxScriptBackend.ACTION_ID)?.message
-                ?: "Termux 0.109+, RUN_COMMAND permission, and an approved script hash are required.",
-            R.string.capability_termux_setup,
+                ?: "Termux script dispatch ready when Termux and Termux:Tasker are installed.",
         ),
-        "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action.", R.string.capability_tasker_import_unsupported),
-        "macrodroid.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported MacroDroid action could not be mapped to a supported OpenTasker action.", R.string.capability_macrodroid_import_unsupported),
+        "flash" to ActionCapability(CapabilityLevel.RequiresSetup, "Custom colours, border and position need \"display over other apps\"; without it the flash falls back to a plain toast.", CapabilityRequirement.Overlay),
+        "bubble.flash_add" to ActionCapability(CapabilityLevel.RequiresSetup, "The flash bubbles render only with \"display over other apps\" and only while the Desktop launcher is foreground.", CapabilityRequirement.Overlay),
+        "bubble.flashkill_show" to ActionCapability(CapabilityLevel.RequiresSetup, "The kill-all icon renders only with \"display over other apps\" and only while the Desktop launcher is foreground.", CapabilityRequirement.Overlay),
+        "wallpaper.live" to ActionCapability(CapabilityLevel.RequiresSetup, "Silent only with Shizuku — shell holds the privileged permission the framework reserves for setting a live wallpaper. Without it the system preview opens for a confirming tap.", CapabilityRequirement.Shizuku),
+        "ocr.models" to ActionCapability(CapabilityLevel.Supported, "Records where the OCR weight files are. Needs no permission beyond being able to read the folder."),
+        "ocr.recognize" to ActionCapability(CapabilityLevel.Supported, "Reads the text in an image entirely on-device (PP-OCRv5); no permissions and no network. The image must be somewhere this app can read."),
+        "ocr.article" to ActionCapability(CapabilityLevel.Supported, "Reads a scrolling screenshot into an HTML article, entirely on-device. No network. Needs to read the screenshots and write into the output folder."),
+        "state.get" to ActionCapability(CapabilityLevel.Supported, "Reads battery / charging / WiFi / airplane into variables; no permissions needed."),
+        "clipboard.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 10+ blocks clipboard reads unless the app is focused; may return empty from the background."),
+        "apps.list" to ActionCapability(CapabilityLevel.RequiresSetup, "Android 11+ package visibility limits the result to apps this app can see."),
+        "nav.back" to accessibilityCapability(),
+        "nav.recents" to accessibilityCapability(),
+        "panel.notifications" to accessibilityCapability(),
+        "panel.quicksettings" to accessibilityCapability(),
+        "nav.power" to accessibilityCapability(),
+        "screen.lock" to accessibilityCapability(),
+        "screen.lockdown" to ActionCapability(CapabilityLevel.RequiresSetup, "Enable 白い熊 自由作業盤 as a Device Admin (Permissions screen) so it can lock and require the PIN/password.", CapabilityRequirement.DeviceAdmin, blocking = true),
+        "scene.show" to accessibilityCapability(),
+        "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
+        "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", CapabilityRequirement.WriteSettings, blocking = true),
+        "setting.put" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access; only the System namespace is writable without Shizuku.", CapabilityRequirement.WriteSettings, blocking = true),
+        "system.set_locale" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access plus the adb-granted CHANGE_CONFIGURATION permission (pm grant … android.permission.CHANGE_CONFIGURATION).", CapabilityRequirement.WriteSettings, blocking = true),
+        "dialog.input" to dialogCapability(),
+        "dialog.list" to dialogCapability(),
+        "dialog.text" to dialogCapability(),
+        "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
+        // Switching which SIM carries data goes through ISub.setDefaultDataSubId, which needs
+        // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
+        "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
+        "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
+        // Reads a fix through the framework LocationManager; the permission is the whole requirement.
+        // Connects to the band over BLE. No pairing, no bonding and no scan — it is addressed by
+        // MAC — so BLUETOOTH_CONNECT is the entire requirement.
+        "band.charts" to ActionCapability(CapabilityLevel.Supported, "Opens the 健康 window on data already stored on this device. Needs no permission.", blocking = false),
+        "band.sync" to ActionCapability(CapabilityLevel.RequiresSetup, "Reads the Hume Band's stored health history over Bluetooth — needs the Nearby devices (Bluetooth) permission.", CapabilityRequirement.Bluetooth, blocking = true),
+        "location.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Reads the device's position into variables — needs the Location permission.", CapabilityRequirement.Location, blocking = true),
+        // Upstream 0.2.88. Android returns the last cached scan whether or not a fresh one was
+        // accepted, so the permission is the whole gate the user can act on.
+        "wifi.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Lists nearby access points into variables — needs Location, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so the result may be a cached one.", CapabilityRequirement.Location, blocking = true),
+        // Upstream 0.2.88. Writes a secure setting through the Shizuku transport and reads it
+        // back, because plenty of OEM builds accept the write and ignore it.
+        "aod.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Always-on display is a protected secure setting — requires Shizuku, and not every build honours it.", CapabilityRequirement.Shizuku, blocking = true),
+        // Pins its own network and transfers over it; no special access beyond the declared
+        // CHANGE_NETWORK_STATE, and it never changes the system's default route.
+        "net.speedtest.cancel" to ActionCapability(CapabilityLevel.Supported, "Aborts a running speed test immediately."),
+        "net.speedtest" to ActionCapability(CapabilityLevel.Supported, "Measures download/upload throughput over a chosen transport (mobile or WiFi), time-boxed and byte-capped."),
+        "audio.record.start" to ActionCapability(CapabilityLevel.RequiresSetup, "Records the microphone — needs the Microphone (RECORD_AUDIO) permission.", CapabilityRequirement.Microphone, blocking = true),
+        "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
     /**
-     * Resolves a shipped action through its canonical declaration. The policy table below remains
-     * deliberately private to this resolver; callers cannot accidentally bypass the catalogue by
-     * reading a second public registry.
+     * An action's capability. Only ~60 actions need an explicit entry; the rest are ordinary and
+     * default to [supported] — but ONLY if this app actually ships them.
+     *
+     * An id the app has never heard of fails **closed**. It reaches here from an imported bundle
+     * written by a newer build or another app, or from a typo, and answering "Ready" for it meant the
+     * editor offered it and the import review waved it through. [AutomationSensitivityRegistry.isKnown]
+     * is the oracle rather than the metadata registry, because it is a static set with no
+     * registration-order hazard: a capability query before `registerActionMetadata()` must not turn
+     * every action unsupported.
      */
-    fun get(actionId: String): ActionCapability = ActionCatalog.get(actionId)
-        ?.capability
-        ?.invoke()
-        ?: resolveDeclared(actionId)
+    fun get(actionId: String): ActionCapability = resolveDeclared(actionId)
 
+    /**
+     * The same resolution, reachable from an [com.opentasker.core.actions.ActionDefinition]'s default
+     * capability lambda. Upstream routes every capability query through the catalogue; the fork keeps
+     * the fail-closed table above as the single answer, so both entry points land here.
+     */
     internal fun resolveDeclared(actionId: String): ActionCapability = capabilities[actionId]
-        ?: if (actionId in ordinaryActionIds) supported else unknown
+        ?: if (AutomationSensitivityRegistry.isKnown(actionId)) supported else unknownAction
 
-    /** Every action id with an explicit contract, used by the contract completeness test. */
-    internal fun contractedActionIds(): Set<String> = capabilities.keys + ordinaryActionIds
+    private val unknownAction = ActionCapability(
+        CapabilityLevel.Unsupported,
+        "This build does not know this action — it may come from a newer version. Re-export the bundle " +
+            "from a build that has it, or remove the action.",
+    )
 
     private fun bluetoothCapability(): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= 33) {
-            ActionCapability(CapabilityLevel.Unsupported, "Android 13+ blocks direct Bluetooth enable/disable for normal apps.", R.string.capability_bluetooth_unsupported)
+            ActionCapability(CapabilityLevel.Unsupported, "Android 13+ blocks direct Bluetooth enable/disable for normal apps.")
         } else {
-            ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.", R.string.capability_bluetooth_permission)
-        }
-
-    /**
-     * Not [CapabilityLevel.Supported]: OpenTasker is never the installer of record, so Android
-     * answers every archive request with STATUS_PENDING_USER_ACTION and a confirmation the app has
-     * to show. That needs a visible app, which a background automation cannot promise.
-     */
-    private fun packageArchiveCapability(reason: String): ActionCapability =
-        if (android.os.Build.VERSION.SDK_INT >= 35) {
-            ActionCapability(CapabilityLevel.RequiresSetup, reason, R.string.capability_app_archive_ready)
-        } else {
-            ActionCapability(CapabilityLevel.Unsupported, "Package archive APIs require Android 15 (API 35) or newer.", R.string.capability_app_archive_unsupported)
-        }
-
-    /**
-     * Wake-on-LAN only ever targets a private address, so on Android 17+ it is permanently gated
-     * on ACCESS_LOCAL_NETWORK rather than failing at run time like the general HTTP actions.
-     */
-    private fun wakeOnLanCapability(): ActionCapability =
-        if (android.os.Build.VERSION.SDK_INT >= ANDROID_17_API) {
-            ActionCapability(
-                CapabilityLevel.RequiresSetup,
-                "Android 17+ requires local network access for the LAN broadcast; grant it in Setup.",
-                R.string.capability_local_network_setup,
-            )
-        } else {
-            ActionCapability(CapabilityLevel.Supported, "Sends a magic packet on the local network.", R.string.capability_ready)
+            // The fork's registry classifies by CapabilityRequirement, not by upstream's label
+            // resource, and it does not classify wol/app.archive at all — so upstream's two new
+            // helpers alongside this one are deliberately not taken here.
+            ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.")
         }
 
     private fun smsCapability(): ActionCapability =
         if (BuildConfig.SMS_ACTION_AVAILABLE) {
-            ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.", R.string.capability_sms_permission)
+            ActionCapability(CapabilityLevel.RequiresSetup, "Requires SMS permission; Play builds omit SMS actions for policy compliance.")
         } else {
-            ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.", R.string.capability_sms_distribution_unsupported)
+            ActionCapability(CapabilityLevel.Unsupported, "SMS action is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.")
         }
 
+    // Android 17+ restricts these to "app visible, or a while-in-use eligible foreground service, or the
+    // alarm stream with exact-alarm access" — a CONDITION, not an impossibility, and this fork ships the
+    // eligible foreground service plus the runtime check (AudioRuntimeEligibility) that enforces it.
+    // Unsupported would make them un-addable even though they work; setup-gated is the honest level.
     internal fun audioOutputCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.outputCapabilityReason(reason), R.string.capability_audio_output_restricted)
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.outputCapabilityReason(reason))
         } else {
-            ActionCapability(CapabilityLevel.Supported, reason, R.string.capability_audio_output_ready)
+            ActionCapability(CapabilityLevel.Supported, reason)
         }
+
+    private fun shizukuCapability(feature: String): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "$feature runs through Shizuku — install and start Shizuku, then grant this app access.", CapabilityRequirement.Shizuku, blocking = true)
+
+    private fun dialogCapability(): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "Shows over other apps; from a background trigger it needs the \"display over other apps\" permission. Always works when run from the app.", CapabilityRequirement.Overlay)
+
+    private fun accessibilityCapability(): ActionCapability =
+        ActionCapability(CapabilityLevel.RequiresSetup, "Enable the 白い熊 自由作業盤 accessibility service in Android settings.", CapabilityRequirement.Accessibility, blocking = true)
 
     internal fun mediaKeyCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.mediaKeyCapabilityReason(reason), R.string.capability_media_key_restricted)
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.mediaKeyCapabilityReason(reason))
         } else {
-            ActionCapability(CapabilityLevel.Supported, reason, R.string.capability_media_key_ready)
+            ActionCapability(CapabilityLevel.Supported, reason)
         }
 
     internal fun volumeCapabilityForSdk(sdkInt: Int, reason: String): ActionCapability =
         if (AndroidAudioHardening.isRestricted(sdkInt)) {
-            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.volumeCapabilityReason(reason), R.string.capability_volume_restricted)
+            ActionCapability(CapabilityLevel.RequiresSetup, AndroidAudioHardening.volumeCapabilityReason(reason))
         } else {
-            ActionCapability(CapabilityLevel.RequiresSetup, reason, R.string.capability_volume_policy)
+            ActionCapability(CapabilityLevel.RequiresSetup, reason)
         }
 
     private fun audioOutputCapability(reason: String): ActionCapability =
@@ -233,10 +229,13 @@ object ActionCapabilityRegistry {
     private fun volumeCapability(reason: String): ActionCapability =
         volumeCapabilityForSdk(android.os.Build.VERSION.SDK_INT, reason)
 
-    private fun elevatedUnsupported(actionId: String, reason: String, @StringRes reasonRes: Int): ActionCapability =
-        ActionCapability(
-            CapabilityLevel.RequiresSetup,
-            "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "No privileged backend is available."}",
-            reasonRes,
-        )
+    private fun elevatedUnsupported(actionId: String, reason: String): ActionCapability =
+        if (ShizukuPowerBackend.isReady()) {
+            ActionCapability(CapabilityLevel.RequiresSetup, "$reason Shizuku elevated mode is active.")
+        } else {
+            ActionCapability(
+                CapabilityLevel.Unsupported,
+                "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "Optional elevated backend is not active."}",
+            )
+        }
 }

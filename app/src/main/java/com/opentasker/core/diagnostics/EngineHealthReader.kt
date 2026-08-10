@@ -286,7 +286,9 @@ object EngineHealthReader {
     }
 
     internal fun correlateProcessExit(
-        heartbeat: com.opentasker.core.engine.EngineHeartbeat,
+        // The fork's `EngineHeartbeat` is the live object that keeps the engine alive across Doze;
+        // the persisted record upstream calls EngineHeartbeat is EngineHeartbeatSnapshot here.
+        heartbeat: com.opentasker.core.engine.EngineHeartbeatSnapshot,
         nowMillis: Long,
         read: HistoricalProcessExitRead,
         staleAfterMillis: Long = EngineHeartbeatStore.STALE_AFTER_MS,

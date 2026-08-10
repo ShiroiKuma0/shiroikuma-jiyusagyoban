@@ -1,11 +1,12 @@
 package com.opentasker.core.engine
 
-import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
-import com.opentasker.core.diagnostics.ExportRedactionPolicy
+import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.capabilities.CapabilityPrompt
+import com.opentasker.core.capabilities.CapabilityState
+import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.expressions.TemplateExpansionTrace
-import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
@@ -33,16 +34,16 @@ class TaskRunner(
     /**
      * Reports the step about to run so an in-flight execution can say what it is doing. Nested
      * sub-task runners inherit it, so a run stuck inside a sub-task still names the real step.
-    */
-    private val onStep: (suspend (index: Int, label: String) -> Unit)? = null,
-    /** Reports a non-control action only after it has returned a result. */
-    private val onStepCompleted: (suspend (index: Int, label: String) -> Unit)? = null,
+     */
+    private val onStep: ((index: Int, label: String) -> Unit)? = null,
     private val collisionCoordinator: TaskCollisionCoordinator? = null,
     private val executionChain: Set<Long> = emptySet(),
     private val originatingProfileId: Long? = null,
     private val originatingProfileName: String? = null,
     /** Injectable clock for deterministic scenario tests; production uses wall-clock time. */
     private val now: () -> Long = System::currentTimeMillis,
+    /** Resolves a projectId → project name, for the permission-block dialog. Null → "Unfiled". */
+    private val projectNameResolver: (suspend (Long?) -> String?)? = null,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -66,6 +67,39 @@ class TaskRunner(
     )
 
     suspend fun run(task: Task): TaskRunReport {
+        // Pre-flight permission gate: if the task uses an action whose special access isn't granted,
+        // DON'T run any action — show a modal OK dialog naming the task, project, and missing permission(s).
+        val missing = CapabilityState.missingForTask(task, ctx.app)
+        if (missing.isNotEmpty()) {
+            val preStart = System.currentTimeMillis()
+            val project = runCatching { projectNameResolver?.invoke(task.projectId) }.getOrNull() ?: "Unfiled"
+            // Still blocked, still logged — but don't stack another modal on top of the settings page
+            // the user was just sent to. A per-minute profile would otherwise re-raise it immediately.
+            if (!CapabilityPrompt.allQuiet(missing.map { it.requirement })) {
+                showPermissionBlockDialog(project, task.name, missing)
+            }
+            val summary = missing.joinToString(", ") { CapabilityState.shortLabel(it.requirement) }
+            val failure = ActionResult.Failure("Not run — missing permission(s): $summary")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = preStart,
+                durationMs = System.currentTimeMillis() - preStart,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "permission",
+                        label = "permission check",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
+        }
+
         ctx.variables.pushScope()
         val started = now()
         val results = mutableListOf<ActionResult>()
@@ -83,7 +117,24 @@ class TaskRunner(
             val failure = ActionResult.Failure(
                 "task contains unknown unclassified actions: ${unknownActionIds.joinToString()}",
             )
-            return preflightFailureReport(task, started, failure, "preflight", "action classification")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "preflight",
+                        label = "action classification",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
         }
 
         val unsupportedActionIds = task.actions
@@ -99,14 +150,48 @@ class TaskRunner(
             val failure = ActionResult.Failure(
                 "task contains unsupported actions: ${unsupportedActionIds.joinToString()}",
             )
-            return preflightFailureReport(task, started, failure, "preflight", "action capability")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "preflight",
+                        label = "action capability",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
         }
 
         val structure = FlowStructure.analyze(task.actions)
         if (structure.error != null) {
             ctx.variables.popScope()
             val failure = ActionResult.Failure("flow control error: ${structure.error}")
-            return preflightFailureReport(task, started, failure, "flow", "flow control")
+            return TaskRunReport(
+                taskId = task.id,
+                taskName = task.name,
+                startedAt = started,
+                durationMs = System.currentTimeMillis() - started,
+                results = listOf(failure),
+                traces = listOf(
+                    ActionExecutionTrace(
+                        index = 0,
+                        actionType = "flow",
+                        label = "flow control",
+                        durationMs = 0,
+                        status = ActionTraceStatus.FAILURE,
+                        message = failure.message,
+                    ),
+                ),
+                success = false,
+            )
         }
 
         val loopStack = ArrayDeque<LoopFrame>()
@@ -114,7 +199,6 @@ class TaskRunner(
         val armedElseIndices = mutableSetOf<Int>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
-        var structuredFailure: StructuredTaskError? = null
         try {
             var pc = 0
             var steps = 0
@@ -123,16 +207,6 @@ class TaskRunner(
                     val failure = ActionResult.Failure("flow step budget ($MAX_FLOW_STEPS) exceeded")
                     results += failure
                     traces += markerTrace(pc, task.actions[pc], failure, ActionTraceStatus.FAILURE)
-                    structuredFailure = setFailureVariables(
-                        task = task,
-                        pc = pc,
-                        spec = task.actions[pc],
-                        failure = failure,
-                        attempt = 1,
-                        retrying = false,
-                        retryReason = null,
-                    )
-                    ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                     unhandledFailure = true
                     break
                 }
@@ -142,61 +216,23 @@ class TaskRunner(
                     results += outcome.result
                     traces += outcome.trace
                     if (outcome.halt) {
-                        if (outcome.result is ActionResult.Failure) {
-                            structuredFailure = setFailureVariables(
-                                task = task,
-                                pc = pc,
-                                spec = spec,
-                                failure = outcome.result,
-                                attempt = 1,
-                                retrying = false,
-                                retryReason = null,
-                            )
-                            ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
-                            unhandledFailure = true
-                        }
+                        if (outcome.result is ActionResult.Failure) unhandledFailure = true
                         break
                     }
                     pc = outcome.nextPc
                     continue
                 }
 
-                val stepLabel = spec.label ?: spec.type
-                onStep?.invoke(pc, stepLabel)
+                onStep?.invoke(pc, spec.label ?: spec.type)
                 val (result, trace) = runOne(pc, spec)
-                onStepCompleted?.invoke(pc, stepLabel)
                 results += result
                 traces += trace
-                if (result !is ActionResult.Failure &&
-                    tryStack.any { frame ->
-                        frame.phase == TryPhase.BODY && pc > frame.tryIndex && pc < frame.endIndex
-                    }
-                ) {
-                    clearRetryVariables()
-                }
                 if (result is ActionResult.Failure) {
-                    val recovery = recoverFailure(task, pc, spec, result, structure, loopStack, tryStack)
-                    recovery.reason?.let { reason ->
-                        traces[traces.lastIndex] = traces.last().copy(
-                            message = "${traces.last().message}; $reason",
-                        )
-                    }
-                    if (recovery.nextPc != null) {
+                    val recoveryPc = recoverFailure(pc, spec, result, structure, loopStack, tryStack)
+                    if (recoveryPc != null) {
                         handledFailureIndices += results.lastIndex
-                        pc = recovery.nextPc
+                        pc = recoveryPc
                         continue
-                    }
-                    if (structuredFailure == null) {
-                        structuredFailure = setFailureVariables(
-                            task = task,
-                            pc = pc,
-                            spec = spec,
-                            failure = result,
-                            attempt = recovery.attemptCount,
-                            retrying = false,
-                            retryReason = recovery.reason,
-                        )
-                        ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                     }
                     if (!spec.continueOnError) {
                         unhandledFailure = true
@@ -217,46 +253,7 @@ class TaskRunner(
             traces = traces,
             success = !unhandledFailure && results.withIndex().all { (index, result) ->
                 result !is ActionResult.Failure || index in handledFailureIndices
-            },
-            structuredError = structuredFailure,
-        )
-    }
-
-    private fun preflightFailureReport(
-        task: Task,
-        started: Long,
-        failure: ActionResult.Failure,
-        actionType: String,
-        label: String,
-    ): TaskRunReport {
-        return TaskRunReport(
-            taskId = task.id,
-            taskName = task.name,
-            startedAt = started,
-            durationMs = now() - started,
-            results = listOf(failure),
-            traces = listOf(
-                ActionExecutionTrace(
-                    index = 0,
-                    actionType = actionType,
-                    label = label,
-                    durationMs = 0,
-                    status = ActionTraceStatus.FAILURE,
-                    message = failure.message,
-                ),
-            ),
-            success = false,
-            structuredError = StructuredTaskError(
-                taskId = task.id,
-                taskName = task.name,
-                actionId = 0L,
-                actionIndex = 0,
-                actionType = actionType,
-                message = failure.message,
-                attemptCount = 1,
-                originatingProfileId = originatingProfileId,
-                originatingProfileName = originatingProfileName,
-            ),
+            }
         )
     }
 
@@ -265,12 +262,6 @@ class TaskRunner(
         val trace: ActionExecutionTrace,
         val nextPc: Int,
         val halt: Boolean = false,
-    )
-
-    private data class FailureRecovery(
-        val nextPc: Int?,
-        val reason: String? = null,
-        val attemptCount: Int = 1,
     )
 
     private fun stepControl(
@@ -454,77 +445,37 @@ class TaskRunner(
         }
     }
 
-    /**
-     * Whether replaying the whole try body is safe.
-     *
-     * A retry restarts at `tryIndex + 1`, so every action in the body runs again - not just the one
-     * that failed. Checking only the failing action let a body like `[sms.send, http.get]` re-send
-     * the message each time the HTTP call failed. Control markers carry no side effects and are
-     * skipped; an unknown action id is treated as unsafe.
-     */
-    private fun tryBodyIsRetrySafe(task: Task, frame: TryFrame): Boolean {
-        val bodyEnd = frame.catchIndex ?: frame.endIndex
-        return ((frame.tryIndex + 1) until bodyEnd)
-            .mapNotNull { index -> task.actions.getOrNull(index) }
-            .filterNot { bodySpec -> FlowControl.isControl(bodySpec.type) }
-            .all { bodySpec ->
-                ActionRegistry.get(bodySpec.type)?.retrySafetyFor(bodySpec.args) == ActionRetrySafety.IDEMPOTENT
-            }
-    }
-
     private suspend fun recoverFailure(
-        task: Task,
         pc: Int,
         spec: ActionSpec,
         failure: ActionResult.Failure,
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
         tryStack: ArrayDeque<TryFrame>,
-    ): FailureRecovery {
-        var nonRetryReason: String? = null
-        var lastAttempt = 1
+    ): Int? {
         while (true) {
             val frame = tryStack.asReversed().firstOrNull { candidate ->
                 candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
-            } ?: return FailureRecovery(nextPc = null, reason = nonRetryReason, attemptCount = lastAttempt)
+            } ?: return null
 
             while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
-            lastAttempt = frame.attempt
-            if (frame.attempt < frame.config.maxAttempts && tryBodyIsRetrySafe(task, frame)) {
-                setFailureVariables(task, pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
+            if (frame.attempt < frame.config.maxAttempts &&
+                ActionRegistry.get(spec.type)?.retrySafety == ActionRetrySafety.IDEMPOTENT
+            ) {
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true)
                 frame.attempt++
                 clearLoopsToDepth(loopStack, frame.loopDepth)
                 val waitMs = retryBackoffMs(frame.config.backoffMs, frame.attempt - 1)
                 if (waitMs > 0) delay(waitMs)
-                return FailureRecovery(
-                    nextPc = frame.tryIndex + 1,
-                    reason = nonRetryReason,
-                    attemptCount = frame.attempt - 1,
-                )
-            } else if (frame.attempt < frame.config.maxAttempts || frame.config.maxAttempts > 1) {
-                nonRetryReason = retryReason(spec, ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args))
+                return frame.tryIndex + 1
             }
 
             frame.catchIndex?.let { catchIndex ->
-                setFailureVariables(
-                    task,
-                    pc,
-                    spec,
-                    failure,
-                    frame.attempt,
-                    retrying = false,
-                    retryReason = nonRetryReason,
-                )
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = false)
+                ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                 frame.phase = TryPhase.CATCH
                 clearLoopsToDepth(loopStack, frame.loopDepth)
-                // Resume on the CATCH marker itself, not past it. Jumping to catchIndex + 1 skipped
-                // the only place that records the failure as caught, so %FLOW_ERROR_CAUGHT read
-                // "false" inside every flow.catch handler and the marker's branch was dead code.
-                return FailureRecovery(
-                    nextPc = catchIndex,
-                    reason = nonRetryReason,
-                    attemptCount = frame.attempt,
-                )
+                return catchIndex + 1
             }
 
             // An uncaught nested failure propagates to the enclosing try block.
@@ -532,55 +483,18 @@ class TaskRunner(
         }
     }
 
-    private fun retryReason(spec: ActionSpec, safety: ActionRetrySafety?): String = when (safety) {
-        ActionRetrySafety.NEVER ->
-            "not retried: ${spec.type} is classified NEVER; flow.try retries only IDEMPOTENT actions"
-        ActionRetrySafety.IDEMPOTENT ->
-            "not retried: ${spec.type} exhausted the configured attempts"
-        null ->
-            "not retried: ${spec.type} has no runtime retry classification"
-    }
-
     private fun setFailureVariables(
-        task: Task,
         pc: Int,
         spec: ActionSpec,
         failure: ActionResult.Failure,
         attempt: Int,
         retrying: Boolean,
-        retryReason: String?,
-        structuredError: StructuredTaskError? = null,
-    ): StructuredTaskError {
-        val error = structuredError ?: failure.structuredError ?: StructuredTaskError(
-            taskId = task.id,
-            taskName = task.name,
-            actionId = spec.id,
-            actionIndex = pc + 1,
-            actionType = spec.type,
-            message = failure.message,
-            attemptCount = attempt.coerceAtLeast(1),
-            originatingProfileId = originatingProfileId,
-            originatingProfileName = originatingProfileName,
-        )
-        ctx.variables.set(FLOW_ERROR_JSON, StructuredTaskErrorCodec.encode(error))
-        ctx.variables.set(FLOW_ERROR_TASK_ID, error.taskId.toString())
-        ctx.variables.set(FLOW_ERROR_TASK_NAME, error.taskName)
-        ctx.variables.set(FLOW_ERROR_ACTION_ID, error.actionId.toString())
-        ctx.variables.set(FLOW_ERROR_MESSAGE, error.message)
-        ctx.variables.set(FLOW_ERROR_ACTION, error.actionType)
-        ctx.variables.set(FLOW_ERROR_INDEX, error.actionIndex.toString())
-        ctx.variables.set(FLOW_ERROR_TYPE, error.actionType)
-        ctx.variables.set(FLOW_ERROR_ATTEMPT, error.attemptCount.toString())
+    ) {
+        ctx.variables.set(FLOW_ERROR_MESSAGE, failure.message)
+        ctx.variables.set(FLOW_ERROR_ACTION, spec.type)
+        ctx.variables.set(FLOW_ERROR_INDEX, (pc + 1).toString())
+        ctx.variables.set(FLOW_ERROR_ATTEMPT, attempt.toString())
         ctx.variables.set(FLOW_ERROR_RETRYING, retrying.toString())
-        ctx.variables.set(FLOW_ERROR_RETRY_REASON, retryReason.orEmpty())
-        ctx.variables.set(FLOW_ERROR_PROFILE_ID, error.originatingProfileId?.toString().orEmpty())
-        ctx.variables.set(FLOW_ERROR_PROFILE_NAME, error.originatingProfileName.orEmpty())
-        return error
-    }
-
-    private fun clearRetryVariables() {
-        ctx.variables.set(FLOW_ERROR_RETRYING, "false")
-        ctx.variables.set(FLOW_ERROR_RETRY_REASON, "")
     }
 
     private fun clearLoopsToDepth(loopStack: ArrayDeque<LoopFrame>, depth: Int) {
@@ -617,9 +531,8 @@ class TaskRunner(
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
             }
-        val expansionReport = expandArgs(spec.type, spec.args)
+        val expansionReport = expandArgs(spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
-        val before = ctx.variables.toTemplateScope()
         val rawResult = try {
             withTimeout(timeoutMs) {
                 ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
@@ -633,24 +546,18 @@ class TaskRunner(
         } catch (e: Exception) {
             ActionResult.Failure("threw: ${e.message}", e)
         }
-        val result = if (rawResult is ActionResult.Failure) {
-            // Preserve useful failure context while applying the same field-aware policy used by
-            // exports. Drop the cause whenever an action received a sensitive value because a
-            // Throwable message/stack cannot be redacted in place.
-            val redactedMessage = expansionReport.redactSensitiveValues(rawResult.message)
-            if (expansionReport.hasSensitiveValues() || redactedMessage != rawResult.message) {
-                ActionResult.Failure(
-                    message = redactedMessage,
-                    structuredError = rawResult.structuredError,
-                )
-            } else {
-                rawResult
-            }
+        val result = if (rawResult is ActionResult.Failure && expansionReport.hasSecretDerivedValues()) {
+            // Preserve the real error class/context for debuggability but scrub any secret-derived
+            // argument value the action echoed into its message; drop the cause because its message
+            // and stack could also embed the secret and a Throwable cannot be redacted in place.
+            // Only literal echoes of the raw argument are removed — a secret the action transformed
+            // (hashed/encoded/sliced) before failing is not detectable here, so the whole value is
+            // over-redacted rather than partially matched, which errs toward non-disclosure.
+            ActionResult.Failure(expansionReport.redactSecretDerivedValues(rawResult.message))
         } else {
             rawResult
         }
-        val changes = variableChangesBetween(before, ctx.variables.toTemplateScope())
-        return result to traceFor(index, spec, started, result, expansionReport, changes)
+        return result to traceFor(index, spec, started, result, expansionReport)
     }
 
     private suspend fun runSubTask(
@@ -658,7 +565,7 @@ class TaskRunner(
         spec: ActionSpec,
         started: Long,
     ): Pair<ActionResult, ActionExecutionTrace> {
-        val expansionReport = expandArgs(spec.type, spec.args)
+        val expansionReport = expandArgs(spec.args)
         val args = expansionReport.args
 
         fun fail(message: String): Pair<ActionResult, ActionExecutionTrace> {
@@ -678,47 +585,101 @@ class TaskRunner(
             return fail("sub-task '${target.name}' is already active in this execution chain")
         }
 
-        // Pass any extra args as input variables scoped to the sub-task invocation: a dedicated
-        // scope wraps the child run so local (lowercase) inputs are visible to the child through the
-        // scope chain but are popped when it returns, never leaking into the parent's later actions.
-        // Global (uppercase) outputs still flow back through the shared global namespace.
+        // Named parameters (param:<name>); values are already expanded in the caller's scope.
+        val parameters = buildMap {
+            args.forEach { (key, value) ->
+                if (key.startsWith(SUB_TASK_PARAM_PREFIX)) put(key.removePrefix(SUB_TASK_PARAM_PREFIX), value)
+            }
+        }
+        val resultsPrefix = args[SUB_TASK_RESULTS_PREFIX_KEY]?.trim().orEmpty()
+
+        // Isolated child: shares globals + arrays, fresh locals, read-only params, its own returns.
+        // The child resolves its %MixedCase project-globals against ITS OWN project.
+        val childCtx = ActionContext(
+            app = ctx.app,
+            variables = ctx.variables.childScope(target.projectId),
+            eventVariables = emptyMap(),
+            parameters = parameters,
+            returns = mutableMapOf(),
+            logger = ctx.logger,
+        )
         val child = TaskRunner(
-            ctx = ctx,
+            ctx = childCtx,
             templateExpressionEngine = templateExpressionEngine,
             resolveTask = resolveTask,
             depth = depth + 1,
             onStep = onStep,
-            onStepCompleted = onStepCompleted,
             collisionCoordinator = collisionCoordinator,
             executionChain = executionChain + target.id,
             originatingProfileId = originatingProfileId,
             originatingProfileName = originatingProfileName,
             now = now,
+            projectNameResolver = projectNameResolver,
         )
-        ctx.variables.pushScope()
-        val report = try {
-            args.forEach { (key, value) ->
-                if (key !in SUB_TASK_REF_KEYS) {
-                    ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
-                }
-            }
-            when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
-                null -> child.run(target)
-                is TaskCollisionOutcome.Executed -> collision.value
-                is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
-            }
-        } finally {
-            ctx.variables.popScope()
+        // Upstream's global last-mile rule: the target task's own collision policy decides whether a
+        // nested run starts, waits behind the active one, or is skipped outright.
+        val report = when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
+            null -> child.run(target)
+            is TaskCollisionOutcome.Executed -> collision.value
+            is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
         }
+
+        // Surface the sub-task's named results and status back to the caller as variables.
+        childCtx.returns.forEach { (name, value) -> ctx.variables.set("$resultsPrefix$name", value) }
+        ctx.variables.set("${resultsPrefix}ok", report.success.toString())
+        val errorMessage = report.results.firstNotNullOfOrNull { (it as? ActionResult.Failure)?.message } ?: ""
+        ctx.variables.set("${resultsPrefix}error", errorMessage)
+
         val result = if (report.success) {
             ActionResult.Success
         } else {
-            ActionResult.Failure(
-                "sub-task '${target.name}' failed",
-                structuredError = report.structuredError,
-            )
+            ActionResult.Failure(errorMessage.ifBlank { "sub-task '${target.name}' failed" })
         }
         return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /**
+     * Modal OK dialog (via DialogActivity) naming the task, project, and each missing permission.
+     *
+     * **It does not wait for the answer.** The pre-flight has already decided the task cannot run, so
+     * there is nothing an answer could change about this run — and awaiting it held the engine for up
+     * to two minutes per blocked task. Measured on 白い熊's phone on 2026-08-08: two tasks failed at
+     * `120030ms` and `120022ms`, both of them entirely spent sitting in this dialog.
+     *
+     * Showing it also quiets the requirement immediately, so a workspace whose tasks fire by the
+     * second raises one dialog rather than a stack of them.
+     */
+    private fun showPermissionBlockDialog(
+        project: String,
+        taskName: String,
+        missing: List<CapabilityState.MissingCapability>,
+    ) {
+        val lines = missing.joinToString("\n") { m ->
+            "• ${CapabilityState.shortLabel(m.requirement)} — needed by: ${m.actionTypes.joinToString(", ")}"
+        }
+        // A permission whose ordinary "you have not granted it" story is wrong says so instead — see
+        // CapabilityState.blockedDetail.
+        val details = missing.distinctBy { it.requirement }
+            .mapNotNull { CapabilityState.blockedDetail(it.requirement, ctx.app) }
+        val advice = details.takeIf { it.isNotEmpty() }?.joinToString("\n\n")
+            ?: "Grant it below, then run again."
+        val text = "Can't run “$taskName” (project “$project”).\n\nMissing permission(s):\n$lines\n\n$advice"
+        // Only offer a deep-link pill for a permission that actually has a System settings page to open.
+        val grantable = missing.distinctBy { it.requirement }
+            .filter { CapabilityState.settingsIntent(it.requirement, ctx.app) != null }
+        val intent = android.content.Intent(ctx.app, DialogActivity::class.java).apply {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_TEXT)
+            putExtra(DialogActivity.EXTRA_TITLE, "Permission required")
+            putExtra(DialogActivity.EXTRA_TEXT, text)
+            putExtra(DialogActivity.EXTRA_OK, "OK")
+            putExtra(DialogActivity.EXTRA_SETTINGS_REQS, grantable.map { it.requirement.name }.toTypedArray())
+            putExtra(DialogActivity.EXTRA_SETTINGS_LABELS, grantable.map { CapabilityState.shortLabel(it.requirement) }.toTypedArray())
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val shown = runCatching { ctx.app.startActivity(intent); true }.getOrDefault(false)
+        // Quiet on SHOWING, not on the answer — the answer is never awaited. Tapping "Open … settings"
+        // shortens the window from inside DialogActivity, so an active fix is re-checked sooner.
+        if (shown) missing.forEach { CapabilityPrompt.markShown(it.requirement) }
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {
@@ -728,10 +689,10 @@ class TaskRunner(
 
     /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
     private fun evaluateConditionString(condition: String): Boolean {
-        val legacyExpanded = ctx.variables.expand(condition)
+        val legacyExpanded = ctx.variables.expand(rewriteParamSugar(condition))
         if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
 
-        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables))
+        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters))
         if (expanded.warnings.isNotEmpty()) return false
         return ctx.variables.evaluateCondition(expanded.value)
     }
@@ -742,7 +703,6 @@ class TaskRunner(
         started: Long,
         result: ActionResult,
         expansionReport: ActionArgumentExpansionReport,
-        variableChanges: List<ActionVariableChange> = emptyList(),
     ): ActionExecutionTrace = ActionExecutionTrace(
         index = index,
         actionType = spec.type,
@@ -761,25 +721,21 @@ class TaskRunner(
         expandedArgSummary = expansionReport.summary(),
         templateWarnings = expansionReport.templateWarnings(),
         argumentExpansions = expansionReport.expansions,
-        variableChanges = variableChanges,
     )
 
-    private fun expandArgs(actionType: String, args: Map<String, String>): ActionArgumentExpansionReport {
+    private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
-        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
+        val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            arrayReferenceName(actionType, name, rawValue)?.let { arrayName ->
-                return@mapValues arrayName
-            }
-            val legacy = ctx.variables.expandTracked(rawValue)
+            val legacy = ctx.variables.expandTracked(rewriteParamSugar(rawValue))
             if (!legacy.value.contains("{{")) {
                 if (legacy.isSecretDerived) {
                     expansions += ActionArgumentExpansionTrace(
                         argName = name,
                         rawValue = rawValue,
-                        expandedValue = REDACTED_VALUE,
+                        expandedValue = ActionArgumentSensitivity.REDACTED,
                         expressions = emptyList(),
                         warnings = emptyList(),
                         isSecretDerived = true,
@@ -794,9 +750,9 @@ class TaskRunner(
                 expansions += ActionArgumentExpansionTrace(
                     argName = name,
                     rawValue = rawValue,
-                    expandedValue = if (isSecretDerived) REDACTED_VALUE else result.value,
+                    expandedValue = if (isSecretDerived) ActionArgumentSensitivity.REDACTED else result.value,
                     expressions = result.traces.map { trace ->
-                        if (trace.isSecretDerived) trace.copy(value = REDACTED_VALUE) else trace
+                        if (trace.isSecretDerived) trace.copy(value = ActionArgumentSensitivity.REDACTED) else trace
                     },
                     warnings = result.warnings,
                     isSecretDerived = isSecretDerived,
@@ -805,31 +761,10 @@ class TaskRunner(
             result.value
         }
 
-        return ActionArgumentExpansionReport(expandedArgs, expansions, actionType)
-    }
-
-    /**
-     * Array inputs consume a variable name, not the array's rendered contents. A typed chip uses
-     * `{{ array.parts }}` so the reference remains explicit in stored text; preserve that exact
-     * name for the two actions whose contracts expect an array slot.
-     */
-    private fun arrayReferenceName(actionType: String, argumentName: String, rawValue: String): String? {
-        val validArgument = when (actionType) {
-            "text.join" -> argumentName == "array"
-            FlowControl.FOREACH -> argumentName in setOf("list", "in", "array", "items")
-            else -> false
-        }
-        if (!validArgument) return null
-        val match = ARRAY_REFERENCE.matchEntire(rawValue.trim()) ?: return null
-        return VariableNamePolicy.normalize(match.groupValues[1])
-    }
-
-    private companion object {
-        // The closing braces must be escaped: Android's ICU regex engine rejects a bare "}}"
-        // where desktop java.util.regex accepts it. Because this sits in a companion
-        // initializer, the failure was an ExceptionInInitializerError that made TaskRunner
-        // unusable on device - every task execution, not only ones using array references.
-        val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*\\}\\}")
+        // The fork keeps arrayReferenceName and ARRAY_REFERENCE at file level rather than in a
+        // companion object, and already escapes the closing braces there — which is why upstream's
+        // ICU-rejects-"}}" defect, fatal on device from 2026-08-10, never reached this build.
+        return ActionArgumentExpansionReport(expandedArgs, expansions)
     }
 }
 
@@ -841,8 +776,6 @@ data class TaskRunReport(
     val results: List<ActionResult>,
     val traces: List<ActionExecutionTrace>,
     val success: Boolean,
-    /** Present only when the task completed with an unhandled failure. */
-    val structuredError: StructuredTaskError? = null,
 )
 
 enum class ActionTraceStatus {
@@ -863,11 +796,23 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // Playback and speech suspend until completion; a long sound file or near-limit TTS
     // text legitimately outlives the default 60 s budget.
     actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS
+    // intent.send receiver-mode replies wait on real work in the target app (sister-app
+    // state exports run for minutes); its result_timeout caps at 600 s, budget adds slack.
+    actionType == "intent.send" -> INTENT_SEND_TIMEOUT_MS
+    // Interactive dialogs suspend on the user; a picker pondered for over a minute must not
+    // be killed under them (their own `timeout` arg still applies when set).
+    actionType.startsWith("dialog.") || actionType == "app.pickmulti" -> MEDIA_ACTION_TIMEOUT_MS
+    // A scrolling screenshot is read in slices, each a full detect + recognise pass: 25 of them on
+    // the sample article's first page and 19 on its second. This is minutes of honest work, not a
+    // hung action — measured, it was 64 s into the first page when the default budget killed it.
+    actionType == "ocr.article" -> ARTICLE_ACTION_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
 private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
+private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
+private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a
@@ -876,25 +821,26 @@ private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
 const val MAX_SUBTASK_DEPTH = 8
-/** Argument keys `task.run` accepts as its target, in precedence order. */
-val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+internal val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
+
+/** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
+const val SUB_TASK_PARAM_PREFIX = "param:"
+const val SUB_TASK_RESULTS_PREFIX_KEY = "results_prefix"
+
+private val PARAM_SUGAR_REGEX = Regex("%@([A-Za-z_][A-Za-z0-9_]*)")
+
+/** Rewrites the terse `%@name` parameter reference into the canonical `{{ param.name }}`. */
+private fun rewriteParamSugar(text: String): String =
+    if (text.contains("%@")) text.replace(PARAM_SUGAR_REGEX) { "{{ param.${it.groupValues[1]} }}" } else text
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 private const val MAX_FLOW_STEPS = 100_000
-private const val FLOW_ERROR_JSON = TaskFailureVariables.JSON
-private const val FLOW_ERROR_TASK_ID = TaskFailureVariables.TASK_ID
-private const val FLOW_ERROR_TASK_NAME = TaskFailureVariables.TASK_NAME
-private const val FLOW_ERROR_ACTION_ID = TaskFailureVariables.ACTION_ID
-private const val FLOW_ERROR_MESSAGE = TaskFailureVariables.MESSAGE
-private const val FLOW_ERROR_ACTION = TaskFailureVariables.ACTION
-private const val FLOW_ERROR_INDEX = TaskFailureVariables.ACTION_INDEX
-private const val FLOW_ERROR_TYPE = TaskFailureVariables.ACTION_TYPE
-private const val FLOW_ERROR_ATTEMPT = TaskFailureVariables.ATTEMPT
-private const val FLOW_ERROR_RETRYING = TaskFailureVariables.RETRYING
-private const val FLOW_ERROR_RETRY_REASON = TaskFailureVariables.RETRY_REASON
-private const val FLOW_ERROR_PROFILE_ID = TaskFailureVariables.ORIGINATING_PROFILE_ID
-private const val FLOW_ERROR_PROFILE_NAME = TaskFailureVariables.ORIGINATING_PROFILE_NAME
-private const val FLOW_ERROR_CAUGHT = TaskFailureVariables.CAUGHT
+private const val FLOW_ERROR_MESSAGE = "FLOW_ERROR_MESSAGE"
+private const val FLOW_ERROR_ACTION = "FLOW_ERROR_ACTION"
+private const val FLOW_ERROR_INDEX = "FLOW_ERROR_INDEX"
+private const val FLOW_ERROR_ATTEMPT = "FLOW_ERROR_ATTEMPT"
+private const val FLOW_ERROR_RETRYING = "FLOW_ERROR_RETRYING"
+private const val FLOW_ERROR_CAUGHT = "FLOW_ERROR_CAUGHT"
 
 private fun retryBackoffMs(baseMs: Long, retryNumber: Int): Long {
     if (baseMs <= 0L) return 0L
@@ -912,61 +858,7 @@ data class ActionExecutionTrace(
     val expandedArgSummary: String? = null,
     val templateWarnings: List<String> = emptyList(),
     val argumentExpansions: List<ActionArgumentExpansionTrace> = emptyList(),
-    val variableChanges: List<ActionVariableChange> = emptyList(),
 )
-
-/**
- * One variable an action added or modified. Captured per step so a finished run answers "what did
- * this task actually set?" — the run log previously showed only what went *into* each action.
- */
-data class ActionVariableChange(
-    val scope: VariableChangeScope,
-    val name: String,
-    val value: String,
-    val added: Boolean,
-    val sensitive: Boolean = false,
-)
-
-enum class VariableChangeScope { TASK, GLOBAL, ARRAY }
-
-/**
- * Variables an action added or modified, derived by diffing the store around the call.
- *
- * Deltas are used rather than a full snapshot because a run's interesting output is what changed,
- * and a snapshot per step would grow the run log with the same untouched globals over and over.
- * Sensitive names carry the flag so the value is redacted at the serialization boundary — the
- * value itself is never written to the log.
- */
-internal fun variableChangesBetween(
-    before: TemplateScope,
-    after: TemplateScope,
-): List<ActionVariableChange> = buildList {
-    fun diff(
-        scope: VariableChangeScope,
-        beforeValues: Map<String, String>,
-        afterValues: Map<String, String>,
-        sensitiveNames: Set<String>,
-    ) {
-        afterValues.entries
-            .sortedBy { it.key }
-            .forEach { (name, value) ->
-                if (!beforeValues.containsKey(name)) {
-                    add(ActionVariableChange(scope, name, value, added = true, sensitive = name in sensitiveNames))
-                } else if (beforeValues[name] != value) {
-                    add(ActionVariableChange(scope, name, value, added = false, sensitive = name in sensitiveNames))
-                }
-            }
-    }
-
-    diff(VariableChangeScope.TASK, before.task, after.task, after.sensitiveTask)
-    diff(VariableChangeScope.GLOBAL, before.global, after.global, after.sensitiveGlobal)
-    diff(
-        VariableChangeScope.ARRAY,
-        before.arrays.mapValues { (_, items) -> items.joinToString(", ") },
-        after.arrays.mapValues { (_, items) -> items.joinToString(", ") },
-        after.sensitiveArrays,
-    )
-}
 
 data class ActionArgumentExpansionTrace(
     val argName: String,
@@ -990,7 +882,6 @@ fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
 private data class ActionArgumentExpansionReport(
     val args: Map<String, String>,
     val expansions: List<ActionArgumentExpansionTrace>,
-    val actionType: String? = null,
 ) {
     fun templateWarnings(): List<String> =
         expansions.flatMap { expansion -> expansion.warnings.map { "${expansion.argName}: $it" } }.distinct()
@@ -1000,7 +891,7 @@ private data class ActionArgumentExpansionReport(
         return expansions
             .take(MAX_SUMMARY_ARGS)
             .joinToString(", ") { expansion ->
-                "${expansion.argName}=${summarizeArgValue(actionType, expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
+                "${expansion.argName}=${summarizeArgValue(expansion.argName, expansion.expandedValue, expansion.isSecretDerived)}"
             }
             .let { summary ->
                 val remaining = expansions.size - MAX_SUMMARY_ARGS
@@ -1016,25 +907,17 @@ private data class ActionArgumentExpansionReport(
      * redacted placeholder, so it cannot be used for scrubbing. Longest values are replaced first so
      * a secret that contains a shorter secret as a substring is fully removed.
      */
-    fun redactSensitiveValues(message: String): String {
-        val sensitiveValues = args
-            .filter { (name, _) ->
-                ActionArgumentSensitivity.isSensitive(actionType, name, args) ||
-                    expansions.any { it.argName == name && it.isSecretDerived }
-            }
-            .values
-            .mapNotNull { it.takeIf(String::isNotBlank) }
+    fun redactSecretDerivedValues(message: String): String {
+        val secretValues = expansions
+            .filter { it.isSecretDerived }
+            .mapNotNull { args[it.argName]?.takeIf(String::isNotBlank) }
             .distinct()
             .sortedByDescending { it.length }
-        return ExportRedactionPolicy.redactText(message, sensitiveValues, REDACTED_VALUE)
-    }
-
-    /** Compatibility name retained for source-level callers; the policy now covers all fields. */
-    fun redactSecretDerivedValues(message: String): String = redactSensitiveValues(message)
-
-    fun hasSensitiveValues(): Boolean = args.keys.any { name ->
-        ActionArgumentSensitivity.isSensitive(actionType, name, args) ||
-            expansions.any { it.argName == name && it.isSecretDerived }
+        var redacted = message
+        for (value in secretValues) {
+            redacted = redacted.replace(value, ActionArgumentSensitivity.REDACTED)
+        }
+        return redacted
     }
 
     fun sensitiveArgumentNames(): Set<String> = expansions
@@ -1050,6 +933,30 @@ private data class ActionArgumentExpansionReport(
     }
 }
 
+/**
+ * The editor writes an array slot as the explicit reference `{{ array.parts }}` rather than a bare
+ * name, so the two actions whose contracts take an array — foreach's list and text.join's array —
+ * resolve that form back to the array's own name before looking it up. Anything else is passed
+ * through untouched, which is how a plain `%name` still works.
+ */
+private fun arrayReferenceName(actionType: String, argumentName: String, rawValue: String): String? {
+    val validArgument = when (actionType) {
+        "text.join" -> argumentName == "array"
+        FlowControl.FOREACH -> argumentName in setOf("list", "in", "array", "items")
+        else -> false
+    }
+    if (!validArgument) return null
+    val match = ARRAY_REFERENCE.matchEntire(rawValue.trim()) ?: return null
+    return VariableNamePolicy.normalize(match.groupValues[1])
+}
+
+// The closing braces are escaped, and that is not cosmetic. Android's regex engine is ICU, which
+// treats `{` and `}` as interval-quantifier syntax and REJECTS a stray `}` — `Pattern.compile` throws
+// PatternSyntaxException at class-init and takes the process down. Desktop Java is lenient and accepts
+// the same pattern, so this compiles fine and every JVM test passes; it only fails on the phone.
+// Upstream's own copy of this literal leaves them bare.
+private val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*\\}\\}")
+
 private fun ActionExecutionTrace.traceDetailSuffix(): String {
     val details = buildList {
         expandedArgSummary?.takeIf { it.isNotBlank() }?.let { add("args: $it") }
@@ -1061,46 +968,27 @@ private fun ActionExecutionTrace.traceDetailSuffix(): String {
 private fun ActionExecutionTrace.toRunLogLines(): List<String> = buildList {
     add(toSummaryLine())
     argumentExpansions
-        .flatMap { it.toTemplateDiagnosticLines(actionType) }
+        .flatMap { it.toTemplateDiagnosticLines() }
         .take(MAX_TEMPLATE_TRACE_LINES_PER_ACTION)
-        .forEach(::add)
-    variableChanges
-        .take(MAX_VARIABLE_CHANGE_LINES_PER_ACTION)
-        .map { it.toRunLogLine() }
         .forEach(::add)
 }
 
-private fun ActionVariableChange.toRunLogLine(): String = listOf(
-    VARIABLE_CHANGE_PREFIX,
-    scope.name.lowercase(),
-    name.toLogField(),
-    if (added) VARIABLE_CHANGE_ADDED else VARIABLE_CHANGE_UPDATED,
-    if (sensitive) REDACTED_VALUE else value.toLogField(),
-).joinToString("	")
-
-private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(actionType: String?): List<String> =
+private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<String> =
     expressions.map { expressionTrace ->
-        val sensitive = isSecretDerived ||
-            ActionArgumentSensitivity.isSensitive(actionType, argName) ||
-            expressionTrace.isSecretDerived
+        val sensitive = isSecretDerived || isSensitiveArgName(argName) || expressionTrace.isSecretDerived
         listOf(
             TEMPLATE_TRACE_PREFIX,
             argName.toLogField(),
             expressionTrace.source.name.lowercase().toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.expression.toLogField(),
-            if (sensitive) REDACTED_VALUE else expressionTrace.value.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.expression.toLogField(),
+            if (sensitive) ActionArgumentSensitivity.REDACTED else expressionTrace.value.toLogField(),
             expressionTrace.warning.orEmpty().toLogField(),
         ).joinToString("\t")
     }
 
-private fun summarizeArgValue(
-    actionType: String?,
-    argName: String,
-    value: String,
-    forceRedact: Boolean = false,
-): String {
-    if (forceRedact || ActionArgumentSensitivity.isSensitive(actionType, argName)) {
-        return REDACTED_VALUE
+private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
+    if (forceRedact || isSensitiveArgName(argName)) {
+        return ActionArgumentSensitivity.REDACTED
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
     return if (singleLine.length <= MAX_SUMMARY_VALUE_LENGTH) {
@@ -1120,13 +1008,22 @@ private fun String.toLogField(): String =
             if (value.length <= MAX_TEMPLATE_TRACE_FIELD_LENGTH) value else value.take(MAX_TEMPLATE_TRACE_FIELD_LENGTH) + "..."
         }
 
+private fun isSensitiveArgName(argName: String): Boolean =
+    SENSITIVE_ARG_TOKENS.any { token -> argName.contains(token, ignoreCase = true) }
+
+private val SENSITIVE_ARG_TOKENS = listOf(
+    "authorization",
+    "cookie",
+    "body",
+    "headers",
+    "key",
+    "password",
+    "query",
+    "secret",
+    "token",
+)
 private const val TEMPLATE_TRACE_PREFIX = "Template:"
-private const val REDACTED_VALUE = ActionArgumentSensitivity.REDACTED
 private const val MAX_SUMMARY_ARGS = 4
 private const val MAX_SUMMARY_VALUE_LENGTH = 80
 private const val MAX_TEMPLATE_TRACE_LINES_PER_ACTION = 8
-private const val MAX_VARIABLE_CHANGE_LINES_PER_ACTION = 8
-private const val VARIABLE_CHANGE_PREFIX = "Var:"
-private const val VARIABLE_CHANGE_ADDED = "added"
-private const val VARIABLE_CHANGE_UPDATED = "updated"
 private const val MAX_TEMPLATE_TRACE_FIELD_LENGTH = 120

@@ -202,7 +202,7 @@ class TaskerXmlExportTest {
 
     @Test
     fun exportsVariables() {
-        val variable = Variable(name = "MODE", value = "silent", isGlobal = true)
+        val variable = Variable(name = "MODE", value = "silent", projectId = 0)
         val report = TaskerXmlExporter.export(emptyList(), emptyList(), listOf(variable))
 
         assertEquals(1, report.exportedVariableCount)
@@ -216,8 +216,8 @@ class TaskerXmlExportTest {
             emptyList(),
             emptyList(),
             listOf(
-                Variable("MODE", "silent", isGlobal = true),
-                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                Variable("MODE", "silent"),
+                Variable("API_TOKEN", "must-not-export", isSecret = true),
             ),
         )
 
@@ -251,7 +251,7 @@ class TaskerXmlExportTest {
                     ),
                 ),
             ),
-            variables = listOf(Variable("API_TOKEN", "sentinel", isGlobal = true, isSecret = true)),
+            variables = listOf(Variable("API_TOKEN", "sentinel", isSecret = true)),
         )
 
         assertFalse(report.xml.contains("sentinel"))
