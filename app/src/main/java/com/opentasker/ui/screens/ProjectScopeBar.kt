@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
@@ -158,20 +160,32 @@ private fun ProjectManagerDialog(
                                 },
                             ) { Text(stringResource(R.string.action_save)) }
                         } else {
-                            Text(project.name, Modifier.weight(1f))
+                            // The row's four controls leave the name a narrow column, so ellipsize
+                            // rather than wrapping a short name across two lines mid-word.
+                            Text(
+                                project.name,
+                                Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             IconButton(onClick = { onReorderProject(project, -1) }) {
                                 Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.projects_move_up))
                             }
                             IconButton(onClick = { onReorderProject(project, 1) }) {
                                 Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.projects_move_down))
                             }
-                            TextButton(
+                            IconButton(
                                 onClick = {
                                     editingId = project.id
                                     editingName = project.name
                                 },
                                 enabled = !isDefault,
-                            ) { Text(stringResource(R.string.action_rename)) }
+                            ) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = stringResource(R.string.action_rename),
+                                )
+                            }
                             IconButton(
                                 onClick = {
                                     deletingId = project.id
