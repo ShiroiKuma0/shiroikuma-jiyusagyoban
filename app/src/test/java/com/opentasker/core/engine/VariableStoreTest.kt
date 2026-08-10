@@ -48,6 +48,13 @@ class VariableStoreTest {
     }
 
     @Test
+    fun legacyExpansionSupportsPolicyAllowedHyphenNames() {
+        val store = VariableStore().apply { set("api-token", "present") }
+
+        assertEquals("present", store.expand("%api-token"))
+    }
+
+    @Test
     fun expandsEmbeddedOperatorsInText() {
         val store = VariableStore().apply {
             set("name", "open tasker")

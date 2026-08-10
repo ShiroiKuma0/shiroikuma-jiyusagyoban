@@ -9,6 +9,7 @@
 - Profile-triggered executions now carry causal parent/depth metadata; repeated profile chains stop with named CAUSAL_LOOP terminal reasons in Run Log, Diagnostics, and the Context Inspector.
 - Diagnostics now pairs stale engine heartbeats with Android 11+ historical process-exit reasons, timestamps, and downtime gaps, with an explicit unsupported-platform state below API 30.
 - Scheduled triggers now persist expected fire times; the watchdog records overdue delivery once with delay, standby bucket, and battery/exact-alarm remediation in the Run Log.
+- Variable renames now rewrite legacy and template references across action arguments, conditions, profile context bindings, and scenes atomically; referenced variables cannot be deleted without showing their dependent sites.
 - Record the current evaluation decisions to wait on Glance and Navigation3 stability, and to keep unrestricted accessibility automation out of the product.
 
 ## v0.2.82

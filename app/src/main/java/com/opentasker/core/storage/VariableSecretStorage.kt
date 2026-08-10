@@ -197,10 +197,58 @@ class VariableRepository(
         }
     }
 
-    suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
+    suspend fun get(name: String, projectId: Long = DEFAULT_PROJECT_ID): Variable? {
+        migrateLegacySensitiveVariables()
+        val normalizedName = VariableNamePolicy.normalize(name) ?: return null
+        val entity = if (projectId == DEFAULT_PROJECT_ID) {
+            dao.get(normalizedName)
+        } else {
+            dao.getInProject(normalizedName, projectId)
+        }
+        return entity?.let(::decodeForDomain)
+    }
+
+    /** Stores an edited value under a new name and removes the old row as one mutation. */
+    suspend fun rename(previousName: String, variable: Variable) {
+        val normalized = variable.normalizedForStorage()
+        val oldName = VariableNamePolicy.normalize(previousName)
+            ?: throw IllegalArgumentException("Invalid variable name '$previousName'.")
+        require(normalized.projectId == variable.projectId) { "Variable project scope changed during rename." }
         storageMutationMutex.withLock {
-            if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(name)
-            else dao.deleteByNameInProject(name, projectId)
+            val oldEntity = if (normalized.projectId == DEFAULT_PROJECT_ID) {
+                dao.get(oldName)
+            } else {
+                dao.getInProject(oldName, normalized.projectId)
+            } ?: throw IllegalStateException("Variable '%$oldName' no longer exists.")
+            require(oldEntity.isGlobal == normalized.isGlobal) {
+                "Variable scope cannot change during rename."
+            }
+            if (oldEntity.isSecret && !variable.secretAvailable && variable.value.isEmpty()) {
+                throw IllegalStateException("Secret variable '%$oldName' must be entered again before it can be renamed.")
+            }
+            if (oldName != normalized.name) {
+                val destination = if (normalized.projectId == DEFAULT_PROJECT_ID) {
+                    dao.get(normalized.name)
+                } else {
+                    dao.getInProject(normalized.name, normalized.projectId)
+                }
+                require(destination == null) { "Variable '%${normalized.name}' already exists." }
+            }
+
+            dao.upsert(normalized.toStoredEntity(secretCodec))
+            if (oldName != normalized.name) {
+                if (normalized.projectId == DEFAULT_PROJECT_ID) dao.deleteByName(oldName)
+                else dao.deleteByNameInProject(oldName, normalized.projectId)
+            }
+        }
+    }
+
+    suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
+        val normalizedName = VariableNamePolicy.normalize(name)
+            ?: throw IllegalArgumentException("Invalid variable name '$name'.")
+        storageMutationMutex.withLock {
+            if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(normalizedName)
+            else dao.deleteByNameInProject(normalizedName, projectId)
         }
     }
 
@@ -330,7 +378,7 @@ class VariableRepository(
 
     private fun decodeForDomain(entity: VariableEntity): Variable {
         if (!entity.isSecret) {
-            return Variable(entity.name, entity.value, entity.isGlobal)
+            return Variable(entity.name, entity.value, entity.isGlobal, projectId = entity.projectId)
         }
         val decoded = secretCodec.decrypt(entity.name, entity.value)
         return Variable(
@@ -389,4 +437,5 @@ internal fun Variable.toStoredEntity(codec: VariableSecretCodec): VariableEntity
     value = if (isSecret) codec.encrypt(name, value) else value,
     isGlobal = isGlobal,
     isSecret = isSecret,
+    projectId = projectId,
 )

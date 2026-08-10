@@ -1,11 +1,14 @@
 package com.opentasker.core.references
 
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.Variable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -280,6 +283,124 @@ class AutomationReferenceTest {
                 "Scene \"Panel\" element 1 (tap)",
             ),
             references.map { it.describe() },
+        )
+    }
+
+    @Test
+    fun variableIndexAndRenameCoverLegacyTemplatesConditionsScenesAndProfiles() {
+        val variable = Variable("ApiToken", "secret", isGlobal = true, projectId = 7)
+        val profile = Profile(
+            id = 1,
+            name = "Home",
+            enterTaskId = 10,
+            projectId = 7,
+            contexts = listOf(
+                ContextSpec(ContextType.STATE, config = mapOf("value" to "{{ global.ApiToken }}")),
+            ),
+        )
+        val task = Task(
+            id = 10,
+            name = "Call API",
+            projectId = 7,
+            actions = listOf(
+                ActionSpec(
+                    type = "http.request",
+                    args = mapOf("url" to "https://example.test/%ApiToken/{{ global.ApiToken }}?next={{ ApiToken | lower }}"),
+                    condition = "%ApiToken == {{ global.ApiToken }}",
+                ),
+            ),
+        )
+        val scene = Scene(
+            id = 20,
+            name = "Panel",
+            widthDp = 200,
+            heightDp = 200,
+            projectId = 7,
+            elements = listOf(element().copy(config = mapOf("text" to "Token %ApiToken / {{ ApiToken }}"))),
+        )
+
+        val references = AutomationReferenceIndex.referencesTo(
+            variable,
+            profiles = listOf(profile),
+            tasks = listOf(task),
+            scenes = listOf(scene),
+        )
+        assertEquals(8, references.size)
+        assertEquals(3, references.count { it.syntax == VariableReferenceSyntax.LEGACY })
+        assertEquals(5, references.count { it.syntax == VariableReferenceSyntax.TEMPLATE })
+
+        val blocked = AutomationReferenceRewriter.guardVariableDeletion(
+            target = variable,
+            profiles = listOf(profile),
+            tasks = listOf(task),
+            scenes = listOf(scene),
+        )
+        assertFalse(blocked.canCommit)
+        assertTrue(blocked.blocked.any { it.describe().contains("Call API") })
+        assertTrue(blocked.blocked.any { it.describe().contains("Panel") })
+
+        val rewrite = AutomationReferenceRewriter.renameVariable(
+            target = variable,
+            replacementName = "RotatedToken",
+            profiles = listOf(profile),
+            tasks = listOf(task),
+            scenes = listOf(scene),
+        )
+        val rewrittenAction = rewrite.tasks.single().actions.single()
+        assertEquals(
+            "https://example.test/%RotatedToken/{{ global.RotatedToken }}?next={{ RotatedToken | lower }}",
+            rewrittenAction.args["url"],
+        )
+        assertEquals("%RotatedToken == {{ global.RotatedToken }}", rewrittenAction.condition)
+        assertEquals(
+            "Token %RotatedToken / {{ RotatedToken }}",
+            rewrite.scenes.single().elements.single().config["text"],
+        )
+        assertEquals(
+            "{{ global.RotatedToken }}",
+            rewrite.profiles.single().contexts.single().config["value"],
+        )
+        assertTrue(
+            AutomationReferenceIndex.referencesTo(
+                Variable("RotatedToken", "secret", isGlobal = true, projectId = 7),
+                profiles = rewrite.profiles,
+                tasks = rewrite.tasks,
+                scenes = rewrite.scenes,
+            ).isNotEmpty(),
+        )
+        assertTrue(
+            AutomationReferenceIndex.referencesTo(
+                variable,
+                profiles = rewrite.profiles,
+                tasks = rewrite.tasks,
+                scenes = rewrite.scenes,
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun variableReferencesKeepLocalAndGlobalNamespacesSeparate() {
+        val local = Variable("local_name", "value", isGlobal = false, projectId = 7)
+        val task = caller(
+            ActionSpec(
+                type = "text.show",
+                args = mapOf(
+                    "text" to "%local_name / {{ local_name }} / {{ task.local_name }} / {{ global.local_name }} / {{ event.local_name }}",
+                ),
+            ),
+        ).copy(projectId = 7)
+
+        val references = AutomationReferenceIndex.referencesTo(local, tasks = listOf(task))
+        assertEquals(3, references.size)
+
+        val rewrite = AutomationReferenceRewriter.renameVariable(
+            target = local,
+            replacementName = "renamed_local",
+            tasks = listOf(task),
+        )
+        assertEquals(
+            "%renamed_local / {{ renamed_local }} / {{ task.renamed_local }} / {{ global.local_name }} / {{ event.local_name }}",
+            rewrite.tasks.single().actions.single().args["text"],
         )
     }
 }
