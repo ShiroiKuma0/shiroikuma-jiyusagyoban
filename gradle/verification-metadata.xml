@@ -44,6 +44,7 @@
             <trusting group="^com[.]android($|([.].*))" regex="true" />
          </trusted-key>
          <trusted-key id="0F07D1201BDDAB67CFB84EB479752DB6C966F0B8" group="com.google.android" name="annotations" version="4.1.1.4" />
+         <trusted-key id="10F3C7A02ECA55E502BADCF3991EFB94DB91127D" group="org.ow2" name="ow2" version="1.5.1" />
          <trusted-key id="19BEAB2D799C020F17C69126B16698A4ADF4D638" group="org.checkerframework" name="checker-qual" />
          <trusted-key id="1A55F091AD28C07F831FA44D7905DE25C78AD456" group="com.google.protobuf" />
          <trusted-key id="1D0A8B5E77C678A7C724445ABF984B4145EA13F7" group="com.squareup" name="javapoet" version="1.13.0" />
@@ -95,7 +96,10 @@
          <trusted-key id="90EE19787A7BCF6FD37A1E9180C08B1C29100955" group="com.squareup" name="javawriter" />
          <trusted-key id="933EBDD4894BA1198E7269F4F5D8F3BB9C728AAD" group="dev.rikka.shizuku" />
          <trusted-key id="95115197C5227C0887299D000F9FE62F88E938D8" group="com.google.dagger" name="dagger" version="2.48" />
-         <trusted-key id="A413F67D71BEEC23ADD0CE0ACB43338E060CF9FA" group="com.google.code.findbugs" name="jsr305" version="2.0.2" />
+         <trusted-key id="A413F67D71BEEC23ADD0CE0ACB43338E060CF9FA">
+            <trusting group="com.google.code.findbugs" name="jsr305" version="2.0.2" />
+            <trusting group="org.jacoco" />
+         </trusted-key>
          <trusted-key id="A5BD02B93E7A40482EB1D66A5F69AD087600B22C" group="org.ow2.asm" />
          <trusted-key id="A5F483CD733A4EBAEA378B2AE88979FB9B30ACF2">
             <trusting group="androidx.annotation" />
@@ -4729,6 +4733,11 @@
             <sha256 value="6d535f94efb663bdb682c9f27a50335394688009642ba7a9677504bc1be4129b" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
+      <component group="org.jacoco" name="org.jacoco.build" version="0.8.13">
+         <artifact name="org.jacoco.build-0.8.13.pom">
+            <sha256 value="994c3ae1cfca6765968fe3ede4f379986aeb2e7eb51a2014caa4a09d71a8f4a3" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+      </component>
       <component group="org.jdom" name="jdom2" version="2.0.6">
          <artifact name="jdom2-2.0.6.jar">
             <sha256 value="1345f11ba606d15603d6740551a8c21947c0215640770ec67271fe78bea97cf5" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
@@ -6218,6 +6227,11 @@
          </artifact>
          <artifact name="asm-analysis-9.9.pom">
             <sha256 value="909f24a710c728e0e5d643ec0b4834a63cb3d30022100d583d5dd6a26e35cda6" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+      </component>
+      <component group="org.ow2.asm" name="asm-bom" version="9.8">
+         <artifact name="asm-bom-9.8.pom">
+            <sha256 value="0da1dcb226e6cdfdadb4dac591916bb917b57374674d91bd2f13003137b41520" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="org.ow2.asm" name="asm-commons" version="9.9">

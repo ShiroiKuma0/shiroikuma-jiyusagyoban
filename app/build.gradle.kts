@@ -13,6 +13,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.testing.jacoco.tasks.JacocoReport
 import com.opentasker.build.VerifyReleaseTruthTask
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
@@ -116,6 +117,11 @@ plugins {
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.baselineprofile)
+    jacoco
+}
+
+jacoco {
+    toolVersion = libs.versions.jacoco.get()
 }
 
 val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
@@ -474,6 +480,63 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
     }
 }
 
+abstract class VerifyCoverageFloorTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val reportFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val areaFloors: org.gradle.api.provider.MapProperty<String, Double>
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val report = reportFile.get().asFile
+        check(report.isFile) { "JaCoCo XML report is missing: ${report.absolutePath}" }
+
+        val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }
+        val document = factory.newDocumentBuilder().parse(report)
+        val packages = document.getElementsByTagName("package")
+
+        areaFloors.get().forEach { (area, minimumPercent) ->
+            var missed = 0L
+            var covered = 0L
+            var matched = false
+            for (index in 0 until packages.length) {
+                val packageNode = packages.item(index)
+                val packageName = packageNode.attributes?.getNamedItem("name")?.nodeValue ?: continue
+                if (packageName != area && !packageName.startsWith("$area/")) continue
+                matched = true
+                val counters = packageNode.childNodes
+                for (counterIndex in 0 until counters.length) {
+                    val counter = counters.item(counterIndex)
+                    if (counter.nodeName != "counter" ||
+                        counter.attributes?.getNamedItem("type")?.nodeValue != "INSTRUCTION"
+                    ) continue
+                    missed += counter.attributes?.getNamedItem("missed")?.nodeValue?.toLongOrNull() ?: 0L
+                    covered += counter.attributes?.getNamedItem("covered")?.nodeValue?.toLongOrNull() ?: 0L
+                }
+            }
+            check(matched) { "JaCoCo report contains no classes for coverage area '$area'." }
+            val total = missed + covered
+            check(total > 0L) { "JaCoCo report contains no instructions for coverage area '$area'." }
+            val percent = covered.toDouble() * 100.0 / total
+            check(percent + 0.000_001 >= minimumPercent) {
+                "Coverage floor regressed for $area: %.2f%%, expected at least %.2f%%.".format(
+                    percent,
+                    minimumPercent,
+                )
+            }
+            println("Coverage floor passed: $area %.2f%% >= %.2f%%.".format(percent, minimumPercent))
+        }
+    }
+}
+
 abstract class VerifyQualityGateSeedTask : org.gradle.api.DefaultTask() {
     @get:org.gradle.api.tasks.Input
     abstract val seedFailure: org.gradle.api.provider.Property<Boolean>
@@ -618,7 +681,52 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
     resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
-    minimumTests.set(522)
+    // Ratchet step: 1,020 is the current passing suite count; raise this floor with each test batch.
+    minimumTests.set(1020)
+}
+
+val debugCoverageXml = layout.buildDirectory.file("reports/jacoco/debugCoverage/debugCoverage.xml")
+val generateDebugCoverage = tasks.register<JacocoReport>("generateDebugCoverage") {
+    group = "verification"
+    description = "Produces the deterministic debug JVM JaCoCo coverage report."
+    dependsOn("testDebugUnitTest")
+    executionData.setFrom(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"))
+
+    classDirectories.setFrom(
+        layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes").map { directory ->
+            fileTree(directory.asFile) {
+                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Manifest*.*")
+            }
+        },
+        layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes").map { directory ->
+            fileTree(directory.asFile) {
+                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Manifest*.*")
+            }
+        },
+    )
+    sourceDirectories.setFrom(files("src/main/java", "src/main/kotlin"))
+    reports {
+        xml.required.set(true)
+        xml.outputLocation.set(debugCoverageXml)
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/debugCoverage/html"))
+        csv.required.set(false)
+    }
+}
+
+val verifyCoverageFloor = tasks.register<VerifyCoverageFloorTask>("verifyCoverageFloor") {
+    group = "verification"
+    description = "Fails if coverage regresses in the previously untested runtime areas."
+    dependsOn(generateDebugCoverage)
+    reportFile.set(debugCoverageXml)
+    areaFloors.set(
+        mapOf(
+            "com/opentasker/core/scheduling" to 50.0,
+            "com/opentasker/core/resilience" to 80.0,
+            "com/opentasker/automation/receiver" to 15.0,
+            "com/opentasker/ui/utils" to 15.0,
+        ),
+    )
 }
 
 val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
@@ -885,6 +993,7 @@ tasks.register("localQualityGate") {
         verifyResolvedDependencyPolicy,
         generateCycloneDxSbom,
         verifyJvmTestCount,
+        verifyCoverageFloor,
         verifyQualityGateSeed,
         "verifyNativePageAlignment",
         verifyPerformanceEvidence,

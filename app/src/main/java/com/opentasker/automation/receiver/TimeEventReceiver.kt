@@ -10,6 +10,19 @@ import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
 
+internal enum class TimeEventAction {
+    TIME_TICK,
+    EXACT_ALARM_PERMISSION_CHANGED,
+    IGNORE,
+}
+
+internal fun classifyTimeEventAction(action: String?): TimeEventAction = when (action) {
+    TimeEventScheduler.ACTION_TIME_TICK,
+    Intent.ACTION_TIME_TICK -> TimeEventAction.TIME_TICK
+    ExactAlarmSupport.PERMISSION_STATE_CHANGED_ACTION -> TimeEventAction.EXACT_ALARM_PERMISSION_CHANGED
+    else -> TimeEventAction.IGNORE
+}
+
 /**
  * Receives app-owned time ticks and exact-alarm permission changes.
  */
@@ -17,9 +30,8 @@ class TimeEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent == null) return
 
-        when (intent.action) {
-            TimeEventScheduler.ACTION_TIME_TICK,
-            Intent.ACTION_TIME_TICK -> {
+        when (classifyTimeEventAction(intent.action)) {
+            TimeEventAction.TIME_TICK -> {
                 ExpectedTriggerLedger(context).markDelivered(System.currentTimeMillis())
                 val scheduler = TimeEventScheduler(context)
                 runCatching { scheduler.scheduleNextMinute() }
@@ -38,7 +50,7 @@ class TimeEventReceiver : BroadcastReceiver() {
                         .onFailure { AppLogger.error(TAG, "Could not schedule time-tick recovery", it) }
                 }
             }
-            ExactAlarmSupport.PERMISSION_STATE_CHANGED_ACTION -> {
+            TimeEventAction.EXACT_ALARM_PERMISSION_CHANGED -> {
                 try {
                     AppLogger.debug(TAG, "Exact alarm permission changed")
                     TimeEventScheduler(context).scheduleNextMinute()
@@ -46,6 +58,7 @@ class TimeEventReceiver : BroadcastReceiver() {
                     AppLogger.error(TAG, "Error rescheduling time tick after exact alarm permission change", e)
                 }
             }
+            TimeEventAction.IGNORE -> Unit
         }
     }
 
