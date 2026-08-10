@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Device orientation now follows the Android sensor convention: a normally held phone reports `portrait` rather than `portrait_upside_down`, and the landscape sub-values are no longer swapped.
+- Tethering state now reports the union of Wi-Fi hotspot and interface tethering and publishes an initial value on registration. Any delivery of the legacy tethering broadcast previously latched the state to on, so it stayed on after tethering stopped, and a `tethering=false` predicate could never match.
+- A state context whose predicate cannot be parsed no longer starts GPS, telephony receivers, and every sensor for a context that can never match.
+- Step cadence is published in buckets, so walking no longer re-evaluates every profile on each step.
+- Roaming and phone-call state presets are hidden on distributions that do not declare the Phone permission, where their Setup row cannot exist.
+- The new roaming, call-state, and tethering receivers register as not-exported, matching every other dynamic receiver in the app.
 - Project rows in Manage projects no longer break the project name across two lines; rename is now an icon button matching the reorder and delete controls, leaving the name room to render in full.
 - Duplicating a profile now keeps its review requirement. An imported profile awaiting risk review could previously be duplicated into a copy that enabled without ever showing the risk disclosure.
 - Fresh installs now start with the Default project. It was only ever created by the schema 8 to 9 migration, so a new install had no project row and the first project the user created silently took the reserved default id, becoming an undeletable workspace that owned every existing task and profile.

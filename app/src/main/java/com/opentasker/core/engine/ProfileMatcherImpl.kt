@@ -6,6 +6,7 @@ import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.EventDemandContextSource
 import com.opentasker.core.contexts.StateDemandContextSource
+import com.opentasker.core.contexts.UNRESOLVED_STATE_KEY
 import com.opentasker.core.contexts.stateContextKey
 import com.opentasker.core.contexts.SubscriptionReadyContextSource
 import com.opentasker.core.location.LocationDwellStateStore
@@ -73,7 +74,10 @@ internal class ProfileMatcher(
                         markPulseContextSubscribed(index, pulseContextCount)
                     }
                 } else if (spec.type == ContextType.STATE && source is StateDemandContextSource) {
-                    source.events(app, stateContextKey(spec))
+                    // A matcher always narrows demand to one key. If the spec has no resolvable
+                    // key, subscribe to nothing physical rather than everything - null here means
+                    // "the Inspector wants all keys".
+                    source.events(app, stateContextKey(spec) ?: UNRESOLVED_STATE_KEY)
                 } else if (isPulseContext && source is SubscriptionReadyContextSource) {
                     source.events(app) { markPulseContextSubscribed(index, pulseContextCount) }
                 } else {

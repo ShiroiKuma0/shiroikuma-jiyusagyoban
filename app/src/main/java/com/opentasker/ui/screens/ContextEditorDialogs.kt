@@ -558,15 +558,28 @@ internal data class StateContextPreset(
 )
 
 internal object StateContextPresets {
-    val all = listOf(
-        StateContextPreset("orientation", R.string.context_state_preset_orientation, mapOf("key" to "orientation", "operator" to "=", "value" to "portrait")),
-        StateContextPreset("proximity", R.string.context_state_preset_proximity, mapOf("key" to "proximity", "operator" to "=", "value" to "near")),
-        StateContextPreset("activity", R.string.context_state_preset_activity, mapOf("key" to "activity", "operator" to "=", "value" to "walking")),
-        StateContextPreset("speed", R.string.context_state_preset_speed, mapOf("key" to "speed", "operator" to ">=", "value" to "10")),
-        StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")),
-        StateContextPreset("tethering", R.string.context_state_preset_tethering, mapOf("key" to "tethering", "operator" to "=", "value" to "true")),
-        StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")),
-    )
+    /**
+     * Roaming and call state need READ_PHONE_STATE, which the Play distribution deliberately does
+     * not declare - and its Setup screen has no Phone row either. Offering those presets there
+     * produced a context that fails closed while telling the user to grant a permission that can
+     * never appear in Setup, the same trap as the missing DND declaration.
+     */
+    private val phoneStateAvailable: Boolean get() = BuildConfig.SMS_ACTION_AVAILABLE
+
+    val all: List<StateContextPreset>
+        get() = buildList {
+            add(StateContextPreset("orientation", R.string.context_state_preset_orientation, mapOf("key" to "orientation", "operator" to "=", "value" to "portrait")))
+            add(StateContextPreset("proximity", R.string.context_state_preset_proximity, mapOf("key" to "proximity", "operator" to "=", "value" to "near")))
+            add(StateContextPreset("activity", R.string.context_state_preset_activity, mapOf("key" to "activity", "operator" to "=", "value" to "walking")))
+            add(StateContextPreset("speed", R.string.context_state_preset_speed, mapOf("key" to "speed", "operator" to ">=", "value" to "10")))
+            if (phoneStateAvailable) {
+                add(StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")))
+            }
+            add(StateContextPreset("tethering", R.string.context_state_preset_tethering, mapOf("key" to "tethering", "operator" to "=", "value" to "true")))
+            if (phoneStateAvailable) {
+                add(StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")))
+            }
+        }
 
     fun apply(current: Map<String, String>, preset: StateContextPreset): Map<String, String> =
         current + preset.config

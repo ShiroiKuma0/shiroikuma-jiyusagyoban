@@ -50,9 +50,26 @@ object StateSensorEvents {
     private const val ACTIVITY_IDLE_MS = 15_000L
     private const val SPEED_MIN_TIME_MS = 15_000L
     private const val SPEED_MIN_DISTANCE_METERS = 5f
+
+    /** Steps-per-minute granularity published to matchers; see the activity registration. */
+    private const val STEP_RATE_BUCKET = 10
     private const val AP_STATE_ACTION = "android.net.wifi.WIFI_AP_STATE_CHANGED"
     private const val AP_STATE_EXTRA = "wifi_state"
     private const val TETHER_STATE_ACTION = "android.net.conn.TETHER_STATE_CHANGED"
+
+    /** `WifiManager.WIFI_AP_STATE_ENABLED`; the constant itself is not public API. */
+    private const val WIFI_AP_STATE_ENABLED = 13
+
+    /**
+     * Names the platform has used for the "currently tethered interfaces" extra on
+     * TETHER_STATE_CHANGED. Neither is public API, so both are read best-effort and an absent or
+     * unreadable payload is reported as not tethering rather than assumed active.
+     */
+    private val TETHERED_INTERFACE_EXTRAS = listOf("tetherArray", "activeArray")
+
+    private fun Intent.hasTetheredInterfaces(): Boolean = TETHERED_INTERFACE_EXTRAS.any { key ->
+        runCatching { getStringArrayListExtra(key) }.getOrNull()?.isNotEmpty() == true
+    }
 
     private val physicalKeys = setOf(
         "orientation",
@@ -214,18 +231,24 @@ object StateSensorEvents {
         var listener: SensorEventListener? = null
         var lastMotionAt = 0L
         var lastActivity: String? = null
+        var lastStepBucket: Int? = null
         val stepTimes = ArrayDeque<Long>()
 
         fun emitActivity(activity: String, stepsPerMinute: Int? = null) {
             if (activity == "walking" || activity == "running") lastMotionAt = System.currentTimeMillis()
-            if (activity == lastActivity && stepsPerMinute == null) return
+            // With a step detector the cadence changes on almost every step, which bypassed the
+            // dedupe and re-evaluated every profile roughly twice a second while walking. Publish
+            // a bucketed rate so only a meaningful change reaches the matcher.
+            val bucket = stepsPerMinute?.let { (it / STEP_RATE_BUCKET) * STEP_RATE_BUCKET }
+            if (activity == lastActivity && bucket == lastStepBucket) return
             lastActivity = activity
+            lastStepBucket = bucket
             emitReady(
                 emit,
                 "activity",
                 buildMap {
                     put("activity", activity)
-                    stepsPerMinute?.let { put("activity_steps_per_minute", it.toString()) }
+                    bucket?.let { put("activity_steps_per_minute", it.toString()) }
                 },
             )
         }
@@ -425,7 +448,7 @@ object StateSensorEvents {
                         IntentFilter().apply {
                             addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
                         },
-                        ContextCompat.RECEIVER_EXPORTED,
+                        ContextCompat.RECEIVER_NOT_EXPORTED,
                     )
                 }.onSuccess { receiver = candidate }
                     .onFailure { emitSetup(emit, "roaming", "Open Setup and grant Phone permission before using Roaming context values.") }
@@ -494,7 +517,7 @@ object StateSensorEvents {
                         app,
                         candidate,
                         IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED),
-                        ContextCompat.RECEIVER_EXPORTED,
+                        ContextCompat.RECEIVER_NOT_EXPORTED,
                     )
                 }.onSuccess { receiver = candidate }
                     .onFailure { emitSetup(emit, "call_state", "Open Setup and grant Phone permission before using Phone call state values.") }
@@ -533,19 +556,26 @@ object StateSensorEvents {
                 return
             }
             if (receiver != null) return
+            // Wi-Fi hotspot and cable/Bluetooth tethering arrive on two different broadcasts, so
+            // hold both and report their union. TETHER_STATE_CHANGED fires on stop as well as
+            // start, and it can be replayed stickily on registration - treating any delivery as
+            // "tethering on" left the state stuck on after tethering had already stopped.
+            var apEnabled = false
+            var interfacesTethered = false
             val candidate = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     when (intent?.action) {
                         AP_STATE_ACTION -> {
                             val state = intent.getIntExtra(AP_STATE_EXTRA, -1)
-                            if (state >= 0) emitReady(emit, "tethering", mapOf("tethering" to (state == 13).toString()))
+                            if (state < 0) return
+                            apEnabled = state == WIFI_AP_STATE_ENABLED
                         }
                         TETHER_STATE_ACTION -> {
-                            // The legacy broadcast does not expose a stable public payload across
-                            // Android releases; its delivery itself is the useful transition.
-                            emitReady(emit, "tethering", mapOf("tethering" to "true"))
+                            interfacesTethered = intent.hasTetheredInterfaces()
                         }
+                        else -> return
                     }
+                    emitReady(emit, "tethering", mapOf("tethering" to (apEnabled || interfacesTethered).toString()))
                 }
             }
             runCatching {
@@ -556,11 +586,17 @@ object StateSensorEvents {
                         addAction(AP_STATE_ACTION)
                         addAction(TETHER_STATE_ACTION)
                     },
-                    ContextCompat.RECEIVER_EXPORTED,
+                    // Both actions are protected broadcasts; NOT_EXPORTED still receives them and
+                    // matches every other dynamic receiver in this codebase.
+                    ContextCompat.RECEIVER_NOT_EXPORTED,
                 )
             }.onSuccess {
                 receiver = candidate
-                emitReady(emit, "tethering")
+                // Publish a value immediately. Reporting the source ready with no value left a
+                // `tethering=false` predicate unable to match until the first transition, while the
+                // Inspector claimed the source was healthy. A sticky or subsequent broadcast
+                // corrects this at once if tethering is in fact already on.
+                emitReady(emit, "tethering", mapOf("tethering" to "false"))
             }.onFailure {
                 emitSetup(emit, "tethering", "Open Setup to review tethering support; Android could not register its tethering state callback.")
             }
@@ -666,14 +702,20 @@ private class RecheckingRegistration(
 }
 
 internal object DeviceOrientationClassifier {
+    /**
+     * An accelerometer at rest reads +g along whichever device axis currently points upward - which
+     * is why a face-up device reads z = +9.81. The same convention fixes the other two axes: held
+     * upright the top edge is up, so y = +9.81 is portrait, and with the right edge up x = +9.81 is
+     * landscape-left (the device rotated a quarter turn counter-clockwise).
+     */
     fun classify(x: Float, y: Float, z: Float): String {
         val ax = abs(x)
         val ay = abs(y)
         val az = abs(z)
         return when {
             az >= ax && az >= ay -> if (z >= 0f) "face_up" else "face_down"
-            ay >= ax -> if (y <= 0f) "portrait" else "portrait_upside_down"
-            else -> if (x >= 0f) "landscape_right" else "landscape_left"
+            ay >= ax -> if (y >= 0f) "portrait" else "portrait_upside_down"
+            else -> if (x >= 0f) "landscape_left" else "landscape_right"
         }
     }
 }

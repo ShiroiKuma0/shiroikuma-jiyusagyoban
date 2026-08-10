@@ -150,6 +150,16 @@ fun stateMatches(predicate: String, state: Map<String, String>): Boolean {
     }
 }
 
+/**
+ * Requested-key sentinel for a spec whose physical key cannot be determined.
+ *
+ * A null request means "the Inspector wants every physical key", so it must not double as "this
+ * context is unparseable". A malformed predicate - reachable through JSON or Tasker import - would
+ * otherwise start continuous GPS, telephony receivers, and every sensor for a context that can
+ * never match, which is the opposite of failing closed.
+ */
+internal const val UNRESOLVED_STATE_KEY = "__unresolved__"
+
 /** Extract the physical state key used by a matcher, preserving compatibility with predicate form. */
 internal fun stateContextKey(spec: ContextSpec): String? {
     val rawKey = spec.config["predicate"]?.let(::parseStatePredicate)?.first
