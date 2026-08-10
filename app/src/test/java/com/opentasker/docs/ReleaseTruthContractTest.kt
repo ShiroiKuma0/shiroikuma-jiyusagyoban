@@ -101,16 +101,63 @@ class ReleaseTruthContractTest {
     fun generatedReleaseTruthManifestOwnsArtifactAndCapabilityClaims() {
         val truth = read("tools/release-truth.json")
         val gradle = read("app/build.gradle.kts")
+        val versions = read("gradle/libs.versions.toml")
+        val wrapper = read("gradle/wrapper/gradle-wrapper.properties")
         val fdroid = read("fdroid/metadata/com.opentasker.app.yml")
+        val runtime = read("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt")
+        val contextSpec = read("app/src/main/java/com/opentasker/core/model/ContextSpec.kt")
+        val flowStructure = read("app/src/main/java/com/opentasker/core/engine/FlowStructure.kt")
+        val taskRunner = read("app/src/main/java/com/opentasker/core/engine/TaskRunner.kt")
+        val database = read("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt")
+        val bundle = read("app/src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt")
+        val generator = read("tools/generate-release-truth.ps1")
         val artifactCommit = jsonValue(truth, "requiredArtifactCommit")
 
         assertEquals("1", jsonValue(truth, "schemaVersion"))
         assertEquals(gradleValue(gradle, """val\s+appVersionName\s*=\s*"([^"]+)"""), jsonValue(truth, "versionName"))
         assertEquals(gradleValue(gradle, """val\s+appVersionCode\s*=\s*(\d+)"""), jsonValue(truth, "versionCode"))
+        assertEquals(gradleValue(gradle, "minSdk\\s*=\\s*(\\d+)"), jsonValue(truth, "minSdk"))
+        assertEquals(gradleValue(gradle, "compileSdk\\s*=\\s*(\\d+)"), jsonValue(truth, "compileSdk"))
+        assertEquals(gradleValue(gradle, "targetSdk\\s*=\\s*(\\d+)"), jsonValue(truth, "targetSdk"))
+        assertEquals(gradleValue(gradle, "buildToolsVersion\\s*=\\s*\"([^\"]+)\""), jsonValue(truth, "buildTools"))
+        assertEquals(catalogVersion(versions, "kotlin"), jsonValue(truth, "kotlin"))
+        assertEquals(gradleValue(wrapper, """gradle-([0-9.]+)-"""), jsonValue(truth, "gradle"))
+        assertEquals(catalogVersion(versions, "agp"), jsonValue(truth, "agp"))
+        assertEquals(catalogVersion(versions, "ksp"), jsonValue(truth, "ksp"))
+        assertEquals(catalogVersion(versions, "room"), jsonValue(truth, "room"))
+        assertEquals(catalogVersion(versions, "composeBom"), jsonValue(truth, "composeBom"))
+        assertEquals(catalogVersion(versions, "work"), jsonValue(truth, "work"))
+        assertEquals(
+            Regex("(?m)^\\s+const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)")
+                .find(bundle)?.groupValues?.get(1),
+            jsonValue(truth, "bundleSchemaVersion"),
+        )
+        assertEquals(
+            Regex("(?m)^const val OPEN_TASKER_DATABASE_SCHEMA_VERSION\\s*=\\s*(\\d+)")
+                .find(database)?.groupValues?.get(1),
+            jsonValue(truth, "roomSchemaVersion"),
+        )
+        assertEquals(
+            Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(runtime).count().toString(),
+            jsonValue(truth, "registeredActions"),
+        )
+        val flowBody = gradleValue(flowStructure, """(?s)\bval\s+ALL\s*=\s*setOf\(([^)]*)\)""")
+        val flowCount = Regex("\\b[A-Z][A-Z0-9_]*\\b").findAll(flowBody).map { it.value }.toSet().size
+        val engineCount = flowCount + if ("const val SUB_TASK_ACTION_ID" in taskRunner) 1 else 0
+        assertEquals(engineCount.toString(), jsonValue(truth, "engineHandledActions"))
+        val contextBody = gradleValue(contextSpec, """(?s)enum class ContextType\s*\{(.*?)\}""")
+        assertEquals(
+            Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(contextBody).count().toString(),
+            jsonValue(truth, "contextFamilies"),
+        )
         assertTrue("verifyReleaseTruth" in gradle)
         assertEquals(artifactCommit, metadataValue(fdroid, "commit"))
         assertTrue(Regex("[0-9a-f]{40}").matches(artifactCommit))
         assertTrue(Files.exists(repoRoot.resolve("tools/generate-release-truth.ps1")))
+        assertTrue("\$flowControlIds.Count" in generator)
+        assertTrue("SUB_TASK_ACTION_ID" in generator)
+        assertTrue("OPEN_TASKER_DATABASE_SCHEMA_VERSION" in generator)
+        assertFalse("engineHandledActions = 7" in generator)
     }
 
     @Test
