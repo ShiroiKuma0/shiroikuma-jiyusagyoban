@@ -1,5 +1,6 @@
 package com.opentasker.docs
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,7 +63,25 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("resolutionResult.allComponents"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("minimumTests.set(1049)"))
+        assertTrue(build.contains("private val JVM_TEST_FLOOR = 1049"))
+        assertTrue(build.contains("minimumTests.set(JVM_TEST_FLOOR)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
+    }
+
+    @Test
+    fun jvmTestReportSeparatesObservedCountFromConfiguredFloor() {
+        val readme = repoRoot.resolve("README.md").readText()
+        val build = repoRoot.resolve("app/build.gradle.kts").readText()
+        val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
+
+        assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1049").findAll(build).count())
+        assertTrue(build.contains("reportFile.set(layout.buildDirectory.file(\"reports/opentasker/jvm-test-count.json\"))"))
+        assertTrue(script.contains("jvm-test-count.json"))
+        assertTrue(script.contains("observedJvmTests"))
+        assertTrue(script.contains("jvmTestFloor"))
+        assertFalse(script.contains("minimumJvmTests"))
+        assertTrue(readme.contains("observed JVM test count"))
+        assertTrue(readme.contains("configured JVM test floor"))
+        assertFalse(readme.contains("1,049-test JVM floor"))
     }
 }

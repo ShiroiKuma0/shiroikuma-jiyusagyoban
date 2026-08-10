@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The local release gate now reports observed JVM tests separately from the configured release floor, and the README uses explicit threshold-versus-observed wording instead of duplicating a suite count.
 - OpenTasker now exposes a Locale/Tasker condition-plugin target for profile-active, context-satisfied, and non-secret variable comparisons; edit/query bundles are typed and bounded, live matcher state returns satisfied/unsatisfied/unknown, and malformed or secret-bearing inputs fail closed.
 - Debug builds now detect Android 17 implicit URI grants; configurable URI dispatch rejects missing explicit read/write grants, and the Sharesheet receiver checks content-URI readability off the main thread with visible failure feedback.
 - Built-in actions now use one typed declaration catalogue for runtime factories, categories, retry safety, capability resolution, editor metadata binding, and release-truth counts; adding an action without a canonical declaration is rejected by the action base contract.

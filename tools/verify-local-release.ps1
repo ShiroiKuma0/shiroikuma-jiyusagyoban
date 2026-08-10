@@ -16,6 +16,7 @@ $ReportDirectory = Join-Path $Root "build\reports\opentasker"
 $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
 $SummaryPath = Join-Path $ReportDirectory "local-release-gate.json"
+$JvmTestReportPath = Join-Path $ReportDirectory "jvm-test-count.json"
 $ExpectedGradleVersion = "9.6.1"
 $ExpectedGradleDistributionSha256 = "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14"
 $ExpectedGradleWrapperJarSha256 = "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7"
@@ -149,6 +150,19 @@ if (-not ($reuseOutput -match "Reusing configuration cache")) {
     throw "The second local quality-gate invocation did not reuse the Gradle configuration cache."
 }
 
+if (-not (Test-Path -LiteralPath $JvmTestReportPath -PathType Leaf)) {
+    throw "JVM test report was not produced at $JvmTestReportPath"
+}
+$jvmTestReport = Get-Content -LiteralPath $JvmTestReportPath -Raw | ConvertFrom-Json
+$observedJvmTests = [int]$jvmTestReport.observedTests
+$jvmTestFloor = [int]$jvmTestReport.configuredFloor
+if ($jvmTestReport.status -ne "passed" -or $jvmTestReport.failures -ne 0 -or $jvmTestReport.errors -ne 0) {
+    throw "JVM test report is not passing: observed $observedJvmTests, configured floor $jvmTestFloor, failures $($jvmTestReport.failures), errors $($jvmTestReport.errors)."
+}
+if ($observedJvmTests -lt $jvmTestFloor) {
+    throw "JVM test report is below its configured floor: observed $observedJvmTests, configured floor $jvmTestFloor."
+}
+
 & git -c "safe.directory=$GitSafeDirectory" -C $Root diff --quiet -- app/schemas
 $schemaDiffExit = $LASTEXITCODE
 if ($schemaDiffExit -eq 1) {
@@ -262,13 +276,20 @@ $summary = [ordered]@{
     gradleBootstrapVerified = $true
     gradleDistributionSha256 = $ExpectedGradleDistributionSha256
     gradleWrapperJarSha256 = $ExpectedGradleWrapperJarSha256
-    minimumJvmTests = 522
+    jvmTests = [ordered]@{
+        observed = $observedJvmTests
+        floor = $jvmTestFloor
+        failures = [int]$jvmTestReport.failures
+        errors = [int]$jvmTestReport.errors
+        report = "build/reports/opentasker/jvm-test-count.json"
+    }
     configurationCacheReused = $true
     resolvedComponentCount = $components.Count
     advisoryCount = $findings.Count
     reports = @(
         "build/reports/opentasker/sbom.cdx.json",
         "build/reports/opentasker/osv-advisories.json",
+        "build/reports/opentasker/jvm-test-count.json",
         "app/build/reports/lint-results-debug.html"
     )
 }
