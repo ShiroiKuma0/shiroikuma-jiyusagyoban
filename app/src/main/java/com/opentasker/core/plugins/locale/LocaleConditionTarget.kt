@@ -25,6 +25,8 @@ data class LocaleConditionSpec(
     val variableProjectId: Long = DEFAULT_PROJECT_ID,
     val operator: LocaleConditionOperator? = null,
     val expectedValue: String? = null,
+    /** Configure-time read grant; required for [LocaleConditionKind.VARIABLE_COMPARE]. */
+    val grantToken: String? = null,
 )
 
 data class LocaleConditionSnapshot(
@@ -49,6 +51,8 @@ object LocaleConditionTarget {
     const val BUNDLE_KEY_VARIABLE_PROJECT_ID = "com.opentasker.locale.condition.VARIABLE_PROJECT_ID"
     const val BUNDLE_KEY_OPERATOR = "com.opentasker.locale.condition.OPERATOR"
     const val BUNDLE_KEY_EXPECTED_VALUE = "com.opentasker.locale.condition.EXPECTED_VALUE"
+    const val BUNDLE_KEY_GRANT = "com.opentasker.locale.condition.GRANT"
+    const val MAX_GRANT_CHARS = 128
     const val MAX_CONTEXT_INDEX = 1_024
     const val MAX_EXPECTED_VALUE_BYTES = 4 * 1_024
 
@@ -78,11 +82,13 @@ object LocaleConditionTarget {
         projectId: Long,
         operator: LocaleConditionOperator,
         expectedValue: String,
+        grantToken: String,
     ): Map<String, String> {
         val name = VariableNamePolicy.normalize(variableName)
             ?: throw IllegalArgumentException("Invalid variable name.")
         requirePositiveId(projectId)
         requireExpectedValue(expectedValue)
+        requireGrantToken(grantToken)
         return mapOf(
             BUNDLE_KEY_SCHEMA to SCHEMA_VERSION,
             BUNDLE_KEY_KIND to LocaleConditionKind.VARIABLE_COMPARE.wireName,
@@ -90,6 +96,7 @@ object LocaleConditionTarget {
             BUNDLE_KEY_VARIABLE_PROJECT_ID to projectId.toString(),
             BUNDLE_KEY_OPERATOR to operator.wireName,
             BUNDLE_KEY_EXPECTED_VALUE to expectedValue,
+            BUNDLE_KEY_GRANT to grantToken,
         )
     }
 
@@ -122,6 +129,7 @@ object LocaleConditionTarget {
                     LocaleConditionOperator.entries.firstOrNull { it.wireName == raw }
                 } ?: error("Unknown Locale condition comparison operator."),
                 expectedValue = requireExpectedValue(values[BUNDLE_KEY_EXPECTED_VALUE].orEmpty()),
+                grantToken = requireGrantToken(values[BUNDLE_KEY_GRANT].orEmpty()),
             )
         }
     }
@@ -145,6 +153,11 @@ object LocaleConditionTarget {
 
     private fun parseContextIndex(raw: String?): Int = raw?.toIntOrNull()?.let(::requireContextIndex)
         ?: error("Invalid context index.")
+
+    private fun requireGrantToken(value: String): String = value.also {
+        require(it.isNotBlank()) { "This condition was configured before read grants existed; re-select the variable." }
+        require(it.length <= MAX_GRANT_CHARS) { "Grant token is too large." }
+    }
 
     private fun requireExpectedValue(value: String): String = value.also {
         require(it.isNotEmpty()) { "Comparison value must not be empty." }
