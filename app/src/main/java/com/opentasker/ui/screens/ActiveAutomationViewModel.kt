@@ -67,6 +67,9 @@ import com.opentasker.core.sharing.ProfileShareDraft
 import com.opentasker.core.sharing.ProfileShareLibrary
 import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ConfigurationSnapshotPolicy
+import com.opentasker.core.storage.ConfigurationSnapshotSettings
+import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
@@ -1509,14 +1512,41 @@ class ActiveAutomationViewModel(
         // Backup enumeration and pending-restore checks hit the filesystem; keep them off
         // the main thread (debug StrictMode flags them otherwise).
         val loaded = withContext(Dispatchers.IO) {
+            val settings = ConfigurationSnapshotSettings(appContext)
+            val (snapshotCount, snapshotBytes) = databaseBackupManager.snapshotStorage()
             BackupSetupState(
                 busy = busy,
                 latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
                 pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
+                snapshotPolicy = settings.load(),
+                snapshotStatus = settings.loadStatus().copy(
+                    snapshotCount = snapshotCount,
+                    storageBytes = snapshotBytes,
+                ),
             )
         }
         _backupSetupState.value = loaded
+    }
+
+    /** Persists the snapshot schedule and brings the periodic worker in line with it. */
+    fun updateSnapshotPolicy(policy: ConfigurationSnapshotPolicy) {
+        launchBackupOperation {
+            val saved = withContext(Dispatchers.IO) {
+                val settings = ConfigurationSnapshotSettings(appContext)
+                settings.save(policy)
+                val stored = settings.load()
+                ConfigurationSnapshotWorker.sync(appContext, stored)
+                stored
+            }
+            events.send(
+                if (saved.enabled) {
+                    message(R.string.ui_message_snapshots_enabled, saved.maxSnapshots, saved.maxAgeDays)
+                } else {
+                    message(R.string.ui_message_snapshots_disabled)
+                },
+            )
+        }
     }
 
     fun runTaskNow(task: Task) {

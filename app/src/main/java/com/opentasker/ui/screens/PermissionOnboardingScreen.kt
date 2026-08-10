@@ -51,6 +51,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.FilterChip
+import com.opentasker.core.storage.ConfigurationSnapshotPolicy
+import com.opentasker.core.storage.ConfigurationSnapshotStatus
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -138,6 +141,8 @@ data class BackupSetupState(
     val pendingRestore: Boolean = false,
     /** What the staged restore would install, so the pending banner is specific rather than generic. */
     val pendingRestoreSummary: RestoreCandidate? = null,
+    val snapshotPolicy: ConfigurationSnapshotPolicy = ConfigurationSnapshotPolicy(),
+    val snapshotStatus: ConfigurationSnapshotStatus = ConfigurationSnapshotStatus(),
 )
 
 private sealed interface PermissionAction {
@@ -162,6 +167,7 @@ fun PermissionOnboardingScreen(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit = {},
+    onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit = {},
     profiles: List<Profile> = emptyList(),
     tasks: List<Task> = emptyList(),
     globalFallbackTaskId: Long? = null,
@@ -331,6 +337,7 @@ fun PermissionOnboardingScreen(
                 onExportBackup = onExportBackup,
                 onImportBackup = onImportBackup,
                 onCancelPendingRestore = onCancelPendingRestore,
+                onSnapshotPolicyChanged = onSnapshotPolicyChanged,
             )
         }
 
@@ -783,6 +790,7 @@ private fun BackupSetupCard(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit,
+    onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -839,6 +847,12 @@ private fun BackupSetupCard(
                         Text(stringResource(R.string.setup_backup_restore_cancel))
                     }
                 }
+                SnapshotScheduleControls(
+                    policy = state.snapshotPolicy,
+                    status = state.snapshotStatus,
+                    enabled = !state.busy,
+                    onPolicyChanged = onSnapshotPolicyChanged,
+                )
             }
         }
     }
@@ -1449,3 +1463,108 @@ private fun openOemSettings(context: Context, action: PermissionAction.OemSettin
         onMessage(context.getString(R.string.setup_oem_guide_unavailable, ex.message ?: context.getString(R.string.setup_error_no_handler)))
     }
 }
+
+/**
+ * Opt-in local snapshot schedule.
+ *
+ * Snapshots are local-only and never applied automatically: restoring one still goes through the
+ * existing inspect-then-stage review, so turning this on cannot overwrite a live database or a
+ * restore the user already staged.
+ */
+@Composable
+private fun SnapshotScheduleControls(
+    policy: ConfigurationSnapshotPolicy,
+    status: ConfigurationSnapshotStatus,
+    enabled: Boolean,
+    onPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
+) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = policy.enabled,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = { checked -> onPolicyChanged(policy.copy(enabled = checked)) },
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.setup_snapshots_label), style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    stringResource(R.string.setup_snapshots_helper),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = policy.enabled, onCheckedChange = null, enabled = enabled)
+        }
+        if (policy.enabled) {
+            Text(
+                stringResource(
+                    R.string.setup_snapshots_retention,
+                    policy.maxSnapshots,
+                    policy.maxAgeDays,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SNAPSHOT_RETENTION_CHOICES.forEach { choice ->
+                    FilterChip(
+                        selected = policy.maxSnapshots == choice.first && policy.maxAgeDays == choice.second,
+                        onClick = {
+                            onPolicyChanged(policy.copy(maxSnapshots = choice.first, maxAgeDays = choice.second))
+                        },
+                        enabled = enabled,
+                        label = {
+                            Text(
+                                stringResource(R.string.setup_snapshots_choice, choice.first, choice.second),
+                                maxLines = 1,
+                            )
+                        },
+                    )
+                }
+            }
+            Text(
+                snapshotStatusLabel(context, status),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (status.lastFailureAtMs != null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
+    }
+}
+
+private val SNAPSHOT_RETENTION_CHOICES = listOf(3 to 7, 5 to 14, 10 to 30)
+
+private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotStatus): String {
+    val storage = android.text.format.Formatter.formatShortFileSize(context, status.storageBytes)
+    val failure = status.lastFailureAtMs
+    if (failure != null) {
+        return context.getString(
+            R.string.setup_snapshots_status_failed,
+            formatSnapshotTimestamp(failure),
+            status.lastFailureMessage ?: context.getString(R.string.setup_snapshots_status_unknown_error),
+        )
+    }
+    val success = status.lastSuccessAtMs
+        ?: return context.getString(R.string.setup_snapshots_status_pending)
+    return context.getString(
+        R.string.setup_snapshots_status_ok,
+        formatSnapshotTimestamp(success),
+        status.snapshotCount,
+        storage,
+    )
+}
+
+private fun formatSnapshotTimestamp(epochMs: Long): String =
+    java.time.Instant.ofEpochMilli(epochMs)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", java.util.Locale.US))

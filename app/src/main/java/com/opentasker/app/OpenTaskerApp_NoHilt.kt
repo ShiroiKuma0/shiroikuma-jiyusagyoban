@@ -10,6 +10,7 @@ import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.DatabaseSecurity
@@ -116,6 +117,7 @@ class OpenTaskerApp_NoHilt : Application() {
             }
 
             RunLogPruneWorker.enqueue(this)
+            ConfigurationSnapshotWorker.enqueueIfEnabled(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }

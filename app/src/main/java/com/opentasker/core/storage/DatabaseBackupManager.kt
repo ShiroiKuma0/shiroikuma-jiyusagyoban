@@ -320,12 +320,19 @@ class DatabaseBackupManager(
 
     fun hasPendingRestore(): Boolean = pendingRestoreFile(context, databaseName).exists()
 
+    /** Removes a backup together with the sidecars validation left beside it. */
+    private fun deleteBackupWithSidecars(backup: File): Boolean {
+        val deleted = backup.delete()
+        deleteDatabaseSidecars(backup)
+        return deleted
+    }
+
     fun deleteBackup(backupFile: File): Boolean {
         val managedBackup = runCatching { requireManagedBackupFile(backupFile) }.getOrElse { error ->
             AppLogger.warn(tag, "Refusing to delete unmanaged backup: ${error.message}")
             return false
         }
-        return if (managedBackup.delete()) {
+        return if (deleteBackupWithSidecars(managedBackup)) {
             AppLogger.info(tag, "Backup deleted: ${managedBackup.absolutePath}")
             true
         } else {
@@ -334,12 +341,36 @@ class DatabaseBackupManager(
         }
     }
 
+    /**
+     * Applies the snapshot retention window, returning how many files were removed.
+     *
+     * The decision itself is [selectExpiredSnapshots], which is pure and covered by unit tests; this
+     * only maps it onto the managed backup directory.
+     */
+    fun pruneSnapshots(policy: ConfigurationSnapshotPolicy, nowMs: Long = System.currentTimeMillis()): Int {
+        val backups = listBackups()
+        val expired = selectExpiredSnapshots(backups.map { it.toSnapshotFile() }, policy, nowMs)
+            .mapTo(hashSetOf(), SnapshotFile::name)
+        if (expired.isEmpty()) return 0
+        return backups.filter { it.name in expired }.count { backup ->
+            deleteBackupWithSidecars(backup).also { deleted ->
+                if (deleted) AppLogger.info(tag, "Pruned expired snapshot: ${backup.name}")
+            }
+        }
+    }
+
+    /** Snapshot count and disk usage for the Setup status line. */
+    fun snapshotStorage(): Pair<Int, Long> {
+        val backups = listBackups()
+        return backups.size to backups.sumOf(File::length)
+    }
+
     fun deleteOldBackups(olderThanDays: Int): Int {
         val cutoffTime = System.currentTimeMillis() - (olderThanDays.coerceAtLeast(1).toLong() * 24 * 60 * 60 * 1000L)
         return listBackups()
             .filter { it.lastModified() < cutoffTime }
             .count { backup ->
-                backup.delete().also { deleted ->
+                deleteBackupWithSidecars(backup).also { deleted ->
                     if (deleted) AppLogger.info(tag, "Deleted old backup: ${backup.name}")
                 }
             }
@@ -402,6 +433,10 @@ class DatabaseBackupManager(
 
     private fun validateDatabaseFile(file: File) {
         validateDatabaseFile(context, file)
+    }
+
+    private fun deleteDatabaseSidecars(file: File) {
+        Companion.deleteDatabaseSidecars(file)
     }
 
     companion object {
@@ -500,6 +535,11 @@ class DatabaseBackupManager(
                     tempFile.delete()
                 }
                 validateDatabaseFile(context, backupFile)
+                // Validation opens the copy, so SQLite leaves -wal/-shm beside it; the staging
+                // file's sidecars are orphaned by the rename. Neither is part of the backup and
+                // neither was ever cleaned up, so they accumulated one set per backup.
+                deleteDatabaseSidecars(tempFile)
+                deleteDatabaseSidecars(backupFile)
             } catch (error: Exception) {
                 backupFile.delete()
                 throw error
@@ -642,7 +682,7 @@ class DatabaseBackupManager(
                 cursor.getLong(0)
             }
 
-        private fun deleteDatabaseSidecars(dbFile: File) {
+        internal fun deleteDatabaseSidecars(dbFile: File) {
             listOf(
                 File("${dbFile.path}-wal"),
                 File("${dbFile.path}-shm"),

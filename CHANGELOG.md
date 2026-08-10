@@ -23,6 +23,9 @@
 - Opening the trigger simulation no longer reads preferences on the UI thread, and long diff or import lists render only the rows on screen.
 - Execution journal progress writes are rate-bounded instead of one database update per action, which a long flow could repeat tens of thousands of times in a single run.
 - The import boundary corpus covers the DOCTYPE internal-subset scanner, the share-intent payload boundary, and the secret-variable refusal in the Locale condition receiver.
+- Setup can turn on automatic local snapshots: a scheduled local database snapshot with a bounded count and age, a status line showing the last result and disk use, and a retention choice. Snapshots never leave the device and are never applied automatically - restoring one still goes through the existing review.
+- Backups no longer leave orphaned `-wal`/`-shm` files beside them, and deleting or pruning a backup takes its sidecars with it.
+- Two tasks in Wait mode that run each other no longer deadlock the engine. Each held a per-task lock for its whole run and acquired them in opposite orders, and because a sub-task returns before the per-action timeout nothing bounded the wait; the stuck runs then held admission leases until the engine's global cap wedged.
 
 ## v0.2.83
 

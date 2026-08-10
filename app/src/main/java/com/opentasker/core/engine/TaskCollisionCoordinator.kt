@@ -7,7 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface TaskCollisionOutcome<out T> {
     data class Executed<T>(val value: T) : TaskCollisionOutcome<T>
@@ -19,7 +19,18 @@ sealed interface TaskCollisionOutcome<out T> {
  * source and by nested `task.run` actions. Profile re-trigger modes decide whether a profile emits
  * another invocation; this coordinator then applies the referenced task's global collision rule.
  */
-class TaskCollisionCoordinator {
+class TaskCollisionCoordinator(
+    /**
+     * How long a WAIT-mode invocation queues before giving up.
+     *
+     * WAIT holds a per-task mutex for the whole run, so two tasks that sub-run each other in WAIT
+     * mode acquire them in opposite orders and deadlock (A holds 1 and wants 2 while B holds 2 and
+     * wants 1). `executionChain` only guards recursion inside one chain, and `task.run` returns
+     * before the per-action timeout wrapper, so nothing else bounded the wait: each stuck run held
+     * an admission lease until the global cap wedged the engine.
+     */
+    private val waitAcquisitionTimeoutMs: Long = DEFAULT_WAIT_ACQUISITION_TIMEOUT_MS,
+) {
     private class Slot {
         val activeJobs = linkedSetOf<Job>()
         val waitMutex = Mutex()
@@ -34,7 +45,23 @@ class TaskCollisionCoordinator {
 
         return when (task.collisionMode) {
             CollisionMode.RUN_BOTH -> runRegistered(slot, job, block = block)
-            CollisionMode.WAIT -> slot.waitMutex.withLock { runRegistered(slot, job, block = block) }
+            CollisionMode.WAIT -> {
+                val owner = Any()
+                withTimeoutOrNull(waitAcquisitionTimeoutMs) { slot.waitMutex.lock(owner) }
+                // holdsLock is the authoritative post-condition: it stays correct even when the
+                // timeout fires in the window between acquiring the lock and returning.
+                if (!slot.waitMutex.holdsLock(owner)) {
+                    TaskCollisionOutcome.Skipped(
+                        "Task was still running after ${waitAcquisitionTimeoutMs / 1_000} s; Wait gave up on this invocation.",
+                    )
+                } else {
+                    try {
+                        runRegistered(slot, job, block = block)
+                    } finally {
+                        slot.waitMutex.unlock(owner)
+                    }
+                }
+            }
             CollisionMode.ABORT_NEW -> {
                 val admitted = synchronized(slot) {
                     slot.activeJobs.removeAll { !it.isActive }
@@ -82,6 +109,7 @@ class TaskCollisionCoordinator {
     }
 
     companion object {
+        internal const val DEFAULT_WAIT_ACQUISITION_TIMEOUT_MS = 300_000L
         val Default = TaskCollisionCoordinator()
     }
 }

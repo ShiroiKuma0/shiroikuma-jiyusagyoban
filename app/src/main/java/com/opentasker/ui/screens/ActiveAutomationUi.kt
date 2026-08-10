@@ -862,6 +862,7 @@ fun ActiveAutomationUi(
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
                 onCancelPendingRestore = viewModel::cancelPendingRestore,
+                onSnapshotPolicyChanged = viewModel::updateSnapshotPolicy,
                 profiles = profiles,
                 tasks = tasks,
                 globalFallbackTaskId = globalFallbackTaskId,
