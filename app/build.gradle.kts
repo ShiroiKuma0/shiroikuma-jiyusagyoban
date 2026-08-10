@@ -19,6 +19,8 @@ import com.opentasker.build.VerifyLocaleResourcesTask
 import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
 
+private val JVM_TEST_FLOOR = 1049
+
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)
         ?: error("Could not derive $name from ${file.path}.")
@@ -476,6 +478,9 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
     @get:org.gradle.api.tasks.Input
     abstract val minimumTests: org.gradle.api.provider.Property<Int>
 
+    @get:org.gradle.api.tasks.OutputFile
+    abstract val reportFile: org.gradle.api.file.RegularFileProperty
+
     @org.gradle.api.tasks.TaskAction
     fun verify() {
         val reports = resultsDirectory.get().asFile.listFiles { file ->
@@ -488,11 +493,25 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
         val tests = count("tests")
         val failures = count("failures")
         val errors = count("errors")
+        val floor = minimumTests.get()
+        val report = reportFile.get().asFile
+        report.parentFile.mkdirs()
+        report.writeText(
+            """{
+  "schemaVersion": 1,
+  "observedTests": $tests,
+  "configuredFloor": $floor,
+  "failures": $failures,
+  "errors": $errors,
+  "status": "${if (failures == 0 && errors == 0 && tests >= floor) "passed" else "failed"}"
+}
+""",
+        )
         check(failures == 0 && errors == 0) { "JVM tests reported $failures failure(s) and $errors error(s)." }
-        check(tests >= minimumTests.get()) {
-            "JVM test floor regressed: found $tests, expected at least ${minimumTests.get()}."
+        check(tests >= floor) {
+            "JVM test floor regressed: observed $tests, configured floor $floor."
         }
-        println("JVM test floor passed: $tests tests, 0 failures, 0 errors.")
+        println("JVM test gate passed: observed $tests tests, configured floor $floor, 0 failures, 0 errors.")
     }
 }
 
@@ -697,8 +716,8 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
     resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
-    // Ratchet step: 1,049 is the current passing suite count; raise this floor with each test batch.
-    minimumTests.set(1049)
+    reportFile.set(layout.buildDirectory.file("reports/opentasker/jvm-test-count.json"))
+    minimumTests.set(JVM_TEST_FLOOR)
 }
 
 val debugCoverageXml = layout.buildDirectory.file("reports/jacoco/debugCoverage/debugCoverage.xml")

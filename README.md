@@ -204,7 +204,7 @@ Play manifest policy check:
 ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
-Full local release gate (pinned Gradle bootstrap verification, blocking lint, the 1,049-test JVM floor, JaCoCo coverage floors for scheduling/resilience/receivers/UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
+Full local release gate (pinned Gradle bootstrap verification, blocking lint, the configured JVM test floor, JaCoCo coverage floors for scheduling/resilience/receivers/UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
 
 Release-facing version, SDK, capability-count, schema, and required artifact-commit claims are generated and checked from [`tools/release-truth.json`](tools/release-truth.json) by the same gate.
 
@@ -212,7 +212,7 @@ Performance evidence is local and explicit. The quality gate validates the commi
 
 Current release claims come from `tools/release-truth.json` and the versioned README/CHANGELOG. The local quality gate reports stale version, schema, and capability claims found in ignored historical research files as warnings; labeled historical snapshots remain non-blocking.
 
-The gate writes the debug JaCoCo XML report to `app/build/reports/jacoco/debugCoverage/debugCoverage.xml` and an HTML drill-down beside it. The test-count floor is ratcheted to the current passing count; the four area floors are explicit in `app/build.gradle.kts` and fail the gate on regression.
+The gate writes the debug JaCoCo XML report to `app/build/reports/jacoco/debugCoverage/debugCoverage.xml` and an HTML drill-down beside it. Its machine-readable JVM test report records the observed JVM test count and configured JVM test floor separately; the floor is a release threshold, not a claim about the observed suite size. The four area floors are explicit in `app/build.gradle.kts` and fail the gate on regression.
 
 ```powershell
 .\tools\verify-local-release.ps1
