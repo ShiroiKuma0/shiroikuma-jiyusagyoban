@@ -59,7 +59,7 @@ data class RunLogTaskOption(
     val taskName: String,
 )
 
-enum class RunLogStatusQuery { ALL, SUCCEEDED, FAILED, SKIPPED, CANCELLED, HELD }
+enum class RunLogStatusQuery { ALL, SUCCEEDED, FAILED, SKIPPED, CANCELLED, HELD, INTERRUPTED }
 
 data class RunLogQuery(
     val status: RunLogStatusQuery = RunLogStatusQuery.ALL,
@@ -104,6 +104,8 @@ interface RunLogDao {
     suspend fun getByTask(taskId: Long): List<RunLogEntity>
     @Query("SELECT * FROM run_logs WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): RunLogEntity?
+    @Query("SELECT * FROM run_logs WHERE executionId = :executionId ORDER BY id DESC LIMIT 1")
+    suspend fun getByExecutionId(executionId: String): RunLogEntity?
     @Query("UPDATE run_logs SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
     @Query(
@@ -142,6 +144,7 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'INTERRUPTED' AND instr(lower(message), 'decision: interrupted') > 0)
             OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
                 AND held = 0
@@ -150,7 +153,8 @@ interface RunLogDao {
             OR (:status = 'FAILED' AND success = 0
                 AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
-                AND instr(lower(message), 'decision: cancelled') = 0)
+                AND instr(lower(message), 'decision: cancelled') = 0
+                AND instr(lower(message), 'decision: interrupted') = 0)
           )
         ORDER BY timestamp DESC, id DESC
         LIMIT 1
@@ -182,6 +186,7 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'INTERRUPTED' AND instr(lower(message), 'decision: interrupted') > 0)
             OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
                 AND held = 0
@@ -190,7 +195,8 @@ interface RunLogDao {
             OR (:status = 'FAILED' AND success = 0
                 AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
-                AND instr(lower(message), 'decision: cancelled') = 0)
+                AND instr(lower(message), 'decision: cancelled') = 0
+                AND instr(lower(message), 'decision: interrupted') = 0)
           )
         """
     )
@@ -227,6 +233,7 @@ interface RunLogDao {
             :status = 'ALL'
             OR (:status = 'SKIPPED' AND instr(lower(message), 'decision: skipped') > 0)
             OR (:status = 'CANCELLED' AND instr(lower(message), 'decision: cancelled') > 0)
+            OR (:status = 'INTERRUPTED' AND instr(lower(message), 'decision: interrupted') > 0)
             OR (:status = 'HELD' AND held = 1)
             OR (:status = 'SUCCEEDED' AND success = 1
                 AND held = 0
@@ -235,7 +242,8 @@ interface RunLogDao {
             OR (:status = 'FAILED' AND success = 0
                 AND held = 0
                 AND instr(lower(message), 'decision: skipped') = 0
-                AND instr(lower(message), 'decision: cancelled') = 0)
+                AND instr(lower(message), 'decision: cancelled') = 0
+                AND instr(lower(message), 'decision: interrupted') = 0)
           )
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit

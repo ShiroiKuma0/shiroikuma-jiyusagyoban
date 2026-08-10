@@ -32,8 +32,10 @@ class TaskRunner(
     /**
      * Reports the step about to run so an in-flight execution can say what it is doing. Nested
      * sub-task runners inherit it, so a run stuck inside a sub-task still names the real step.
-     */
-    private val onStep: ((index: Int, label: String) -> Unit)? = null,
+    */
+    private val onStep: (suspend (index: Int, label: String) -> Unit)? = null,
+    /** Reports a non-control action only after it has returned a result. */
+    private val onStepCompleted: (suspend (index: Int, label: String) -> Unit)? = null,
     private val collisionCoordinator: TaskCollisionCoordinator? = null,
     private val executionChain: Set<Long> = emptySet(),
     private val originatingProfileId: Long? = null,
@@ -155,8 +157,10 @@ class TaskRunner(
                     continue
                 }
 
-                onStep?.invoke(pc, spec.label ?: spec.type)
+                val stepLabel = spec.label ?: spec.type
+                onStep?.invoke(pc, stepLabel)
                 val (result, trace) = runOne(pc, spec)
+                onStepCompleted?.invoke(pc, stepLabel)
                 results += result
                 traces += trace
                 if (result !is ActionResult.Failure &&
@@ -600,6 +604,7 @@ class TaskRunner(
             resolveTask = resolveTask,
             depth = depth + 1,
             onStep = onStep,
+            onStepCompleted = onStepCompleted,
             collisionCoordinator = collisionCoordinator,
             executionChain = executionChain + target.id,
             originatingProfileId = originatingProfileId,

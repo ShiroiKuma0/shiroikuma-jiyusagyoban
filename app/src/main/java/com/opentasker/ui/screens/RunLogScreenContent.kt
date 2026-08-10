@@ -414,6 +414,7 @@ private fun RunLogSummaryCard(
 ) {
     val outcomes = remember(logs) { logs.map { it.outcome() } }
     val failures = outcomes.count { it == RunLogOutcome.Failed }
+    val interrupted = outcomes.count { it == RunLogOutcome.Interrupted }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
     val held = outcomes.count { it == RunLogOutcome.Held }
     val latest = logs.firstOrNull()
@@ -436,12 +437,14 @@ private fun RunLogSummaryCard(
                 }
                 StatusPill(
                     when {
+                        interrupted > 0 -> stringResource(R.string.status_interrupted)
                         failures > 0 -> stringResource(R.string.run_log_summary_failed, failures)
                         held > 0 -> stringResource(R.string.status_held)
                         skipped > 0 -> stringResource(R.string.run_log_summary_skipped, skipped)
                         else -> stringResource(R.string.run_log_summary_healthy)
                     },
                     when {
+                        interrupted > 0 -> MaterialTheme.colorScheme.error
                         failures > 0 -> MaterialTheme.colorScheme.error
                         held > 0 -> MaterialTheme.colorScheme.tertiary
                         skipped > 0 -> MaterialTheme.colorScheme.secondary
@@ -454,6 +457,7 @@ private fun RunLogSummaryCard(
                 item { SummaryMetric("${logs.size}", stringResource(R.string.run_log_loaded), Modifier.width(104.dp)) }
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
+                item { SummaryMetric("$interrupted", stringResource(R.string.status_interrupted), Modifier.width(104.dp)) }
                 item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
                 item { SummaryMetric("$held", stringResource(R.string.status_held), Modifier.width(104.dp)) }
             }
@@ -509,6 +513,7 @@ private fun RunLogCard(
         RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary
         RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary
         RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary
+        RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
     val sourceText = entry.source?.let { key ->
         val name = RunLogSource.displayName(key)
@@ -523,6 +528,7 @@ private fun RunLogCard(
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
                 RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
             }
         ),
         border = BorderStroke(
@@ -533,6 +539,7 @@ private fun RunLogCard(
                 RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
                 RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.42f)
                 RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
+                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error.copy(alpha = 0.42f)
             },
         ),
         shape = RoundedCornerShape(16.dp),
@@ -552,6 +559,7 @@ private fun RunLogCard(
                         RunLogOutcome.Skipped -> Icons.Filled.Info
                         RunLogOutcome.Held -> Icons.Filled.Info
                         RunLogOutcome.Cancelled -> Icons.Filled.Cancel
+                        RunLogOutcome.Interrupted -> Icons.Filled.Error
                     },
                     contentDescription = when (outcome) {
                         RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
@@ -559,6 +567,7 @@ private fun RunLogCard(
                         RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
                         RunLogOutcome.Held -> stringResource(R.string.status_held)
                         RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
+                        RunLogOutcome.Interrupted -> stringResource(R.string.status_interrupted)
                     },
                     tint = accent,
                     modifier = Modifier
@@ -1028,6 +1037,7 @@ private fun RunLogOutcome.localizedLabel(): String = stringResource(
         RunLogOutcome.Skipped -> R.string.status_skipped
         RunLogOutcome.Held -> R.string.status_held
         RunLogOutcome.Cancelled -> R.string.status_cancelled
+        RunLogOutcome.Interrupted -> R.string.status_interrupted
     },
 )
 

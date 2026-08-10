@@ -92,6 +92,31 @@ class RunLogDiagnosticsTest {
     }
 
     @Test
+    fun interruptedRecoveryMessageClassifiesOutcomeAsInterrupted() {
+        val entry = RunLogEntry(
+            taskId = 7,
+            taskName = "Interrupted task",
+            durationMs = 42,
+            success = false,
+            message = """
+                Source: Profile: Night
+                Decision: Interrupted
+                Reason: ENGINE_RESTARTED: Process ended before a terminal execution record was written.
+                Execution ID: execution-7
+                Parent execution ID: parent-1
+                Last known step: 3. Upload
+                Recovery: no automatic retry was attempted.
+            """.trimIndent(),
+        )
+
+        val diagnostics = entry.message.toRunLogDiagnostics()
+
+        assertTrue(diagnostics.isInterrupted)
+        assertEquals("parent-1", diagnostics.parentExecutionId)
+        assertEquals(RunLogOutcome.Interrupted, entry.outcome())
+    }
+
+    @Test
     fun traceParserExtractsTemplateArgumentDetails() {
         val diagnostics = (
             "Source: Profile: Morning\n" +
