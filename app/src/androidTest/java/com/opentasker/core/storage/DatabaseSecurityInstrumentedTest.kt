@@ -3,9 +3,11 @@ package com.opentasker.core.storage
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.opentasker.core.model.Profile
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -27,6 +29,9 @@ class DatabaseSecurityInstrumentedTest {
         val plaintext = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE)
             .allowMainThreadQueries()
             .build()
+        // Room opens lazily, so without a query the file is never created and the plaintext
+        // assertion below passes over a database that does not exist.
+        plaintext.profileDao().insert(Profile(name = "Legacy profile", enterTaskId = 1).toEntity())
         plaintext.close()
 
         val databaseFile = context.getDatabasePath(TEST_DATABASE)
@@ -41,7 +46,8 @@ class DatabaseSecurityInstrumentedTest {
             .allowMainThreadQueries()
             .build()
         try {
-            assertTrue(encrypted.profileDao().getAll().isEmpty())
+            // The migration must carry the user's data across, not just produce a valid file.
+            assertEquals(listOf("Legacy profile"), encrypted.profileDao().getAll().map { it.name })
         } finally {
             encrypted.close()
         }

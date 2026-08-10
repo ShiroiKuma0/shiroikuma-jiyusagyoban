@@ -9,6 +9,7 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.runBlocking
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -191,6 +192,72 @@ class DatabaseBackupManagerInstrumentedTest {
         }
     }
 
+    /**
+     * The reinstall/device-transfer case the feature exists for: the SQLCipher key that encrypted
+     * the database is gone, and the exported `.otbackup` must still open.
+     */
+    @Test
+    fun encryptedExportRestoresAfterTheDatabaseKeyIsLost() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanupEncrypted(context)
+
+        val exported = context.cacheDir.resolve("opentasker-portable-export.otbackup")
+        val passphrase = "portable-passphrase"
+        var key = DatabaseSecurity.prepareEncryptedDatabase(context, ENCRYPTED_TEST_DATABASE)
+        var db = encryptedDatabase(context, key)
+        try {
+            db.profileDao().insert(Profile(name = "Survives reinstall", enterTaskId = 1).toEntity())
+            val manager = DatabaseBackupManager(context, db, ENCRYPTED_TEST_DATABASE)
+            val backup = manager.backup().getOrThrow()
+            assertFalse(
+                "the managed backup must still be ciphertext",
+                DatabaseSecurity.isPlaintext(backup),
+            )
+
+            manager.exportEncryptedBackup(backup, Uri.fromFile(exported), passphrase.toCharArray()).getOrThrow()
+            assertFalse(
+                "the plaintext staging copy must not survive the export",
+                context.filesDir.resolve("backups/${backup.name}.portable.tmp").exists(),
+            )
+            db.close()
+
+            // Simulate a fresh install: the wrapped SQLCipher key is destroyed with app data, so
+            // the next getOrCreate() mints a different one and the old ciphertext is unreadable.
+            context.deleteDatabase(ENCRYPTED_TEST_DATABASE)
+            context.getSharedPreferences("database_security", 0).edit().clear().commit()
+
+            DatabaseBackupManager(context, db, ENCRYPTED_TEST_DATABASE)
+                .stageEncryptedRestore(Uri.fromFile(exported), passphrase.toCharArray())
+                .getOrThrow()
+            val applied = DatabaseBackupManager.applyPendingRestoreIfPresent(context, ENCRYPTED_TEST_DATABASE)
+            assertTrue("restore must apply on the new install", applied is PendingRestoreApplyResult.Applied)
+
+            key = DatabaseSecurity.prepareEncryptedDatabase(context, ENCRYPTED_TEST_DATABASE)
+            db = encryptedDatabase(context, key)
+            assertEquals(listOf("Survives reinstall"), db.profileDao().getAll().map { it.name })
+        } finally {
+            db.close()
+            exported.delete()
+            cleanupEncrypted(context)
+        }
+    }
+
+    private fun encryptedDatabase(context: android.content.Context, key: ByteArray): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, ENCRYPTED_TEST_DATABASE)
+            .addMigrations(*DatabaseMigrations.getManualMigrations())
+            .openHelperFactory(SupportOpenHelperFactory(key.copyOf()))
+            .allowMainThreadQueries()
+            .build()
+
+    private fun cleanupEncrypted(context: android.content.Context) {
+        context.deleteDatabase(ENCRYPTED_TEST_DATABASE)
+        DatabaseBackupManager.pendingRestoreFile(context, ENCRYPTED_TEST_DATABASE).delete()
+        context.filesDir.resolve("backups")
+            .listFiles { file -> file.name.startsWith(ENCRYPTED_TEST_DATABASE.removeSuffix(".db")) }
+            ?.forEach { it.delete() }
+        context.getSharedPreferences("database_security", 0).edit().clear().commit()
+    }
+
     private fun cleanup(context: android.content.Context) {
         context.deleteDatabase(TEST_DATABASE)
         DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE).delete()
@@ -201,5 +268,6 @@ class DatabaseBackupManagerInstrumentedTest {
 
     private companion object {
         const val TEST_DATABASE = "opentasker-backup-test.db"
+        const val ENCRYPTED_TEST_DATABASE = "opentasker-portable-backup-test.db"
     }
 }

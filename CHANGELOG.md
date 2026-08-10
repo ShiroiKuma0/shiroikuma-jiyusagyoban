@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Upgrading a database created before OpenTasker encrypted its storage no longer discards it. The conversion copied the new empty file onto itself instead of reading the old one, leaving a database with no tables; the app then refused to open it. The migration now verifies it carried the tables across before publishing the result.
+- Exported backups restore on a different device and after a reinstall. Both export paths wrote the on-disk ciphertext, which is keyed to a randomly generated key that is destroyed with the app's data and never transferred, so every exported `.otbackup` was unopenable in exactly the situations backups exist for. Exports now carry a portable copy inside the passphrase-encrypted envelope, and the staging copy is shredded afterwards. First-class secret values still stay on the device that created them.
+- Startup recovery no longer marks a just-started execution as interrupted. Recovery runs alongside engine startup, so a boot-triggered run that reached the journal first was reported as interrupted, written to the run log twice, and then blocked from recording its real result.
+- Applying a staged restore and converting a legacy database now happen off the main thread, so a large database cannot stall app start or exhaust the boot broadcast's time budget.
+
 ## v0.2.83
 
 - The pre-unlock time trigger setting is now a single toggleable row, so a screen reader announces its name along with its state instead of an unnamed on/off switch.

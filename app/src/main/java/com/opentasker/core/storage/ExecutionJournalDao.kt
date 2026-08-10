@@ -86,6 +86,21 @@ interface ExecutionJournalDao {
     @Query("SELECT * FROM execution_journal WHERE state = 'ACTIVE' ORDER BY startedAtMs, executionId")
     suspend fun active(): List<ExecutionJournalEntity>
 
+    /**
+     * Rows an *earlier* process left behind. Startup recovery runs concurrently with the engine, so
+     * without the cutoff a boot-triggered execution that journals itself first is declared
+     * INTERRUPTED and gets a contradictory second run-log row while it is still running.
+     */
+    @Query(
+        """
+        SELECT * FROM execution_journal
+        WHERE state = 'ACTIVE'
+          AND startedAtMs < :startedBeforeMs
+        ORDER BY startedAtMs, executionId
+        """
+    )
+    suspend fun activeStartedBefore(startedBeforeMs: Long): List<ExecutionJournalEntity>
+
     @Query(
         """
         SELECT * FROM execution_journal
