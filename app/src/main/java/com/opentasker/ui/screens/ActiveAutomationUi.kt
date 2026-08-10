@@ -1210,6 +1210,7 @@ fun ActiveAutomationUi(
         ActionConfigDialog(
             state = state,
             tasks = tasks,
+            enclosingActions = state.task.actions,
             onDismiss = { clearActionEdit() },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->

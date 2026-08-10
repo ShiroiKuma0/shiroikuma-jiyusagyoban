@@ -74,4 +74,28 @@ class FlowStructureTest {
         assertNotNull(FlowStructure.analyze(listOf(ActionSpec(type = FlowControl.TRY, args = mapOf("max_attempts" to "6")), a(FlowControl.ENDTRY))).error)
         assertNotNull(FlowStructure.analyze(listOf(a(FlowControl.TRY), a(FlowControl.CATCH), a(FlowControl.CATCH), a(FlowControl.ENDTRY))).error)
     }
+
+    @Test
+    fun retryPlanSeparatesBodyActionsFromFlowMarkers() {
+        val actions = listOf(
+            a(FlowControl.TRY),
+            a("safe.read"),
+            a(FlowControl.IF),
+            a("unsafe.send"),
+            a(FlowControl.ENDIF),
+            a(FlowControl.CATCH),
+            a(FlowControl.ENDTRY),
+        )
+
+        val plan = tryRetryPlan(actions, tryIndex = 0) { action ->
+            when (action.type) {
+                "safe.read" -> ActionRetrySafety.IDEMPOTENT
+                "unsafe.send" -> ActionRetrySafety.NEVER
+                else -> null
+            }
+        }
+
+        assertEquals(listOf("safe.read"), plan.retryableActionIds)
+        assertEquals(listOf("unsafe.send"), plan.nonRetryableActionIds)
+    }
 }

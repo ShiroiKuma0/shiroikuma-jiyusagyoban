@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -24,6 +25,7 @@ import java.net.URL
 class PingAction : Action {
     override val id = "ping"
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
@@ -65,6 +67,7 @@ class DownloadAction(
 ) : Action {
     override val id = "download"
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")
@@ -105,6 +108,7 @@ class DownloadAction(
 class WakeOnLanAction : Action {
     override val id = "wol"
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val macStr = args["mac"] ?: return ActionResult.Failure("missing mac")

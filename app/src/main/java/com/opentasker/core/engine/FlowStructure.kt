@@ -33,6 +33,40 @@ object FlowControl {
     fun isControl(type: String): Boolean = type in ALL
 }
 
+data class TryRetryPlan(
+    val retryableActionIds: List<String>,
+    val nonRetryableActionIds: List<String>,
+)
+
+/**
+ * Describes which actions in a try body can be repeated after a transient failure. Control
+ * markers are omitted because the runner retries the body action that failed, not the markers.
+ * Unknown and engine-handled actions are deliberately non-retryable.
+ */
+fun tryRetryPlan(
+    actions: List<ActionSpec>,
+    tryIndex: Int,
+    safetyFor: (ActionSpec) -> ActionRetrySafety? = { spec ->
+        ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args)
+    },
+): TryRetryPlan {
+    val structure = FlowStructure.analyze(actions)
+    val endIndex = structure.tryToEndtry[tryIndex] ?: return TryRetryPlan(emptyList(), emptyList())
+    val bodyEnd = structure.tryToCatch[tryIndex] ?: endIndex
+    val retryable = linkedSetOf<String>()
+    val nonRetryable = linkedSetOf<String>()
+    for (index in (tryIndex + 1) until bodyEnd) {
+        val action = actions.getOrNull(index) ?: continue
+        if (FlowControl.isControl(action.type)) continue
+        if (safetyFor(action) == ActionRetrySafety.IDEMPOTENT) {
+            retryable += action.type
+        } else {
+            nonRetryable += action.type
+        }
+    }
+    return TryRetryPlan(retryable.toList(), nonRetryable.toList())
+}
+
 /**
  * Resolved jump targets for block-structured flow control within a single task's action list.
  *

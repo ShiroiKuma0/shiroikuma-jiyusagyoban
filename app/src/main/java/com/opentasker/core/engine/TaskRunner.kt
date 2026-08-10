@@ -185,10 +185,15 @@ class TaskRunner(
                 results += result
                 traces += trace
                 if (result is ActionResult.Failure) {
-                    val recoveryPc = recoverFailure(pc, spec, result, structure, loopStack, tryStack)
-                    if (recoveryPc != null) {
+                    val recovery = recoverFailure(pc, spec, result, structure, loopStack, tryStack)
+                    recovery.reason?.let { reason ->
+                        traces[traces.lastIndex] = traces.last().copy(
+                            message = "${traces.last().message}; $reason",
+                        )
+                    }
+                    if (recovery.nextPc != null) {
                         handledFailureIndices += results.lastIndex
-                        pc = recoveryPc
+                        pc = recovery.nextPc
                         continue
                     }
                     if (!spec.continueOnError) {
@@ -219,6 +224,11 @@ class TaskRunner(
         val trace: ActionExecutionTrace,
         val nextPc: Int,
         val halt: Boolean = false,
+    )
+
+    private data class FailureRecovery(
+        val nextPc: Int?,
+        val reason: String? = null,
     )
 
     private fun stepControl(
@@ -348,35 +358,54 @@ class TaskRunner(
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
         tryStack: ArrayDeque<TryFrame>,
-    ): Int? {
+    ): FailureRecovery {
+        var nonRetryReason: String? = null
         while (true) {
             val frame = tryStack.asReversed().firstOrNull { candidate ->
                 candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
-            } ?: return null
+            } ?: return FailureRecovery(nextPc = null, reason = nonRetryReason)
 
             while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
             if (frame.attempt < frame.config.maxAttempts &&
-                ActionRegistry.get(spec.type)?.retrySafety == ActionRetrySafety.IDEMPOTENT
+                ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args) == ActionRetrySafety.IDEMPOTENT
             ) {
-                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true)
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
                 frame.attempt++
                 clearLoopsToDepth(loopStack, frame.loopDepth)
                 val waitMs = retryBackoffMs(frame.config.backoffMs, frame.attempt - 1)
                 if (waitMs > 0) delay(waitMs)
-                return frame.tryIndex + 1
+                return FailureRecovery(nextPc = frame.tryIndex + 1, reason = nonRetryReason)
+            } else if (frame.attempt < frame.config.maxAttempts || frame.config.maxAttempts > 1) {
+                nonRetryReason = retryReason(spec, ActionRegistry.get(spec.type)?.retrySafetyFor(spec.args))
             }
 
             frame.catchIndex?.let { catchIndex ->
-                setFailureVariables(pc, spec, failure, frame.attempt, retrying = false)
+                setFailureVariables(
+                    pc,
+                    spec,
+                    failure,
+                    frame.attempt,
+                    retrying = false,
+                    retryReason = nonRetryReason,
+                )
                 ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                 frame.phase = TryPhase.CATCH
                 clearLoopsToDepth(loopStack, frame.loopDepth)
-                return catchIndex + 1
+                return FailureRecovery(nextPc = catchIndex + 1, reason = nonRetryReason)
             }
 
             // An uncaught nested failure propagates to the enclosing try block.
             tryStack.removeLast()
         }
+    }
+
+    private fun retryReason(spec: ActionSpec, safety: ActionRetrySafety?): String = when (safety) {
+        ActionRetrySafety.NEVER ->
+            "not retried: ${spec.type} is classified NEVER; flow.try retries only IDEMPOTENT actions"
+        ActionRetrySafety.IDEMPOTENT ->
+            "not retried: ${spec.type} exhausted the configured attempts"
+        null ->
+            "not retried: ${spec.type} has no runtime retry classification"
     }
 
     private fun setFailureVariables(
@@ -385,12 +414,14 @@ class TaskRunner(
         failure: ActionResult.Failure,
         attempt: Int,
         retrying: Boolean,
+        retryReason: String?,
     ) {
         ctx.variables.set(FLOW_ERROR_MESSAGE, failure.message)
         ctx.variables.set(FLOW_ERROR_ACTION, spec.type)
         ctx.variables.set(FLOW_ERROR_INDEX, (pc + 1).toString())
         ctx.variables.set(FLOW_ERROR_ATTEMPT, attempt.toString())
         ctx.variables.set(FLOW_ERROR_RETRYING, retrying.toString())
+        ctx.variables.set(FLOW_ERROR_RETRY_REASON, retryReason.orEmpty())
     }
 
     private fun clearLoopsToDepth(loopStack: ArrayDeque<LoopFrame>, depth: Int) {
@@ -650,6 +681,7 @@ private const val FLOW_ERROR_ACTION = "FLOW_ERROR_ACTION"
 private const val FLOW_ERROR_INDEX = "FLOW_ERROR_INDEX"
 private const val FLOW_ERROR_ATTEMPT = "FLOW_ERROR_ATTEMPT"
 private const val FLOW_ERROR_RETRYING = "FLOW_ERROR_RETRYING"
+private const val FLOW_ERROR_RETRY_REASON = "FLOW_ERROR_RETRY_REASON"
 private const val FLOW_ERROR_CAUGHT = "FLOW_ERROR_CAUGHT"
 
 private fun retryBackoffMs(baseMs: Long, retryNumber: Int): Long {

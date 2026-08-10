@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import java.net.URI
 import kotlinx.coroutines.delay
@@ -87,6 +88,7 @@ class HomeAssistantWebhookAction(
 ) : Action {
     override val id = ID
     override val category = ActionCategory.NET
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val config = HomeAssistantWebhookProtocol.parse(args).getOrElse { error ->

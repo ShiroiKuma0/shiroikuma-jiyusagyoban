@@ -20,6 +20,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.isArgumentSensitive
 import com.opentasker.core.model.VariableNamePolicy
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class NotifyAction : Action {
     override val id = "notify.show"
     override val category = ActionCategory.NOTIFICATION
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val title = args["title"] ?: "Notification"
@@ -128,6 +130,7 @@ class NotifyAction : Action {
 class ProgressNotificationAction : Action {
     override val id = "notify.progress"
     override val category = ActionCategory.NOTIFICATION
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -197,6 +200,7 @@ internal fun parseSegmentLengths(value: String?): List<Int> = value.orEmpty()
 class NotifyCancelAction : Action {
     override val id = "notify.cancel"
     override val category = ActionCategory.NOTIFICATION
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val tag = args["tag"]
@@ -256,6 +260,7 @@ internal object NotificationChannels {
 class SetVariableAction : Action {
     override val id = "var.set"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val name = args["name"] ?: return ActionResult.Failure("missing name")
@@ -297,6 +302,7 @@ class SetVariableAction : Action {
 class PersistVariableAction : Action {
     override val id = "var.persist"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawName = args["name"] ?: return ActionResult.Failure("missing name")
@@ -325,6 +331,7 @@ private const val REDACTED_VARIABLE_VALUE = ActionArgumentSensitivity.REDACTED
 class SayAction : Action {
     override val id = "tts.speak"
     override val category = ActionCategory.NOTIFICATION
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val text = args["text"]?.takeIf { it.isNotBlank() }
@@ -380,6 +387,7 @@ class SayAction : Action {
 class WaitAction : Action {
     override val id = "flow.wait"
     override val category = ActionCategory.FLOW
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
@@ -419,6 +427,7 @@ class WaitAction : Action {
 class LaunchIntentAction : Action {
     override val id = "intent.launch"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val plan = when (val parsed = IntentDispatchPolicy.parse(args)) {

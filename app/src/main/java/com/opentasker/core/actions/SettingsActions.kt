@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.contexts.QuickSettingsTileStore
 import com.opentasker.core.contexts.requestRefresh
@@ -36,6 +37,7 @@ import kotlin.coroutines.resume
 class WiFiToggleAction : Action {
     override val id = "wifi.toggle"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -66,6 +68,7 @@ class WiFiToggleAction : Action {
 class BluetoothToggleAction : Action {
     override val id = "bluetooth.toggle"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -103,6 +106,7 @@ class BluetoothToggleAction : Action {
 class BrightnessAction : Action {
     override val id = "brightness.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val brightness = args["brightness"] ?: args["level"] ?: return ActionResult.Failure("missing brightness")
@@ -136,6 +140,7 @@ class BrightnessAction : Action {
 class VolumeAction : Action {
     override val id = "volume.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val levelArg = args["level"] ?: return ActionResult.Failure("missing level")
@@ -177,6 +182,7 @@ class VolumeAction : Action {
 class AirplaneModeAction : Action {
     override val id = "airplane.toggle"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -194,6 +200,7 @@ class AirplaneModeAction : Action {
 class MobileDataAction : Action {
     override val id = "mobile.toggle"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -205,6 +212,7 @@ class MobileDataAction : Action {
 class DoNotDisturbAction : Action {
     override val id = "dnd.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val nm = ctx.app.getSystemService(NotificationManager::class.java)
@@ -233,6 +241,7 @@ class DoNotDisturbAction : Action {
 class RingerModeAction : Action {
     override val id = "ringer.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"] ?: return ActionResult.Failure("missing mode argument")
@@ -258,6 +267,7 @@ class RingerModeAction : Action {
 class TorchAction : Action {
     override val id = "torch.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
@@ -359,6 +369,7 @@ private fun safelyUnregisterTorchCallback(cameraManager: CameraManager, callback
 class TileStateAction : Action {
     override val id = "tile.set"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: return ActionResult.Failure("missing state argument")
@@ -410,6 +421,7 @@ private fun streamType(name: String): Int? = when (name.lowercase()) {
 class ScreenTimeoutAction : Action {
     override val id = "screen.timeout"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")

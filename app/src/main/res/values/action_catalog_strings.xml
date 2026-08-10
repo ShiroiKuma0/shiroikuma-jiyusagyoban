@@ -179,9 +179,12 @@
       <string name="catalog_action_flow_try_name" formatted="false">Try</string>
       <string name="catalog_action_flow_try_description" formatted="false">Run a bounded, retryable block and optionally handle its failure with Catch</string>
       <string name="catalog_action_flow_try_field_max_attempts_label" formatted="false">Maximum attempts</string>
-      <string name="catalog_action_flow_try_field_max_attempts_hint" formatted="false">1–5; retries require an idempotent action</string>
+      <string name="catalog_action_flow_try_field_max_attempts_hint" formatted="false">1–5; the block review below lists actions that can retry</string>
       <string name="catalog_action_flow_try_field_backoff_label" formatted="false">Base backoff (ms)</string>
       <string name="catalog_action_flow_try_field_backoff_hint" formatted="false">0–60000; exponential between retries</string>
+      <string name="flow_try_retry_summary_empty" formatted="false">Retries apply only to idempotent actions added inside this block.</string>
+      <string name="flow_try_retryable_summary" formatted="false">Retryable actions: %1$s</string>
+      <string name="flow_try_non_retryable_summary" formatted="false">Will not retry: %1$s</string>
       <string name="catalog_action_flow_catch_name" formatted="false">Catch</string>
       <string name="catalog_action_flow_catch_description" formatted="false">Handle a failed Try block using FLOW_ERROR_* variables</string>
       <string name="catalog_action_flow_endtry_name" formatted="false">End Try</string>

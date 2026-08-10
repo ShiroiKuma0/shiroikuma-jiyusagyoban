@@ -13,6 +13,7 @@ import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -25,6 +26,7 @@ class AppArchiveAction(
 ) : Action {
     override val id = "app.archive"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
         PackageArchiveActionSupport.run(ctx, args, PackageArchiveMode.ARCHIVE, sdkInt())
@@ -35,6 +37,7 @@ class AppUnarchiveAction(
 ) : Action {
     override val id = "app.unarchive"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
         PackageArchiveActionSupport.run(ctx, args, PackageArchiveMode.UNARCHIVE, sdkInt())

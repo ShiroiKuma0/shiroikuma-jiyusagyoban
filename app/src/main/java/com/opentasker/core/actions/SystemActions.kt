@@ -8,6 +8,7 @@ import android.os.VibratorManager
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -19,6 +20,7 @@ import com.opentasker.core.engine.ActionResult
 class VibrateAction : Action {
     override val id = "vibrate"
     override val category = ActionCategory.NOTIFICATION
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
@@ -59,6 +61,7 @@ class VibrateAction : Action {
 class RebootAction : Action {
     override val id = "reboot"
     override val category = ActionCategory.SYSTEM
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"]?.ifBlank { null }
@@ -73,6 +76,7 @@ class RebootAction : Action {
 class LockDeviceAction : Action {
     override val id = "lock"
     override val category = ActionCategory.SYSTEM
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Lock device")
@@ -86,6 +90,7 @@ class LockDeviceAction : Action {
 class ScreenOffAction : Action {
     override val id = "screen.off"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Screen off")
@@ -102,6 +107,7 @@ class ScreenOffAction : Action {
 class WakeAction : Action {
     override val id = "wake"
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
@@ -119,6 +125,7 @@ class WakeAction : Action {
 class LogAction : Action {
     override val id = "log"
     override val category = ActionCategory.SYSTEM
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val message = args["message"] ?: ""

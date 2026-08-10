@@ -3,6 +3,7 @@ package com.opentasker.core.capabilities
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.engine.ActionRegistry
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
 import com.opentasker.core.registerCoreRuntime
@@ -66,6 +67,53 @@ class ActionContractCompletenessTest {
             .sorted()
 
         assertTrue("Actions with no sensitivity classification: $unclassified", unclassified.isEmpty())
+    }
+
+    @Test
+    fun everyRegisteredActionHasAReviewedRetrySafetyClassification() {
+        val metadataIds = ActionMetadataRegistry.all().map { it.id }.toSet()
+        val registered = ActionRegistry.all().filter { it.id in metadataIds }
+        val retryable = registered
+            .filter { it.retrySafety == ActionRetrySafety.IDEMPOTENT }
+            .map { it.id }
+            .toSet()
+
+        assertEquals("all built-in actions must remain registered", 74, registered.size)
+        assertEquals(
+            setOf(
+                "app.archive", "app.unarchive", "brightness.set", "clipboard.get", "clipboard.set",
+                "contacts.lookup", "data.read", "datetime.add", "datetime.format", "datetime.parse",
+                "dnd.set", "download", "file.delete", "file.list", "file.read", "file.write",
+                "http.get", "ime.info", "lock", "media.mute", "notify.cancel", "ping", "plugin.locale.query",
+                "screen.off", "screen.timeout", "sound.pause", "sound.stop", "text.join", "text.match",
+                "text.replace", "text.split", "text.substring", "tile.set", "var.persist", "var.set",
+                "volume.set", "wake", "wol", "zen.rule.clear", "ringer.set",
+            ),
+            retryable,
+        )
+        assertTrue(registered.all { it.retrySafety in ActionRetrySafety.entries })
+        assertEquals(ActionRetrySafety.IDEMPOTENT, ActionRegistry.get("http.request")?.retrySafetyFor(mapOf("method" to "GET")))
+        assertEquals(ActionRetrySafety.NEVER, ActionRegistry.get("http.request")?.retrySafetyFor(mapOf("method" to "POST")))
+    }
+
+    @Test
+    fun everyRegisteredBuiltInSourceDeclaresRetrySafety() {
+        val runtime = repoRoot.resolve("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt").readText()
+        val actionSources = repoRoot.resolve("app/src/main/java/com/opentasker/core/actions")
+            .toFile()
+            .walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString("\n") { it.readText() }
+        val registeredCount = Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(runtime).count()
+        val classifiedCount = Regex("override val retrySafety = ActionRetrySafety\\.(?:NEVER|IDEMPOTENT)")
+            .findAll(actionSources)
+            .count()
+
+        assertEquals(
+            "Adding a registered action without an explicit retry classification must fail the source guard",
+            registeredCount,
+            classifiedCount,
+        )
     }
 
     @Test

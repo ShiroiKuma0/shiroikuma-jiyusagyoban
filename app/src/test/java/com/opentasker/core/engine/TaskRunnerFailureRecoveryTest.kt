@@ -34,6 +34,7 @@ class TaskRunnerFailureRecoveryTest {
         ActionRegistry.register(object : Action {
             override val id = "test.flow.fail"
             override val category = ActionCategory.FLOW
+            override val retrySafety = ActionRetrySafety.NEVER
             override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
                 ActionResult.Failure("permanent failure")
         })
@@ -68,13 +69,14 @@ class TaskRunnerFailureRecoveryTest {
         ActionRegistry.register(object : Action {
             override val id = "test.flow.observe"
             override val category = ActionCategory.FLOW
+            override val retrySafety = ActionRetrySafety.IDEMPOTENT
             override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
                 seen += args["value"].orEmpty()
                 return ActionResult.Success
             }
         })
         val report = run(
-            marker(FlowControl.TRY),
+            marker(FlowControl.TRY, mapOf("max_attempts" to "3")),
             marker("test.flow.fail"),
             marker(FlowControl.CATCH),
             ActionSpec(type = "test.flow.observe", args = mapOf("value" to "%FLOW_ERROR_ACTION:%FLOW_ERROR_ATTEMPT")),
@@ -83,6 +85,7 @@ class TaskRunnerFailureRecoveryTest {
 
         assertTrue(report.success)
         assertEquals(listOf("test.flow.fail:1"), seen)
+        assertTrue(report.traces.any { it.message.contains("classified NEVER") })
     }
 
     @Test
@@ -97,6 +100,7 @@ class TaskRunnerFailureRecoveryTest {
         assertTrue(report.success)
         assertEquals(2, calls)
         assertEquals(2, report.traces.count { it.actionType == "test.flow.flaky" && it.status == ActionTraceStatus.FAILURE })
+        assertTrue(report.traces.any { it.message.contains("exhausted the configured attempts") })
     }
 
     @Test

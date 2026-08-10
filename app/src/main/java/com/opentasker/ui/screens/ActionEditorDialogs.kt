@@ -63,8 +63,10 @@ import com.opentasker.core.actions.NotificationTaskResolution
 import com.opentasker.core.actions.mergeActionArguments
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
+import com.opentasker.core.engine.tryRetryPlan
 import com.opentasker.ui.theme.DesignSystem
 
 private data class LocalizedActionMetadata(
@@ -218,6 +220,7 @@ private fun List<Task>.toNotificationCandidates(): List<NotificationTaskCandidat
 internal fun ActionConfigDialog(
     state: ActionEditState,
     tasks: List<Task> = emptyList(),
+    enclosingActions: List<ActionSpec> = emptyList(),
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
@@ -258,6 +261,13 @@ internal fun ActionConfigDialog(
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
     val availableTaskIds = remember(tasks) { tasks.mapTo(mutableSetOf()) { it.id } }
     val validationIssues = ActionFieldPolicy.validateForm(state.metadata, values, availableTaskIds)
+    val retryPlan = remember(enclosingActions, state.index, state.metadata.id) {
+        if (state.metadata.id == FlowControl.TRY && state.index != null) {
+            tryRetryPlan(enclosingActions, state.index)
+        } else {
+            null
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -269,6 +279,39 @@ internal fun ActionConfigDialog(
             ) {
                 item {
                     Text(metadataDescription, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.metadata.id == FlowControl.TRY) {
+                        Spacer(Modifier.height(8.dp))
+                        if (retryPlan == null ||
+                            (retryPlan.retryableActionIds.isEmpty() && retryPlan.nonRetryableActionIds.isEmpty())
+                        ) {
+                            Text(
+                                stringResource(R.string.flow_try_retry_summary_empty),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            retryPlan.retryableActionIds.takeIf { it.isNotEmpty() }?.let { actionIds ->
+                                Text(
+                                    stringResource(
+                                        R.string.flow_try_retryable_summary,
+                                        actionIds.joinToString(),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            retryPlan.nonRetryableActionIds.takeIf { it.isNotEmpty() }?.let { actionIds ->
+                                Text(
+                                    stringResource(
+                                        R.string.flow_try_non_retryable_summary,
+                                        actionIds.joinToString(),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
                     if (capability.level != CapabilityLevel.Supported) {
                         Spacer(Modifier.height(8.dp))
                         Surface(

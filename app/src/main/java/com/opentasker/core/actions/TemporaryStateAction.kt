@@ -15,6 +15,7 @@ import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
@@ -36,6 +37,7 @@ import java.util.concurrent.TimeUnit
 class TemporaryStateAction : Action {
     override val id = ACTION_ID
     override val category = ActionCategory.SETTINGS
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val plan = TemporaryStatePlan.parse(args).getOrElse { return ActionResult.Failure(it.message ?: "invalid temporary state") }

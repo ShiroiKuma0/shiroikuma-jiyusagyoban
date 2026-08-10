@@ -4,6 +4,7 @@ import com.opentasker.core.data.DateTimeOps
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private fun resolveEpochMillis(raw: String?): Long? {
@@ -19,6 +20,7 @@ private fun resolveEpochMillis(raw: String?): Long? {
 class DateTimeFormatAction : Action {
     override val id = "datetime.format"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val epoch = resolveEpochMillis(args["time"]) ?: return ActionResult.Failure("invalid time (expected epoch millis or 'now')")
@@ -39,6 +41,7 @@ class DateTimeFormatAction : Action {
 class DateTimeParseAction : Action {
     override val id = "datetime.parse"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val text = args["text"]?.trim()?.ifBlank { null } ?: return ActionResult.Failure("missing text")
@@ -60,6 +63,7 @@ class DateTimeParseAction : Action {
 class DateTimeAddAction : Action {
     override val id = "datetime.add"
     override val category = ActionCategory.VARIABLE
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val epoch = resolveEpochMillis(args["time"]) ?: return ActionResult.Failure("invalid time (expected epoch millis or 'now')")

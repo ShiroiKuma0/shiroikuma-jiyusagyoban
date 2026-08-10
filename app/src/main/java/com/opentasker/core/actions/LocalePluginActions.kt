@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.plugins.locale.LocalePluginConditionState
 import com.opentasker.core.plugins.locale.LocalePluginHost
@@ -11,6 +12,7 @@ import com.opentasker.core.plugins.locale.LocalePluginRequest
 class LocalePluginSettingAction : Action {
     override val id = "plugin.locale.fire"
     override val category = ActionCategory.APP
+    override val retrySafety = ActionRetrySafety.NEVER
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val packageName = args["package"]?.trim().orEmpty()
@@ -42,6 +44,7 @@ class LocalePluginSettingAction : Action {
 class LocalePluginConditionQueryAction : Action {
     override val id = "plugin.locale.query"
     override val category = ActionCategory.PLUGIN
+    override val retrySafety = ActionRetrySafety.IDEMPOTENT
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val packageName = args["package"]?.trim().orEmpty()
