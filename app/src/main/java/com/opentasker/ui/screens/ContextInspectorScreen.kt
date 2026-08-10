@@ -499,6 +499,16 @@ private fun ProfileInspectorCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    stringResource(
+                        R.string.inspector_profile_concurrency,
+                        candidate.maxActiveExecutions?.toString() ?: stringResource(R.string.profile_concurrency_default),
+                        candidate.burstLimit?.toString() ?: stringResource(R.string.profile_concurrency_default),
+                        profileOverflowPolicyTitle(candidate.overflowPolicy),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (candidate.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && candidate.expiresAtMs != null) {
                     Text(
                         stringResource(R.string.inspector_profile_expiry, formatProfileExpiryDate(candidate.expiresAtMs)),

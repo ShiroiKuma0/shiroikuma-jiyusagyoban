@@ -19,6 +19,8 @@ object ProfileLifecyclePolicy {
         gracePeriodSec = profile.gracePeriodSec.coerceIn(0, MAX_GRACE_PERIOD_SEC),
         expiresAtMs = profile.expiresAtMs.takeIf { profile.lifetime == ProfileLifetime.UNTIL_DATE },
         lifetimeConsumed = profile.lifetimeConsumed && profile.lifetime == ProfileLifetime.ONCE,
+        maxActiveExecutions = ProfileConcurrencyPolicy.normalizeMaxActive(profile.maxActiveExecutions),
+        burstLimit = ProfileConcurrencyPolicy.normalizeBurstLimit(profile.burstLimit),
     )
 
     /** Returns the deterministic winner; lower IDs break equal-priority ties. */

@@ -14,6 +14,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 
@@ -35,6 +36,9 @@ data class ProfileEntity(
     @androidx.room.ColumnInfo(defaultValue = "'NEVER'") val lifetime: String = ProfileLifetime.NEVER.name,
     val expiresAtMs: Long? = null,
     @androidx.room.ColumnInfo(defaultValue = "0") val lifetimeConsumed: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val maxActiveExecutions: Int? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val burstLimit: Int? = null,
+    @androidx.room.ColumnInfo(defaultValue = "'LOG'") val overflowPolicy: String = ProfileOverflowPolicy.LOG.name,
 ) {
     fun toDomain(): Profile = toDomainDecodeResult().requireDecoded()
 
@@ -76,6 +80,8 @@ data class ProfileEntity(
 
         val profileLifetime = runCatching { ProfileLifetime.valueOf(lifetime) }
             .getOrDefault(ProfileLifetime.NEVER)
+        val profileOverflowPolicy = runCatching { ProfileOverflowPolicy.valueOf(overflowPolicy) }
+            .getOrDefault(ProfileOverflowPolicy.LOG)
         return StorageDecodeResult(
             value = Profile(
                 id = id,
@@ -95,6 +101,9 @@ data class ProfileEntity(
                 lifetime = profileLifetime,
                 expiresAtMs = expiresAtMs,
                 lifetimeConsumed = lifetimeConsumed,
+                maxActiveExecutions = maxActiveExecutions,
+                burstLimit = burstLimit,
+                overflowPolicy = profileOverflowPolicy,
             ),
         )
     }
@@ -121,6 +130,9 @@ fun Profile.toEntity() = ProfileEntity(
     lifetime.name,
     expiresAtMs,
     lifetimeConsumed,
+    maxActiveExecutions,
+    burstLimit,
+    overflowPolicy.name,
 )
 
 @kotlinx.serialization.Serializable

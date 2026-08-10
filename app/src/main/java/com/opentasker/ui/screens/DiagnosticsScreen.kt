@@ -40,6 +40,8 @@ import com.opentasker.core.diagnostics.assessment
 import com.opentasker.core.diagnostics.healthy
 import com.opentasker.core.engine.EngineExitCorrelation
 import com.opentasker.core.engine.EngineExitCorrelationState
+import com.opentasker.core.engine.ExecutionAdmissionSnapshot
+import com.opentasker.core.engine.ExecutionCircuitState
 import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.ui.theme.DesignSystem
@@ -76,6 +78,10 @@ fun DiagnosticsScreen(
         item {
             SectionTitle(stringResource(R.string.diagnostics_engine_health))
             EngineHealthCard(health, formatter)
+        }
+        item {
+            SectionTitle(stringResource(R.string.diagnostics_admission_title))
+            AdmissionHealthCard(state.admission)
         }
         item { SectionTitle(stringResource(R.string.diagnostics_crash_logs, state.crashLogs.size)) }
         if (state.crashLogs.isEmpty()) {
@@ -278,6 +284,95 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AdmissionHealthCard(snapshot: ExecutionAdmissionSnapshot?) {
+    val now = System.currentTimeMillis()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (snapshot == null) {
+                HealthRow(
+                    stringResource(R.string.diagnostics_admission_status),
+                    stringResource(R.string.diagnostics_loading),
+                )
+            } else {
+                HealthRow(
+                    stringResource(R.string.diagnostics_admission_active),
+                    stringResource(
+                        R.string.diagnostics_admission_count,
+                        snapshot.activeGlobal,
+                        snapshot.limits.globalMaxActive,
+                    ),
+                )
+                HealthRow(
+                    stringResource(R.string.diagnostics_admission_burst),
+                    stringResource(
+                        R.string.diagnostics_admission_count,
+                        snapshot.globalBurstCount,
+                        snapshot.limits.globalBurstLimit,
+                    ),
+                )
+                snapshot.activeByProfile.toSortedMap().forEach { (profileId, active) ->
+                    HealthRow(
+                        stringResource(R.string.diagnostics_admission_profile_active, profileId),
+                        active.toString(),
+                    )
+                }
+                val circuits = snapshot.circuits.entries
+                    .filter { (_, state) -> state.openUntilMs > now || state.strikeCount > 0 || state.lastReason != null }
+                    .sortedWith(
+                        compareBy<Map.Entry<Long?, ExecutionCircuitState>> { it.key != null }
+                            .thenBy { it.key ?: Long.MIN_VALUE },
+                    )
+                Text(
+                    stringResource(R.string.diagnostics_admission_circuits),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (circuits.isEmpty()) {
+                    Text(
+                        stringResource(R.string.diagnostics_admission_no_circuits),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    circuits.forEach { entry ->
+                        AdmissionCircuitRow(entry.key, entry.value, now)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdmissionCircuitRow(profileId: Long?, state: ExecutionCircuitState, now: Long) {
+    val remainingMs = (state.openUntilMs - now).coerceAtLeast(0L)
+    val label = profileId?.let { stringResource(R.string.diagnostics_admission_profile, it) }
+        ?: stringResource(R.string.diagnostics_admission_global)
+    val status = if (remainingMs > 0L) {
+        stringResource(
+            R.string.diagnostics_admission_open,
+            (remainingMs / 1_000L).coerceAtLeast(1L),
+            state.strikeCount,
+        )
+    } else {
+        stringResource(R.string.diagnostics_admission_closed, state.strikeCount)
+    }
+    HealthRow(label, status)
+    state.lastReason?.takeIf(String::isNotBlank)?.let { reason ->
+        Text(
+            stringResource(R.string.diagnostics_admission_trip_reason, reason),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (remainingMs > 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

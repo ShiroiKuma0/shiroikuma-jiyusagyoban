@@ -1129,8 +1129,8 @@ fun ActiveAutomationUi(
             profile = null,
             tasks = projectTasks,
             onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs ->
-                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs)
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy ->
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy)
                 showCreateProfileDialog = false
             },
         )
@@ -1184,7 +1184,7 @@ fun ActiveAutomationUi(
             profile = profile,
             tasks = tasks,
             onDismiss = { clearProfileDialog() },
-            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs ->
+            onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy ->
                 viewModel.updateProfile(profile.copy(
                         name = name.trim(),
                         enabled = enabled,
@@ -1194,6 +1194,7 @@ fun ActiveAutomationUi(
                         automationMode = automationMode,
                         group = group,
                         priority = priority, gracePeriodSec = gracePeriod, lifetime = lifetime, expiresAtMs = expiresAtMs,
+                        maxActiveExecutions = maxActiveExecutions, burstLimit = burstLimit, overflowPolicy = overflowPolicy,
                         lifetimeConsumed = if (lifetime == profile.lifetime) profile.lifetimeConsumed else false,
                     ))
                 clearProfileDialog()

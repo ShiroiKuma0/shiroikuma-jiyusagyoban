@@ -4,6 +4,8 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 
@@ -185,6 +187,17 @@ object TaskerXmlExporter {
             sb.appendLine("    <mid1>$it</mid1>")
         }
         sb.appendLine("    <nme>${escapeXml(profile.name)}</nme>")
+        if (profile.priority != 0) sb.appendLine("    <priority>${profile.priority}</priority>")
+        if (profile.gracePeriodSec > 0) sb.appendLine("    <gracePeriodSec>${profile.gracePeriodSec}</gracePeriodSec>")
+        if (profile.lifetime != ProfileLifetime.NEVER) {
+            sb.appendLine("    <lifetime>${profile.lifetime.name}</lifetime>")
+            profile.expiresAtMs?.let { sb.appendLine("    <expiresAtMs>$it</expiresAtMs>") }
+        }
+        profile.maxActiveExecutions?.let { sb.appendLine("    <maxActiveExecutions>$it</maxActiveExecutions>") }
+        profile.burstLimit?.let { sb.appendLine("    <burstLimit>$it</burstLimit>") }
+        if (profile.overflowPolicy != ProfileOverflowPolicy.LOG) {
+            sb.appendLine("    <overflowPolicy>${profile.overflowPolicy.name}</overflowPolicy>")
+        }
 
         if (profile.contextExpression != null) {
             warnings += "Profile '${profile.name}' uses nested context grouping; Tasker XML cannot represent the grouping, so only leaf contexts were exported."

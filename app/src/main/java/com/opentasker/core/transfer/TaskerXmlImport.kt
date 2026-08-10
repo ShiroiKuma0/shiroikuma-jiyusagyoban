@@ -4,8 +4,10 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileConcurrencyPolicy
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
@@ -142,6 +144,28 @@ object TaskerXmlImporter {
 
             val rawLifetime = element.childText("lifetime").uppercase(Locale.US)
             val importedExpiry = element.childText("expiresAtMs", "expiresAt").toLongOrNull()?.takeIf { it > 0L }
+            val rawMaxActive = element.childText("maxActiveExecutions", "maxActive")
+            val importedMaxActive = rawMaxActive.toIntOrNull()?.takeIf {
+                it in ProfileConcurrencyPolicy.MIN_MAX_ACTIVE..ProfileConcurrencyPolicy.MAX_MAX_ACTIVE
+            }
+            if (rawMaxActive.isNotBlank() && importedMaxActive == null) {
+                lossyWarnings += "Profile '$name' had an invalid active execution limit; it was reset to inherit the engine default."
+            }
+            val rawBurstLimit = element.childText("burstLimit", "profileBurstLimit")
+            val importedBurstLimit = rawBurstLimit.toIntOrNull()?.takeIf {
+                it in ProfileConcurrencyPolicy.MIN_BURST_LIMIT..ProfileConcurrencyPolicy.MAX_BURST_LIMIT
+            }
+            if (rawBurstLimit.isNotBlank() && importedBurstLimit == null) {
+                lossyWarnings += "Profile '$name' had an invalid burst limit; it was reset to inherit the engine default."
+            }
+            val rawOverflowPolicy = element.childText("overflowPolicy").uppercase(Locale.US)
+            val importedOverflowPolicy = runCatching { ProfileOverflowPolicy.valueOf(rawOverflowPolicy) }
+                .getOrElse {
+                    if (rawOverflowPolicy.isNotBlank()) {
+                        lossyWarnings += "Profile '$name' had an unknown overflow policy '$rawOverflowPolicy'; it was reset to log rejections."
+                    }
+                    ProfileOverflowPolicy.LOG
+                }
             val importedLifetime = when (rawLifetime) {
                 ProfileLifetime.ONCE.name -> ProfileLifetime.ONCE
                 ProfileLifetime.UNTIL_DATE.name -> if (importedExpiry != null) {
@@ -168,6 +192,9 @@ object TaskerXmlImporter {
                     gracePeriodSec = element.childText("gracePeriodSec", "grace").toIntOrNull() ?: 0,
                     lifetime = importedLifetime,
                     expiresAtMs = importedExpiry,
+                    maxActiveExecutions = importedMaxActive,
+                    burstLimit = importedBurstLimit,
+                    overflowPolicy = importedOverflowPolicy,
                 ),
             )
         }
@@ -561,6 +588,17 @@ object TaskerXmlImporter {
         "name",
         "off",
         "pri",
+        "priority",
+        "gracePeriodSec",
+        "grace",
+        "lifetime",
+        "expiresAtMs",
+        "expiresAt",
+        "maxActiveExecutions",
+        "maxActive",
+        "burstLimit",
+        "profileBurstLimit",
+        "overflowPolicy",
     )
 
     const val TASKER_UNSUPPORTED_ACTION_ID = "tasker.unsupported"

@@ -62,4 +62,46 @@ class EditorValidationTest {
             ),
         )
     }
+
+    @Test
+    fun profileEditorSaveRequiresBoundedConcurrencyOverridesWhenEntered() {
+        assertFalse(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                maxActiveExecutions = "9",
+                parsedMaxActiveExecutions = 9,
+            ),
+        )
+        assertFalse(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                burstLimit = "33",
+                parsedBurstLimit = 33,
+            ),
+        )
+        assertTrue(
+            profileEditorCanSave(
+                "Work",
+                1,
+                true,
+                true,
+                "",
+                null,
+                maxActiveExecutions = "",
+                parsedMaxActiveExecutions = null,
+                burstLimit = "",
+                parsedBurstLimit = null,
+            ),
+        )
+    }
 }

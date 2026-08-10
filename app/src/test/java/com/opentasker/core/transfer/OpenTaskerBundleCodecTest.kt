@@ -9,6 +9,7 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
@@ -354,6 +355,9 @@ class OpenTaskerBundleCodecTest {
             lifetime = ProfileLifetime.UNTIL_DATE,
             expiresAtMs = 1_800_000_000_000L,
             lifetimeConsumed = true,
+            maxActiveExecutions = 4,
+            burstLimit = 16,
+            overflowPolicy = ProfileOverflowPolicy.SILENT,
         )
         val bundle = OpenTaskerBundleCodec.build(
             appVersion = "0.2.82",
@@ -367,6 +371,9 @@ class OpenTaskerBundleCodecTest {
         assertEquals(profile.gracePeriodSec, exportedProfile.gracePeriodSec)
         assertEquals(profile.lifetime, exportedProfile.lifetime)
         assertEquals(profile.expiresAtMs, exportedProfile.expiresAtMs)
+        assertEquals(profile.maxActiveExecutions, exportedProfile.maxActiveExecutions)
+        assertEquals(profile.burstLimit, exportedProfile.burstLimit)
+        assertEquals(profile.overflowPolicy, exportedProfile.overflowPolicy)
         assertFalse(exportedProfile.lifetimeConsumed)
         assertEquals(bundle, OpenTaskerBundleCodec.decode(OpenTaskerBundleCodec.encode(bundle)))
     }

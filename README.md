@@ -25,6 +25,7 @@
 - **Trigger simulation** — from a profile editor or Context Inspector, pin family-specific synthetic events and see each predicate, context expression, cooldown, and admission result without writing a production run-log row or running the task
 - **Automation lint** — profile saves, imports, the flow graph, and Context Inspector surface missing reversals, repeated state triggers, conflicting writers, and inter-profile loops with concrete fixes
 - **Profile lifecycle policy** — assign deterministic priority, symmetric activation grace, and never/date/once lifetimes; the Inspector explains expiry and priority suppression, while bundles and Tasker mappings preserve safe defaults
+- **Profile execution admission** — optionally bound active and burst starts per profile, choose replayable logged holds or silent skips on overflow, and inspect rejection counts and circuit-breaker state in Diagnostics
 - **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
 - **One redaction boundary for stored arguments** — credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
 - **Coherent execution controls** — per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
@@ -105,7 +106,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
   Loading/Ready/Stale/Error observation status with age-aware reporting
 - Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, reviewed retention reductions, held admission rows with safe manual replay, and user-pinned history
 - Live view of in-flight automations — task, origin, current step, and elapsed time — with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
-- In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
+- In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, execution admission limits and circuit trips, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
 - Crash log capture and local diagnostic export
 
 ### Interoperability

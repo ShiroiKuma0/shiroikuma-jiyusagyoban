@@ -50,6 +50,9 @@ class TaskerXmlImporterTest {
                         <gracePeriodSec>20</gracePeriodSec>
                         <lifetime>UNTIL_DATE</lifetime>
                         <expiresAtMs>1800000000000</expiresAtMs>
+                        <maxActiveExecutions>3</maxActiveExecutions>
+                        <burstLimit>12</burstLimit>
+                        <overflowPolicy>SILENT</overflowPolicy>
                         <Time>
                             <from>09:00</from>
                             <to>17:00</to>
@@ -91,6 +94,9 @@ class TaskerXmlImporterTest {
         assertEquals(20, profile.gracePeriodSec)
         assertEquals(com.opentasker.core.model.ProfileLifetime.UNTIL_DATE, profile.lifetime)
         assertEquals(1_800_000_000_000L, profile.expiresAtMs)
+        assertEquals(3, profile.maxActiveExecutions)
+        assertEquals(12, profile.burstLimit)
+        assertEquals(com.opentasker.core.model.ProfileOverflowPolicy.SILENT, profile.overflowPolicy)
 
         val variable = report.bundle.variables.single()
         assertEquals("%FOO", variable.name)

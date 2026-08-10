@@ -58,6 +58,22 @@ class InputValidationTest {
     }
 
     @Test
+    fun validateProfileRejectsUnboundedConcurrencyOverrides() {
+        val errors = InputValidation.validateProfile(
+            Profile(
+                name = "Limited",
+                enterTaskId = 1,
+                contexts = listOf(ContextSpec(ContextType.STATE)),
+                maxActiveExecutions = InputValidation.MAX_PROFILE_MAX_ACTIVE + 1,
+                burstLimit = InputValidation.MAX_PROFILE_BURST_LIMIT + 1,
+            ),
+        )
+
+        assertTrue(errors.any { it.field == "maxActiveExecutions" })
+        assertTrue(errors.any { it.field == "burstLimit" })
+    }
+
+    @Test
     fun validateTaskRejectsInvalidPriorityAndEmptyActions() {
         val errors = InputValidation.validateTask(
             Task(

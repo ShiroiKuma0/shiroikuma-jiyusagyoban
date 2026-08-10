@@ -144,4 +144,58 @@ class ExecutionAdmissionControllerTest {
         assertTrue(preview.reason.orEmpty().contains("Profile execution limit"))
         lease?.release()
     }
+
+    @Test
+    fun profileOverridesApplyToActiveAndBurstBudgetsAndExposeCounts() {
+        val clock = Clock()
+        val controller = ExecutionAdmissionController(
+            limits(perProfileMaxActive = 2, perProfileBurstLimit = 6, circuitTripCount = 10),
+            clock::now,
+            InMemoryExecutionCircuitStore(),
+        )
+        val override = ExecutionAdmissionProfileLimits(maxActive = 1, burstLimit = 2)
+        val first = controller.tryAcquire(profileId = 7L, profileLimits = override)
+        assertTrue(first.accepted)
+
+        val activeRejected = controller.tryAcquire(profileId = 7L, profileLimits = override)
+        assertFalse(activeRejected.accepted)
+        assertEquals(ExecutionAdmissionRejectionKind.PROFILE_ACTIVE, activeRejected.rejection?.kind)
+        assertEquals(1, activeRejected.rejection?.counts?.activeProfile)
+        assertTrue(activeRejected.reason.orEmpty().contains("active global=1/2"))
+        first.lease?.release()
+
+        repeat(1) {
+            val admitted = controller.tryAcquire(profileId = 7L, profileLimits = override)
+            assertTrue(admitted.accepted)
+            admitted.lease?.release()
+        }
+        val burstRejected = controller.tryAcquire(profileId = 7L, profileLimits = override)
+        assertFalse(burstRejected.accepted)
+        assertEquals(ExecutionAdmissionRejectionKind.PROFILE_BURST, burstRejected.rejection?.kind)
+        assertEquals(2, burstRejected.rejection?.counts?.profileBurst)
+        assertTrue(burstRejected.reason.orEmpty().contains("profile=2/2"))
+    }
+
+    @Test
+    fun circuitSnapshotIncludesTripReasonAndRemainingState() {
+        val clock = Clock()
+        val controller = ExecutionAdmissionController(
+            limits(perProfileBurstLimit = 1, circuitTripCount = 2),
+            clock::now,
+            InMemoryExecutionCircuitStore(),
+        )
+        val first = controller.tryAcquire(profileId = 7L)
+        assertTrue(first.accepted)
+        first.lease?.release()
+        controller.tryAcquire(profileId = 7L)
+        val opened = controller.tryAcquire(profileId = 7L)
+
+        assertTrue(opened.circuitOpened)
+        assertEquals(ExecutionAdmissionRejectionKind.PROFILE_BURST, opened.rejection?.kind)
+        val state = controller.snapshot().circuits[7L]
+        assertNotNull(state)
+        assertTrue(state!!.openUntilMs > clock.now())
+        assertTrue(state.lastReason.orEmpty().contains("per-profile"))
+        assertEquals(2, state.strikeCount)
+    }
 }
