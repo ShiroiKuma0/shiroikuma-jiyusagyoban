@@ -30,7 +30,7 @@ function Match-Value([string]$Text, [string]$Pattern, [string]$Name) {
 if ([string]::IsNullOrWhiteSpace($RequiredArtifactCommit)) {
     $RequiredArtifactCommit = (& git -C $Root rev-parse HEAD).Trim()
 }
-if ($RequiredArtifactCommit -notmatch "^[0-9a-f]{40}$") {
+if ($RequiredArtifactCommit -cnotmatch "^[0-9a-f]{40}$") {
     throw "Required artifact commit must be a full lowercase Git SHA-1."
 }
 

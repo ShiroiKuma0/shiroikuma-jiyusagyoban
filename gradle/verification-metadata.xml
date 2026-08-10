@@ -7,6 +7,8 @@
          <ignored-key id="E2F38302C8075E3D" reason="Key couldn't be downloaded from any key server" />
       </ignored-keys>
       <trusted-keys>
+         <trusted-key id="0D35D3F60078655126908E8AF3D1600878E85A3D" group="io.netty" />
+         <trusted-key id="7E22D50A7EBD9D2CD269B2D4056ACA74D46000BF" group="io.netty" />
          <trusted-key id="04543577D6A9CC626239C50C7ECBD740FF06AEB5">
             <trusting group="org.glassfish.jaxb" />
             <trusting group="org.jvnet.staxex" />
@@ -14,7 +16,6 @@
          </trusted-key>
          <trusted-key id="0785B3EFF60B1B1BEA94E0BB7C25280EAE63EBE5" group="org.apache.httpcomponents" />
          <trusted-key id="0CC641C3A62453AB390066C4A41F13C999945293" group="commons-logging" name="commons-logging" version="1.2" />
-         <trusted-key id="0D35D3F60078655126908E8AF3D1600878E85A3D" group="io.netty" />
          <trusted-key id="0E225917414670F4442C250DFD533C07C264648F">
             <trusting group="androidx.activity" />
             <trusting group="androidx.benchmark" />
@@ -84,7 +85,6 @@
          <trusted-key id="7440F1F7D27BAC115F953D55EB095DA7D2F6AC0E" group="org.tensorflow" name="tensorflow-lite-metadata" version="0.2.0" />
          <trusted-key id="7616EB882DAF57A11477AAF559A252FB1199D873" group="com.google.code.findbugs" name="jsr305" version="3.0.2" />
          <trusted-key id="7B121B76A7ED6CE6E60AD51784E913A8E3A748C0" group="org.bouncycastle" />
-         <trusted-key id="7E22D50A7EBD9D2CD269B2D4056ACA74D46000BF" group="io.netty" />
          <trusted-key id="7F36E793AE3252E5D9E9B98FEE9E7DC9D92FC896" group="com.google.errorprone" />
          <trusted-key id="8461EFA0E74ABAE010DE66994EB27DB2A3B88B8B">
             <trusting group="androidx.emoji2" />
@@ -129,7 +129,6 @@
          <trusted-key id="EB1B3DE71713C9EC2E87CC26EE92349AD86DE446" group="com.google.j2objc" name="j2objc-annotations" version="2.8" />
          <trusted-key id="EE0CA873074092F806F59B65D364ABAA39A47320" group="com.google.errorprone" />
          <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9">
-            <trusting group="org.jsoup" name="jsoup" version="1.22.2" />
             <trusting group="org.jsoup" name="jsoup" version="1.23.1" />
          </trusted-key>
          <trusted-key id="FA77DCFEF2EE6EB2DEBEDD2C012579464D01C06A" group="org.apache" name="apache" />

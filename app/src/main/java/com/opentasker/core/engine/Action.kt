@@ -85,14 +85,10 @@ object ActionRegistry {
                 "Action ${action.id} does not use its canonical ActionCatalog declaration"
             }
         }
-        if (declaration != null) {
-            require(declaration.category == action.category) {
-                "Action ${action.id} category drift: ${action.category} != ${declaration.category}"
-            }
-            require(declaration.retrySafety == action.retrySafety) {
-                "Action ${action.id} retry-safety drift: ${action.retrySafety} != ${declaration.retrySafety}"
-            }
-        }
+        // No category/retry-safety comparison here: since every built-in extends DeclaredAction,
+        // both sides of such a check read from the same ActionDefinition, so it could only ever
+        // compare the declaration to itself. The invariant that matters is enforced where the two
+        // are declared independently - ActionCatalog against the editor metadata registry.
         byId[declaration?.id ?: action.id] = action
     }
 
