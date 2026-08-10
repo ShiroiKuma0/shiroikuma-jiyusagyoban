@@ -196,13 +196,15 @@ Play manifest policy check:
 ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
-Full local release gate (pinned Gradle bootstrap verification, blocking lint, JVM tests, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
+Full local release gate (pinned Gradle bootstrap verification, blocking lint, the 1,020-test JVM floor, JaCoCo coverage floors for scheduling/resilience/receivers/UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
 
 Release-facing version, SDK, capability-count, schema, and required artifact-commit claims are generated and checked from [`tools/release-truth.json`](tools/release-truth.json) by the same gate.
 
 Performance evidence is local and explicit. The quality gate validates the committed baseline-profile artifact and compiles the API 35+ Macrobenchmark harness; collect device evidence with `./gradlew :app:generateBaselineProfile` and run the release-like benchmark APK with `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest`. The harness records cold-start (`StartupTimingMetric`) and first-navigation (`FrameTimingMetric`) results. Review repeated clean runs before changing a regression budget; hosted CI is intentionally not required.
 
 Current release claims come from `tools/release-truth.json` and the versioned README/CHANGELOG. The local quality gate reports stale version, schema, and capability claims found in ignored historical research files as warnings; labeled historical snapshots remain non-blocking.
+
+The gate writes the debug JaCoCo XML report to `app/build/reports/jacoco/debugCoverage/debugCoverage.xml` and an HTML drill-down beside it. The test-count floor is ratcheted to the current passing count; the four area floors are explicit in `app/build.gradle.kts` and fail the gate on regression.
 
 ```powershell
 .\tools\verify-local-release.ps1
