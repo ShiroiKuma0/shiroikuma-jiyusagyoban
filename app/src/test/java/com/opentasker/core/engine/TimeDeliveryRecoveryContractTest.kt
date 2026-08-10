@@ -40,7 +40,7 @@ class TimeDeliveryRecoveryContractTest {
         assertTrue(worker.contains("PeriodicWorkRequestBuilder<EngineWatchdogWorker>"))
         assertTrue(worker.contains("ExistingPeriodicWorkPolicy.UPDATE"))
         assertTrue(worker.contains("consumeMissed"))
-        assertTrue(worker.contains("Standby bucket:"))
+        assertTrue(worker.contains("Standby consequence:"))
         assertTrue(worker.contains("Remediation:"))
     }
 

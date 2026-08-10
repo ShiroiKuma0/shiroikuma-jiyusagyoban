@@ -2,10 +2,13 @@ package com.opentasker.core.diagnostics
 
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
+import android.app.job.JobScheduler
+import android.app.job.PendingJobReasonsInfo
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.opentasker.core.engine.EngineHeartbeatStore
@@ -19,13 +22,36 @@ import com.opentasker.core.engine.needsRecovery
 import com.opentasker.core.external.ExternalExecutions
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.scheduling.ExactAlarmSupport
+import java.time.Duration
 import kotlinx.coroutines.flow.first
+
+data class ScheduledJobDiagnostics(
+    val currentAvailable: Boolean,
+    val currentReasons: String? = null,
+    val historyAvailable: Boolean,
+    val history: String? = null,
+    val aggregateStatsAvailable: Boolean,
+    val aggregateStats: String? = null,
+) {
+    companion object {
+        fun unavailable(): ScheduledJobDiagnostics = ScheduledJobDiagnostics(
+            currentAvailable = false,
+            historyAvailable = false,
+            aggregateStatsAvailable = false,
+        )
+    }
+}
+
+fun interface ScheduledJobDiagnosticsSource {
+    fun read(context: Context, nowMillis: Long): ScheduledJobDiagnostics
+}
 
 data class EngineHealthStatus(
     val serviceRunning: Boolean,
     val lastHeartbeatAtMillis: Long,
     val activeForegroundServiceTypes: String,
     val standbyBucket: String,
+    val standbyConsequence: String = "Standby bucket consequence unavailable.",
     /** True when the app-standby bucket (RARE/RESTRICTED) throttles the per-minute alarm/workers. */
     val standbyThrottled: Boolean,
     /** True when Android 16 Advanced Protection Mode is active and may degrade automation features. */
@@ -35,12 +61,7 @@ data class EngineHealthStatus(
     val lastMatcherErrorAtMillis: Long,
     val lastWorkerStopReason: String?,
     val processExitCorrelation: EngineExitCorrelation = EngineExitCorrelation(EngineExitCorrelationState.UNAVAILABLE),
-    /**
-     * Plain-language reasons this app's scheduled jobs (WorkManager watchdog/prune) are still
-     * pending — e.g. "App standby, Connectivity". Null when nothing is blocked or the signal is
-     * unavailable (below Android 14). Answers the "why hasn't my scheduled automation fired" case.
-     */
-    val pendingScheduledJobReasons: String? = null,
+    val pendingScheduledJobs: ScheduledJobDiagnostics = ScheduledJobDiagnostics.unavailable(),
     val activeExecutionCount: Int = 0,
     val pendingExecutionCount: Int = 0,
     val signals: List<HealthSignal> = emptyList(),
@@ -86,6 +107,11 @@ private object AndroidHistoricalProcessExitSource : HistoricalProcessExitSource 
     }
 }
 
+private object AndroidScheduledJobDiagnosticsSource : ScheduledJobDiagnosticsSource {
+    override fun read(context: Context, nowMillis: Long): ScheduledJobDiagnostics =
+        EngineHealthReader.readScheduledJobDiagnostics(context, nowMillis)
+}
+
 val EngineHealthStatus.assessment: HealthAssessment
     get() = assessHealth(signals)
 
@@ -97,6 +123,7 @@ object EngineHealthReader {
         context: Context,
         nowMillis: Long = System.currentTimeMillis(),
         processExitSource: HistoricalProcessExitSource = AndroidHistoricalProcessExitSource,
+        scheduledJobSource: ScheduledJobDiagnosticsSource = AndroidScheduledJobDiagnosticsSource,
     ): EngineHealthStatus {
         val heartbeatStore = EngineHeartbeatStore(context)
         val persisted = heartbeatStore.readPersistedHealth()
@@ -112,7 +139,7 @@ object EngineHealthReader {
                 .firstOrNull()
                 ?.stopReason
         }.getOrNull()
-        val pendingReasons = readPendingScheduledJobReasons(context)
+        val pendingJobs = scheduledJobSource.read(context, nowMillis)
         val activeExecutionCount = ActiveExecutionRegistry.active.value.size
         val pendingExecutionCount = ExternalExecutions.snapshot(context)
             .count { !it.state.isTerminal }
@@ -129,7 +156,10 @@ object EngineHealthReader {
         val matcherState = if (persisted.lastMatcherError != null) HealthSignalState.Error else serviceState
         val matcherReason = persisted.lastMatcherError?.let(DiagnosticExport::redactSensitive)
             ?: if (matcherState == HealthSignalState.Ready) "Profile matchers are reporting normally." else serviceReason
-        val standbyState = if (standbyBucketThrottled(context)) HealthSignalState.Stale else HealthSignalState.Ready
+        val standbyBucket = standbyBucketLabel(context)
+        val standbyConsequence = standbyConsequence(context)
+        val standbyThrottled = standbyBucketThrottled(context)
+        val standbyState = if (standbyThrottled) HealthSignalState.Stale else HealthSignalState.Ready
         val exactAlarm = ExactAlarmSupport.schedulePrecision(context)
         val exactAlarmState = if (exactAlarm == AlarmSchedulePrecision.Exact) {
             HealthSignalState.Ready
@@ -140,7 +170,11 @@ object EngineHealthReader {
             workerStopReason == null || workerStopReason == WorkInfo.STOP_REASON_NOT_STOPPED -> HealthSignalState.Ready
             else -> HealthSignalState.Error
         }
-        val scheduledState = if (pendingReasons == null) HealthSignalState.Ready else HealthSignalState.Stale
+        val scheduledState = when {
+            !pendingJobs.currentAvailable -> HealthSignalState.Loading
+            pendingJobs.currentReasons != null -> HealthSignalState.Stale
+            else -> HealthSignalState.Ready
+        }
         val processExitState = when (processExitCorrelation.state) {
             EngineExitCorrelationState.MATCHED,
             EngineExitCorrelationState.NO_MATCH,
@@ -156,7 +190,7 @@ object EngineHealthReader {
                 "App standby",
                 standbyState,
                 nowMillis,
-                if (standbyState == HealthSignalState.Ready) "${standbyBucketLabel(context)} does not currently throttle delivery." else "${standbyBucketLabel(context)} may delay alarms and workers.",
+                standbyConsequence,
             ),
             HealthSignal(
                 "exact-alarm",
@@ -177,7 +211,8 @@ object EngineHealthReader {
                 "Scheduled jobs",
                 scheduledState,
                 nowMillis,
-                pendingReasons?.let { "Blocked by $it." } ?: "No pending scheduler constraints are reported.",
+                scheduledJobSignalReason(pendingJobs),
+                required = false,
             ),
             HealthSignal(
                 "process-exit",
@@ -208,8 +243,9 @@ object EngineHealthReader {
             serviceRunning = serviceState == HealthSignalState.Ready,
             lastHeartbeatAtMillis = persisted.heartbeat.lastAliveAtMillis,
             activeForegroundServiceTypes = foregroundServiceTypeLabel(persisted.heartbeat.foregroundServiceTypes),
-            standbyBucket = standbyBucketLabel(context),
-            standbyThrottled = standbyBucketThrottled(context),
+            standbyBucket = standbyBucket,
+            standbyConsequence = standbyConsequence,
+            standbyThrottled = standbyThrottled,
             advancedProtectionEnabled = AdvancedProtectionReader.isEnabled(context),
             exactAlarmStatus = when (exactAlarm) {
                 AlarmSchedulePrecision.Exact -> "Exact allowed"
@@ -219,7 +255,7 @@ object EngineHealthReader {
             lastMatcherErrorAtMillis = persisted.lastMatcherErrorAtMillis,
             lastWorkerStopReason = workerStopReason?.let(::workerStopReasonLabel),
             processExitCorrelation = processExitCorrelation,
-            pendingScheduledJobReasons = pendingReasons,
+            pendingScheduledJobs = pendingJobs,
             activeExecutionCount = activeExecutionCount,
             pendingExecutionCount = pendingExecutionCount,
             signals = signals,
@@ -296,27 +332,138 @@ object EngineHealthReader {
         else -> "${ageMillis / 60_000L}m"
     }
 
-    /**
-     * Reads why this app's currently-scheduled JobScheduler jobs (WorkManager runs its deferrable
-     * workers through JobScheduler) are still pending. Returns a comma-separated set of plain-language
-     * causes, or null when nothing meaningful is blocked or the API is unavailable. Android 14 (API
-     * 34) added `getPendingJobReason`; the whole read is wrapped so it fails closed on any device
-     * that reports differently rather than crashing the diagnostics screen.
-     */
-    private fun readPendingScheduledJobReasons(context: Context): String? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return null
-        return runCatching {
-            val scheduler = context.getSystemService(android.app.job.JobScheduler::class.java)
-                ?: return null
-            scheduler.allPendingJobs
-                .map { scheduler.getPendingJobReason(it.id) }
-                .filter(::isReportablePendingJobReason)
-                .map(::pendingJobReasonLabel)
-                .distinct()
-                .sorted()
-                .takeIf { it.isNotEmpty() }
-                ?.joinToString()
-        }.getOrNull()
+    internal fun readScheduledJobDiagnostics(context: Context, nowMillis: Long): ScheduledJobDiagnostics {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return ScheduledJobDiagnostics.unavailable()
+        }
+        val scheduler = context.getSystemService(JobScheduler::class.java)
+            ?: return ScheduledJobDiagnostics.unavailable()
+        val jobs = runCatching { scheduler.allPendingJobs }.getOrElse {
+            return ScheduledJobDiagnostics.unavailable()
+        }
+        val current = readCurrentPendingJobReasons(scheduler, jobs)
+        val history = if (Build.VERSION.SDK_INT >= 36) {
+            readPendingJobHistory(scheduler, jobs, nowMillis)
+        } else {
+            PlatformScheduledJobSignal(available = false, value = null)
+        }
+        val aggregateStats = if (Build.VERSION.SDK_INT >= 37) {
+            readPendingJobAggregateStats(scheduler, jobs)
+        } else {
+            PlatformScheduledJobSignal(available = false, value = null)
+        }
+        return ScheduledJobDiagnostics(
+            currentAvailable = current.available,
+            currentReasons = current.value,
+            historyAvailable = history.available,
+            history = history.value,
+            aggregateStatsAvailable = aggregateStats.available,
+            aggregateStats = aggregateStats.value,
+        )
+    }
+
+    private data class PlatformScheduledJobSignal(
+        val available: Boolean,
+        val value: String?,
+    )
+
+    @RequiresApi(34)
+    private fun readCurrentPendingJobReasons(
+        scheduler: JobScheduler,
+        jobs: List<android.app.job.JobInfo>,
+    ): PlatformScheduledJobSignal {
+        var successfulReads = 0
+        val reasons = jobs.flatMap { job ->
+            runCatching {
+                val pendingReasons = if (Build.VERSION.SDK_INT >= 36) {
+                    readPendingJobReasonsApi36(scheduler, job.id)
+                } else {
+                    listOf(readPendingJobReasonApi34(scheduler, job.id))
+                }
+                successfulReads += 1
+                pendingReasons
+                    .filter(::isReportablePendingJobReason)
+                    .map { reason -> "job ${job.id}: ${pendingJobReasonLabel(reason)}" }
+            }.getOrElse { emptyList() }
+        }.distinct().sorted().take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        return PlatformScheduledJobSignal(
+            available = jobs.isEmpty() || successfulReads > 0,
+            value = reasons.takeIf { it.isNotEmpty() }?.joinToString("; "),
+        )
+    }
+
+    @RequiresApi(34)
+    private fun readPendingJobReasonApi34(scheduler: JobScheduler, jobId: Int): Int =
+        scheduler.getPendingJobReason(jobId)
+
+    @RequiresApi(36)
+    private fun readPendingJobReasonsApi36(scheduler: JobScheduler, jobId: Int): List<Int> =
+        scheduler.getPendingJobReasons(jobId).toList()
+
+    @RequiresApi(36)
+    private fun readPendingJobHistory(
+        scheduler: JobScheduler,
+        jobs: List<android.app.job.JobInfo>,
+        nowMillis: Long,
+    ): PlatformScheduledJobSignal {
+        if (jobs.isEmpty()) return PlatformScheduledJobSignal(available = true, value = null)
+        var successfulReads = 0
+        val history = jobs.flatMap { job ->
+            runCatching {
+                val snapshots: List<PendingJobReasonsInfo> = scheduler.getPendingJobReasonsHistory(job.id)
+                successfulReads += 1
+                snapshots.flatMap { snapshot ->
+                    val age = ageLabel((nowMillis - snapshot.timestampMillis).coerceAtLeast(0L))
+                    snapshot.getPendingJobReasons()
+                        .filter(::isReportablePendingJobReason)
+                        .map { reason -> "job ${job.id}, $age ago: ${pendingJobReasonLabel(reason)}" }
+                }
+            }.getOrElse { emptyList() }
+        }.distinct().takeLast(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        return PlatformScheduledJobSignal(
+            available = successfulReads > 0,
+            value = history.takeIf { it.isNotEmpty() }?.joinToString("; "),
+        )
+    }
+
+    @RequiresApi(37)
+    private fun readPendingJobAggregateStats(
+        scheduler: JobScheduler,
+        jobs: List<android.app.job.JobInfo>,
+    ): PlatformScheduledJobSignal {
+        if (jobs.isEmpty()) return PlatformScheduledJobSignal(available = true, value = null)
+        var successfulReads = 0
+        val stats = jobs.flatMap { job ->
+            runCatching {
+                val durations = scheduler.getPendingJobReasonStats(job.id)
+                successfulReads += 1
+                durations.entries
+                    .filter { (reason, _) -> isReportablePendingJobReason(reason) }
+                    .sortedByDescending { (_, duration) -> duration.toMillis() }
+                    .map { (reason, duration) ->
+                        "job ${job.id}: ${pendingJobReasonLabel(reason)} for ${durationLabel(duration)}"
+                    }
+            }.getOrElse { emptyList() }
+        }.distinct().take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        return PlatformScheduledJobSignal(
+            available = successfulReads > 0,
+            value = stats.takeIf { it.isNotEmpty() }?.joinToString("; "),
+        )
+    }
+
+    internal fun scheduledJobSignalReason(diagnostics: ScheduledJobDiagnostics): String = when {
+        !diagnostics.currentAvailable ->
+            "Pending-job diagnostics are unavailable on this Android version or could not be read."
+        diagnostics.currentReasons != null -> buildString {
+            append("Blocked by ").append(diagnostics.currentReasons).append('.')
+            if (!diagnostics.historyAvailable) append(" Pending-job history is unavailable.")
+            if (!diagnostics.aggregateStatsAvailable) append(" Aggregate pending time is unavailable.")
+        }
+        else -> buildString {
+            append("No pending scheduler constraints are reported.")
+            if (!diagnostics.historyAvailable) append(" Pending-job history is unavailable.")
+            if (!diagnostics.aggregateStatsAvailable) append(" Aggregate pending time is unavailable.")
+        }
     }
 
     /**
@@ -339,6 +486,7 @@ object EngineHealthReader {
      * without a JobScheduler.
      */
     internal fun pendingJobReasonLabel(reason: Int): String = when (reason) {
+        JobScheduler.PENDING_JOB_REASON_APP -> "App state"
         android.app.job.JobScheduler.PENDING_JOB_REASON_APP_STANDBY -> "App standby bucket"
         android.app.job.JobScheduler.PENDING_JOB_REASON_BACKGROUND_RESTRICTION -> "Background restricted"
         android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_BATTERY_NOT_LOW -> "Battery low"
@@ -346,10 +494,13 @@ object EngineHealthReader {
         android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CONNECTIVITY -> "No connectivity"
         android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CONTENT_TRIGGER -> "Content trigger"
         android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_DEVICE_IDLE -> "Device not idle"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_MINIMUM_LATENCY -> "Minimum delay not elapsed"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_PREFETCH -> "Prefetch window"
         android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_STORAGE_NOT_LOW -> "Storage low"
         android.app.job.JobScheduler.PENDING_JOB_REASON_DEVICE_STATE -> "Device state (thermal/power)"
         android.app.job.JobScheduler.PENDING_JOB_REASON_QUOTA -> "Out of run quota"
         android.app.job.JobScheduler.PENDING_JOB_REASON_USER -> "User restriction"
+        android.app.job.JobScheduler.PENDING_JOB_REASON_CONSTRAINT_DEADLINE -> "Override deadline"
         else -> "Constraint $reason"
     }
 
@@ -364,21 +515,32 @@ object EngineHealthReader {
     internal fun workerStopReasonLabel(reason: Int): String = when (reason) {
         WorkInfo.STOP_REASON_NOT_STOPPED -> "Not stopped"
         WorkInfo.STOP_REASON_CANCELLED_BY_APP -> "Cancelled by app"
+        WorkInfo.STOP_REASON_PREEMPT -> "Preempted by a higher-priority job"
+        WorkInfo.STOP_REASON_TIMEOUT -> "Timed out"
+        STOP_REASON_TIMEOUT_ABANDONED -> "Timed out; job was abandoned after the app did not respond"
+        WorkInfo.STOP_REASON_DEVICE_STATE -> "Device state"
         WorkInfo.STOP_REASON_CONSTRAINT_BATTERY_NOT_LOW -> "Battery constraint"
         WorkInfo.STOP_REASON_CONSTRAINT_CHARGING -> "Charging constraint"
         WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY -> "Connectivity constraint"
         WorkInfo.STOP_REASON_CONSTRAINT_DEVICE_IDLE -> "Device-idle constraint"
         WorkInfo.STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW -> "Storage constraint"
-        WorkInfo.STOP_REASON_DEVICE_STATE -> "Device state"
-        WorkInfo.STOP_REASON_TIMEOUT -> "Timed out"
+        WorkInfo.STOP_REASON_QUOTA -> "Out of run quota"
+        WorkInfo.STOP_REASON_BACKGROUND_RESTRICTION -> "Background restricted"
+        WorkInfo.STOP_REASON_APP_STANDBY -> "App standby bucket"
+        WorkInfo.STOP_REASON_USER -> "Stopped by user"
+        WorkInfo.STOP_REASON_SYSTEM_PROCESSING -> "System processing"
+        WorkInfo.STOP_REASON_ESTIMATED_APP_LAUNCH_TIME_CHANGED -> "Estimated app launch time changed"
+        WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT -> "Foreground-service time limit"
         WorkInfo.STOP_REASON_UNKNOWN -> "Unknown"
         else -> "Reason $reason"
     }
 
     internal fun standbyBucketLabel(context: Context): String {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return "Unavailable before Android 9"
-        val manager = context.getSystemService(UsageStatsManager::class.java) ?: return "Unavailable"
-        return when (manager.appStandbyBucket) {
+        val bucket = standbyBucketValue(context)
+        if (bucket == null) {
+            return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) "Unavailable before Android 9" else "Unavailable"
+        }
+        return when (bucket) {
             UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "Active"
             UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "Working set"
             UsageStatsManager.STANDBY_BUCKET_FREQUENT -> "Frequent"
@@ -389,9 +551,25 @@ object EngineHealthReader {
     }
 
     private fun standbyBucketThrottled(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
-        val manager = context.getSystemService(UsageStatsManager::class.java) ?: return false
-        return isThrottledStandbyBucket(manager.appStandbyBucket)
+        return standbyBucketValue(context)?.let(::isThrottledStandbyBucket) == true
+    }
+
+    internal fun standbyConsequence(context: Context): String =
+        standbyBucketValue(context)?.let(::standbyConsequenceLabel)
+            ?: "Standby bucket consequence is unavailable on this device."
+
+    internal fun standbyConsequenceLabel(bucket: Int): String = when (bucket) {
+        UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "Active — time triggers and workers have minimal restrictions."
+        UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "Working set — normal background delivery is expected."
+        UsageStatsManager.STANDBY_BUCKET_FREQUENT -> "Frequent — delivery may be deferred when the device is idle."
+        UsageStatsManager.STANDBY_BUCKET_RARE -> "Rare — time triggers and workers may be delayed."
+        UsageStatsManager.STANDBY_BUCKET_RESTRICTED -> "Restricted — time triggers and workers may be heavily delayed."
+        else -> "Unknown standby bucket — delivery impact cannot be determined."
+    }
+
+    private fun standbyBucketValue(context: Context): Int? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
+        return context.getSystemService(UsageStatsManager::class.java)?.appStandbyBucket
     }
 
     /**
@@ -403,6 +581,20 @@ object EngineHealthReader {
         bucket == UsageStatsManager.STANDBY_BUCKET_RARE ||
             bucket == UsageStatsManager.STANDBY_BUCKET_RESTRICTED
 
+    internal fun durationLabel(duration: Duration): String = durationLabel(duration.toMillis())
+
+    internal fun durationLabel(durationMillis: Long): String {
+        val seconds = durationMillis.coerceAtLeast(0L) / 1_000L
+        return when {
+            seconds < 1L -> "less than a second"
+            seconds < 60L -> "${seconds}s"
+            seconds < 3_600L -> "${seconds / 60L}m ${seconds % 60L}s"
+            else -> "${seconds / 3_600L}h ${(seconds % 3_600L) / 60L}m"
+        }
+    }
+
     internal const val MAX_HISTORICAL_EXITS = 20
     internal const val MAX_EXIT_DESCRIPTION_CHARS = 512
+    internal const val STOP_REASON_TIMEOUT_ABANDONED = 16
+    private const val MAX_PENDING_DIAGNOSTIC_ENTRIES = 32
 }

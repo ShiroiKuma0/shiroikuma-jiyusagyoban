@@ -919,6 +919,7 @@
     <string name="diagnostics_process_exit_matched">Reason: %1$s; description: %2$s; exited: %3$s; heartbeat gap: %4$s</string>
     <string name="diagnostics_fgs_types">Foreground service types</string>
     <string name="diagnostics_standby_bucket">App standby bucket</string>
+    <string name="diagnostics_standby_consequence">Standby delivery consequence</string>
     <string name="diagnostics_standby_throttled">This bucket throttles the per-minute trigger alarm and background workers, so time and polling triggers may fire late. Add OpenTasker to the battery-optimization exemption list in Setup to keep it responsive.</string>
     <string name="diagnostics_advanced_protection">Advanced Protection</string>
     <string name="diagnostics_advanced_protection_on">On</string>
@@ -929,6 +930,13 @@
     <string name="diagnostics_worker_stop">Watchdog stop reason</string>
     <string name="diagnostics_pending_jobs">Scheduled jobs blocked by</string>
     <string name="diagnostics_pending_jobs_none">Nothing blocking</string>
+    <string name="diagnostics_pending_jobs_unavailable">Unavailable on this Android version or could not be read</string>
+    <string name="diagnostics_pending_job_history">Pending-job reason history</string>
+    <string name="diagnostics_pending_job_history_none">No pending-job history recorded</string>
+    <string name="diagnostics_pending_job_history_unavailable">Unavailable below Android 16 or could not be read</string>
+    <string name="diagnostics_pending_job_stats">Pending time by reason</string>
+    <string name="diagnostics_pending_job_stats_none">No aggregate pending time recorded</string>
+    <string name="diagnostics_pending_job_stats_unavailable">Unavailable below Android 17 or could not be read</string>
     <string name="diagnostics_active_executions">Active executions</string>
     <string name="diagnostics_pending_executions">Pending external executions</string>
     <string name="diagnostics_health_evidence">Health evidence</string>

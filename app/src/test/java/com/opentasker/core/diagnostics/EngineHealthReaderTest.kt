@@ -35,6 +35,11 @@ class EngineHealthReaderTest {
     @Test
     fun workerStopReasonsAreHumanReadable() {
         assertEquals("Timed out", EngineHealthReader.workerStopReasonLabel(WorkInfo.STOP_REASON_TIMEOUT))
+        assertEquals(
+            "Timed out; job was abandoned after the app did not respond",
+            EngineHealthReader.workerStopReasonLabel(EngineHealthReader.STOP_REASON_TIMEOUT_ABANDONED),
+        )
+        assertEquals("App standby bucket", EngineHealthReader.workerStopReasonLabel(WorkInfo.STOP_REASON_APP_STANDBY))
         assertEquals("Reason 9876", EngineHealthReader.workerStopReasonLabel(9876))
     }
 
@@ -52,5 +57,27 @@ class EngineHealthReaderTest {
         assertFalse(EngineHealthReader.isReportablePendingJobReason(JobScheduler.PENDING_JOB_REASON_EXECUTING))
         assertFalse(EngineHealthReader.isReportablePendingJobReason(JobScheduler.PENDING_JOB_REASON_UNDEFINED))
         assertTrue(EngineHealthReader.isReportablePendingJobReason(JobScheduler.PENDING_JOB_REASON_APP_STANDBY))
+    }
+
+    @Test
+    fun standbyBucketsExplainDeliveryConsequences() {
+        assertTrue(EngineHealthReader.standbyConsequenceLabel(UsageStatsManager.STANDBY_BUCKET_RARE).contains("may be delayed"))
+        assertTrue(EngineHealthReader.standbyConsequenceLabel(UsageStatsManager.STANDBY_BUCKET_RESTRICTED).contains("heavily delayed"))
+        assertTrue(EngineHealthReader.standbyConsequenceLabel(UsageStatsManager.STANDBY_BUCKET_ACTIVE).contains("minimal restrictions"))
+    }
+
+    @Test
+    fun pendingTimeDurationsAreReadableAndBounded() {
+        assertEquals("less than a second", EngineHealthReader.durationLabel(0L))
+        assertEquals("1m 5s", EngineHealthReader.durationLabel(65_000L))
+        assertEquals("2h 3m", EngineHealthReader.durationLabel(7_398_000L))
+    }
+
+    @Test
+    fun unavailableScheduledDiagnosticsSayTheyAreUnavailable() {
+        val diagnostics = ScheduledJobDiagnostics.unavailable()
+
+        assertFalse(diagnostics.currentAvailable)
+        assertTrue(EngineHealthReader.scheduledJobSignalReason(diagnostics).contains("unavailable"))
     }
 }
