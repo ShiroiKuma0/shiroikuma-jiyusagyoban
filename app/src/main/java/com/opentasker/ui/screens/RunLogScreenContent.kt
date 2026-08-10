@@ -79,6 +79,7 @@ internal fun RunLogScreenContent(
     retentionPolicy: RunLogRetentionPolicy,
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
     onShareDiagnostic: () -> Unit,
+    onReplayHeld: (RunLogEntry) -> Unit,
     contentPadding: PaddingValues,
 ) {
     var statusFilterOrdinal by rememberSaveable { mutableIntStateOf(0) }
@@ -158,7 +159,7 @@ internal fun RunLogScreenContent(
             }
         }
         items(filteredLogs, key = { it.id }) { entry ->
-            RunLogCard(entry)
+            RunLogCard(entry, onReplayHeld)
         }
     }
 }
@@ -432,7 +433,7 @@ private fun RunLogSummaryCard(logs: List<RunLogEntry>, onShareDiagnostic: () -> 
 }
 
 @Composable
-private fun RunLogCard(entry: RunLogEntry) {
+private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit) {
     val time = remember(entry.timestamp) {
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
     }
@@ -562,6 +563,24 @@ private fun RunLogCard(entry: RunLogEntry) {
                         maxLines = 6,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (entry.held) {
+                    // Held rows keep the trigger data, so this run can still be made to happen. The
+                    // entry is consumed on replay, which is why the button disappears afterwards
+                    // rather than sitting there inviting a second copy of the same work.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            entry.heldPolicy?.let { "Held — refused by $it" } ?: "Held",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { onReplayHeld(entry) }) { Text("Replay") }
+                    }
                 }
             }
         }

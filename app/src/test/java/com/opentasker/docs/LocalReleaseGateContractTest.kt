@@ -31,6 +31,6 @@ class LocalReleaseGateContractTest {
 
     private companion object {
         /** Keep in step with JVM_TEST_FLOOR in app/build.gradle.kts. */
-        const val EXPECTED_JVM_TEST_FLOOR = 1324
+        const val EXPECTED_JVM_TEST_FLOOR = 1332
     }
 }
