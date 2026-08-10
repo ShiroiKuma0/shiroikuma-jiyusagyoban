@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Parcelable
@@ -9,6 +10,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+
+enum class SharePublishResult {
+    ACCEPTED,
+    INVALID_INPUT,
+    URI_NOT_READABLE,
+}
 
 /**
  * Sanitizes Android Sharesheet deliveries before they enter the automation engine.
@@ -38,12 +45,34 @@ object ShareContextEvents {
         emitAll(shareEvents.asSharedFlow())
     }
 
-    /** Parses and publishes a Sharesheet intent without retaining Android framework objects. */
+    /**
+     * Parses and publishes a Sharesheet intent without retaining Android framework objects.
+     * This overload is kept for pure callers that have already handled URI readability.
+     */
     fun publishFromIntent(intent: Intent, nowMs: Long = System.currentTimeMillis()): Boolean {
-        val event = parseIntent(intent, nowMs) ?: return false
+        return publishFromIntentResult(context = null, intent = intent, nowMs = nowMs) == SharePublishResult.ACCEPTED
+    }
+
+    /**
+     * Parses, checks temporary content-URI access, and publishes one Sharesheet delivery.
+     * Readability is checked before the event enters the engine so a missing grant becomes
+     * visible feedback instead of a later opaque task failure.
+     */
+    fun publishFromIntent(context: Context, intent: Intent, nowMs: Long = System.currentTimeMillis()): SharePublishResult =
+        publishFromIntentResult(context, intent, nowMs)
+
+    private fun publishFromIntentResult(
+        context: Context?,
+        intent: Intent,
+        nowMs: Long,
+    ): SharePublishResult {
+        val event = parseIntent(intent, nowMs) ?: return SharePublishResult.INVALID_INPUT
+        if (context != null && event.containsUnreadableContentUri(context)) {
+            return SharePublishResult.URI_NOT_READABLE
+        }
         pendingPulse.set(PendingSharePulse(event, nowMs))
         shareEvents.tryEmit(event)
-        return true
+        return SharePublishResult.ACCEPTED
     }
 
     fun parseIntent(intent: Intent, nowMs: Long = System.currentTimeMillis()): ContextEvent? {
@@ -151,6 +180,20 @@ object ShareContextEvents {
     internal fun resetForTests() {
         pendingPulse.set(null)
     }
+
+    private fun ContextEvent.containsUnreadableContentUri(context: Context): Boolean =
+        containsUnreadableContentUri { rawUri ->
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(rawUri))?.use { true } ?: false
+            }.getOrDefault(false)
+        }
+
+    internal fun ContextEvent.containsUnreadableContentUri(isReadable: (String) -> Boolean): Boolean =
+        metadata["uris"].orEmpty()
+            .lineSequence()
+            .filter(String::isNotBlank)
+            .filter { rawUri -> rawUri.substringBefore(':').equals("content", ignoreCase = true) }
+            .any { rawUri -> !isReadable(rawUri) }
 }
 
 internal data class ShareInput(

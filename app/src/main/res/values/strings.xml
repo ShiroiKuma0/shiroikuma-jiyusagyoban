@@ -457,6 +457,8 @@
     <string name="run_log_search_label">Search task or message</string>
     <string name="run_log_search_hint">permission, WiFi, task name</string>
     <string name="run_log_share_diagnostic">Share diagnostic report</string>
+    <string name="share_uri_unreadable">OpenTasker could not read the shared file. Re-share it with read access.</string>
+    <string name="share_invalid">OpenTasker could not read that share.</string>
     <string name="run_log_more_actions">+%1$d more action(s)</string>
     <string name="run_log_loaded">Loaded</string>
     <string name="run_log_loading">Loading run logs…</string>
