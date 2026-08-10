@@ -79,7 +79,7 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
                 Text(
                     BandText.indexOutOf[lang].format(index.band[lang]),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = LocalChartStyle.current.axisText,
+                    color = sectionNote,
                     modifier = Modifier.padding(bottom = 6.dp),
                 )
         }
@@ -155,7 +155,7 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp) {
             maxLines = 1,
             softWrap = false,
             modifier = Modifier.width(valueWidth),
-            color = if (c.score == null) LocalChartStyle.current.axisText else sectionInk,
+            color = if (c.score == null) sectionNote else sectionInk,
         )
     }
 }

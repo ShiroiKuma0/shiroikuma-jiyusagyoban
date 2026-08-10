@@ -155,8 +155,8 @@ private fun Headline(r: RecoveryResult) {
             r.adverseMarkers.joinToString(if (lang == BandLanguage.EN) ", " else "・") {
                 markerLabel(it)[lang]
             },
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalChartStyle.current.axisText,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+            color = sectionNote,
         )
     }
 }
@@ -173,7 +173,7 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(labelWidth),
-            color = if (m.value == null) style.axisText else MaterialTheme.colorScheme.onSurface,
+            color = if (m.value == null) sectionNote else sectionInk,
         )
         Spacer(Modifier.width(10.dp))
         Text(
@@ -194,8 +194,8 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
                     format(m.marker, m.usualLo, lang, unit = false),
                     format(m.marker, m.usualHi, lang, unit = false),
                 ),
-                style = MaterialTheme.typography.labelSmall,
-                color = style.axisText,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                color = sectionNote,
             )
         }
     }
@@ -347,14 +347,18 @@ private fun LoadRow(load: RecoveryBuild.LoadReading) {
             )
             Spacer(Modifier.width(10.dp))
             load.band?.let {
-                Text(loadBandLabel(it)[lang], style = MaterialTheme.typography.labelSmall, color = style.axisText)
+                Text(
+                    loadBandLabel(it)[lang],
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                    color = sectionNote,
+                )
             }
             Spacer(Modifier.weight(1f))
             load.weekly?.let {
                 Text(
                     BandText.loadWeekly[lang].format(it.roundToInt()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = style.axisText,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                    color = sectionNote,
                 )
             }
         }
@@ -386,8 +390,8 @@ private fun FeltRow(feltToday: Int?, onFelt: (Int) -> Unit) {
         Text(
             feltToday?.let { BandText.recoveryAskDone[lang].format(feltLabel(it)[lang]) }
                 ?: BandText.recoveryAsk[lang],
-            style = MaterialTheme.typography.bodySmall,
-            color = if (feltToday == null) MaterialTheme.colorScheme.onSurface else style.axisText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (feltToday == null) sectionInk else sectionNote,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in RecoveryLogScale) {
@@ -413,15 +417,15 @@ private fun FeltRow(feltToday: Int?, onFelt: (Int) -> Unit) {
                         "$n",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selected) ChartPalette.HEART_RATE else style.axisText,
+                        color = if (selected) sectionInk else sectionNote,
                     )
                 }
             }
             Spacer(Modifier.weight(1f))
             Text(
                 "1 = ${BandText.feltScale1[lang]} · 5 = ${BandText.feltScale5[lang]}",
-                style = MaterialTheme.typography.labelSmall,
-                color = style.axisText,
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                color = sectionNote,
             )
         }
     }

@@ -3,6 +3,21 @@
 Fork-specific changes layered on top of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker).
 This lists what the fork adds; upstream's own history lives in the OpenTasker repository.
 
+## 0.2.82.2026-08-08.gbd01eebb+030 — 2026-08-10
+
+**Two inks, and the split carries meaning.** The secondary text was grey, which read as *disabled*
+rather than as *secondary*, and left headings distinguished from prose by weight alone (白い熊).
+
+So: **yellow is the data** — headings, labels, values, anything the band measured. **Light blue is the
+explanation** — the usual ranges, the provenance, the caveats, the arithmetic behind a number. A
+glance now sorts the screen into what the band said and what we are saying about it, which is the
+distinction this whole window is built around.
+
+Blue against yellow is also the one pair that survives every common colour-vision deficiency, so the
+split stays legible to anyone. And headings keep two further cues besides colour: they are larger and
+bolder, and sub-headings now carry a leading bar — so the hierarchy still reads in greyscale. Colour
+reinforces the structure here; it never carries it alone.
+
 ## 0.2.82.2026-08-08.gbd01eebb+029 — 2026-08-10
 
 **Four reported faults, and a visual pass over the whole 「健康」 page.**

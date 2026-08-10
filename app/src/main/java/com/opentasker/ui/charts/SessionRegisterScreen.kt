@@ -73,7 +73,7 @@ fun SessionRegisterScreen(
                         BandText.registerEmpty[lang],
                         Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = style.axisText,
+                        color = sectionNote,
                     )
                 }
             }
@@ -85,7 +85,7 @@ fun SessionRegisterScreen(
                         Text(
                             BandText.registerLegend[lang],
                             style = MaterialTheme.typography.labelSmall,
-                            color = style.axisText,
+                            color = sectionNote,
                         )
                     }
                 }
@@ -104,7 +104,7 @@ fun SessionRegisterScreen(
                             Text(
                                 BandText.registerContrastNote[lang],
                                 style = MaterialTheme.typography.labelSmall,
-                                color = style.axisText,
+                                color = sectionNote,
                             )
                         }
                     }
@@ -113,7 +113,7 @@ fun SessionRegisterScreen(
                         Text(
                             BandText.registerContrastWaiting[lang].format(SessionRegister.MIN_CONTRAST_NIGHTS),
                             style = MaterialTheme.typography.labelSmall,
-                            color = style.axisText,
+                            color = sectionNote,
                         )
                     }
                 }
@@ -164,7 +164,7 @@ private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
                             Text(
                                 labels.format(Instant.ofEpochMilli(cell.epochDay * 86_400_000L)),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = style.axisText,
+                                color = sectionNote,
                             )
                             // The bar: 4 dp of track always, filled in proportion to the session.
                             Box(
@@ -243,7 +243,7 @@ private fun EntryCard(e: SessionRegister.Entry, zone: ZoneId) {
                     Text(
                         BandText.registerPeak[lang].format(it.roundToInt()),
                         style = MaterialTheme.typography.labelSmall,
-                        color = style.axisText,
+                        color = sectionNote,
                     )
                 }
             }
@@ -252,7 +252,7 @@ private fun EntryCard(e: SessionRegister.Entry, zone: ZoneId) {
                 Text(
                     BandText.registerNoNight[lang],
                     style = MaterialTheme.typography.labelSmall,
-                    color = style.axisText,
+                    color = sectionNote,
                 )
             } else {
                 Text(
@@ -267,7 +267,7 @@ private fun EntryCard(e: SessionRegister.Entry, zone: ZoneId) {
                         night.felt.value?.let { "${BandText.markerFelt[lang]} ${it.roundToInt()}" },
                     ).joinToString("  ·  "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = style.axisText,
+                    color = sectionNote,
                 )
                 Text(
                     when (night.adverseCount) {

@@ -122,7 +122,7 @@ fun MarkSessionScreen(
                         Text(
                             BandText.markSessionHint[lang],
                             style = MaterialTheme.typography.bodySmall,
-                            color = style.axisText,
+                            color = sectionNote,
                         )
                     }
                 }

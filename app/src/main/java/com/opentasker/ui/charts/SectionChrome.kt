@@ -43,9 +43,28 @@ import androidx.compose.ui.unit.sp
  * colour is read from `MaterialTheme` and the metric's own series colour, never hard-coded.
  */
 
-/** Base ink for section prose. Yellow-on-black is 白い熊's palette; it follows the theme. */
+/**
+ * Two inks, and the split between them carries meaning.
+ *
+ * 白い熊 (2026-08-10): the grey was wrong — it read as disabled rather than as secondary, and it left
+ * headings distinguished from prose by weight alone.
+ *
+ * So: **yellow is the data** — headings, labels, values, anything measured. **Light blue is the
+ * explanation** — the usual ranges, the provenance, the caveats, the arithmetic behind a number. Once
+ * that rule holds, a glance sorts the screen into what the band said and what we are saying about it,
+ * which is the distinction this whole window is built around.
+ *
+ * Blue against yellow is also the one pair that survives every common colour-vision deficiency —
+ * it is the axis protanopia and deuteranopia leave alone — so the split is legible to anyone. And
+ * headings keep TWO further cues besides colour: they are larger and bolder, and [SubHeading] carries
+ * a leading bar. Colour is never the only thing doing the work.
+ */
 val sectionInk: Color
     @Composable get() = MaterialTheme.colorScheme.primary
+
+/** The explanation ink: a soft cyan, lighter and less saturated than the heart-rate series blue. */
+val sectionNote: Color
+    @Composable get() = Color(0xFF8FCBE8)
 
 /**
  * A bordered group.
@@ -114,12 +133,24 @@ fun SectionTitle(
 /** A heading inside a section — smaller than [SectionTitle], heavier and warmer than body text. */
 @Composable
 fun SubHeading(text: String, accent: Color = sectionInk) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.sp, letterSpacing = 0.4.sp),
-        fontWeight = FontWeight.Bold,
-        color = accent.copy(alpha = 0.85f),
-    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // A leading bar, so a sub-heading is still a sub-heading in greyscale or to a reader who
+        // cannot separate the two inks. Colour is a reinforcement here, never the only signal.
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(15.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(accent),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall.copy(fontSize = 16.5.sp, letterSpacing = 0.3.sp),
+            fontWeight = FontWeight.Bold,
+            color = accent,
+        )
+    }
 }
 
 /** Section prose. A step up from the old bodySmall, which was hard work on a phone at arm's length. */
@@ -141,7 +172,7 @@ fun NoteText(text: String, modifier: Modifier = Modifier, warn: Boolean = false)
         text,
         modifier = modifier,
         style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.5.sp, lineHeight = 19.sp),
-        color = if (warn) ChartPalette.BAND_WARN else LocalChartStyle.current.axisText,
+        color = if (warn) ChartPalette.BAND_WARN else sectionNote,
     )
 }
 

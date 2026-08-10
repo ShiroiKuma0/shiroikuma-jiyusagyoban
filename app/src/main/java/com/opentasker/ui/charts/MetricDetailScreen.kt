@@ -369,20 +369,20 @@ private fun SleepBreakdown(session: SleepSession) {
             Text(
                 BandText.sleepStageHeader[lang],
                 style = MaterialTheme.typography.labelMedium,
-                color = style.axisText,
+                color = sectionNote,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 BandText.sleepMinutesHeader[lang],
                 style = MaterialTheme.typography.labelMedium,
-                color = style.axisText,
+                color = sectionNote,
                 modifier = Modifier.width(64.dp),
                 textAlign = TextAlign.End,
             )
             Text(
                 BandText.sleepShareHeader[lang],
                 style = MaterialTheme.typography.labelMedium,
-                color = style.axisText,
+                color = sectionNote,
                 modifier = Modifier.width(56.dp),
                 textAlign = TextAlign.End,
             )
@@ -411,7 +411,7 @@ private fun SleepBreakdown(session: SleepSession) {
                 Text(
                     "$pct%",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = style.axisText,
+                    color = sectionNote,
                     modifier = Modifier.width(56.dp),
                     textAlign = TextAlign.End,
                 )
