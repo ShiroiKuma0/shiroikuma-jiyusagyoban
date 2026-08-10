@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pasting something that is not an OpenTasker bundle now explains that in plain language instead of showing the JSON parser's own message and echoing the pasted text back.
+- Out-of-range profile priority and grace period now show an error naming the valid range. Both fields accepted more digits than they allow, so a value like 500 quietly disabled Save with nothing on screen explaining why.
+- An expired profile reports the date it expired rather than a raw millisecond timestamp.
+- A kept run-log entry is labelled "Kept" instead of repeating the "Unkeep" button's own label.
+- Diagnostics shows profile names instead of raw database ids.
 - Dialogs and dropdown menus now use the app's own surfaces in all three themes. The surfaceContainer roles were never defined, so Material's purple-tinted baseline showed through on every editor dialog - lavender against the light theme's cream, and purple-grey against the dark theme's graphite.
 - `flow.try` retries now require every action in the try body to be retry-safe, not just the one that failed. A retry restarts the whole body, so a body such as send-message then fetch-URL re-sent the message on each attempt.
 - `%FLOW_ERROR_CAUGHT` is now `true` inside a `flow.catch` handler; it was always `false` because the catch marker that records it was skipped.

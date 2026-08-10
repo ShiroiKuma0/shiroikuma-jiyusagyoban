@@ -50,6 +50,7 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
+import kotlinx.serialization.SerializationException
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.diff.AutomationSemanticDiff
 import com.opentasker.core.diff.SemanticDiffDocument
@@ -213,6 +214,8 @@ data class DiagnosticsUiState(
     val crashLogs: List<CrashLogRecord> = emptyList(),
     val appLogs: List<AppLogEntry> = emptyList(),
     val loadedAtMillis: Long = 0L,
+    /** Resolves admission rows to profile names; they previously showed raw Room ids. */
+    val profileNames: Map<Long, String> = emptyMap(),
 )
 
 data class RunLogPageUiState(
@@ -488,6 +491,7 @@ class ActiveAutomationViewModel(
                             entry.copy(message = DiagnosticExport.redactSensitive(entry.message))
                         },
                         loadedAtMillis = System.currentTimeMillis(),
+                        profileNames = db.profileDao().getAll().associate { it.id to it.name },
                     )
                 }
             }.onSuccess { state ->
@@ -1043,7 +1047,17 @@ class ActiveAutomationViewModel(
                     _profileShareReview.value = it
                     events.send(message(R.string.ui_message_bundle_ready))
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_preview)) }
+                .onFailure { error ->
+                    // A decode failure means the input is not an OpenTasker bundle. Surfacing the
+                    // serializer's own text put "Unexpected JSON token at offset 0: Expected start
+                    // of the object '{'" in front of the user, along with their raw input.
+                    if (error is SerializationException) {
+                        AppLogger.warn("OpenTasker", "Rejected an OpenTasker bundle that failed to decode", error)
+                        events.send(message(R.string.ui_error_message, appContext.getString(R.string.ui_error_bundle_not_recognized)))
+                    } else {
+                        events.send(errorMessage(error, R.string.ui_error_bundle_preview))
+                    }
+                }
             _openTaskerBundleBusy.value = false
         }
     }

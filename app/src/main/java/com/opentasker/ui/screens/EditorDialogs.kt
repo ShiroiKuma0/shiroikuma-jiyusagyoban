@@ -318,6 +318,13 @@ internal fun ProfileEditorDialog(
     val parsedCooldown = cooldown.toIntOrNull()
     val parsedPriority = priority.toIntOrNull()
     val parsedGracePeriod = gracePeriod.toIntOrNull()
+    // Mirror profileEditorCanSave exactly. These fields accept three and four digits, so a value
+    // like 500 or 5000 parsed cleanly, kept the ordinary helper text, and silently disabled Save
+    // with nothing on screen explaining why.
+    val priorityInvalid = parsedPriority == null ||
+        parsedPriority !in InputValidation.MIN_PROFILE_PRIORITY..InputValidation.MAX_PROFILE_PRIORITY
+    val gracePeriodInvalid = parsedGracePeriod == null ||
+        parsedGracePeriod !in 0..InputValidation.MAX_GRACE_PERIOD_SEC
     val lifetime = profileLifetimeFromName(lifetimeName)
     val parsedExpiryDate = parseProfileExpiryDate(expiryDate)
     val parsedMaxActiveExecutions = maxActiveExecutions.toIntOrNull()
@@ -459,14 +466,14 @@ internal fun ProfileEditorDialog(
                     label = { Text(stringResource(R.string.profile_priority_label)) },
                     supportingText = {
                         Text(
-                            if (priority.isNotBlank() && parsedPriority == null) {
+                            if (priorityInvalid) {
                                 stringResource(R.string.profile_priority_invalid)
                             } else {
                                 stringResource(R.string.profile_priority_helper)
                             },
                         )
                     },
-                    isError = priority.isNotBlank() && parsedPriority == null,
+                    isError = priorityInvalid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -477,14 +484,14 @@ internal fun ProfileEditorDialog(
                     label = { Text(stringResource(R.string.profile_grace_period_label)) },
                     supportingText = {
                         Text(
-                            if (gracePeriod.isNotBlank() && parsedGracePeriod == null) {
+                            if (gracePeriodInvalid) {
                                 stringResource(R.string.profile_grace_period_invalid)
                             } else {
                                 stringResource(R.string.profile_grace_period_helper)
                             },
                         )
                     },
-                    isError = gracePeriod.isNotBlank() && parsedGracePeriod == null,
+                    isError = gracePeriodInvalid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),

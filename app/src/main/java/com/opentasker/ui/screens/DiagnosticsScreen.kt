@@ -81,7 +81,7 @@ fun DiagnosticsScreen(
         }
         item {
             SectionTitle(stringResource(R.string.diagnostics_admission_title))
-            AdmissionHealthCard(state.admission)
+            AdmissionHealthCard(state.admission, state.profileNames)
         }
         item { SectionTitle(stringResource(R.string.diagnostics_crash_logs, state.crashLogs.size)) }
         if (state.crashLogs.isEmpty()) {
@@ -311,7 +311,10 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
 }
 
 @Composable
-private fun AdmissionHealthCard(snapshot: ExecutionAdmissionSnapshot?) {
+private fun AdmissionHealthCard(
+    snapshot: ExecutionAdmissionSnapshot?,
+    profileNames: Map<Long, String> = emptyMap(),
+) {
     val now = System.currentTimeMillis()
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -344,7 +347,10 @@ private fun AdmissionHealthCard(snapshot: ExecutionAdmissionSnapshot?) {
                 )
                 snapshot.activeByProfile.toSortedMap().forEach { (profileId, active) ->
                     HealthRow(
-                        stringResource(R.string.diagnostics_admission_profile_active, profileId),
+                        stringResource(
+                            R.string.diagnostics_admission_profile_active,
+                            profileNames[profileId] ?: profileId.toString(),
+                        ),
                         active.toString(),
                     )
                 }
@@ -367,7 +373,7 @@ private fun AdmissionHealthCard(snapshot: ExecutionAdmissionSnapshot?) {
                     )
                 } else {
                     circuits.forEach { entry ->
-                        AdmissionCircuitRow(entry.key, entry.value, now)
+                        AdmissionCircuitRow(entry.key, entry.value, now, profileNames)
                     }
                 }
             }
@@ -376,9 +382,16 @@ private fun AdmissionHealthCard(snapshot: ExecutionAdmissionSnapshot?) {
 }
 
 @Composable
-private fun AdmissionCircuitRow(profileId: Long?, state: ExecutionCircuitState, now: Long) {
+private fun AdmissionCircuitRow(
+    profileId: Long?,
+    state: ExecutionCircuitState,
+    now: Long,
+    profileNames: Map<Long, String> = emptyMap(),
+) {
     val remainingMs = (state.openUntilMs - now).coerceAtLeast(0L)
-    val label = profileId?.let { stringResource(R.string.diagnostics_admission_profile, it) }
+    val label = profileId?.let {
+        stringResource(R.string.diagnostics_admission_profile, profileNames[it] ?: it.toString())
+    }
         ?: stringResource(R.string.diagnostics_admission_global)
     val status = if (remainingMs > 0L) {
         stringResource(
