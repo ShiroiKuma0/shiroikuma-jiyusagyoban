@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Causal loop protection now ends when the parent execution finishes and no longer treats a profile's own exit task as a loop back into itself, so exit tasks and ordinary re-triggers within 30 seconds are no longer skipped as "Causal profile cycle stopped".
 - The `state.temporary` action now captures the current setting before applying a reversible change; it previously read the target action id out of the target's own arguments and failed every invocation with "current state is unavailable".
 - The local release gate now reports observed JVM tests separately from the configured release floor, and the README uses explicit threshold-versus-observed wording instead of duplicating a suite count.
 - Admitted executions now persist a bounded journal with source/lineage and last known step, reconcile process-death interruptions into one visible Interrupted run-log outcome, and never retry interrupted work automatically.

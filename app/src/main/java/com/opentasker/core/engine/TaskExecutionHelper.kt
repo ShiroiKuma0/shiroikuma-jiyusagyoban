@@ -412,6 +412,9 @@ suspend fun executeAndLogTask(
     TaskExecutionResult(report, inserted, execution = execution, fallback = fallback)
     } finally {
         admissionLease.release()
+        // Finished work cannot have caused a later trigger. Releasing attribution here is what
+        // keeps ordinary re-triggers and exit tasks from being read as causal cycles.
+        ExecutionCausality.forget(execution.executionId)
     }
 }
 

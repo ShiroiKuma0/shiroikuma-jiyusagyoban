@@ -27,10 +27,17 @@ data class CausalLoopDiagnostic(
  * Best-effort causal attribution for profile-triggered executions.
  *
  * Context broadcasts do not carry an execution id, so the engine keeps the most recent admitted
- * profile chain for a short attribution window. The chain is attached to the next profile run,
- * making event-driven A -> B -> A loops visible even when Android delivered each context through
- * a different callback. The fixed depth cap is deliberately lower than any process-wide rate
- * limit: a loop is stopped before it can become an admission storm.
+ * profile chain and attaches it to the next profile run, making event-driven A -> B -> A loops
+ * visible even when Android delivered each context through a different callback. The fixed depth
+ * cap is deliberately lower than any process-wide rate limit: a loop is stopped before it can
+ * become an admission storm.
+ *
+ * Attribution lasts only while the parent execution is still running ([forget] clears it on
+ * completion). A runaway loop re-triggers from a side effect of work that is still in flight, so
+ * that is the only window in which a later run can honestly be called a child. The wall-clock
+ * window is a backstop for executions whose completion is never observed (process death), not the
+ * primary lifetime: attributing every run within a fixed window made ordinary re-triggers and
+ * exit tasks look like cycles.
  */
 class CausalExecutionTracker(
     private val maxDepth: Int = DEFAULT_MAX_DEPTH,
@@ -48,6 +55,7 @@ class CausalExecutionTracker(
     fun nextForProfile(
         profileId: Long? = null,
         profileName: String,
+        isExit: Boolean = false,
         nowMs: Long = clock(),
     ): CausalExecutionDecision {
         val hop = ProfileHop(profileId, normalizeProfileName(profileName))
@@ -60,14 +68,19 @@ class CausalExecutionTracker(
 
         val proposed = current.hops + hop
         val cycleIndex = current.hops.indexOfFirst { it.sameProfileAs(hop) }
+        // A profile's exit task is the counterpart of its own still-running enter task, not a loop
+        // back into it: the context genuinely deactivated. Only the immediately preceding hop is
+        // exempt, so a real A -> B -> A cycle that happens to end on an exit is still stopped.
+        val parentIsOwnEnterTask = isExit && cycleIndex == current.hops.lastIndex
+        val cycleDetected = cycleIndex >= 0 && !parentIsOwnEnterTask
         val depth = current.depth + 1
-        val displayedChain = if (cycleIndex >= 0) {
+        val displayedChain = if (cycleDetected) {
             proposed.drop(cycleIndex)
         } else {
             proposed
         }.map(ProfileHop::name)
         val blockedReason = when {
-            cycleIndex >= 0 -> "Causal profile cycle stopped: ${displayedChain.joinToString(" -> ")}"
+            cycleDetected -> "Causal profile cycle stopped: ${displayedChain.joinToString(" -> ")}"
             depth > maxDepth -> "Causal profile depth limit ($maxDepth) exceeded: ${displayedChain.joinToString(" -> ")}"
             else -> null
         }
@@ -88,10 +101,23 @@ class CausalExecutionTracker(
             latest = CausalSnapshot(
                 executionId = execution.executionId,
                 depth = execution.causalDepth,
-                hops = chain.map { ProfileHop(null, it) },
+                // The chain travels as display names, so only the executing profile's own id is
+                // known here. Carrying it makes self-loop detection exact for the hop that matters
+                // instead of relying on a truncated name match.
+                hops = chain.mapIndexed { index, name ->
+                    ProfileHop(execution.profileId.takeIf { index == chain.lastIndex }, name)
+                },
                 observedAtMs = nowMs,
             )
         }
+    }
+
+    /**
+     * Ends attribution for a finished execution. Work that has already completed cannot be the
+     * cause of a later trigger, so the next profile run starts a fresh chain.
+     */
+    fun forget(executionId: String) = synchronized(lock) {
+        if (latest?.executionId == executionId) latest = null
     }
 
     internal fun reset() = synchronized(lock) { latest = null }
@@ -127,10 +153,12 @@ class CausalExecutionTracker(
 object ExecutionCausality {
     private val tracker = CausalExecutionTracker()
 
-    fun nextForProfile(profileId: Long, profileName: String): CausalExecutionDecision =
-        tracker.nextForProfile(profileId, profileName)
+    fun nextForProfile(profileId: Long, profileName: String, isExit: Boolean = false): CausalExecutionDecision =
+        tracker.nextForProfile(profileId, profileName, isExit)
 
     fun remember(execution: ExecutionEnvelope) = tracker.remember(execution)
+
+    fun forget(executionId: String) = tracker.forget(executionId)
 
     fun recordBlocked(decision: CausalExecutionDecision) {
         val reason = decision.blockedReason ?: return

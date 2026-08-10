@@ -69,6 +69,46 @@ class CausalExecutionTrackerTest {
         assertEquals(listOf("Three"), fresh.profileChain)
     }
 
+    @Test
+    fun completedWorkStopsBeingACausalParent() {
+        var nowMs = 1_000L
+        val tracker = CausalExecutionTracker(attributionWindowMs = 30_000L, clock = { nowMs })
+
+        val first = tracker.nextForProfile(1L, "Notify me")
+        tracker.remember(envelope("Notify me", 1L, first, "run-1"), nowMs)
+        tracker.forget("run-1")
+
+        // Same profile fires again well inside the wall-clock window. The previous run already
+        // finished, so this is an ordinary re-trigger and must not read as a self-cycle.
+        nowMs += 10_000L
+        val second = tracker.nextForProfile(1L, "Notify me")
+        assertTrue("re-trigger after the parent finished must be allowed", second.allowed)
+        assertNull(second.parentExecutionId)
+        assertEquals(0, second.depth)
+        assertEquals(listOf("Notify me"), second.profileChain)
+    }
+
+    @Test
+    fun exitTaskOfTheRunningProfileIsNotACycle() {
+        var nowMs = 1_000L
+        val tracker = CausalExecutionTracker(attributionWindowMs = 30_000L, clock = { nowMs })
+
+        val enter = tracker.nextForProfile(1L, "At home")
+        tracker.remember(envelope("At home", 1L, enter, "enter-1"), nowMs)
+
+        // Context deactivates while the enter task is still running.
+        nowMs += 5_000L
+        val exit = tracker.nextForProfile(1L, "At home", isExit = true)
+        assertTrue("a profile's own exit task must not be blocked as a loop", exit.allowed)
+
+        // A genuine A -> B -> A cycle that happens to land on an exit task is still stopped.
+        tracker.remember(envelope("At home", 1L, exit, "exit-1"), nowMs)
+        val other = tracker.nextForProfile(2L, "Away")
+        tracker.remember(envelope("Away", 2L, other, "away-1"), nowMs)
+        val loop = tracker.nextForProfile(1L, "At home", isExit = true)
+        assertFalse("a real cycle ending on an exit task is still a cycle", loop.allowed)
+    }
+
     private fun envelope(
         profileName: String,
         profileId: Long,
