@@ -36,7 +36,12 @@ internal const val SECRET_DERIVED_ACTION_LOG = "<redacted: action output depends
 /** Result of executing a single Action. */
 sealed class ActionResult {
     data object Success : ActionResult()
-    data class Failure(val message: String, val cause: Throwable? = null) : ActionResult()
+    data class Failure(
+        val message: String,
+        val cause: Throwable? = null,
+        /** Child task failures retain their original structured location when they bubble up. */
+        val structuredError: StructuredTaskError? = null,
+    ) : ActionResult()
     data object Skip : ActionResult()
 }
 
