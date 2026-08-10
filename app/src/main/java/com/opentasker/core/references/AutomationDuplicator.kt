@@ -35,7 +35,10 @@ object AutomationDuplicator {
         id = 0L,
         name = name,
         enabled = false,
-        requiresRiskAcknowledgement = false,
+        // A copy carries the original's powers, so it has to carry its review requirement too.
+        // Clearing this let a user duplicate an imported profile that the app refuses to enable
+        // and then enable the copy without ever seeing the risk disclosure.
+        requiresRiskAcknowledgement = source.requiresRiskAcknowledgement,
         lifetimeConsumed = false,
         contexts = source.contexts.map { context -> context.copy(config = context.config.toMap()) },
         contextExpression = source.contextExpression?.deepCopy(),

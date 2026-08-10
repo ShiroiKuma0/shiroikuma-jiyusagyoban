@@ -78,13 +78,24 @@ class AutomationDuplicatorTest {
         val duplicate = AutomationDuplicator.profilePayload(source, "At home (copy)").copy(id = 44)
 
         assertFalse(duplicate.enabled)
-        assertFalse(duplicate.requiresRiskAcknowledgement)
         assertFalse(duplicate.lifetimeConsumed)
         assertEquals(44L, duplicate.id)
         assertNotSame(source.contexts, duplicate.contexts)
         assertNotSame(source.contexts[0].config, duplicate.contexts[0].config)
         assertNotSame(source.contextExpression, duplicate.contextExpression)
         assertNotSame(source.contextExpression?.children, duplicate.contextExpression?.children)
+    }
+
+    @Test
+    fun profileCopiesKeepTheRiskReviewRequirement() {
+        // The copy has the original's actions and therefore its powers. Clearing the flag let a
+        // user duplicate a gated imported profile and enable the copy without the risk dialog,
+        // which is the only surface that discloses what the automation is allowed to do.
+        val gated = Profile(id = 10, name = "Imported", requiresRiskAcknowledgement = true, enterTaskId = 20)
+        val ordinary = gated.copy(id = 11, name = "Mine", requiresRiskAcknowledgement = false)
+
+        assertTrue(AutomationDuplicator.profilePayload(gated, "Imported (copy)").requiresRiskAcknowledgement)
+        assertFalse(AutomationDuplicator.profilePayload(ordinary, "Mine (copy)").requiresRiskAcknowledgement)
     }
 
     @Test
