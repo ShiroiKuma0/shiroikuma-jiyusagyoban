@@ -109,14 +109,14 @@ internal object AndroidAudioHardening {
     }
 
     fun outputCapabilityReason(reason: String): String =
-        "Android 17+ allows this only while OpenTasker is visible, from a while-in-use eligible foreground service, " +
+        "Android 17+ allows this only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground service, " +
             "or for alarm-usage audio with exact-alarm access. $reason"
 
     fun mediaKeyCapabilityReason(reason: String): String =
-        "Android 17+ allows media-key dispatch only while OpenTasker is visible or from a while-in-use eligible " +
+        "Android 17+ allows media-key dispatch only while 白い熊 自由作業盤 is visible or from a while-in-use eligible " +
             "foreground service. $reason"
 
     fun volumeCapabilityReason(reason: String): String =
-        "Android 17+ allows volume changes only while OpenTasker is visible, from a while-in-use eligible foreground " +
+        "Android 17+ allows volume changes only while 白い熊 自由作業盤 is visible, from a while-in-use eligible foreground " +
             "service, or on the alarm stream with exact-alarm access. $reason"
 }
