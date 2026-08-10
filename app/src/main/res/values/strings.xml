@@ -1015,6 +1015,8 @@
     <string name="inspector_no_match">No match</string>
     <string name="inspector_latest_value">Latest value</string>
     <string name="inspector_warning">Warning</string>
+    <string name="inspector_causal_loop_title">Causal profile loop stopped</string>
+    <string name="inspector_causal_loop_body">The engine stopped this profile chain: %1$s. See Run Log and Diagnostics for the parent execution.</string>
     <string name="inspector_no_profiles_body">Create a profile before reviewing match explanations.</string>
     <string name="inspector_ready">Ready</string>
     <string name="inspector_attention">%1$d attention</string>

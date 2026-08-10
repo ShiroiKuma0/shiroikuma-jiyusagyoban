@@ -15,6 +15,8 @@ data class RunLogDiagnostics(
     val source: String? = null,
     val executionId: String? = null,
     val parentExecutionId: String? = null,
+    val causalDepth: Int? = null,
+    val causalProfileChain: List<String> = emptyList(),
     val producer: String? = null,
     val terminalReason: String? = null,
     val decision: String? = null,
@@ -131,6 +133,8 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
     var source: String? = null
     var executionId: String? = null
     var parentExecutionId: String? = null
+    var causalDepth: Int? = null
+    var causalProfileChain = emptyList<String>()
     var producer: String? = null
     var terminalReason: String? = null
     var decision: String? = null
@@ -147,6 +151,17 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
                 line.startsWith(SOURCE_PREFIX, ignoreCase = true) -> source = line.valueAfterPrefix(SOURCE_PREFIX)
                 line.startsWith(EXECUTION_ID_PREFIX, ignoreCase = true) -> executionId = line.valueAfterPrefix(EXECUTION_ID_PREFIX)
                 line.startsWith(PARENT_EXECUTION_ID_PREFIX, ignoreCase = true) -> parentExecutionId = line.valueAfterPrefix(PARENT_EXECUTION_ID_PREFIX)
+                line.startsWith(CAUSAL_DEPTH_PREFIX, ignoreCase = true) -> {
+                    causalDepth = line.valueAfterPrefix(CAUSAL_DEPTH_PREFIX).toIntOrNull()
+                    details.add(line)
+                }
+                line.startsWith(CAUSAL_CHAIN_PREFIX, ignoreCase = true) -> {
+                    causalProfileChain = line.valueAfterPrefix(CAUSAL_CHAIN_PREFIX)
+                        .split(" -> ")
+                        .map(String::trim)
+                        .filter(String::isNotBlank)
+                    details.add(line)
+                }
                 line.startsWith(PRODUCER_PREFIX, ignoreCase = true) -> producer = line.valueAfterPrefix(PRODUCER_PREFIX)
                 line.startsWith(TERMINAL_REASON_PREFIX, ignoreCase = true) -> terminalReason = line.valueAfterPrefix(TERMINAL_REASON_PREFIX)
                 line.startsWith(DECISION_PREFIX, ignoreCase = true) -> decision = line.valueAfterPrefix(DECISION_PREFIX)
@@ -177,6 +192,8 @@ fun String.toRunLogDiagnostics(): RunLogDiagnostics {
         source = source?.takeIf { it.isNotBlank() },
         executionId = executionId?.takeIf { it.isNotBlank() },
         parentExecutionId = parentExecutionId?.takeIf { it.isNotBlank() },
+        causalDepth = causalDepth,
+        causalProfileChain = causalProfileChain,
         producer = producer?.takeIf { it.isNotBlank() },
         terminalReason = terminalReason?.takeIf { it.isNotBlank() },
         decision = decision?.takeIf { it.isNotBlank() },
@@ -274,6 +291,8 @@ private val tracePattern = Regex("""^(\d+)\. ([a-z]+): (.*?) \[([^]]+)] (\d+)ms 
 private const val SOURCE_PREFIX = "Source:"
 private const val EXECUTION_ID_PREFIX = "Execution ID:"
 private const val PARENT_EXECUTION_ID_PREFIX = "Parent execution ID:"
+private const val CAUSAL_DEPTH_PREFIX = "Causal depth:"
+private const val CAUSAL_CHAIN_PREFIX = "Causal profile chain:"
 private const val PRODUCER_PREFIX = "Producer:"
 private const val TERMINAL_REASON_PREFIX = "Terminal reason:"
 private const val DECISION_PREFIX = "Decision:"
