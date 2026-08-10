@@ -260,11 +260,11 @@ Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned featu
 
 ### Translations
 
-OpenTasker supports localization. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`; locale targets under `app/src/main/res/values-*` are ready for Weblate-style translation workflows. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
+OpenTasker supports localization. English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources have genuinely translated values; incomplete or empty locale directories are not shipped. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
 
 1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
 2. Translate only the string values (not the `name` attributes)
-3. Omit strings that are identical to English — Android falls back automatically
-4. Submit a PR with your locale directory
+3. Omit strings that are identical to English — Android falls back automatically, but the locale must still reach the 80% translated-value threshold
+4. Run `./gradlew :app:verifyLocaleResources` and submit the locale directory only when it passes
 
-Skeleton directories exist for: `ar`, `de`, `es`, `fr`, `hi`, `it`, `ja`, `ko`, `pl`, `pt-rBR`, `ru`, `tr`, `zh-rCN`.
+No incomplete locale directories are kept as release placeholders. The gate reports the exact translated-string count when a locale falls below the threshold.

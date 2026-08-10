@@ -32,6 +32,8 @@ class LocalReleaseGateContractTest {
             "verifyResolvedDependencyPolicy",
             "generateCycloneDxSbom",
             "verifyJvmTestCount",
+            "verifyCoverageFloor",
+            "verifyLocaleResources",
         ).forEach { task -> assertTrue("Local gate must include $task", build.contains(task)) }
 
         assertTrue(script.contains("openTaskerDistribution=play"))
@@ -60,7 +62,7 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("resolutionResult.allComponents"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("minimumTests.set(522)"))
+        assertTrue(build.contains("minimumTests.set(1020)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
 }

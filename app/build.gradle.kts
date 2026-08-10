@@ -39,6 +39,32 @@ private fun deriveRoomSchemaVersion(databaseFile: java.io.File): Int =
         "Room schema version",
     ).toInt()
 
+private val LOCALE_COMPLETION_THRESHOLD = 0.80
+
+private fun localeXmlFiles(directory: java.io.File): List<java.io.File> =
+    directory.listFiles()
+        ?.filter { it.isFile && it.extension == "xml" }
+        .orEmpty()
+        .sortedBy { it.name }
+
+private fun localeStringValues(files: List<java.io.File>): Map<String, String> {
+    val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance().apply {
+        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        setFeature("http://xml.org/sax/features/external-general-entities", false)
+        setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+        isXIncludeAware = false
+        isExpandEntityReferences = false
+    }
+    return files.flatMap { file ->
+        val document = factory.newDocumentBuilder().parse(file)
+        val strings = document.getElementsByTagName("string")
+        (0 until strings.length).map { index ->
+            val node = strings.item(index)
+            node.attributes.getNamedItem("name").nodeValue to node.textContent.trim()
+        }
+    }.toMap()
+}
+
 abstract class VerifyDocumentationTruthTask : DefaultTask() {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -230,6 +256,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    androidResources {
+        generateLocaleConfig = true
     }
 
     packaging {
@@ -729,6 +759,55 @@ val verifyCoverageFloor = tasks.register<VerifyCoverageFloorTask>("verifyCoverag
     )
 }
 
+val verifyLocaleResources = tasks.register("verifyLocaleResources") {
+    group = "verification"
+    description = "Fails if an alternate locale is below the release translation threshold."
+    val resourcesDirectory = layout.projectDirectory.dir("src/main/res")
+    inputs.dir(resourcesDirectory)
+    inputs.property("completionThreshold", LOCALE_COMPLETION_THRESHOLD)
+    doLast {
+        val resources = resourcesDirectory.asFile
+        val defaultValues = localeStringValues(localeXmlFiles(resources.resolve("values")))
+        check(defaultValues.isNotEmpty()) { "Default Android string resources are missing." }
+
+        val localeDirectories = resources.listFiles()
+            ?.filter { it.isDirectory && it.name.startsWith("values-") }
+            ?.filter { localeXmlFiles(it).isNotEmpty() }
+            .orEmpty()
+            .sortedBy { it.name }
+        val failures = localeDirectories.mapNotNull { directory ->
+            val localeValues = localeStringValues(localeXmlFiles(directory))
+            val unknownNames = localeValues.keys - defaultValues.keys
+            if (unknownNames.isNotEmpty()) {
+                return@mapNotNull "${directory.name} defines unknown string(s): ${unknownNames.sorted().joinToString()}"
+            }
+            val translated = defaultValues.count { (name, english) ->
+                localeValues.containsKey(name) && localeValues.getValue(name) != english
+            }
+            val completion = translated.toDouble() / defaultValues.size
+            if (completion < LOCALE_COMPLETION_THRESHOLD) {
+                "${directory.name} is ${"%.0f%%".format(completion * 100.0)} complete; " +
+                    "the release threshold is ${"%.0f%%".format(LOCALE_COMPLETION_THRESHOLD * 100.0)} " +
+                    "($translated/${defaultValues.size} translated strings)."
+            } else {
+                null
+            }
+        }
+        check(failures.isEmpty()) {
+            "Locale resource completeness gate failed:\n${failures.joinToString("\n")}"
+        }
+        val shipped = localeDirectories.joinToString { it.name.removePrefix("values-") }
+        println(
+            if (shipped.isBlank()) {
+                "Locale resource gate passed: English is the only shipped locale; no incomplete locale directories found."
+            } else {
+                "Locale resource gate passed: shipped locales $shipped meet the " +
+                    "${"%.0f%%".format(LOCALE_COMPLETION_THRESHOLD * 100.0)} completion threshold."
+            },
+        )
+    }
+}
+
 val qualityGateSeedFailure = providers.gradleProperty("openTaskerQualityGateSeedFailure")
     .map(String::toBoolean)
     .orElse(false)
@@ -994,6 +1073,7 @@ tasks.register("localQualityGate") {
         generateCycloneDxSbom,
         verifyJvmTestCount,
         verifyCoverageFloor,
+        verifyLocaleResources,
         verifyQualityGateSeed,
         "verifyNativePageAlignment",
         verifyPerformanceEvidence,
