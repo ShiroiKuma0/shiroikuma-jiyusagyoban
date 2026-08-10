@@ -577,7 +577,16 @@ class ActiveAutomationViewModel(
         db.sceneDao().delete(scene.toEntity())
     }
 
-    fun createProfile(name: String, enabled: Boolean, enterTaskId: Long, cooldownSec: Int, automationMode: AutomationMode, group: String? = null, projectId: Long? = null) =
+    fun createProfile(
+        name: String,
+        enabled: Boolean,
+        enterTaskId: Long,
+        cooldownSec: Int,
+        automationMode: AutomationMode,
+        group: String? = null,
+        projectId: Long? = null,
+        policy: ProfilePolicyDraft = ProfilePolicyDraft.from(null),
+    ) =
         launchWithMessage("Profile created") {
             val profile = Profile(
                 name = name.trim(),
@@ -587,7 +596,7 @@ class ActiveAutomationViewModel(
                 automationMode = automationMode,
                 group = group,
                 projectId = projectId,
-            )
+            ).withPolicy(policy)
             requireValidProfileFieldLimits(profile)
             db.profileDao().insert(profile.toEntity())
         }

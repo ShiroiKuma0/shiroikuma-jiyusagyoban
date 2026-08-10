@@ -44,11 +44,16 @@ import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
+import androidx.room.withTransaction
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Task
+import com.opentasker.core.storage.toEntity
 import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
@@ -94,6 +99,21 @@ class AutomationService : Service() {
     private val cooldownStore by lazy { CooldownStore(this) }
     private val executionAdmission by lazy { ExecutionAdmissionController.persisted(this) }
     private val matchers = Collections.synchronizedMap(mutableMapOf<Long, ProfileMatcher>())
+    /**
+     * Priority arbitration state: every profile currently *matched*, whether or not it dispatched.
+     *
+     * Arbitration needs the matched set, not the running set — a higher-priority profile outranks a
+     * lower one for as long as its conditions hold, including while its own task has already
+     * finished. [admittedProfiles] then records which of them were ADMITTED — passed the lifetime
+     * and priority checks — which is what deactivation consults to decide whether an exit task is
+     * owed. Admission, not dispatch: a profile carrying only an exit task is admitted and still owes
+     * it, while a profile that was outranked never acted and has nothing to undo.
+     *
+     * Both are read under their own lock: the matcher runs one coroutine per profile, so iterating
+     * these maps unsynchronized can throw ConcurrentModificationException under a burst.
+     */
+    private val matchedProfiles = Collections.synchronizedMap(mutableMapOf<Long, Profile>())
+    private val admittedProfiles = Collections.synchronizedSet(mutableSetOf<Long>())
     private val profileCooldowns = Collections.synchronizedMap(mutableMapOf<Long, Long>()) // profileId -> cooldownUntilMs
     private val matcherJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>()) // Track jobs for cleanup
     private val profileTaskJobs = Collections.synchronizedMap(mutableMapOf<Long, Job>())
@@ -266,6 +286,11 @@ class AutomationService : Service() {
         taskJobSnapshot.forEach { it.cancel() }
         matcherJobs.clear()
         matchers.clear()
+        // Arbitration state is per-service-lifetime: nothing is matched once the engine is down, and
+        // carrying a stale matched set into the next start would suppress profiles that nothing is
+        // actually outranking any more.
+        matchedProfiles.clear()
+        admittedProfiles.clear()
         profileCooldowns.clear()
         profileTaskJobs.clear()
         queuedProfileTasks.clear()
@@ -310,6 +335,16 @@ class AutomationService : Service() {
             queuedProfileTasks.keys.removeAll { kotlin.math.abs(it) !in activeIds }
         }
         val domains = profiles.map { it.toDomain() }
+        // Keep the arbitration set in step with the reload: drop profiles that were deleted or
+        // disabled, and refresh the ones still matched so an edited priority takes effect on the
+        // next activation rather than at the next service restart.
+        synchronized(matchedProfiles) {
+            matchedProfiles.keys.retainAll(activeIds)
+            admittedProfiles.retainAll(activeIds)
+            domains.forEach { profile ->
+                if (profile.id in matchedProfiles) matchedProfiles[profile.id] = profile
+            }
+        }
         registerPluginSubscriptions(domains)
         // Keep the broadcast (Intent Received) receiver listening for exactly the actions in use.
         val broadcastActions = domains
@@ -390,7 +425,56 @@ class AutomationService : Service() {
     }
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, eventVars: Map<String, String>) {
-        if (profile.enterTaskName.isBlank() && profile.enterTaskId <= 0) return
+        // A pulse profile (one driven by an EVENT context) fires and is immediately done; it never
+        // holds a matched state, so it must not enter the arbitration set — parking it there would
+        // leave a phantom high-priority profile suppressing everything else for ever.
+        val pulseProfile = profile.contexts.any { it.type == ContextType.EVENT }
+
+        // Lifetime first: an expired or already-spent profile must not run at all. Disabling it is
+        // upstream's behaviour and the honest one — the profile has done what it was set up to do,
+        // and leaving it enabled would re-evaluate it on every tick for ever.
+        val suppression = ProfileLifecyclePolicy.suppressionReason(profile, System.currentTimeMillis())
+        if (suppression != null) {
+            AppLogger.info(TAG, "Profile ${profile.id} (${profile.name}) activation suppressed: $suppression")
+            if (profile.enabled) {
+                runCatching { db.profileDao().update(profile.copy(enabled = false).toEntity()) }
+                    .onFailure { AppLogger.error(TAG, "Could not disable spent profile ${profile.id}", it) }
+            }
+            return
+        }
+
+        // Read the candidate set once under the lock, then decide outside it. This happens before
+        // the enter task is resolved, because arbitration is about the PROFILE, not its task: a
+        // profile carrying only an exit task is still matched and still outranks lower ones.
+        val suppressedBy = synchronized(matchedProfiles) {
+            if (!pulseProfile) matchedProfiles[profile.id] = profile
+            ProfileLifecyclePolicy.suppressionByPriority(profile, matchedProfiles.values + profile)
+        }
+        val hasEnterTask = profile.enterTaskName.isNotBlank() || profile.enterTaskId > 0
+        if (suppressedBy != null) {
+            AppLogger.info(TAG, "Profile ${profile.id} (${profile.name}) $suppressedBy")
+            // A run-log row needs a task to name; a profile with no enter task leaves the log alone.
+            if (hasEnterTask) {
+                resolveTask(profile.enterTaskName, profile.enterTaskId)
+                    ?.let { logProfileSkippedRun(profile, it, suppressedBy) }
+            }
+            return
+        }
+
+        // One-shot profiles are consumed transactionally, so two contexts matching in the same
+        // instant cannot both win the single run.
+        if (profile.lifetime == ProfileLifetime.ONCE && !consumeOneShotProfile(profile)) {
+            if (!pulseProfile) synchronized(matchedProfiles) { matchedProfiles.remove(profile.id) }
+            return
+        }
+
+        // Admitted — recorded whether or not there is an enter task to run, because this is what
+        // deactivation consults to decide whether the exit task is owed. Gating that on a *dispatch*
+        // instead would silently stop the exit task of every profile that carries only one, which is
+        // a perfectly ordinary way to write a profile.
+        if (!pulseProfile) admittedProfiles += profile.id
+
+        if (!hasEnterTask) return
         val domain = resolveTask(profile.enterTaskName, profile.enterTaskId)
         if (domain == null) {
             AppLogger.warn("OpenTasker", "Enter task not found for profile ${profile.name} (name='${profile.enterTaskName}', id=${profile.enterTaskId})")
@@ -400,14 +484,55 @@ class AutomationService : Service() {
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
-        if (profile.exitTaskName.isBlank() && (profile.exitTaskId == null || profile.exitTaskId <= 0)) return
-        val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
-        if (domain == null) {
-            AppLogger.warn("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
-            return
+        // Leaving the matched set can un-suppress others: anything this profile was outranking, and
+        // that nothing else still outranks, becomes eligible now.
+        val released: List<Profile>
+        val wasAdmitted: Boolean
+        synchronized(matchedProfiles) {
+            val before = matchedProfiles.values.toList()
+            matchedProfiles.remove(profile.id)
+            wasAdmitted = admittedProfiles.remove(profile.id)
+            val remaining = matchedProfiles.values.toList()
+            released = ProfileLifecyclePolicy.released(before, remaining)
         }
-        dispatchTask(profile, domain, emptyMap(), isExit = true)
+
+        // The exit task is owed only if the profile was admitted. One that never ran because it was
+        // outranked has no cleanup to do, and running its exit task would undo state it never set.
+        if (wasAdmitted && (profile.exitTaskName.isNotBlank() || (profile.exitTaskId != null && profile.exitTaskId > 0))) {
+            val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
+            if (domain == null) {
+                AppLogger.warn("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")
+            } else {
+                dispatchTask(profile, domain, emptyMap(), isExit = true)
+            }
+        }
+
+        released.forEach { candidate ->
+            AppLogger.info(TAG, "Profile ${candidate.id} (${candidate.name}) released by ${profile.name} deactivating")
+            onProfileActivated(candidate, emptyMap())
+        }
     }
+
+    /**
+     * Spends a one-shot profile, returning true only for the caller that actually consumed it.
+     *
+     * The read-modify-write is one transaction because two contexts can satisfy a profile in the
+     * same instant on different matcher coroutines; without it both would see `lifetimeConsumed`
+     * false and a "run once" profile would run twice.
+     */
+    private suspend fun consumeOneShotProfile(profile: Profile): Boolean = runCatching {
+        db.withTransaction {
+            val entity = db.profileDao().getById(profile.id) ?: return@withTransaction false
+            val current = entity.toDomain()
+            if (!current.enabled || current.lifetime != ProfileLifetime.ONCE || current.lifetimeConsumed) {
+                return@withTransaction false
+            }
+            db.profileDao().update(current.copy(enabled = false, lifetimeConsumed = true).toEntity())
+            true
+        }
+    }.onFailure {
+        AppLogger.error(TAG, "Could not consume one-shot profile ${profile.id}", it)
+    }.getOrDefault(false)
 
     /**
      * Enter and exit tasks are distinct execution units: they use separate job slots (so a
@@ -574,6 +699,9 @@ class AutomationService : Service() {
             audioForegroundService = audioForegroundServiceEligibility,
             admissionController = executionAdmission,
             profileId = profile.id,
+            // The profile's own concurrency policy, honoured per run rather than only globally.
+            profileLimits = profile.toExecutionAdmissionProfileLimits(),
+            overflowPolicy = profile.overflowPolicy,
             eventLocals = eventVars,
         )
         if (result.logInserted) {
