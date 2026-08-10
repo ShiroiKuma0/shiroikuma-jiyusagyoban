@@ -7,10 +7,7 @@ import android.net.Uri
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import com.opentasker.app.BuildConfig
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.widget.TaskShortcutHelper
 
@@ -20,10 +17,7 @@ import com.opentasker.widget.TaskShortcutHelper
  * Args:
  *   - "package": package name (e.g., "com.spotify.music")
  */
-class LaunchAppAction : Action {
-    override val id = "app.launch"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class LaunchAppAction : DeclaredAction(ActionCatalog.require("app.launch")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
@@ -41,10 +35,7 @@ class LaunchAppAction : Action {
 }
 
 /** Publish a dynamic launcher shortcut or request a pinned shortcut for an existing task. */
-class ShortcutPublishAction : Action {
-    override val id = "shortcut.publish"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class ShortcutPublishAction : DeclaredAction(ActionCatalog.require("shortcut.publish")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val shortcutId = args["id"]?.trim().orEmpty()
@@ -69,10 +60,7 @@ class ShortcutPublishAction : Action {
  * Args:
  *   - "package": package name
  */
-class KillAppAction : Action {
-    override val id = "app.kill"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class KillAppAction : DeclaredAction(ActionCatalog.require("app.kill")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
@@ -84,10 +72,7 @@ class KillAppAction : Action {
 /**
  * Go to home screen (dismiss notifications, etc.).
  */
-class GoHomeAction : Action {
-    override val id = "home.go"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class GoHomeAction : DeclaredAction(ActionCatalog.require("home.go")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -106,10 +91,7 @@ class GoHomeAction : Action {
  * Args:
  *   - "url": URL to open
  */
-class OpenUrlAction : Action {
-    override val id = "url.open"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class OpenUrlAction : DeclaredAction(ActionCatalog.require("url.open")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val url = args["url"] ?: return ActionResult.Failure("missing url")
@@ -141,10 +123,7 @@ class OpenUrlAction : Action {
  *   - "number": recipient phone number
  *   - "message": SMS text
  */
-class SendSmsAction : Action {
-    override val id = "sms.send"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class SendSmsAction : DeclaredAction(ActionCatalog.require("sms.send")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (!BuildConfig.SMS_ACTION_AVAILABLE) {
@@ -186,10 +165,7 @@ internal fun maskPhoneNumber(number: String): String {
  * Args:
  *   - "path": optional output file path
  */
-class ScreenshotAction : Action {
-    override val id = "screenshot.take"
-    override val category = ActionCategory.APP
-    override val retrySafety = ActionRetrySafety.NEVER
+class ScreenshotAction : DeclaredAction(ActionCatalog.require("screenshot.take")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: args["filename"]

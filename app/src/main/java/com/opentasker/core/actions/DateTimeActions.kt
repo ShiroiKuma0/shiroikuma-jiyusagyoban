@@ -1,10 +1,7 @@
 package com.opentasker.core.actions
 
 import com.opentasker.core.data.DateTimeOps
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private fun resolveEpochMillis(raw: String?): Long? {
@@ -17,10 +14,7 @@ private fun resolveEpochMillis(raw: String?): Long? {
  * Format an epoch-millis time into a string. Args: `time` (epoch millis or "now"), `format`
  * (pattern, default `yyyy-MM-dd HH:mm:ss`), `zone` (optional, e.g. `UTC`), `var` (output).
  */
-class DateTimeFormatAction : Action {
-    override val id = "datetime.format"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DateTimeFormatAction : DeclaredAction(ActionCatalog.require("datetime.format")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val epoch = resolveEpochMillis(args["time"]) ?: return ActionResult.Failure("invalid time (expected epoch millis or 'now')")
@@ -38,10 +32,7 @@ class DateTimeFormatAction : Action {
  * Parse a date-time string into epoch millis. Args: `text` (required), `format` (pattern, required),
  * `zone` (optional), `var` (output). Sets `%var` to the epoch-millis value.
  */
-class DateTimeParseAction : Action {
-    override val id = "datetime.parse"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DateTimeParseAction : DeclaredAction(ActionCatalog.require("datetime.parse")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val text = args["text"]?.trim()?.ifBlank { null } ?: return ActionResult.Failure("missing text")
@@ -60,10 +51,7 @@ class DateTimeParseAction : Action {
  * `amount` (integer, may be negative), `unit` (seconds/minutes/hours/days/weeks/months/years),
  * `var` (output). Sets `%var` to the resulting epoch-millis value.
  */
-class DateTimeAddAction : Action {
-    override val id = "datetime.add"
-    override val category = ActionCategory.VARIABLE
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class DateTimeAddAction : DeclaredAction(ActionCatalog.require("datetime.add")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val epoch = resolveEpochMillis(args["time"]) ?: return ActionResult.Failure("invalid time (expected epoch millis or 'now')")

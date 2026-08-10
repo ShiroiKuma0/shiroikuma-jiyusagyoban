@@ -71,22 +71,21 @@ data class ActionMetadata(
  * Registry of action metadata for UI form generation.
  */
 object ActionMetadataRegistry {
-    private val byId = mutableMapOf<String, ActionMetadata>()
-
     fun register(metadata: ActionMetadata) {
+        val definition = ActionCatalog.require(metadata.id)
         val summaryRes = metadata.summaryRes ?: declaredActionSummaryRes(metadata.id)
-        byId[metadata.id] = metadata.copy(
+        definition.bindMetadata(metadata.copy(
             outputs = metadata.outputs.ifEmpty { declaredActionOutputs(metadata.id) },
             summaryRes = summaryRes,
-        )
+        ))
     }
 
-    fun get(id: String): ActionMetadata? = byId[id]
+    fun get(id: String): ActionMetadata? = ActionCatalog.get(id)?.metadataOrNull()
 
-    fun all(): Collection<ActionMetadata> = byId.values
+    fun all(): Collection<ActionMetadata> = ActionCatalog.allDefinitions.mapNotNull { it.metadataOrNull() }
 
     fun byCategory(@StringRes categoryRes: Int): List<ActionMetadata> =
-        byId.values.filter { it.categoryRes == categoryRes }
+        all().filter { it.categoryRes == categoryRes }
 }
 
 /**

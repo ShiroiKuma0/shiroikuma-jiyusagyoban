@@ -1,6 +1,8 @@
 package com.opentasker.core.engine
 
 import android.content.Context
+import com.opentasker.core.actions.ActionCatalog
+import com.opentasker.core.actions.ActionDefinition
 import com.opentasker.core.platform.AudioRuntimeEligibility
 import java.util.Collections
 
@@ -52,6 +54,9 @@ sealed class ActionResult {
 interface Action {
     val id: String                 // stable, e.g. "wifi.toggle"
     val category: ActionCategory
+    /** The shared catalogue entry for a built-in implementation, when one exists. */
+    val definition: ActionDefinition?
+        get() = null
     /** Whether the engine may repeat this action after a transient failure. */
     val retrySafety: ActionRetrySafety get() = ActionRetrySafety.NEVER
 
@@ -73,8 +78,45 @@ enum class ActionCategory {
 object ActionRegistry {
     private val byId = Collections.synchronizedMap(mutableMapOf<String, Action>())
 
-    fun register(action: Action) { byId[action.id] = action }
+    fun register(action: Action) {
+        val declaration = action.definition ?: ActionCatalog.get(action.id)
+        if (action.definition != null) {
+            require(ActionCatalog.get(action.id) === action.definition) {
+                "Action ${action.id} does not use its canonical ActionCatalog declaration"
+            }
+        }
+        if (declaration != null) {
+            require(declaration.category == action.category) {
+                "Action ${action.id} category drift: ${action.category} != ${declaration.category}"
+            }
+            require(declaration.retrySafety == action.retrySafety) {
+                "Action ${action.id} retry-safety drift: ${action.retrySafety} != ${declaration.retrySafety}"
+            }
+        }
+        byId[declaration?.id ?: action.id] = action
+    }
+
+    fun registerAll() {
+        ActionCatalog.all.map { it.factory() }.forEach(::register)
+    }
+    fun clear() = byId.clear()
     fun get(id: String): Action? = byId[id]
     fun all(): Collection<Action> = byId.values.toList()
     fun allIds(): Set<String> = byId.keys.toSet()
+}
+
+/**
+ * Base class for built-in actions. Requiring the canonical definition in the constructor makes
+ * omitting an action declaration a compile-time choice instead of another hand-maintained field
+ * triplet that can drift from the runtime registry.
+ */
+abstract class DeclaredAction(
+    final override val definition: ActionDefinition,
+) : Action {
+    final override val id: String
+        get() = definition.id
+    final override val category: ActionCategory
+        get() = definition.category
+    final override val retrySafety: ActionRetrySafety
+        get() = definition.retrySafety
 }

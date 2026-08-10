@@ -3,6 +3,7 @@ package com.opentasker.core.capabilities
 import androidx.annotation.StringRes
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
+import com.opentasker.core.actions.ActionCatalog
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AndroidAudioHardening.ANDROID_17_API
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -142,7 +143,17 @@ object ActionCapabilityRegistry {
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action.", R.string.capability_tasker_import_unsupported),
     )
 
-    fun get(actionId: String): ActionCapability = capabilities[actionId]
+    /**
+     * Resolves a shipped action through its canonical declaration. The policy table below remains
+     * deliberately private to this resolver; callers cannot accidentally bypass the catalogue by
+     * reading a second public registry.
+     */
+    fun get(actionId: String): ActionCapability = ActionCatalog.get(actionId)
+        ?.capability
+        ?.invoke()
+        ?: resolveDeclared(actionId)
+
+    internal fun resolveDeclared(actionId: String): ActionCapability = capabilities[actionId]
         ?: if (actionId in ordinaryActionIds) supported else unknown
 
     /** Every action id with an explicit contract, used by the contract completeness test. */

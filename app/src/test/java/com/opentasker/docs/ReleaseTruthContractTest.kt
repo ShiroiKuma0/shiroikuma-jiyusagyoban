@@ -104,7 +104,7 @@ class ReleaseTruthContractTest {
         val versions = read("gradle/libs.versions.toml")
         val wrapper = read("gradle/wrapper/gradle-wrapper.properties")
         val fdroid = read("fdroid/metadata/com.opentasker.app.yml")
-        val runtime = read("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt")
+        val actionCatalog = read("app/src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
         val contextSpec = read("app/src/main/java/com/opentasker/core/model/ContextSpec.kt")
         val flowStructure = read("app/src/main/java/com/opentasker/core/engine/FlowStructure.kt")
         val taskRunner = read("app/src/main/java/com/opentasker/core/engine/TaskRunner.kt")
@@ -138,7 +138,7 @@ class ReleaseTruthContractTest {
             jsonValue(truth, "roomSchemaVersion"),
         )
         assertEquals(
-            Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(runtime).count().toString(),
+            Regex("(?m)^\\s*define\\(\\\"").findAll(actionCatalog).count().toString(),
             jsonValue(truth, "registeredActions"),
         )
         val flowBody = gradleValue(flowStructure, """(?s)\bval\s+ALL\s*=\s*setOf\(([^)]*)\)""")
@@ -157,6 +157,7 @@ class ReleaseTruthContractTest {
         assertTrue("\$flowControlIds.Count" in generator)
         assertTrue("SUB_TASK_ACTION_ID" in generator)
         assertTrue("OPEN_TASKER_DATABASE_SCHEMA_VERSION" in generator)
+        assertTrue("ActionCatalog.kt" in generator)
         assertFalse("engineHandledActions = 7" in generator)
     }
 

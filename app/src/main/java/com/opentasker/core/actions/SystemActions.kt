@@ -5,10 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 /**
@@ -17,10 +14,7 @@ import com.opentasker.core.engine.ActionResult
  * Args:
  *   - "millis": duration in milliseconds
  */
-class VibrateAction : Action {
-    override val id = "vibrate"
-    override val category = ActionCategory.NOTIFICATION
-    override val retrySafety = ActionRetrySafety.NEVER
+class VibrateAction : DeclaredAction(ActionCatalog.require("vibrate")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val rawMillis = args["millis"] ?: return ActionResult.Failure("missing millis")
@@ -58,10 +52,7 @@ class VibrateAction : Action {
  * Args:
  *   - "mode": "recovery", "bootloader", or blank for normal reboot
  */
-class RebootAction : Action {
-    override val id = "reboot"
-    override val category = ActionCategory.SYSTEM
-    override val retrySafety = ActionRetrySafety.NEVER
+class RebootAction : DeclaredAction(ActionCatalog.require("reboot")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"]?.ifBlank { null }
@@ -73,10 +64,7 @@ class RebootAction : Action {
 /**
  * Lock device (secure lock).
  */
-class LockDeviceAction : Action {
-    override val id = "lock"
-    override val category = ActionCategory.SYSTEM
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class LockDeviceAction : DeclaredAction(ActionCatalog.require("lock")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Lock device")
@@ -87,10 +75,7 @@ class LockDeviceAction : Action {
 /**
  * Turn off screen.
  */
-class ScreenOffAction : Action {
-    override val id = "screen.off"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class ScreenOffAction : DeclaredAction(ActionCatalog.require("screen.off")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Screen off")
@@ -104,10 +89,7 @@ class ScreenOffAction : Action {
  * Args:
  *   - "duration_sec": how long to keep screen on
  */
-class WakeAction : Action {
-    override val id = "wake"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class WakeAction : DeclaredAction(ActionCatalog.require("wake")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
@@ -122,10 +104,7 @@ class WakeAction : Action {
  * Args:
  *   - "message": text to log
  */
-class LogAction : Action {
-    override val id = "log"
-    override val category = ActionCategory.SYSTEM
-    override val retrySafety = ActionRetrySafety.NEVER
+class LogAction : DeclaredAction(ActionCatalog.require("log")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val message = args["message"] ?: ""

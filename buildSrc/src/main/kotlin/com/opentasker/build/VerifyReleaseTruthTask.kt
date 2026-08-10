@@ -28,7 +28,7 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
 
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val runtimeRegistriesFile: RegularFileProperty
+    abstract val actionCatalogFile: RegularFileProperty
 
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -94,7 +94,7 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
         val moduleBuild = moduleBuildFile.get().asFile.readText()
         val versions = versionCatalogFile.get().asFile.readText()
         val wrapper = wrapperFile.get().asFile.readText()
-        val runtime = runtimeRegistriesFile.get().asFile.readText()
+        val actionCatalog = actionCatalogFile.get().asFile.readText()
         val contextSpec = contextSpecFile.get().asFile.readText()
         val bundle = bundleFile.get().asFile.readText()
         val flowControl = flowControlFile.get().asFile.readText()
@@ -130,8 +130,8 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
             "room" to catalogValue(versions, "room"),
             "composeBom" to catalogValue(versions, "composeBom"),
             "work" to catalogValue(versions, "work"),
-            "registeredActions" to Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),")
-                .findAll(runtime)
+            "registeredActions" to Regex("(?m)^\\s*define\\(\\\"")
+                .findAll(actionCatalog)
                 .count()
                 .toString(),
             "engineHandledActions" to (flowControlIds.size + 1).toString(),

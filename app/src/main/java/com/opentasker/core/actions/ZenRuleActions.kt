@@ -10,10 +10,7 @@ import android.service.notification.Condition
 import android.service.notification.ZenDeviceEffects
 import androidx.annotation.RequiresApi
 import com.opentasker.app.MainActivity
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 
 private const val AUTOMATIC_ZEN_RULE_API = 35
@@ -94,10 +91,7 @@ private class ZenRuleStore(context: Context) {
 
 class ZenRuleSetAction(
     private val sdkInt: () -> Int = { Build.VERSION.SDK_INT },
-) : Action {
-    override val id = "zen.rule.set"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.NEVER
+) : DeclaredAction(ActionCatalog.require("zen.rule.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val spec = ZenRuleActionSupport.parse(args).getOrElse {
@@ -178,10 +172,7 @@ class ZenRuleSetAction(
 
 class ZenRuleClearAction(
     private val sdkInt: () -> Int = { Build.VERSION.SDK_INT },
-) : Action {
-    override val id = "zen.rule.clear"
-    override val category = ActionCategory.SETTINGS
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+) : DeclaredAction(ActionCatalog.require("zen.rule.clear")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val id = args["id"]?.trim().orEmpty()

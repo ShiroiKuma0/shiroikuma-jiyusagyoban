@@ -1,7 +1,5 @@
 package com.opentasker.core.actions
 
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.ActionRetrySafety
@@ -33,10 +31,7 @@ import okhttp3.Response
 class HttpRequestAction(
     private val baseClient: OkHttpClient = DEFAULT_HTTP_CLIENT,
     private val localNetworkGuard: (ActionContext) -> ActionResult? = ::checkLocalNetworkPermission,
-) : Action {
-    override val id = ID
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.NEVER
+) : DeclaredAction(ActionCatalog.require(ID)) {
 
     override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety = when (
         args["method"]?.trim()?.uppercase() ?: "GET"
@@ -186,10 +181,7 @@ class HttpRequestAction(
 /** Compatibility execution path for stored `http.get` actions. New actions use [HttpRequestAction]. */
 class HttpGetAction(
     private val delegate: HttpRequestAction = HttpRequestAction(),
-) : Action {
-    override val id = "http.get"
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+) : DeclaredAction(ActionCatalog.require("http.get")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")
@@ -206,10 +198,7 @@ class HttpGetAction(
 /** Compatibility execution path for stored `http.post` actions. New actions use [HttpRequestAction]. */
 class HttpPostAction(
     private val delegate: HttpRequestAction = HttpRequestAction(),
-) : Action {
-    override val id = "http.post"
-    override val category = ActionCategory.NET
-    override val retrySafety = ActionRetrySafety.NEVER
+) : DeclaredAction(ActionCatalog.require("http.post")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         if (args["url"].isNullOrBlank()) return ActionResult.Failure("missing url")

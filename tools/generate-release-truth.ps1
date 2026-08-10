@@ -12,7 +12,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $Root "tools\release-truth.json"
 }
 $Gradle = Get-Content -LiteralPath (Join-Path $Root "app\build.gradle.kts") -Raw
-$RuntimeRegistries = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\RuntimeRegistries.kt") -Raw
+$ActionCatalog = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\actions\ActionCatalog.kt") -Raw
 $ContextSpec = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\model\ContextSpec.kt") -Raw
 $FlowStructure = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\engine\FlowStructure.kt") -Raw
 $TaskRunner = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\engine\TaskRunner.kt") -Raw
@@ -69,7 +69,7 @@ $truth = [ordered]@{
         work = Match-Value $Versions '(?m)^work\s*=\s*"([^"]+)"' "WorkManager version"
     }
     capabilities = [ordered]@{
-        registeredActions = ([regex]::Matches($RuntimeRegistries, '(?m)^\s+[A-Za-z0-9]+Action\(\),')).Count
+        registeredActions = ([regex]::Matches($ActionCatalog, '(?m)^\s*define\("')).Count
         engineHandledActions = $engineHandledActionCount
         contextFamilies = ([regex]::Match($ContextSpec, '(?s)enum class ContextType\s*\{(.*?)\}')).Groups[1].Value.Split("`n") |
             Where-Object { $_ -match '^\s+[A-Z][A-Z_]+\s*(,|//)' } | Measure-Object | Select-Object -ExpandProperty Count

@@ -6,10 +6,7 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.view.KeyEvent
 import kotlinx.coroutines.suspendCancellableCoroutine
-import com.opentasker.core.engine.Action
-import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
-import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AudioUsageEligibility
@@ -21,10 +18,7 @@ import com.opentasker.core.platform.AudioUsageEligibility
  *   - "path": file path or URI (e.g., content://media/external/audio/media/123)
  *   - "volume": 0-100 (optional)
  */
-class PlaySoundAction : Action {
-    override val id = "sound.play"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.NEVER
+class PlaySoundAction : DeclaredAction(ActionCatalog.require("sound.play")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
@@ -63,10 +57,7 @@ class PlaySoundAction : Action {
 /**
  * Stop/pause audio playback.
  */
-class StopSoundAction : Action {
-    override val id = "sound.stop"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class StopSoundAction : DeclaredAction(ActionCatalog.require("sound.stop")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Stop playback")
@@ -77,10 +68,7 @@ class StopSoundAction : Action {
 /**
  * Pause audio playback.
  */
-class PauseSoundAction : Action {
-    override val id = "sound.pause"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class PauseSoundAction : DeclaredAction(ActionCatalog.require("sound.pause")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Pause playback")
@@ -91,10 +79,7 @@ class PauseSoundAction : Action {
 /**
  * Next track.
  */
-class NextTrackAction : Action {
-    override val id = "track.next"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.NEVER
+class NextTrackAction : DeclaredAction(ActionCatalog.require("track.next")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Next track")
@@ -105,10 +90,7 @@ class NextTrackAction : Action {
 /**
  * Previous track.
  */
-class PreviousTrackAction : Action {
-    override val id = "track.previous"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.NEVER
+class PreviousTrackAction : DeclaredAction(ActionCatalog.require("track.previous")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Previous track")
@@ -122,10 +104,7 @@ class PreviousTrackAction : Action {
  * Args:
  *   - "stream": stream type (music, ring, notification, etc.)
  */
-class MuteAction : Action {
-    override val id = "media.mute"
-    override val category = ActionCategory.MEDIA
-    override val retrySafety = ActionRetrySafety.IDEMPOTENT
+class MuteAction : DeclaredAction(ActionCatalog.require("media.mute")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val stream = args["stream"] ?: "music"

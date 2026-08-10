@@ -21,7 +21,7 @@ private fun deriveSourceValue(file: java.io.File, pattern: String, name: String)
         ?: error("Could not derive $name from ${file.path}.")
 
 private fun deriveRegisteredActionCount(file: java.io.File): Int =
-    Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),").findAll(file.readText()).count()
+    Regex("(?m)^\\s*define\\(\\\"").findAll(file.readText()).count()
 
 private fun deriveContextFamilyCount(file: java.io.File): Int {
     val body = deriveSourceValue(
@@ -889,7 +889,7 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
 
     val repositoryRootPath = rootProject.layout.projectDirectory.asFile
     val readmeFilePath = repositoryRootPath.resolve("README.md")
-    val runtimeRegistriesFilePath = projectDir.resolve("src/main/java/com/opentasker/core/RuntimeRegistries.kt")
+    val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
     val contextSpecFilePath = projectDir.resolve("src/main/java/com/opentasker/core/model/ContextSpec.kt")
     val databaseFilePath = projectDir.resolve("src/main/java/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
@@ -906,7 +906,7 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     currentDocumentation.from(currentDocumentationPaths)
     historicalDocumentation.from(historicalDocumentationPaths)
     versionName.set(appVersionName)
-    actionCount.set(deriveRegisteredActionCount(runtimeRegistriesFilePath))
+    actionCount.set(deriveRegisteredActionCount(actionCatalogFilePath))
     contextFamilyCount.set(deriveContextFamilyCount(contextSpecFilePath))
     schemaVersion.set(deriveRoomSchemaVersion(databaseFilePath))
     repositoryRoot.set(repositoryRootPath)
@@ -917,7 +917,7 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     readmeFile.set(rootProject.layout.projectDirectory.file("README.md"))
     metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
     moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
-    runtimeRegistriesFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/RuntimeRegistries.kt"))
+    actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/actions/ActionCatalog.kt"))
     contextSpecFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/model/ContextSpec.kt"))
     bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
     versionCatalogFile.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
