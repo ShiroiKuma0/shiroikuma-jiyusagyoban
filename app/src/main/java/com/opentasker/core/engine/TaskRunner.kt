@@ -198,6 +198,21 @@ class TaskRunner(
         val tryStack = ArrayDeque<TryFrame>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
+        // Only the FIRST unhandled failure is kept: it is the one that actually ended the run, and a
+        // later one (from a continueOnError action further down) would misname the cause.
+        var structuredFailure: StructuredTaskError? = null
+        fun recordFailure(index: Int, spec: ActionSpec, failure: ActionResult.Failure) {
+            if (structuredFailure != null) return
+            structuredFailure = failure.structuredError ?: StructuredTaskError(
+                taskId = task.id,
+                taskName = task.name,
+                actionId = spec.id,
+                actionIndex = index + 1,
+                actionType = spec.type,
+                message = failure.message,
+                attemptCount = 1,
+            )
+        }
         try {
             var pc = 0
             var steps = 0
@@ -206,6 +221,7 @@ class TaskRunner(
                     val failure = ActionResult.Failure("flow step budget ($MAX_FLOW_STEPS) exceeded")
                     results += failure
                     traces += markerTrace(pc, task.actions[pc], failure, ActionTraceStatus.FAILURE)
+                    recordFailure(pc, task.actions[pc], failure)
                     unhandledFailure = true
                     break
                 }
@@ -215,7 +231,10 @@ class TaskRunner(
                     results += outcome.result
                     traces += outcome.trace
                     if (outcome.halt) {
-                        if (outcome.result is ActionResult.Failure) unhandledFailure = true
+                        (outcome.result as? ActionResult.Failure)?.let {
+                            recordFailure(pc, spec, it)
+                            unhandledFailure = true
+                        }
                         break
                     }
                     pc = outcome.nextPc
@@ -234,6 +253,7 @@ class TaskRunner(
                         continue
                     }
                     if (!spec.continueOnError) {
+                        recordFailure(pc, spec, result)
                         unhandledFailure = true
                         break
                     }
@@ -252,7 +272,8 @@ class TaskRunner(
             traces = traces,
             success = !unhandledFailure && results.withIndex().all { (index, result) ->
                 result !is ActionResult.Failure || index in handledFailureIndices
-            }
+            },
+            structuredError = structuredFailure,
         )
     }
 
@@ -715,6 +736,14 @@ data class TaskRunReport(
     val results: List<ActionResult>,
     val traces: List<ActionExecutionTrace>,
     val success: Boolean,
+    /**
+     * The failure that ended this run, when one did and nothing caught it.
+     *
+     * It names the action rather than just the message, which is what a fallback task needs to say
+     * anything useful about what broke — and it is the presence of this, not `!success`, that makes a
+     * run eligible for a fallback: a run stopped on purpose has no error to recover from.
+     */
+    val structuredError: StructuredTaskError? = null,
 )
 
 enum class ActionTraceStatus {

@@ -429,6 +429,7 @@ data class ProfilePolicyDraft(
     val maxActiveExecutions: Int?,
     val burstLimit: Int?,
     val overflowPolicy: ProfileOverflowPolicy,
+    val fallbackTaskId: Long?,
 ) {
     companion object {
         fun from(profile: Profile?): ProfilePolicyDraft = ProfilePolicyDraft(
@@ -439,6 +440,7 @@ data class ProfilePolicyDraft(
             maxActiveExecutions = profile?.maxActiveExecutions,
             burstLimit = profile?.burstLimit,
             overflowPolicy = profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG,
+            fallbackTaskId = profile?.fallbackTaskId,
         )
     }
 }
@@ -453,6 +455,7 @@ fun Profile.withPolicy(draft: ProfilePolicyDraft): Profile = ProfileLifecyclePol
         maxActiveExecutions = draft.maxActiveExecutions,
         burstLimit = draft.burstLimit,
         overflowPolicy = draft.overflowPolicy,
+        fallbackTaskId = draft.fallbackTaskId,
         // Re-arming a spent one-shot is the point of editing it back to ONCE; a profile that is no
         // longer ONCE cannot stay "consumed" either.
         lifetimeConsumed = lifetimeConsumed && draft.lifetime == ProfileLifetime.ONCE && lifetime == ProfileLifetime.ONCE,
@@ -489,6 +492,7 @@ internal fun ProfileEditorDialog(
     var maxActiveText by rememberSaveable(profile?.id) { mutableStateOf(profile?.maxActiveExecutions?.toString().orEmpty()) }
     var burstText by rememberSaveable(profile?.id) { mutableStateOf(profile?.burstLimit?.toString().orEmpty()) }
     var overflowPolicy by rememberSaveable(profile?.id) { mutableStateOf(profile?.overflowPolicy ?: ProfileOverflowPolicy.LOG) }
+    var fallbackTaskId by rememberSaveable(profile?.id) { mutableLongStateOf(profile?.fallbackTaskId ?: 0L) }
 
     val parsedPriority = priorityText.trim().toIntOrNull()
     val priorityValid = parsedPriority != null &&
@@ -513,6 +517,7 @@ internal fun ProfileEditorDialog(
         maxActiveExecutions = parsedMaxActive,
         burstLimit = parsedBurst,
         overflowPolicy = overflowPolicy,
+        fallbackTaskId = fallbackTaskId.takeIf { it > 0L },
     )
     // Names are unique within a project (siblingNames = other profiles in the same project, lowercased).
     val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
@@ -757,6 +762,29 @@ internal fun ProfileEditorDialog(
                     selected = overflowPolicy == ProfileOverflowPolicy.SILENT,
                     onClick = { overflowPolicy = ProfileOverflowPolicy.SILENT },
                 )
+
+                Text("Recovery task", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "Run when this profile's task fails and nothing in it caught the error. It receives " +
+                        "the failure as variables — which task, which action, which message — so it can " +
+                        "report or repair. It runs once and never triggers its own recovery.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SelectableOption(
+                    title = "None",
+                    body = "A failure is logged and left alone.",
+                    selected = fallbackTaskId <= 0L,
+                    onClick = { fallbackTaskId = 0L },
+                )
+                tasks.filter { it.id != enterTaskId }.forEach { candidate ->
+                    SelectableOption(
+                        title = candidate.name,
+                        body = stringResource(R.string.label_action_count, candidate.actions.size),
+                        selected = candidate.id == fallbackTaskId,
+                        onClick = { fallbackTaskId = candidate.id },
+                    )
+                }
             }
         },
         confirmButton = {
