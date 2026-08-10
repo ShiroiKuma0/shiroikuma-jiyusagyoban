@@ -101,11 +101,13 @@ object LocaleConditionTarget {
         return when (kind) {
             LocaleConditionKind.PROFILE_ACTIVE -> LocaleConditionSpec(
                 kind = kind,
-                profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID]),
+                profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID])
+                    ?: error("Invalid profile identifier."),
             )
             LocaleConditionKind.CONTEXT_SATISFIED -> LocaleConditionSpec(
                 kind = kind,
-                profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID]),
+                profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID])
+                    ?: error("Invalid profile identifier."),
                 contextIndex = parseContextIndex(values[BUNDLE_KEY_CONTEXT_INDEX]),
             )
             LocaleConditionKind.VARIABLE_COMPARE -> LocaleConditionSpec(

@@ -123,6 +123,29 @@ object AutomationTargetContract {
             .firstOrNull { it.wireValue == rawSource || it.runLogLabel == rawSource }
             ?.runLogLabel
             ?: DEFAULT_RUN_SOURCE
+
+    /**
+     * Extracts only the bounded, string-valued variable extras accepted by RUN_TASK. Keeping this
+     * parser beside the public contract lets tests and future producers exercise the same boundary
+     * without invoking a receiver or touching the database.
+     */
+    fun extractVariableExtras(extras: Bundle?): Map<String, String> {
+        if (extras == null) return emptyMap()
+        return extractVariableExtras(extras.keySet().associateWith { key -> extras.getString(key) })
+    }
+
+    internal fun extractVariableExtras(values: Map<String, String?>): Map<String, String> = values.keys
+            .asSequence()
+            .filter { it.startsWith(VARIABLE_EXTRA_PREFIX) }
+            .sorted()
+            .mapNotNull { key ->
+                val name = key.removePrefix(VARIABLE_EXTRA_PREFIX)
+                if (!isValidVariableName(name)) return@mapNotNull null
+                val value = values[key] ?: return@mapNotNull null
+                name to value.take(MAX_VARIABLE_VALUE_CHARS)
+            }
+            .take(MAX_SUPPLIED_VARIABLES)
+            .toMap()
 }
 
 class AutomationTargetReceiver : BroadcastReceiver() {
@@ -173,7 +196,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val task = resolveTask(intent)
             ?: return failure("Task not found. Provide ${AutomationTargetContract.EXTRA_TASK_ID} or ${AutomationTargetContract.EXTRA_TASK_NAME}.")
 
-        val suppliedVariables = extractVariables(intent.extras)
+        val suppliedVariables = AutomationTargetContract.extractVariableExtras(intent.extras)
         val runSource = AutomationTargetContract.runSourceLabel(
             intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
         )
@@ -344,22 +367,6 @@ class AutomationTargetReceiver : BroadcastReceiver() {
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
                 ?.let { name -> profiles.firstOrNull { it.name.equals(name, ignoreCase = true) } }
-
-    private fun extractVariables(extras: Bundle?): Map<String, String> {
-        if (extras == null) return emptyMap()
-        return extras.keySet()
-            .asSequence()
-            .filter { it.startsWith(AutomationTargetContract.VARIABLE_EXTRA_PREFIX) }
-            .sorted() // deterministic which variables survive the cap
-            .mapNotNull { key ->
-                val name = key.removePrefix(AutomationTargetContract.VARIABLE_EXTRA_PREFIX)
-                if (!AutomationTargetContract.isValidVariableName(name)) return@mapNotNull null
-                val value = extras.getString(key) ?: return@mapNotNull null
-                name to value.take(AutomationTargetContract.MAX_VARIABLE_VALUE_CHARS)
-            }
-            .take(AutomationTargetContract.MAX_SUPPLIED_VARIABLES)
-            .toMap()
-    }
 
     private fun failure(message: String, extras: Bundle = Bundle()): TargetResponse {
         AppLogger.warn(TAG, message)
