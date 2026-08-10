@@ -115,6 +115,7 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 ### Interoperability
 
 - **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
+- **Locale/Tasker condition plugin target** — third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions; the exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
 - **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
 - **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`; see [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
 - **OpenTasker JSON bundles** — schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design

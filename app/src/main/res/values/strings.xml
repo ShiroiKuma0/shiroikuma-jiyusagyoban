@@ -23,6 +23,26 @@
 
     <!-- Navigation -->
     <string name="locale_select_task_title">Select task for Locale plugin</string>
+    <string name="locale_condition_edit_title">Select OpenTasker condition</string>
+    <string name="locale_condition_profiles">Profile state</string>
+    <string name="locale_condition_profile_active">Profile is currently active</string>
+    <string name="locale_condition_no_profiles">No profiles are available.</string>
+    <string name="locale_condition_contexts">Context state</string>
+    <string name="locale_condition_context_satisfied">Context is currently satisfied</string>
+    <string name="locale_condition_no_contexts">No profile contexts are available.</string>
+    <string name="locale_condition_variables">Variable comparison</string>
+    <string name="locale_condition_variable_help">Secret variables are omitted. Choose a non-secret variable, then enter the comparison value.</string>
+    <string name="locale_condition_variable_choose">Choose this variable</string>
+    <string name="locale_condition_no_variables">No non-secret variables are available.</string>
+    <string name="locale_condition_compare_title">Compare %1$s</string>
+    <string name="locale_condition_expected_label">Expected value</string>
+    <string name="locale_condition_save">Use condition</string>
+    <string name="locale_condition_clear_selection">Clear variable selection</string>
+    <string name="locale_condition_operator_equals">equals</string>
+    <string name="locale_condition_operator_not_equals">does not equal</string>
+    <string name="locale_condition_operator_contains">contains</string>
+    <string name="locale_condition_operator_starts_with">starts with</string>
+    <string name="locale_condition_operator_ends_with">ends with</string>
     <string name="nav_profiles">Profiles</string>
     <string name="nav_tasks">Tasks</string>
     <string name="nav_run_log">Run Log</string>

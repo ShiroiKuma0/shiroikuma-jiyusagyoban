@@ -329,6 +329,7 @@ class AutomationService : Service() {
         matcherJobs.clear()
         matchers.clear()
         matchedProfiles.clear()
+        AutomationLiveConditionState.clear()
         dispatchedProfiles.clear()
         cooldowns.clear()
         ExecutionAdmissionRegistry.detach(executionAdmission)
@@ -378,6 +379,7 @@ class AutomationService : Service() {
                 if (profile.id in matchedProfiles) matchedProfiles[profile.id] = profile
             }
         }
+        AutomationLiveConditionState.retainProfiles(activeIds)
         synchronized(dispatchedProfiles) { dispatchedProfiles.retainAll(activeIds) }
         synchronized(pulseContinuities) {
             pulseContinuities.keys.removeAll { it !in activeIds }
@@ -463,12 +465,15 @@ class AutomationService : Service() {
     }
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, event: ContextEvent?) {
+        val pulseProfile = profile.contexts.any { it.type == com.opentasker.core.model.ContextType.EVENT }
         val suppression = ProfileLifecyclePolicy.suppressionReason(profile, System.currentTimeMillis())
         if (suppression != null) {
+            AutomationLiveConditionState.updateProfile(profile.id, false)
             AppLogger.info(TAG, "Profile ${profile.id} activation suppressed: $suppression")
             if (profile.enabled) db.profileDao().upsert(profile.copy(enabled = false).toEntity())
             return
         }
+        AutomationLiveConditionState.updateProfile(profile.id, active = !pulseProfile)
         if (profile.enterTaskId <= 0) return
 
         val task = db.taskDao().getById(profile.enterTaskId)
@@ -483,7 +488,6 @@ class AutomationService : Service() {
             return
         }
 
-        val pulseProfile = profile.contexts.any { it.type == com.opentasker.core.model.ContextType.EVENT }
         val winner = synchronized(matchedProfiles) {
             if (!pulseProfile) matchedProfiles[profile.id] = profile
             ProfileLifecyclePolicy.winner(matchedProfiles.values + profile)
@@ -506,6 +510,7 @@ class AutomationService : Service() {
     }
 
     private suspend fun onProfileDeactivated(profile: com.opentasker.core.model.Profile) {
+        AutomationLiveConditionState.updateProfile(profile.id, false)
         val wasWinner: Boolean
         val wasDispatched: Boolean
         val nextWinner: Profile?
@@ -643,7 +648,6 @@ class AutomationService : Service() {
                 QueuedProfileTask(task, initialVariables, causal),
             )
             DispatchStep.LAUNCH_PARALLEL -> scope.launch { runTask(task, profile, initialVariables, causal) }
-            else -> Unit
         }
     }
 
