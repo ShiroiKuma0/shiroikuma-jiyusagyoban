@@ -93,6 +93,34 @@ class LocalizationSourceTest {
     }
 
     @Test
+    fun successMessagesUseResourceIdsAtEveryCallSite() {
+        val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+        val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
+        val sceneScreen = sourceRoot.resolve("com/opentasker/ui/screens/SceneLibraryScreen.kt").readText()
+        val sceneCards = sourceRoot.resolve("com/opentasker/ui/screens/SceneLibraryCards.kt").readText()
+        val variables = sourceRoot.resolve("com/opentasker/ui/screens/VariablesScreen.kt").readText()
+
+        assertFalse("The raw success-message translation table must not return", "legacyMessage" in viewModel)
+        assertFalse("Success helpers must not receive user-facing literals", Regex("launchWithMessage\\(\\s*\"").containsMatchIn(viewModel))
+        assertFalse("Success callbacks must carry message resources, not resolved text", "successMessage: String" in viewModel)
+        assertFalse("Variable edits must stay resource-backed until collection", Regex("val (created|updated|deleted)Msg = stringResource").containsMatchIn(variables))
+        assertTrue("Profile toggle must choose a resource at its call site", "R.string.ui_message_profile_enabled" in ui)
+        assertTrue("Profile toggle must localize the disabled branch", "R.string.ui_message_profile_disabled" in ui)
+        assertTrue("Scene edits must pass resource IDs", "onUpdateScene: (Scene, Int)" in sceneScreen && "onUpdateScene: (Scene, Int)" in sceneCards)
+
+        val resources = defaultStringResourceNames()
+        listOf(
+            "ui_message_profile_enabled",
+            "ui_message_profile_disabled",
+            "ui_message_action_removed",
+            "ui_message_context_removed",
+            "ui_message_element_moved",
+            "ui_message_element_resized",
+            "ui_message_element_removed",
+        ).forEach { resource -> assertTrue("Missing success resource: $resource", resource in resources) }
+    }
+
+    @Test
     fun flowGraphUsesTheCurrentResourceBundleForGeneratedCopy() {
         val flow = sourceRoot.resolve("com/opentasker/ui/screens/AutomationFlowScreen.kt").readText()
         val graph = sourceRoot.resolve("com/opentasker/core/flow/AutomationFlowGraph.kt").readText()

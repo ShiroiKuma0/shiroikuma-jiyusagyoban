@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.opentasker.app.R
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.scenes.SceneOverlayService
@@ -28,7 +29,7 @@ fun SceneLibraryScreen(
     tasks: List<Task>,
     focusSceneId: Long? = null,
     onCreateScene: (String, Int, Int) -> Unit,
-    onUpdateScene: (Scene, String) -> Unit,
+    onUpdateScene: (Scene, Int) -> Unit,
     onUndoSceneEdit: (Scene) -> Unit = {},
     onRedoSceneEdit: (Scene) -> Unit = {},
     onDeleteScene: (Scene) -> Unit,
@@ -95,7 +96,10 @@ fun SceneLibraryScreen(
                         },
                     )
                 }
-                onUpdateScene(updatedScene, if (state.index == null) "Element added" else "Element updated")
+                onUpdateScene(
+                    updatedScene,
+                    if (state.index == null) R.string.ui_message_element_added else R.string.ui_message_element_updated,
+                )
                 elementEditorSceneId = null
                 elementEditorIndex = null
             },
@@ -114,7 +118,7 @@ fun SceneLibraryScreen(
                 if (index != null) {
                     onUpdateScene(
                         state.scene.copy(elements = state.scene.elements.filterIndexed { i, _ -> i != index }),
-                        "Element removed",
+                        R.string.ui_message_element_removed,
                     )
                 }
                 pendingElementDeleteSceneId = null

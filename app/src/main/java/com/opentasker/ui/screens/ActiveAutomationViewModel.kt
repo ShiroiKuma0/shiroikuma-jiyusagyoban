@@ -290,37 +290,6 @@ class ActiveAutomationViewModel(
     private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage =
         message(R.string.ui_error_message, error.message ?: appContext.getString(fallbackRes))
 
-    private fun legacyMessage(value: String): UiMessage = when {
-        value == "Task created" -> message(R.string.ui_message_task_created)
-        value == "Task updated" -> message(R.string.ui_message_task_updated)
-        value == "Action moved" -> message(R.string.ui_message_action_moved)
-        value == "Scene created" -> message(R.string.ui_message_scene_created)
-        value == "Scene updated" -> message(R.string.ui_message_scene_updated)
-        value == "Scene deleted" -> message(R.string.ui_message_scene_deleted)
-        value == "Profile created" -> message(R.string.ui_message_profile_created)
-        value == "Profile updated" -> message(R.string.ui_message_profile_updated)
-        value == "Profile deleted" -> message(R.string.ui_message_profile_deleted)
-        value == "Project created" -> message(R.string.ui_message_project_created)
-        value == "Project renamed" -> message(R.string.ui_message_project_renamed)
-        value == "Project reordered" -> message(R.string.ui_message_project_reordered)
-        value == "Project deleted" -> message(R.string.ui_message_project_deleted)
-        value == "Imported profile reviewed and enabled" -> message(R.string.ui_message_profile_reviewed)
-        value == "Template installed as a disabled profile" -> message(R.string.ui_message_template_installed)
-        value == "Edit undone" -> message(R.string.ui_message_edit_undone)
-        value == "No edit history available" -> message(R.string.ui_message_no_edit_history)
-        value == "Elements moved" -> message(R.string.ui_message_elements_moved)
-        value == "Element added" -> message(R.string.ui_message_element_added)
-        value == "Element updated" -> message(R.string.ui_message_element_updated)
-        value == "Action added" -> message(R.string.ui_message_action_added)
-        value == "Action updated" -> message(R.string.ui_message_action_updated)
-        value == "Context added" -> message(R.string.ui_message_context_added)
-        value == "Context updated" -> message(R.string.ui_message_context_updated)
-        value == "Variable created" -> message(R.string.ui_message_variable_created)
-        value.startsWith("Updated ") -> message(R.string.variables_updated, value.removePrefix("Updated "))
-        value.startsWith("Deleted ") -> message(R.string.variables_deleted, value.removePrefix("Deleted "))
-        else -> message(R.string.ui_error_message, value)
-    }
-
     private suspend fun recordEdit(
         entityType: String,
         entityId: Long,
@@ -563,7 +532,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int, collisionMode: CollisionMode, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Task created") {
+    fun createTask(name: String, priority: Int, collisionMode: CollisionMode, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage(R.string.ui_message_task_created) {
         db.taskDao().insert(
             Task(
                 name = name.trim(),
@@ -600,7 +569,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
+    fun updateTask(task: Task, @StringRes successMessageRes: Int = R.string.ui_message_task_updated) = launchWithMessage(successMessageRes) {
         // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
         // update must be atomic so a concurrent writer can't interleave and lose a revision.
         db.withTransaction {
@@ -637,7 +606,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun moveTaskAction(taskId: Long, fromIndex: Int, toIndex: Int) = launchWithMessage("Action moved") {
+    fun moveTaskAction(taskId: Long, fromIndex: Int, toIndex: Int) = launchWithMessage(R.string.ui_message_action_moved) {
         db.withTransaction {
             val entity = db.taskDao().getById(taskId) ?: error("Task no longer exists.")
             val decoded = entity.toDomainDecodeResult()
@@ -728,7 +697,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage("Scene created") {
+    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage(R.string.ui_message_scene_created) {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
@@ -762,7 +731,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
+    fun updateScene(scene: Scene, @StringRes successMessageRes: Int = R.string.ui_message_scene_updated) = launchWithMessage(successMessageRes) {
         db.withTransaction {
             val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
             if (previous != null) {
@@ -780,7 +749,7 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
+    fun deleteScene(scene: Scene) = launchWithMessage(R.string.ui_message_scene_deleted) {
         db.sceneDao().delete(scene.toEntity())
     }
 
@@ -802,7 +771,7 @@ class ActiveAutomationViewModel(
         overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
         fallbackTaskId: Long? = null,
     ) =
-        launchWithMessage("Profile created") {
+        launchWithMessage(R.string.ui_message_profile_created) {
             val profile = ProfileLifecyclePolicy.normalize(
                 Profile(
                 name = name.trim(),
@@ -852,8 +821,8 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateProfile(profile: Profile, message: String = "Profile updated") =
-        launchWithMessage(message) {
+    fun updateProfile(profile: Profile, @StringRes successMessageRes: Int = R.string.ui_message_profile_updated) =
+        launchWithMessage(successMessageRes) {
             val reviewedProfile = reviewFeedbackRisk(ProfileLifecyclePolicy.normalize(profile))
             requireValidProfileFieldLimits(reviewedProfile)
             val lint = requireAutomationLint(reviewedProfile)
@@ -888,7 +857,7 @@ class ActiveAutomationViewModel(
             emitLintWarnings(reviewedProfile, lint)
         }
 
-    fun createProject(name: String) = launchWithMessage("Project created") {
+    fun createProject(name: String) = launchWithMessage(R.string.ui_message_project_created) {
         val normalized = validateProjectName(name)
         require(db.projectDao().getAll().none { it.name.equals(normalized, ignoreCase = true) }) {
             "A project with that name already exists."
@@ -897,7 +866,7 @@ class ActiveAutomationViewModel(
         db.projectDao().insert(ProjectEntity(name = normalized, position = nextPosition))
     }
 
-    fun renameProject(project: Project, name: String) = launchWithMessage("Project renamed") {
+    fun renameProject(project: Project, name: String) = launchWithMessage(R.string.ui_message_project_renamed) {
         require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be renamed." }
         val normalized = validateProjectName(name)
         require(db.projectDao().getAll().none { it.id != project.id && it.name.equals(normalized, ignoreCase = true) }) {
@@ -906,7 +875,7 @@ class ActiveAutomationViewModel(
         db.projectDao().update(ProjectEntity(project.id, normalized, project.position))
     }
 
-    fun reorderProject(project: Project, direction: Int) = launchWithMessage("Project reordered") {
+    fun reorderProject(project: Project, direction: Int) = launchWithMessage(R.string.ui_message_project_reordered) {
         val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
         val index = ordered.indexOfFirst { it.id == project.id }
         val targetIndex = (index + direction.coerceIn(-1, 1)).coerceIn(0, ordered.lastIndex)
@@ -916,7 +885,7 @@ class ActiveAutomationViewModel(
         db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
     }
 
-    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage("Project deleted") {
+    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage(R.string.ui_message_project_deleted) {
         require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be deleted." }
         require(project.id != targetProject.id) { "Choose a different destination project." }
         db.withTransaction {
@@ -953,7 +922,7 @@ class ActiveAutomationViewModel(
     }
 
     fun acknowledgeAndEnableImportedProfile(profileId: Long) =
-        launchWithMessage("Imported profile reviewed and enabled") {
+        launchWithMessage(R.string.ui_message_profile_reviewed) {
             val current = db.profileDao().getById(profileId)?.toDomain()
                 ?: throw IllegalStateException("Profile no longer exists.")
             check(current.requiresRiskAcknowledgement) { "Profile review is no longer required." }
@@ -983,13 +952,13 @@ class ActiveAutomationViewModel(
             emitLintWarnings(enabledProfile, lint)
         }
 
-    fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
+    fun deleteProfile(profile: Profile) = launchWithMessage(R.string.ui_message_profile_deleted) {
         db.profileDao().delete(profile.toEntity())
         locationDwellStateStore.clearProfile(profile.id)
     }
 
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
-        launchWithMessage("Template installed as a disabled profile") {
+        launchWithMessage(R.string.ui_message_template_installed) {
             val applied = template.instantiate(slotValues)
             val resolvedValues = template.defaults() + slotValues.mapValues { it.value.trim() }
             var taskId = 0L
@@ -1905,7 +1874,7 @@ class ActiveAutomationViewModel(
         name: String,
         value: String,
         isSecret: Boolean,
-        successMessage: String,
+        successMessage: UiMessage,
         projectId: Long = DEFAULT_PROJECT_ID,
     ) {
         viewModelScope.launch {
@@ -1983,14 +1952,14 @@ class ActiveAutomationViewModel(
                         variableRepository.rename(previous.name, updated)
                     }
                 }
-                events.send(legacyMessage(successMessage))
+                events.send(successMessage)
             }.onFailure { error ->
                 events.send(errorMessage(error, R.string.ui_error_variable_save))
             }
         }
     }
 
-    fun deleteVariable(name: String, successMessage: String, projectId: Long = DEFAULT_PROJECT_ID) {
+    fun deleteVariable(name: String, successMessage: UiMessage, projectId: Long = DEFAULT_PROJECT_ID) {
         viewModelScope.launch {
             runCatching {
                 db.withTransaction {
@@ -2024,7 +1993,7 @@ class ActiveAutomationViewModel(
                     variableRepository.delete(variable.name, projectId)
                 }
             }
-                .onSuccess { events.send(legacyMessage(successMessage)) }
+                .onSuccess { events.send(successMessage) }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
         }
     }
@@ -2082,10 +2051,10 @@ class ActiveAutomationViewModel(
         }
     }
 
-    private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
+    private fun launchWithMessage(@StringRes successMessageRes: Int, block: suspend () -> Unit) {
         viewModelScope.launch {
             runCatching { block() }
-                .onSuccess { events.send(legacyMessage(successMessage)) }
+                .onSuccess { events.send(message(successMessageRes)) }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
