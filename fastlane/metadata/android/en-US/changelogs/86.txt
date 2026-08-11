@@ -1,0 +1,5 @@
+Exported backups now restore on another device and after a reinstall, and upgrading a database created before OpenTasker encrypted its storage no longer discards it.
+
+Automatic local snapshots, reachable Tasker XML export, and a read grant before the exported Locale receiver will report on a variable.
+
+Fixes: Wait-mode deadlock, startup recovery racing live runs, simulation dialogs discarding edits, flow-canvas change markers, and the widget palette.
