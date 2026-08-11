@@ -63,7 +63,7 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("resolutionResult.allComponents"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("private val JVM_TEST_FLOOR = 1049"))
+        assertTrue(build.contains("private val JVM_TEST_FLOOR = 1200"))
         assertTrue(build.contains("minimumTests.set(JVM_TEST_FLOOR)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
@@ -74,7 +74,7 @@ class LocalReleaseGateContractTest {
         val build = repoRoot.resolve("app/build.gradle.kts").readText()
         val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
 
-        assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1049").findAll(build).count())
+        assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1200").findAll(build).count())
         assertTrue(build.contains("reportFile.set(rootProject.layout.buildDirectory.file(\"reports/opentasker/jvm-test-count.json\"))"))
         assertTrue(script.contains("jvm-test-count.json"))
         assertTrue(script.contains("observedJvmTests"))
