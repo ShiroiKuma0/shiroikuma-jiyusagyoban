@@ -6,4 +6,6 @@
     <color name="widget_primary">#B7C7B0</color>
     <color name="widget_text_primary">#F4F1EA</color>
     <color name="widget_text_secondary">#A9AEA8</color>
+    <!-- Splash and pre-composition window fill. Black in dark mode, matching the dark schemes. -->
+    <color name="window_background">#000000</color>
 </resources>

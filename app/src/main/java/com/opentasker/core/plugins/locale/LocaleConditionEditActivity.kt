@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -53,6 +54,10 @@ import kotlinx.coroutines.flow.map
 class LocaleConditionEditActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Without this the window keeps Theme.OpenTasker's opaque black bars while the
+        // shared theme sets light status-bar icons, so a Light-theme user sees dark icons
+        // on black - invisible - on Android 8 through 14. MainActivity already does this.
+        enableEdgeToEdge()
         val db = runCatching { OpenTaskerApp_NoHilt.db }.getOrNull()
         if (db == null) {
             setResult(RESULT_CANCELED)

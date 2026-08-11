@@ -81,7 +81,10 @@ object DesignSystem {
     // ========== Semantic Colors ==========
     object SemanticColor {
         val warningDark = androidx.compose.ui.graphics.Color(0xFFFFB4A2) // Peach — warm amber for warnings in dark theme
-        val warningLight = androidx.compose.ui.graphics.Color(0xFFDF8E1D) // Latte Yellow — warm amber for warnings in light theme
+        // Text-grade amber, not the accent-grade #DF8E1D it replaced: that measured 2.5:1 on
+        // surface and 2.2:1 on surfaceVariant, below the 4.5:1 AA floor for the 13sp warning
+        // text it is used for.
+        val warningLight = androidx.compose.ui.graphics.Color(0xFF7A5000) // Deep amber — warnings on light surfaces
     }
 
     // ========== Opacity Scale ==========

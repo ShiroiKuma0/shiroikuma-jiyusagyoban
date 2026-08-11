@@ -12,4 +12,8 @@
     <color name="widget_primary">#4D6653</color>
     <color name="widget_text_primary">#20241F</color>
     <color name="widget_text_secondary">#606960</color>
+    <!-- Splash and pre-composition window fill. Matches LightBase in ui/theme/Theme.kt. -->
+    <color name="window_background">#F4F2EC</color>
+    <!-- Notification accent; the sage primary shared with the widget. -->
+    <color name="notification_accent">#4D6653</color>
 </resources>
