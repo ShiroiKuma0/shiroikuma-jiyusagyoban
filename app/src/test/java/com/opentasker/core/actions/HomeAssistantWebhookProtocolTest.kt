@@ -36,6 +36,40 @@ class HomeAssistantWebhookProtocolTest {
     }
 
     @Test
+    fun buildsHomeAssistantNotificationCommandEnvelope() {
+        val config = HomeAssistantWebhookProtocol.parse(
+            mapOf(
+                "url" to "https://hooks.example.test/ha",
+                "message" to "command_broadcast_intent",
+                "data" to "{\"intent_action\":\"com.opentasker.action.RUN_TASK\"}",
+            ),
+        ).getOrThrow()
+
+        assertEquals(
+            "{\"message\":\"command_broadcast_intent\",\"data\":{\"intent_action\":\"com.opentasker.action.RUN_TASK\"}}",
+            config.payload,
+        )
+    }
+
+    @Test
+    fun rejectsUnknownHomeAssistantCommandAndAmbiguousPayloadFields() {
+        assertTrue(
+            HomeAssistantWebhookProtocol.parse(
+                mapOf("url" to "https://hooks.example.test/ha", "message" to "command_not_real"),
+            ).isFailure,
+        )
+        assertTrue(
+            HomeAssistantWebhookProtocol.parse(
+                mapOf(
+                    "url" to "https://hooks.example.test/ha",
+                    "payload" to "{}",
+                    "message" to "command_update_sensors",
+                ),
+            ).isFailure,
+        )
+    }
+
+    @Test
     fun transientFailuresRetryButPermanentResponsesDoNot() {
         assertTrue(HomeAssistantWebhookProtocol.isTransientFailure(ActionResult.Failure("HTTP 500")))
         assertTrue(HomeAssistantWebhookProtocol.isTransientFailure(ActionResult.Failure("HTTP 429")))

@@ -26,6 +26,15 @@ class AutomationTargetContractTest {
     }
 
     @Test
+    fun exposesHomeAssistantVocabularyAsNonBreakingAliases() {
+        assertEquals("command_broadcast_intent", AutomationTargetContract.HOME_ASSISTANT_COMMAND_BROADCAST_INTENT)
+        assertEquals("message", AutomationTargetContract.HOME_ASSISTANT_FIELD_MESSAGE)
+        assertEquals("data", AutomationTargetContract.HOME_ASSISTANT_FIELD_DATA)
+        assertEquals("intent_extras", AutomationTargetContract.HOME_ASSISTANT_FIELD_INTENT_EXTRAS)
+        assertEquals(2, AutomationTargetContract.PROTOCOL_VERSION)
+    }
+
+    @Test
     fun rejectsInvalidVariableExtraNames() {
         val error = runCatching {
             AutomationTargetContract.variableExtraName("bad-name")

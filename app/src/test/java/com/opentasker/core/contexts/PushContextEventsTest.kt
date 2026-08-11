@@ -103,4 +103,36 @@ class PushContextEventsTest {
         val missingId = """{"topic":"tasks","message":"hello"}""".toByteArray(StandardCharsets.UTF_8)
         assertNull(PushContextEvents.parseUnifiedPushMessage(missingId))
     }
+
+    @Test
+    fun ntfyBroadcastUsesDocumentedExtraNamesWithoutExposingMessage() {
+        val event = PushContextEvents.parseDelivery(
+            PushDelivery(
+                token = "token",
+                topic = "tasks",
+                eventId = "ntfy-action-1",
+                title = "Run task",
+                message = "secret body",
+                baseUrl = "https://ntfy.example.test",
+                time = "1710000000",
+                priority = "4",
+            ),
+            expectedToken = "token",
+            nowMs = 20_000L,
+        )
+
+        assertEquals("ntfy-action-1", event?.metadata?.get(PushContextEvents.NTFY_EXTRA_ID))
+        assertEquals("https://ntfy.example.test", event?.metadata?.get(PushContextEvents.NTFY_EXTRA_BASE_URL))
+        assertEquals("1710000000", event?.metadata?.get(PushContextEvents.NTFY_EXTRA_TIME))
+        assertEquals("4", event?.metadata?.get(PushContextEvents.NTFY_EXTRA_PRIORITY))
+        assertFalse(event?.metadata?.containsKey(PushContextEvents.NTFY_EXTRA_MESSAGE) == true)
+    }
+
+    @Test
+    fun ntfyBroadcastActionNameStillRequiresTheOpenTaskerToken() {
+        val delivery = PushDelivery(token = "token", topic = "tasks", eventId = "button-1")
+
+        assertTrue(PushContextEvents.parseDelivery(delivery, expectedToken = "token") != null)
+        assertNull(PushContextEvents.parseDelivery(delivery, expectedToken = "other"))
+    }
 }

@@ -1129,6 +1129,8 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("url", R.string.catalog_action_home_assistant_webhook_field_url_label, required = true, hintRes = R.string.catalog_action_home_assistant_webhook_field_url_hint, sensitive = true),
                 ActionField("payload", R.string.catalog_action_home_assistant_webhook_field_payload_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_home_assistant_webhook_field_payload_hint, sensitive = true),
+                ActionField("message", R.string.catalog_action_home_assistant_webhook_field_message_label, hintRes = R.string.catalog_action_home_assistant_webhook_field_message_hint),
+                ActionField("data", R.string.catalog_action_home_assistant_webhook_field_data_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_home_assistant_webhook_field_data_hint, sensitive = true),
                 ActionField("timeout_sec", R.string.catalog_action_home_assistant_webhook_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_timeout_hint, numberRule = integerRule(1, 30)),
                 ActionField("retries", R.string.catalog_action_home_assistant_webhook_field_retries_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_retries_hint, numberRule = integerRule(0, 3)),
                 ActionField("backoff_ms", R.string.catalog_action_home_assistant_webhook_field_backoff_label, FieldType.NUMBER, hintRes = R.string.catalog_action_home_assistant_webhook_field_backoff_hint, numberRule = integerRule(100, 5_000)),
