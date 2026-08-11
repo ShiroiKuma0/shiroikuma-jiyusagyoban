@@ -150,6 +150,14 @@
     <string name="dialog_edit_profile">Edit Profile</string>
     <string name="dialog_add_action">Add action</string>
     <string name="dialog_add_context">Add context</string>
+    <string name="action_picker_search_label">Search actions</string>
+    <string name="action_picker_search_hint">Name, description, or action ID</string>
+    <string name="action_picker_clear_search">Clear action search</string>
+    <string name="action_picker_no_results">No actions match your search.</string>
+    <string name="context_picker_search_label">Search contexts</string>
+    <string name="context_picker_search_hint">Name, description, or context type</string>
+    <string name="context_picker_clear_search">Clear context search</string>
+    <string name="context_picker_no_results">No contexts match your search.</string>
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
     <string name="dialog_review_bundle">Review OpenTasker bundle</string>
     <string name="dialog_review_tasker">Review Tasker import</string>

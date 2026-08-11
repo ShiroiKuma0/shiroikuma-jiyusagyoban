@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Action and context pickers now have clearable search across localized names, descriptions, and stable IDs; empty queries show a clear no-match state, and localized catalogs are rebuilt only when the configuration changes.
 - Back navigation now returns from secondary destinations to Profiles and exits only from the start screen; app-wide settings have a dedicated primary destination separate from the permission checklist, with navigation state retained across recreation.
 - Dismissing the first-run starter-template picker now completes onboarding, including Back/scrim dismissal and cancelling the template details step; the template browser remains available from the workspace.
 - User-facing automation labels, setup requirements, capability levels, share trust, diagnostics levels, and scene element types now resolve through localized resources; unknown action IDs and operation failures use safe generic copy while raw details remain in diagnostics logs.

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.annotation.SuppressLint
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -36,11 +37,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -64,24 +68,88 @@ import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 
+internal data class LocalizedContextType(
+    val type: ContextType,
+    val title: String,
+    val description: String,
+)
+
+internal fun filterContextPickerItems(
+    items: List<LocalizedContextType>,
+    query: String,
+): List<LocalizedContextType> {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isEmpty()) return items
+    return items.filter { item ->
+        item.title.contains(normalizedQuery, ignoreCase = true) ||
+            item.description.contains(normalizedQuery, ignoreCase = true) ||
+            item.type.name.contains(normalizedQuery, ignoreCase = true)
+    }
+}
+
 @Composable
+@SuppressLint("LocalContextGetResourceValueCall")
 internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextType) -> Unit) {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    var query by rememberSaveable { mutableStateOf("") }
+    val localizedTypes = remember(configuration) {
+        ContextType.entries.map { type ->
+            LocalizedContextType(
+                type = type,
+                title = context.getString(contextTitleRes(type)),
+                description = context.getString(contextDescriptionRes(type)),
+            )
+        }
+    }
+    val filteredTypes = remember(localizedTypes, query) { filterContextPickerItems(localizedTypes, query) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_add_context)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                ContextType.entries.forEach { type ->
-                    Card(
-                        onClick = { onSelect(type) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
-                        shape = RoundedCornerShape(14.dp),
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.context_picker_search_label)) },
+                    placeholder = { Text(stringResource(R.string.context_picker_search_hint)) },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        {
+                            TextButton(onClick = { query = "" }) {
+                                Text(stringResource(R.string.context_picker_clear_search))
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                    singleLine = true,
+                )
+                if (filteredTypes.isEmpty()) {
+                    Text(
+                        stringResource(R.string.context_picker_no_results),
+                        modifier = Modifier.padding(vertical = 24.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                     ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                            Text(stringResource(contextTitleRes(type)), style = MaterialTheme.typography.titleSmall)
-                            Text(stringResource(contextDescriptionRes(type)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        items(filteredTypes, key = { it.type.name }) { localized ->
+                            val type = localized.type
+                            Card(
+                                onClick = { onSelect(type) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                                shape = RoundedCornerShape(14.dp),
+                            ) {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+                                    Text(localized.title, style = MaterialTheme.typography.titleSmall)
+                                    Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
                         }
                     }
                 }
