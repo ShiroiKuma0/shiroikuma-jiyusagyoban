@@ -447,11 +447,7 @@ ksp {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:model"))
-    implementation(project(":core:storage"))
-    implementation(project(":core:engine"))
-    implementation(project(":feature:automation"))
+    // Upstream's core/* and feature/* modules are not wired in: see the note in settings.gradle.kts.
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -1514,12 +1510,13 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     group = "verification"
     description = "Checks that all Room schema versions up to the current are exported and tracked."
 
-    // core:storage owns the entities now, so its KSP run is what exports the schema. It still
-    // writes into app/schemas, which is where the androidTest migration assets are read from.
-    dependsOn(":core:storage:kspDebugKotlin")
+    // The fork does not take upstream's core/* module split (see settings.gradle.kts), so :app's
+    // own KSP run is what exports the schema, into app/schemas where the androidTest migration
+    // assets are read from.
+    dependsOn("kspDebugKotlin")
     schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
     databaseFile.set(rootProject.layout.projectDirectory.file(
-        "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt",
+        "app/src/main/java/com/opentasker/core/storage/AppDatabase.kt",
     ))
 }
 
@@ -1564,9 +1561,9 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     val readmeFilePath = repositoryRootPath.resolve("README.md")
     val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
     val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
+        .resolve("app/src/main/java/com/opentasker/core/model/ContextSpec.kt")
     val databaseFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt")
+        .resolve("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
         readmeFilePath,
         repositoryRootPath.resolve("CHANGELOG.md"),
@@ -1593,13 +1590,13 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
     moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
     actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/actions/ActionCatalog.kt"))
-    contextSpecFile.set(rootProject.layout.projectDirectory.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt"))
+    contextSpecFile.set(rootProject.layout.projectDirectory.file("app/src/main/java/com/opentasker/core/model/ContextSpec.kt"))
     bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
     versionCatalogFile.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
     wrapperFile.set(rootProject.layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties"))
     flowControlFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/FlowStructure.kt"))
     taskRunnerFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/TaskRunner.kt"))
-    databaseFile.set(rootProject.layout.projectDirectory.file("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt"))
+    databaseFile.set(rootProject.layout.projectDirectory.file("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt"))
     changelogFile.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
     repositoryDirectory.set(rootProject.layout.projectDirectory)
 }
@@ -1809,15 +1806,11 @@ val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyR
     versionName.set(appVersionName)
 }
 
-// Where production Kotlin lives. Source-scanning gates that walk a tree must walk all of these:
-// a gate pointed only at app/ silently stopped covering the 44 files the core modules now own.
+// Where production Kotlin lives. Upstream splits this across core/* modules; the fork keeps one
+// tree (see settings.gradle.kts), so the list stays a list — a future sync that does adopt the
+// split only has to add the roots back here.
 val productionSourceRoots: List<Directory> = listOf(
     layout.projectDirectory.dir("src/main/java"),
-    rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("core/storage/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("core/engine/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("feature/automation/src/main/kotlin"),
 ).filter { it.asFile.isDirectory }
 
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
@@ -1848,9 +1841,6 @@ tasks.register("localQualityGate") {
     description = "Runs the deterministic local debug-quality and dependency-report gate."
     dependsOn(
         verifyReleaseAssetName,
-        ":core:common:testDebugUnitTest",
-        ":core:storage:testDebugUnitTest",
-        ":core:engine:testDebugUnitTest",
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "connectedDebugAndroidTest",
