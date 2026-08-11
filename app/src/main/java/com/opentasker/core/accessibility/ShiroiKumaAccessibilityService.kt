@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.contexts.AppForegroundChangedContextEvents
 import com.opentasker.core.engine.EngineShutdown
+import com.opentasker.core.logging.AppLogger
 import kotlinx.coroutines.delay
 
 /**
@@ -39,7 +40,8 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
     }
 
     // Maintain a foreground-app history from window-state changes — accurate for ALL apps (UsageStats
-    // misses some, e.g. emacs). Only real launchable apps are recorded; overlays / IME / dialogs are skipped.
+    // misses some, e.g. emacs). Only a real launchable app entering through an Activity of its own is
+    // recorded; widgets, overlays, IME and dialogs are skipped.
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Dormant, not disabled, while the app is stopped. disableSelf() would work, but it drops the
         // accessibility grant — 白い熊 would have to re-enable the service by hand in system settings —
@@ -47,6 +49,15 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         if (EngineShutdown.isStopped(this)) return
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
+        // A window-state change is NOT proof that `pkg` came to the front. Anything that adds or replaces
+        // a window inside somebody else's screen fires one tagged with its OWN package: an app widget on
+        // the launcher's desktop, a popup, a toast — and our own scene / bubble overlays. On 白い熊's
+        // widget-dense 雷起動盤 desktop %APP_PACKAGE therefore flipped within seconds of landing on the
+        // home screen (observed: mahojutan, com.android.settings, and jiyusagyoban itself) while
+        // raikidoban held the only application window, so every per-app rule keyed on it read the wrong
+        // app — the 相撲字時計 blacklist never matched raikidoban and the clock stayed up over it.
+        // A real switch names an Activity of `pkg`; a widget or an overlay names a plain View class.
+        if (!isActivityOf(pkg, event.className?.toString())) return
         // Record only real APPLICATION windows — never the IME (keyboard), system tools (screenshot), or
         // overlays. Prefer the window type; if it can't be read, at least exclude IME packages.
         val type = runCatching { windows.firstOrNull { it.id == event.windowId }?.type }.getOrNull()
@@ -66,6 +77,25 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         if (changed) AppForegroundChangedContextEvents.publish(pkg)
     }
 
+    /**
+     * True when [className] is an Activity (or activity-alias) that [pkg] itself declares — the mark of a
+     * real app switch. A widget, popup or overlay window names a View class instead, which no manifest
+     * declares as an activity, so the lookup fails and the event is ignored. The answer is a manifest
+     * fact for as long as the app is installed, so it is cached per class; a package this app cannot see
+     * would answer "no" to everything, which is why the manifest holds QUERY_ALL_PACKAGES.
+     */
+    private fun isActivityOf(pkg: String, className: String?): Boolean {
+        if (className.isNullOrBlank()) return false
+        return activityCache.getOrPut("$pkg/$className") {
+            val declared = runCatching {
+                packageManager.getActivityInfo(ComponentName(pkg, className), 0)
+            }.isSuccess
+            // Once per class, not per event — the desktop's widgets would otherwise flood the log.
+            if (!declared) AppLogger.debug(TAG, "foreground: ignoring $pkg/$className — not an activity")
+            declared
+        }
+    }
+
     private fun isIme(pkg: String): Boolean = imeCache.getOrPut(pkg) {
         (getSystemService(InputMethodManager::class.java)?.enabledInputMethodList ?: emptyList())
             .any { it.packageName == pkg }
@@ -77,10 +107,12 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         @Volatile
         private var instance: ShiroiKumaAccessibilityService? = null
 
+        private const val TAG = "OpenTasker"
         private const val MRU_CAP = 30
         private val mru = ArrayList<String>() // most-recent-first foreground apps (incl. our own when opened)
         private val launchable = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
         private val imeCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+        private val activityCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
         /** Foreground-app history, most-recent-first — captures every real app the user switches to. */
         val recentApps: List<String> get() = synchronized(mru) { mru.toList() }
