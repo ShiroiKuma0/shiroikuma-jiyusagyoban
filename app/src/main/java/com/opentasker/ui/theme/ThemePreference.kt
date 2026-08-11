@@ -12,14 +12,20 @@ import kotlinx.coroutines.flow.map
 enum class ThemeMode {
     System,
     Dark,
+    Amoled,
     Light,
-    HighContrast;
+    HighContrast,
+
+    /** Material You. Requires API 31; below that it renders as [System]. */
+    Dynamic;
 
     companion object {
         fun fromString(value: String?): ThemeMode = when (value) {
             "dark" -> Dark
+            "amoled" -> Amoled
             "light" -> Light
             "high_contrast" -> HighContrast
+            "dynamic" -> Dynamic
             else -> System
         }
     }
@@ -27,8 +33,10 @@ enum class ThemeMode {
     fun toStorageString(): String = when (this) {
         System -> "system"
         Dark -> "dark"
+        Amoled -> "amoled"
         Light -> "light"
         HighContrast -> "high_contrast"
+        Dynamic -> "dynamic"
     }
 }
 

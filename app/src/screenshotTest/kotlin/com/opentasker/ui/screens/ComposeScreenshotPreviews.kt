@@ -44,6 +44,7 @@ private enum class PreviewTheme {
     SYSTEM,
     LIGHT,
     DARK,
+    AMOLED,
     HIGH_CONTRAST,
 }
 
@@ -101,6 +102,7 @@ private fun PreviewFrame(
         PreviewTheme.SYSTEM -> OpenTaskerTheme(content = frameContent)
         PreviewTheme.LIGHT -> OpenTaskerTheme(darkTheme = false, content = frameContent)
         PreviewTheme.DARK -> OpenTaskerTheme(darkTheme = true, content = frameContent)
+        PreviewTheme.AMOLED -> OpenTaskerTheme(darkTheme = true, amoled = true, content = frameContent)
         PreviewTheme.HIGH_CONTRAST -> OpenTaskerTheme(
             darkTheme = true,
             highContrast = true,
@@ -186,6 +188,14 @@ fun ProfilesDarkPreview() {
 @Composable
 fun ProfilesSystemPreview() {
     ProfilesLightPreviewContent(PreviewTheme.SYSTEM)
+}
+
+@PreviewTest
+@Preview(name = "Profiles · AMOLED · 1.0x", widthDp = 411, heightDp = 891, fontScale = 1.0f, showBackground = true)
+@Preview(name = "Profiles · AMOLED · 2.0x", widthDp = 411, heightDp = 891, fontScale = 2.0f, showBackground = true)
+@Composable
+fun ProfilesAmoledPreview() {
+    ProfilesLightPreviewContent(PreviewTheme.AMOLED)
 }
 
 @PreviewTest
