@@ -1248,6 +1248,15 @@
     <string name="header_run_log_detail">%1$d matching entries</string>
     <string name="header_diagnostics_detail">Engine, crashes, and app logs</string>
     <string name="header_settings_detail">App-wide behavior and recovery</string>
+    <string name="setup_update_title">Release update checks</string>
+    <string name="setup_update_body">Optional daily check of the public GitHub release page. It sends no account or device information, stores only a newer-version link, and never downloads or installs anything.</string>
+    <string name="setup_update_enabled">Release update checks enabled</string>
+    <string name="setup_update_disabled">Release update checks disabled</string>
+    <string name="setup_update_status_off">Off</string>
+    <string name="setup_update_status_pending">Enabled; the next scheduled check has not run yet</string>
+    <string name="setup_update_status_current">No newer release found at the last check</string>
+    <string name="setup_update_status_available">Newer release available: %1$s</string>
+    <string name="setup_update_open_release">Open release page</string>
     <string name="ui_flow_target_missing">Flow target no longer exists</string>
     <string name="ui_error_message">Error: %1$s</string>
     <string name="ui_error_generic">Operation failed</string>

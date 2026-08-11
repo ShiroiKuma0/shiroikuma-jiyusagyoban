@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added an opt-in, non-F-Droid release update check that reports newer GitHub releases without downloading or installing them.
 -Home Assistant Companion `message`/`data` notification envelopes are now first-class webhook inputs, and ntfy's documented push field names are accepted by the token-authenticated push bridge so a `broadcast` action can trigger OpenTasker without a relay app.
 -Release truth now records the annotated release tag and sync target; the verification gate checks every versioned changelog release from v0.2.58 onward, rejects lightweight or mismatched tags, and requires the current release to be tagged before publishing its manifest.
 -Scene canvas elements now announce their localized type, label, position, size, and selection state; screen-reader users can select, nudge, and resize them through custom actions, while the resize handle keeps a labeled 48dp target and the visible canvas text includes the element type.
