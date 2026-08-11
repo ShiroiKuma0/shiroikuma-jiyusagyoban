@@ -52,6 +52,8 @@ object SessionRegister {
         val nocturnalHr: MarkerReading,
         val sleep: MarkerReading,
         val felt: MarkerReading,
+        /** Reported but never counted, exactly as on the card — see [Recovery] for why. */
+        val temperature: MarkerReading,
         val adverseCount: Int,
     )
 
@@ -62,6 +64,25 @@ object SessionRegister {
         val sessionLoad: Double?,
         /** Markers off on the night that STARTED that day, or null when there was no night. */
         val adverseCount: Int?,
+        /** The 1–5 rating for that night, so the grid shows the score itself and not only a count. */
+        val felt: Int?,
+    )
+
+    /**
+     * One line of the night table: a recorded night, a rating with no night, or both.
+     *
+     * The two sets are NOT the same. A night comes from the band's sleep sessions; a rating comes from
+     * 白い熊 tapping 1–5. Listing only the first hides any rating whose date the band never recorded —
+     * it is stored, counted in the baseline, and invisible. This row type exists so that cannot
+     * happen: the table is driven by the union of both. (白い熊, 2026-08-11: "where's the fourth data
+     * point?")
+     */
+    data class NightRow(
+        /** `yyyyMMdd` — the night's start date, which is also the key the rating is filed under. */
+        val dateKey: Long,
+        val night: NightReading?,
+        /** Straight from the store, so a rating with no night still shows its score. */
+        val felt: Int?,
     )
 
     /** Nights after a session against nights after none. */
@@ -77,6 +98,18 @@ object SessionRegister {
     data class Register(
         val entries: List<Entry>,
         val days: List<DayCell>,
+        /**
+         * Every night on record, newest first.
+         *
+         * Carried out whole rather than folded into [days] because the grid can only ever show a
+         * count, and a count is not a reading: three grey dots say the same thing for a night rated 3
+         * and a night never rated at all. The screen lists these so every stored value has somewhere
+         * it is actually printed — which is the whole point of keeping them. (白い熊, 2026-08-11:
+         * "it is indistinguishable what the individual day scores are".)
+         */
+        val nights: List<NightReading>,
+        /** The night table's lines, newest first: every night AND every rating, unioned. */
+        val rows: List<NightRow>,
         val contrast: Contrast?,
     )
 
@@ -103,11 +136,18 @@ object SessionRegister {
             RecoveryMarker.FELT, feltFor(night), prior.mapNotNull(feltFor),
             Recovery.FELT_MEANINGFUL_STEPS, confidence, counted = true,
         )
+        val temperature = Recovery.band(
+            RecoveryMarker.TEMPERATURE, night.skinTemp, prior.mapNotNull { it.skinTemp },
+            Recovery.TEMP_MEANINGFUL_C, confidence, counted = false, oneSidedHigh = true,
+        )
         NightReading(
             startMs = night.startMs,
             nocturnalHr = hr,
             sleep = sleep,
             felt = felt,
+            temperature = temperature,
+            // Three, not four: temperature is reported and never counted, so the register's count and
+            // the card's headline can never disagree about the same night.
             adverseCount = listOf(hr, sleep, felt).count { it.adverse },
         )
     }
@@ -120,6 +160,10 @@ object SessionRegister {
         zoneOffsetMs: Long,
         fromEpochDay: Long,
         toEpochDay: Long,
+        /** Every stored rating, so one filed against a date with no night is still listed. */
+        ratings: Map<Long, Int> = emptyMap(),
+        /** A night's start instant → the `yyyyMMdd` its rating is filed under. */
+        dateOfNight: (Long) -> Long = { 0L },
     ): Register {
         fun dayOf(ms: Long) = (ms + zoneOffsetMs) / 86_400_000L
 
@@ -139,8 +183,17 @@ object SessionRegister {
                 v.sumOf { s -> restingHr?.let { RecoverySource.sessionLoad(s, spotPoints, it) } ?: 0.0 }
             }
         val adverseByDay = nights.associate { dayOf(it.startMs) to it.adverseCount }
+        val feltByDay = nights.mapNotNull { n ->
+            n.felt.value?.let { dayOf(n.startMs) to it.toInt() }
+        }.toMap()
         val days = (fromEpochDay..toEpochDay).map { d ->
-            DayCell(d, loadByDay[d], adverseByDay[d])
+            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d])
+        }
+
+        // The union, so a rating whose date the band never recorded is still a line. Newest first.
+        val nightByDate = nights.associateBy { dateOfNight(it.startMs) }
+        val rows = (nightByDate.keys + ratings.keys).sortedDescending().map { date ->
+            NightRow(date, nightByDate[date], ratings[date])
         }
 
         // Which nights followed a session, by the same pairing rule the entries use.
@@ -158,6 +211,6 @@ object SessionRegister {
             null
         }
 
-        return Register(entries, days, contrast)
+        return Register(entries, days, nights.sortedByDescending { it.startMs }, rows, contrast)
     }
 }

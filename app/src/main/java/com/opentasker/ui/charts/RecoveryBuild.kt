@@ -96,6 +96,8 @@ object RecoveryBuild {
             zoneOffsetMs = zoneOffsetMs,
             fromEpochDay = gridFrom,
             toEpochDay = todayEpochDay,
+            ratings = ratings,
+            dateOfNight = localDateOf,
         )
 
         if (nights.isEmpty()) {
