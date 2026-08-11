@@ -30,6 +30,16 @@ enum class InternalTaskRunSource(
 object AutomationTargetContract {
     const val PERMISSION = "com.opentasker.permission.AUTOMATION"
 
+    // Home Assistant Companion notification commands use these field names when a
+    // command_broadcast_intent action targets this receiver. They are aliases for the
+    // namespaced OpenTasker extras, not replacements, so protocol-v2 callers remain stable.
+    const val HOME_ASSISTANT_COMMAND_BROADCAST_INTENT = "command_broadcast_intent"
+    const val HOME_ASSISTANT_FIELD_MESSAGE = "message"
+    const val HOME_ASSISTANT_FIELD_DATA = "data"
+    const val HOME_ASSISTANT_FIELD_INTENT_PACKAGE_NAME = "intent_package_name"
+    const val HOME_ASSISTANT_FIELD_INTENT_ACTION = "intent_action"
+    const val HOME_ASSISTANT_FIELD_INTENT_EXTRAS = "intent_extras"
+
     const val ACTION_RUN_TASK = "com.opentasker.action.RUN_TASK"
     const val ACTION_SET_PROFILE_ENABLED = "com.opentasker.action.SET_PROFILE_ENABLED"
     const val ACTION_QUERY_STATUS = "com.opentasker.action.QUERY_STATUS"

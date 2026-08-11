@@ -26,12 +26,39 @@ import kotlinx.serialization.json.contentOrNull
  */
 object PushContextEvents {
     const val ACTION_PUSH_EVENT = "com.opentasker.action.PUSH_EVENT"
+    /** ntfy's documented action for a notification button that sends a broadcast. */
+    const val ACTION_NTFY_USER_ACTION = "io.heckel.ntfy.USER_ACTION"
+    /** ntfy's documented action for the incoming-message automation broadcast. */
+    const val ACTION_NTFY_MESSAGE_RECEIVED = "io.heckel.ntfy.MESSAGE_RECEIVED"
     const val EVENT_PUSH = "push"
     const val EXTRA_TOKEN = "com.opentasker.extra.PUSH_TOKEN"
     const val EXTRA_TOPIC = "com.opentasker.extra.PUSH_TOPIC"
     const val EXTRA_EVENT_ID = "com.opentasker.extra.PUSH_EVENT_ID"
     const val EXTRA_TITLE = "com.opentasker.extra.PUSH_TITLE"
     const val EXTRA_MESSAGE = "com.opentasker.extra.PUSH_MESSAGE"
+
+    // These names are the ntfy Android broadcast contract. Keep them unprefixed when parsing so
+    // an ntfy `broadcast` action can target ACTION_PUSH_EVENT directly without a relay app.
+    const val NTFY_EXTRA_ID = "id"
+    const val NTFY_EXTRA_BASE_URL = "base_url"
+    const val NTFY_EXTRA_TOPIC = "topic"
+    const val NTFY_EXTRA_MUTED = "muted"
+    const val NTFY_EXTRA_MUTED_STRING = "muted_str"
+    const val NTFY_EXTRA_TIME = "time"
+    const val NTFY_EXTRA_TITLE = "title"
+    const val NTFY_EXTRA_MESSAGE = "message"
+    const val NTFY_EXTRA_MESSAGE_BYTES = "message_bytes"
+    const val NTFY_EXTRA_ENCODING = "encoding"
+    const val NTFY_EXTRA_CONTENT_TYPE = "content_type"
+    const val NTFY_EXTRA_TAGS = "tags"
+    const val NTFY_EXTRA_TAGS_MAP = "tags_map"
+    const val NTFY_EXTRA_PRIORITY = "priority"
+    const val NTFY_EXTRA_CLICK = "click"
+    const val NTFY_EXTRA_ATTACHMENT_NAME = "attachment_name"
+    const val NTFY_EXTRA_ATTACHMENT_TYPE = "attachment_type"
+    const val NTFY_EXTRA_ATTACHMENT_SIZE = "attachment_size"
+    const val NTFY_EXTRA_ATTACHMENT_EXPIRES = "attachment_expires"
+    const val NTFY_EXTRA_ATTACHMENT_URL = "attachment_url"
 
     const val MAX_TOPIC_CHARS = 160
     const val MAX_EVENT_ID_CHARS = 128
@@ -66,18 +93,8 @@ object PushContextEvents {
         expectedToken: String,
         nowMs: Long = System.currentTimeMillis(),
     ): Boolean {
-        if (intent.action != ACTION_PUSH_EVENT) return false
-        return publishDelivery(
-            PushDelivery(
-                token = intent.getStringExtra(EXTRA_TOKEN).orEmpty(),
-                topic = intent.getStringExtra(EXTRA_TOPIC).orEmpty(),
-                eventId = intent.getStringExtra(EXTRA_EVENT_ID).orEmpty(),
-                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
-                message = intent.getStringExtra(EXTRA_MESSAGE).orEmpty(),
-            ),
-            expectedToken,
-            nowMs,
-        )
+        val delivery = intent.toPushDelivery() ?: return false
+        return publishDelivery(delivery, expectedToken, nowMs)
     }
 
     fun publishDelivery(
@@ -114,7 +131,29 @@ object PushContextEvents {
         val eventId = root.stringValue("id", "event_id", "eventId") ?: return null
         val title = root.stringValue("title").orEmpty()
         val message = root.stringValue("message", "body").orEmpty()
-        return parseFields(topic, eventId, title, message, nowMs)
+        return parseFields(
+            PushDelivery(
+                token = "",
+                topic = topic,
+                eventId = eventId,
+                title = title,
+                message = message,
+                baseUrl = root.stringValue("base_url").orEmpty(),
+                muted = root.stringValue("muted").orEmpty(),
+                mutedString = root.stringValue("muted_str").orEmpty(),
+                time = root.stringValue("time").orEmpty(),
+                encoding = root.stringValue("encoding").orEmpty(),
+                contentType = root.stringValue("content_type").orEmpty(),
+                tags = root.stringValue("tags").orEmpty(),
+                tagsMap = root.stringValue("tags_map").orEmpty(),
+                priority = root.stringValue("priority").orEmpty(),
+                attachmentName = root.stringValue("attachment_name").orEmpty(),
+                attachmentType = root.stringValue("attachment_type").orEmpty(),
+                attachmentSize = root.stringValue("attachment_size").orEmpty(),
+                attachmentExpires = root.stringValue("attachment_expires").orEmpty(),
+            ),
+            nowMs,
+        )
     }
 
     private fun publishEvent(event: ContextEvent, nowMs: Long): Boolean {
@@ -130,21 +169,7 @@ object PushContextEvents {
         intent: Intent,
         expectedToken: String,
         nowMs: Long = System.currentTimeMillis(),
-    ): ContextEvent? = if (intent.action == ACTION_PUSH_EVENT) {
-        parseDelivery(
-            PushDelivery(
-                token = intent.getStringExtra(EXTRA_TOKEN).orEmpty(),
-                topic = intent.getStringExtra(EXTRA_TOPIC).orEmpty(),
-                eventId = intent.getStringExtra(EXTRA_EVENT_ID).orEmpty(),
-                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
-                message = intent.getStringExtra(EXTRA_MESSAGE).orEmpty(),
-            ),
-            expectedToken,
-            nowMs,
-        )
-    } else {
-        null
-    }
+    ): ContextEvent? = intent.toPushDelivery()?.let { parseDelivery(it, expectedToken, nowMs) }
 
     fun parseDelivery(
         delivery: PushDelivery,
@@ -152,29 +177,28 @@ object PushContextEvents {
         nowMs: Long = System.currentTimeMillis(),
     ): ContextEvent? {
         if (expectedToken.isBlank() || !constantTimeEquals(delivery.token, expectedToken)) return null
-        return parseFields(delivery.topic, delivery.eventId, delivery.title, delivery.message, nowMs)
+        return parseFields(delivery, nowMs)
     }
 
     private fun parseFields(
-        rawTopic: String,
-        rawEventId: String,
-        rawTitle: String,
-        message: String,
+        delivery: PushDelivery,
         nowMs: Long,
     ): ContextEvent? {
-        val topic = rawTopic.trim()
-        val eventId = rawEventId.trim()
-        val title = sanitizeText(rawTitle, MAX_TITLE_CHARS)
+        val topic = delivery.topic.trim()
+        val eventId = delivery.eventId.trim()
+        val title = sanitizeText(delivery.title, MAX_TITLE_CHARS)
+        val messageBytes = delivery.messageBytes ?: delivery.message.toByteArray(StandardCharsets.UTF_8).size
         if (topic.isBlank() || topic.length > MAX_TOPIC_CHARS) return null
         if (eventId.isBlank() || eventId.length > MAX_EVENT_ID_CHARS) return null
-        if (message.toByteArray(StandardCharsets.UTF_8).size > MAX_MESSAGE_BYTES) return null
+        if (messageBytes !in 0..MAX_MESSAGE_BYTES) return null
 
         return buildEvent(
             topic = topic,
             eventId = eventId,
             title = title,
-            messageBytes = message.toByteArray(StandardCharsets.UTF_8).size,
+            messageBytes = messageBytes,
             nowMs = nowMs,
+            ntfyMetadata = delivery.ntfyMetadata(),
         )
     }
 
@@ -189,6 +213,7 @@ object PushContextEvents {
         title: String = "",
         messageBytes: Int = 0,
         nowMs: Long = System.currentTimeMillis(),
+        ntfyMetadata: Map<String, String> = emptyMap(),
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
@@ -196,11 +221,83 @@ object PushContextEvents {
             put("event", EVENT_PUSH)
             put("topic", topic)
             put("eventId", eventId)
+            put(NTFY_EXTRA_ID, eventId)
             if (title.isNotBlank()) put("title", title)
             put("payloadBytes", messageBytes.toString())
             put("observedAtEpochMs", nowMs.toString())
+            ntfyMetadata.forEach { (key, value) ->
+                if (value.isNotBlank()) put(key, value)
+            }
         },
     )
+
+    private fun Intent.toPushDelivery(): PushDelivery? {
+        if (action !in setOf(ACTION_PUSH_EVENT, ACTION_NTFY_USER_ACTION, ACTION_NTFY_MESSAGE_RECEIVED)) {
+            return null
+        }
+        return PushDelivery(
+            token = firstExtraString(EXTRA_TOKEN),
+            topic = firstExtraString(EXTRA_TOPIC, NTFY_EXTRA_TOPIC),
+            eventId = firstExtraString(EXTRA_EVENT_ID, NTFY_EXTRA_ID),
+            title = firstExtraString(EXTRA_TITLE, NTFY_EXTRA_TITLE),
+            message = firstExtraString(EXTRA_MESSAGE, NTFY_EXTRA_MESSAGE),
+            messageBytes = extras?.get(NTFY_EXTRA_MESSAGE_BYTES).byteCount(),
+            baseUrl = firstExtraString(NTFY_EXTRA_BASE_URL),
+            muted = firstExtraString(NTFY_EXTRA_MUTED),
+            mutedString = firstExtraString(NTFY_EXTRA_MUTED_STRING),
+            time = firstExtraString(NTFY_EXTRA_TIME),
+            encoding = firstExtraString(NTFY_EXTRA_ENCODING),
+            contentType = firstExtraString(NTFY_EXTRA_CONTENT_TYPE),
+            tags = firstExtraString(NTFY_EXTRA_TAGS),
+            tagsMap = firstExtraString(NTFY_EXTRA_TAGS_MAP),
+            priority = firstExtraString(NTFY_EXTRA_PRIORITY),
+            attachmentName = firstExtraString(NTFY_EXTRA_ATTACHMENT_NAME),
+            attachmentType = firstExtraString(NTFY_EXTRA_ATTACHMENT_TYPE),
+            attachmentSize = firstExtraString(NTFY_EXTRA_ATTACHMENT_SIZE),
+            attachmentExpires = firstExtraString(NTFY_EXTRA_ATTACHMENT_EXPIRES),
+        )
+    }
+
+    private fun Intent.firstExtraString(vararg names: String): String =
+        names.asSequence()
+            .mapNotNull { name -> extras?.get(name).extraString()?.takeIf(String::isNotBlank) }
+            .firstOrNull()
+            .orEmpty()
+
+    private fun Any?.extraString(): String? = when (this) {
+        null -> null
+        is CharSequence -> toString()
+        is Boolean,
+        is Number,
+        -> toString()
+        else -> null
+    }
+
+    private fun Any?.byteCount(): Int? = when (this) {
+        is ByteArray -> size
+        is String -> toByteArray(StandardCharsets.UTF_8).size
+        else -> null
+    }
+
+    private fun PushDelivery.ntfyMetadata(): Map<String, String> = buildMap {
+        putIfPresent(NTFY_EXTRA_BASE_URL, baseUrl, 512)
+        putIfPresent(NTFY_EXTRA_MUTED, muted, 16)
+        putIfPresent(NTFY_EXTRA_MUTED_STRING, mutedString, 16)
+        putIfPresent(NTFY_EXTRA_TIME, time, 32)
+        putIfPresent(NTFY_EXTRA_ENCODING, encoding, 32)
+        putIfPresent(NTFY_EXTRA_CONTENT_TYPE, contentType, 128)
+        putIfPresent(NTFY_EXTRA_TAGS, tags, 512)
+        putIfPresent(NTFY_EXTRA_TAGS_MAP, tagsMap, 512)
+        putIfPresent(NTFY_EXTRA_PRIORITY, priority, 32)
+        putIfPresent(NTFY_EXTRA_ATTACHMENT_NAME, attachmentName, 256)
+        putIfPresent(NTFY_EXTRA_ATTACHMENT_TYPE, attachmentType, 128)
+        putIfPresent(NTFY_EXTRA_ATTACHMENT_SIZE, attachmentSize, 32)
+        putIfPresent(NTFY_EXTRA_ATTACHMENT_EXPIRES, attachmentExpires, 32)
+    }
+
+    private fun MutableMap<String, String>.putIfPresent(key: String, value: String, maxChars: Int) {
+        sanitizeText(value, maxChars).takeIf(String::isNotBlank)?.let { put(key, it) }
+    }
 
     internal fun resetForTests() {
         pendingPulse.set(null)
@@ -239,6 +336,20 @@ data class PushDelivery(
     val eventId: String,
     val title: String = "",
     val message: String = "",
+    val messageBytes: Int? = null,
+    val baseUrl: String = "",
+    val muted: String = "",
+    val mutedString: String = "",
+    val time: String = "",
+    val encoding: String = "",
+    val contentType: String = "",
+    val tags: String = "",
+    val tagsMap: String = "",
+    val priority: String = "",
+    val attachmentName: String = "",
+    val attachmentType: String = "",
+    val attachmentSize: String = "",
+    val attachmentExpires: String = "",
 )
 
 private data class PendingPushPulse(

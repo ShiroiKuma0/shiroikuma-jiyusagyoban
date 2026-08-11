@@ -457,6 +457,10 @@
     <string name="catalog_action_home_assistant_webhook_field_url_hint" formatted="false">HTTPS webhook URL; the secret path is redacted from display</string>
     <string name="catalog_action_home_assistant_webhook_field_payload_label" formatted="false">JSON payload</string>
     <string name="catalog_action_home_assistant_webhook_field_payload_hint" formatted="false">JSON object, maximum 16 KB; payload is redacted from display</string>
+    <string name="catalog_action_home_assistant_webhook_field_message_label" formatted="false">Home Assistant message/command</string>
+    <string name="catalog_action_home_assistant_webhook_field_message_hint" formatted="false">Optional Companion notification message, such as command_broadcast_intent; use with data</string>
+    <string name="catalog_action_home_assistant_webhook_field_data_label" formatted="false">Home Assistant data</string>
+    <string name="catalog_action_home_assistant_webhook_field_data_hint" formatted="false">Optional JSON object paired with message; secrets are redacted from display</string>
     <string name="catalog_action_home_assistant_webhook_field_timeout_label" formatted="false">Timeout (seconds)</string>
     <string name="catalog_action_home_assistant_webhook_field_timeout_hint" formatted="false">Default: 15 (1-30)</string>
     <string name="catalog_action_home_assistant_webhook_field_retries_label" formatted="false">Retries</string>

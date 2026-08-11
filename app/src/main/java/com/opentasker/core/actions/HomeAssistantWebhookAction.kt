@@ -6,6 +6,7 @@ import java.net.URI
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 data class HomeAssistantWebhookConfig(
     val url: String,
@@ -21,6 +22,46 @@ object HomeAssistantWebhookProtocol {
     const val MAX_RETRIES = 3
     const val MAX_BACKOFF_MILLISECONDS = 5_000L
 
+    /** Notification command values documented by the Home Assistant Companion apps. */
+    val NOTIFICATION_COMMANDS: Set<String> = setOf(
+        "request_location_update",
+        "clear_badge",
+        "clear_notification",
+        "update_complications",
+        "update_widgets",
+        "kiosk_show_screensaver",
+        "kiosk_hide_screensaver",
+        "kiosk_show_camera",
+        "kiosk_hide_camera",
+        "kiosk_set_brightness",
+        "kiosk_set_volume",
+        "kiosk_reload",
+        "kiosk_default",
+        "command_activity",
+        "command_app_lock",
+        "command_auto_screen_brightness",
+        "command_bluetooth",
+        "command_ble_transmitter",
+        "command_beacon_monitor",
+        "command_broadcast_intent",
+        "command_dnd",
+        "command_flashlight",
+        "command_high_accuracy_mode",
+        "command_launch_app",
+        "command_media",
+        "command_ringer_mode",
+        "command_screen_brightness_level",
+        "command_screen_off_timeout",
+        "command_screen_on",
+        "command_stop_tts",
+        "command_persistent_connection",
+        "command_update_sensors",
+        "command_volume_level",
+        "command_wake_word_detection",
+        "command_webview",
+        "remove_channel",
+    )
+
     fun parse(args: Map<String, String>): Result<HomeAssistantWebhookConfig> = runCatching {
         val url = args["url"]?.trim().orEmpty()
         require(url.isNotBlank()) { "Home Assistant webhook URL is required" }
@@ -34,7 +75,36 @@ object HomeAssistantWebhookProtocol {
             "Home Assistant webhooks require https; set allow_http=true only for a private-LAN endpoint"
         }
 
-        val payload = args["payload"].orEmpty().ifBlank { "{}" }
+        val rawPayload = args["payload"].orEmpty().trim()
+        val message = args["message"].orEmpty().trim()
+        val data = args["data"].orEmpty().trim()
+        require(rawPayload.isBlank() || (message.isBlank() && data.isBlank())) {
+            "Use either payload or the Home Assistant message/data fields, not both"
+        }
+        if (message.startsWith("command_")) {
+            require(message in NOTIFICATION_COMMANDS) {
+                "Unknown Home Assistant notification command"
+            }
+        }
+        val payload = when {
+            rawPayload.isNotBlank() -> rawPayload
+            message.isNotBlank() || data.isNotBlank() -> {
+                require(message.isNotBlank()) {
+                    "Home Assistant message is required when data is provided"
+                }
+                val dataElement = Json.parseToJsonElement(data.ifBlank { "{}" })
+                require(dataElement is JsonObject) {
+                    "Home Assistant data must be a JSON object"
+                }
+                JsonObject(
+                    mapOf(
+                        "message" to JsonPrimitive(message),
+                        "data" to dataElement,
+                    ),
+                ).toString()
+            }
+            else -> "{}"
+        }
         require(payload.toByteArray(Charsets.UTF_8).size <= MAX_PAYLOAD_BYTES) {
             "Home Assistant webhook payload exceeds ${MAX_PAYLOAD_BYTES / 1024} KB"
         }
