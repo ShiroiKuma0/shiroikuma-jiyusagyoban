@@ -159,7 +159,7 @@ internal fun SceneCard(
     onAddElement: () -> Unit,
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
-    onUpdateScene: (Scene, String) -> Unit,
+    onUpdateScene: (Scene, Int) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
@@ -210,7 +210,7 @@ internal fun SceneCard(
                     scene.elements.getOrNull(index)?.let { element ->
                         onUpdateScene(
                             SceneEditorMutations.replaceElement(scene, index, element.copy(xDp = xDp, yDp = yDp)),
-                            "Element moved",
+                            R.string.ui_message_element_moved,
                         )
                     }
                 },
@@ -222,7 +222,7 @@ internal fun SceneCard(
                                 index,
                                 element.copy(widthDp = widthDp, heightDp = heightDp),
                             ),
-                            "Element resized",
+                            R.string.ui_message_element_resized,
                         )
                     }
                 },
@@ -233,7 +233,7 @@ internal fun SceneCard(
                 onMoveSelected = { dx, dy ->
                     val updatedScene = SceneEditorMutations.moveSelected(scene, selectedIndices, dx, dy)
                     if (updatedScene != scene) {
-                        onUpdateScene(updatedScene, "Elements moved")
+                        onUpdateScene(updatedScene, R.string.ui_message_elements_moved)
                     }
                 },
             )
@@ -270,7 +270,7 @@ internal fun SceneCard(
                                         index,
                                         element.nudgedWithin(scene, deltaX, deltaY),
                                     ),
-                                    "Element moved",
+                                    R.string.ui_message_element_moved,
                                 )
                             },
                             onEdit = { onEditElement(index, element) },

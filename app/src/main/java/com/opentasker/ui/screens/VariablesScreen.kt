@@ -62,8 +62,8 @@ fun VariablesScreen(
     projectId: Long = DEFAULT_PROJECT_ID,
     focusVariableName: String? = null,
     focusVariableProjectId: Long = DEFAULT_PROJECT_ID,
-    onUpdate: (previousName: String?, name: String, value: String, isSecret: Boolean, successMessage: String, projectId: Long) -> Unit,
-    onDelete: (name: String, successMessage: String, projectId: Long) -> Unit,
+    onUpdate: (previousName: String?, name: String, value: String, isSecret: Boolean, successMessage: UiMessage, projectId: Long) -> Unit,
+    onDelete: (name: String, successMessage: UiMessage, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -159,7 +159,7 @@ fun VariablesScreen(
     }
 
     if (showCreateDialog) {
-        val createdMsg = stringResource(R.string.variables_created)
+        val createdMsg = UiMessage(R.string.variables_created)
         VariableEditorDialog(
             variable = null,
             existingNames = variables.mapTo(hashSetOf()) { it.name },
@@ -172,7 +172,7 @@ fun VariablesScreen(
     }
 
     pendingDeleteName?.let { name ->
-        val deletedMsg = stringResource(R.string.variables_deleted, name)
+        val deletedMsg = UiMessage(R.string.variables_deleted, listOf(name))
         AlertDialog(
             onDismissRequest = { pendingDeleteName = null },
             icon = {
@@ -209,7 +209,7 @@ fun VariablesScreen(
     }
 
     editTarget?.let { target ->
-        val updatedMsg = stringResource(R.string.variables_updated, target.name)
+        val updatedMsg = UiMessage(R.string.variables_updated, listOf(target.name))
         VariableEditorDialog(
             variable = target,
             existingNames = variables.mapTo(hashSetOf()) { it.name },

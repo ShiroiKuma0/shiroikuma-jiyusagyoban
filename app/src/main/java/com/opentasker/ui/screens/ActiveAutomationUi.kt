@@ -752,7 +752,7 @@ fun ActiveAutomationUi(
                     } else {
                         viewModel.updateProfile(
                             profile.copy(enabled = enabled),
-                            "Profile ${if (enabled) "enabled" else "disabled"}",
+                            if (enabled) R.string.ui_message_profile_enabled else R.string.ui_message_profile_disabled,
                         )
                     }
                 },
@@ -951,14 +951,14 @@ fun ActiveAutomationUi(
                     is DeleteTarget.SceneTarget -> viewModel.deleteScene(target.scene)
                     is DeleteTarget.ActionTarget -> viewModel.updateTask(
                         target.task.copy(actions = target.task.actions.filterIndexed { i, _ -> i != target.index }),
-                        "Action removed",
+                        R.string.ui_message_action_removed,
                     )
                     is DeleteTarget.ContextTarget -> viewModel.updateProfile(
                         target.profile.copy(
                             contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index },
                             contextExpression = target.profile.contextExpression?.removeLeaf(target.index),
                         ),
-                        "Context removed",
+                        R.string.ui_message_context_removed,
                     )
                 }
                 clearPendingDelete()
@@ -1218,7 +1218,10 @@ fun ActiveAutomationUi(
                 val updatedActions = state.index?.let { index ->
                     state.task.actions.mapIndexed { i, existing -> if (i == index) action else existing }
                 } ?: (state.task.actions + action)
-                viewModel.updateTask(state.task.copy(actions = updatedActions), if (state.index == null) "Action added" else "Action updated")
+                viewModel.updateTask(
+                    state.task.copy(actions = updatedActions),
+                    if (state.index == null) R.string.ui_message_action_added else R.string.ui_message_action_updated,
+                )
                 clearActionEdit()
             },
         )
@@ -1264,7 +1267,7 @@ fun ActiveAutomationUi(
                 }
                 viewModel.updateProfile(
                     state.profile.copy(contexts = updatedContexts, contextExpression = updatedExpression),
-                    if (state.index == null) "Context added" else "Context updated",
+                    if (state.index == null) R.string.ui_message_context_added else R.string.ui_message_context_updated,
                 )
                 clearContextEdit()
             },
@@ -1278,7 +1281,7 @@ fun ActiveAutomationUi(
             onSave = { expression ->
                 viewModel.updateProfile(
                     profile.copy(contextExpression = expression),
-                    context.getString(R.string.context_logic_updated),
+                    R.string.context_logic_updated,
                 )
                 clearContextLogic()
             },
