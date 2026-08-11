@@ -353,6 +353,9 @@ class ActiveAutomationViewModel(
     /** See [contentLoadedSignal]: screens gate first-run empty states on this. */
     val contentLoaded: StateFlow<Boolean> = contentLoadedSignal(db, viewModelScope)
 
+    /** See [editHistoryAvailability]: Undo/Redo are enabled only where there is history. */
+    val historyAvailability: StateFlow<EditHistoryAvailabilityState> = editHistoryAvailability(db, viewModelScope)
+
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomainDecodeResult() } }

@@ -37,6 +37,7 @@ fun SceneLibraryScreen(
     onDuplicateScene: (Scene) -> Unit = {},
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -140,6 +141,8 @@ fun SceneLibraryScreen(
                     onRemoveElement(scene, index)
                 },
                 onUpdateScene = onUpdateScene,
+                canUndo = historyAvailability.canUndoScene(scene.id),
+                canRedo = historyAvailability.canRedoScene(scene.id),
                 onUndo = { onUndoSceneEdit(scene) },
                 onRedo = { onRedoSceneEdit(scene) },
                 onDelete = { onDeleteScene(scene) },

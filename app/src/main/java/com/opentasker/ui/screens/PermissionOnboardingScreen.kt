@@ -1373,7 +1373,15 @@ private fun PermissionSetupCard(
             }
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             PermissionRequirement(label = if (item.optional) stringResource(R.string.setup_optional_requirement, item.requiredFor) else item.requiredFor)
-            if (!item.granted) {
+            if (!item.granted && item.action == PermissionAction.None) {
+                // Nothing to run: rendering a button here promised an action that only produced a
+                // toast saying the item was already ready.
+                Text(
+                    stringResource(R.string.setup_no_action_available),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (!item.granted) {
                 Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Text(item.actionLabel)
                 }

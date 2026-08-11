@@ -19,6 +19,14 @@ data class EditHistoryEntity(
     val timestamp: Long = System.currentTimeMillis(),
 )
 
+/** Projection for [EditHistoryDao.availabilityAsFlow]. */
+data class EditHistoryAvailability(
+    val entityType: String,
+    val entityId: Long,
+    val canUndo: Boolean,
+    val canRedo: Boolean,
+)
+
 @Dao
 interface EditHistoryDao {
     @Insert
@@ -53,6 +61,21 @@ interface EditHistoryDao {
 
     @Query("DELETE FROM edit_history WHERE timestamp < :before")
     suspend fun deleteOlderThan(before: Long)
+
+    /**
+     * One row per entity that has any history, saying whether undo and redo are actually available.
+     *
+     * Undo/Redo used to be permanently enabled and answered with a snackbar when there was nothing
+     * to do, which also made a screen reader announce them as available. Deriving availability here
+     * keeps the buttons honest without a query per card.
+     */
+    @Query(
+        "SELECT entityType, entityId, " +
+            "MAX(CASE WHEN isUndone = 0 THEN 1 ELSE 0 END) AS canUndo, " +
+            "MAX(CASE WHEN isUndone = 1 THEN 1 ELSE 0 END) AS canRedo " +
+            "FROM edit_history GROUP BY entityType, entityId",
+    )
+    fun availabilityAsFlow(): kotlinx.coroutines.flow.Flow<List<EditHistoryAvailability>>
 
     companion object {
         const val MAX_HISTORY_PER_ENTITY = 5

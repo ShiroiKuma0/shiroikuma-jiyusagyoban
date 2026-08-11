@@ -39,6 +39,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -160,6 +162,8 @@ internal fun SceneCard(
     onEditElement: (Int, SceneElement) -> Unit,
     onDeleteElement: (Int, SceneElement) -> Unit,
     onUpdateScene: (Scene, Int) -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
@@ -244,14 +248,28 @@ internal fun SceneCard(
                 Text(stringResource(R.string.action_add_element))
             }
 
+            val nothingToUndo = stringResource(R.string.history_nothing_to_undo)
+            val nothingToRedo = stringResource(R.string.history_nothing_to_redo)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
-                OutlinedButton(onClick = onUndo, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = onUndo,
+                    enabled = canUndo,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { if (!canUndo) stateDescription = nothingToUndo },
+                ) {
                     Text(stringResource(R.string.action_undo))
                 }
-                OutlinedButton(onClick = onRedo, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    onClick = onRedo,
+                    enabled = canRedo,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { if (!canRedo) stateDescription = nothingToRedo },
+                ) {
                     Text(stringResource(R.string.action_redo))
                 }
             }
