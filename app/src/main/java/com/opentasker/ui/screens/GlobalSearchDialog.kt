@@ -28,6 +28,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import com.opentasker.app.R
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
@@ -80,15 +84,20 @@ fun GlobalSearchDialog(
                         }
                     },
                 )
+                // Polite live region: this line is the only feedback that a query matched
+                // nothing, and without it a screen-reader user typing heard silence.
+                val announce = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
                 when {
                     query.isBlank() -> Text(
                         stringResource(R.string.global_search_prompt),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = announce,
                     )
 
                     results.isEmpty() -> Text(
                         stringResource(R.string.global_search_no_results),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = announce,
                     )
 
                     else -> LazyColumn(
@@ -121,6 +130,9 @@ private fun GlobalSearchResultCard(result: GlobalSearchResult, onClick: () -> Un
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        // surfaceVariant equals the dialog container in every static scheme, so without a border
+        // these results had no visible boundary at all.
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Text(

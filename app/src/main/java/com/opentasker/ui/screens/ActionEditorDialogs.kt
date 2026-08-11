@@ -187,13 +187,20 @@ internal fun ActionPickerDialog(
                                     enabled = capability.canAdd,
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (capability.canAdd) {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    ),
+                                    // In every static scheme surfaceVariant IS the dialog's own
+                                    // container colour, so compositing it over itself at any alpha
+                                    // yields the same colour: the enabled/disabled distinction the
+                                    // two alphas were meant to draw was mathematically zero.
+                                    border = BorderStroke(
+                                        width = 1.dp,
+                                        color = if (capability.canAdd) {
+                                            MaterialTheme.colorScheme.outline
                                         } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                            MaterialTheme.colorScheme.outlineVariant
                                         },
                                     ),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
                                     shape = RoundedCornerShape(14.dp),
                                 ) {
                                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
