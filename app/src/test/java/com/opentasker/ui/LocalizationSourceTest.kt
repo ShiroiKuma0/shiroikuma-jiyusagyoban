@@ -94,6 +94,27 @@ class LocalizationSourceTest {
     }
 
     @Test
+    fun setupPlatformStateIsLoadedByAnIoBackedViewModel() {
+        val setup = sourceRoot.resolve("com/opentasker/ui/screens/PermissionOnboardingScreen.kt").readText()
+        val screen = setup.substringAfter("fun PermissionOnboardingScreen(")
+            .substringBefore("@Composable\nprivate fun GlobalFallbackTaskCard")
+        val viewModel = setup.substringAfter("private class PermissionOnboardingViewModel")
+
+        assertTrue("Setup permission snapshots must be produced on Dispatchers.IO", ".flowOn(Dispatchers.IO)" in viewModel)
+        assertTrue("Setup must collect permission snapshots from a ViewModel", "setupViewModel.permissionItems.collectAsState()" in screen)
+        listOf(
+            "buildPermissionItems(context, permissionHistory)",
+            "DirectBootTriggerStore.observe(context)",
+            "ThemePreference.observe(context)",
+            "CompanionDeviceAssociation.list(context)",
+            "PushTriggerTokenStore(context).token()",
+            "LocaleGrantStore(context).grants()",
+        ).forEach { call ->
+            assertFalse("Blocking setup call must not remain in the composable body: $call", call in screen)
+        }
+    }
+
+    @Test
     fun successMessagesUseResourceIdsAtEveryCallSite() {
         val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
         val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()

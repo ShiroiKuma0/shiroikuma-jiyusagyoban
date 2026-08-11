@@ -59,7 +59,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -78,12 +77,15 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.storage.RestoreCandidate
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.permissions.RuntimePermissionOutcome
@@ -102,11 +104,23 @@ import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.contexts.PushTriggerTokenStore
 import com.opentasker.core.engine.DirectBootTriggerStore
+import com.opentasker.core.contexts.CompanionAssociation
 import com.opentasker.core.contexts.CompanionAssociationResult
 import com.opentasker.core.contexts.CompanionDeviceAssociation
+import com.opentasker.core.plugins.locale.LocaleGrant
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 
 private enum class SetupSection {
     ENGINE,
@@ -158,6 +172,94 @@ private sealed interface PermissionAction {
     data object None : PermissionAction
 }
 
+private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
+    private val context = appContext.applicationContext
+
+    val permissionHistory = RuntimePermissionRequestHistory(context)
+
+    private val refreshTick = MutableStateFlow(0L)
+    val permissionItems: StateFlow<List<PermissionSetupItem>> = refreshTick
+        .map { buildPermissionItems(context, permissionHistory) }
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val directBootEnabled: StateFlow<Boolean> = DirectBootTriggerStore.observe(context)
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val themeMode: StateFlow<ThemeMode> = ThemePreference.observe(context)
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.System)
+
+    private val _associations = MutableStateFlow<List<CompanionAssociation>>(emptyList())
+    val associations: StateFlow<List<CompanionAssociation>> = _associations.asStateFlow()
+
+    private val _pushToken = MutableStateFlow("")
+    val pushToken: StateFlow<String> = _pushToken.asStateFlow()
+
+    private val _localeGrants = MutableStateFlow<List<LocaleGrant>>(emptyList())
+    val localeGrants: StateFlow<List<LocaleGrant>> = _localeGrants.asStateFlow()
+
+    private var externalRefreshJob: Job? = null
+
+    init {
+        refreshExternalState()
+    }
+
+    fun refresh() {
+        refreshTick.update { it + 1L }
+        refreshExternalState()
+    }
+
+    fun setDirectBootEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            DirectBootTriggerStore.setEnabled(context, enabled)
+            refresh()
+        }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch(Dispatchers.IO) {
+            ThemePreference.set(context, mode)
+        }
+    }
+
+    fun refreshAssociations() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _associations.value = CompanionDeviceAssociation.list(context)
+        }
+    }
+
+    fun revokeLocaleGrant(token: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val store = LocaleGrantStore(context)
+            store.revoke(token)
+            _localeGrants.value = store.grants()
+        }
+    }
+
+    private fun refreshExternalState() {
+        externalRefreshJob?.cancel()
+        externalRefreshJob = viewModelScope.launch(Dispatchers.IO) {
+            _associations.value = CompanionDeviceAssociation.list(context)
+            _pushToken.value = PushTriggerTokenStore(context).token()
+            _localeGrants.value = LocaleGrantStore(context).grants()
+        }
+    }
+}
+
+private class PermissionOnboardingViewModelFactory(
+    private val appContext: Context,
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(PermissionOnboardingViewModel::class.java)) {
+            return PermissionOnboardingViewModel(appContext) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
 @Composable
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
@@ -174,9 +276,19 @@ fun PermissionOnboardingScreen(
     onGlobalFallbackTaskChange: (Long?) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val viewModelFactory = remember(context) {
+        PermissionOnboardingViewModelFactory(context.applicationContext)
+    }
+    val setupViewModel: PermissionOnboardingViewModel = viewModel(factory = viewModelFactory)
     val advancedProtectionEnabled by AdvancedProtectionReader.enabled.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
-    val permissionHistory = remember(context) { RuntimePermissionRequestHistory(context) }
+    val permissionHistory = setupViewModel.permissionHistory
+    val items by setupViewModel.permissionItems.collectAsState()
+    val directBootEnabled by setupViewModel.directBootEnabled.collectAsState()
+    val themeMode by setupViewModel.themeMode.collectAsState()
+    val associations by setupViewModel.associations.collectAsState()
+    val pushToken by setupViewModel.pushToken.collectAsState()
+    val localeGrants by setupViewModel.localeGrants.collectAsState()
     val permissionGrantedMessage = stringResource(R.string.permission_granted)
     val permissionDeniedRetryMessage = stringResource(R.string.permission_denied_retry)
     val permissionDeniedSettingsMessage = stringResource(R.string.permission_denied_settings)
@@ -184,9 +296,6 @@ fun PermissionOnboardingScreen(
     val shizukuPermissionFailedMessage = stringResource(R.string.setup_shizuku_permission_failed)
     val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
     val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
-    var refreshTick by remember { mutableIntStateOf(0) }
-    val directBootEnabled by DirectBootTriggerStore.observe(context).collectAsState(initial = false)
-    val setupScope = rememberCoroutineScope()
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermission?.let { permission ->
@@ -200,13 +309,13 @@ fun PermissionOnboardingScreen(
             }
         }
         pendingPermission = null
-        refreshTick++
+        setupViewModel.refresh()
     }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                refreshTick++
+                setupViewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -216,7 +325,6 @@ fun PermissionOnboardingScreen(
     val automationRequirements = remember(profiles, tasks) {
         SetupRequirementResolver.resolve(profiles, tasks)
     }
-    val items = remember(context, refreshTick) { buildPermissionItems(context, permissionHistory) }
     val visibleItems = remember(items, automationRequirements) {
         items.filter { item ->
             item.section != SetupSection.NEEDED || item.requirements.any(automationRequirements::contains)
@@ -296,17 +404,17 @@ fun PermissionOnboardingScreen(
             }
         }
 
-        item { ThemeSetupCard() }
+        item {
+            ThemeSetupCard(
+                currentMode = themeMode,
+                onSelectMode = setupViewModel::setThemeMode,
+            )
+        }
 
         item {
             DirectBootSetupCard(
                 enabled = directBootEnabled,
-                onEnabledChange = { enabled ->
-                    setupScope.launch {
-                        DirectBootTriggerStore.setEnabled(context, enabled)
-                        refreshTick++
-                    }
-                },
+                onEnabledChange = setupViewModel::setDirectBootEnabled,
             )
         }
 
@@ -350,9 +458,21 @@ fun PermissionOnboardingScreen(
         }
 
         item { TermuxScriptAllowlistCard(onMessage) }
-        item { PushTriggerSetupCard(onMessage) }
-        item { CompanionSetupCard(onMessage) }
-        item { LocaleGrantManagementCard(tasks = tasks, refreshKey = refreshTick) }
+        item { PushTriggerSetupCard(token = pushToken, onMessage = onMessage) }
+        item {
+            CompanionSetupCard(
+                associations = associations,
+                onRefresh = setupViewModel::refreshAssociations,
+                onMessage = onMessage,
+            )
+        }
+        item {
+            LocaleGrantManagementCard(
+                tasks = tasks,
+                grants = localeGrants,
+                onRevoke = setupViewModel::revokeLocaleGrant,
+            )
+        }
 
         SetupSection.entries.forEach { section ->
             val itemsForSection = sectionItems.getValue(section)
@@ -385,7 +505,7 @@ fun PermissionOnboardingScreen(
                                 if (requested) shizukuPermissionRequestedMessage
                                 else shizukuPermissionFailedMessage,
                             )
-                            refreshTick++
+                            setupViewModel.refresh()
                         }
                         is PermissionAction.ShizukuKillSwitch -> {
                             ShizukuPowerBackend.setKillSwitchEnabled(context, action.enabled)
@@ -393,7 +513,7 @@ fun PermissionOnboardingScreen(
                                 if (action.enabled) shizukuModeDisabledMessage
                                 else shizukuModeEnabledMessage,
                             )
-                            refreshTick++
+                            setupViewModel.refresh()
                         }
                             }
                         },
@@ -435,20 +555,19 @@ private fun GlobalFallbackTaskCard(
 }
 
 @Composable
-private fun CompanionSetupCard(onMessage: (String) -> Unit) {
+private fun CompanionSetupCard(
+    associations: List<CompanionAssociation>,
+    onRefresh: () -> Unit,
+    onMessage: (String) -> Unit,
+) {
     val context = LocalContext.current
     val activity = context.findActivity()
-    var refreshTick by remember { mutableIntStateOf(0) }
-    var associations by remember(context, refreshTick) {
-        mutableStateOf(CompanionDeviceAssociation.list(context))
-    }
     val associatedMessage = stringResource(R.string.setup_companion_associated)
     val failureMessage = stringResource(R.string.setup_companion_failed)
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
     ) {
-        associations = CompanionDeviceAssociation.list(context)
-        refreshTick++
+        onRefresh()
         onMessage(associatedMessage)
     }
 
@@ -482,8 +601,7 @@ private fun CompanionSetupCard(onMessage: (String) -> Unit) {
                         OutlinedButton(
                             onClick = {
                                 CompanionDeviceAssociation.disassociate(context, association)
-                                associations = CompanionDeviceAssociation.list(context)
-                                refreshTick++
+                                onRefresh()
                             },
                         ) {
                             Text(stringResource(R.string.setup_companion_revoke))
@@ -501,8 +619,7 @@ private fun CompanionSetupCard(onMessage: (String) -> Unit) {
                                     IntentSenderRequest.Builder(result.intentSender).build(),
                                 )
                                 is CompanionAssociationResult.Created -> {
-                                    associations = CompanionDeviceAssociation.list(context)
-                                    refreshTick++
+                                    onRefresh()
                                     onMessage(associatedMessage)
                                 }
                                 is CompanionAssociationResult.Failed -> onMessage(
@@ -522,9 +639,11 @@ private fun CompanionSetupCard(onMessage: (String) -> Unit) {
 }
 
 @Composable
-private fun PushTriggerSetupCard(onMessage: (String) -> Unit) {
+private fun PushTriggerSetupCard(
+    token: String,
+    onMessage: (String) -> Unit,
+) {
     val context = LocalContext.current
-    val token = remember(context) { PushTriggerTokenStore(context).token() }
     val tokenLabel = stringResource(R.string.setup_push_title)
     val copiedMessage = stringResource(R.string.setup_push_copied)
     Card(
@@ -563,11 +682,9 @@ private fun PushTriggerSetupCard(onMessage: (String) -> Unit) {
 @Composable
 private fun LocaleGrantManagementCard(
     tasks: List<Task>,
-    refreshKey: Int,
+    grants: List<LocaleGrant>,
+    onRevoke: (String) -> Unit,
 ) {
-    val context = LocalContext.current
-    val store = remember(context) { LocaleGrantStore(context) }
-    var grants by remember(context, refreshKey) { mutableStateOf(store.grants()) }
     val taskNames = remember(tasks) { tasks.associateBy(Task::id) }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -611,8 +728,7 @@ private fun LocaleGrantManagementCard(
                         }
                         OutlinedButton(
                             onClick = {
-                                store.revoke(grant.token)
-                                grants = grants.filterNot { it.token == grant.token }
+                                onRevoke(grant.token)
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
@@ -626,14 +742,10 @@ private fun LocaleGrantManagementCard(
 }
 
 @Composable
-private fun ThemeSetupCard() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
-    val onSelectMode: (ThemeMode) -> Unit = { mode ->
-        scope.launch { ThemePreference.set(context, mode) }
-    }
-
+private fun ThemeSetupCard(
+    currentMode: ThemeMode,
+    onSelectMode: (ThemeMode) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
