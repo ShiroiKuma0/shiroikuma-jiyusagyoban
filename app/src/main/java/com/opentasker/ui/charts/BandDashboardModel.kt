@@ -134,8 +134,14 @@ data class DashboardState(
     val regime: RecoveryRegime.Regime? = null,
     /** Every marked session paired with the night after it — see [SessionRegister]. */
     val register: SessionRegister.Register? = null,
-    /** Today's self-rating, if given — the third counted marker. Null means not asked yet today. */
+    /**
+     * The self-rating for [feltNight], if given — the third counted marker. Null means that night has
+     * not been rated. It is deliberately NOT "today's": in the morning the night being rated started
+     * yesterday, and labelling it "Today" is what let a stale entry pass for last night's answer.
+     */
     val feltToday: Int? = null,
+    /** `yyyyMMdd` start date of the night [feltToday] belongs to, so the row can name it. */
+    val feltNight: Long? = null,
     val feltEnabled: Boolean = true,
     /** The full extent of everything stored, so a viewport can pan across all of it. */
     val bounds: LongRange = 0L..0L,
@@ -280,11 +286,13 @@ class BandDashboardModel(
             peakCadenceDay = assembled.peakCadenceDay,
             regime = assembled.regime,
             register = assembled.register,
-            // Read back by the same key it is written under, so the buttons show what the marker
-            // is actually using.
-            feltToday = assembled.recovery?.nightStartMs
-                ?.let { RecoveryLog.rating(appContext, localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate())) }
-                ?: RecoveryLog.rating(appContext, localDateKey(today)),
+            // Read back by the same key it is written under, so the buttons show what the marker is
+            // actually using. Both sides go through feltKey for that reason: the read used to fall
+            // through to today's calendar date whenever the night had no rating — `?.let {}` yields
+            // null for "no recovery" and for "no rating alike" — which is a key nothing writes any
+            // more, so the only thing it could ever surface was a stale pre-night-keying entry.
+            feltNight = feltKey(assembled.recovery?.nightStartMs, zone),
+            feltToday = RecoveryLog.rating(appContext, feltKey(assembled.recovery?.nightStartMs, zone)),
             feltEnabled = RecoveryLog.enabled(appContext),
         )
     }
@@ -325,6 +333,19 @@ class BandDashboardModel(
         date.year * 10_000L + date.monthValue * 100L + date.dayOfMonth
 
     /**
+     * The key a felt rating is filed under: the START date of the night it describes.
+     *
+     * One function for both the read and the write, so the buttons can never show a value the marker
+     * is not using. With no night on record yet there is still a night to rate — the one that ended
+     * this morning, which started yesterday — so the fallback is yesterday rather than today. Today's
+     * calendar date would be the night about to begin, which 白い熊 cannot have an opinion on yet.
+     */
+    private fun feltKey(nightStartMs: Long?, zone: ZoneId): Long =
+        nightStartMs
+            ?.let { localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()) }
+            ?: localDateKey(LocalDate.now(zone).minusDays(1))
+
+    /**
      * Record how 白い熊 feels today, then reload so the counting rule picks it up at once.
      *
      * Filed under today's date; [RecoveryBuild] attributes it to the night that STARTED on the
@@ -339,9 +360,7 @@ class BandDashboardModel(
         // therefore filed every morning's answer against a night that had not happened yet, and the
         // card showed the previous day's rating for ever. Reported 2026-08-10: rated 2, card said
         // Normal.
-        val key = state.value.recovery?.nightStartMs
-            ?.let { localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()) }
-            ?: localDateKey(LocalDate.now(zone))
+        val key = feltKey(state.value.recovery?.nightStartMs, zone)
         // Tapping the value already selected REMOVES it. A rating you can change but never withdraw
         // is a trap: a stray tap becomes permanent data 白い熊 did not author, and the marker would
         // then be counted against a number nobody meant. (Found exactly that way, 2026-08-09.)
