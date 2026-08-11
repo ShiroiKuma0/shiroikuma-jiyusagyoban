@@ -129,9 +129,17 @@
             android:shell="true"
             tools:targetApi="29" />
 
+        <!--
+            singleTop is required for the NFC filter below, not a preference. Manifest NFC dispatch
+            delivers a tag to a standard-launchMode activity by starting a *new* instance, so
+            onNewIntent never ran and every tap stacked another copy of the app: the armed tag-write
+            editor stayed buried in the back stack while its result was delivered to the instance
+            the user could no longer see.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.OpenTasker">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
