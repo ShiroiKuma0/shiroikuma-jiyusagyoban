@@ -29,7 +29,7 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
         check(defaultValues.isNotEmpty()) { "Default Android string resources are missing." }
 
         val localeDirectories = resources.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("values-") }
+            ?.filter { it.isDirectory && isLocaleValuesDirectory(it.name) }
             ?.filter { localeXmlFiles(it).isNotEmpty() }
             .orEmpty()
             .sortedBy { it.name }
@@ -71,6 +71,11 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
             .orEmpty()
             .sortedBy { it.name }
 
+    private fun isLocaleValuesDirectory(name: String): Boolean {
+        val qualifier = name.removePrefix("values-").takeIf { it != name } ?: return false
+        return LOCALE_QUALIFIER.matches(qualifier)
+    }
+
     private fun localeStringValues(files: List<File>): Map<String, String> {
         val factory = DocumentBuilderFactory.newInstance().apply {
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
@@ -87,6 +92,10 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
                 node.attributes.getNamedItem("name").nodeValue to node.textContent.trim()
             }
         }.toMap()
+    }
+
+    private companion object {
+        val LOCALE_QUALIFIER = Regex("""^(b\+[A-Za-z0-9+]+|[a-z]{2,3}(-r[A-Z]{2})?)$""")
     }
 }
 
