@@ -240,6 +240,61 @@ class VariableSecretStorageTest {
         assertEquals("legacy-plaintext", dao.get("API_TOKEN")!!.value)
     }
 
+    @Test
+    fun movingVariablesToAnotherProjectReEncryptsSecretsSoTheyStayReadable() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+        val source = DEFAULT_PROJECT_ID + 7
+        val target = DEFAULT_PROJECT_ID + 9
+        repository.upsert(Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true, projectId = source))
+        repository.upsert(Variable("Plain", "kept", isGlobal = true, projectId = source))
+
+        repository.withMutationLock { reassignProject(source, target) }
+
+        // A raw row copy would leave the envelope bound to the old project id and decode to "".
+        val moved = repository.get("API_TOKEN", target)!!
+        assertTrue(moved.secretAvailable)
+        assertEquals("token-123", moved.value)
+        assertEquals("kept", repository.get("Plain", target)!!.value)
+        assertTrue(dao.getAllInProject(source).isEmpty())
+    }
+
+    @Test
+    fun movingAnUndecryptableSecretAbortsInsteadOfRelocatingDeadCiphertext() = runBlocking {
+        // An envelope written under a key this install no longer has (rotated/lost Keystore key).
+        val orphaned = codec(newKey()).encrypt(5L, "API_TOKEN", "token-123")
+        val dao = FakeVariableDao(
+            VariableEntity("API_TOKEN", orphaned, isGlobal = true, isSecret = true, projectId = 5L),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+
+        val failure = runCatching { repository.withMutationLock { reassignProject(5L, 9L) } }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals(1, dao.getAllInProject(5L).size)
+        assertTrue(dao.getAllInProject(9L).isEmpty())
+    }
+
+    @Test
+    fun lockedMutationsRunWithoutReacquiringTheMutationLock() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+        repository.upsert(Variable("API_TOKEN", "token-123", isGlobal = true, isSecret = true))
+
+        // Every member must be reachable in one scope: the mutex is not reentrant, so a member
+        // that still took the lock itself would hang here rather than fail.
+        repository.withMutationLock {
+            assertEquals("token-123", get("API_TOKEN")!!.value)
+            importVariable(Variable("Imported", "9", isGlobal = true))
+            rename("API_TOKEN", Variable("Renamed", "token-456", isGlobal = true, isSecret = true))
+            delete("Imported")
+        }
+
+        assertNull(dao.get("API_TOKEN"))
+        assertNull(dao.get("Imported"))
+        assertEquals("token-456", repository.get("Renamed")!!.value)
+    }
+
     private fun codec(key: SecretKey): VariableSecretCodec = AesGcmVariableSecretCodec(keyProvider = { key })
 
     private fun newKey(): SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()

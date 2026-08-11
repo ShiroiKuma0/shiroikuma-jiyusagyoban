@@ -757,104 +757,108 @@ class OpenTaskerBundleRepository(
         val importWarnings = (bundle.metadata.warnings + plan.warnings).distinct().toMutableList()
         val lossyWarnings = plan.lossyWarnings.toMutableList()
 
-        db.withTransaction {
-            val projectIdMap = resolveProjectIds(bundle.projects, createMissing = true)
-            val taskIdMap = mutableMapOf<Long, Long>()
-            val insertedTaskRecords = mutableListOf<Task>()
-            bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
-                val newId = db.taskDao().insert(task.copy(id = 0, projectId = projectIdMap[task.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
-                taskIdMap[task.id] = newId
-                insertedTaskRecords += task.copy(id = newId)
-                insertedTasks++
-            }
-
-            // Task-to-task references (`task.run` targets and notification-button bindings) live
-            // inside action arguments, so they can only be remapped once every task has its new id.
-            // Skipping this pass is how imported sub-task calls used to point at whatever task
-            // happened to own the exporter's id in this database.
-            AutomationReferenceRewriter
-                .remapIds(idMap = taskIdMap, tasks = insertedTaskRecords)
-                .tasks
-                .forEach { db.taskDao().update(it.toEntity()) }
-
-            bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
-                val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
-                    ?: throw IllegalArgumentException("Invalid variable name '${variable.name}'")
-                val targetProjectId = projectIdMap[variable.projectId] ?: DEFAULT_PROJECT_ID
-                val existing = if (targetProjectId == DEFAULT_PROJECT_ID) {
-                    db.variableDao().get(storageName)
-                } else {
-                    db.variableDao().getInProject(storageName, targetProjectId)
-                }
-                if (existing == null) {
-                    variableRepository.importVariable(variable.copy(name = storageName, projectId = targetProjectId))
-                    insertedVariables++
-                    return@forEach
+        // Mutation lock first, then the transaction: the reverse order deadlocks against the
+        // engine's variable commit path.
+        variableRepository.withMutationLock {
+            db.withTransaction {
+                val projectIdMap = resolveProjectIds(bundle.projects, createMissing = true)
+                val taskIdMap = mutableMapOf<Long, Long>()
+                val insertedTaskRecords = mutableListOf<Task>()
+                bundle.tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id }).forEach { task ->
+                    val newId = db.taskDao().insert(task.copy(id = 0, projectId = projectIdMap[task.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
+                    taskIdMap[task.id] = newId
+                    insertedTaskRecords += task.copy(id = newId)
+                    insertedTasks++
                 }
 
-                val resolution = variableResolutions[storageName]
-                    ?: VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING)
-                when (resolution.action) {
-                    VariableConflictAction.PRESERVE_EXISTING -> {
-                        importWarnings += "Preserved existing variable '$storageName'."
+                // Task-to-task references (`task.run` targets and notification-button bindings) live
+                // inside action arguments, so they can only be remapped once every task has its new id.
+                // Skipping this pass is how imported sub-task calls used to point at whatever task
+                // happened to own the exporter's id in this database.
+                AutomationReferenceRewriter
+                    .remapIds(idMap = taskIdMap, tasks = insertedTaskRecords)
+                    .tasks
+                    .forEach { db.taskDao().update(it.toEntity()) }
+
+                bundle.variables.sortedWith(compareBy<Variable> { it.name.lowercase() }.thenBy { it.name }).forEach { variable ->
+                    val storageName = VariableNamePolicy.normalizeForScope(variable.name, variable.isGlobal)
+                        ?: throw IllegalArgumentException("Invalid variable name '${variable.name}'")
+                    val targetProjectId = projectIdMap[variable.projectId] ?: DEFAULT_PROJECT_ID
+                    val existing = if (targetProjectId == DEFAULT_PROJECT_ID) {
+                        db.variableDao().get(storageName)
+                    } else {
+                        db.variableDao().getInProject(storageName, targetProjectId)
                     }
-                    VariableConflictAction.RENAME_IMPORTED -> {
-                        val rename = resolution.renamedTo
-                            ?: plan.variableConflicts.first { it.name == storageName }.suggestedRename
-                        val normalizedRename = VariableNamePolicy.normalizeForScope(rename, variable.isGlobal)
-                            ?: throw IllegalArgumentException("Invalid renamed variable '$rename'")
-                        require(normalizedRename != storageName) {
-                            "Renamed variable '$storageName' must use a different name."
-                        }
-                        val renamedExists = if (targetProjectId == DEFAULT_PROJECT_ID) {
-                            db.variableDao().get(normalizedRename) != null
-                        } else {
-                            db.variableDao().getInProject(normalizedRename, targetProjectId) != null
-                        }
-                        require(!renamedExists) {
-                            "Renamed variable '$normalizedRename' already exists."
-                        }
-                        variableRepository.importVariable(variable.copy(name = normalizedRename, projectId = targetProjectId))
+                    if (existing == null) {
+                        importVariable(variable.copy(name = storageName, projectId = targetProjectId))
                         insertedVariables++
-                        importWarnings += "Renamed imported variable '$storageName' to '$normalizedRename'."
+                        return@forEach
                     }
-                    VariableConflictAction.REPLACE_EXISTING -> {
-                        val keepSecret = existing.isEffectivelySecret()
-                        variableRepository.importVariable(
-                            variable.copy(name = storageName, isSecret = keepSecret || variable.isSecret, projectId = targetProjectId),
-                        )
-                        val suffix = if (keepSecret) " and kept it secret" else ""
-                        importWarnings += "Replaced existing variable '$storageName'$suffix."
+
+                    val resolution = variableResolutions[storageName]
+                        ?: VariableConflictResolution(VariableConflictAction.PRESERVE_EXISTING)
+                    when (resolution.action) {
+                        VariableConflictAction.PRESERVE_EXISTING -> {
+                            importWarnings += "Preserved existing variable '$storageName'."
+                        }
+                        VariableConflictAction.RENAME_IMPORTED -> {
+                            val rename = resolution.renamedTo
+                                ?: plan.variableConflicts.first { it.name == storageName }.suggestedRename
+                            val normalizedRename = VariableNamePolicy.normalizeForScope(rename, variable.isGlobal)
+                                ?: throw IllegalArgumentException("Invalid renamed variable '$rename'")
+                            require(normalizedRename != storageName) {
+                                "Renamed variable '$storageName' must use a different name."
+                            }
+                            val renamedExists = if (targetProjectId == DEFAULT_PROJECT_ID) {
+                                db.variableDao().get(normalizedRename) != null
+                            } else {
+                                db.variableDao().getInProject(normalizedRename, targetProjectId) != null
+                            }
+                            require(!renamedExists) {
+                                "Renamed variable '$normalizedRename' already exists."
+                            }
+                            importVariable(variable.copy(name = normalizedRename, projectId = targetProjectId))
+                            insertedVariables++
+                            importWarnings += "Renamed imported variable '$storageName' to '$normalizedRename'."
+                        }
+                        VariableConflictAction.REPLACE_EXISTING -> {
+                            val keepSecret = existing.isEffectivelySecret()
+                            importVariable(
+                                variable.copy(name = storageName, isSecret = keepSecret || variable.isSecret, projectId = targetProjectId),
+                            )
+                            val suffix = if (keepSecret) " and kept it secret" else ""
+                            importWarnings += "Replaced existing variable '$storageName'$suffix."
+                        }
                     }
                 }
-            }
 
-            bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->
-                val enterTaskId = taskIdMap[profile.enterTaskId]
-                if (enterTaskId == null) {
-                    lossyWarnings += "Skipped profile '${profile.name}' because enter task ${profile.enterTaskId} was not imported."
-                    return@forEach
+                bundle.profiles.sortedWith(compareBy<Profile> { it.name.lowercase() }.thenBy { it.id }).forEach { profile ->
+                    val enterTaskId = taskIdMap[profile.enterTaskId]
+                    if (enterTaskId == null) {
+                        lossyWarnings += "Skipped profile '${profile.name}' because enter task ${profile.enterTaskId} was not imported."
+                        return@forEach
+                    }
+                    val remappedProfile = profile.copy(
+                        id = 0,
+                        enabled = false,
+                        requiresRiskAcknowledgement = true,
+                        lifetimeConsumed = false,
+                        enterTaskId = enterTaskId,
+                        exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
+                        fallbackTaskId = profile.fallbackTaskId?.let { taskIdMap[it] },
+                        projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,
+                    )
+                    db.profileDao().upsert(remappedProfile.toEntity())
+                    insertedProfiles++
                 }
-                val remappedProfile = profile.copy(
-                    id = 0,
-                    enabled = false,
-                    requiresRiskAcknowledgement = true,
-                    lifetimeConsumed = false,
-                    enterTaskId = enterTaskId,
-                    exitTaskId = profile.exitTaskId?.let { taskIdMap[it] },
-                    fallbackTaskId = profile.fallbackTaskId?.let { taskIdMap[it] },
-                    projectId = projectIdMap[profile.projectId] ?: DEFAULT_PROJECT_ID,
-                )
-                db.profileDao().upsert(remappedProfile.toEntity())
-                insertedProfiles++
-            }
 
-            bundle.scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id }).forEach { scene ->
-                val remappedElements = scene.elements.map { element ->
-                    remapSceneElement(element, taskIdMap)
+                bundle.scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id }).forEach { scene ->
+                    val remappedElements = scene.elements.map { element ->
+                        remapSceneElement(element, taskIdMap)
+                    }
+                    db.sceneDao().insert(scene.copy(id = 0, elements = remappedElements, projectId = projectIdMap[scene.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
+                    insertedScenes++
                 }
-                db.sceneDao().insert(scene.copy(id = 0, elements = remappedElements, projectId = projectIdMap[scene.projectId] ?: DEFAULT_PROJECT_ID).toEntity())
-                insertedScenes++
             }
         }
 

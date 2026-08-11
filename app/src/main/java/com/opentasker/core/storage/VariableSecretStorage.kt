@@ -217,8 +217,51 @@ class VariableRepository(
         }
     }
 
+    /**
+     * Runs [block] holding the process-wide variable-mutation lock, exposing the mutations that
+     * assume it is already held.
+     *
+     * Callers that also need a Room transaction MUST take this lock first and open the transaction
+     * inside it. The engine's commit path ([persistRuntimeAtomically]) takes the lock and then
+     * writes, so a caller holding an open write transaction while waiting for the lock deadlocks
+     * against it: the engine cannot reach the write connection the transaction holds, and the
+     * transaction cannot acquire the lock the engine holds. Lock order is always mutation lock →
+     * Room transaction.
+     */
+    suspend fun <T> withMutationLock(block: suspend LockedMutations.() -> T): T =
+        storageMutationMutex.withLock { LockedMutations().block() }
+
+    /**
+     * The mutation surface used inside [withMutationLock]. Every member assumes the mutation lock
+     * is held and must never take it again — [Mutex] is not reentrant.
+     */
+    inner class LockedMutations internal constructor() {
+        suspend fun get(name: String, projectId: Long = DEFAULT_PROJECT_ID): Variable? =
+            getLocked(name, projectId)
+
+        suspend fun rename(previousName: String, variable: Variable) =
+            renameLocked(previousName, variable)
+
+        suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) =
+            deleteLocked(name, projectId)
+
+        suspend fun importVariable(variable: Variable) = importVariableLocked(variable)
+
+        suspend fun reassignProject(fromProjectId: Long, toProjectId: Long) =
+            reassignProjectLocked(fromProjectId, toProjectId)
+    }
+
     suspend fun get(name: String, projectId: Long = DEFAULT_PROJECT_ID): Variable? {
         migrateLegacySensitiveVariables()
+        return getLocked(name, projectId, migrate = false)
+    }
+
+    private suspend fun getLocked(
+        name: String,
+        projectId: Long = DEFAULT_PROJECT_ID,
+        migrate: Boolean = true,
+    ): Variable? {
+        if (migrate) migrateLegacySensitiveVariablesLocked()
         val normalizedName = VariableNamePolicy.normalize(name) ?: return null
         val entity = if (projectId == DEFAULT_PROJECT_ID) {
             dao.get(normalizedName)
@@ -228,13 +271,46 @@ class VariableRepository(
         return entity?.let(::decodeForDomain)
     }
 
+    /**
+     * Moves every variable in [fromProjectId] to [toProjectId], re-encrypting secrets under the
+     * destination project.
+     *
+     * A raw row copy is not sufficient: a v2 secret envelope authenticates `projectId` and `name`
+     * as GCM AAD, so a ciphertext carried to a different project fails tag verification and the
+     * secret becomes permanently unreadable. Failing to decrypt any secret aborts the move rather
+     * than relocating an envelope that can never be opened.
+     */
+    private suspend fun reassignProjectLocked(fromProjectId: Long, toProjectId: Long) {
+        migrateLegacySensitiveVariablesLocked()
+        val moved = dao.getAllInProject(fromProjectId).map { entity ->
+            if (!entity.isEffectivelySecret()) return@map entity.copy(projectId = toProjectId)
+            val plaintext = secretCodec.decrypt(entity.projectId, entity.name, entity.value)
+                .getOrElse {
+                    throw IllegalStateException(
+                        "Secret variable '%${entity.name}' could not be decrypted, so it cannot be " +
+                            "moved to another project. Re-enter or delete it first.",
+                    )
+                }
+            entity.copy(
+                projectId = toProjectId,
+                value = secretCodec.encrypt(toProjectId, entity.name, plaintext),
+            )
+        }
+        if (moved.isNotEmpty()) dao.insertAll(moved)
+        dao.deleteAllInProject(fromProjectId)
+    }
+
     /** Stores an edited value under a new name and removes the old row as one mutation. */
     suspend fun rename(previousName: String, variable: Variable) {
+        storageMutationMutex.withLock { renameLocked(previousName, variable) }
+    }
+
+    private suspend fun renameLocked(previousName: String, variable: Variable) {
         val normalized = variable.normalizedForStorage()
         val oldName = VariableNamePolicy.normalize(previousName)
             ?: throw IllegalArgumentException("Invalid variable name '$previousName'.")
         require(normalized.projectId == variable.projectId) { "Variable project scope changed during rename." }
-        storageMutationMutex.withLock {
+        run {
             val oldEntity = if (normalized.projectId == DEFAULT_PROJECT_ID) {
                 dao.get(oldName)
             } else {
@@ -264,25 +340,23 @@ class VariableRepository(
     }
 
     suspend fun delete(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
+        storageMutationMutex.withLock { deleteLocked(name, projectId) }
+    }
+
+    private suspend fun deleteLocked(name: String, projectId: Long = DEFAULT_PROJECT_ID) {
         val normalizedName = VariableNamePolicy.normalize(name)
             ?: throw IllegalArgumentException("Invalid variable name '$name'.")
-        storageMutationMutex.withLock {
-            if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(normalizedName)
-            else dao.deleteByNameInProject(normalizedName, projectId)
-        }
+        if (projectId == DEFAULT_PROJECT_ID) dao.deleteByName(normalizedName)
+        else dao.deleteByNameInProject(normalizedName, projectId)
     }
 
     suspend fun importVariable(variable: Variable) {
+        storageMutationMutex.withLock { importVariableLocked(variable) }
+    }
+
+    private suspend fun importVariableLocked(variable: Variable) {
         val normalized = variable.normalizedForStorage()
-        val entity = normalized.toStoredEntity(secretCodec)
-        storageMutationMutex.withLock {
-            val existing = if (normalized.projectId == DEFAULT_PROJECT_ID) {
-                dao.get(normalized.name)
-            } else {
-                dao.getInProject(normalized.name, normalized.projectId)
-            }
-            if (existing == null) dao.upsert(entity) else dao.upsert(entity)
-        }
+        dao.upsert(normalized.toStoredEntity(secretCodec))
     }
 
     suspend fun ordinaryExport(projectId: Long? = null): OrdinaryVariableExport {
@@ -380,28 +454,40 @@ class VariableRepository(
         if (legacyMigrationAttempted) return
         migrationMutex.withLock {
             if (legacyMigrationAttempted) return
-            storageMutationMutex.withLock {
-                dao.getAll()
-                    .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
-                    .forEach { entity ->
-                        runCatching {
-                            dao.upsert(
-                                entity.copy(
-                                    value = secretCodec.encrypt(entity.projectId, entity.name, entity.value),
-                                    isSecret = true,
-                                ),
-                            )
-                        }.onFailure { error ->
-                            // Logging must never replace the encryption failure (notably in host-side
-                            // migration tests where android.util.Log is unavailable).
-                            runCatching {
-                                AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
-                            }
-                        }
-                    }
-            }
+            storageMutationMutex.withLock { encryptLegacyRows() }
             legacyMigrationAttempted = true
         }
+    }
+
+    /** [migrateLegacySensitiveVariables] for callers that already hold the mutation lock. */
+    private suspend fun migrateLegacySensitiveVariablesLocked() {
+        if (legacyMigrationAttempted) return
+        migrationMutex.withLock {
+            if (legacyMigrationAttempted) return
+            encryptLegacyRows()
+            legacyMigrationAttempted = true
+        }
+    }
+
+    private suspend fun encryptLegacyRows() {
+        dao.getAll()
+            .filter { it.isSecret && !AesGcmVariableSecretCodec.isEnvelope(it.value) }
+            .forEach { entity ->
+                runCatching {
+                    dao.upsert(
+                        entity.copy(
+                            value = secretCodec.encrypt(entity.projectId, entity.name, entity.value),
+                            isSecret = true,
+                        ),
+                    )
+                }.onFailure { error ->
+                    // Logging must never replace the encryption failure (notably in host-side
+                    // migration tests where android.util.Log is unavailable).
+                    runCatching {
+                        AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
+                    }
+                }
+            }
     }
 
     /** Refuses backup/export paths while any flagged legacy value is still plaintext. */
