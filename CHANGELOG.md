@@ -8,6 +8,36 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.84.2026-08-11.g9b75aac5+018 — 2026-08-11
+
+**Only an Activity may now claim to have come to the front.** `TYPE_WINDOW_STATE_CHANGED` is fired by
+anything that adds or replaces a window inside somebody else's screen — an app widget on the
+launcher's desktop, a popup, a toast, and this app's own scene and bubble overlays — and every one of
+them carries **its own** package, not the package of whatever is actually on screen. The
+accessibility service took that at face value, so on a widget-dense desktop `%APP_PACKAGE` flipped to
+a random widget's package within seconds of arriving at the home screen. Sampled every five seconds
+against a launcher that held the only application window on the display, it read a calculator, then
+the launcher, then this app itself, then the system settings.
+
+**Everything keyed on the foreground app was therefore reading the wrong app, intermittently.** The
+kanji clock's blacklist — the list of apps it must stay off — compared the launcher's entry against
+whichever widget had spoken last, missed, and drew the clock strip across the one desktop it was
+configured to avoid. It looked like a blacklist being ignored; it was a blacklist being asked the
+wrong question, which is why it held for other apps and failed only where the widgets live. 回転's
+per-app rotation modes and 通知明滅's foreground kill read the same signal and were wrong in the same
+moments.
+
+**The test is the event's class, not its package.** A real switch names an Activity that the package
+itself declares; a widget or an overlay names a plain View class, which no manifest declares as an
+activity. That answer is a manifest fact for as long as the app is installed, so it is cached per
+class, and a rejection is logged once per class — the desktop's widgets would otherwise flood the log
+with the same line every minute.
+
+Measured on the device rather than argued: four minutes on the launcher with `%APP_PACKAGE` steady,
+where it had previously flipped inside five seconds, and eight of eight samples agreeing with the
+system's own resumed activity across a file manager, a notepad, a dictionary, the settings app and
+home.
+
 ## 0.2.84.2026-08-11.g9b75aac5+017 — 2026-08-11
 
 **The app can now find a band whose address it does not already know.** A sync is addressed by MAC
