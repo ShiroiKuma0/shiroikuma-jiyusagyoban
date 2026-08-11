@@ -172,7 +172,9 @@ object ExecutionCausality {
         )
     }
 
-    internal fun reset() {
+    // This source file is compiled into both the app and core:engine modules. Keep the
+    // cross-module reset entry point public so Kotlin does not mangle it with a module suffix.
+    fun reset() {
         tracker.reset()
         CausalLoopDiagnostics.reset()
     }

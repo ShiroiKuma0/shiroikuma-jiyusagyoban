@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compose instrumentation now runs the Accessibility Test Framework across the primary UI flows, with regression fixtures for unlabeled controls and undersized touch targets.
 - Locale verification now examines every existing locale directory, rejects empty directories by name, reports how many it examined, and documents that the current release ships English only.
 - Shizuku now binds a versioned AIDL user service for the six allowlisted elevated actions, rechecks exact argv in the privileged process, keeps the persisted kill switch and fail-closed behavior, and unbinds the service during application teardown.
 - UnifiedPush registration now uses the official connector service for distributor discovery, SDK-versioned identity registration, RFC 8291 decryption, endpoint persistence, failure status, and delivery acknowledgement; ntfy's standard JSON reaches `event=push`, while the bounded/redacted legacy broadcast remains compatible.

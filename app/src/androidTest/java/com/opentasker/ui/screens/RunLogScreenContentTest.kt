@@ -2,7 +2,6 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
@@ -23,7 +22,7 @@ import org.junit.Test
 class RunLogScreenContentTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAccessibilityComposeRule()
 
     @Test
     fun emptyRunLogShowsEmptyState() {
@@ -39,6 +38,7 @@ class RunLogScreenContentTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
         composeTestRule.onNodeWithText("No run log entries", substring = true).assertIsDisplayed()
     }
 
@@ -69,6 +69,7 @@ class RunLogScreenContentTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
         // The task name appears in both the per-task summary ("Latest: …") and the entry card,
         // so assert the first displayed node rather than requiring a single match.
         composeTestRule.onAllNodesWithText("Morning Routine", substring = true).onFirst().assertIsDisplayed()
@@ -100,6 +101,7 @@ class RunLogScreenContentTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
         composeTestRule.onAllNodesWithText("Backup Task", substring = true).onFirst().assertIsDisplayed()
         // "Failed" shows on both the status pill and the per-task health summary.
         composeTestRule.onAllNodesWithText("Failed", substring = true).onFirst().assertIsDisplayed()
@@ -136,6 +138,7 @@ class RunLogScreenContentTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Export JSON").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Export CSV").performScrollTo().performClick()
@@ -172,6 +175,7 @@ class RunLogScreenContentTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Show all 6 actions"))
         composeTestRule.onNodeWithText("Show all 6 actions").performClick()

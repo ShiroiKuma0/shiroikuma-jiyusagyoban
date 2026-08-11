@@ -383,6 +383,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4-accessibility")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
@@ -1151,6 +1152,7 @@ tasks.register("localQualityGate") {
     dependsOn(
         "lintDebug",
         "compileDebugAndroidTestKotlin",
+        "connectedDebugAndroidTest",
         "verifyRoomSchema",
         "verifyReleaseTruth",
         verifyResolvedDependencyPolicy,

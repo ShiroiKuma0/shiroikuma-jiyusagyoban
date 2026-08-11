@@ -2,7 +2,6 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -19,7 +18,7 @@ import org.junit.Test
 
 class DiagnosticsScreenTest {
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAccessibilityComposeRule()
 
     @Test
     fun healthCrashesLogsAndShareActionAreReachable() {
@@ -50,6 +49,7 @@ class DiagnosticsScreenTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Engine healthy").assertIsDisplayed()
         composeTestRule.onNodeWithText("Share redacted report").performClick()
