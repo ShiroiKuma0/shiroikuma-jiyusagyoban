@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.2.86
+
+Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships all of them plus a critical defect the audit itself missed.
+
+### Fixed — critical
+
+- **Tasks could not run on any real device.** `TaskRunner` compiled a regex with unescaped closing braces in a class initializer. Desktop `java.util.regex` accepts that; Android's ICU engine rejects it, so the initializer threw on first use and every task execution failed — not only ones using array references. Present since 2026-08-10 and invisible to 1255 green JVM tests. Found by the new end-to-end instrumented test.
+- **Deleting a project destroyed every secret variable it held.** Variables were moved by copying the stored row to the new project, but a secret's envelope authenticates its project id, so each relocated secret failed verification and decoded as empty and unavailable with no way back. Secrets are now decrypted and re-encrypted under the destination, and a secret that cannot be decrypted aborts the move rather than being relocated as dead ciphertext.
+- **The database could freeze permanently.** The variable mutation lock and Room's write transaction were acquired in both orders — bundle import, variable rename and delete took the transaction first, the engine's commit path took the lock first — so the two could interleave and hold the single write connection until the process died. Lock order is now always mutation lock, then transaction.
+- **Automations fired on unrelated events.** A pulse advanced whenever any event reached an EVENT context, whether or not the context was watching for it, so a profile whose expression was already true for another reason activated on unrelated traffic: `EVENT(nfc) OR STATE(wifi=Home)` ran on every notification while on that network, and two OR'd EVENT leaves turned one physical event into two runs.
+- **NFC taps stacked a new copy of the app.** Manifest NFC dispatch starts a new activity unless the target is `singleTop`, so `onNewIntent` never ran and the armed tag-write editor stayed buried while its result went to an instance the user could no longer see.
+
+### Fixed — data and execution
+
+- A scheduled download to a fixed path replaced the good file with the 404 or 503 error body before the status was checked.
+- `clipboard.get` turned Android's background-read denial into an empty string and reported success, silently feeding blank data to whatever came next.
+- `sound.play` streamed arbitrary remote URLs, bypassing the private-network and cleartext policy the HTTP action enforces in code.
+- `app.archive`/`app.unarchive` advertised themselves as supported but could never succeed: Android's confirmation response was treated as a terminal failure.
+- The `unlocked` device state latched true after the first unlock for the rest of the service's life.
+- Calendar automations ran once a minute for the whole event; a 60-minute meeting ran its task about 60 times.
+- `data.read` with `format=xml` failed on every device — the same parser-parity defect as the Tasker XML import bug, in the one parser that never got the fix.
+- Tasker XML export then re-import dropped every variable.
+- Widget and shortcut runs ignored the concurrency limits and circuit breakers the in-app Run button respects, and a second tap started a concurrent run.
+- Wake-on-LAN could target any public address; `ping` demanded local-network permission even for public hosts; a broker could make the MQTT client allocate up to 256 MB.
+- A persisted cooldown was deleted when a profile was merely disabled.
+
+### Fixed — interface
+
+- A refused save no longer discards the whole form, and now says why: automation lint, duplicate names, and reference guards state their reason instead of "Operation failed".
+- Cold start no longer blocks the main thread waiting for the database — the launch after staging a restore could freeze for up to 30 seconds.
+- The Run Log keeps its entries while reloading, reports a failed load as a failure rather than "no runs match", and debounces search.
+- Task widgets refresh after a rename or delete instead of showing a stale label and a run that cannot succeed.
+- A widget task no longer leaves an invisible overlay covering the launcher for the duration of the run.
+- Large editors ignore a stray tap on the scrim, the context-logic editor survives background writes, and the elapsed counter on a running task advances.
+- Status bar icons are visible in the widget, quick-settings and Locale editors in light theme; light mode no longer flashes black on launch; warning text meets contrast; notifications use the app's own icon and accent.
+- AMOLED card and section borders are visible again, disabled action-picker entries look disabled, and search announces its result to screen readers.
+- Duplicated automations are named "Name (copy)" rather than "Name(copy)"; export and retention messages are proper plurals; and one term is used per concept throughout.
+
+### Changed
+
+- Verification: the Room schema gate now detects real drift rather than checking that files exist, the decoder fuzz harness can surface unexpected exceptions instead of swallowing them, the baseline profile must be recaptured for the release it ships in, capability counts are checked against the compiled runtime, and the JVM test floor no longer counts skipped tests.
+- Performance: one shared Locale-plugin poll replaces one per context (previously N x N broadcasts per interval), and media polling only runs for contexts that read media state.
+
 ## v0.2.85
 
 - Fixed the release build, which had failed since the staged module split: the core/* modules compile sources that still live under `app/`, so every shared class was compiled twice and R8 rejected the duplicate types. `:app` holds the only copy that ships and the module jars are no longer merged into the APK.
