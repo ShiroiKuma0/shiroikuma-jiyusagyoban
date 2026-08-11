@@ -1117,6 +1117,10 @@ class ActiveAutomationViewModel(
             runCatching {
                 db.variableDao().delete(projectId, name)
                 com.opentasker.core.engine.variables.PersistentGlobalScope.unset(projectId, name)
+                // A Locale-condition grant outlives the variable it names unless it is revoked here,
+                // so a variable recreated under the same name would honour the old token again.
+                LocaleConditionGrantStore(appContext)
+                    .revokeAllForBinding(LocaleConditionGrantStore.variableKey(projectId, name))
             }
                 .onSuccess { events.send("Variable deleted") }
                 .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
