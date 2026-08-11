@@ -206,6 +206,10 @@ object AutomationSensitivityRegistry {
     private val deviceControlActionIds = setOf(
         // Drives the Bluetooth radio and connects to a paired-free peripheral.
         "band.sync",
+        // Drives the same radio, listening rather than reading: it enumerates every BLE device in
+        // range and may connect to a few to identify them. Device control, not data access — it
+        // reads no health history, and the addresses it learns are broadcast to the whole room.
+        "band.scan",
         "backup.prune",
         "clipboard.set",
         "notify.show",
