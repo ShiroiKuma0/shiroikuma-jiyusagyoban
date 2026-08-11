@@ -8,6 +8,46 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.84.2026-08-11.g9b75aac5+013 — 2026-08-11
+
+**Upstream sync: 2 commits, 18 files. Upstream did not move its own version literals**, so the pin
+alone advances: `.g5c01f064` → `.g9b75aac5`, same base date. The build counter therefore keeps
+running — `+012` → `+013`, `versionCode 860013` — because `versionCode` is the only thing an installer
+compares.
+
+**What landed from upstream.** The Home Assistant webhook action takes the Companion apps'
+`message`/`data` notification envelope directly instead of only a hand-written JSON payload: fill the
+two new fields and the action assembles `{"message": …, "data": {…}}` itself, refusing the pair if a
+raw payload is also set. A `message` beginning `command_` is checked against the ~35 documented
+Companion commands (`command_broadcast_intent`, `command_flashlight`, `command_dnd`, the `kiosk_*`
+family, …), so a typo fails at parse time rather than posting a webhook that quietly does nothing.
+`AutomationTargetContract` gained Home Assistant's field names (`message`, `data`,
+`intent_package_name`, `intent_action`, `intent_extras`) as aliases beside the namespaced extras, so
+an HA `command_broadcast_intent` can reach the automation receiver in HA's own vocabulary.
+
+**The push bridge now speaks ntfy natively.** `PushContextEvents` accepts ntfy's unprefixed extra
+names (`topic`, `id`, `title`, `message`, `message_bytes`) alongside the `com.opentasker.extra.*`
+ones and listens on `io.heckel.ntfy.USER_ACTION` and `…MESSAGE_RECEIVED`, so an ntfy notification's
+own `broadcast` action can drive an `event=push` context with no relay app in between. The
+per-install token stays mandatory, the unauthenticated ntfy action is deliberately not a manifest
+entry point, and the forwarded `base_url` / `time` / `tags` / `priority` / `attachment_*` metadata is
+sanitized and length-capped before it reaches the event's variables.
+
+**Upstream's new webhook fields arrived as resource ids the fork does not have.** Both new
+`ActionField`s were declared with `R.string.catalog_action_home_assistant_webhook_field_*`; the fork
+keeps action labels and hints as inline strings, so the metadata block conflicted. The fields are
+re-added in the fork's own style with upstream's wording rather than dropped — `HomeAssistantWebhookAction`
+merged cleanly on its own, so taking the conflict as a deletion would have left the parser able to
+read `message`/`data` and the editor unable to offer them: a feature present in the engine and
+unreachable from the UI.
+
+**Release-truth provenance, adopted as schema only.** Upstream's gate now requires an annotated tag
+per changelog release from v0.2.58 onward, matching `releaseTagCommit` and an ancestor of HEAD.
+`tools/release-truth.json` takes the two new keys so the manifest matches the schema, but keeps the
+fork's capability counts (172 actions, bundle schema 5, Room 27); the gate itself hangs only off
+`verifyFdroidMetadata` and `localQualityGate`, neither of which `buildFork` runs, and the fork ships
+no F-Droid metadata to verify. The upstream test asserting those keys stays retired here.
+
 ## 0.2.84.2026-08-11.g5c01f064+012 — 2026-08-11
 
 **Upstream sync: 11 commits, 71 files. Upstream did not move its own version literals**, so the pin
