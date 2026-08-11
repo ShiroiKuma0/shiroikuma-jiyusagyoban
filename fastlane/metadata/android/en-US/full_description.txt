@@ -1,0 +1,39 @@
+OpenTasker automates your phone from rules you can read. A profile watches for a
+situation — a time window, a Wi-Fi network, a device state, an app opening, an NFC
+tag, a location — and runs a task you built from a list of typed actions.
+
+Everything runs on the device. There is no account, no cloud execution, and no
+telemetry.
+
+WHAT YOU GET
+
+* Profiles and contexts — combine time, day, location, device state, application,
+  and event triggers with AND/OR grouping, cooldowns, priorities, expiry, and
+  re-trigger policies.
+* Tasks and actions — a typed catalogue of built-in actions with per-action
+  conditions, continue-after-failure behaviour, try/catch/retry flow control, and
+  variables with template expansion.
+* Run evidence — every execution is logged with its trigger, per-action traces,
+  duration, and outcome. Held executions can be replayed; interrupted ones are
+  recovered and explained rather than lost.
+* Review before it runs — imported profiles arrive disabled, actions that need
+  special access are labelled, and risky imports need an explicit acknowledgement.
+* Portable data — export and import OpenTasker JSON bundles, import from Tasker
+  XML with a migration report, and export to Tasker XML. Secret values are never
+  exported.
+* Local backups — create a database backup on demand or on a schedule, review what
+  a restore would install before staging it, and protect exports with a passphrase.
+* Interoperability — Locale/Tasker plugin host and target, external automation
+  intents, launcher shortcuts, quick-settings tile, and a home-screen widget.
+
+PRIVACY AND PERMISSIONS
+
+OpenTasker asks only for what the automations you build actually need, and Setup
+explains what each permission unlocks and what stops working without it. The
+database is encrypted at rest, and first-class secret variables are encrypted with
+a key that never leaves the device.
+
+OPEN SOURCE
+
+MIT licensed. Source, issue tracker, and releases:
+https://github.com/SysAdminDoc/OpenTasker
