@@ -130,6 +130,7 @@
             <trusting group="com.google.code.gson" />
             <trusting group="^com[.]google[.]auto($|([.].*))" regex="true" />
          </trusted-key>
+         <trusted-key id="D233B6C6E7EDC0866D486C166054D87C226DFDC2" group="com.code-intelligence" />
          <trusted-key id="D477D51812E692011DB11E66A6EA2E2BF22E0543" group="io.github.java-diff-utils" />
          <trusted-key id="DBD744ACE7ADE6AA50DD591F66B50994442D2D40" group="com.squareup" />
          <trusted-key id="E7DC75FC24FB3C8DFE8086AD3D5839A2262CBBFB" group="org.jetbrains.kotlinx" />
@@ -4112,6 +4113,22 @@
          </artifact>
          <artifact name="utp-common-32.3.1.module">
             <sha256 value="2d3defd14992363d9ded44bc9e80c5d196045522b5b8162d8595bbd56c28fdfe" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="com.code-intelligence" name="jazzer" version="0.30.0">
+         <artifact name="jazzer-0.30.0.jar">
+            <sha256 value="8bdeac017bcd3d9473c9772fac62111c4df830188571def1d001a1b743a62b2f" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+         <artifact name="jazzer-0.30.0.pom">
+            <sha256 value="0018b6614e7722b95cf342510c23c7eef139d19a0d893a4be9132feb1bf92942" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+      </component>
+      <component group="com.code-intelligence" name="jazzer-api" version="0.30.0">
+         <artifact name="jazzer-api-0.30.0.jar">
+            <sha256 value="d36a725cfedcb7f3590206866cc2836f84d12afccf7c98912f5c720e4d2208d7" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+         <artifact name="jazzer-api-0.30.0.pom">
+            <sha256 value="09a2133a8ada6a52e2d312df8beeca2d1bb14954c5e0793b1abd37bedcd102d8" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="com.google.android" name="annotations" version="4.1.1.4">

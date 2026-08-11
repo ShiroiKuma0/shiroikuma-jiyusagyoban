@@ -191,6 +191,10 @@ cd OpenTasker
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+The external-decoder fuzzer is opt-in and is not part of the release or local quality gates. Run
+`./gradlew :app:fuzzExternalDecoders -PfuzzSeconds=30` for a bounded coverage-guided pass, or
+`./gradlew :app:fuzzExternalDecoderRegression` to replay the checked-in regression corpus.
+
 Release build (signed with the repo-owned self-host key when no keystore env vars are set):
 ```bash
 ./gradlew :app:assembleRelease
