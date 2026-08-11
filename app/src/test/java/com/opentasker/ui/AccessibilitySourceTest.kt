@@ -62,6 +62,30 @@ class AccessibilitySourceTest {
     }
 
     @Test
+    fun sceneCanvasElementsExposeGeometryAndAdjustmentActions() {
+        val source = uiSourceRoot.resolve("screens/SceneEditorCanvas.kt").readText()
+        val requiredMarkers = listOf(
+            ".semantics(mergeDescendants = true)",
+            "contentDescription = elementDescription",
+            "stateDescription = selectionState",
+            "role = Role.Button",
+            "customActions = elementAccessibilityActions",
+            "scenes_canvas_element_description",
+            "scenes_canvas_element_with_label",
+            "sceneElementTypeLabel(element.type)",
+            "scenes_resize_handle_content_description",
+            "scenes_resize_narrower_content_description",
+            "scenes_resize_wider_content_description",
+            "scenes_resize_shorter_content_description",
+            "scenes_resize_taller_content_description",
+            "private const val MIN_ELEMENT_SIZE = 12",
+        )
+        val missingMarkers = requiredMarkers.filterNot(source::contains)
+
+        assertTrue("Missing scene canvas accessibility contracts: $missingMarkers", missingMarkers.isEmpty())
+    }
+
+    @Test
     fun sceneOverlayKeepsTouchAndNonTouchMovementContracts() {
         val source = mainSourceRoot.resolve("com/opentasker/core/scenes/SceneOverlayService.kt").readText()
         val requiredMarkers = listOf(

@@ -31,6 +31,13 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -180,8 +187,77 @@ private fun SceneCanvasElement(
     }
     val borderColor = if (selected) MaterialTheme.colorScheme.primary else color.copy(alpha = 0.52f)
     val borderWidth = if (selected) 2.dp else 1.dp
-    val currentWidth = (projection.width + resizeDx).coerceAtLeast(12f)
-    val currentHeight = (projection.height + resizeDy).coerceAtLeast(12f)
+    val typeLabel = sceneElementTypeLabel(element.type)
+    val elementLabel = sceneElementSummary(element) ?: stringResource(R.string.scenes_unlabeled_element)
+    val visibleLabel = stringResource(R.string.scenes_canvas_element_with_label, typeLabel, elementLabel)
+    val elementDescription = stringResource(
+        R.string.scenes_canvas_element_description,
+        typeLabel,
+        elementLabel,
+        element.xDp,
+        element.yDp,
+        element.widthDp,
+        element.heightDp,
+    )
+    val selectionState = stringResource(
+        if (selected) R.string.a11y_selected else R.string.a11y_not_selected,
+    )
+    val selectActionLabel = stringResource(R.string.scenes_select_element_content_description)
+    val moveLeftActionLabel = stringResource(R.string.scenes_move_left_content_description)
+    val moveUpActionLabel = stringResource(R.string.scenes_move_up_content_description)
+    val moveDownActionLabel = stringResource(R.string.scenes_move_down_content_description)
+    val moveRightActionLabel = stringResource(R.string.scenes_move_right_content_description)
+    val resizeHandleDescription = stringResource(R.string.scenes_resize_handle_content_description)
+    val resizeNarrowerActionLabel = stringResource(R.string.scenes_resize_narrower_content_description)
+    val resizeWiderActionLabel = stringResource(R.string.scenes_resize_wider_content_description)
+    val resizeShorterActionLabel = stringResource(R.string.scenes_resize_shorter_content_description)
+    val resizeTallerActionLabel = stringResource(R.string.scenes_resize_taller_content_description)
+
+    fun moveBy(deltaX: Int, deltaY: Int): Boolean {
+        val maxX = (scene.widthDp - element.widthDp).coerceAtLeast(0)
+        val maxY = (scene.heightDp - element.heightDp).coerceAtLeast(0)
+        val targetX = (element.xDp + deltaX).coerceIn(0, maxX)
+        val targetY = (element.yDp + deltaY).coerceIn(0, maxY)
+        if (targetX == element.xDp && targetY == element.yDp) return false
+        onMoveElement(index, targetX, targetY)
+        return true
+    }
+
+    fun resizeBy(deltaWidth: Int, deltaHeight: Int): Boolean {
+        val maxWidth = (scene.widthDp - element.xDp).coerceAtLeast(1)
+        val maxHeight = (scene.heightDp - element.yDp).coerceAtLeast(1)
+        val minimumWidth = MIN_ELEMENT_SIZE.coerceAtMost(maxWidth)
+        val minimumHeight = MIN_ELEMENT_SIZE.coerceAtMost(maxHeight)
+        val targetWidth = (element.widthDp + deltaWidth).coerceIn(minimumWidth, maxWidth)
+        val targetHeight = (element.heightDp + deltaHeight).coerceIn(minimumHeight, maxHeight)
+        if (targetWidth == element.widthDp && targetHeight == element.heightDp) return false
+        onResizeElement(index, targetWidth, targetHeight)
+        return true
+    }
+
+    val resizeAccessibilityActions = listOf(
+        CustomAccessibilityAction(resizeNarrowerActionLabel) { resizeBy(-1, 0) },
+        CustomAccessibilityAction(resizeWiderActionLabel) { resizeBy(1, 0) },
+        CustomAccessibilityAction(resizeShorterActionLabel) { resizeBy(0, -1) },
+        CustomAccessibilityAction(resizeTallerActionLabel) { resizeBy(0, 1) },
+    )
+    val elementAccessibilityActions = listOf(
+        CustomAccessibilityAction(selectActionLabel) {
+            if (selected) {
+                false
+            } else {
+                onSelect()
+                true
+            }
+        },
+        CustomAccessibilityAction(moveLeftActionLabel) { moveBy(-1, 0) },
+        CustomAccessibilityAction(moveUpActionLabel) { moveBy(0, -1) },
+        CustomAccessibilityAction(moveDownActionLabel) { moveBy(0, 1) },
+        CustomAccessibilityAction(moveRightActionLabel) { moveBy(1, 0) },
+    ) + resizeAccessibilityActions
+
+    val currentWidth = (projection.width + resizeDx).coerceAtLeast(MIN_ELEMENT_SIZE.toFloat())
+    val currentHeight = (projection.height + resizeDy).coerceAtLeast(MIN_ELEMENT_SIZE.toFloat())
     Box(
         modifier = Modifier
             .offset {
@@ -197,6 +273,12 @@ private fun SceneCanvasElement(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
+                .semantics(mergeDescendants = true) {
+                    contentDescription = elementDescription
+                    stateDescription = selectionState
+                    role = Role.Button
+                    customActions = elementAccessibilityActions
+                }
                 .pointerInput(scene.id, element.id, projection.x, projection.y, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
                         // Only add to the selection if this member isn't already selected; toggling
@@ -260,7 +342,7 @@ private fun SceneCanvasElement(
         ) {
             Box(Modifier.fillMaxSize().padding(4.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    text = sceneElementSummary(element) ?: sceneElementTypeLabel(element.type),
+                    text = visibleLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -274,6 +356,11 @@ private fun SceneCanvasElement(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .size(DesignSystem.ComponentSize.touchTargetMin)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = resizeHandleDescription
+                    role = Role.Button
+                    customActions = resizeAccessibilityActions
+                }
                 .pointerInput(scene.id, element.id, projection.width, projection.height, canvasWidth, canvasHeight, density.density) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
@@ -312,4 +399,4 @@ private fun SceneCanvasElement(
     }
 }
 
-private const val MIN_ELEMENT_SIZE = 8
+private const val MIN_ELEMENT_SIZE = 12

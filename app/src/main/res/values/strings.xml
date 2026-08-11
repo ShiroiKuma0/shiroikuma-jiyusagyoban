@@ -835,6 +835,15 @@
     <string name="scenes_move_up_content_description">Move element up 1 dp</string>
     <string name="scenes_move_down_content_description">Move element down 1 dp</string>
     <string name="scenes_move_right_content_description">Move element right 1 dp</string>
+    <string name="scenes_canvas_element_with_label">%1$s • %2$s</string>
+    <string name="scenes_canvas_element_description">%1$s, %2$s, at %3$d,%4$d dp, size %5$dx%6$d dp</string>
+    <string name="scenes_unlabeled_element">Unlabeled element</string>
+    <string name="scenes_select_element_content_description">Select element</string>
+    <string name="scenes_resize_handle_content_description">Resize element</string>
+    <string name="scenes_resize_narrower_content_description">Make element narrower by 1 dp</string>
+    <string name="scenes_resize_wider_content_description">Make element wider by 1 dp</string>
+    <string name="scenes_resize_shorter_content_description">Make element shorter by 1 dp</string>
+    <string name="scenes_resize_taller_content_description">Make element taller by 1 dp</string>
 
     <string name="inspector_not_matching">Not matching</string>
     <string name="inspector_warning_content_description">Warning</string>
