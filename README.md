@@ -231,9 +231,9 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | Property | Value |
 |----------|-------|
 | Kotlin | 2.4.10 |
-| Gradle | 9.6.1 |
+| Gradle | 9.7.0 |
 | AGP | 9.3.1 |
-| KSP | 2.3.10 |
+| KSP | 2.3.11 |
 | Build Tools | 36.0.0 |
 | Macrobenchmark | 1.5.0-alpha07 |
 | JDK | 17 or 21 |
@@ -241,7 +241,7 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | Compile SDK | 37 |
 | Target SDK | 37 |
 | Room | 2.8.4 |
-| Compose BOM | 2026.06.00 |
+| Compose BOM | 2026.06.01 |
 | WorkManager | 2.11.2 |
 
 All dependency versions are centralized in `gradle/libs.versions.toml`.

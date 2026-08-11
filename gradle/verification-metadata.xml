@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<verification-metadata xmlns="https://schema.gradle.org/dependency-verification" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://schema.gradle.org/dependency-verification https://schema.gradle.org/dependency-verification/dependency-verification-1.3.xsd">
+<verification-metadata xmlns="https://schema.gradle.org/dependency-verification" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://schema.gradle.org/dependency-verification https://schema.gradle.org/dependency-verification/dependency-verification-1.4.xsd">
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>true</verify-signatures>
@@ -7,8 +7,6 @@
          <ignored-key id="E2F38302C8075E3D" reason="Key couldn't be downloaded from any key server" />
       </ignored-keys>
       <trusted-keys>
-         <trusted-key id="0D35D3F60078655126908E8AF3D1600878E85A3D" group="io.netty" />
-         <trusted-key id="7E22D50A7EBD9D2CD269B2D4056ACA74D46000BF" group="io.netty" />
          <trusted-key id="04543577D6A9CC626239C50C7ECBD740FF06AEB5">
             <trusting group="org.glassfish.jaxb" />
             <trusting group="org.jvnet.staxex" />
@@ -16,6 +14,7 @@
          </trusted-key>
          <trusted-key id="0785B3EFF60B1B1BEA94E0BB7C25280EAE63EBE5" group="org.apache.httpcomponents" />
          <trusted-key id="0CC641C3A62453AB390066C4A41F13C999945293" group="commons-logging" name="commons-logging" version="1.2" />
+         <trusted-key id="0D35D3F60078655126908E8AF3D1600878E85A3D" group="io.netty" />
          <trusted-key id="0E225917414670F4442C250DFD533C07C264648F">
             <trusting group="androidx.activity" />
             <trusting group="androidx.benchmark" />
@@ -85,6 +84,7 @@
          <trusted-key id="7440F1F7D27BAC115F953D55EB095DA7D2F6AC0E" group="org.tensorflow" name="tensorflow-lite-metadata" version="0.2.0" />
          <trusted-key id="7616EB882DAF57A11477AAF559A252FB1199D873" group="com.google.code.findbugs" name="jsr305" version="3.0.2" />
          <trusted-key id="7B121B76A7ED6CE6E60AD51784E913A8E3A748C0" group="org.bouncycastle" />
+         <trusted-key id="7E22D50A7EBD9D2CD269B2D4056ACA74D46000BF" group="io.netty" />
          <trusted-key id="7F36E793AE3252E5D9E9B98FEE9E7DC9D92FC896" group="com.google.errorprone" />
          <trusted-key id="8461EFA0E74ABAE010DE66994EB27DB2A3B88B8B">
             <trusting group="androidx.emoji2" />
@@ -128,9 +128,7 @@
          <trusted-key id="E7DC75FC24FB3C8DFE8086AD3D5839A2262CBBFB" group="org.jetbrains.kotlinx" />
          <trusted-key id="EB1B3DE71713C9EC2E87CC26EE92349AD86DE446" group="com.google.j2objc" name="j2objc-annotations" version="2.8" />
          <trusted-key id="EE0CA873074092F806F59B65D364ABAA39A47320" group="com.google.errorprone" />
-         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9">
-            <trusting group="org.jsoup" name="jsoup" version="1.23.1" />
-         </trusted-key>
+         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9" group="org.jsoup" name="jsoup" version="1.23.1" />
          <trusted-key id="FA77DCFEF2EE6EB2DEBEDD2C012579464D01C06A" group="org.apache" name="apache" />
          <trusted-key id="FA7929F83AD44C4590F6CC6815C71C0A4E0B8EDD" group="net.java.dev.jna" />
          <trusted-key id="FAABC3738B1F58DA2D776FA2EB380DC13C39F675" group="com.intellij" name="annotations" version="12.0" />
@@ -4504,6 +4502,14 @@
             <sha256 value="f7d9c2cb045422afc8d0cdc1427a9cec1cd75b3d28675be50525490986eec453" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
          </artifact>
       </component>
+      <component group="org.gradle.kotlin" name="gradle-kotlin-dsl-plugins" version="6.7.3">
+         <artifact name="gradle-kotlin-dsl-plugins-6.7.3.jar">
+            <sha256 value="1cf4851c403e5def3896e56d5315ec81a3b1b63bc2225fcafaa6492ead69a67c" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
+         </artifact>
+         <artifact name="gradle-kotlin-dsl-plugins-6.7.3.module">
+            <sha256 value="d83b7e15ebcd97461e7bb6c42e34382c79051bc705a1daa95eccd3d91671e587" origin="OpenTasker: Gradle Plugin Portal published .asc + artifact SHA-256" reason="A key couldn't be downloaded" />
+         </artifact>
+      </component>
       <component group="org.gradle.kotlin.kotlin-dsl" name="org.gradle.kotlin.kotlin-dsl.gradle.plugin" version="6.5.2">
          <artifact name="org.gradle.kotlin.kotlin-dsl.gradle.plugin-6.5.2.pom">
             <sha256 value="e5a6af17b58560d746cab42c795fe3a42a1ebe4050e55a4f00d8cf54cf31f1ea" origin="OpenTasker: Gradle Plugin Portal direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
@@ -4512,6 +4518,11 @@
       <component group="org.gradle.kotlin.kotlin-dsl" name="org.gradle.kotlin.kotlin-dsl.gradle.plugin" version="6.6.4">
          <artifact name="org.gradle.kotlin.kotlin-dsl.gradle.plugin-6.6.4.pom">
             <sha256 value="3e9412faf093fce6f9459837c8b3fd367ee3ffc2c77d0d7d343e13ecdd9075eb" origin="OpenTasker: Gradle Plugin Portal direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
+         </artifact>
+      </component>
+      <component group="org.gradle.kotlin.kotlin-dsl" name="org.gradle.kotlin.kotlin-dsl.gradle.plugin" version="6.7.3">
+         <artifact name="org.gradle.kotlin.kotlin-dsl.gradle.plugin-6.7.3.pom">
+            <sha256 value="1d1b62a1dd8af85ef21808361197da4649393d5cea7efa422ab9a8016f5e6dd1" origin="OpenTasker: Gradle Plugin Portal direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
          </artifact>
       </component>
       <component group="org.hamcrest" name="hamcrest-core" version="1.3">
@@ -5094,6 +5105,11 @@
          </artifact>
          <artifact name="kotlin-gradle-plugins-bom-2.3.21.pom">
             <sha256 value="7adf21d36e9376ad445089e191a7715c9ab1f9503a23124094641d84ee5fcb7d" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlin" name="kotlin-gradle-plugins-bom" version="2.4.0">
+         <artifact name="kotlin-gradle-plugins-bom-2.4.0.pom">
+            <sha256 value="8067da597f6e705c0edc50dc4f00293f326ba1b085d7b6a18871c569b1e8ec3e" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
       <component group="org.jetbrains.kotlin" name="kotlin-gradle-plugins-bom" version="2.4.10">
