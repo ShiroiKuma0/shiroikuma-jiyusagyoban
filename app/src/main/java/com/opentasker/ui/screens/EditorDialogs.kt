@@ -1052,8 +1052,6 @@ internal sealed interface DeleteTarget {
     data class ProfileTarget(val profile: Profile) : DeleteTarget
     data class TaskTarget(val task: Task) : DeleteTarget
     data class SceneTarget(val scene: Scene) : DeleteTarget
-    data class ActionTarget(val task: Task, val index: Int, val action: ActionSpec) : DeleteTarget
-    data class ContextTarget(val profile: Profile, val index: Int, val context: ContextSpec) : DeleteTarget
 }
 
 @Composable
@@ -1066,22 +1064,16 @@ internal fun DeleteConfirmationDialog(
         is DeleteTarget.ProfileTarget -> stringResource(R.string.dialog_delete_profile)
         is DeleteTarget.TaskTarget -> stringResource(R.string.dialog_delete_task)
         is DeleteTarget.SceneTarget -> stringResource(R.string.dialog_delete_scene)
-        is DeleteTarget.ActionTarget -> stringResource(R.string.dialog_remove_action)
-        is DeleteTarget.ContextTarget -> stringResource(R.string.dialog_remove_context)
     }
     val body = when (target) {
         is DeleteTarget.ProfileTarget -> stringResource(R.string.delete_profile_body, target.profile.name)
         is DeleteTarget.TaskTarget -> stringResource(R.string.delete_task_body, target.task.name, target.task.actions.size)
         is DeleteTarget.SceneTarget -> stringResource(R.string.delete_scene_body, target.scene.name, target.scene.elements.size)
-        is DeleteTarget.ActionTarget -> stringResource(R.string.delete_action_body, target.index + 1, target.task.name)
-        is DeleteTarget.ContextTarget -> stringResource(R.string.delete_context_body, stringResource(contextTitleRes(target.context.type)), target.profile.name)
     }
     val confirmLabel = when (target) {
         is DeleteTarget.ProfileTarget -> stringResource(R.string.profile_delete)
         is DeleteTarget.TaskTarget -> stringResource(R.string.task_delete)
         is DeleteTarget.SceneTarget -> stringResource(R.string.scenes_delete)
-        is DeleteTarget.ActionTarget -> stringResource(R.string.action_remove_action)
-        is DeleteTarget.ContextTarget -> stringResource(R.string.action_remove_context)
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1097,12 +1089,12 @@ internal fun DeleteConfirmationDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(body, style = MaterialTheme.typography.bodyMedium)
                 Surface(
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.24f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.24f),
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)),
                 ) {
                     Text(
-                        stringResource(R.string.delete_cannot_undo),
+                        stringResource(R.string.delete_undo_helper),
                         modifier = Modifier.padding(12.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,

@@ -89,7 +89,8 @@ class LocalizationSourceTest {
 
         assertTrue("Snackbar channel must carry resource IDs", "Channel<UiMessage>" in viewModel)
         assertFalse("ViewModel must not emit raw snackbar literals", Regex("events\\.send\\(\\s*\"").containsMatchIn(viewModel))
-        assertTrue("Compose collector must resolve the message in the current locale", "it.resolve(context)" in ui)
+        assertTrue("Compose collector must resolve the message in the current locale", "message.resolve(context)" in ui)
+        assertTrue("Undo-capable messages must expose a snackbar action", "message.action?.let" in ui)
     }
 
     @Test

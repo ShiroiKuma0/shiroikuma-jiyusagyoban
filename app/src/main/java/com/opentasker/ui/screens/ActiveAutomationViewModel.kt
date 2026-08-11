@@ -162,6 +162,13 @@ internal data class TaskerImportReviewState(
 )
 
 /** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
+sealed interface UiMessageAction {
+    data class Undo(
+        val entityType: String,
+        val entityId: Long,
+    ) : UiMessageAction
+}
+
 data class UiMessage(
     // Deliberately unannotated: this is a string resource when [quantity] is null and a plurals
     // resource otherwise. The message() and pluralMessage() factories carry the precise type.
@@ -169,6 +176,7 @@ data class UiMessage(
     val args: List<Any> = emptyList(),
     /** Set when [resId] names a plurals resource rather than a string. */
     val quantity: Int? = null,
+    val action: UiMessageAction? = null,
 ) {
     @SuppressLint("ResourceType")
     fun resolve(context: Context): String = if (quantity == null) {
@@ -317,6 +325,19 @@ class ActiveAutomationViewModel(
                 entityId = entityId,
                 previousJson = "",
                 nextJson = nextJson,
+            ),
+        )
+        db.editHistoryDao().pruneOld(entityType, entityId)
+    }
+
+    private suspend fun recordDeletion(entityType: String, entityId: Long, previousJson: String) {
+        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
+        db.editHistoryDao().insert(
+            EditHistoryEntity(
+                entityType = entityType,
+                entityId = entityId,
+                previousJson = previousJson,
+                nextJson = "",
             ),
         )
         db.editHistoryDao().pruneOld(entityType, entityId)
@@ -570,7 +591,11 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateTask(task: Task, @StringRes successMessageRes: Int = R.string.ui_message_task_updated) = launchWithMessage(successMessageRes) {
+    fun updateTask(
+        task: Task,
+        @StringRes successMessageRes: Int = R.string.ui_message_task_updated,
+        successAction: UiMessageAction? = null,
+    ) = launchWithMessage(successMessageRes, successAction) {
         // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
         // update must be atomic so a concurrent writer can't interleave and lose a revision.
         db.withTransaction {
@@ -625,6 +650,15 @@ class ActiveAutomationViewModel(
         }
     }
 
+    fun removeTaskAction(task: Task, index: Int) {
+        require(index in task.actions.indices) { "Action index is out of range." }
+        updateTask(
+            task.copy(actions = task.actions.filterIndexed { actionIndex, _ -> actionIndex != index }),
+            R.string.ui_message_action_removed,
+            UiMessageAction.Undo(EditHistoryDao.TYPE_TASK, task.id),
+        )
+    }
+
     /**
      * Every object that still points at [task], resolved through the shared reference index so
      * `task.run` arguments, notification buttons, and scene gestures are surfaced alongside the
@@ -658,11 +692,14 @@ class ActiveAutomationViewModel(
                 var rewrittenGlobalFallbackTaskId: Long? = null
                 var globalFallbackChanged = false
                 db.withTransaction {
+                    val currentTask = db.taskDao().getById(task.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Task no longer exists.")
                     val profiles = db.profileDao().getAll().map { it.toDomain() }
                     val tasks = db.taskDao().getAll().map { it.toDomain() }
                     val scenes = db.sceneDao().getAll().map { it.toDomain() }
                     val rewrite = AutomationReferenceRewriter.retarget(
-                        target = task,
+                        target = currentTask,
                         resolution = resolution,
                         profiles = profiles,
                         tasks = tasks,
@@ -673,10 +710,15 @@ class ActiveAutomationViewModel(
                         blockedCount = rewrite.blocked.size
                         return@withTransaction
                     }
+                    recordDeletion(
+                        entityType = EditHistoryDao.TYPE_TASK,
+                        entityId = currentTask.id,
+                        previousJson = StorageJson.encodeToString(currentTask),
+                    )
                     rewrite.profiles.forEach { db.profileDao().upsert(it.toEntity()) }
                     rewrite.tasks.forEach { db.taskDao().update(it.toEntity()) }
                     rewrite.scenes.forEach { db.sceneDao().update(it.toEntity()) }
-                    db.taskDao().delete(task.toEntity())
+                    db.taskDao().delete(currentTask.toEntity())
                     rewrittenGlobalFallbackTaskId = rewrite.globalFallbackTaskId
                     globalFallbackChanged = rewrite.globalFallbackChanged
                 }
@@ -691,7 +733,12 @@ class ActiveAutomationViewModel(
                         events.send(message(R.string.ui_task_still_used, blocked))
                     } else {
                         LocaleGrantStore(appContext).revokeAllForTask(task.id)
-                        events.send(message(R.string.ui_message_task_deleted))
+                        events.send(
+                            UiMessage(
+                                resId = R.string.ui_message_task_deleted,
+                                action = UiMessageAction.Undo(EditHistoryDao.TYPE_TASK, task.id),
+                            ),
+                        )
                     }
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_task_delete)) }
@@ -732,7 +779,20 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateScene(scene: Scene, @StringRes successMessageRes: Int = R.string.ui_message_scene_updated) = launchWithMessage(successMessageRes) {
+    fun removeSceneElement(scene: Scene, index: Int) {
+        require(index in scene.elements.indices) { "Scene element index is out of range." }
+        updateScene(
+            scene.copy(elements = scene.elements.filterIndexed { elementIndex, _ -> elementIndex != index }),
+            R.string.ui_message_element_removed,
+            UiMessageAction.Undo(EditHistoryDao.TYPE_SCENE, scene.id),
+        )
+    }
+
+    fun updateScene(
+        scene: Scene,
+        @StringRes successMessageRes: Int = R.string.ui_message_scene_updated,
+        successAction: UiMessageAction? = null,
+    ) = launchWithMessage(successMessageRes, successAction) {
         db.withTransaction {
             val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
             if (previous != null) {
@@ -750,8 +810,29 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun deleteScene(scene: Scene) = launchWithMessage(R.string.ui_message_scene_deleted) {
-        db.sceneDao().delete(scene.toEntity())
+    fun deleteScene(scene: Scene) {
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    val current = db.sceneDao().getById(scene.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Scene no longer exists.")
+                    recordDeletion(
+                        entityType = EditHistoryDao.TYPE_SCENE,
+                        entityId = current.id,
+                        previousJson = StorageJson.encodeToString(current),
+                    )
+                    db.sceneDao().delete(current.toEntity())
+                }
+            }.onSuccess {
+                events.send(
+                    UiMessage(
+                        resId = R.string.ui_message_scene_deleted,
+                        action = UiMessageAction.Undo(EditHistoryDao.TYPE_SCENE, scene.id),
+                    ),
+                )
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+        }
     }
 
     fun createProfile(
@@ -822,8 +903,11 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateProfile(profile: Profile, @StringRes successMessageRes: Int = R.string.ui_message_profile_updated) =
-        launchWithMessage(successMessageRes) {
+    fun updateProfile(
+        profile: Profile,
+        @StringRes successMessageRes: Int = R.string.ui_message_profile_updated,
+        successAction: UiMessageAction? = null,
+    ) = launchWithMessage(successMessageRes, successAction) {
             val reviewedProfile = reviewFeedbackRisk(ProfileLifecyclePolicy.normalize(profile))
             requireValidProfileFieldLimits(reviewedProfile)
             val lint = requireAutomationLint(reviewedProfile)
@@ -862,6 +946,18 @@ class ActiveAutomationViewModel(
             }
             emitLintWarnings(reviewedProfile, lint)
         }
+
+    fun removeProfileContext(profile: Profile, index: Int) {
+        require(index in profile.contexts.indices) { "Context index is out of range." }
+        updateProfile(
+            profile.copy(
+                contexts = profile.contexts.filterIndexed { contextIndex, _ -> contextIndex != index },
+                contextExpression = profile.contextExpression?.removeLeaf(index),
+            ),
+            R.string.ui_message_context_removed,
+            UiMessageAction.Undo(EditHistoryDao.TYPE_PROFILE, profile.id),
+        )
+    }
 
     fun createProject(name: String) = launchWithMessage(R.string.ui_message_project_created) {
         val normalized = validateProjectName(name)
@@ -958,15 +1054,36 @@ class ActiveAutomationViewModel(
             emitLintWarnings(enabledProfile, lint)
         }
 
-    fun deleteProfile(profile: Profile) = launchWithMessage(R.string.ui_message_profile_deleted) {
-        db.profileDao().delete(profile.toEntity())
-        LocaleConditionGrantStore(appContext).apply {
-            revokeAllForBinding(LocaleConditionGrantStore.profileKey(profile.id))
-            profile.contexts.indices.forEach { index ->
-                revokeAllForBinding(LocaleConditionGrantStore.contextKey(profile.id, index))
-            }
+    fun deleteProfile(profile: Profile) {
+        viewModelScope.launch {
+            runCatching {
+                db.withTransaction {
+                    val current = db.profileDao().getById(profile.id)?.toDomainDecodeResult()?.also { result ->
+                        result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                    }?.value ?: error("Profile no longer exists.")
+                    recordDeletion(
+                        entityType = EditHistoryDao.TYPE_PROFILE,
+                        entityId = current.id,
+                        previousJson = StorageJson.encodeToString(current),
+                    )
+                    db.profileDao().delete(current.toEntity())
+                }
+                LocaleConditionGrantStore(appContext).apply {
+                    revokeAllForBinding(LocaleConditionGrantStore.profileKey(profile.id))
+                    profile.contexts.indices.forEach { index ->
+                        revokeAllForBinding(LocaleConditionGrantStore.contextKey(profile.id, index))
+                    }
+                }
+                locationDwellStateStore.clearProfile(profile.id)
+            }.onSuccess {
+                events.send(
+                    UiMessage(
+                        resId = R.string.ui_message_profile_deleted,
+                        action = UiMessageAction.Undo(EditHistoryDao.TYPE_PROFILE, profile.id),
+                    ),
+                )
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
-        locationDwellStateStore.clearProfile(profile.id)
     }
 
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
@@ -1707,6 +1824,94 @@ class ActiveAutomationViewModel(
             history.getUndoCandidate(entityType, entityId)
         } ?: return@withTransaction null
 
+        if (snapshot.nextJson.isBlank()) {
+            if (redo) {
+                when (entityType) {
+                    EditHistoryDao.TYPE_TASK -> {
+                        val current = db.taskDao().getById(entityId) ?: return@withTransaction null
+                        val currentTask = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
+                        val references = AutomationReferenceIndex.referencesTo(
+                            task = currentTask,
+                            profiles = db.profileDao().getAll().map { it.toDomain() },
+                            tasks = db.taskDao().getAll().map { it.toDomain() },
+                            scenes = db.sceneDao().getAll().map { it.toDomain() },
+                            globalFallbackTaskId = fallbackTaskSettings.loadTaskId(),
+                        )
+                        if (references.isNotEmpty()) return@withTransaction null
+                        db.taskDao().delete(current)
+                        LocaleGrantStore(appContext).revokeAllForTask(entityId)
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareTask(currentTask, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    EditHistoryDao.TYPE_PROFILE -> {
+                        val current = db.profileDao().getById(entityId) ?: return@withTransaction null
+                        val currentProfile = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
+                        db.profileDao().delete(current)
+                        LocaleConditionGrantStore(appContext).apply {
+                            revokeAllForBinding(LocaleConditionGrantStore.profileKey(entityId))
+                            currentProfile.contexts.indices.forEach { index ->
+                                revokeAllForBinding(LocaleConditionGrantStore.contextKey(entityId, index))
+                            }
+                        }
+                        locationDwellStateStore.clearProfile(entityId)
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareProfile(currentProfile, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    EditHistoryDao.TYPE_SCENE -> {
+                        val current = db.sceneDao().getById(entityId) ?: return@withTransaction null
+                        val currentScene = current.toDomainDecodeResult().also { result ->
+                            result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
+                        }.value
+                        db.sceneDao().delete(current)
+                        history.markRedone(snapshot.id)
+                        return@withTransaction AutomationSemanticDiff.compareScene(currentScene, null)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    else -> return@withTransaction null
+                }
+            } else {
+                when (entityType) {
+                    EditHistoryDao.TYPE_TASK -> {
+                        if (db.taskDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.task(snapshot.previousJson, entityId)
+                        db.taskDao().insert(restored.toEntity())
+                        history.markUndone(snapshot.id, "")
+                        return@withTransaction AutomationSemanticDiff.compareTask(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    EditHistoryDao.TYPE_PROFILE -> {
+                        if (db.profileDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.profile(snapshot.previousJson, entityId)
+                        db.profileDao().insert(restored.toEntity())
+                        history.markUndone(snapshot.id, "")
+                        return@withTransaction AutomationSemanticDiff.compareProfile(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    EditHistoryDao.TYPE_SCENE -> {
+                        if (db.sceneDao().getById(entityId) != null) return@withTransaction null
+                        val restored = EditHistorySnapshotDecoder.scene(snapshot.previousJson, entityId)
+                        db.sceneDao().insert(restored.toEntity())
+                        history.markUndone(snapshot.id, "")
+                        return@withTransaction AutomationSemanticDiff.compareScene(null, restored)
+                            ?.let(::documentOf)
+                            ?: SemanticDiffDocument()
+                    }
+                    else -> return@withTransaction null
+                }
+            }
+        }
+
         if (snapshot.previousJson.isBlank()) {
             if (redo) {
                 when (entityType) {
@@ -2068,10 +2273,14 @@ class ActiveAutomationViewModel(
         }
     }
 
-    private fun launchWithMessage(@StringRes successMessageRes: Int, block: suspend () -> Unit) {
+    private fun launchWithMessage(
+        @StringRes successMessageRes: Int,
+        successAction: UiMessageAction? = null,
+        block: suspend () -> Unit,
+    ) {
         viewModelScope.launch {
             runCatching { block() }
-                .onSuccess { events.send(message(successMessageRes)) }
+                .onSuccess { events.send(UiMessage(successMessageRes, action = successAction)) }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }

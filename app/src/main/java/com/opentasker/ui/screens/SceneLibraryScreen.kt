@@ -30,6 +30,7 @@ fun SceneLibraryScreen(
     focusSceneId: Long? = null,
     onCreateScene: (String, Int, Int) -> Unit,
     onUpdateScene: (Scene, Int) -> Unit,
+    onRemoveElement: (Scene, Int) -> Unit,
     onUndoSceneEdit: (Scene) -> Unit = {},
     onRedoSceneEdit: (Scene) -> Unit = {},
     onDeleteScene: (Scene) -> Unit,
@@ -39,15 +40,10 @@ fun SceneLibraryScreen(
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    var pendingElementDeleteSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var pendingElementDeleteIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
     val listState = rememberLazyListState()
     val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
         sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
-    }
-    val pendingElementDelete = remember(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex) {
-        sceneElementEditorState(scenes, pendingElementDeleteSceneId, pendingElementDeleteIndex, allowNew = false)
     }
 
     LaunchedEffect(focusSceneId, sortedScenes) {
@@ -61,13 +57,6 @@ fun SceneLibraryScreen(
             elementEditorIndex = null
         }
     }
-    LaunchedEffect(pendingElementDeleteSceneId, pendingElementDelete) {
-        if (pendingElementDeleteSceneId != null && pendingElementDelete == null) {
-            pendingElementDeleteSceneId = null
-            pendingElementDeleteIndex = null
-        }
-    }
-
     if (showCreateDialog) {
         SceneEditorDialog(
             onDismiss = { showCreateDialog = false },
@@ -102,27 +91,6 @@ fun SceneLibraryScreen(
                 )
                 elementEditorSceneId = null
                 elementEditorIndex = null
-            },
-        )
-    }
-
-    pendingElementDelete?.let { state ->
-        SceneElementDeleteDialog(
-            state = state,
-            onDismiss = {
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
-            },
-            onConfirm = {
-                val index = state.index
-                if (index != null) {
-                    onUpdateScene(
-                        state.scene.copy(elements = state.scene.elements.filterIndexed { i, _ -> i != index }),
-                        R.string.ui_message_element_removed,
-                    )
-                }
-                pendingElementDeleteSceneId = null
-                pendingElementDeleteIndex = null
             },
         )
     }
@@ -164,8 +132,7 @@ fun SceneLibraryScreen(
                     elementEditorIndex = index
                 },
                 onDeleteElement = { index, _ ->
-                    pendingElementDeleteSceneId = scene.id
-                    pendingElementDeleteIndex = index
+                    onRemoveElement(scene, index)
                 },
                 onUpdateScene = onUpdateScene,
                 onUndo = { onUndoSceneEdit(scene) },

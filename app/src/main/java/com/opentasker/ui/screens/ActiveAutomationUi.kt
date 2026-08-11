@@ -75,6 +75,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -192,8 +193,6 @@ private const val NO_DIALOG_INDEX = -1
 private const val DELETE_TARGET_PROFILE = "profile"
 private const val DELETE_TARGET_TASK = "task"
 private const val DELETE_TARGET_SCENE = "scene"
-private const val DELETE_TARGET_ACTION = "action"
-private const val DELETE_TARGET_CONTEXT = "context"
 
 
 private enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
@@ -316,7 +315,6 @@ fun ActiveAutomationUi(
     var contextLogicProfileId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var pendingDeleteKind by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDeleteOwnerId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
-    var pendingDeleteIndex by rememberSaveable { mutableIntStateOf(NO_DIALOG_INDEX) }
     var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
@@ -391,10 +389,6 @@ fun ActiveAutomationUi(
             ?.let { DeleteTarget.TaskTarget(it) }
         DELETE_TARGET_SCENE -> scenes.firstOrNull { it.id == pendingDeleteOwnerId }
             ?.let { DeleteTarget.SceneTarget(it) }
-        DELETE_TARGET_ACTION -> tasks.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { task -> task.actions.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ActionTarget(task, pendingDeleteIndex, it) } }
-        DELETE_TARGET_CONTEXT -> profiles.firstOrNull { it.id == pendingDeleteOwnerId }
-            ?.let { profile -> profile.contexts.getOrNull(pendingDeleteIndex)?.let { DeleteTarget.ContextTarget(profile, pendingDeleteIndex, it) } }
         else -> null
     }
     val importedProfileReview = importedProfileReviewId.takeIf { it != NO_DIALOG_ENTITY_ID }
@@ -412,7 +406,6 @@ fun ActiveAutomationUi(
     fun clearPendingDelete() {
         pendingDeleteKind = null
         pendingDeleteOwnerId = NO_DIALOG_ENTITY_ID
-        pendingDeleteIndex = NO_DIALOG_INDEX
     }
     fun openTaskDialog(task: Task) {
         taskDialogId = task.id
@@ -468,27 +461,14 @@ fun ActiveAutomationUi(
     fun openDeleteProfile(profile: Profile) {
         pendingDeleteKind = DELETE_TARGET_PROFILE
         pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
     }
     fun openDeleteTask(task: Task) {
         pendingDeleteKind = DELETE_TARGET_TASK
         pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
     }
     fun openDeleteScene(scene: Scene) {
         pendingDeleteKind = DELETE_TARGET_SCENE
         pendingDeleteOwnerId = scene.id
-        pendingDeleteIndex = NO_DIALOG_INDEX
-    }
-    fun openDeleteAction(task: Task, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_ACTION
-        pendingDeleteOwnerId = task.id
-        pendingDeleteIndex = index
-    }
-    fun openDeleteContext(profile: Profile, index: Int) {
-        pendingDeleteKind = DELETE_TARGET_CONTEXT
-        pendingDeleteOwnerId = profile.id
-        pendingDeleteIndex = index
     }
     val openFlowTarget: (AutomationFlowTarget) -> Unit = { target ->
         var opened = true
@@ -536,7 +516,24 @@ fun ActiveAutomationUi(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { snackbarHostState.showSnackbar(it.resolve(context)) }
+        viewModel.messages.collect { message ->
+            val result = snackbarHostState.showSnackbar(
+                message = message.resolve(context),
+                actionLabel = message.action?.let { context.getString(R.string.action_undo) },
+                withDismissAction = message.action != null,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                when (val action = message.action) {
+                    is UiMessageAction.Undo -> when (action.entityType) {
+                        EditHistoryDao.TYPE_PROFILE -> viewModel.undoLastProfileEdit(action.entityId)
+                        EditHistoryDao.TYPE_TASK -> viewModel.undoLastTaskEdit(action.entityId)
+                        EditHistoryDao.TYPE_SCENE -> viewModel.undoLastSceneEdit(action.entityId)
+                        else -> Unit
+                    }
+                    null -> Unit
+                }
+            }
+        }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(screen) {
@@ -762,7 +759,7 @@ fun ActiveAutomationUi(
                     openContextEdit(profile, context.type, index)
                 },
                 onDeleteContext = { profile, index ->
-                    if (profile.contexts.getOrNull(index) != null) openDeleteContext(profile, index)
+                    if (profile.contexts.getOrNull(index) != null) viewModel.removeProfileContext(profile, index)
                 },
                 contentPadding = innerPadding,
             )
@@ -794,7 +791,7 @@ fun ActiveAutomationUi(
                     }
                 },
                 onDeleteAction = { task, index ->
-                    if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
+                    if (task.actions.getOrNull(index) != null) viewModel.removeTaskAction(task, index)
                 },
                 onMoveAction = { task, fromIndex, toIndex ->
                     viewModel.moveTaskAction(task.id, fromIndex, toIndex)
@@ -849,7 +846,8 @@ fun ActiveAutomationUi(
                 onCreateScene = { name, width, height ->
                     viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
                 },
-                onUpdateScene = viewModel::updateScene,
+                onUpdateScene = { scene, messageRes -> viewModel.updateScene(scene, messageRes) },
+                onRemoveElement = { scene, index -> viewModel.removeSceneElement(scene, index) },
                 onUndoSceneEdit = { viewModel.undoLastSceneEdit(it.id) },
                 onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },
                 onDeleteScene = { openDeleteScene(it) }, onDuplicateScene = viewModel::duplicateScene,
@@ -949,17 +947,6 @@ fun ActiveAutomationUi(
                     is DeleteTarget.ProfileTarget -> viewModel.deleteProfile(target.profile)
                     is DeleteTarget.TaskTarget -> viewModel.deleteTask(target.task)
                     is DeleteTarget.SceneTarget -> viewModel.deleteScene(target.scene)
-                    is DeleteTarget.ActionTarget -> viewModel.updateTask(
-                        target.task.copy(actions = target.task.actions.filterIndexed { i, _ -> i != target.index }),
-                        R.string.ui_message_action_removed,
-                    )
-                    is DeleteTarget.ContextTarget -> viewModel.updateProfile(
-                        target.profile.copy(
-                            contexts = target.profile.contexts.filterIndexed { i, _ -> i != target.index },
-                            contextExpression = target.profile.contextExpression?.removeLeaf(target.index),
-                        ),
-                        R.string.ui_message_context_removed,
-                    )
                 }
                 clearPendingDelete()
             },

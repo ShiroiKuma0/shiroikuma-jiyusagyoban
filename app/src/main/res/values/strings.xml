@@ -1016,12 +1016,12 @@
     <string name="automation_mode_parallel">allow overlap</string>
     <string name="action_remove_action">Remove Action</string>
     <string name="action_remove_context">Remove Context</string>
-    <string name="delete_profile_body">This removes &quot;%1$s&quot; and its contexts. The linked task remains available.</string>
-    <string name="delete_task_body">This permanently removes &quot;%1$s&quot; and its %2$d action(s).</string>
-    <string name="delete_scene_body">This permanently removes &quot;%1$s&quot; and its %2$d element(s).</string>
+    <string name="delete_profile_body">This removes &quot;%1$s&quot; and its contexts. The linked task remains available; you can restore the profile from the snackbar.</string>
+    <string name="delete_task_body">This removes &quot;%1$s&quot; and its %2$d action(s). You can restore it from the snackbar.</string>
+    <string name="delete_scene_body">This removes &quot;%1$s&quot; and its %2$d element(s). You can restore it from the snackbar.</string>
     <string name="delete_action_body">This removes step %1$d from &quot;%2$s&quot;. Remaining actions keep their order.</string>
     <string name="delete_context_body">This removes the %1$s condition from &quot;%2$s&quot;.</string>
-    <string name="delete_cannot_undo">This action cannot be undone.</string>
+    <string name="delete_undo_helper">You can restore this from the Undo action in the snackbar.</string>
 
     <string name="delete_task_references_title">Task is still in use</string>
     <string name="delete_task_references_body">&quot;%1$s&quot; is referenced by %2$d other automation(s). Choose what happens to those references before it is deleted.</string>
