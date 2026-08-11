@@ -656,9 +656,8 @@ internal fun ProfileEditorDialog(
                 }
                 Text(stringResource(R.string.profile_retrigger_label), style = MaterialTheme.typography.labelLarge)
                 AutomationMode.entries.forEach { mode ->
-                    val label = mode.name.lowercase().replaceFirstChar { it.uppercase() }
                     SelectableOption(
-                        title = label,
+                        title = stringResource(automationModeTitleRes(mode)),
                         body = automationModeDescription(mode),
                         selected = mode == automationMode,
                         onClick = { automationMode = mode },
@@ -784,14 +783,7 @@ internal fun automationModeDescription(mode: AutomationMode): String = when (mod
 }
 
 @Composable
-internal fun collisionModeTitle(mode: CollisionMode): String = stringResource(
-    when (mode) {
-        CollisionMode.ABORT_NEW -> R.string.collision_mode_abort_new_title
-        CollisionMode.ABORT_EXISTING -> R.string.collision_mode_abort_existing_title
-        CollisionMode.RUN_BOTH -> R.string.collision_mode_run_both_title
-        CollisionMode.WAIT -> R.string.collision_mode_wait_title
-    },
-)
+internal fun collisionModeTitle(mode: CollisionMode): String = stringResource(collisionModeTitleRes(mode))
 
 @Composable
 internal fun collisionModeDescription(mode: CollisionMode): String = stringResource(
@@ -865,13 +857,7 @@ internal fun formatProfileExpiryDate(value: Long?): String = value?.let {
 }.orEmpty()
 
 @Composable
-internal fun profileLifetimeTitle(lifetime: ProfileLifetime): String = stringResource(
-    when (lifetime) {
-        ProfileLifetime.NEVER -> R.string.profile_lifetime_never_title
-        ProfileLifetime.UNTIL_DATE -> R.string.profile_lifetime_date_title
-        ProfileLifetime.ONCE -> R.string.profile_lifetime_once_title
-    },
-)
+internal fun profileLifetimeTitle(lifetime: ProfileLifetime): String = stringResource(profileLifetimeTitleRes(lifetime))
 
 @Composable
 internal fun profileLifetimeDescription(lifetime: ProfileLifetime): String = stringResource(
@@ -883,12 +869,7 @@ internal fun profileLifetimeDescription(lifetime: ProfileLifetime): String = str
 )
 
 @Composable
-internal fun profileOverflowPolicyTitle(policy: ProfileOverflowPolicy): String = stringResource(
-    when (policy) {
-        ProfileOverflowPolicy.LOG -> R.string.profile_overflow_log_title
-        ProfileOverflowPolicy.SILENT -> R.string.profile_overflow_silent_title
-    },
-)
+internal fun profileOverflowPolicyTitle(policy: ProfileOverflowPolicy): String = stringResource(profileOverflowPolicyTitleRes(policy))
 
 @Composable
 internal fun profileOverflowPolicyDescription(policy: ProfileOverflowPolicy): String = stringResource(

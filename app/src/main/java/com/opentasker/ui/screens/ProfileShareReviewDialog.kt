@@ -159,7 +159,7 @@ internal fun ProfileShareReviewDialog(
                         title = stringResource(R.string.profile_share_trust_title),
                         body = stringResource(
                             R.string.profile_share_trust_body,
-                            manifest.trustLevel.name,
+                            stringResource(shareTrustLevelLabelRes(manifest.trustLevel)),
                             manifest.submissionChannel,
                         ),
                         color = MaterialTheme.colorScheme.primary,

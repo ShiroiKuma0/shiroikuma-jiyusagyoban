@@ -24,7 +24,7 @@ object ActionSummaryFormatter {
         val actionName = metadata
             ?.let { resources.getString(it.nameRes) }
             ?.takeUnless(String::isBlank)
-            ?: actionType
+            ?: resources.getString(R.string.action_unknown_name)
         val parameters = ActionArgumentSensitivity.summarize(
             actionType = actionType,
             args = args,

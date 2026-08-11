@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.transfer.RecipePowerRequest
 import com.opentasker.core.transfer.VariableConflictAction
@@ -224,8 +225,14 @@ internal fun OpenTaskerBundleReviewDialog(
                     item {
                         TaskerImportListSection(
                             title = stringResource(R.string.import_capability_review),
-                            values = capabilityRequirements.map {
-                                "${it.actionId}: ${it.level.name.lowercase().replace('_', ' ')} - ${it.reason}"
+                            values = capabilityRequirements.map { requirement ->
+                                val capability = ActionCapabilityRegistry.get(requirement.actionId)
+                                stringResource(
+                                    R.string.import_capability_item,
+                                    actionDisplayName(requirement.actionId),
+                                    stringResource(capabilityLevelLabelRes(requirement.level)),
+                                    stringResource(capability.reasonRes),
+                                )
                             },
                             color = MaterialTheme.colorScheme.primary,
                         )
@@ -457,7 +464,11 @@ private fun powerRequestSummary(request: RecipePowerRequest): String {
         ?.joinToString()
         ?: stringResource(R.string.import_power_no_profile)
     val chain = request.dataToExternalChains.firstOrNull()?.let { value ->
-        stringResource(R.string.import_power_chain, value.sourceActionId, value.sinkActionId)
+        stringResource(
+            R.string.import_power_chain,
+            actionDisplayName(value.sourceActionId),
+            actionDisplayName(value.sinkActionId),
+        )
     }
     return buildString {
         append(stringResource(R.string.import_power_task, request.taskName, powers))

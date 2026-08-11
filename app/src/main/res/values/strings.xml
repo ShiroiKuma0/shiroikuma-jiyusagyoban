@@ -192,6 +192,10 @@
     <string name="profile_lifetime_date_body">Stop matching after the selected calendar date ends.</string>
     <string name="profile_lifetime_once_title">Run once</string>
     <string name="profile_lifetime_once_body">Disable the profile after its first accepted activation.</string>
+    <string name="automation_mode_single_title">Ignore while running</string>
+    <string name="automation_mode_restart_title">Cancel and restart</string>
+    <string name="automation_mode_queued_title">Run again in order</string>
+    <string name="automation_mode_parallel_title">Allow overlap</string>
     <string name="profile_expiry_date_label">Expiry date</string>
     <string name="profile_expiry_date_hint">YYYY-MM-DD</string>
     <string name="profile_expiry_date_helper">Use the local calendar date. The profile remains available through that day.</string>
@@ -230,6 +234,7 @@
     <!-- Action editor -->
     <string name="action_label_field">Action label</string>
     <string name="action_label_hint">Shown in task steps and run log entries.</string>
+    <string name="action_unknown_name">Unknown action</string>
     <string name="action_condition_label">Run only if</string>
     <string name="action_condition_helper">Optional variable condition, for example %%armed == true. A false or invalid condition skips this action.</string>
     <string name="action_variable_picker_label">Insert a variable</string>
@@ -593,6 +598,7 @@
     <string name="import_incompatible">Cannot import</string>
     <string name="import_incompatible_body">Bundle schema is not compatible with this version of OpenTasker.</string>
     <string name="import_capability_review">Capability review</string>
+    <string name="import_capability_item">%1$s — %2$s: %3$s</string>
     <string name="import_warnings">Import warnings</string>
     <string name="import_migration_warnings">Migration warnings</string>
     <string name="import_unsupported_actions">Unsupported Tasker actions</string>
@@ -641,6 +647,9 @@
     <string name="profile_share_invalid_details">Share details need attention</string>
     <string name="profile_share_trust_title">Trust and submission</string>
     <string name="profile_share_trust_body">Trust: %1$s. Submission channel: %2$s. OpenTasker does not treat this draft as verified.</string>
+    <string name="profile_share_trust_local_draft">Local draft</string>
+    <string name="profile_share_trust_community_unverified">Community draft, not verified</string>
+    <string name="profile_share_invalid_details_body">Review the share fields and try again.</string>
     <string name="profile_share_screenshots">Screenshots</string>
     <string name="profile_share_screenshot_count">%1$d of %2$d attached</string>
     <string name="profile_share_attach_screenshots">Attach screenshots</string>
@@ -1060,8 +1069,20 @@
     <string name="scenes_slider_summary">%1$s: %2$s (%3$s-%4$s)</string>
     <string name="scene_element_type_button">Button</string>
     <string name="scene_element_type_text">Text</string>
+    <string name="scene_element_type_edit_text">Editable text</string>
+    <string name="scene_element_type_checkbox">Checkbox</string>
+    <string name="scene_element_type_toggle">Toggle</string>
     <string name="scene_element_type_slider">Slider</string>
+    <string name="scene_element_type_number_picker">Number picker</string>
+    <string name="scene_element_type_spinner">Spinner</string>
     <string name="scene_element_type_image">Image</string>
+    <string name="scene_element_type_map">Map</string>
+    <string name="scene_element_type_web">Web content</string>
+    <string name="scene_element_type_menu">Menu</string>
+    <string name="scene_element_type_video">Video</string>
+    <string name="scene_element_type_oval">Oval</string>
+    <string name="scene_element_type_rectangle">Rectangle</string>
+    <string name="scene_element_type_doodle">Drawing</string>
 
     <string name="diagnostics_title">Diagnostics and engine health</string>
     <string name="diagnostics_summary_body">Inspect background delivery, captured crashes, and the bounded in-app log without connecting to a server.</string>
@@ -1141,6 +1162,10 @@
     <string name="diagnostics_no_app_logs">No in-app log entries in this process yet.</string>
     <string name="diagnostics_crash_record">%1$s - %2$s</string>
     <string name="diagnostics_log_record">%1$s  %2$s/%3$s</string>
+    <string name="diagnostics_log_level_debug">Debug</string>
+    <string name="diagnostics_log_level_info">Info</string>
+    <string name="diagnostics_log_level_warning">Warning</string>
+    <string name="diagnostics_log_level_error">Error</string>
     <string name="action_field_error_invalid_number">Enter a valid number.</string>
     <string name="action_field_error_below_minimum">Must be at least %1$s.</string>
     <string name="action_field_error_above_maximum">Must be at most %1$s.</string>
@@ -1205,6 +1230,7 @@
     <string name="ui_flow_target_missing">Flow target no longer exists</string>
     <string name="ui_error_message">Error: %1$s</string>
     <string name="ui_error_generic">Operation failed</string>
+    <string name="ui_error_corrupt_record">Saved data could not be read. Restore a backup or delete the affected item.</string>
     <string name="ui_error_diagnostics_refresh">Diagnostics could not be refreshed</string>
     <string name="ui_error_task_delete">Task delete failed</string>
     <string name="ui_error_tasker_xml_preview">Tasker XML import preview failed</string>

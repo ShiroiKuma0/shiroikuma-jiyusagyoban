@@ -11,6 +11,7 @@ import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateValueSource
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
@@ -52,7 +53,7 @@ data class PreflightTaskReport(
 
 data class PreflightContextReport(
     val index: Int,
-    val type: String,
+    val type: ContextType,
     val configuration: Map<String, String>,
     val intendedEffect: String = "Context matching is described only; no context source is started.",
 )
@@ -148,7 +149,7 @@ object PreflightRunner {
         val variables = VariableStore()
         seedVariables(variables, inputs)
         val contexts = profile.contexts.mapIndexed { index, context ->
-            PreflightContextReport(index, context.type.name, context.config)
+            PreflightContextReport(index, context.type, context.config)
         }
         val rootTaskIds = listOfNotNull(profile.enterTaskId, profile.exitTaskId).distinct()
         rootTaskIds.forEach { taskId ->

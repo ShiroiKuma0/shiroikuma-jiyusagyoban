@@ -438,13 +438,7 @@ private fun SceneMetric(value: String, label: String, modifier: Modifier = Modif
 }
 
 @Composable
-internal fun sceneElementTypeLabel(type: SceneElementType): String = when (type) {
-    SceneElementType.BUTTON -> stringResource(R.string.scene_element_type_button)
-    SceneElementType.TEXT -> stringResource(R.string.scene_element_type_text)
-    SceneElementType.SLIDER -> stringResource(R.string.scene_element_type_slider)
-    SceneElementType.IMAGE -> stringResource(R.string.scene_element_type_image)
-    else -> type.name.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() }
-}
+internal fun sceneElementTypeLabel(type: SceneElementType): String = stringResource(sceneElementTypeLabelRes(type))
 
 @Composable
 internal fun sceneElementSummary(element: SceneElement): String? = when (element.type) {

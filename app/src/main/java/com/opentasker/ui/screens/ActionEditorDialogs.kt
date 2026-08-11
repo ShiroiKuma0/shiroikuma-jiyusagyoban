@@ -314,7 +314,7 @@ internal fun ActionConfigDialog(
                                 Text(
                                     stringResource(
                                         R.string.flow_try_retryable_summary,
-                                        actionIds.joinToString(),
+                                        actionIds.map { actionId -> actionDisplayName(actionId) }.joinToString(),
                                     ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
@@ -324,7 +324,7 @@ internal fun ActionConfigDialog(
                                 Text(
                                     stringResource(
                                         R.string.flow_try_non_retryable_summary,
-                                        actionIds.joinToString(),
+                                        actionIds.map { actionId -> actionDisplayName(actionId) }.joinToString(),
                                     ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
