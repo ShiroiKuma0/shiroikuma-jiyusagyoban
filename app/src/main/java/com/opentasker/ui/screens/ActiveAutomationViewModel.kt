@@ -267,49 +267,14 @@ class ActiveAutomationViewModel(
         return uiErrorMessage(error, fallbackRes)
     }
 
-    private suspend fun recordEdit(
-        entityType: String,
-        entityId: Long,
-        previousJson: String,
-        nextJson: String,
-    ) {
-        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
-        db.editHistoryDao().insert(
-            EditHistoryEntity(
-                entityType = entityType,
-                entityId = entityId,
-                previousJson = previousJson,
-                nextJson = nextJson,
-            ),
-        )
-        db.editHistoryDao().pruneOld(entityType, entityId)
-    }
+    private suspend fun recordEdit(entityType: String, entityId: Long, previousJson: String, nextJson: String) =
+        db.editHistoryDao().recordEdit(entityType, entityId, previousJson, nextJson)
 
-    private suspend fun recordCreation(entityType: String, entityId: Long, nextJson: String) {
-        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
-        db.editHistoryDao().insert(
-            EditHistoryEntity(
-                entityType = entityType,
-                entityId = entityId,
-                previousJson = "",
-                nextJson = nextJson,
-            ),
-        )
-        db.editHistoryDao().pruneOld(entityType, entityId)
-    }
+    private suspend fun recordCreation(entityType: String, entityId: Long, nextJson: String) =
+        db.editHistoryDao().recordCreation(entityType, entityId, nextJson)
 
-    private suspend fun recordDeletion(entityType: String, entityId: Long, previousJson: String) {
-        db.editHistoryDao().deleteRedoBranch(entityType, entityId)
-        db.editHistoryDao().insert(
-            EditHistoryEntity(
-                entityType = entityType,
-                entityId = entityId,
-                previousJson = previousJson,
-                nextJson = "",
-            ),
-        )
-        db.editHistoryDao().pruneOld(entityType, entityId)
-    }
+    private suspend fun recordDeletion(entityType: String, entityId: Long, previousJson: String) =
+        db.editHistoryDao().recordDeletion(entityType, entityId, previousJson)
 
     /** See [contentLoadedSignal]: screens gate first-run empty states on this. */
     val contentLoaded: StateFlow<Boolean> = contentLoadedSignal(db, viewModelScope)
@@ -1051,9 +1016,18 @@ class ActiveAutomationViewModel(
                 requiresRiskAcknowledgement = false,
             )
             val lint = requireAutomationLint(enabledProfile)
-            db.profileDao().upsert(
-                enabledProfile.toEntity(),
-            )
+            db.withTransaction {
+                // Acknowledging risk and enabling an imported profile is a real edit to that
+                // profile, and it was the one profile write that recorded no history - so the
+                // step that arms an unreviewed automation was the one the user could not undo.
+                recordEdit(
+                    entityType = EditHistoryDao.TYPE_PROFILE,
+                    entityId = current.id,
+                    previousJson = StorageJson.encodeToString(current),
+                    nextJson = StorageJson.encodeToString(enabledProfile),
+                )
+                db.profileDao().upsert(enabledProfile.toEntity())
+            }
             emitLintWarnings(enabledProfile, lint)
         }
 

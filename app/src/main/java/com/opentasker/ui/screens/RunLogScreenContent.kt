@@ -54,6 +54,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
 import com.opentasker.app.R
 import com.opentasker.core.engine.ActionTraceStatus
 import com.opentasker.core.engine.RunLogActionDiagnostic
@@ -991,8 +993,16 @@ private fun ActiveExecutionsCard(
                 pluralStringResource(R.plurals.run_log_active_executions, executions.size, executions.size),
                 style = MaterialTheme.typography.titleSmall,
             )
+            // Reading the clock during composition froze the figure until the executions flow
+            // happened to emit, so a running task appeared stuck at whatever second it started.
+            val now by produceState(System.currentTimeMillis()) {
+                while (true) {
+                    value = System.currentTimeMillis()
+                    delay(1_000)
+                }
+            }
             executions.forEach { execution ->
-                val elapsedSeconds = ((System.currentTimeMillis() - execution.startedAtMs) / 1000).coerceAtLeast(0)
+                val elapsedSeconds = ((now - execution.startedAtMs) / 1000).coerceAtLeast(0)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
