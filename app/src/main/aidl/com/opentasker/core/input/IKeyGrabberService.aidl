@@ -27,4 +27,12 @@ interface IKeyGrabberService {
      * Long/double/triple are always consumed regardless.
      */
     void setScreenOn(boolean on) = 3;
+
+    /**
+     * Tell the grabber a call is ringing. Ringing → a SINGLE tap is re-injected whatever the screen state,
+     * so the framework and the dialer still see the key (silence the ringer); the app suppresses its own
+     * volume panel for that same press. Idle → the screen rule alone decides again. Long/double/triple are
+     * unaffected.
+     */
+    void setRinging(boolean ringing) = 4;
 }

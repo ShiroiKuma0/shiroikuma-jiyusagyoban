@@ -67,6 +67,11 @@ class KeyGrabberService : IKeyGrabberService.Stub {
         runCatching { if (libLoaded) nativeSetScreenOn(on) }
     }
 
+    override fun setRinging(ringing: Boolean) {
+        // Same deal as setScreenOn: one volatile flag, read by the classify loop on the next tap.
+        runCatching { if (libLoaded) nativeSetRinging(ringing) }
+    }
+
     override fun destroy() {
         stopInternal()
         // daemon(false) → Shizuku kills this process after unbind; nothing else to clean up.
@@ -107,6 +112,9 @@ class KeyGrabberService : IKeyGrabberService.Stub {
 
     /** Set the screen-on flag (gates single-tap re-injection). */
     private external fun nativeSetScreenOn(on: Boolean)
+
+    /** Set the ringing flag (forces single-tap re-injection while a call rings, whatever the screen state). */
+    private external fun nativeSetRinging(ringing: Boolean)
 
     companion object {
         private const val TAG = "OpenTaskerKeyGrab"
