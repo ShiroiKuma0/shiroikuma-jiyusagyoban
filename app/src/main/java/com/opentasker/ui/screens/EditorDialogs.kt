@@ -930,6 +930,9 @@ internal fun EmptyState(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
+            // An empty state can carry up to five actions; at large font scale the last of them
+            // fell off-screen on a compact device with no way to reach it.
+            .verticalScroll(rememberScrollState())
             .padding(28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,

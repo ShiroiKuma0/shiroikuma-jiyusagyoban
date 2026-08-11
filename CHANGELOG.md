@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Profile and task lists reserve room for the floating action button, so the last row is no longer permanently covered, and empty states scroll — at large font scale their last action could previously sit off-screen with no way to reach it.
 - Undo and Redo on profile, task, and scene cards are now disabled when there is nothing to undo or redo, and announce why to a screen reader, instead of being permanently live and answering with a snackbar. A setup item with no available action shows status text rather than a button that only reported the item was already ready.
 - Profiles, Tasks, and Scenes now show a loading state until Room delivers its first snapshot, instead of flashing the first-run "Build your first automation" screen at every cold start for users who already have data.
 - Profile execution slots now decide and store under one lock for every automation mode, not only QUEUED, so a second dispatch path reaching the same slot cannot start a SINGLE profile twice or leave a superseded RESTART job running untracked. The queue consumer takes the same lock order, and the invariant is covered by concurrency tests.
