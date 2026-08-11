@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -827,6 +828,37 @@ private fun Pane(
     }
 }
 
+/**
+ * The four frames of the running-row spinner.
+ *
+ * Geometric shapes rather than the usual braille spinner: braille falls back to tofu on a phone whose
+ * font never needed it, and a row of empty boxes is a worse "it is alive" signal than no animation at
+ * all. These four are in every CJK font this app will ever meet.
+ */
+private val SPINNER_FRAMES = listOf("◐", "◓", "◑", "◒")
+
+/** Slow enough to read as turning rather than flickering, fast enough to look alive. */
+private const val SPINNER_FRAME_MS = 140L
+
+/**
+ * A glyph that turns on its own.
+ *
+ * Deliberately driven by its own coroutine rather than by panel updates: the case that matters is a
+ * task blocked inside ONE long action, where by definition nothing is arriving to redraw the row. A
+ * spinner that only moved when the panel was updated would stop precisely when it is needed.
+ */
+@Composable
+private fun spinnerFrame(): String {
+    var index by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(SPINNER_FRAME_MS)
+            index = (index + 1) % SPINNER_FRAMES.size
+        }
+    }
+    return SPINNER_FRAMES[index]
+}
+
 @Composable
 private fun PanelLineView(
     line: PanelLine,
@@ -914,7 +946,11 @@ private fun PanelLineView(
     val glyph = when (row.state) {
         ProgressRowState.DONE -> "✓"
         ProgressRowState.FAIL -> "✗"
-        ProgressRowState.ACTIVE -> "▶"
+        // The running row TURNS. A static ▶ beside a step that takes twenty seconds is
+        // indistinguishable from a wedged one, which is exactly how it read (白い熊, 2026-08-11) —
+        // the animation is driven by the composition's own clock, so it keeps moving even while the
+        // task is blocked inside a single action and nothing is updating the panel at all.
+        ProgressRowState.ACTIVE -> spinnerFrame()
         ProgressRowState.CANCEL -> "■"
         ProgressRowState.SKIP -> "–"
         ProgressRowState.PENDING -> "·"
