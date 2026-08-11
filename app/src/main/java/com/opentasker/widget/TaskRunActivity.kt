@@ -10,6 +10,9 @@ import com.opentasker.core.engine.ExecutionEnvelope
 import com.opentasker.core.engine.logSkippedRun
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.recoveryMessage
+import android.os.Handler
+import android.os.Looper
+import com.opentasker.app.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +29,18 @@ class TaskRunActivity : Activity() {
             finishWithMessage("Invalid task")
             return
         }
+
+        // A widget task can legitimately run for minutes (flow.wait alone allows 30). This
+        // activity draws nothing but is a real window, so staying alive for the run left the
+        // launcher covered by an invisible, touch-consuming overlay with no progress indication.
+        // Hand the work to a detached scope and get out of the way; the result arrives as a toast.
+        if (!RunningWidgetTasks.begin(taskId)) {
+            finishWithMessage(getString(R.string.widget_task_already_running))
+            return
+        }
+        val appContext = applicationContext
+        val mainHandler = Handler(Looper.getMainLooper())
+        finish()
 
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope.launch {
@@ -70,15 +85,27 @@ class TaskRunActivity : Activity() {
                 AppLogger.error(TAG, "Task run failed", e)
                 "Task run failed"
             }
-            runOnUiThread {
-                finishWithMessage(message)
+            finally {
+                RunningWidgetTasks.finish(taskId)
             }
+            mainHandler.post { Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show() }
         }
     }
 
     private fun finishWithMessage(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         finish()
+    }
+
+    /** Two quick taps on a widget used to start two concurrent runs with real side effects. */
+    private object RunningWidgetTasks {
+        private val running = java.util.Collections.synchronizedSet(mutableSetOf<Long>())
+
+        fun begin(taskId: Long): Boolean = running.add(taskId)
+
+        fun finish(taskId: Long) {
+            running.remove(taskId)
+        }
     }
 
     companion object {
