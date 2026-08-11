@@ -6,6 +6,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import android.os.Build
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
@@ -31,7 +35,7 @@ private val GraphiteSurface = Color(0xFF151817)
 private val GraphiteElevated = Color(0xFF1C211F)
 private val GraphiteOutline = Color(0xFF39413D)
 
-private val Amoled = darkColorScheme(
+private val Graphite = darkColorScheme(
     primary = Sage,
     onPrimary = Color(0xFF182019),
     primaryContainer = Color(0xFF2A352B),
@@ -66,6 +70,48 @@ private val Amoled = darkColorScheme(
     surfaceContainerHighest = Color(0xFF222825),
     surfaceBright = Color(0xFF2A312E),
     surfaceDim = GraphiteBackground,
+)
+
+/**
+ * True-black variant of [Graphite].
+ *
+ * The scheme previously called "Amoled" used #101211, which lights every background pixel — the
+ * saving an OLED user asks for only happens at #000000. Accent and text colours are unchanged, so
+ * body text keeps 19:1 on black and secondary text ~8.8:1.
+ */
+private val Amoled = darkColorScheme(
+    primary = Sage,
+    onPrimary = Color(0xFF182019),
+    primaryContainer = Color(0xFF1E271F),
+    onPrimaryContainer = Color(0xFFD9E7D3),
+    secondary = Sand,
+    onSecondary = Color.Black,
+    secondaryContainer = Color(0xFF2B2720),
+    onSecondaryContainer = Color(0xFFF0E2C8),
+    tertiary = CoolBlue,
+    onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF1B2523),
+    onTertiaryContainer = Color(0xFFD6E7E2),
+    error = SignalRed,
+    onError = Color(0xFF35000A),
+    errorContainer = Color(0xFF360E16),
+    onErrorContainer = Color(0xFFFFD9DE),
+    background = Color.Black,
+    onBackground = Text,
+    surface = Color.Black,
+    onSurface = Text,
+    // Cards and dialogs need to separate from the background; keep them as dark as legibility allows.
+    surfaceVariant = Color(0xFF141614),
+    onSurfaceVariant = TextSecondary,
+    outline = Color(0xFF2E3532),
+    outlineVariant = Color(0xFF1B1F1D),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0A0C0B),
+    surfaceContainer = Color(0xFF0E100F),
+    surfaceContainerHigh = Color(0xFF141614),
+    surfaceContainerHighest = Color(0xFF1A1D1B),
+    surfaceBright = Color(0xFF20241F),
+    surfaceDim = Color.Black,
 )
 
 // Catppuccin Latte palette for the light theme. Mirrors the dark scheme's structure so every
@@ -207,15 +253,46 @@ private val OpenTaskerShapes = Shapes(
     large = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
 )
 
+/**
+ * Applies a persisted [ThemeMode].
+ *
+ * Every entry point took the mode apart itself, so each of the five copies had to be found and
+ * updated whenever a mode was added — and adding one broke four activities at compile time. The
+ * mapping lives here now.
+ */
+@Composable
+fun OpenTaskerTheme(themeMode: ThemeMode, content: @Composable () -> Unit) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.Dark, ThemeMode.Amoled, ThemeMode.HighContrast -> true
+        ThemeMode.Light -> false
+        ThemeMode.System, ThemeMode.Dynamic -> isSystemInDarkTheme()
+    }
+    OpenTaskerTheme(
+        darkTheme = darkTheme,
+        highContrast = themeMode == ThemeMode.HighContrast,
+        amoled = themeMode == ThemeMode.Amoled,
+        dynamicColor = themeMode == ThemeMode.Dynamic,
+        content = content,
+    )
+}
+
 @Composable
 fun OpenTaskerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     highContrast: Boolean = false,
+    amoled: Boolean = false,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = when {
         highContrast -> HighContrast
-        darkTheme -> Amoled
+        // Dynamic colour is opt-in and platform-gated; below API 31 it degrades to the static
+        // scheme rather than silently doing nothing different.
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        amoled && darkTheme -> Amoled
+        darkTheme -> Graphite
         else -> Light
     }
     val view = LocalView.current

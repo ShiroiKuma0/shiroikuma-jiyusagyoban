@@ -125,6 +125,8 @@
     <string name="theme_dark">Dark</string>
     <string name="theme_light">Light</string>
     <string name="theme_high_contrast">High contrast</string>
+    <string name="theme_amoled">AMOLED black</string>
+    <string name="theme_dynamic">Material You</string>
 
     <!-- Screen titles -->
     <string name="title_automation_workspace">Automation workspace</string>

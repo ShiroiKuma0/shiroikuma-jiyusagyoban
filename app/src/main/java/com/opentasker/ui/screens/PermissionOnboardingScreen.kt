@@ -1043,7 +1043,12 @@ private fun ThemeSetupCard(
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ThemeMode.entries.chunked(2).forEach { rowModes ->
+                // Material You needs API 31; offering it below that would be a choice that
+                // silently does nothing.
+                val offeredModes = ThemeMode.entries.filter {
+                    it != ThemeMode.Dynamic || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                }
+                offeredModes.chunked(2).forEach { rowModes ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         rowModes.forEach { mode ->
                             ThemeChoice(
@@ -1125,6 +1130,8 @@ private fun ThemeChoice(
         ThemeMode.Dark -> stringResource(R.string.theme_dark)
         ThemeMode.Light -> stringResource(R.string.theme_light)
         ThemeMode.HighContrast -> stringResource(R.string.theme_high_contrast)
+        ThemeMode.Amoled -> stringResource(R.string.theme_amoled)
+        ThemeMode.Dynamic -> stringResource(R.string.theme_dynamic)
     }
     val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     val selectionDescription = stringResource(

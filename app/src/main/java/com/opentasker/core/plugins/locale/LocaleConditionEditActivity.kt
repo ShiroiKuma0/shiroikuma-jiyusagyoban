@@ -89,14 +89,9 @@ class LocaleConditionEditActivity : ComponentActivity() {
 
         setContent {
             val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            val darkTheme = when (themeMode) {
-                ThemeMode.Dark, ThemeMode.HighContrast -> true
-                ThemeMode.Light -> false
-                ThemeMode.System -> isSystemInDarkTheme()
-            }
             val profiles by profilesFlow.collectAsState(initial = emptyList())
             val variables by variablesFlow.collectAsState(initial = emptyList())
-            OpenTaskerTheme(darkTheme = darkTheme, highContrast = themeMode == ThemeMode.HighContrast) {
+            OpenTaskerTheme(themeMode) {
                 LocaleConditionEditor(
                     profiles = profiles,
                     variables = variables,
