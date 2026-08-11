@@ -81,10 +81,12 @@
          <trusted-key id="6DD3B8C64EF75253BEB2C53AD908A43FB7EC07AC" group="jakarta.activation" />
          <trusted-key id="6F538074CCEBF35F28AF9B066A0975F8B1127B83" group="^org[.]jetbrains[.]kotlin($|([.].*))" regex="true" />
          <trusted-key id="73976C9C39C1479B84E2641A5A68A2249128E2C6" group="com.google.crypto.tink" name="tink" version="1.18.0" />
+         <trusted-key id="73976C9C39C1479B84E2641A5A68A2249128E2C6" group="com.google.crypto.tink" name="tink" version="1.23.0" />
          <trusted-key id="7440F1F7D27BAC115F953D55EB095DA7D2F6AC0E" group="org.tensorflow" name="tensorflow-lite-metadata" version="0.2.0" />
          <trusted-key id="7616EB882DAF57A11477AAF559A252FB1199D873" group="com.google.code.findbugs" name="jsr305" version="3.0.2" />
          <trusted-key id="7B121B76A7ED6CE6E60AD51784E913A8E3A748C0" group="org.bouncycastle" />
          <trusted-key id="7E22D50A7EBD9D2CD269B2D4056ACA74D46000BF" group="io.netty" />
+         <trusted-key id="7F0C6700F82B97092092AFF84DA93C0B57A98B11" group="org.unifiedpush.android" />
          <trusted-key id="7F36E793AE3252E5D9E9B98FEE9E7DC9D92FC896" group="com.google.errorprone" />
          <trusted-key id="8461EFA0E74ABAE010DE66994EB27DB2A3B88B8B">
             <trusting group="androidx.emoji2" />
@@ -3236,6 +3238,14 @@
             <sha256 value="08c2dcac9ce37428aca73b1d6aa6a93f35c385224db03b3cae843b74e64d1edf" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
+      <component group="com.google.crypto.tink" name="tink" version="1.23.0">
+         <artifact name="tink-1.23.0.jar">
+            <sha256 value="5bcdc8798ce106f5145acb4a0e993c5e5861337b1e75ca88ceb6ab9da10fa512" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+         <artifact name="tink-1.23.0.pom">
+            <sha256 value="12a7e7b0d4a55e69c2d4006e268714598bc881b0ddfa8a05f1ac09e4e90c48bc" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+      </component>
       <component group="com.google.crypto.tink" name="tink" version="1.7.0">
          <artifact name="tink-1.7.0.jar">
             <sha256 value="88970a456a08ba4c66b01b23e5846ca1095cc14e54cb48363e5d2e15a1307308" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
@@ -6122,6 +6132,14 @@
          </artifact>
          <artifact name="tensorflow-lite-metadata-0.2.0.pom">
             <sha256 value="0fe31326e83b7622cbcd9c75d467b291f01ffe3cc6e3e76651ac05a1c1c7a360" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+      </component>
+      <component group="org.unifiedpush.android" name="connector" version="3.3.4-rc1">
+         <artifact name="connector-3.3.4-rc1.aar">
+            <sha256 value="1a9b0abf477ef95d91923925a2e43ff6039b1f3a4bf5e880c917a96ba9fbfce2" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         </artifact>
+         <artifact name="connector-3.3.4-rc1.module">
+            <sha256 value="bda1b77d1d78525ddaa98b18108729b5df8752aeb5f12d7229384fb33192c1c8" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
       <component group="org.xerial" name="sqlite-jdbc" version="3.41.2.2">

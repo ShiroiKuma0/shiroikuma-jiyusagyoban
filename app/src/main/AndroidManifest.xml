@@ -384,6 +384,18 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            The connector SDK owns the UnifiedPush protocol broadcasts, RFC 8291 decryption, and
+            MESSAGE_ACK. This app service receives only the already-decrypted bytes message.
+        -->
+        <service
+            android:name="com.opentasker.core.contexts.UnifiedPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name="com.opentasker.core.actions.PackageArchiveStatusReceiver"
             android:exported="false" />

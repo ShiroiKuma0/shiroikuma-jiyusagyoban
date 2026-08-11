@@ -75,4 +75,32 @@ class PushContextEventsTest {
         assertTrue(PushContextEvents.publishDelivery(delivery, "token", nowMs = 1_000L))
         assertFalse(PushContextEvents.publishDelivery(delivery, "token", nowMs = 1_001L))
     }
+
+    @Test
+    fun unifiedPushNtfyJsonUsesStandardFieldsAndKeepsMessageRedacted() {
+        val content = """
+            {"id":"ntfy-1","time":1710000000,"event":"message","topic":"tasks","title":"Run task","message":"secret body"}
+        """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+
+        val event = PushContextEvents.parseUnifiedPushMessage(content, nowMs = 12_000L)
+
+        assertEquals("tasks", event?.metadata?.get("topic"))
+        assertEquals("ntfy-1", event?.metadata?.get("eventId"))
+        assertEquals("Run task", event?.metadata?.get("title"))
+        assertEquals("secret body".toByteArray(StandardCharsets.UTF_8).size.toString(), event?.metadata?.get("payloadBytes"))
+        assertFalse(event?.metadata?.containsKey("message") == true)
+    }
+
+    @Test
+    fun unifiedPushPayloadSupportsLegacyAliasesAndRejectsBounds() {
+        val aliased = """{"topic":"tasks","event_id":"evt-2","body":"hello"}"""
+            .toByteArray(StandardCharsets.UTF_8)
+        assertEquals("evt-2", PushContextEvents.parseUnifiedPushMessage(aliased)?.metadata?.get("eventId"))
+
+        val oversized = ByteArray(PushContextEvents.MAX_UNIFIED_PUSH_MESSAGE_BYTES + 1)
+        assertNull(PushContextEvents.parseUnifiedPushMessage(oversized))
+
+        val missingId = """{"topic":"tasks","message":"hello"}""".toByteArray(StandardCharsets.UTF_8)
+        assertNull(PushContextEvents.parseUnifiedPushMessage(missingId))
+    }
 }

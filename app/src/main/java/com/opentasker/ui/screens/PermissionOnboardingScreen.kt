@@ -103,6 +103,10 @@ import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.contexts.PushTriggerTokenStore
+import com.opentasker.core.contexts.UnifiedPushConnector
+import com.opentasker.core.contexts.UnifiedPushEndpointStore
+import com.opentasker.core.contexts.UnifiedPushRegistrationState
+import com.opentasker.core.contexts.UnifiedPushRegistrationStatus
 import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.contexts.CompanionAssociation
 import com.opentasker.core.contexts.CompanionAssociationResult
@@ -197,6 +201,9 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
     private val _pushToken = MutableStateFlow("")
     val pushToken: StateFlow<String> = _pushToken.asStateFlow()
 
+    private val _pushRegistration = MutableStateFlow(UnifiedPushRegistrationState())
+    val pushRegistration: StateFlow<UnifiedPushRegistrationState> = _pushRegistration.asStateFlow()
+
     private val _localeGrants = MutableStateFlow<List<LocaleGrant>>(emptyList())
     val localeGrants: StateFlow<List<LocaleGrant>> = _localeGrants.asStateFlow()
 
@@ -238,11 +245,31 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         }
     }
 
+    fun chooseUnifiedPushDistributor(activityContext: Context, onResult: (Boolean) -> Unit) {
+        UnifiedPushConnector.chooseDistributor(activityContext) { selected ->
+            refreshExternalState()
+            onResult(selected)
+        }
+    }
+
+    fun registerUnifiedPush(activityContext: Context, onResult: (Boolean) -> Unit) {
+        UnifiedPushConnector.register(activityContext) { requested ->
+            refreshExternalState()
+            onResult(requested)
+        }
+    }
+
+    fun unregisterUnifiedPush() {
+        UnifiedPushConnector.unregister(context)
+        refreshExternalState()
+    }
+
     private fun refreshExternalState() {
         externalRefreshJob?.cancel()
         externalRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             _associations.value = CompanionDeviceAssociation.list(context)
             _pushToken.value = PushTriggerTokenStore(context).token()
+            _pushRegistration.value = UnifiedPushEndpointStore(context).state()
             _localeGrants.value = LocaleGrantStore(context).grants()
         }
     }
@@ -288,6 +315,7 @@ fun PermissionOnboardingScreen(
     val themeMode by setupViewModel.themeMode.collectAsState()
     val associations by setupViewModel.associations.collectAsState()
     val pushToken by setupViewModel.pushToken.collectAsState()
+    val pushRegistration by setupViewModel.pushRegistration.collectAsState()
     val localeGrants by setupViewModel.localeGrants.collectAsState()
     val permissionGrantedMessage = stringResource(R.string.permission_granted)
     val permissionDeniedRetryMessage = stringResource(R.string.permission_denied_retry)
@@ -296,6 +324,11 @@ fun PermissionOnboardingScreen(
     val shizukuPermissionFailedMessage = stringResource(R.string.setup_shizuku_permission_failed)
     val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
     val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
+    val pushDistributorSelectedMessage = stringResource(R.string.setup_push_distributor_selected)
+    val pushDistributorUnavailableMessage = stringResource(R.string.setup_push_distributor_unavailable)
+    val pushRegistrationRequestedMessage = stringResource(R.string.setup_push_registration_requested)
+    val pushRegistrationFailedMessage = stringResource(R.string.setup_push_registration_failed)
+    val pushUnregisteredMessage = stringResource(R.string.setup_push_unregistered)
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         pendingPermission?.let { permission ->
@@ -458,7 +491,39 @@ fun PermissionOnboardingScreen(
         }
 
         item { TermuxScriptAllowlistCard(onMessage) }
-        item { PushTriggerSetupCard(token = pushToken, onMessage = onMessage) }
+        item {
+            PushTriggerSetupCard(
+                token = pushToken,
+                registration = pushRegistration,
+                onChooseDistributor = {
+                    setupViewModel.chooseUnifiedPushDistributor(context) { selected ->
+                        onMessage(
+                            if (selected) {
+                                pushDistributorSelectedMessage
+                            } else {
+                                pushDistributorUnavailableMessage
+                            },
+                        )
+                    }
+                },
+                onRegister = {
+                    setupViewModel.registerUnifiedPush(context) { requested ->
+                        onMessage(
+                            if (requested) {
+                                pushRegistrationRequestedMessage
+                            } else {
+                                pushRegistrationFailedMessage
+                            },
+                        )
+                    }
+                },
+                onUnregister = {
+                    setupViewModel.unregisterUnifiedPush()
+                    onMessage(pushUnregisteredMessage)
+                },
+                onMessage = onMessage,
+            )
+        }
         item {
             CompanionSetupCard(
                 associations = associations,
@@ -641,11 +706,35 @@ private fun CompanionSetupCard(
 @Composable
 private fun PushTriggerSetupCard(
     token: String,
+    registration: UnifiedPushRegistrationState,
+    onChooseDistributor: () -> Unit,
+    onRegister: () -> Unit,
+    onUnregister: () -> Unit,
     onMessage: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val tokenLabel = stringResource(R.string.setup_push_title)
     val copiedMessage = stringResource(R.string.setup_push_copied)
+    val endpointCopiedMessage = stringResource(R.string.setup_push_endpoint_copied)
+    val statusText = when (registration.status) {
+        UnifiedPushRegistrationStatus.IDLE -> stringResource(R.string.setup_push_status_idle)
+        UnifiedPushRegistrationStatus.REGISTERING -> stringResource(R.string.setup_push_status_registering)
+        UnifiedPushRegistrationStatus.REGISTERED -> stringResource(R.string.setup_push_status_registered)
+        UnifiedPushRegistrationStatus.UNREGISTERED -> stringResource(R.string.setup_push_status_unregistered)
+        UnifiedPushRegistrationStatus.TEMPORARILY_UNAVAILABLE -> {
+            stringResource(R.string.setup_push_status_temporarily_unavailable)
+        }
+        UnifiedPushRegistrationStatus.REGISTRATION_FAILED -> stringResource(
+            R.string.setup_push_status_failed,
+            stringResource(pushFailureReasonRes(registration.failureReason)),
+        )
+    }
+    val distributor = registration.distributor
+        ?: stringResource(R.string.setup_push_distributor_none)
+    val endpoint = registration.endpoint
+    val canUnregister = registration.status != UnifiedPushRegistrationStatus.IDLE &&
+        registration.status != UnifiedPushRegistrationStatus.UNREGISTERED
+    val canRegister = registration.status != UnifiedPushRegistrationStatus.REGISTERING
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
@@ -660,9 +749,80 @@ private fun PushTriggerSetupCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
+                stringResource(R.string.setup_push_status, statusText),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                stringResource(R.string.setup_push_distributor, distributor),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (endpoint != null) {
+                Text(
+                    stringResource(
+                        R.string.setup_push_endpoint,
+                        registration.endpointHost ?: stringResource(R.string.setup_push_endpoint_unknown),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onChooseDistributor,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(stringResource(R.string.setup_push_choose_distributor))
+                }
+                if (canUnregister) {
+                    OutlinedButton(
+                        onClick = onUnregister,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(stringResource(R.string.setup_push_unregister))
+                    }
+                } else {
+                    Button(
+                        onClick = onRegister,
+                        enabled = canRegister,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(stringResource(R.string.setup_push_register))
+                    }
+                }
+            }
+            if (endpoint != null) {
+                OutlinedButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        clipboard?.setPrimaryClip(ClipData.newPlainText(tokenLabel, endpoint))
+                        onMessage(endpointCopiedMessage)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text(stringResource(R.string.setup_push_copy_endpoint))
+                }
+            }
+            Text(
+                stringResource(R.string.setup_push_legacy_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
                 stringResource(R.string.setup_push_token, token),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             Button(
                 onClick = {
@@ -670,6 +830,7 @@ private fun PushTriggerSetupCard(
                     clipboard?.setPrimaryClip(ClipData.newPlainText(tokenLabel, token))
                     onMessage(copiedMessage)
                 },
+                enabled = token.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
@@ -677,6 +838,15 @@ private fun PushTriggerSetupCard(
             }
         }
     }
+}
+
+private fun pushFailureReasonRes(reason: String?): Int = when (reason) {
+    "VAPID_REQUIRED" -> R.string.setup_push_failure_vapid
+    "NETWORK" -> R.string.setup_push_failure_network
+    "ACTION_REQUIRED" -> R.string.setup_push_failure_action_required
+    "INTERNAL_ERROR" -> R.string.setup_push_failure_internal
+    "NO_DISTRIBUTOR" -> R.string.setup_push_failure_no_distributor
+    else -> R.string.setup_push_failure_unknown
 }
 
 @Composable
