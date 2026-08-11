@@ -73,6 +73,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks") suspend fun getAll(): List<TaskEntity>
     @Query("SELECT * FROM tasks") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
     @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
+
+    /** See [ProfileDao.getByNameIgnoreCase] for the ASCII-folding caveat. */
+    @Query("SELECT * FROM tasks WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun getByNameIgnoreCase(name: String): TaskEntity?
+
+    @Query("SELECT COUNT(*) FROM tasks") suspend fun countAll(): Int
     @Query("UPDATE tasks SET projectId = :targetProjectId WHERE projectId = :sourceProjectId")
     suspend fun reassignProject(sourceProjectId: Long, targetProjectId: Long)
 }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The exported automation broadcast target now answers status and name-lookup requests with bounded `COUNT(*)` and indexed name queries instead of loading the whole profile and task tables inside the `goAsync()` window, and reuses one supervisor scope rather than creating one per broadcast. Name matching moved into SQLite's `COLLATE NOCASE`, which folds ASCII only — two names differing solely in the case of a non-ASCII letter are now distinct.
 - Added an opt-in, coverage-guided JVM fuzz task for bundle, Tasker XML, template-expression, and structured-data decoders, with a checked-in seed and regression corpus kept out of release dependency graphs.
 - Added headless Compose screenshot regression coverage for primary screens and shared states across system, light, dark, and high-contrast themes, 1×/2× font scales, and an RTL pseudolocale; reference validation is part of the local quality gate.
 - Automation lint now reports shadowed, unreachable, and action/revert rules, and supports bounded device-state invariants with localized diagnostics, a reusable predicate editor, and optional bundle import/export.

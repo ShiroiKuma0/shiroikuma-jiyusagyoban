@@ -162,7 +162,7 @@ object AutomationTargetContract {
 class AutomationTargetReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        requestScope.launch {
             val response = runCatching {
                 when (intent.action) {
                     AutomationTargetContract.ACTION_RUN_TASK -> runTask(context.applicationContext, intent)
@@ -330,17 +330,15 @@ class AutomationTargetReceiver : BroadcastReceiver() {
 
     private suspend fun queryStatus(intent: Intent): TargetResponse {
         val db = OpenTaskerApp_NoHilt.db
-        val profileEntities = db.profileDao().getAll()
-        val tasks = db.taskDao().getAll()
-        val profile = resolveProfileEntity(intent, profileEntities)?.toDomain()
+        val profile = resolveProfile(intent)
         return TargetResponse(
             Activity.RESULT_OK,
             Bundle().apply {
-                putInt(AutomationTargetContract.EXTRA_TASK_COUNT, tasks.size)
-                putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, profileEntities.size)
+                putInt(AutomationTargetContract.EXTRA_TASK_COUNT, db.taskDao().countAll())
+                putInt(AutomationTargetContract.EXTRA_PROFILE_COUNT, db.profileDao().countAll())
                 putInt(
                     AutomationTargetContract.EXTRA_ENABLED_PROFILE_COUNT,
-                    profileEntities.count { it.enabled && !it.requiresRiskAcknowledgement },
+                    db.profileDao().countEnabled(),
                 )
                 putBoolean(AutomationTargetContract.EXTRA_PROFILE_FOUND, profile != null)
                 profile?.let {
@@ -358,26 +356,17 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             ?: intent.getStringExtra(AutomationTargetContract.EXTRA_TASK_NAME)
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?.let { name ->
-                    OpenTaskerApp_NoHilt.db.taskDao().getAll()
-                        .firstOrNull { it.name.equals(name, ignoreCase = true) }
-                        ?.toDomain()
-                }
+                ?.let { name -> OpenTaskerApp_NoHilt.db.taskDao().getByNameIgnoreCase(name)?.toDomain() }
 
     private suspend fun resolveProfile(intent: Intent) =
-        resolveProfileEntity(intent, OpenTaskerApp_NoHilt.db.profileDao().getAll())?.toDomain()
-
-    private fun resolveProfileEntity(
-        intent: Intent,
-        profiles: List<com.opentasker.core.storage.ProfileEntity>,
-    ) =
         intent.getLongExtra(AutomationTargetContract.EXTRA_PROFILE_ID, 0L)
             .takeIf { it > 0 }
-            ?.let { id -> profiles.firstOrNull { it.id == id } }
+            ?.let { id -> OpenTaskerApp_NoHilt.db.profileDao().getById(id) }
+            ?.toDomain()
             ?: intent.getStringExtra(AutomationTargetContract.EXTRA_PROFILE_NAME)
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?.let { name -> profiles.firstOrNull { it.name.equals(name, ignoreCase = true) } }
+                ?.let { name -> OpenTaskerApp_NoHilt.db.profileDao().getByNameIgnoreCase(name)?.toDomain() }
 
     private fun failure(message: String, extras: Bundle = Bundle()): TargetResponse {
         AppLogger.warn(TAG, message)
@@ -404,6 +393,15 @@ class AutomationTargetReceiver : BroadcastReceiver() {
 
     companion object {
         private const val TAG = "AutomationTargetReceiver"
+
+        /**
+         * One scope for every broadcast rather than a fresh one per request.
+         *
+         * A `BroadcastReceiver` instance is discarded as soon as [onReceive] returns, so a scope
+         * created there is unreachable and unmanaged for the whole `goAsync()` window. A supervisor
+         * scope on the process keeps one failing request from cancelling the next.
+         */
+        private val requestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 }
 

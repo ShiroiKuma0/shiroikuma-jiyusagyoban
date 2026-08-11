@@ -42,6 +42,40 @@ class ProfileDaoInstrumentedTest {
     }
 
     @Test
+    fun boundedCountsAndNameLookupMatchWholeTableScans() = runBlocking {
+        val db = buildDb()
+        try {
+            val dao = db.profileDao()
+            repeat(400) { index ->
+                dao.insert(
+                    ProfileEntity(
+                        name = "Profile $index",
+                        enabled = index % 2 == 0,
+                        enterTaskId = 1,
+                        exitTaskId = null,
+                        cooldownSec = 0,
+                        contextsJson = "[]",
+                        requiresRiskAcknowledgement = index % 10 == 0,
+                    ),
+                )
+            }
+            val all = dao.getAll()
+            assertEquals(all.size, dao.countAll())
+            assertEquals(
+                all.count { it.enabled && !it.requiresRiskAcknowledgement },
+                dao.countEnabled(),
+            )
+
+            val matched = dao.getByNameIgnoreCase("pROFILE 399")
+            assertNotNull(matched)
+            assertEquals("Profile 399", matched!!.name)
+            assertNull(dao.getByNameIgnoreCase("Profile 400"))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun updateProfileName() = runBlocking {
         val db = buildDb()
         try {
