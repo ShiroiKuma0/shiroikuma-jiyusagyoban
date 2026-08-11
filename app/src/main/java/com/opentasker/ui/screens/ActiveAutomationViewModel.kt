@@ -54,6 +54,7 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import kotlinx.serialization.SerializationException
+import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.diff.AutomationSemanticDiff
 import com.opentasker.core.diff.SemanticDiffDocument
@@ -851,6 +852,11 @@ class ActiveAutomationViewModel(
                 }
                 if (previous != null && previous.contexts != profile.contexts) {
                     locationDwellStateStore.clearProfile(profile.id)
+                    previous.contexts.indices.forEach { index ->
+                        LocaleConditionGrantStore(appContext).revokeAllForBinding(
+                            LocaleConditionGrantStore.contextKey(profile.id, index),
+                        )
+                    }
                 }
                 db.profileDao().upsert(reviewedProfile.toEntity())
             }
@@ -954,6 +960,12 @@ class ActiveAutomationViewModel(
 
     fun deleteProfile(profile: Profile) = launchWithMessage(R.string.ui_message_profile_deleted) {
         db.profileDao().delete(profile.toEntity())
+        LocaleConditionGrantStore(appContext).apply {
+            revokeAllForBinding(LocaleConditionGrantStore.profileKey(profile.id))
+            profile.contexts.indices.forEach { index ->
+                revokeAllForBinding(LocaleConditionGrantStore.contextKey(profile.id, index))
+            }
+        }
         locationDwellStateStore.clearProfile(profile.id)
     }
 
@@ -1960,6 +1972,7 @@ class ActiveAutomationViewModel(
     }
 
     fun deleteVariable(name: String, successMessage: UiMessage, projectId: Long = DEFAULT_PROJECT_ID) {
+        var deletedVariableBinding: String? = null
         viewModelScope.launch {
             runCatching {
                 db.withTransaction {
@@ -1991,9 +2004,13 @@ class ActiveAutomationViewModel(
                         throw IllegalStateException("Cannot delete %${variable.name}; it is referenced by: $sites")
                     }
                     variableRepository.delete(variable.name, projectId)
+                    deletedVariableBinding = LocaleConditionGrantStore.variableKey(projectId, variable.name)
                 }
             }
-                .onSuccess { events.send(successMessage) }
+                .onSuccess {
+                    deletedVariableBinding?.let { LocaleConditionGrantStore(appContext).revokeAllForBinding(it) }
+                    events.send(successMessage)
+                }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
         }
     }

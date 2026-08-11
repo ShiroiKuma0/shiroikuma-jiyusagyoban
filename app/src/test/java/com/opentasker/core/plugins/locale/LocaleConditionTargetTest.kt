@@ -9,16 +9,18 @@ class LocaleConditionTargetTest {
     @Test
     fun profileAndContextBundlesRoundTripAsTypedSpecs() {
         val profile = LocaleConditionTarget.parse(
-            LocaleConditionTarget.profileActive(42, "Work"),
+            LocaleConditionTarget.profileActive(42, "Work", "profile-grant"),
         )
         val context = LocaleConditionTarget.parse(
-            LocaleConditionTarget.contextSatisfied(42, "Work", 2, "Plugin condition"),
+            LocaleConditionTarget.contextSatisfied(42, "Work", 2, "Plugin condition", "context-grant"),
         )
 
         assertEquals(LocaleConditionKind.PROFILE_ACTIVE, profile.kind)
         assertEquals(42L, profile.profileId)
         assertEquals(LocaleConditionKind.CONTEXT_SATISFIED, context.kind)
         assertEquals(2, context.contextIndex)
+        assertEquals("profile-grant", profile.grantToken)
+        assertEquals("context-grant", context.grantToken)
     }
 
     @Test
@@ -64,8 +66,10 @@ class LocaleConditionTargetTest {
 
     @Test
     fun evaluatorDistinguishesSatisfiedUnsatisfiedAndUnknown() {
-        val profileSpec = LocaleConditionTarget.parse(LocaleConditionTarget.profileActive(7, "Home"))
-        val contextSpec = LocaleConditionTarget.parse(LocaleConditionTarget.contextSatisfied(7, "Home", 0, "State"))
+        val profileSpec = LocaleConditionTarget.parse(LocaleConditionTarget.profileActive(7, "Home", "profile-grant"))
+        val contextSpec = LocaleConditionTarget.parse(
+            LocaleConditionTarget.contextSatisfied(7, "Home", 0, "State", "context-grant"),
+        )
         val variableSpec = LocaleConditionTarget.parse(
             LocaleConditionTarget.variableCompare("Mode", 1, LocaleConditionOperator.CONTAINS, "work", "grant-token"),
         )
@@ -126,5 +130,51 @@ class LocaleConditionTargetTest {
         assertFalse("a forged or revoked token has no stored binding", isConditionGrantValid(null, "token", issued))
         assertFalse("a bundle with no token is never authorized", isConditionGrantValid(issued, null, issued))
         assertFalse(isConditionGrantValid(issued, "  ", issued))
+    }
+
+    @Test
+    fun everyConditionKindRequiresItsOwnGrantBinding() {
+        val profile = LocaleConditionTarget.parse(
+            LocaleConditionTarget.profileActive(7, "Home", "profile-grant"),
+        )
+        val context = LocaleConditionTarget.parse(
+            LocaleConditionTarget.contextSatisfied(7, "Home", 0, "State", "context-grant"),
+        )
+        val variable = LocaleConditionTarget.parse(
+            LocaleConditionTarget.variableCompare("Mode", 1, LocaleConditionOperator.EQUALS, "work", "variable-grant"),
+        )
+
+        assertTrue(
+            isConditionGrantValid(
+                LocaleConditionGrantStore.bindingKey(profile),
+                profile.grantToken,
+                LocaleConditionGrantStore.bindingKey(profile),
+            ),
+        )
+        assertFalse(
+            "An ungranted profile query must be unknown regardless of the profile state",
+            isConditionGrantValid(null, profile.grantToken, LocaleConditionGrantStore.bindingKey(profile)),
+        )
+        assertTrue(
+            isConditionGrantValid(
+                LocaleConditionGrantStore.bindingKey(context),
+                context.grantToken,
+                LocaleConditionGrantStore.bindingKey(context),
+            ),
+        )
+        assertFalse(
+            isConditionGrantValid(
+                LocaleConditionGrantStore.bindingKey(profile),
+                context.grantToken,
+                LocaleConditionGrantStore.bindingKey(context),
+            ),
+        )
+        assertTrue(
+            isConditionGrantValid(
+                LocaleConditionGrantStore.bindingKey(variable),
+                variable.grantToken,
+                LocaleConditionGrantStore.bindingKey(variable),
+            ),
+        )
     }
 }
