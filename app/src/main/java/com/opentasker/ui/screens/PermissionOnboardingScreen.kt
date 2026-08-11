@@ -74,8 +74,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -316,112 +314,11 @@ fun PermissionOnboardingScreen(
     }
 }
 
-
-@Composable
-internal fun ThemeSetupCard() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val currentMode by ThemePreference.observe(context).collectAsState(initial = ThemeMode.System)
-    val onSelectMode: (ThemeMode) -> Unit = { mode ->
-        scope.launch { ThemePreference.set(context, mode) }
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Choose the display mode used across navigation, setup, and runtime review surfaces.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ThemeMode.entries.chunked(2).forEach { rowModes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        rowModes.forEach { mode ->
-                            ThemeChoice(
-                                mode = mode,
-                                selected = mode == currentMode,
-                                onSelect = onSelectMode,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeChoice(
-    mode: ThemeMode,
-    selected: Boolean,
-    onSelect: (ThemeMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val label = when (mode) {
-        ThemeMode.System -> stringResource(R.string.theme_system)
-        ThemeMode.Dark -> stringResource(R.string.theme_dark)
-        ThemeMode.Light -> stringResource(R.string.theme_light)
-        ThemeMode.HighContrast -> stringResource(R.string.theme_high_contrast)
-    }
-    val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    val selectionDescription = stringResource(
-        if (selected) R.string.a11y_option_selected else R.string.a11y_option_not_selected,
-        label,
-    )
-    Surface(
-        modifier = modifier
-            .heightIn(min = 52.dp)
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = { if (!selected) onSelect(mode) },
-            )
-            .semantics {
-                this.selected = selected
-                stateDescription = selectionDescription
-            },
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
-        },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.58f else 0.72f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (selected) {
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = selectionDescription,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
+// Upstream's theme picker (ThemeSetupCard/ThemeChoice, a radio group over ThemeMode) is not part of
+// this fork's Setup screen: appearance here comes from ThemeStore's ThemePrefs — the black-yellow
+// palette, font family, weight and scale — not from upstream's light/dark/high-contrast/AMOLED/
+// Material You modes. The card was left behind unreferenced through several syncs and had to be
+// hand-extended every time upstream added a mode, so it is gone rather than dead.
 @Composable
 internal fun BackupSetupCard(
     state: BackupSetupState,
