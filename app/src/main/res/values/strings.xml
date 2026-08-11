@@ -47,6 +47,7 @@
     <string name="nav_tasks">Tasks</string>
     <string name="nav_run_log">Run Log</string>
     <string name="nav_setup">Setup</string>
+    <string name="nav_settings">Settings</string>
     <string name="nav_variables">Variables</string>
     <string name="nav_flow">Flow</string>
     <string name="nav_scenes">Scenes</string>
@@ -132,6 +133,8 @@
     <string name="title_scene_library">Scene library</string>
     <string name="title_context_inspector">Context inspector</string>
     <string name="title_setup_checklist">Setup checklist</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_body">Manage appearance, recovery, background behavior, integrations, and other app-wide preferences.</string>
     <string name="setup_section_engine">Engine baseline</string>
     <string name="setup_section_needed">Needed by enabled automations</string>
     <string name="setup_section_optional">Optional integrations</string>
@@ -1227,6 +1230,7 @@
     <string name="header_setup_detail">Permission and reliability checks</string>
     <string name="header_run_log_detail">%1$d matching entries</string>
     <string name="header_diagnostics_detail">Engine, crashes, and app logs</string>
+    <string name="header_settings_detail">App-wide behavior and recovery</string>
     <string name="ui_flow_target_missing">Flow target no longer exists</string>
     <string name="ui_error_message">Error: %1$s</string>
     <string name="ui_error_generic">Operation failed</string>
