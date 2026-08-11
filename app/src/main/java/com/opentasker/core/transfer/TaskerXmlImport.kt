@@ -200,15 +200,20 @@ object TaskerXmlImporter {
         }
     }
 
+    /**
+     * `<n>`/`<v>` are what Tasker's own project exports use, and what [TaskerXmlExporter] writes.
+     * Reading only `nme`/`val` meant a file this app exported and then re-imported lost every
+     * variable, reported as "skipped because it had no name".
+     */
     private fun parseVariables(doc: Document, lossyWarnings: MutableList<String>): List<Variable> =
         doc.elementsByTagName("Variable").mapNotNull { element ->
-            val name = element.childText("nme", "name").ifBlank {
+            val name = element.childText("nme", "name", "n").ifBlank {
                 lossyWarnings += "A Tasker variable was skipped because it had no name."
                 return@mapNotNull null
             }
             Variable(
                 name = name,
-                value = element.childText("val", "value"),
+                value = element.childText("val", "value", "v"),
                 isGlobal = VariableNamePolicy.isGlobal(name),
             )
         }
