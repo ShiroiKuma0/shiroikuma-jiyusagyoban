@@ -767,7 +767,11 @@ class TaskRunner(
     }
 
     private companion object {
-        val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*}}")
+        // The closing braces must be escaped: Android's ICU regex engine rejects a bare "}}"
+        // where desktop java.util.regex accepts it. Because this sits in a companion
+        // initializer, the failure was an ExceptionInInitializerError that made TaskRunner
+        // unusable on device - every task execution, not only ones using array references.
+        val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*\\}\\}")
     }
 }
 
