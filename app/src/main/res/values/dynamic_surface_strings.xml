@@ -158,7 +158,7 @@
     <string name="capability_bluetooth_permission" formatted="false">Requires Bluetooth permission.</string>
     <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
     <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app requires privileged app-management access that no normal app can hold.</string>
-    <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests; the package-management permission and responsible installer still decide whether the request is accepted.</string>
+    <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests. OpenTasker is not the installer of record, so Android asks you to confirm each request on screen; run this action with OpenTasker open.</string>
     <string name="capability_app_archive_unsupported" formatted="false">Package archive requests require Android 15 (API 35) or newer.</string>
     <string name="capability_local_network_setup" formatted="false">Android 17+ requires local network access for the LAN broadcast; grant it in Setup.</string>
     <string name="capability_dnd_access" formatted="false">Requires Do Not Disturb access.</string>

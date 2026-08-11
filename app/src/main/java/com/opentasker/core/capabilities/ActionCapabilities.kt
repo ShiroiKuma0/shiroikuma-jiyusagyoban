@@ -166,9 +166,14 @@ object ActionCapabilityRegistry {
             ActionCapability(CapabilityLevel.RequiresSetup, "Requires Bluetooth permission.", R.string.capability_bluetooth_permission)
         }
 
+    /**
+     * Not [CapabilityLevel.Supported]: OpenTasker is never the installer of record, so Android
+     * answers every archive request with STATUS_PENDING_USER_ACTION and a confirmation the app has
+     * to show. That needs a visible app, which a background automation cannot promise.
+     */
     private fun packageArchiveCapability(reason: String): ActionCapability =
         if (android.os.Build.VERSION.SDK_INT >= 35) {
-            ActionCapability(CapabilityLevel.Supported, reason, R.string.capability_app_archive_ready)
+            ActionCapability(CapabilityLevel.RequiresSetup, reason, R.string.capability_app_archive_ready)
         } else {
             ActionCapability(CapabilityLevel.Unsupported, "Package archive APIs require Android 15 (API 35) or newer.", R.string.capability_app_archive_unsupported)
         }

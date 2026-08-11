@@ -123,6 +123,26 @@ internal object PackageArchiveActionSupport {
     private const val REQUEST_TIMEOUT_MS = 60_000L
 }
 
+/**
+ * True when Android is asking the user to approve the request rather than reporting an outcome.
+ * Archive uses the generic installer status; unarchive has its own dedicated code.
+ */
+@Suppress("NewApi")
+internal fun Int.needsUserConfirmation(mode: String): Boolean =
+    if (mode == PackageArchiveMode.UNARCHIVE.name) {
+        this == PackageInstaller.UNARCHIVAL_ERROR_USER_ACTION_NEEDED || this == PackageInstaller.STATUS_PENDING_USER_ACTION
+    } else {
+        this == PackageInstaller.STATUS_PENDING_USER_ACTION
+    }
+
+internal fun Intent.confirmationIntent(): Intent? =
+    if (Build.VERSION.SDK_INT >= 33) {
+        getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+    } else {
+        @Suppress("DEPRECATION")
+        getParcelableExtra(Intent.EXTRA_INTENT) as? Intent
+    }
+
 internal data class PackageArchiveStatus(val accepted: Boolean, val detail: String)
 
 internal object PackageArchiveOperations {
@@ -152,6 +172,29 @@ class PackageArchiveStatusReceiver : BroadcastReceiver() {
             intent.getIntExtra(PackageInstaller.EXTRA_UNARCHIVE_STATUS, PackageInstaller.UNARCHIVAL_GENERIC_ERROR)
         } else {
             intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        }
+
+        // OpenTasker is not the installer of record, so this is the *expected* first answer to
+        // every request: Android hands back a confirmation to show rather than a result. Treating
+        // it as a terminal failure ("status=-1") is why the action could never succeed. The
+        // operation stays pending here - the real outcome arrives as a second broadcast.
+        if (status.needsUserConfirmation(mode)) {
+            val confirmation = intent.confirmationIntent()
+            if (confirmation == null) {
+                PackageArchiveOperations.complete(
+                    operationId,
+                    PackageArchiveStatus(false, "Android asked for confirmation but supplied no screen to show"),
+                )
+                return
+            }
+            confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { context.startActivity(confirmation) }.onFailure {
+                PackageArchiveOperations.complete(
+                    operationId,
+                    PackageArchiveStatus(false, "the confirmation screen could not be opened; open OpenTasker and retry"),
+                )
+            }
+            return
         }
         val accepted = if (mode == PackageArchiveMode.UNARCHIVE.name) {
             status == PackageInstaller.UNARCHIVAL_OK
