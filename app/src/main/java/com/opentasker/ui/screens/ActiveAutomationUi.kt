@@ -304,6 +304,13 @@ fun ActiveAutomationUi(
             onboardingTemplateFlow = true
         }
     }
+    fun finishOnboarding(exit: OnboardingExit) {
+        val wasOnboarding = onboardingTemplateFlow
+        onboardingTemplateFlow = false
+        if (wasOnboarding && shouldCompleteOnboarding(exit)) {
+            scope.launch { OnboardingPreference.markCompleted(context) }
+        }
+    }
     var actionPickerTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var actionEditTaskId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     var actionEditActionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1118,7 +1125,7 @@ fun ActiveAutomationUi(
             templates = availableBlueprints,
             onDismiss = {
                 showTemplateDialog = false
-                onboardingTemplateFlow = false
+                finishOnboarding(OnboardingExit.Dismissed)
             },
             onSelect = { template ->
                 showTemplateDialog = false
@@ -1127,10 +1134,7 @@ fun ActiveAutomationUi(
             onSkip = if (onboardingTemplateFlow) {
                 {
                     showTemplateDialog = false
-                    onboardingTemplateFlow = false
-                    if (shouldCompleteOnboarding(OnboardingExit.Skipped)) {
-                        scope.launch { OnboardingPreference.markCompleted(context) }
-                    }
+                    finishOnboarding(OnboardingExit.Skipped)
                 }
             } else {
                 null
@@ -1143,16 +1147,13 @@ fun ActiveAutomationUi(
             template = template,
             onDismiss = {
                 selectedTemplateId = null
-                onboardingTemplateFlow = false
+                finishOnboarding(OnboardingExit.Dismissed)
             },
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
                 selectedTemplateId = null
                 screenOrdinal = OpenTaskerScreen.Profiles.ordinal
-                if (onboardingTemplateFlow && shouldCompleteOnboarding(OnboardingExit.InstalledTemplate)) {
-                    onboardingTemplateFlow = false
-                    scope.launch { OnboardingPreference.markCompleted(context) }
-                }
+                finishOnboarding(OnboardingExit.InstalledTemplate)
             },
         )
     }

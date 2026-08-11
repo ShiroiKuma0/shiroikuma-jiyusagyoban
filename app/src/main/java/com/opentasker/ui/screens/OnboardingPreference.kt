@@ -30,8 +30,12 @@ internal enum class OnboardingExit {
     InstalledTemplate,
 }
 
-internal fun shouldCompleteOnboarding(exit: OnboardingExit): Boolean =
-    exit == OnboardingExit.Skipped || exit == OnboardingExit.InstalledTemplate
+internal fun shouldCompleteOnboarding(exit: OnboardingExit): Boolean = when (exit) {
+    OnboardingExit.Dismissed,
+    OnboardingExit.Skipped,
+    OnboardingExit.InstalledTemplate,
+    -> true
+}
 
 internal fun shouldLaunchOnboarding(completed: Boolean, selectedTemplateId: String?): Boolean =
     !completed && selectedTemplateId == null
