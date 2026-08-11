@@ -64,7 +64,10 @@ class OpenTaskerBundleCodecTest {
 
         val requirements = bundle.metadata.capabilityRequirements.associateBy { it.actionId }
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("notify.show").level)
-        assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("reboot").level)
+        // Upstream made reboot setup-gated in 8b32a9b when it added the Shizuku user service. The fork
+        // keeps it Unsupported: shell access is not enough for a reboot, it wants device-owner or
+        // system-app privilege, so it fails closed rather than pretending Shizuku helps.
+        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("reboot").level)
         assertFalse(requirements.containsKey("log"))
         assertFalse(bundle.metadata.warnings.any { it.contains("manifest did not match") })
     }
@@ -88,7 +91,9 @@ class OpenTaskerBundleCodecTest {
         val bundle = OpenTaskerBundle(
             appVersion = "0.2.13",
             exportedAtEpochMs = 123L,
-            tasks = listOf(Task(id = 1, name = "Task", actions = listOf(ActionSpec(type = "app.kill")))),
+            // `reboot`, not upstream's `app.kill`: in the fork app.kill runs through Shizuku and is
+            // therefore supported, so it would raise no "unsupported actions" warning at all.
+            tasks = listOf(Task(id = 1, name = "Task", actions = listOf(ActionSpec(type = "reboot")))),
             profiles = listOf(Profile(id = 1, name = "Broken", enterTaskId = 99, exitTaskId = 42)),
         )
 
