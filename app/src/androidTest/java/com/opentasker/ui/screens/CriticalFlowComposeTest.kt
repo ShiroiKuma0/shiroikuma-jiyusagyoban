@@ -9,7 +9,6 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -47,7 +46,7 @@ import org.junit.Test
 
 class CriticalFlowComposeTest {
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAccessibilityComposeRule()
 
     @Test
     fun setupOnboardingShowsThemeAndBackupEntryPoints() {
@@ -67,6 +66,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Setup checklist").assertIsDisplayed()
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
@@ -88,6 +88,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Create Task").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
@@ -109,6 +110,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onAllNodes(hasSetTextAction())[0].performTextInput("Remembered task")
         restorationTester.emulateSavedInstanceStateRestore()
@@ -132,6 +134,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Create Profile").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
@@ -157,6 +160,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNode(hasText("Exit task") and hasClickAction()).performScrollTo().performClick()
         composeTestRule.onNode(hasText("Cleanup (43)") and hasClickAction()).performClick()
@@ -200,6 +204,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithContentDescription("Move action 2, Second, up")
             .performScrollTo()
@@ -230,6 +235,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         // "Show Notification" is the dialog title and appears again in the action summary.
         composeTestRule.onAllNodesWithText("Show Notification").onFirst().assertIsDisplayed()
@@ -268,6 +274,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onAllNodes(hasSetTextAction())[1].performTextClearance()
         composeTestRule.onAllNodes(hasSetTextAction())[1].performTextInput("%armed == true")
@@ -309,6 +316,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         composeTestRule.onNode(hasText("State *") and hasClickAction()).performClick()
@@ -344,6 +352,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNode(hasText("Milliseconds *") and hasSetTextAction()).performTextInput("1e3")
         composeTestRule.onNodeWithText("Enter a valid number.").assertIsDisplayed()
@@ -378,6 +387,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
 
@@ -400,6 +410,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Application").assertIsDisplayed()
         composeTestRule.onNodeWithText("Invert match").assertIsDisplayed()
@@ -423,6 +434,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("No scenes yet").assertIsDisplayed()
         composeTestRule.onNodeWithText("Create Scene").performClick()
@@ -455,6 +467,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Review OpenTasker bundle").assertIsDisplayed()
         composeTestRule.onNodeWithText("Cannot import").assertIsDisplayed()
@@ -496,6 +509,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Import Disabled").assertIsNotEnabled()
         composeTestRule.onNodeWithText("Keep existing").performClick()
@@ -522,6 +536,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Search by app or package").performTextInput("spotify.music")
         composeTestRule.onNodeWithText("Spotify").assertIsDisplayed().performClick()
@@ -541,6 +556,7 @@ class CriticalFlowComposeTest {
                 )
             }
         }
+        composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Use latest observed: Spotify (com.spotify.music)").performClick()
         assertEquals(InstalledApp("com.spotify.music", "Spotify"), selected)

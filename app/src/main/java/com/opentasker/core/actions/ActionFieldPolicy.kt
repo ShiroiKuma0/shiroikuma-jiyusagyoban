@@ -159,7 +159,7 @@ object ActionFieldPolicy {
     }
 
     private val VARIABLE_REFERENCE = Regex("%[A-Za-z][A-Za-z0-9_-]*")
-    private val TEMPLATE_REFERENCE = Regex("\\{\\{\\s*(?:%?(?:task|event|global|array)\\.)?%?[A-Za-z][A-Za-z0-9_-]*(?:\\s*\\|[^{}]+)?\\s*}}")
+    private val TEMPLATE_REFERENCE = Regex("\\{\\{\\s*(?:%?(?:task|event|global|array)\\.)?%?[A-Za-z][A-Za-z0-9_-]*(?:\\s*\\|[^{}]+)?\\s*\\}\\}")
     private val URI_SCHEME = Regex("[A-Za-z][A-Za-z0-9+.-]*")
     private fun String?.isPresent(): Boolean = !this.isNullOrBlank()
     private const val MAX_VARIABLE_RESPONSE_BYTES = 1_048_576L

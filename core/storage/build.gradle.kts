@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
 
@@ -34,6 +35,8 @@ ksp {
 
 dependencies {
     api(project(":core:model"))
+    compileOnly(platform(libs.androidx.compose.bom))
+    compileOnly(libs.androidx.compose.runtime)
     implementation(project(":core:common"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.room.runtime)
