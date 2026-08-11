@@ -237,9 +237,9 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (172 registered + 10 engine-handled)
+### Actions (173 registered + 10 engine-handled)
 
-**172 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**173 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/actions/ActionCatalog.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.
