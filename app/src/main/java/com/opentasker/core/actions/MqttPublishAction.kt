@@ -13,6 +13,8 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlin.coroutines.coroutineContext
 
 data class MqttPublishConfig(
     val host: String,
@@ -152,6 +154,13 @@ class SocketMqttPublishTransport(
 ) : MqttPublishTransport {
     override suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?) = withContext(Dispatchers.IO) {
         Socket().use { rawSocket ->
+            // The socket work below is blocking, so cancellation cannot interrupt it. Without
+            // this, a publish the engine had already given up on and reported as timed out could
+            // still complete and deliver the message - a side effect after a reported failure.
+            val cancellationCloser = coroutineContext[Job]?.invokeOnCompletion {
+                if (it != null) runCatching { rawSocket.close() }
+            }
+            try {
             val endpoint = pinnedAddress
                 ?.let { InetSocketAddress(it, config.port) }
                 ?: InetSocketAddress(config.host, config.port)
@@ -192,6 +201,9 @@ class SocketMqttPublishTransport(
                     output.write(MqttWireCodec.disconnectPacket())
                     output.flush()
                 }
+            }
+            } finally {
+                cancellationCloser?.dispose()
             }
         }
     }

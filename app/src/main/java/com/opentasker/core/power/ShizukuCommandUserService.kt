@@ -22,11 +22,27 @@ class ShizukuCommandUserService : IShizukuCommandService.Stub() {
         return runCommand(argv.toList(), exitCode)
     }
 
+    /**
+     * Android's per-app external files directory for this package, derived here from the fixed
+     * platform layout: the user service runs as shell and has no Context to ask.
+     */
+    private fun isWithinAppExternalFiles(target: File): Boolean = runCatching {
+        val canonical = target.canonicalFile.path
+        APP_EXTERNAL_FILES_ROOTS.any { root ->
+            canonical.startsWith(root + File.separator)
+        }
+    }.getOrDefault(false)
+
     override fun captureScreenshot(actionId: String, path: String): Int {
         val command = ShizukuCommandPolicy.command(actionId, 0)
         if (command == null || command != listOf("screencap", "-p")) return EXIT_REJECTED
         val output = File(path)
         if (!output.isAbsolute || output.parentFile?.isDirectory != true) return EXIT_INVALID_ARGUMENT
+        // This process holds shell privileges, so it re-derives the allowed destination rather
+        // than trusting the unprivileged caller's. The host checks the same thing, but a check
+        // that lives only on the calling side is a convention, not a boundary - and execute()
+        // already re-validates its argv here for exactly that reason.
+        if (!isWithinAppExternalFiles(output)) return EXIT_INVALID_ARGUMENT
 
         return runCatching {
             val process = Runtime.getRuntime().exec(command.toTypedArray())
@@ -128,6 +144,11 @@ class ShizukuCommandUserService : IShizukuCommandService.Stub() {
         const val STREAM_JOIN_TIMEOUT_MILLIS = 1_000L
         const val MAX_OUTPUT_BYTES = 8 * 1024
         const val DESTROY_TRANSACTION_CODE = 16777114
+        /** `/sdcard/Android/data/<pkg>/files`, plus the raw storage paths that resolve to it. */
+        private val APP_EXTERNAL_FILES_ROOTS = listOf(
+            "/storage/emulated/0/Android/data/com.opentasker.app/files",
+            "/sdcard/Android/data/com.opentasker.app/files",
+        )
         const val EXIT_REJECTED = 126
         const val EXIT_INVALID_ARGUMENT = 125
         const val EXIT_TIMEOUT = 124

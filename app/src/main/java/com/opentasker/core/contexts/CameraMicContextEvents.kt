@@ -32,7 +32,7 @@ object CameraMicContextEvents {
         }
 
         val camCb = AppOpsManager.OnOpActiveChangedListener { _, _, packageName, active ->
-            events.tryEmit(
+            events.tryEmitPulse("camera/mic", 
                 ContextEvent(
                     type = "event",
                     matched = true,
@@ -46,7 +46,7 @@ object CameraMicContextEvents {
         }
 
         val micCb = AppOpsManager.OnOpActiveChangedListener { _, _, packageName, active ->
-            events.tryEmit(
+            events.tryEmitPulse("camera/mic", 
                 ContextEvent(
                     type = "event",
                     matched = true,

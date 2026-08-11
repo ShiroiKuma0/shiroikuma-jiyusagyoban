@@ -67,13 +67,13 @@ object BluetoothContextEvents {
             val identity = address.ifBlank { "name:$name" }
             // Log device name + state only; the address is intentionally omitted from logs.
             AppLogger.debug(TAG, "Bluetooth event: state=$state, device=$name")
-            events_.tryEmit(buildEvent(state, name, address))
+            events_.tryEmitPulse("bluetooth", buildEvent(state, name, address))
             if (state == STATE_CONNECTED) {
                 if (connectionTracker.onConnected(identity)) {
-                    events_.tryEmit(buildSomeConnectedEvent())
+                    events_.tryEmitPulse("bluetooth", buildSomeConnectedEvent())
                 }
             } else if (connectionTracker.onDisconnected(identity)) {
-                events_.tryEmit(buildAllDisconnectedEvent())
+                events_.tryEmitPulse("bluetooth", buildAllDisconnectedEvent())
             }
         }
     }
@@ -185,13 +185,13 @@ object BluetoothContextEvents {
                     .getIntExtra(BOND_LOSS_REASON_EXTRA, BluetoothDevice.ERROR)
                     .takeUnless { it == BluetoothDevice.ERROR }
                 AppLogger.debug(TAG, "Bluetooth security event: key missing, device=$name")
-                events_.tryEmit(buildKeyMissingEvent(name, address, reason))
+                events_.tryEmitPulse("bluetooth", buildKeyMissingEvent(name, address, reason))
             }
 
             BluetoothDevice.ACTION_ENCRYPTION_CHANGE -> {
                 val enabled = intent.getBooleanExtra(BluetoothDevice.EXTRA_ENCRYPTION_ENABLED, false)
                 AppLogger.debug(TAG, "Bluetooth security event: encryption=${if (enabled) "on" else "off"}, device=$name")
-                events_.tryEmit(
+                events_.tryEmitPulse("bluetooth", 
                     buildEncryptionChangeEvent(
                         deviceName = name,
                         deviceAddress = address,

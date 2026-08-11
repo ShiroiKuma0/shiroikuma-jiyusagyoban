@@ -29,7 +29,7 @@ object PackageContextEvents {
                 }
                 else -> return
             }
-            packages.tryEmit(
+            packages.tryEmitPulse("package", 
                 ContextEvent(
                     type = "event",
                     matched = true,
