@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2.85
 
 - The action editor now says where to satisfy a setup-gated action, not just what is missing — elevated device actions point at the Setup tab and Shizuku rather than leaving the manifest looking like the answer.
 - Added an **AMOLED black** theme that uses true `#000000` surfaces, so an OLED panel can actually switch pixels off — the existing dark scheme is `#101211` and is unchanged, now named for what it is. Body text keeps 18.6:1 and secondary text 9.3:1 on black.
