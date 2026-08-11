@@ -227,7 +227,7 @@ object ActionCapabilityRegistry {
 
     private fun elevatedUnsupported(actionId: String, reason: String, @StringRes reasonRes: Int): ActionCapability =
         ActionCapability(
-            CapabilityLevel.Unsupported,
+            CapabilityLevel.RequiresSetup,
             "$reason ${ShizukuPowerBackend.hintForAction(actionId)?.message ?: "No privileged backend is available."}",
             reasonRes,
         )

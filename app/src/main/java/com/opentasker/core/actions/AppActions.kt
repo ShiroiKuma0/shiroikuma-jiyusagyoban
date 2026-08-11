@@ -176,6 +176,6 @@ class ScreenshotAction : DeclaredAction(ActionCatalog.require("screenshot.take")
             ?: ctx.app.getExternalFilesDir(null)?.resolve("screenshot.png")?.absolutePath
             ?: "app-specific external storage/screenshot.png"
         ctx.logger("Screenshot: $path")
-        return ActionResult.Failure("Screenshot capture requires MediaProjection consent or privileged shell access")
+        return ctx.runShizukuScreenshot(path)
     }
 }

@@ -15,6 +15,8 @@
 -keep class dev.rikka.shizuku.** { *; }
 -keep class moe.shizuku.** { *; }
 -keep interface rikka.shizuku.** { *; }
+-keep class com.opentasker.core.power.ShizukuCommandUserService { *; }
+-keep interface com.opentasker.core.power.IShizukuCommandService { *; }
 
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**

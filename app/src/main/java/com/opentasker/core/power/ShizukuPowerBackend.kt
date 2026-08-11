@@ -29,14 +29,24 @@ object ShizukuPowerBackend {
         internal set
 
     fun initialize(context: Context) {
+        ShizukuShellRunner.initialize(context)
         killSwitchEnabled = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getBoolean(KEY_KILL_SWITCH, true)
+    }
+
+    fun shutdown() {
+        ShizukuShellRunner.shutdown()
     }
 
     fun setKillSwitchEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit { putBoolean(KEY_KILL_SWITCH, enabled) }
         killSwitchEnabled = enabled
+        if (enabled) {
+            ShizukuShellRunner.shutdown()
+        } else {
+            ShizukuShellRunner.initialize(context)
+        }
     }
 
     fun inspect(context: Context): ShizukuPowerStatus = statusFor(
@@ -75,7 +85,7 @@ object ShizukuPowerBackend {
         !privilegedTransportAvailable -> ShizukuPowerStatus(
             state = ShizukuPowerState.BackendUnavailable,
             summary = "Shizuku permission is granted, but this build has no privileged user-service transport. " +
-                "Elevated actions remain unsupported.",
+                "Elevated actions cannot run until the transport is available.",
         )
         else -> ShizukuPowerStatus(
             state = ShizukuPowerState.Ready,
@@ -87,7 +97,7 @@ object ShizukuPowerBackend {
         if (actionId in elevatedActionIds) {
             ShizukuActionHint(
                 actionId = actionId,
-                message = "This build does not ship a privileged Shizuku user-service transport, so the action remains unsupported.",
+                message = "This action requires Shizuku permission and its privileged user-service transport.",
             )
         } else {
             null

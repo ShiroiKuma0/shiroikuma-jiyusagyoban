@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
@@ -167,9 +168,26 @@ class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
 class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val state = args["state"] ?: "toggle"
+        val state = args["state"]?.lowercase() ?: "toggle"
+        val variant = when (state) {
+            "on" -> 0
+            "off" -> 1
+            "toggle" -> {
+                val enabled = runCatching {
+                    Settings.Global.getInt(
+                        ctx.app.contentResolver,
+                        Settings.Global.AIRPLANE_MODE_ON,
+                        0,
+                    ) == 1
+                }.getOrElse { error ->
+                    return ActionResult.Failure("Airplane mode state could not be read: ${error.message ?: "unknown error"}")
+                }
+                if (enabled) 1 else 0
+            }
+            else -> return ActionResult.Failure("invalid airplane mode state: $state")
+        }
         ctx.logger("Airplane mode: $state")
-        return ActionResult.Failure("Airplane mode changes are restricted to system or device-owner apps")
+        return ctx.runShizukuAction("airplane.toggle", "Airplane mode", variant)
     }
 }
 
@@ -182,9 +200,25 @@ class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle
 class MobileDataAction : DeclaredAction(ActionCatalog.require("mobile.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val state = args["state"] ?: "toggle"
+        val state = args["state"]?.lowercase() ?: "toggle"
+        val variant = when (state) {
+            "on" -> 0
+            "off" -> 1
+            "toggle" -> {
+                if (ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                    return ActionResult.Failure("Mobile data state requires phone-state permission; choose on or off, or grant it in Setup")
+                }
+                val telephony = ctx.app.getSystemService(TelephonyManager::class.java)
+                    ?: return ActionResult.Failure("Mobile data service is unavailable")
+                val enabled = runCatching { telephony.isDataEnabled }.getOrElse { error ->
+                    return ActionResult.Failure("Mobile data state could not be read: ${error.message ?: "unknown error"}")
+                }
+                if (enabled) 1 else 0
+            }
+            else -> return ActionResult.Failure("invalid mobile data state: $state")
+        }
         ctx.logger("Mobile data: $state")
-        return ActionResult.Failure("Mobile data changes are restricted to carrier, system, or device-owner apps")
+        return ctx.runShizukuAction("mobile.toggle", "Mobile data", variant)
     }
 }
 

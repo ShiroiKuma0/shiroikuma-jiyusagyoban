@@ -10,17 +10,17 @@ import org.junit.Test
 class ActionCapabilitiesTest {
     @Test
     fun unsupportedActionsCannotBeAddedFromUi() {
-        assertFalse(ActionCapabilityRegistry.get("reboot").canAdd)
+        assertFalse(ActionCapabilityRegistry.get("app.kill").canAdd)
         assertFalse(ActionCapabilityRegistry.get("wifi.toggle").canAdd)
     }
 
     @Test
-    fun elevatedActionsStayUnsupportedWithoutPrivilegedTransport() {
+    fun elevatedActionsAreAddableButRequireShizukuSetup() {
         ShizukuPowerBackend.elevatedActionIds.forEach { actionId ->
             val capability = ActionCapabilityRegistry.get(actionId)
-            assertEquals("$actionId must fail closed", CapabilityLevel.Unsupported, capability.level)
-            assertFalse(capability.canAdd)
-            assertTrue(capability.reason.contains("does not ship a privileged Shizuku user-service transport"))
+            assertEquals("$actionId must require setup", CapabilityLevel.RequiresSetup, capability.level)
+            assertTrue(capability.canAdd)
+            assertTrue(capability.reason.contains("Shizuku"))
         }
     }
 

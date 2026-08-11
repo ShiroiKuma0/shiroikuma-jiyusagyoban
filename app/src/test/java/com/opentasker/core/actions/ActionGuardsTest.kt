@@ -653,19 +653,19 @@ class ActionGuardsTest {
     }
 
     @Test
-    fun airplaneModeAlwaysFailsHonestly() = runBlocking {
+    fun airplaneModeFailsClosedWithoutShizuku() = runBlocking {
         val action = AirplaneModeAction()
         val result = action.run(ctx(), mapOf("state" to "on"))
         assertTrue("airplane mode should fail", result is ActionResult.Failure)
-        assertTrue((result as ActionResult.Failure).message.contains("restricted"))
+        assertTrue((result as ActionResult.Failure).message.contains("Shizuku"))
     }
 
     @Test
-    fun mobileDataAlwaysFailsHonestly() = runBlocking {
+    fun mobileDataFailsClosedWithoutShizuku() = runBlocking {
         val action = MobileDataAction()
         val result = action.run(ctx(), mapOf("state" to "on"))
         assertTrue("mobile data should fail", result is ActionResult.Failure)
-        assertTrue((result as ActionResult.Failure).message.contains("restricted"))
+        assertTrue((result as ActionResult.Failure).message.contains("Shizuku"))
     }
 
     @Test

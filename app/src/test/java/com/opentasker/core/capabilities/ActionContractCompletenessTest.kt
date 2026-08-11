@@ -8,6 +8,7 @@ import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
 import com.opentasker.core.registerCoreRuntime
+import com.opentasker.core.power.ShizukuPowerBackend
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -135,10 +136,8 @@ class ActionContractCompletenessTest {
     }
 
     @Test
-    fun permanentStubsAreUnsupportedRatherThanAdvertisedAsWorking() {
-        // These always fail at run time on any unprivileged Android build; the contract has to say
-        // so up front instead of letting a user add them and discover it in a run log.
-        listOf("app.kill", "wifi.toggle", "airplane.toggle", "mobile.toggle", "reboot", "lock", "screen.off", "wake", "screenshot.take")
+    fun permanentlyBlockedActionsStayUnsupportedAndShizukuActionsRequireSetup() {
+        listOf("app.kill", "wifi.toggle", "lock")
             .forEach { actionId ->
                 assertEquals(
                     "$actionId must be Unsupported",
@@ -146,6 +145,13 @@ class ActionContractCompletenessTest {
                     ActionCapabilityRegistry.get(actionId).level,
                 )
             }
+        ShizukuPowerBackend.elevatedActionIds.forEach { actionId ->
+            assertEquals(
+                "$actionId must be RequiresSetup",
+                CapabilityLevel.RequiresSetup,
+                ActionCapabilityRegistry.get(actionId).level,
+            )
+        }
     }
 
     @Test
