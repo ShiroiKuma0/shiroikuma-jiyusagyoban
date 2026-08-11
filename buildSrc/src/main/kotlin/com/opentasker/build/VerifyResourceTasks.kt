@@ -88,12 +88,18 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
             isXIncludeAware = false
             isExpandEntityReferences = false
         }
+        // <plurals> and <string-array> are translatable too. Counting only <string> meant the
+        // seven plurals were invisible to the completeness threshold and to the unknown-name
+        // check, so a locale could omit every one of them and still measure as complete.
         return files.flatMap { file ->
             val document = factory.newDocumentBuilder().parse(file)
-            val strings = document.getElementsByTagName("string")
-            (0 until strings.length).map { index ->
-                val node = strings.item(index)
-                node.attributes.getNamedItem("name").nodeValue to node.textContent.trim()
+            listOf("string", "plurals", "string-array").flatMap { tag ->
+                val nodes = document.getElementsByTagName(tag)
+                (0 until nodes.length).mapNotNull { index ->
+                    val node = nodes.item(index)
+                    val name = node.attributes?.getNamedItem("name")?.nodeValue ?: return@mapNotNull null
+                    name to node.textContent.trim()
+                }
             }
         }.toMap()
     }
