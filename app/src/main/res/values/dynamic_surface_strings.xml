@@ -17,7 +17,7 @@
     <string name="context_type_plugin_description" formatted="false">Matches when a Locale/Tasker condition plugin reports satisfied. The plugin is polled periodically and its last known state is cached.</string>
 
     <string name="context_field_application_package_label" formatted="false">Package name</string>
-    <string name="context_field_application_package_hint" formatted="false">com.example.app (personal profile only)</string>
+    <string name="context_field_application_package_hint" formatted="false">com.example.app (work-profile apps are not visible)</string>
     <string name="context_field_application_component_label" formatted="false">Foreground component (optional)</string>
     <string name="context_field_application_component_hint" formatted="false">com.example.app.PlayerActivity or com.example.app.*</string>
     <string name="context_field_time_start_label" formatted="false">Start HH:mm</string>

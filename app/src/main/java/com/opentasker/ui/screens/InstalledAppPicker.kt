@@ -127,11 +127,10 @@ internal fun InstalledAppPickerDialog(
                         onSuccess = { InstalledAppLoadState(apps = it) },
                         onFailure = {
                             AppLogger.warn("OpenTasker.InstalledAppPicker", "Installed-app query failed", it)
+                            // Previously composed "Operation failed" into this sentence, which
+                            // read "Installed apps could not be loaded: Operation failed".
                             InstalledAppLoadState(
-                                error = appContext.getString(
-                                    R.string.app_picker_load_error,
-                                    appContext.getString(R.string.ui_error_generic),
-                                ),
+                                error = appContext.getString(R.string.app_picker_load_error),
                             )
                         },
                     )

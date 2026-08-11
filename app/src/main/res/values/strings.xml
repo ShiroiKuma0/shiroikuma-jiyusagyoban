@@ -79,8 +79,9 @@
     <string name="action_edit">Edit</string>
     <string name="action_duplicate">Duplicate</string>
     <string name="automation_duplicate_untitled">Untitled</string>
-    <string name="automation_duplicate_copy_suffix"> (copy)</string>
-    <string name="automation_duplicate_copy_number_suffix"> (copy %1$d)</string>
+    <!-- Quoted: AAPT2 strips unquoted leading whitespace, which produced "Morning focus(copy)". -->
+    <string name="automation_duplicate_copy_suffix">" (copy)"</string>
+    <string name="automation_duplicate_copy_number_suffix">" (copy %1$d)"</string>
     <string name="action_run">Run</string>
     <string name="action_undo">Undo</string>
     <string name="action_redo">Redo</string>
@@ -280,17 +281,9 @@
 
     <!-- Setup permissions -->
     <string name="setup_title">Setup</string>
-    <string name="setup_notifications_title">Notification permission</string>
-    <string name="setup_notifications_body">Needed for action notifications and alerts. Can be revoked later in system settings.</string>
-    <string name="setup_exact_alarm_title">Exact alarm scheduling</string>
-    <string name="setup_exact_alarm_body">Needed for precise time-based triggers. Without it, time triggers use inexact scheduling with up to 10 minutes of drift.</string>
     <string name="setup_battery_title">Battery optimization</string>
-    <string name="setup_battery_body">Disable battery optimization so background automations survive long idle periods.</string>
-    <string name="setup_usage_title">App usage access</string>
-    <string name="setup_usage_body">Needed for app-open triggers. Without it, profile contexts that watch for foreground apps will not fire.</string>
     <string name="setup_local_network_title">Local network access</string>
     <string name="setup_local_network_body">Android 17+ requires this permission for any LAN device communication (HTTP, Ping, Wake-on-LAN, MQTT, mDNS). Without it, network actions targeting local addresses will fail.</string>
-    <string name="setup_intro">OpenTasker can run with missing access but some features may not work.</string>
     <string name="setup_pending_required">Pending required items must be completed before automations will trigger reliably.</string>
     <string name="setup_status_order">Pending required items are listed first. Optional integrations are listed after required setup.</string>
     <string name="setup_review_settings">Review app settings</string>
@@ -302,7 +295,7 @@
 
     <!-- Setup - Backup -->
     <string name="setup_backup_label">Backup and restore</string>
-    <string name="setup_backup_helper">Create a local database snapshot or import/export backups for device transfers.</string>
+    <string name="setup_backup_helper">Create a local backup or import/export backups for device transfers.</string>
     <string name="setup_backup_create">Create Local Backup</string>
     <string name="setup_backup_restore_staged">Restore staged</string>
     <string name="setup_backup_available">Backup available</string>
@@ -311,7 +304,7 @@
     <string name="setup_item_already_ready">%1$s is already ready.</string>
     <string name="setup_theme_helper_full">Choose the display mode used across navigation, setup, and runtime review surfaces.</string>
     <string name="setup_direct_boot_title">Pre-unlock time triggers</string>
-    <string name="setup_direct_boot_body">Optional and off by default. When enabled, OpenTasker arms only its app-owned minute time trigger before first unlock and queues one time pulse in device-protected storage. Profiles, tasks, Room, secrets, and every other trigger family wait until you unlock the device.</string>
+    <string name="setup_direct_boot_body">Optional and off by default. When enabled, OpenTasker arms only its app-owned minute time trigger before first unlock and queues one time pulse in device-protected storage. Profiles, tasks, your saved data, secrets, and every other trigger family wait until you unlock the device.</string>
     <string name="setup_direct_boot_enabled">Enabled: one time pulse may be queued before unlock.</string>
     <string name="setup_direct_boot_disabled">Disabled: all triggers wait until unlock.</string>
     <string name="setup_backup_helper_full">Create a local database snapshot, export a copy that restores on any device, or stage an import for the next restart. Secret variable values never leave this device and must be re-entered after a transfer.</string>
@@ -496,7 +489,7 @@
     <string name="run_log_history_body">Recent runs with duration, status, and action-level traces.</string>
     <string name="run_log_any_task">Any task</string>
     <string name="run_log_search_label">Search task or message</string>
-    <string name="run_log_search_hint">permission, WiFi, task name</string>
+    <string name="run_log_search_hint">permission, Wi-Fi, task name</string>
     <string name="run_log_share_diagnostic">Share diagnostic report</string>
     <string name="share_uri_unreadable">OpenTasker could not read the shared file. Re-share it with read access.</string>
     <string name="share_invalid">OpenTasker could not read that share.</string>
@@ -583,10 +576,10 @@
     <string name="automation_lint_inter_profile_loop_title">Inter-profile loop</string>
     <string name="automation_lint_inter_profile_loop_detail">Profiles form a direct task cycle: %1$s.</string>
     <string name="automation_lint_inter_profile_loop_fix">Remove one task.run edge or add an explicit state guard so the chain cannot retrigger itself.</string>
-    <string name="automation_lint_shadowed_rule_title">Shadowed rule</string>
+    <string name="automation_lint_shadowed_rule_title">Shadowed profile</string>
     <string name="automation_lint_shadowed_rule_detail">%1$s can be active with %2$s, which writes %3$s at priority %4$d versus %5$d.</string>
-    <string name="automation_lint_shadowed_rule_fix">Make the contexts mutually exclusive, or confirm that the lower-priority rule should remain available.</string>
-    <string name="automation_lint_unreachable_rule_title">Unreachable rule</string>
+    <string name="automation_lint_shadowed_rule_fix">Make the contexts mutually exclusive, or confirm that the lower-priority profile should remain available.</string>
+    <string name="automation_lint_unreachable_rule_title">Unreachable profile</string>
     <string name="automation_lint_unreachable_rule_detail">%1$s cannot run: %2$s.</string>
     <string name="automation_lint_unreachable_rule_fix">Restore the referenced task or adjust the context and lifetime constraints so the profile can run.</string>
     <string name="automation_lint_action_revert_pair_title">Action/revert pair</string>
@@ -689,8 +682,8 @@
     <string name="import_variable_replace">Replace existing</string>
     <string name="import_variable_replace_secret">Replace value; keep secret</string>
     <string name="import_variable_selected">Selected: %1$s</string>
-    <string name="import_count_src_tasks">Src tasks</string>
-    <string name="import_count_src_profiles">Src profiles</string>
+    <string name="import_count_src_tasks">Source tasks</string>
+    <string name="import_count_src_profiles">Source profiles</string>
     <string name="import_mapped">mapped</string>
     <string name="import_unsupported">unsupported</string>
     <string name="profile_share_unverified_notice">This is an unverified local draft. Review the manifest and import plan before anything is written to OpenTasker.</string>
@@ -726,7 +719,7 @@
     <string name="app_picker_invalid_package">Enter a valid Android package name, such as com.example.app.</string>
     <string name="app_picker_visibility_notice">Only apps visible through Android’s scoped package queries are shown. You can cancel and enter a valid package manually.</string>
     <string name="app_picker_use_observed">Use latest observed: %1$s (%2$s)</string>
-    <string name="app_picker_load_error">Installed apps could not be loaded: %1$s</string>
+    <string name="app_picker_load_error">Installed apps could not be loaded. Try again, or type the package name.</string>
     <string name="app_picker_empty">No visible app matches. Cancel to enter the package manually.</string>
     <string name="app_picker_icon_description">%1$s app icon</string>
 
@@ -867,7 +860,7 @@
     <string name="empty_first_automation_body">Start from a guided template for the fastest path, import existing work, or create a blank task when you know the exact steps.</string>
     <string name="empty_first_profile_title">Create your first profile</string>
     <string name="empty_first_profile_body">Profiles decide when a task runs. Use a template for the fastest path, import existing workflows, or connect a blank profile to your task.</string>
-    <string name="empty_tasks_create_body">Tasks are ordered action lists. Create a task, then add actions from the metadata registry.</string>
+    <string name="empty_tasks_create_body">Tasks are ordered action lists. Create a task, then add actions from the catalog.</string>
     <string name="empty_scene_elements">No elements</string>
 
     <string name="scenes_scene_name">Scene name</string>
@@ -928,7 +921,7 @@
     <string name="flow_empty_profile_graph_body">Create or import a profile to generate a readable automation graph with contexts, tasks, actions, and missing references.</string>
     <string name="flow_waiting_for_profile">Waiting for profile</string>
     <string name="flow_overview_title">Flow overview</string>
-    <string name="flow_overview_body">Profile graph generated from the active Room data.</string>
+    <string name="flow_overview_body">Profile graph generated from your saved profiles and tasks.</string>
     <string name="flow_context_action_summary">%1$d context(s) - %2$d action(s)</string>
     <string name="flow_all_context_rules">all context rules</string>
     <string name="flow_add_content_description">Add</string>
@@ -1099,7 +1092,7 @@
     <string name="delete_task_body">This removes &quot;%1$s&quot; and its %2$d action(s). You can restore it from the snackbar.</string>
     <string name="delete_scene_body">This removes &quot;%1$s&quot; and its %2$d element(s). You can restore it from the snackbar.</string>
     <string name="delete_action_body">This removes step %1$d from &quot;%2$s&quot;. Remaining actions keep their order.</string>
-    <string name="delete_context_body">This removes the %1$s condition from &quot;%2$s&quot;.</string>
+    <string name="delete_context_body">This removes the %1$s context from &quot;%2$s&quot;.</string>
     <string name="delete_undo_helper">You can restore this from the Undo action in the snackbar.</string>
 
     <string name="delete_task_references_title">Task is still in use</string>
@@ -1422,9 +1415,20 @@
     <string name="ui_message_export_summary">Exported %1$d task(s), %2$d profile(s), %3$d variable(s), %4$d scene(s)</string>
     <string name="ui_message_bundle_exported">Exported %1$d task(s), %2$d profile(s), %3$d scene(s)</string>
     <string name="ui_message_bundle_imported">Imported %1$d task(s), %2$d disabled profile(s), %3$d scene(s)</string>
-    <string name="ui_message_run_logs_exported">Exported %1$d run log entr%2$s</string>
-    <string name="ui_message_retention_updated">Run log retention updated%1$s</string>
-    <string name="ui_message_retention_pruned">; pruned %1$d entr%2$s</string>
+    <!--
+        Plural forms, not a stem plus a suffix passed from code. "Exported %1$d run log entr%2$s"
+        with "y"/"ies" supplied by Kotlin cannot be translated into any language, and the retention
+        message was a sentence assembled from three fragments starting with a semicolon.
+    -->
+    <plurals name="ui_message_run_logs_exported">
+        <item quantity="one">Exported %1$d run log entry</item>
+        <item quantity="other">Exported %1$d run log entries</item>
+    </plurals>
+    <string name="ui_message_retention_updated">Run log retention updated</string>
+    <plurals name="ui_message_retention_updated_pruned">
+        <item quantity="one">Run log retention updated; pruned %1$d entry</item>
+        <item quantity="other">Run log retention updated; pruned %1$d entries</item>
+    </plurals>
     <string name="ui_message_variable_created">Variable created</string>
     <string name="workspace_recent_failure_detail">%1$s: %2$s</string>
 
@@ -1480,7 +1484,7 @@
     <string name="inspector_time_minutes">%1$d m ago</string>
     <string name="inspector_time_hours">%1$d h ago</string>
     <string name="inspector_time_absolute">%1$s - %2$s</string>
-    <string name="inspector_dwell_target"> of %1$s</string>
+    <string name="inspector_dwell_target">" of %1$s"</string>
     <string name="inspector_dwell_inside">Dwell: inside for %1$s%2$s.</string>
     <string name="inspector_dwell_inside_waiting">Dwell: inside; waiting for a stable entry time.</string>
     <string name="inspector_dwell_accuracy_blocked">Dwell: latest fix is inside but blocked by accuracy; retained timer at %1$s%2$s.</string>

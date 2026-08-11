@@ -1489,7 +1489,7 @@ class ActiveAutomationViewModel(
                         ?: error("Could not open the export destination")
                     output.use { RunLogExporter(db.runLogDao()).export(snapshot, format, it) }
                 }
-                events.send(message(R.string.ui_message_run_logs_exported, exported, if (exported == 1) "y" else "ies"))
+                events.send(pluralMessage(R.plurals.ui_message_run_logs_exported, exported, exported))
             } catch (error: Exception) {
                 events.send(errorMessage(error, R.string.ui_error_run_log_export))
             }
@@ -1538,12 +1538,13 @@ class ActiveAutomationViewModel(
                 pruneRunLogs(normalized)
             }
                 .onSuccess { deleted ->
-                    val suffix = if (deleted > 0) {
-                        appContext.getString(R.string.ui_message_retention_pruned, deleted, plural(deleted))
-                    } else {
-                        ""
-                    }
-                    events.send(message(R.string.ui_message_retention_updated, suffix))
+                    events.send(
+                        if (deleted > 0) {
+                            pluralMessage(R.plurals.ui_message_retention_updated_pruned, deleted, deleted)
+                        } else {
+                            message(R.string.ui_message_retention_updated)
+                        },
+                    )
                     refreshRunLogPage()
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
