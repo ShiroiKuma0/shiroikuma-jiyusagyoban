@@ -1103,6 +1103,10 @@
     <string name="scene_element_type_oval">Oval</string>
     <string name="scene_element_type_rectangle">Rectangle</string>
     <string name="scene_element_type_doodle">Drawing</string>
+    <!-- Fork-only scene element types. PROGRESS is the battery line's fill bar; METEOR is the
+         legacy tombstone kept so archived exports still decode (it renders nothing). -->
+    <string name="scene_element_type_progress">Progress bar</string>
+    <string name="scene_element_type_meteor">Meteor (legacy)</string>
 
     <string name="diagnostics_title">Diagnostics and engine health</string>
     <string name="diagnostics_summary_body">Inspect background delivery, captured crashes, and the bounded in-app log without connecting to a server.</string>
