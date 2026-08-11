@@ -6,8 +6,8 @@ import org.junit.Test
 
 class OnboardingPreferencePolicyTest {
     @Test
-    fun backOrOutsideDismissalDoesNotCompleteOnboarding() {
-        assertFalse(shouldCompleteOnboarding(OnboardingExit.Dismissed))
+    fun backOrOutsideDismissalCompletesOnboarding() {
+        assertTrue(shouldCompleteOnboarding(OnboardingExit.Dismissed))
     }
 
     @Test
