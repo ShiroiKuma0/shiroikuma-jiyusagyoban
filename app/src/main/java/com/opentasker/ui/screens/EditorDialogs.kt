@@ -65,6 +65,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.R
 import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.describe
@@ -289,6 +290,7 @@ internal fun TaskEditorDialog(
     task: Task?,
     onDismiss: () -> Unit,
     onSave: (String, Int, CollisionMode) -> Unit,
+    existingTaskNames: List<String> = emptyList(),
 ) {
     var name by rememberSaveable(task?.id) { mutableStateOf(task?.name.orEmpty()) }
     var priority by rememberSaveable(task?.id) { mutableStateOf((task?.priority ?: 5).toString()) }
@@ -297,6 +299,12 @@ internal fun TaskEditorDialog(
     }
     val parsedPriority = priority.toIntOrNull()
     val canSave = taskEditorCanSave(name, parsedPriority)
+    // Warn but do not block: task.run targets and legacy notification bindings resolve by name, and
+    // the resolver already has an Ambiguous case for exactly this, so two tasks sharing a name make
+    // those references ambiguous at authoring time.
+    val duplicateName = name.isNotBlank() &&
+        !name.trim().equals(task?.name?.trim(), ignoreCase = true) &&
+        existingTaskNames.any { it.trim().equals(name.trim(), ignoreCase = true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -308,7 +316,20 @@ internal fun TaskEditorDialog(
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.task_name_label)) },
                     placeholder = { Text(stringResource(R.string.task_name_hint)) },
-                    supportingText = { Text(stringResource(R.string.task_name_helper)) },
+                    supportingText = {
+                        Text(
+                            if (duplicateName) {
+                                stringResource(R.string.task_name_duplicate_warning)
+                            } else {
+                                stringResource(R.string.task_name_helper)
+                            },
+                            color = if (duplicateName) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                Color.Unspecified
+                            },
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -430,6 +451,10 @@ internal fun ProfileEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
+        // These forms carry many fields, and discarding them has no undo because nothing was
+        // saved yet.
+        properties = DialogProperties(dismissOnClickOutside = false),
         title = { Text(if (profile == null) stringResource(R.string.dialog_create_profile) else stringResource(R.string.dialog_edit_profile)) },
         text = {
             Column(

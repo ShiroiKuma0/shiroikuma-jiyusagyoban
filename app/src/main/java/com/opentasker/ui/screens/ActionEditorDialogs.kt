@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionFieldPolicy
@@ -79,6 +80,9 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.engine.tryRetryPlan
 import com.opentasker.ui.theme.DesignSystem
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal data class LocalizedActionMetadata(
     val metadata: ActionMetadata,
@@ -344,6 +348,10 @@ internal fun ActionConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
+        // These forms carry many fields, and discarding them has no undo because nothing was
+        // saved yet.
+        properties = DialogProperties(dismissOnClickOutside = false),
         title = { Text(metadataName) },
         text = {
             LazyColumn(
@@ -838,20 +846,30 @@ private fun ActionFileFieldInput(
             onChange(uri.toString())
         }
     }
-    val savedPaths = remember(context.filesDir, field.fileRule?.scope) {
-        if (field.fileRule?.scope != ActionFileScope.OPENTASKER) {
+    // Walking the sandbox is disk work; doing it in remember{} ran it on the main thread while
+    // composing the field, so a large user_files tree janked the editor open.
+    val fileScope = field.fileRule?.scope
+    val savedPaths by produceState(emptyList<String>(), context.filesDir, fileScope) {
+        this.value = if (fileScope != ActionFileScope.OPENTASKER) {
             emptyList()
         } else {
-            val root = java.io.File(context.filesDir, "user_files")
-            runCatching {
-                if (!root.exists()) emptyList() else root.walkTopDown()
-                    .drop(1)
-                    .take(100)
-                    .map { file ->
-                        file.relativeTo(root).invariantSeparatorsPath + if (file.isDirectory) "/" else ""
+            withContext(Dispatchers.IO) {
+                val root = java.io.File(context.filesDir, "user_files")
+                runCatching {
+                    if (!root.exists()) {
+                        emptyList()
+                    } else {
+                        root.walkTopDown()
+                            .drop(1)
+                            .take(100)
+                            .map { file ->
+                                file.relativeTo(root).invariantSeparatorsPath +
+                                    if (file.isDirectory) "/" else ""
+                            }
+                            .toList()
                     }
-                    .toList()
-            }.getOrDefault(emptyList())
+                }.getOrDefault(emptyList())
+            }
         }
     }
     Column(Modifier.fillMaxWidth()) {

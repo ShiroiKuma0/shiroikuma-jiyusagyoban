@@ -33,6 +33,10 @@ import com.opentasker.app.R
 import com.opentasker.core.scripting.TermuxAllowlistSaveResult
 import com.opentasker.core.scripting.TermuxScriptAllowlistStore
 import com.opentasker.core.scripting.TermuxScriptPolicy
+import com.opentasker.core.scripting.ApprovedTermuxScript
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
@@ -41,7 +45,10 @@ internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
     var executable by rememberSaveable { mutableStateOf("") }
     var sha256 by rememberSaveable { mutableStateOf("") }
     var revision by remember { mutableIntStateOf(0) }
-    val entries = remember(store, revision) { store.entries() }
+    // SharedPreferences first-load is disk work; keep it off the composition thread.
+    val entries by produceState(initialValue = emptyList<ApprovedTermuxScript>(), store, revision) {
+        value = withContext(Dispatchers.IO) { store.entries() }
+    }
     val pathValid = TermuxScriptPolicy.normalizeExecutable(executable) != null
     val hashValid = TermuxScriptPolicy.normalizeHash(sha256) != null
     val savedMessage = stringResource(R.string.setup_termux_script_saved)
