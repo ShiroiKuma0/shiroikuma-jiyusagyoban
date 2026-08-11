@@ -114,6 +114,7 @@ import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.widget.TaskShortcutHelper
+import com.opentasker.widget.TaskWidgetProvider
 import androidx.room.withTransaction
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -606,7 +607,13 @@ class ActiveAutomationViewModel(
         @StringRes successMessageRes: Int = R.string.ui_message_task_updated,
         successAction: UiMessageAction? = null,
         onSaved: () -> Unit = {},
-    ) = launchWithMessage(successMessageRes, successAction, onSaved) {
+    ) = launchWithMessage(
+        successMessageRes,
+        successAction,
+        // A rename leaves every task widget showing the old label until something asks them to
+        // re-read it; nothing else does.
+        onSaved = { TaskWidgetProvider.requestRefresh(appContext); onSaved() },
+    ) {
         // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
         // update must be atomic so a concurrent writer can't interleave and lose a revision.
         db.withTransaction {
@@ -744,6 +751,9 @@ class ActiveAutomationViewModel(
                         events.send(message(R.string.ui_task_still_used, blocked))
                     } else {
                         LocaleGrantStore(appContext).revokeAllForTask(task.id)
+                        // Otherwise a widget bound to this task keeps looking runnable and only
+                        // answers a tap with "Task not found".
+                        TaskWidgetProvider.requestRefresh(appContext)
                         events.send(
                             UiMessage(
                                 resId = R.string.ui_message_task_deleted,

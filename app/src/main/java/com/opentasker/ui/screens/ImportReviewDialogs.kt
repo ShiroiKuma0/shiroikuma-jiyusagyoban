@@ -29,6 +29,15 @@ import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.core.transfer.VariableImportConflict
 import com.opentasker.ui.theme.DesignSystem
 
+/**
+ * The pasted draft is held in `rememberSaveable`, which rides `onSaveInstanceState` through a
+ * binder transaction capped at about 1 MB for the whole bundle. An OpenTasker workspace export is
+ * a legitimate multi-megabyte artefact of this same app, so pasting one and then rotating threw
+ * TransactionTooLargeException and killed the process. Anything beyond this cap belongs in a file
+ * import, which streams and has its own 8 MB decode bound.
+ */
+internal const val MAX_PASTED_BUNDLE_CHARS = 256 * 1024
+
 internal fun readClipboardText(context: Context): String {
     val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return ""
     return clipboard.primaryClip
@@ -36,6 +45,7 @@ internal fun readClipboardText(context: Context): String {
         ?.getItemAt(0)
         ?.coerceToText(context)
         ?.toString()
+        ?.take(MAX_PASTED_BUNDLE_CHARS)
         .orEmpty()
 }
 

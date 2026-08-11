@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.Toast
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.ExecutionEnvelope
 import com.opentasker.core.engine.logSkippedRun
@@ -50,6 +51,11 @@ class TaskRunActivity : Activity() {
                             source = source,
                             execution = ExecutionEnvelope.create(task, source),
                             visibleActivity = true,
+                            // Without the shared controller this path gets a private in-memory one
+                            // that admits even while the profile is saturated or its circuit is
+                            // open, so widget and shortcut taps ignored limits the in-app Run
+                            // button respects.
+                            admissionController = ExecutionAdmissionRegistry.current(applicationContext),
                         )
                         val status = when {
                             result.held -> "held"
