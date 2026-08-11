@@ -88,14 +88,14 @@ fun AutomationFlowScreen(
     val graphs = remember(profiles, tasks, resources, changedNodeKeys) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
-        val lintStrings = AutomationLintStrings.from(resources)
+        // Upstream also threads AutomationLintStrings through the builder so lint findings on the
+        // canvas resolve from resources. This fork's graph builder carries no lint findings.
         profiles.map {
             profile -> AutomationFlowGraphBuilder.build(
                 profile = profile,
                 tasksById = tasksById,
                 strings = strings,
                 changedNodeKeys = changedNodeKeys,
-                lintStrings = lintStrings,
             )
         }
     }
