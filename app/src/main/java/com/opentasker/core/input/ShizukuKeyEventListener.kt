@@ -1,13 +1,18 @@
 package com.opentasker.core.input
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.IBinder
 import android.os.PowerManager
+import android.telephony.TelephonyManager
+import androidx.core.content.ContextCompat
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.contexts.HardwareKeyContextEvents
 import com.opentasker.core.engine.variables.PersistentGlobalScope
@@ -63,10 +68,52 @@ class ShizukuKeyEventListener {
     @Volatile private var screenOn = true
     private var screenReceiver: BroadcastReceiver? = null
 
+    /**
+     * Ringing state, pushed to the grabber the same way.
+     *
+     * A ringing call lights the screen, so the screen-on rule swallowed the single tap exactly when the
+     * phone was ringing: the framework never saw the key, the dialer never silenced, and the volume panel
+     * popped up over the call screen instead. While this is set the grabber re-injects the tap whatever the
+     * screen is doing, and [callback] drops the matching event so no profile shows the panel.
+     */
+    @Volatile private var ringing = false
+
     private fun pushScreen(on: Boolean) {
         screenOn = on
         runCatching { service?.setScreenOn(on) }
     }
+
+    private fun pushRinging(on: Boolean) {
+        if (ringing == on) return
+        ringing = on
+        runCatching { service?.setRinging(on) }
+        AppLogger.info(TAG, "ringing=$on (volume short press ${if (on) "re-injected, panel suppressed" else "back to the screen rule"})")
+    }
+
+    /**
+     * Current ringing state, read fresh.
+     *
+     * [TelephonyManager.getCallState] is the answer when READ_PHONE_STATE is granted. When it is not —
+     * the permission is optional here and the grabber must not depend on it — `AudioManager.getMode()`
+     * reports `MODE_RINGTONE` while the ringer plays and needs no permission at all. It is the coarser
+     * signal (it follows the ringer, not the call), which is precisely what this gate is about.
+     */
+    private fun readRinging(): Boolean {
+        val ctx = appContext ?: return false
+        if (hasPhoneStatePermission(ctx)) {
+            val state = runCatching {
+                ctx.getSystemService(TelephonyManager::class.java)?.callState
+            }.getOrNull()
+            if (state != null) return state == TelephonyManager.CALL_STATE_RINGING
+        }
+        return runCatching {
+            (ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.mode == AudioManager.MODE_RINGTONE
+        }.getOrDefault(false)
+    }
+
+    private fun hasPhoneStatePermission(ctx: Context): Boolean =
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_PHONE_STATE) ==
+            PackageManager.PERMISSION_GRANTED
 
     private val callback = object : IKeyGrabberCallback.Stub() {
         override fun onKey(evCode: Int, pressType: Int) {
@@ -76,6 +123,13 @@ class ShizukuKeyEventListener {
                 2 -> HardwareKeyContextEvents.PRESS_DOUBLE
                 1 -> HardwareKeyContextEvents.PRESS_LONG
                 else -> HardwareKeyContextEvents.PRESS_SHORT
+            }
+            // While ringing the grabber re-injects this press for the framework, so publishing it as well
+            // would run the profile too — and the volume panel would open over the call screen. Only the
+            // short press is affected: long/double/triple are still consumed and still ours.
+            if (ringing && press == HardwareKeyContextEvents.PRESS_SHORT && evCode in REINJECTED_CODES) {
+                AppLogger.info(TAG, "${mapped.first} short press re-injected for the ringing call (not published)")
+                return
             }
             HardwareKeyContextEvents.publish(mapped.first, press, mapped.second)
             AppLogger.info(TAG, "${mapped.first} $press press (grab)")
@@ -99,7 +153,10 @@ class ShizukuKeyEventListener {
                 grabUnavailable = true
                 teardownBind()
             } else {
-                runCatching { svc.setScreenOn(screenOn) }  // seed the fresh service with the current screen state
+                // Seed the fresh service with the current gates; a rebind mid-call must not land ringing=false.
+                runCatching { svc.setScreenOn(screenOn) }
+                ringing = readRinging()
+                runCatching { svc.setRinging(ringing) }
                 AppLogger.info(TAG, "grab mode active on $devs device(s)")
             }
         }
@@ -123,19 +180,47 @@ class ShizukuKeyEventListener {
         appScope = scope
         // Track screen on/off and forward to the grabber (gates single-tap consume vs re-inject).
         screenOn = (appContext?.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive != false
+        ringing = readRinging()
         screenReceiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    Intent.ACTION_SCREEN_ON -> pushScreen(true)
+                    // A ring lights the screen, so this is also the moment to re-read the call state: it
+                    // catches the ring even when READ_PHONE_STATE is denied and no phone-state broadcast
+                    // will ever arrive.
+                    Intent.ACTION_SCREEN_ON -> { pushScreen(true); pushRinging(readRinging()) }
                     Intent.ACTION_SCREEN_OFF -> pushScreen(false)
+                    TelephonyManager.ACTION_PHONE_STATE_CHANGED ->
+                        pushRinging(
+                            intent.getStringExtra(TelephonyManager.EXTRA_STATE)
+                                ?.let { it == TelephonyManager.EXTRA_STATE_RINGING }
+                                ?: readRinging(),
+                        )
                 }
             }
         }.also { recv ->
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
             }
-            runCatching { appContext?.registerReceiver(recv, filter) }
+            // Explicitly NOT_EXPORTED, like the call-state producer in StateSensorEvents. All three are
+            // protected system broadcasts, so the flagless overload is still legal on this targetSdk — but
+            // only for as long as every action in the filter stays protected, and the failure mode is a
+            // SecurityException swallowed by runCatching that would take screen tracking down with it.
+            val ctx = appContext
+            if (ctx != null) {
+                runCatching { ContextCompat.registerReceiver(ctx, recv, filter, ContextCompat.RECEIVER_NOT_EXPORTED) }
+                    .onFailure { AppLogger.warn(TAG, "screen/phone-state receiver not registered: ${it.message}") }
+            }
+        }
+        appContext?.let { ctx ->
+            if (!hasPhoneStatePermission(ctx)) {
+                AppLogger.warn(
+                    TAG,
+                    "READ_PHONE_STATE not granted — the ringing gate falls back to the audio mode, " +
+                        "which is only re-read when the screen turns on",
+                )
+            }
         }
         job = scope.launch(Dispatchers.IO) { runLoop(scope) }
         killSwitchJob = scope.launch(Dispatchers.IO) {
@@ -366,6 +451,10 @@ class ShizukuKeyEventListener {
         // Volume keys only (114 vol-down, 115 vol-up). Power is intentionally NOT grabbed: an injected
         // POWER won't toggle the screen on this Huawei, so consuming it would deaden the power button.
         private val WATCHED_CODES = intArrayOf(114, 115)
+
+        // The codes the native side can re-inject (android_keycode in evgrab.c maps exactly these). Only
+        // these are dropped by the ringing gate — a key we cannot hand back must never be silently eaten.
+        private val REINJECTED_CODES = setOf(114, 115)
 
         // Multi-tap keys. Both volume keys get double (vol-down→camera, vol-up→media play/pause); vol-down
         // also gets triple (speak time). A single short on a multi-tap key waits PKEY_DOUBLEMS before firing
