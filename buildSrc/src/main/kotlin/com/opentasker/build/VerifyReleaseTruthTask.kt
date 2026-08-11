@@ -58,6 +58,10 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val databaseFile: RegularFileProperty
 
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val changelogFile: RegularFileProperty
+
     @get:Internal
     abstract val repositoryDirectory: DirectoryProperty
 
@@ -67,6 +71,8 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
         val expectedKeys = setOf(
             "schemaVersion",
             "requiredArtifactCommit",
+            "releaseTag",
+            "releaseTagCommit",
             "versionName",
             "versionCode",
             "minSdk",
@@ -101,6 +107,7 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
         val flowControl = flowControlFile.get().asFile.readText()
         val taskRunner = taskRunnerFile.get().asFile.readText()
         val database = databaseFile.get().asFile.readText()
+        val changelog = changelogFile.get().asFile.readText()
 
         val flowBody = sourceValue(
             flowControl,
@@ -169,6 +176,17 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
             }
         }
 
+        val versionName = truth.getValue("versionName")
+        val releaseTag = truth.getValue("releaseTag")
+        check(releaseTag == "v$versionName") {
+            "Release truth tag '$releaseTag' does not match version $versionName."
+        }
+        val currentTagCommit = verifyAnnotatedReleaseTag(releaseTag, versionName)
+        check(truth.getValue("releaseTagCommit") == currentTagCommit) {
+            "Release truth releaseTagCommit does not match $releaseTag ($currentTagCommit)."
+        }
+        verifyVersionedChangelogTags(changelog)
+
         val artifactCommit = truth.getValue("requiredArtifactCommit")
         check(Regex("[0-9a-f]{40}").matches(artifactCommit)) {
             "Release truth requiredArtifactCommit must be a full lowercase SHA-1."
@@ -205,7 +223,61 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
         check(metadataValue(metadata, "commit") == artifactCommit) {
             "F-Droid commit does not match release truth."
         }
-        println("Release truth passed for v${truth.getValue("versionName")} (${truth.getValue("versionCode")}); artifact $artifactCommit")
+        println(
+            "Release truth passed for v$versionName (${truth.getValue("versionCode")}); " +
+                "tag $releaseTag at $currentTagCommit; artifact $artifactCommit",
+        )
+    }
+
+    /**
+     * The pre-0.2.58 changelog is a historical development ledger: those headings predate the
+     * versioned application build and have no release sync commit to tag. From 0.2.58 onward each
+     * version has a version-bearing sync commit, so those are the release identities this gate can
+     * verify without inventing provenance for the old scaffold notes.
+     */
+    private fun verifyVersionedChangelogTags(changelog: String) {
+        val versions = Regex("(?m)^##\\s+v(\\d+\\.\\d+\\.\\d+)(?:\\s|$)")
+            .findAll(changelog)
+            .map { it.groupValues[1] }
+            .filter(::isVersionedApplicationRelease)
+            .distinct()
+            .toList()
+        check(versions.isNotEmpty()) { "CHANGELOG.md has no versioned release headings." }
+
+        versions.forEach { version ->
+            val tagCommit = verifyAnnotatedReleaseTag("v$version", version)
+            val taggedBuild = git("show", "$tagCommit:app/build.gradle.kts")
+            val taggedVersion = sourceValue(
+                taggedBuild,
+                Regex("(?m)^\\s*(?:val\\s+appVersionName|versionName)\\s*=\\s*\"([^\"]+)\""),
+                "version name for v$version",
+            )
+            check(taggedVersion == version) {
+                "Tag v$version points to $tagCommit, whose application version is $taggedVersion."
+            }
+        }
+    }
+
+    private fun isVersionedApplicationRelease(version: String): Boolean {
+        val parts = version.split('.').map(String::toInt)
+        return parts[0] > 0 || parts[1] > 2 || (parts[1] == 2 && parts[2] >= 58)
+    }
+
+    private fun verifyAnnotatedReleaseTag(tagName: String, expectedVersion: String): String {
+        val ref = "refs/tags/$tagName"
+        val type = try {
+            git("cat-file", "-t", ref)
+        } catch (_: IllegalStateException) {
+            ""
+        }
+        check(type == "tag") {
+            "Release $expectedVersion requires an annotated Git tag at $tagName."
+        }
+
+        val commit = git("rev-list", "-n", "1", ref)
+        check(commit.isNotBlank()) { "Release tag $tagName does not resolve to a commit." }
+        git("merge-base", "--is-ancestor", commit, "HEAD")
+        return commit
     }
 
     private fun parseTruth(text: String): Map<String, String> {

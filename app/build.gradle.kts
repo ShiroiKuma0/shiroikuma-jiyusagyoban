@@ -953,6 +953,7 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     flowControlFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/FlowStructure.kt"))
     taskRunnerFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/TaskRunner.kt"))
     databaseFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/storage/AppDatabase.kt"))
+    changelogFile.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
     repositoryDirectory.set(rootProject.layout.projectDirectory)
 }
 

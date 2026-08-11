@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$RequiredArtifactCommit,
-    [string]$OutputPath
+    [string]$OutputPath,
+    [switch]$RequireReleaseTag
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,20 @@ $Bundle = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opent
 $Wrapper = Get-Content -LiteralPath (Join-Path $Root "gradle\wrapper\gradle-wrapper.properties") -Raw
 $Versions = Get-Content -LiteralPath (Join-Path $Root "gradle\libs.versions.toml") -Raw
 
+function Get-ReleaseTagCommit([string]$TagName) {
+    $ref = "refs/tags/$TagName"
+    & git -C $Root cat-file -e "$ref`^{commit}" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return ""
+    }
+
+    $type = (& git -C $Root cat-file -t $ref).Trim()
+    if ($type -ne "tag") {
+        throw "Release tag $TagName must be annotated; found $type."
+    }
+    return (& git -C $Root rev-list -n 1 $ref).Trim()
+}
+
 function Match-Value([string]$Text, [string]$Pattern, [string]$Name) {
     $match = [regex]::Match($Text, $Pattern)
     if (-not $match.Success) { throw "Could not derive $Name from the checked-in source." }
@@ -32,6 +47,14 @@ if ([string]::IsNullOrWhiteSpace($RequiredArtifactCommit)) {
 }
 if ($RequiredArtifactCommit -cnotmatch "^[0-9a-f]{40}$") {
     throw "Required artifact commit must be a full lowercase Git SHA-1."
+}
+
+$versionName = Match-Value $Gradle 'val\s+appVersionName\s*=\s*"([^"]+)"' "version name"
+$versionCode = [int](Match-Value $Gradle 'val\s+appVersionCode\s*=\s*(\d+)' "version code")
+$releaseTag = "v$versionName"
+$releaseTagCommit = Get-ReleaseTagCommit $releaseTag
+if ($RequireReleaseTag -and [string]::IsNullOrWhiteSpace($releaseTagCommit)) {
+    throw "Release tag $releaseTag is missing; create the annotated tag before publishing release truth."
 }
 
 $flowBody = Match-Value $FlowStructure '(?s)\bval\s+ALL\s*=\s*setOf\(([^)]*)\)' "FlowControl.ALL"
@@ -49,9 +72,11 @@ $engineHandledActionCount = $flowControlIds.Count + 1
 $truth = [ordered]@{
     schemaVersion = 1
     requiredArtifactCommit = $RequiredArtifactCommit
+    releaseTag = $releaseTag
+    releaseTagCommit = $releaseTagCommit
     application = [ordered]@{
-        versionName = Match-Value $Gradle 'val\s+appVersionName\s*=\s*"([^"]+)"' "version name"
-        versionCode = [int](Match-Value $Gradle 'val\s+appVersionCode\s*=\s*(\d+)' "version code")
+        versionName = $versionName
+        versionCode = $versionCode
     }
     android = [ordered]@{
         minSdk = [int](Match-Value $Gradle 'minSdk\s*=\s*(\d+)' "minimum SDK")
