@@ -1111,7 +1111,12 @@ internal fun DeleteConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    // onPrimary happens to pass contrast today, but its hue is not the error
+                    // hue under Material You and a scheme edit would break it silently.
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
             ) {
                 Text(confirmLabel)
             }
@@ -1239,7 +1244,12 @@ internal fun TaskDeleteReferencesDialog(
                     resolution?.let(onConfirm)
                 },
                 enabled = confirmEnabled,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    // onPrimary happens to pass contrast today, but its hue is not the error
+                    // hue under Material You and a scheme edit would break it silently.
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
             ) {
                 Text(stringResource(R.string.delete_task_references_confirm))
             }

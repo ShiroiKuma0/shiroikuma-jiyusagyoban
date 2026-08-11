@@ -164,6 +164,7 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun getByNameIgnoreCase(name: String): ProfileEntity?
 
+    @Query("SELECT id FROM profiles") suspend fun getAllIds(): List<Long>
     @Query("SELECT COUNT(*) FROM profiles") suspend fun countAll(): Int
 
     @Query("SELECT COUNT(*) FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")

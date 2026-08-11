@@ -442,7 +442,7 @@
             android:name="com.opentasker.core.plugins.locale.LocaleSettingEditActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="OpenTasker task"
+            android:label="@string/locale_setting_edit_title"
             android:theme="@style/Theme.OpenTasker">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
