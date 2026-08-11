@@ -903,6 +903,7 @@ fun ActiveAutomationUi(
                 totalCount = runLogPage.totalCount,
                 hasMore = runLogPage.hasMore,
                 loading = runLogPage.loading,
+                failed = runLogPage.failed,
                 filters = runLogFilters,
                 taskOptions = runLogTaskOptions.map { it.taskId to it.taskName },
                 onFiltersChange = viewModel::updateRunLogFilters,
@@ -1470,29 +1471,3 @@ internal fun StatusPill(
     }
 }
 
-@Composable
-internal fun InlineNotice(title: String, body: String, color: Color) {
-    val isError = color == MaterialTheme.colorScheme.error
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Icon(
-                if (isError) Icons.Filled.Error else Icons.Filled.Info,
-                contentDescription = stringResource(if (isError) R.string.ui_error_content_description else R.string.ui_info_content_description),
-                tint = color,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}

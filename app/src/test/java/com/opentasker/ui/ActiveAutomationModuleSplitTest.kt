@@ -45,14 +45,20 @@ class ActiveAutomationModuleSplitTest {
 
     @Test
     fun activeAutomationShellExposesSharedUiHelpersInternally() {
-        val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+        // Asserted across the screens package: these helpers must exist and stay internal, but
+        // pinning them to one filename turned extracting a shared component into a failure.
+        val screenSources = Files.list(screensSourceRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }
+                .toList()
+                .joinToString(separator = System.lineSeparator()) { it.readText() }
+        }
 
         listOf(
             "internal fun SummaryMetric",
             "internal fun StatusPill",
             "internal fun InlineNotice",
         ).forEach { helperDeclaration ->
-            assertTrue("Missing shared helper: $helperDeclaration", shellSource.contains(helperDeclaration))
+            assertTrue("Missing shared helper: $helperDeclaration", screenSources.contains(helperDeclaration))
         }
     }
 

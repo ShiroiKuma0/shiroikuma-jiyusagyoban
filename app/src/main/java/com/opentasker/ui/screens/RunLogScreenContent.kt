@@ -88,6 +88,7 @@ internal fun RunLogScreenContent(
     totalCount: Int = logs.size,
     hasMore: Boolean = false,
     loading: Boolean = false,
+    failed: Boolean = false,
     filters: RunLogFilterState = RunLogFilterState(),
     taskOptions: List<Pair<Long, String>> = runLogTaskOptions(logs, tasks),
     onFiltersChange: (RunLogFilterState) -> Unit = {},
@@ -117,7 +118,23 @@ internal fun RunLogScreenContent(
                 )
             }
         }
-        if (logs.isEmpty() && totalCount == 0 && !loading) {
+        if (failed) {
+            // A failed read is not an empty result. Without this the screen claimed nothing
+            // matched and the only report was a snackbar that had already gone.
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.run_log_load_failed_title),
+                    body = stringResource(R.string.run_log_load_failed_body),
+                    color = MaterialTheme.colorScheme.error,
+                    action = {
+                        TextButton(onClick = onRefresh) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    },
+                )
+            }
+        }
+        if (!failed && logs.isEmpty() && totalCount == 0 && !loading) {
             item {
                 InlineNotice(
                     title = stringResource(if (hasFilters) R.string.empty_run_log_search_title else R.string.empty_run_log_title),

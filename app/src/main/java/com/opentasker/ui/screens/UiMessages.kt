@@ -6,6 +6,7 @@ import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import com.opentasker.app.R
 import com.opentasker.core.storage.CorruptStoredRecordException
+import com.opentasker.core.storage.StorageDecodeIssue
 
 data class UiMessage(
     // Deliberately unannotated: this is a string resource when [quantity] is null and a plurals
@@ -60,3 +61,13 @@ internal fun uiErrorMessage(error: Throwable, @StringRes fallbackRes: Int): UiMe
     is CorruptStoredRecordException -> UiMessage(R.string.ui_error_corrupt_record)
     else -> UiMessage(fallbackRes)
 }
+
+/**
+ * Thrown when a normal editor save would overwrite a record whose stored payload currently fails
+ * to decode. Blocking the write keeps the corrupt bytes intact for recovery instead of clobbering
+ * them with an empty fallback (fail closed).
+ */
+internal class CorruptRecordOverwriteException(issue: StorageDecodeIssue) : IllegalStateException(
+    "Can't save ${issue.recordType.label.lowercase()} \"${issue.recordName}\": its stored " +
+        "${issue.fieldName} is corrupt. Recover it (undo or restore a backup) or delete it first.",
+)

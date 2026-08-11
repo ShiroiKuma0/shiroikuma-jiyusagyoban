@@ -134,6 +134,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -233,31 +234,6 @@ data class DiagnosticsUiState(
     val loadedAtMillis: Long = 0L,
     /** Resolves admission rows to profile names; they previously showed raw Room ids. */
     val profileNames: Map<Long, String> = emptyMap(),
-)
-
-data class RunLogPageUiState(
-    val entries: ImmutableList<RunLogEntry> = persistentListOf(),
-    val totalCount: Int = 0,
-    val hasMore: Boolean = false,
-    val loading: Boolean = false,
-    internal val snapshot: RunLogSnapshot? = null,
-)
-
-data class RunLogRetentionPreview(
-    val policy: RunLogRetentionPolicy,
-    val storedCount: Int,
-    val prunableCount: Int,
-    val oldestTimestamp: Long?,
-)
-
-/**
- * Thrown when a normal editor save would overwrite a record whose stored payload currently fails
- * to decode. Blocking the write keeps the corrupt bytes intact for recovery instead of clobbering
- * them with an empty fallback (fail closed).
- */
-internal class CorruptRecordOverwriteException(issue: StorageDecodeIssue) : IllegalStateException(
-    "Can't save ${issue.recordType.label.lowercase()} \"${issue.recordName}\": its stored " +
-        "${issue.fieldName} is corrupt. Recover it (undo or restore a backup) or delete it first.",
 )
 
 class ActiveAutomationViewModel(
@@ -1425,15 +1401,32 @@ class ActiveAutomationViewModel(
         }
     }
 
+    private var runLogQueryDebounceJob: Job? = null
+
     fun updateRunLogFilters(filters: RunLogFilterState) {
-        if (_runLogFilters.value == filters) return
+        val previous = _runLogFilters.value
+        if (previous == filters) return
         _runLogFilters.value = filters
-        refreshRunLogPage()
+        runLogQueryDebounceJob?.cancel()
+        // Typing changes only the query, and each character otherwise cost a snapshot, a count and
+        // a page query. Everything else (status, task, date) is a discrete choice and reloads at
+        // once.
+        if (filters.copy(query = previous.query) == previous) {
+            runLogQueryDebounceJob = viewModelScope.launch {
+                delay(RUN_LOG_QUERY_DEBOUNCE_MS)
+                refreshRunLogPage()
+            }
+        } else {
+            refreshRunLogPage()
+        }
     }
 
     fun refreshRunLogPage() {
         runLogPageJob?.cancel()
-        _runLogPage.value = RunLogPageUiState(loading = true)
+        // Keep what is on screen while reloading. Replacing it with an empty state made every
+        // refresh - including one per keystroke in the search field - blank the list and flash the
+        // loading state.
+        _runLogPage.value = _runLogPage.value.copy(loading = true, failed = false)
         val filters = _runLogFilters.value
         runLogPageJob = viewModelScope.launch {
             try {
@@ -1451,7 +1444,7 @@ class ActiveAutomationViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _runLogPage.value = _runLogPage.value.copy(loading = false)
+                _runLogPage.value = _runLogPage.value.copy(loading = false, failed = true)
                 events.send(errorMessage(error, R.string.ui_error_run_logs_load))
             }
         }
@@ -2322,6 +2315,8 @@ class ActiveAutomationViewModel(
         }
     }
 }
+
+private const val RUN_LOG_QUERY_DEBOUNCE_MS = 300L
 
 internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
 
