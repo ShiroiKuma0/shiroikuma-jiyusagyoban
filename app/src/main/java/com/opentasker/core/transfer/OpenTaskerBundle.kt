@@ -2,6 +2,7 @@ package com.opentasker.core.transfer
 
 import androidx.room.withTransaction
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
+import com.opentasker.core.capabilities.AutomationInvariantStore
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
@@ -16,6 +17,8 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.model.AutomationInvariant
+import com.opentasker.core.model.AutomationInvariantPolicy
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.model.isValidForContextCount
@@ -68,6 +71,9 @@ data class OpenTaskerBundle(
     /** Optional additive content; empty legacy exports stay byte-compatible with schema 2. */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val blueprints: List<AutomationBlueprint> = emptyList(),
+    /** Optional additive diagnostics policy; it is not consumed by the automation engine. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val invariants: List<AutomationInvariant> = emptyList(),
 )
 
 @Serializable
@@ -139,6 +145,7 @@ data class BundleImportReport(
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
     val importedBlueprints: Int = 0,
+    val importedInvariants: Int = 0,
 )
 
 object OpenTaskerBundleCodec {
@@ -171,6 +178,7 @@ object OpenTaskerBundleCodec {
         name: String = "OpenTasker Export",
         description: String = "",
         blueprints: List<AutomationBlueprint> = emptyList(),
+        invariants: List<AutomationInvariant> = emptyList(),
     ): OpenTaskerBundle {
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
         // A consumed one-shot is runtime state, not portable configuration. Export its declared
@@ -185,6 +193,8 @@ object OpenTaskerBundleCodec {
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
         val sortedBlueprints = blueprints
             .sortedWith(compareBy<AutomationBlueprint> { it.category.lowercase() }.thenBy { it.title.lowercase() }.thenBy { it.id })
+        val sortedInvariants = AutomationInvariantPolicy.normalize(invariants)
+            .sortedWith(compareBy<AutomationInvariant> { it.name.lowercase() }.thenBy { it.id })
         val sortedProjects = (projects.ifEmpty { listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)) })
             .sortedWith(compareBy<Project> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val capabilityRequirements = capabilityRequirements(sortedTasks)
@@ -209,6 +219,7 @@ object OpenTaskerBundleCodec {
             variables = sortedVariables,
             scenes = sortedScenes,
             blueprints = sortedBlueprints,
+            invariants = sortedInvariants,
         )
         val plan = validate(base)
         return base.copy(
@@ -374,6 +385,14 @@ object OpenTaskerBundleCodec {
 
         duplicateStrings(bundle.blueprints.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
             warnings += "Bundle has duplicate blueprint ids: ${duplicates.joinToString()}."
+        }
+        duplicateLongs(bundle.invariants.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate automation invariant ids: ${duplicates.joinToString()}."
+        }
+        bundle.invariants.forEach { invariant ->
+            AutomationInvariantPolicy.validate(invariant)?.let {
+                warnings += "Invalid automation invariant '${invariant.name}'."
+            }
         }
         bundle.blueprints.forEach { blueprint ->
             if (!blueprint.id.matches(BLUEPRINT_ID_PATTERN) || blueprint.title.isBlank()) {
@@ -620,6 +639,7 @@ class OpenTaskerBundleRepository(
     private val variableRepository: VariableRepository = VariableRepository(db.variableDao()),
     private val blueprintCatalogStore: BlueprintCatalogStore? = null,
     private val blueprintInstallationStore: BlueprintInstallationStore? = null,
+    private val invariantStore: AutomationInvariantStore? = null,
 ) {
     suspend fun planImport(bundle: OpenTaskerBundle): BundleImportPlan {
         val base = OpenTaskerBundleCodec.validate(bundle)
@@ -699,6 +719,7 @@ class OpenTaskerBundleRepository(
         val blueprints = blueprintInstallationStore?.load()
             ?.mapNotNull { installation -> blueprintCatalogStore?.resolve(installation.blueprintId) }
             .orEmpty()
+        val invariants = invariantStore?.load().orEmpty()
 
         return OpenTaskerBundleCodec.sanitizeForExport(
             OpenTaskerBundleCodec.build(
@@ -713,6 +734,7 @@ class OpenTaskerBundleRepository(
                 name = name,
                 description = description,
                 blueprints = blueprints,
+                invariants = invariants,
             ),
             secretVariableNames = variableExport.omittedSecretNames,
             secretVariableValues = variableRepository.decodedForExportRedaction()
@@ -841,6 +863,12 @@ class OpenTaskerBundleRepository(
             importWarnings += "${bundle.blueprints.size} blueprint definition(s) were reviewed and saved; existing instantiated profiles were not overwritten."
         }
 
+        val importableInvariants = AutomationInvariantPolicy.normalize(bundle.invariants)
+        if (importableInvariants.isNotEmpty() && invariantStore != null) {
+            invariantStore.merge(importableInvariants)
+            importWarnings += "${importableInvariants.size} automation invariant(s) were imported and added to local diagnostics policy."
+        }
+
         return BundleImportReport(
             insertedTasks = insertedTasks,
             insertedProfiles = insertedProfiles,
@@ -849,6 +877,7 @@ class OpenTaskerBundleRepository(
             warnings = importWarnings,
             lossyWarnings = lossyWarnings.distinct(),
             importedBlueprints = bundle.blueprints.size,
+            importedInvariants = if (invariantStore == null) 0 else importableInvariants.size,
         )
     }
 

@@ -15,6 +15,7 @@ import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintReport
 import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.capabilities.AutomationLintStrings
+import com.opentasker.core.capabilities.AutomationInvariantStore
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
@@ -38,6 +39,7 @@ import com.opentasker.core.engine.replayHeldExecution
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
@@ -281,11 +283,13 @@ class ActiveAutomationViewModel(
     private val variableRepository = VariableRepository(db.variableDao())
     private val blueprintCatalogStore = BlueprintCatalogStore(appContext)
     private val blueprintInstallationStore = BlueprintInstallationStore(appContext)
+    private val invariantStore = AutomationInvariantStore(appContext)
     private val bundleRepository = OpenTaskerBundleRepository(
         db = db,
         variableRepository = variableRepository,
         blueprintCatalogStore = blueprintCatalogStore,
         blueprintInstallationStore = blueprintInstallationStore,
+        invariantStore = invariantStore,
     )
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val fallbackTaskSettings = FallbackTaskSettings(appContext)
@@ -363,6 +367,13 @@ class ActiveAutomationViewModel(
                 .toImmutableList()
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
+    private val _invariants = MutableStateFlow(invariantStore.load())
+    val invariants: StateFlow<List<AutomationInvariant>> = _invariants.asStateFlow()
+
+    fun updateAutomationInvariants(value: List<AutomationInvariant>) {
+        _invariants.value = invariantStore.save(value)
+    }
 
     val tasks: StateFlow<ImmutableList<Task>> = taskDecodeResults
         .map { results ->

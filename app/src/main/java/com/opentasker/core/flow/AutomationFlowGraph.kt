@@ -8,6 +8,7 @@ import com.opentasker.core.actions.ResolvedActionOutput
 import com.opentasker.core.actions.resolveOutputs
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -112,12 +113,14 @@ object AutomationFlowGraphBuilder {
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
         lintStrings: AutomationLintStrings = AutomationLintStrings.English,
+        invariants: List<AutomationInvariant> = emptyList(),
     ): AutomationFlowGraph = build(
         profile = profile,
         tasksById = tasks.associateBy { it.id },
         strings = strings,
         changedNodeKeys = changedNodeKeys,
         lintStrings = lintStrings,
+        invariants = invariants,
     )
 
     fun build(
@@ -126,6 +129,7 @@ object AutomationFlowGraphBuilder {
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
         lintStrings: AutomationLintStrings = AutomationLintStrings.English,
+        invariants: List<AutomationInvariant> = emptyList(),
     ): AutomationFlowGraph {
         val nodes = mutableListOf<AutomationFlowNode>()
         val edges = mutableListOf<AutomationFlowEdge>()
@@ -209,6 +213,7 @@ object AutomationFlowGraphBuilder {
                 profile,
                 tasksById.values.toList(),
                 strings = lintStrings,
+                invariants = invariants,
             ).forProfile(profile.id),
         )
     }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Automation lint now reports shadowed, unreachable, and action/revert rules, and supports bounded device-state invariants with localized diagnostics, a reusable predicate editor, and optional bundle import/export.
 - Added an opt-in, non-F-Droid release update check that reports newer GitHub releases without downloading or installing them.
 - Added a disabled-by-default, API-36-only AppFunctions prototype that can submit only user-approved task IDs through the existing signature-protected execution boundary.
 - Follow-up audit covered scene editing/runtime, legacy context producers, search/grouping/share dialogs, and widget/quick-settings configuration; no new defect was found, with large-font and inert-history-control follow-ups remaining tracked separately.

@@ -1,6 +1,8 @@
 package com.opentasker.core.capabilities
 
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationInvariant
+import com.opentasker.core.model.InvariantStatePredicate
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -190,6 +192,84 @@ class AutomationLintTest {
         assertEquals(AutomationLintCode.INTER_PROFILE_LOOP, finding.code)
         assertEquals(AutomationLintSeverity.WARNING, finding.severity)
         assertEquals(listOf(1L, 2L), finding.profileIds)
+    }
+
+    @Test
+    fun higherPriorityEquivalentRuleReportsShadowedRule() {
+        val firstTask = settingTask(10, "Bright reader", priority = 5)
+        val secondTask = settingTask(11, "Bright reader fallback", priority = 5)
+        val contexts = listOf(ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.reader")))
+        val first = profile(id = 1, name = "Reader primary", enterTaskId = firstTask.id, contexts = contexts).copy(priority = 10)
+        val second = profile(id = 2, name = "Reader fallback", enterTaskId = secondTask.id, contexts = contexts).copy(priority = 1)
+
+        val finding = AutomationLint.analyze(listOf(first, second), listOf(firstTask, secondTask)).findings
+            .single { it.code == AutomationLintCode.SHADOWED_RULE }
+
+        assertEquals(AutomationLintSeverity.WARNING, finding.severity)
+        assertEquals(listOf(1L, 2L), finding.profileIds)
+        assertTrue(finding.detail.contains("Reader fallback"))
+        assertTrue(finding.suggestedFix.contains("mutually exclusive"))
+    }
+
+    @Test
+    fun missingEnterTaskReportsUnreachableRule() {
+        val profile = profile(
+            id = 1,
+            name = "Missing enter",
+            enterTaskId = 999,
+            contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "open"))),
+        )
+
+        val finding = AutomationLint.analyze(profile, emptyList()).findings.single()
+
+        assertEquals(AutomationLintCode.UNREACHABLE_RULE, finding.code)
+        assertEquals(AutomationLintSeverity.BLOCKING, finding.severity)
+        assertTrue(finding.detail.contains("999"))
+    }
+
+    @Test
+    fun enterAndExitWritesReportActionRevertPair() {
+        val enter = settingTask(10, "Set brightness", priority = 1)
+        val exit = settingTask(11, "Restore brightness", priority = 1)
+        val profile = profile(
+            id = 1,
+            name = "Reader",
+            enterTaskId = enter.id,
+            exitTaskId = exit.id,
+            contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "open"))),
+        )
+
+        val finding = AutomationLint.analyze(profile, listOf(enter, exit)).findings
+            .single { it.code == AutomationLintCode.ACTION_REVERT_PAIR }
+
+        assertEquals(AutomationLintSeverity.WARNING, finding.severity)
+        assertTrue(finding.detail.contains("brightness"))
+    }
+
+    @Test
+    fun enabledProfilesThatCanBreakInvariantAreNamedTogether() {
+        val firstTask = settingTask(10, "Dim reader", priority = 1)
+        val secondTask = settingTask(11, "Dim browser", priority = 1)
+        val first = profile(id = 1, name = "Reader", enterTaskId = firstTask.id, app = "com.example.reader")
+        val second = profile(id = 2, name = "Browser", enterTaskId = secondTask.id, app = "com.example.browser")
+        val invariant = AutomationInvariant(
+            id = 41,
+            name = "Keep display bright while charging",
+            guard = InvariantStatePredicate(key = "charging", value = "true"),
+            forbiddenWriteKey = "brightness",
+        )
+
+        val finding = AutomationLint.analyze(
+            listOf(first, second),
+            listOf(firstTask, secondTask),
+            invariants = listOf(invariant),
+        ).findings.single { it.code == AutomationLintCode.INVARIANT_VIOLATION }
+
+        assertEquals(AutomationLintSeverity.BLOCKING, finding.severity)
+        assertEquals(listOf(1L, 2L), finding.profileIds)
+        assertEquals(41L, finding.invariantId)
+        assertTrue(finding.detail.contains("Reader"))
+        assertTrue(finding.detail.contains("Browser"))
     }
 
     private fun settingTask(id: Long, name: String, priority: Int): Task = Task(

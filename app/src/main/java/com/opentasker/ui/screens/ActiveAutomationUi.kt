@@ -263,7 +263,7 @@ fun ActiveAutomationUi(
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
-    val tasks by viewModel.tasks.collectAsState()
+    val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val projects by viewModel.projects.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
@@ -839,9 +839,9 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
                 profiles = projectProfiles,
-                tasks = projectTasks,
+                tasks = projectTasks, invariants = invariants,
                 contentPadding = innerPadding, changedNodeKeys = highlightedFlowNodeKeys,
-                onNodeTargetSelected = openFlowTarget,
+                onNodeTargetSelected = openFlowTarget, onUpdateInvariants = viewModel::updateAutomationInvariants,
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
                     if (profile != null) {

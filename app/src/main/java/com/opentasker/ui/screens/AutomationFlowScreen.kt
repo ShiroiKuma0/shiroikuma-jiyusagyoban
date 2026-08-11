@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.AutomationLintSeverity
+import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
@@ -67,6 +68,7 @@ import com.opentasker.core.flow.AutomationFlowNodeKind
 import com.opentasker.core.flow.AutomationFlowTarget
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.AutomationInvariant
 
 @Composable
 fun AutomationFlowScreen(
@@ -77,12 +79,22 @@ fun AutomationFlowScreen(
     onAddContext: (Long) -> Unit = {},
     onAddAction: (Long) -> Unit = {},
     changedNodeKeys: Set<String> = emptySet(),
+    invariants: List<AutomationInvariant> = emptyList(),
+    onUpdateInvariants: (List<AutomationInvariant>) -> Unit = {},
 ) {
     val resources = LocalContext.current.resources
-    val graphs = remember(profiles, tasks, resources, changedNodeKeys) {
+    val lintStrings = AutomationLintStrings.from(resources)
+    val lintReport = remember(profiles, tasks, invariants, resources) {
+        AutomationLint.analyze(
+            profiles = profiles,
+            tasks = tasks,
+            strings = lintStrings,
+            invariants = invariants,
+        )
+    }
+    val graphs = remember(profiles, tasks, resources, changedNodeKeys, invariants) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
-        val lintStrings = AutomationLintStrings.from(resources)
         profiles.map {
             profile -> AutomationFlowGraphBuilder.build(
                 profile = profile,
@@ -90,6 +102,7 @@ fun AutomationFlowScreen(
                 strings = strings,
                 changedNodeKeys = changedNodeKeys,
                 lintStrings = lintStrings,
+                invariants = invariants,
             )
         }
     }
@@ -111,6 +124,13 @@ fun AutomationFlowScreen(
                 profiles = profiles,
                 tasks = tasks,
                 graphs = graphs,
+            )
+        }
+        item {
+            AutomationInvariantPanel(
+                invariants = invariants,
+                report = lintReport,
+                onUpdate = onUpdateInvariants,
             )
         }
         items(graphs, key = { it.profileId }) { graph ->
