@@ -8,6 +8,55 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.84.2026-08-11.g5c01f064+012 — 2026-08-11
+
+**Upstream sync: 11 commits, 71 files. Upstream did not move its own version literals**, so the pin
+alone advances: `.2026-08-11.g08847560` → `.2026-08-11.g5c01f064`. The build counter therefore keeps
+running — `+011` → `+012`, `versionCode 860012` — because `versionCode` is the only thing an installer
+compares, and resetting `N` while `appVersionCode` stands still would make the sync a downgrade.
+
+**What landed from upstream.** Elevated actions now run through a versioned Shizuku AIDL user service
+that rechecks exact argv inside the privileged process and unbinds on teardown; the fork takes the
+service and its `reboot` path, which previously just refused. UnifiedPush registration became a real
+distributor-neutral connector — discovery, SDK-versioned identity registration, RFC 8291 decryption,
+endpoint persistence and delivery acknowledgement — with ntfy's standard JSON reaching `event=push`
+and the legacy token broadcast still accepted. Scene-canvas elements announce their type, label,
+position, size and selection state with custom select/nudge/resize actions, user-facing enum and error
+copy moved behind resources, and the locale gate now rejects an empty locale directory by name instead
+of skipping it.
+
+**The action and context pickers gained search — on the fork's own labels.** Upstream's search filters
+a localized triple it builds by resolving three `@StringRes` ids per item. The fork keeps names,
+descriptions and categories as inline strings on `ActionMetadata` itself — some of them Japanese, and
+far more actions than upstream ships — so the filter runs straight over the metadata instead, matching
+display name, description or stable id (`file.read` finds the action as readily as "Read file" does).
+Both catalogues are built once inside `remember` rather than rebuilt on every keystroke.
+
+**Upstream deleted two sealed members the fork still uses, and git applied it cleanly.** Making
+action and context removal immediate-and-undoable let upstream drop `DeleteTarget.ActionTarget` and
+`ContextTarget`. The fork never touched those lines, so the deletion was not a conflict — it simply
+landed, in a tree whose `ActiveAutomationUi` still routes both removals through the confirmation
+dialog. Both members are restored with their exhaustive `when` branches. A clean merge is not evidence
+that nothing was lost.
+
+**The fork's own privileged actions stand.** Upstream rerouted airplane mode, mobile data, screen-off,
+wake and screenshot through its new user service. The fork's implementations are the tested ones and
+each is deliberately different: screen-off prefers the accessibility global action so it sleeps the
+screen without locking the device, the airplane toggle keeps its best-effort `AIRPLANE_MODE` broadcast
+because that broadcast is system-only and its failure used to fail an action whose setting had already
+applied, mobile data uses `svc data` and needs no phone-state permission to read its own state, and
+the screenshot stores the path it wrote. Four upstream UX changes are **declined** for now, each
+entangled with a screen the fork has rewritten: undoable deletions, the new *Settings* destination
+split out of Setup, the back-to-Profiles handler, and the IO-backed setup ViewModel.
+
+**The suite says what the fork actually is.** Upstream swapped its "genuinely unsupported" exemplar
+from `reboot` to `app.kill`, its polarity being the opposite of ours — the fork drives `app.kill`
+through Shizuku, and keeps `reboot` unsupported because shell access is not enough for it and it wants
+device-owner privilege. Three share/bundle capability tests are reverted to `reboot` with that reason
+recorded inline. `UiEnumLabels` learned the fork's `PROGRESS` and `METEOR` scene element types and
+reads action names from the metadata; the picker-search test was rewritten for the fork's shape, and
+the two tests covering declined features were dropped. 1391 tests pass.
+
 ## 0.2.84.2026-08-11.g08847560+011 — 2026-08-11
 
 **The 体感 rating was a night out of step, and 運動と回復 could not show it either way.**
