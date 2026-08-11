@@ -42,7 +42,7 @@ fun ProjectScopeBar(
     projects: List<Project>,
     selectedProjectId: Long?,
     onSelectProject: (Long?) -> Unit,
-    onCreateProject: (String) -> Unit,
+    onCreateProject: (String, onCreated: () -> Unit) -> Unit,
     onRenameProject: (Project, String) -> Unit,
     onReorderProject: (Project, Int) -> Unit,
     onDeleteProject: (Project, Project) -> Unit,
@@ -104,7 +104,7 @@ fun ProjectScopeBar(
 private fun ProjectManagerDialog(
     projects: List<Project>,
     onDismiss: () -> Unit,
-    onCreateProject: (String) -> Unit,
+    onCreateProject: (String, onCreated: () -> Unit) -> Unit,
     onRenameProject: (Project, String) -> Unit,
     onReorderProject: (Project, Int) -> Unit,
     onDeleteProject: (Project, Project) -> Unit,
@@ -131,8 +131,10 @@ private fun ProjectManagerDialog(
                 )
                 Button(
                     onClick = {
-                        onCreateProject(newName)
-                        newName = ""
+                        // The field is cleared only once the project exists: a duplicate name is
+                        // rejected by the view model, and wiping the input first left the user
+                        // retyping a name they could no longer see.
+                        onCreateProject(newName) { newName = "" }
                     },
                     enabled = newName.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
