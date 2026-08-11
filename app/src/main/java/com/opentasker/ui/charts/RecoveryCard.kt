@@ -64,8 +64,13 @@ fun RecoveryCard(
     awakeMinutes: Int?,
     regime: RecoveryRegime.Regime?,
     feltToday: Int?,
+    /** `yyyyMMdd` start date of the night [feltToday] belongs to; the row names it rather than "today". */
+    feltNight: Long?,
     feltEnabled: Boolean,
     onFelt: (Int) -> Unit,
+    /** How much is behind the register, so the way in can say so rather than merely exist. */
+    registerNights: Int,
+    registerRated: Int,
     onOpenRegister: () -> Unit,
     onClick: () -> Unit,
 ) {
@@ -113,16 +118,17 @@ fun RecoveryCard(
             peak30Cadence?.let { PeakCadenceRow(it, peakCadenceDay) }
             // The way into the register. It sits under the load block because that is the number it
             // explains: the weekly figure is a total, and this is what it is made of.
-            Text(
-                BandText.registerOpen[LocalBandLanguage.current],
-                style = MaterialTheme.typography.labelSmall,
-                color = ChartPalette.HEART_RATE,
-                modifier = Modifier.clickable(onClick = onOpenRegister).padding(vertical = 2.dp),
-            )
+            //
+            // A full-width pill carrying its own counts, not a line of link text. As a caption it was
+            // the smallest thing on a long card and read as a footnote, so the whole night-by-night
+            // record — every rating, every measured value — sat behind something easy to never
+            // notice. The counts are the point: they say there IS something in there.
+            // (白い熊, 2026-08-11: "it should be prominent".)
+            RegisterButton(registerNights, registerRated, onOpenRegister)
             // Regime notes go LAST and in amber: they qualify everything above them, so they read
             // as a caveat on the card rather than as another marker on it.
         regime?.let { RegimeNotes(it) }
-        if (feltEnabled) FeltRow(feltToday, onFelt)
+        if (feltEnabled) FeltRow(feltToday, feltNight, onFelt)
     }
 }
 
@@ -383,13 +389,14 @@ private fun LoadRow(load: RecoveryBuild.LoadReading) {
  * because a prompt that interrupts is a prompt that gets dismissed.
  */
 @Composable
-private fun FeltRow(feltToday: Int?, onFelt: (Int) -> Unit) {
+private fun FeltRow(feltToday: Int?, feltNight: Long?, onFelt: (Int) -> Unit) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
+    val night = feltNight?.let { nightDateLabel(it) } ?: "—"
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            feltToday?.let { BandText.recoveryAskDone[lang].format(feltLabel(it)[lang]) }
-                ?: BandText.recoveryAsk[lang],
+            feltToday?.let { BandText.recoveryAskDone[lang].format(night, feltLabel(it)[lang]) }
+                ?: BandText.recoveryAsk[lang].format(night),
             style = MaterialTheme.typography.bodyMedium,
             color = if (feltToday == null) sectionInk else sectionNote,
         )
@@ -448,6 +455,94 @@ fun loadBandLabel(b: LoadBand): Loc = when (b) {
     LoadBand.MAINTAINING -> BandText.loadMaintaining
     LoadBand.PRODUCTIVE -> BandText.loadProductive
     LoadBand.OVERREACHING -> BandText.loadOverreaching
+}
+
+/** The way into 運動と回復: full width, its own counts, unmissable. */
+@Composable
+private fun RegisterButton(nights: Int, rated: Int, onClick: () -> Unit) {
+    val lang = LocalBandLanguage.current
+    val accent = ChartPalette.HEART_RATE
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(accent.copy(alpha = 0.16f))
+            .border(1.5.dp, accent, RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                BandText.registerOpen[lang],
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = accent,
+            )
+            Text(
+                BandText.registerOpenCounts[lang].format(nights, rated),
+                style = MaterialTheme.typography.bodyMedium,
+                color = sectionNote,
+            )
+        }
+        Text(
+            "▸",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+        )
+    }
+}
+
+/** `yyyyMMdd` → `2026-08-10`, the shape every other dated row on this card prints. */
+fun nightDateLabel(key: Long): String =
+    "%04d-%02d-%02d".format(key / 10_000L, (key / 100L) % 100L, key % 100L)
+
+/**
+ * The 1–5 rating as one colour, so a run of good nights and a run of bad ones are different shapes
+ * on the page rather than different digits to read. See [ChartPalette.SCALE] for the scale itself.
+ */
+fun feltColor(rating: Int): Color = ChartPalette.scale(rating)
+
+/** How one graded value is painted: the fill behind it, its outline, and the ink on top. */
+data class ScaleSkin(val fill: Color, val edge: Color?, val ink: Color)
+
+/**
+ * One appearance for every graded value, so a calendar tile and a table cell showing the same step
+ * are the same object twice and not two things that happen to share a hue.
+ *
+ * Step 1 is deliberately not "more red". Red and orange are neighbours on any hue wheel, so at chip
+ * size they separated only by hue — the one cue that fails a red-green reader and a glance alike. The
+ * worst step therefore gets a different LIGHTNESS and a different ink: dark blood, pale ring, pale
+ * numeral. (白い熊's own suggestion, 2026-08-11.)
+ */
+fun scaleSkin(step: Int?, neutral: Color, neutralInk: Color): ScaleSkin = when (step) {
+    null -> ScaleSkin(neutral, null, neutralInk)
+    1 -> ScaleSkin(Color(0xFF4E100D), Color(0xFFFFDCD8), Color(0xFFFFDCD8))
+    else -> ChartPalette.scale(step).let { ScaleSkin(it.copy(alpha = 0.30f), it, it) }
+}
+
+/**
+ * `20260810` → `2026-08-10 (Mon)` / `2026-08-10（月）`.
+ *
+ * The year is spelled out and the weekday named because these are dates 白い熊 reads against memory —
+ * "which night was that" is answered by the day of the week far more often than by the number, and a
+ * bare `08-10` answers neither on its own.
+ */
+fun nightDateFull(key: Long, lang: BandLanguage): String {
+    val date = runCatching {
+        java.time.LocalDate.of(
+            (key / 10_000L).toInt(),
+            ((key / 100L) % 100L).toInt(),
+            (key % 100L).toInt(),
+        )
+    }.getOrNull() ?: return nightDateLabel(key)
+    val dow = date.dayOfWeek.value // 1 = Monday
+    return if (lang == BandLanguage.EN) {
+        "%s (%s)".format(date, listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")[dow - 1])
+    } else {
+        "%s（%s）".format(date, listOf("月", "火", "水", "木", "金", "土", "日")[dow - 1])
+    }
 }
 
 fun feltLabel(n: Int): Loc = when (n) {

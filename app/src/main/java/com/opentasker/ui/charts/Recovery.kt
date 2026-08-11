@@ -88,6 +88,42 @@ data class MarkerReading(
             RecoveryMarker.FELT -> band == RecoveryBand.LOW
             RecoveryMarker.TEMPERATURE -> band == RecoveryBand.HIGH
         }
+
+    /**
+     * This reading on the shared 1–5 scale, or null when there is nothing to grade.
+     *
+     * 3 is inside the usual range; 2 and 1 are outside it in the direction that means worse, 4 and 5
+     * outside it in the direction that means better, with the far step reached at twice the band's own
+     * half-width. It is a re-expression of the banding that is already computed and NOT a new statistic:
+     * the same baseline, the same half-width, the same directions [adverse] uses. Nothing is averaged
+     * and no threshold is invented — the scale only says which side of the band the value fell, and
+     * how far.
+     *
+     * Temperature never reaches 4 or 5. It is banded one-sided because only elevation is meaningful at
+     * the wrist; a cool night is unremarkable, not good, and colouring it green would assert something
+     * the measurement cannot support.
+     */
+    val scaleStep: Int?
+        get() {
+            val v = value ?: return null
+            val b = baseline ?: return null
+            val halfWidth = usualHi?.minus(b)?.takeIf { it > 0 } ?: return null
+            if (band == RecoveryBand.UNKNOWN) return null
+            val deviations = (v - b) / halfWidth
+            if (deviations in -1.0..1.0) return 3
+            val worse = when (marker) {
+                RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE -> deviations > 0
+                RecoveryMarker.SLEEP, RecoveryMarker.FELT -> deviations < 0
+            }
+            val far = kotlin.math.abs(deviations) >= 2.0
+            if (!worse && marker == RecoveryMarker.TEMPERATURE) return 3
+            return when {
+                worse && far -> 1
+                worse -> 2
+                far -> 5
+                else -> 4
+            }
+        }
 }
 
 /** How much history the baselines rest on — and therefore what may honestly be displayed. */
