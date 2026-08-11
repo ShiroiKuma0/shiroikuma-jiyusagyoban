@@ -1036,7 +1036,7 @@ fun ActiveAutomationUi(
         OpenTaskerBundleTextImportDialog(
             text = bundleTextImportDraft,
             busy = openTaskerBundleBusy,
-            onTextChanged = { bundleTextImportDraft = it },
+            onTextChanged = { bundleTextImportDraft = it.take(MAX_PASTED_BUNDLE_CHARS) },
             onDismiss = { if (!openTaskerBundleBusy) showBundleTextImportDialog = false },
             onConfirm = {
                 showBundleTextImportDialog = false

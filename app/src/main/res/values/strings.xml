@@ -20,6 +20,7 @@
     <string name="error_prefix">Error: %1$s</string>
     <string name="success_prefix">Success: %1$s</string>
     <string name="widget_task_description">Run an OpenTasker task with one tap</string>
+    <string name="widget_task_missing">Task deleted — tap to choose another</string>
 
     <!-- Navigation -->
     <string name="locale_select_task_title">Select task for Locale plugin</string>
