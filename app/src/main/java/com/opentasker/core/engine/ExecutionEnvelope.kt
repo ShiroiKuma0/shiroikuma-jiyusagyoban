@@ -19,6 +19,7 @@ enum class ExecutionProducer(val wireValue: String) {
     EXTERNAL("external"),
     LOCALE_PLUGIN("locale_plugin"),
     SCENE_OVERLAY("scene_overlay"),
+    APP_FUNCTION("app_function"),
     WORKER("worker"),
     OTHER("other"),
     ;
@@ -37,6 +38,8 @@ enum class ExecutionProducer(val wireValue: String) {
                     value.equals("locale_plugin", ignoreCase = true) -> LOCALE_PLUGIN
                 value.equals("Scene overlay", ignoreCase = true) ||
                     value.equals("scene_overlay", ignoreCase = true) -> SCENE_OVERLAY
+                value.equals("App function", ignoreCase = true) ||
+                    value.equals("app_function", ignoreCase = true) -> APP_FUNCTION
                 value.equals("External intent", ignoreCase = true) -> EXTERNAL
                 value.equals("Worker", ignoreCase = true) -> WORKER
                 else -> OTHER
