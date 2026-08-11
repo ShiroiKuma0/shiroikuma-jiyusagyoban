@@ -36,6 +36,7 @@ fun SceneLibraryScreen(
     onDeleteScene: (Scene) -> Unit,
     onDuplicateScene: (Scene) -> Unit = {},
     contentPadding: PaddingValues,
+    contentLoaded: Boolean = true,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -95,6 +96,10 @@ fun SceneLibraryScreen(
         )
     }
 
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
     if (sortedScenes.isEmpty()) {
         SceneEmptyState(
             contentPadding = contentPadding,

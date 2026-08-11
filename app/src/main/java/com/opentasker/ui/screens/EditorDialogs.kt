@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -59,6 +60,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -878,6 +880,26 @@ internal fun profileOverflowPolicyDescription(policy: ProfileOverflowPolicy): St
         ProfileOverflowPolicy.SILENT -> R.string.profile_overflow_silent_body
     },
 )
+
+/**
+ * Shown while the first database snapshot is still in flight.
+ *
+ * An empty list and an unread list look identical to a screen, so without this the first-run empty
+ * state renders for the first frames of every cold start, including for users who have data.
+ */
+@Composable
+internal fun ContentLoadingState(contentPadding: PaddingValues) {
+    val description = stringResource(R.string.ui_loading_content)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(contentPadding)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator()
+    }
+}
 
 @Composable
 internal fun EmptyState(
