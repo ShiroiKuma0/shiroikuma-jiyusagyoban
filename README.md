@@ -263,11 +263,21 @@ All dependency versions are centralized in `gradle/libs.versions.toml`.
 
 `data.read` supports bounded HTML extraction with CSS selectors and normalized element text. Parsing is local-only and never fetches linked resources; the pinned jsoup parser is MIT-licensed and included in the F-Droid-compatible dependency set.
 
-See [ROADMAP.md](ROADMAP.md) for the full backlog. Key remaining work:
+Key remaining work:
 
 - Broad device-verified background geofence reliability evidence
 - API 37 platform readiness pass (FGS, predictive back, large-screen QA)
 - Device-run performance evidence is collected locally through the checked-in Macrobenchmark and Baseline Profile harness
+
+## Non-goals
+
+These are settled, and each one is a deliberate trade rather than a gap:
+
+- **No accessibility-service automation.** No UI scraping and no synthetic taps. Triggers keep working when an accessibility service is disabled by policy, by Advanced Protection, or by an OEM, and every action can honestly declare what it will do.
+- **No cloud sync, account, or remote execution.** Automations are local. This is what makes "no account anywhere" a fact rather than a slogan.
+- **No URL or network import for shared profiles.** An imported bundle is untrusted input that can request capabilities; the local review step is the control.
+- **No Google Play Services dependency**, including for geofencing — geofences are evaluated in-app from platform location fixes.
+- **No crash reporting or analytics**, self-hosted or otherwise. The redacted diagnostic export you choose to share is the only way anything leaves the device.
 
 ---
 
@@ -277,7 +287,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Contributing
 
-Issues and pull requests welcome. See [ROADMAP.md](ROADMAP.md) for planned features.
+Issues and pull requests welcome. Open an issue to discuss a feature before building it — the Non-goals above are settled, and everything else is fair game.
 
 ### Translations
 
