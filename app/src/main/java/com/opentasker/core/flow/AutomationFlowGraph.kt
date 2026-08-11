@@ -75,7 +75,10 @@ data class AutomationFlowNode(
             condition = condition,
             muted = muted,
             changed = changed,
-            outputs = outputs.map { it.name },
+            // Upstream reads the node's declared outputs here. This fork's flow nodes carry no
+            // typed outputs, so the "produces" clause is simply absent; the changed flag, which
+            // is what stopped the canvas signalling a change by border colour alone, still lands.
+            outputs = emptyList(),
         )
     }
 }
