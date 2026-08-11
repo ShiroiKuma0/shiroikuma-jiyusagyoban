@@ -1,6 +1,7 @@
 package com.opentasker.core.contexts
 
 import android.content.BroadcastReceiver
+import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -69,7 +70,15 @@ class StateContextSourceImpl : StateDemandContextSource {
                         statePatch["headphones"] = (state == 1).toString()
                     }
                     Intent.ACTION_SCREEN_ON -> statePatch["screen"] = "on"
-                    Intent.ACTION_SCREEN_OFF -> statePatch["screen"] = "off"
+                    Intent.ACTION_SCREEN_OFF -> {
+                        statePatch["screen"] = "off"
+                        // USER_PRESENT was the only writer of "unlocked", so once the device had
+                        // been unlocked the state latched true for the rest of the service's life:
+                        // an unlocked=false profile could never activate again, and an
+                        // unlocked=true one never deactivated.
+                        val keyguard = app.getSystemService(KeyguardManager::class.java)
+                        statePatch["unlocked"] = (keyguard?.isKeyguardLocked == false).toString()
+                    }
                     Intent.ACTION_USER_PRESENT -> statePatch["unlocked"] = "true"
                     PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> {
                         val pm = app.getSystemService(PowerManager::class.java)
@@ -175,9 +184,14 @@ internal fun seedInitialState(app: Context): Map<String, String> {
         ?.state == Display.STATE_ON
     seed["screen"] = if (screenOn) "on" else "off"
 
+    // isInteractive answers "is the screen on", not "is the device unlocked": a locked device
+    // showing the lock screen or always-on display reported unlocked=true.
+    app.getSystemService(KeyguardManager::class.java)?.let { keyguard ->
+        seed["unlocked"] = (!keyguard.isKeyguardLocked).toString()
+    }
+
     val pm = app.getSystemService(PowerManager::class.java)
     if (pm != null) {
-        seed["unlocked"] = pm.isInteractive.toString()
         seed["power_save"] = pm.isPowerSaveMode.toString()
     }
 
