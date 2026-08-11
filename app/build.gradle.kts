@@ -372,6 +372,7 @@ dependencies {
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.aidl)
     implementation(libs.shizuku.provider)
+    implementation(libs.unifiedpush.connector)
     baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)

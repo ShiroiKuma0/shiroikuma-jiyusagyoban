@@ -10,14 +10,19 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * The app-owned boundary for a de-googled push distributor.
  *
- * A UnifiedPush distributor can forward its delivery callback as an explicit broadcast using this
- * contract. The receiver authenticates the per-install token before this bus sees the payload.
- * Message content is intentionally not copied into [ContextEvent.metadata]; event filters can
- * match the topic, title, event ID, and payload size without putting a remote message in logs.
+ * The official UnifiedPush service and the legacy explicit-broadcast receiver publish through this
+ * boundary. The legacy receiver authenticates the per-install token before this bus sees its
+ * payload; the official connector authenticates and decrypts its bytes message first. Message
+ * content is intentionally not copied into [ContextEvent.metadata]; event filters can match the
+ * topic, title, event ID, and payload size without putting a remote message in logs.
  */
 object PushContextEvents {
     const val ACTION_PUSH_EVENT = "com.opentasker.action.PUSH_EVENT"
@@ -32,6 +37,8 @@ object PushContextEvents {
     const val MAX_EVENT_ID_CHARS = 128
     const val MAX_TITLE_CHARS = 160
     const val MAX_MESSAGE_BYTES = 8 * 1024
+    /** AND_3.1.0 bounds the encrypted UnifiedPush bytes message at 4096 bytes. */
+    const val MAX_UNIFIED_PUSH_MESSAGE_BYTES = 4 * 1024
     const val PENDING_PULSE_REPLAY_MS = 30_000L
 
     private val pushEvents = MutableSharedFlow<ContextEvent>(extraBufferCapacity = 32)
@@ -79,6 +86,38 @@ object PushContextEvents {
         nowMs: Long = System.currentTimeMillis(),
     ): Boolean {
         val event = parseDelivery(delivery, expectedToken, nowMs) ?: return false
+        return publishEvent(event, nowMs)
+    }
+
+    /**
+     * Parses the standard ntfy/UnifiedPush JSON bytes message after the connector has decrypted
+     * it. The connector has already authenticated the distributor and acknowledged the message;
+     * this method only applies OpenTasker's payload contract and event safeguards.
+     */
+    fun publishUnifiedPushMessage(
+        content: ByteArray,
+        nowMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        val event = parseUnifiedPushMessage(content, nowMs) ?: return false
+        return publishEvent(event, nowMs)
+    }
+
+    fun parseUnifiedPushMessage(
+        content: ByteArray,
+        nowMs: Long = System.currentTimeMillis(),
+    ): ContextEvent? {
+        if (content.isEmpty() || content.size > MAX_UNIFIED_PUSH_MESSAGE_BYTES) return null
+        val root = runCatching {
+            Json.parseToJsonElement(String(content, StandardCharsets.UTF_8))
+        }.getOrNull() as? JsonObject ?: return null
+        val topic = root.stringValue("topic") ?: return null
+        val eventId = root.stringValue("id", "event_id", "eventId") ?: return null
+        val title = root.stringValue("title").orEmpty()
+        val message = root.stringValue("message", "body").orEmpty()
+        return parseFields(topic, eventId, title, message, nowMs)
+    }
+
+    private fun publishEvent(event: ContextEvent, nowMs: Long): Boolean {
         val dedupeKey = "${event.metadata["topic"]}\u0000${event.metadata["eventId"]}"
         pruneSeen(nowMs)
         if (seenEventIds.putIfAbsent(dedupeKey, nowMs) != null) return false
@@ -113,10 +152,19 @@ object PushContextEvents {
         nowMs: Long = System.currentTimeMillis(),
     ): ContextEvent? {
         if (expectedToken.isBlank() || !constantTimeEquals(delivery.token, expectedToken)) return null
-        val topic = delivery.topic.trim()
-        val eventId = delivery.eventId.trim()
-        val title = sanitizeText(delivery.title, MAX_TITLE_CHARS)
-        val message = delivery.message
+        return parseFields(delivery.topic, delivery.eventId, delivery.title, delivery.message, nowMs)
+    }
+
+    private fun parseFields(
+        rawTopic: String,
+        rawEventId: String,
+        rawTitle: String,
+        message: String,
+        nowMs: Long,
+    ): ContextEvent? {
+        val topic = rawTopic.trim()
+        val eventId = rawEventId.trim()
+        val title = sanitizeText(rawTitle, MAX_TITLE_CHARS)
         if (topic.isBlank() || topic.length > MAX_TOPIC_CHARS) return null
         if (eventId.isBlank() || eventId.length > MAX_EVENT_ID_CHARS) return null
         if (message.toByteArray(StandardCharsets.UTF_8).size > MAX_MESSAGE_BYTES) return null
@@ -129,6 +177,11 @@ object PushContextEvents {
             nowMs = nowMs,
         )
     }
+
+    private fun JsonObject.stringValue(vararg names: String): String? =
+        names.asSequence()
+            .mapNotNull { name -> (this[name] as? JsonPrimitive)?.contentOrNull }
+            .firstOrNull()
 
     fun buildEvent(
         topic: String,

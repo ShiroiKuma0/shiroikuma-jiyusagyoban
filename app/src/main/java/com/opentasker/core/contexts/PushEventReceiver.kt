@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.opentasker.core.logging.AppLogger
 
-/** Receives an explicit, token-authenticated delivery from a UnifiedPush distributor adapter. */
+/** Receives the legacy explicit, token-authenticated delivery envelope. */
 class PushEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val accepted = PushContextEvents.publishFromIntent(
