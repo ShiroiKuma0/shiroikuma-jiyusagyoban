@@ -2,7 +2,12 @@ package com.opentasker.ui.screens
 
 import androidx.annotation.StringRes
 import com.opentasker.app.R
+import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.storage.RunLogQuery
+import com.opentasker.core.storage.RunLogRetentionPolicy
+import com.opentasker.core.storage.RunLogSnapshot
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import com.opentasker.core.storage.RunLogStatusQuery
 import com.opentasker.core.storage.escapeRunLogLikeQuery
 
@@ -43,4 +48,25 @@ fun RunLogFilterState.toStorageQuery(nowMillis: Long = System.currentTimeMillis(
     taskId = taskId,
     minimumTimestamp = date.ageMillis?.let { nowMillis - it },
     escapedSearch = escapeRunLogLikeQuery(query),
+)
+
+data class RunLogPageUiState(
+    val entries: ImmutableList<RunLogEntry> = persistentListOf(),
+    val totalCount: Int = 0,
+    val hasMore: Boolean = false,
+    val loading: Boolean = false,
+    /**
+     * Set when the last load failed. Without it a failed refresh was indistinguishable from an
+     * empty result - the screen showed "no runs match" and the only report was a 4-second
+     * snackbar - so the reader concluded their filters were wrong rather than that the read broke.
+     */
+    val failed: Boolean = false,
+    internal val snapshot: RunLogSnapshot? = null,
+)
+
+data class RunLogRetentionPreview(
+    val policy: RunLogRetentionPolicy,
+    val storedCount: Int,
+    val prunableCount: Int,
+    val oldestTimestamp: Long?,
 )
