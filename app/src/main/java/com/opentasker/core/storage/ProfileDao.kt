@@ -152,6 +152,22 @@ interface ProfileDao {
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
     @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
+
+    /**
+     * Case-insensitive name lookup for callers that must not load the whole table — notably the
+     * exported broadcast target, which answers inside a bounded `goAsync()` window.
+     *
+     * `COLLATE NOCASE` folds ASCII only, which is narrower than Kotlin's
+     * `String.equals(ignoreCase = true)`. That is the deliberate trade: two profile names that
+     * differ only by the case of a non-ASCII letter are treated as distinct here.
+     */
+    @Query("SELECT * FROM profiles WHERE name = :name COLLATE NOCASE LIMIT 1")
+    suspend fun getByNameIgnoreCase(name: String): ProfileEntity?
+
+    @Query("SELECT COUNT(*) FROM profiles") suspend fun countAll(): Int
+
+    @Query("SELECT COUNT(*) FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
+    suspend fun countEnabled(): Int
     @Query("SELECT * FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
     suspend fun getAllEnabled(): List<ProfileEntity>
     @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>

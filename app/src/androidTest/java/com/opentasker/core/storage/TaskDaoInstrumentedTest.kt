@@ -7,8 +7,10 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.system.measureTimeMillis
 
 @RunWith(AndroidJUnit4::class)
 class TaskDaoInstrumentedTest {
@@ -44,6 +46,43 @@ class TaskDaoInstrumentedTest {
             assertNotNull(result)
             assertEquals("Beta", result!!.name)
             assertNull(dao.getByName("Gamma"))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun boundedLookupsAnswerFromTheDatabaseNotTheWholeTable() = runBlocking {
+        val db = buildDb()
+        try {
+            val dao = db.taskDao()
+            repeat(500) { index ->
+                dao.insert(
+                    TaskEntity(
+                        name = "Task $index",
+                        priority = 0,
+                        collisionMode = "ABORT_NEW",
+                        actionsJson = "[]",
+                    ),
+                )
+            }
+            assertEquals(500, dao.countAll())
+
+            // The exported broadcast target resolves names case-insensitively; the query must do
+            // that itself rather than loading every row and folding case in Kotlin.
+            val matched = dao.getByNameIgnoreCase("tASK 499")
+            assertNotNull(matched)
+            assertEquals("Task 499", matched!!.name)
+            assertNull(dao.getByNameIgnoreCase("Task 500"))
+
+            val elapsedMs = measureTimeMillis {
+                repeat(50) {
+                    dao.countAll()
+                    dao.getByNameIgnoreCase("Task 250")
+                }
+            }
+            // 100 bounded queries over 500 rows must stay far inside the ~10s goAsync() budget.
+            assertTrue("100 bounded lookups took ${elapsedMs}ms", elapsedMs < 2_000)
         } finally {
             db.close()
         }
