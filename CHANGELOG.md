@@ -462,6 +462,15 @@ Premium UX polish pass.
 - **Variables**: upgraded the Variables tab into a summary-driven variable vault with metrics, clear search, polished empty states, consistent cards, and explicit sensitive-value masking labels.
 - **Design system**: added reusable screen spacing and opacity tokens to reduce hardcoded visual decisions across Compose surfaces.
 
+## v0.2.70 - 2026-06-16
+
+Profile organization and diagnostic sharing.
+
+- **Profile groups**: profiles carry an optional group, set from a new editor field, shown as a pill badge on profile cards and offered as filter chips in the profile list once any group exists. Room migration v4→v5 adds the column, and the field carries through JSON export/import.
+- **Diagnostic share**: the Run Log summary card can share a redacted diagnostic bundle — app version, device info, recent run logs, and permission state — through the Android share sheet, with regression coverage for the redaction.
+- **Action guard coverage**: missing-argument validation tests for `ReadFile`, `WriteFile`, `PlaySound`, `LaunchApp`, `SetVariable`, and `SayAction`'s text length cap, plus the expanded `OpenUrl` scheme allowlist (`tel`, `mailto`, `geo`, `data`, `blob`).
+- **Supply chain**: pinned the then-current GitHub Actions from mutable `v4` tags to full commit SHAs.
+
 ## v0.2.69 - 2026-06-16
 
 Locale condition plugin context UX (N7).
@@ -508,6 +517,24 @@ Deep engineering, security, and UX audit pass.
 - **UX**: added `contentDescription` to navigation bar icons for screen reader accessibility.
 - **Design system**: added `Radii.xxl` (18dp) token and `SemanticColor.warningDark`/`warningLight` to the design system. Replaced ~11 hardcoded `RoundedCornerShape(18.dp)` instances across all screens with the design token.
 
+## v0.2.66 - 2026-06-15
+
+Shell navigation and scene control polish.
+
+- Reworked the app shell's navigation surface and the scene library's control layout and state handling.
+
+## v0.2.65 - 2026-06-15
+
+Scene editor state and destructive affordances.
+
+- Clarified scene editor state transitions and destructive-action affordances; aligned the Variables surface with the same treatment.
+
+## v0.2.64 - 2026-06-15
+
+Form state and accessibility polish.
+
+- Improved form state handling and accessibility across the active automation shell and the scene library, and fixed compact-width navigation layout.
+
 ## v0.2.63 - 2026-06-15
 
 Release-polish pass.
@@ -547,7 +574,7 @@ Security hardening, platform readiness, and new actions/functions.
 - **Registry-metadata parity test**: bidirectional contract test ensuring every runtime action has UI metadata and vice versa.
 - **Action guard tests**: new `ActionGuardsTest` covering POST body cap, URI scheme allowlist, wait duration cap, HTTP policy, ping host validation, missing-argument failures, and WoL packet construction.
 
-## Unreleased
+## v0.2.60 - 2026-06-14
 
 - Fixed State context matching so battery, charging, headphones, and screen facts persist across partial broadcasts instead of replacing one another.
 - Added State context aliases and fail-closed numeric predicate handling for malformed thresholds.
