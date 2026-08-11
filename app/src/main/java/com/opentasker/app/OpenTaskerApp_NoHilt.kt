@@ -78,6 +78,20 @@ class OpenTaskerApp_NoHilt : Application() {
         }
     }
 
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        if (level == TRIM_MEMORY_COMPLETE) {
+            ShizukuPowerBackend.shutdown()
+        }
+        super.onTrimMemory(level)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onTerminate() {
+        ShizukuPowerBackend.shutdown()
+        super.onTerminate()
+    }
+
     /** Initializes credential-protected runtime state after the user has unlocked the device. */
     fun initializeAfterUnlock() {
         if (!DirectBootTriggerStore.isUserUnlocked(this)) return

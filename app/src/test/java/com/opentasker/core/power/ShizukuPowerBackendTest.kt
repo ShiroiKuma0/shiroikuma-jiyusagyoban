@@ -70,6 +70,24 @@ class ShizukuPowerBackendTest {
     }
 
     @Test
+    fun allowlistAcceptsOnlyExactCommandVariants() {
+        assertTrue(
+            ShizukuCommandPolicy.isExact(
+                "reboot",
+                listOf("svc", "power", "reboot", "false"),
+            ),
+        )
+        assertFalse(
+            ShizukuCommandPolicy.isExact(
+                "reboot",
+                listOf("svc", "power", "reboot", "true"),
+            ),
+        )
+        assertTrue(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1")))
+        assertFalse(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1", "--user", "0")))
+    }
+
+    @Test
     fun statusForDisabledShowsKillSwitchState() {
         val status = ShizukuPowerBackend.statusFor(
             managerInstalled = true,
@@ -119,6 +137,27 @@ class ShizukuPowerBackendTest {
         val source = root.resolve("com/opentasker/core/power/ShizukuShellRunner.kt").readText()
 
         assertFalse(source.contains("ProcessBuilder("))
+
+        val service = root.resolve("com/opentasker/core/power/ShizukuCommandUserService.kt").readText()
+        assertTrue(service.contains("Runtime.getRuntime().exec"))
+        assertFalse(service.contains("ProcessBuilder("))
+        assertTrue(service.contains("ShizukuCommandPolicy.isExact"))
+        assertTrue(service.contains("16777114"))
+    }
+
+    @Test
+    fun runnerBindsAndUnbindsTheShizukuUserService() {
+        val root = listOf(
+            Path.of("src/main/java"),
+            Path.of("app/src/main/java"),
+        ).first(Files::exists)
+        val source = root.resolve("com/opentasker/core/power/ShizukuShellRunner.kt").readText()
+        val application = root.resolve("com/opentasker/app/OpenTaskerApp_NoHilt.kt").readText()
+
+        assertTrue(source.contains("Shizuku.bindUserService"))
+        assertTrue(source.contains("Shizuku.unbindUserService"))
+        assertTrue(source.contains("onBindingDied"))
+        assertTrue(application.contains("ShizukuPowerBackend.shutdown()"))
     }
 
     @Test

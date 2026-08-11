@@ -200,11 +200,13 @@ class ReleaseTruthContractTest {
             "app/src/main/java/com/opentasker/core/power/ShizukuPowerBackend.kt",
             "Shizuku.requestPermission",
             "killSwitchEnabled",
-            "no privileged user-service transport",
+            "ShizukuShellRunner.initialize",
+            "ShizukuShellRunner.shutdown",
         )
         requireSourceEvidence(
             "app/src/main/java/com/opentasker/core/power/ShizukuShellRunner.kt",
-            "Shizuku allowlist",
+            "ShizukuCommandPolicy",
+            "bindUserService",
             "ordinary app processes are never used as a fallback",
         )
         requireSourceEvidence(
@@ -252,7 +254,7 @@ class ReleaseTruthContractTest {
                 "Scene element editor with drag-to-move, resize handles, multi-select, alignment guides",
                 "Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers",
                 "persisted default-on kill switch",
-                "elevated actions remain unsupported until a privileged user-service transport ships",
+                "six elevated actions run through a separately bound AIDL user service",
                 "Termux 0.109+ `RUN_COMMAND` integration",
                 "Locale/Tasker condition context",
             ),
@@ -274,7 +276,7 @@ class ReleaseTruthContractTest {
                 "alignment guides",
                 "links the Shizuku API/provider",
                 "default-on kill switch",
-                "no privileged user-service/Binder transport",
+                "versioned AIDL user service",
                 "Termux scripting boundary dispatches",
                 "ContextType.PLUGIN",
                 "every 30 seconds",
@@ -303,8 +305,8 @@ class ReleaseTruthContractTest {
         ),
         DocumentTruthRule(
             "docs/SHIZUKU.md",
-            required = listOf("Shizuku API/provider", "allowlisted", "kill switch", "no privileged user-service"),
-            forbidden = listOf("readiness baseline", "does not execute privileged work", "No Shizuku API dependency is linked"),
+            required = listOf("Shizuku API/provider", "AIDL user service", "allowlisted", "kill switch", "fail closed"),
+            forbidden = listOf("readiness baseline", "does not execute privileged work", "No Shizuku API dependency is linked", "All elevated candidates remain `Unsupported`"),
         ),
         DocumentTruthRule(
             "docs/TERMUX_SCRIPTING.md",

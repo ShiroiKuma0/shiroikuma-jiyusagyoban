@@ -33,7 +33,7 @@ class ProfileShareLibraryTest {
                     actions = listOf(
                         ActionSpec(type = "notify.show"),
                         ActionSpec(type = "script.termux.run"),
-                        ActionSpec(type = "reboot"),
+                        ActionSpec(type = "app.kill"),
                         ActionSpec(type = "log"),
                     ),
                 )
@@ -63,8 +63,8 @@ class ProfileShareLibraryTest {
         val requirements = manifest.capabilityRequirements.associateBy { it.actionId }
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("notify.show").level)
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("script.termux.run").level)
-        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("reboot").level)
-        assertTrue(manifest.findings.any { it.message.contains("reboot") && it.severity == ShareFindingSeverity.Blocker })
+        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("app.kill").level)
+        assertTrue(manifest.findings.any { it.message.contains("app.kill") && it.severity == ShareFindingSeverity.Blocker })
     }
 
     @Test

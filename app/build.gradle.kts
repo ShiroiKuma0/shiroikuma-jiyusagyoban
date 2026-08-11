@@ -276,6 +276,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true
         compose = true
         buildConfig = true
     }
@@ -369,6 +370,7 @@ dependencies {
     implementation(libs.re2j)
     implementation(libs.jsoup)
     implementation(libs.shizuku.api)
+    implementation(libs.shizuku.aidl)
     implementation(libs.shizuku.provider)
     baselineProfile(project(":baselineprofile"))
 

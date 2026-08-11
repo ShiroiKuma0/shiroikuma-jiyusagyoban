@@ -334,7 +334,7 @@
     <string name="setup_shizuku_permission_requested">Shizuku permission requested.</string>
     <string name="setup_shizuku_permission_failed">Shizuku permission could not be requested; confirm the service is running.</string>
     <string name="setup_shizuku_mode_disabled">Shizuku power mode disabled.</string>
-    <string name="setup_shizuku_mode_enabled">Shizuku power mode enabled; elevated actions remain unsupported without a privileged transport.</string>
+    <string name="setup_shizuku_mode_enabled">Shizuku power mode enabled.</string>
 
     <string name="setup_notifications_card_title">Notifications</string>
     <string name="setup_notifications_card_body">Required for foreground-service visibility and user-facing notification actions on Android 13 and newer.</string>
@@ -417,7 +417,7 @@
     <string name="setup_shizuku_status_disabled">Shizuku power mode is disabled by the persisted kill switch.</string>
     <string name="setup_shizuku_status_manager_stopped">Shizuku manager is installed but the service is not running.</string>
     <string name="setup_shizuku_status_permission_needed">Shizuku is running but OpenTasker needs permission.</string>
-    <string name="setup_shizuku_status_transport_unavailable">Shizuku permission is granted, but this build has no privileged user-service transport. Elevated actions remain unsupported.</string>
+    <string name="setup_shizuku_status_transport_unavailable">Shizuku permission is granted, but the privileged user-service transport is unavailable. Elevated actions will fail closed until it returns.</string>
     <string name="setup_shizuku_status_ready">Shizuku is active, permission is granted, and a privileged transport is available.</string>
     <string name="setup_termux_title">Termux script bridge</string>
     <string name="setup_termux_status_missing">Termux is not installed.</string>

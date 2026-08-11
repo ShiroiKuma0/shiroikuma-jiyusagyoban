@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Locale verification now examines every existing locale directory, rejects empty directories by name, reports how many it examined, and documents that the current release ships English only.
+- Shizuku now binds a versioned AIDL user service for the six allowlisted elevated actions, rechecks exact argv in the privileged process, keeps the persisted kill switch and fail-closed behavior, and unbinds the service during application teardown.
 - Setup permission, preference, companion, push-token, and grant snapshots now load through an IO-backed ViewModel, so returning from system settings refreshes without blocking composition.
 - Profile, task, and scene deletion now snapshots the complete entity for snackbar Undo/Redo, while action, context, and scene-element removal is immediate and undoable without a confirmation dialog.
 - Exported Locale condition queries now require revocable grants bound to the selected profile, context, or variable; unauthorized queries return unknown before database access, and the receiver reuses a bounded scope.

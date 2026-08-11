@@ -153,7 +153,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON 
 
 ### Power-user backends
 
-- Shizuku manager/service/permission status, a persisted default-on kill switch, and a fail-closed command allowlist; elevated actions remain unsupported until a privileged user-service transport ships
+- Shizuku manager/service/permission status, a persisted default-on kill switch, and a fail-closed command allowlist; six elevated actions run through a separately bound AIDL user service and fail closed when Shizuku is absent, revoked, or stopped
 - Termux 0.109+ `RUN_COMMAND` integration with a user-managed SHA-256 allowlist, pre-run hash verification, timeouts, and bounded output variables
 
 To run a Termux script, place it below `~/.termux/tasker/`, enable Termux's external-app access, and grant OpenTasker `RUN_COMMAND` permission from Setup. Add the script path and the expected 64-character SHA-256 under **Approved Termux scripts**; OpenTasker performs a hash preflight and rechecks inside the fixed execution wrapper before the script can run. A capture prefix such as `%script` writes bounded `%script_stdout`, `%script_stderr`, `%script_exit_code`, and original-length variables; captured content is never written to the run log.

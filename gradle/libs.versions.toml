@@ -61,6 +61,7 @@ okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version
 re2j = { module = "com.google.re2j:re2j", version.ref = "re2j" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-aidl = { module = "dev.rikka.shizuku:aidl", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }

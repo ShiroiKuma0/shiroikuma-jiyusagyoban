@@ -56,8 +56,11 @@ class RebootAction : DeclaredAction(ActionCatalog.require("reboot")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val mode = args["mode"]?.ifBlank { null }
+        if (mode != null && mode != "normal") {
+            return ActionResult.Failure("Only normal reboot is available through the Shizuku allowlist")
+        }
         ctx.logger("Reboot${mode?.let { " ($it)" } ?: ""}")
-        return ActionResult.Failure("Reboot requires privileged device-owner or system app access")
+        return ctx.runShizukuAction("reboot", "Reboot")
     }
 }
 
@@ -79,7 +82,7 @@ class ScreenOffAction : DeclaredAction(ActionCatalog.require("screen.off")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Screen off")
-        return ActionResult.Failure("Screen-off requires privileged power management access")
+        return ctx.runShizukuAction("screen.off", "Screen off")
     }
 }
 
@@ -94,7 +97,7 @@ class WakeAction : DeclaredAction(ActionCatalog.require("wake")) {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
         ctx.logger("Wake (${dur}s)")
-        return ActionResult.Failure("Screen wake requires a foreground activity or privileged wake flow")
+        return ctx.runShizukuAction("wake", "Wake")
     }
 }
 
