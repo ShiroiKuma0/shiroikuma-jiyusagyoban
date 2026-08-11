@@ -59,6 +59,7 @@ import com.opentasker.core.storage.minimumTimestamp
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -91,7 +92,17 @@ class AutomationService : Service() {
     // Engine orchestration (context matching, dispatch) runs off the main thread. Room suspend DAOs
     // dispatch to Room's own executor, and task execution hops to Dispatchers.IO inside
     // executeAndLogTask, so no automation work blocks the UI thread.
-    private val scope = CoroutineScope(Dispatchers.Default + job)
+    /**
+     * Without a handler an exception from any engine coroutine reaches the default handler and
+     * kills the process. The realistic trigger is the database not being ready inside its 30 s
+     * deadline on a cold boot that is applying a staged restore, which the watchdog and boot alarm
+     * would then retry into a crash loop. The engine is restarted by those same mechanisms, so
+     * logging and letting this launch fail is the recoverable behaviour.
+     */
+    private val engineExceptionHandler = CoroutineExceptionHandler { _, error ->
+        AppLogger.error(TAG, "Engine coroutine failed", error)
+    }
+    private val scope = CoroutineScope(Dispatchers.Default + job + engineExceptionHandler)
     private val db by lazy { OpenTaskerApp_NoHilt.db }
     private val timeEventScheduler by lazy { TimeEventScheduler(this) }
     private val wifiNetworkMonitor by lazy { WiFiNetworkMonitor(this) }
