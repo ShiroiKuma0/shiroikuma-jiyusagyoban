@@ -8,6 +8,33 @@ import org.junit.Test
 
 class ProfileLifecyclePolicyTest {
     @Test
+    fun lifecycleCopyComesFromTheCallerSuppliedStringProvider() {
+        val profile = Profile(
+            id = 1,
+            name = "Temporary",
+            enterTaskId = 2,
+            lifetime = ProfileLifetime.UNTIL_DATE,
+            expiresAtMs = 1_000L,
+        )
+        val localized = object : ProfileLifecycleStrings {
+            override fun oneShotConsumed() = "localized-consumed"
+            override fun missingExpiry() = "localized-missing"
+            override fun expired(date: String) = "localized-expired"
+            override fun suppressedByPriority(profileName: String) = "localized-priority-$profileName"
+        }
+
+        assertEquals("localized-expired", ProfileLifecyclePolicy.suppressionReason(profile, 1_000L, localized))
+        assertEquals(
+            "localized-priority-Highest",
+            ProfileLifecyclePolicy.suppressionByPriority(
+                profile.copy(priority = 1),
+                listOf(profile.copy(id = 2, name = "Highest", priority = 2)),
+                localized,
+            ),
+        )
+    }
+
+    @Test
     fun expiryAndConsumedLifetimeSuppressOnlyAfterTheirBoundary() {
         val expiring = Profile(
             id = 1,

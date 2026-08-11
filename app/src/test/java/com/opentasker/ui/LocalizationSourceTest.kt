@@ -102,6 +102,31 @@ class LocalizationSourceTest {
     }
 
     @Test
+    fun newFeatureCopyResolvesThroughResourceBackedAdapters() {
+        val lint = sourceRoot.resolve("com/opentasker/core/capabilities/AutomationLintStrings.kt").readText()
+        val lifecycle = sourceRoot.resolve("com/opentasker/core/model/ProfileLifecycleStrings.kt").readText()
+        val admission = sourceRoot.resolve("com/opentasker/core/engine/ExecutionAdmissionStrings.kt").readText()
+        val duplicate = sourceRoot.resolve("com/opentasker/core/references/AutomationDuplicateStrings.kt").readText()
+        val diff = sourceRoot.resolve("com/opentasker/core/diff/SemanticDiffStrings.kt").readText()
+        val diffUi = sourceRoot.resolve("com/opentasker/ui/screens/SemanticDiffDialogs.kt").readText()
+        val statusVm = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+
+        assertTrue("lint findings must have a resource-backed adapter", "ResourceAutomationLintStrings" in lint)
+        assertTrue("lifecycle reasons must have a resource-backed adapter", "ResourceProfileLifecycleStrings" in lifecycle)
+        assertTrue("admission reasons must have a resource-backed adapter", "ResourceExecutionAdmissionStrings" in admission)
+        assertTrue("duplicate names must have a resource-backed adapter", "ResourceAutomationDuplicateStrings" in duplicate)
+        assertTrue("semantic diff labels must have a resource-backed adapter", "ResourceSemanticDiffStrings" in diff)
+        assertTrue("semantic diff UI must resolve labels through the adapter", "strings.path(change.path)" in diffUi)
+        assertTrue("run statuses must resolve through resource IDs", "R.string.ui_run_status_held" in statusVm)
+        val resources = defaultStringResourceNames()
+        assertTrue("lint resource IDs must exist", "automation_lint_missing_reversal_title" in resources)
+        assertTrue("lifecycle resource IDs must exist", "profile_lifecycle_expired" in resources)
+        assertTrue("admission resource IDs must exist", "admission_reason_counts" in resources)
+        assertTrue("duplicate resource IDs must exist", "automation_duplicate_copy_suffix" in resources)
+        assertTrue("semantic diff resource IDs must exist", "semantic_diff_value_until_date" in resources)
+    }
+
+    @Test
     fun dynamicActionAndContextCatalogsUseCompleteResourceIds() {
         val metadata = sourceRoot.resolve("com/opentasker/core/actions/ActionMetadata.kt").readText()
         val contextEditor = sourceRoot.resolve("com/opentasker/ui/screens/ContextEditorDialogs.kt").readText()

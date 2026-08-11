@@ -7,6 +7,38 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExecutionAdmissionControllerTest {
+    @Test
+    fun admissionCopyComesFromTheCallerSuppliedStringProvider() {
+        val localized = object : ExecutionAdmissionStrings {
+            override fun circuitOpen(remainingSeconds: Long) = "localized-circuit-$remainingSeconds"
+            override fun tripReason(reason: String) = "localized-trip-$reason"
+            override fun globalActive(limit: String) = "localized-global-$limit"
+            override fun profileActive(limit: String) = "localized-profile-$limit"
+            override fun globalBurst() = "localized-global-burst"
+            override fun profileBurst() = "localized-profile-burst"
+            override fun globalAndProfileBurst() = "localized-both-burst"
+            override fun counts(
+                activeGlobal: Int,
+                globalActiveLimit: String,
+                activeProfile: Int,
+                profileActiveLimit: String,
+                globalBurst: Int,
+                globalBurstLimit: String,
+                profileBurst: Int,
+                profileBurstLimit: String,
+            ) = "localized-counts"
+            override fun previewAvailable() = "localized-preview"
+        }
+        val controller = ExecutionAdmissionController(limits(globalMaxActive = 1))
+        val lease = controller.tryAcquire(profileId = 7L).lease
+
+        val rejected = controller.tryAcquire(profileId = 8L, strings = localized)
+
+        assertEquals("localized-global-1 localized-counts", rejected.reason)
+        lease?.release()
+        assertEquals("localized-preview", controller.preview(strings = localized).reason)
+    }
+
     private class Clock(var nowMs: Long = 1_000L) {
         fun now() = nowMs
     }

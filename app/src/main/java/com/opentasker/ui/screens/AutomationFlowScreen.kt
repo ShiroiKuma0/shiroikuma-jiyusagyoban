@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.capabilities.AutomationLintSeverity
+import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
 import com.opentasker.core.flow.AutomationFlowNode
@@ -81,7 +82,16 @@ fun AutomationFlowScreen(
     val graphs = remember(profiles, tasks, resources, changedNodeKeys) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
-        profiles.map { profile -> AutomationFlowGraphBuilder.build(profile, tasksById, strings, changedNodeKeys) }
+        val lintStrings = AutomationLintStrings.from(resources)
+        profiles.map {
+            profile -> AutomationFlowGraphBuilder.build(
+                profile = profile,
+                tasksById = tasksById,
+                strings = strings,
+                changedNodeKeys = changedNodeKeys,
+                lintStrings = lintStrings,
+            )
+        }
     }
 
     if (profiles.isEmpty()) {

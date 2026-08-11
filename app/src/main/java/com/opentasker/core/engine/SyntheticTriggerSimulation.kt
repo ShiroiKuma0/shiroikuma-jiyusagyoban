@@ -9,6 +9,7 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecyclePolicy
+import com.opentasker.core.model.ProfileLifecycleStrings
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -78,6 +79,7 @@ object SyntheticTriggerSimulator {
         pinnedEvents: Map<Int, ContextEvent> = emptyMap(),
         cooldown: SyntheticGateResult = SyntheticGateResult.pass("No cooldown is currently blocking this profile."),
         admission: SyntheticGateResult = SyntheticGateResult.pass("Admission budget is available (preview only)."),
+        lifecycleStrings: ProfileLifecycleStrings = ProfileLifecycleStrings.English,
     ): SyntheticTriggerSimulation {
         val results = profile.contexts.mapIndexed { index, spec ->
             val template = pinnedEvents[index]?.let { event ->
@@ -124,7 +126,7 @@ object SyntheticTriggerSimulator {
                 profile.contextExpression,
             )
         }
-        val lifecycleSuppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs)
+        val lifecycleSuppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs, lifecycleStrings)
         val graceSuppression = profile.gracePeriodSec > 0 && aggregateMatch
         val profileMatched = profile.enabled && lifecycleSuppression == null && aggregateMatch && !graceSuppression
         val profileReason = when {

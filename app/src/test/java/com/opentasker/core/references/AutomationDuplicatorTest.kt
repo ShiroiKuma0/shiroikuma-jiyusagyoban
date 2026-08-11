@@ -19,6 +19,19 @@ import org.junit.Test
 
 class AutomationDuplicatorTest {
     @Test
+    fun generatedCopyNamesUseTheCallerSuppliedStringProvider() {
+        val localized = object : AutomationDuplicateStrings {
+            override fun untitled() = "localized-untitled"
+            override fun copySuffix(copyNumber: Int) = "-$copyNumber"
+        }
+
+        assertEquals(
+            "localized-untitled-1",
+            AutomationDuplicator.copyName(" ", emptyList(), localized),
+        )
+    }
+
+    @Test
     fun copyNamesAreDistinctCaseInsensitivelyAndStayWithinTheInputLimit() {
         assertEquals(
             "Morning (copy 3)",

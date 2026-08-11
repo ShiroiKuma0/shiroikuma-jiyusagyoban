@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.engine.CooldownStore
 import com.opentasker.core.engine.ExecutionAdmissionRegistry
+import com.opentasker.core.engine.ExecutionAdmissionStrings
 import com.opentasker.core.engine.toExecutionAdmissionProfileLimits
 import com.opentasker.core.engine.SyntheticContextResult
 import com.opentasker.core.engine.SyntheticContextStatus
@@ -36,6 +37,7 @@ import com.opentasker.core.engine.SyntheticGateResult
 import com.opentasker.core.engine.SyntheticTriggerSimulation
 import com.opentasker.core.engine.SyntheticTriggerSimulator
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecycleStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.opentasker.ui.theme.DesignSystem
@@ -72,6 +74,7 @@ internal fun SyntheticTriggerSimulationDialog(
                 context = context,
                 profileId = profile.id,
                 profileLimits = profile.toExecutionAdmissionProfileLimits(),
+                strings = ExecutionAdmissionStrings.from(resources),
             )
             val admission = SyntheticGateResult(
                 accepted = admissionDecision.accepted,
@@ -82,6 +85,7 @@ internal fun SyntheticTriggerSimulationDialog(
                 nowMs = nowMs,
                 cooldown = cooldown,
                 admission = admission,
+                lifecycleStrings = ProfileLifecycleStrings.from(resources),
             )
         }
     }

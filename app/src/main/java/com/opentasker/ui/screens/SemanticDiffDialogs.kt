@@ -15,6 +15,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -25,6 +26,7 @@ import com.opentasker.core.diff.SemanticDiffDocument
 import com.opentasker.core.diff.SemanticDiffEntity
 import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.diff.SemanticDiffKind
+import com.opentasker.core.diff.SemanticDiffStrings
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -109,6 +111,7 @@ private fun SemanticDiffEntryView(entry: SemanticDiffEntry) {
 
 @Composable
 private fun SemanticDiffChangeView(change: SemanticDiffChange) {
+    val strings = SemanticDiffStrings.from(LocalContext.current.resources)
     val color = when (change.kind) {
         SemanticDiffKind.ADDED -> MaterialTheme.colorScheme.tertiary
         SemanticDiffKind.REMOVED -> MaterialTheme.colorScheme.error
@@ -126,22 +129,22 @@ private fun SemanticDiffChangeView(change: SemanticDiffChange) {
                     style = MaterialTheme.typography.labelMedium,
                     color = color,
                 )
-                Text(change.path, style = MaterialTheme.typography.labelMedium)
+                Text(strings.path(change.path), style = MaterialTheme.typography.labelMedium)
             }
             when (change.kind) {
                 SemanticDiffKind.ADDED -> Text(
-                    stringResource(R.string.semantic_diff_after_value, displayValue(change.after)),
+                    stringResource(R.string.semantic_diff_after_value, strings.value(change.path, change.after)),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 SemanticDiffKind.REMOVED -> Text(
-                    stringResource(R.string.semantic_diff_before_value, displayValue(change.before)),
+                    stringResource(R.string.semantic_diff_before_value, strings.value(change.path, change.before)),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 SemanticDiffKind.CHANGED -> Text(
                     stringResource(
                         R.string.semantic_diff_before_after,
-                        displayValue(change.before),
-                        displayValue(change.after),
+                        strings.value(change.path, change.before),
+                        strings.value(change.path, change.after),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -168,5 +171,3 @@ private fun entityLabel(entity: SemanticDiffEntity): String = stringResource(
         SemanticDiffEntity.VARIABLE -> R.string.semantic_diff_entity_variable
     },
 )
-
-private fun displayValue(value: String?): String = value ?: "—"

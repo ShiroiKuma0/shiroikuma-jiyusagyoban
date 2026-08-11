@@ -80,7 +80,11 @@ suspend fun executeAndLogTask(
             execution = execution,
         )
     }
-    val admission = admissionController.tryAcquire(profileId, profileLimits)
+    val admission = admissionController.tryAcquire(
+        profileId = profileId,
+        profileLimits = profileLimits,
+        strings = ExecutionAdmissionStrings.from(appContext.resources),
+    )
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
         val terminalReason = ExecutionTerminalReason(ExecutionTerminalReasonCode.ADMISSION_REJECTED, reason)
