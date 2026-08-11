@@ -8,6 +8,55 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.84.2026-08-11.g9b75aac5+017 — 2026-08-11
+
+**The app can now find a band whose address it does not already know.** A sync is addressed by MAC
+and needs no scan, so there was no way to *discover* a band at all: `健康の設定 -- [727][01]` simply
+held the address, typed in once. That is fine until the band is replaced or factory-reset — the
+address changes, every sync afterwards fails silently, and nothing on the phone can say what the new
+one is. The new `band.scan` action listens for eight seconds with **no scan filter**, because
+filtering on the band's own `fff0` service is the obvious shortcut and a trap: a band that keeps its
+service UUID out of the advertisement would look exactly like an empty room. It then connects to the
+strongest candidates and checks for `fff0`/`fff6`/`fff7` — the same gate `BandGattClient.open`
+already puts a sync through, reused rather than re-implemented, and the only conclusive test there
+is. It stops at the first device that answers.
+
+**The verdict is never presented as more than it is.** `confirmed` means something answered on the
+band's own characteristics. `likely` means it advertises `fff0`, or this model's name. `possible`
+means the name merely looked plausible — and hands back no address at all. Every line of evidence is
+printed beside the verdict, because that address is about to be typed into a setting every later sync
+trusts. The scan writes no setting itself: the address comes back in a variable and 白い熊 decides
+whether it goes into `01`.
+
+**The band's advertised name was unknown to this repo until it was measured.** Nothing in `core/band`
+ever needed it, since a sync connects by MAC. It is `Hume Band V2 A13A`, and those last four
+characters are the last two octets of `D5:A7:06:DC:A1:3A` — so the prefix is stable across units and
+the suffix identifies the unit. A replacement band can therefore be recognised by name before
+anything connects to it, which is exactly the case the feature exists for.
+
+**One window does the searching and the reporting.** It began as the batch progress panel handing
+over to a summary dialog, which was wrong three ways at once: the panel blacked out the whole screen,
+it never listed the devices it had already heard, and the dialog replaced the list at the moment it
+became worth reading. The window is now a scene — mid-screen over a scrim, 560×640, filling up device
+by device as they are heard and re-ranked on every tick, because a device's evidence changes as more
+of its packets arrive (the name usually turns up in the scan *response*, a packet after the one that
+first announced it). When the scan ends, that same window becomes the report in place. **中止** stops
+the radio without closing the window; **閉じる** does both, so dismissing it can never leave the radio
+listening behind it.
+
+**The progress panel's running row turns.** A static `▶` beside a step that takes twenty seconds is
+indistinguishable from a wedged one. The spinner runs on its own clock rather than on panel updates,
+because the case that needs it is a task blocked inside a single long action — where by definition
+nothing is arriving to redraw the row. Every long task that raises the panel gets it, 保存復元's
+backup runs included.
+
+**A build-time guard for a failure that only ever appeared on the phone.** Registering an action in
+`ActionCatalog` is not enough to make it usable: it also has to be classified in
+`AutomationSensitivityRegistry`, or every bundle containing it is refused at import as an "unknown
+unclassified action", and it needs a capability entry or it is refused as "unsupported". `band.scan`
+shipped, installed, ran, and passed the whole JVM suite before the transfer bridge rejected the first
+bundle that used it. Three assertions now fail the build instead.
+
 ## 0.2.84.2026-08-11.g9b75aac5+013 — 2026-08-11
 
 **Upstream sync: 2 commits, 18 files. Upstream did not move its own version literals**, so the pin
