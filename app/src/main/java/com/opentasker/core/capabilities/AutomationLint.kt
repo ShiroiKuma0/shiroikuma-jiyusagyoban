@@ -3,10 +3,14 @@ package com.opentasker.core.capabilities
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.location.FossGeofenceEvaluator
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationInvariant
+import com.opentasker.core.model.AutomationInvariantPolicy
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.isValidForContextCount
 import java.util.Locale
 
 enum class AutomationLintSeverity {
@@ -19,6 +23,10 @@ enum class AutomationLintCode {
     REPEATED_TRIGGERING,
     PRIORITY_CONFLICT,
     INTER_PROFILE_LOOP,
+    SHADOWED_RULE,
+    UNREACHABLE_RULE,
+    ACTION_REVERT_PAIR,
+    INVARIANT_VIOLATION,
 }
 
 data class AutomationLintFinding(
@@ -29,6 +37,7 @@ data class AutomationLintFinding(
     val title: String,
     val detail: String,
     val suggestedFix: String,
+    val invariantId: Long? = null,
 )
 
 data class AutomationLintReport(
@@ -59,26 +68,68 @@ object AutomationLint {
         tasks: List<Task>,
         otherProfiles: List<Profile> = emptyList(),
         strings: AutomationLintStrings = AutomationLintStrings.English,
+        invariants: List<AutomationInvariant> = emptyList(),
+        nowMs: Long? = null,
     ): AutomationLintReport =
-        analyze((otherProfiles.filterNot { it.id == profile.id } + profile), tasks, strings)
+        analyze(
+            profiles = otherProfiles.filterNot { it.id == profile.id } + profile,
+            tasks = tasks,
+            strings = strings,
+            invariants = invariants,
+            nowMs = nowMs,
+        )
 
     fun analyze(
         profiles: List<Profile>,
         tasks: List<Task>,
         strings: AutomationLintStrings = AutomationLintStrings.English,
+        invariants: List<AutomationInvariant> = emptyList(),
+        nowMs: Long? = null,
     ): AutomationLintReport {
         if (profiles.isEmpty()) return AutomationLintReport()
         val findings = linkedSetOf<AutomationLintFinding>()
         val taskById = tasks.associateBy(Task::id)
+        val writesByProfileId = profiles.associate { profile ->
+            profile.id to settingWrites(profile, tasks)
+        }
 
         profiles.forEach { profile ->
             val enterTask = taskById[profile.enterTaskId]
-            val writes = settingWrites(profile, tasks)
+            val writes = writesByProfileId[profile.id].orEmpty()
             val unreversed = writes.filterNot(SettingWrite::automaticallyReversed)
             if (profile.exitTaskId == null && unreversed.isNotEmpty()) {
                 val copy = strings.missingReversal(profile.name, unreversed.joinToString { it.key })
                 findings += AutomationLintFinding(
                     code = AutomationLintCode.MISSING_REVERSAL,
+                    severity = AutomationLintSeverity.WARNING,
+                    profileIds = listOf(profile.id),
+                    profileNames = listOf(profile.name),
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
+                )
+            }
+
+            unreachableReason(profile, enterTask, nowMs)?.let { reason ->
+                val copy = strings.unreachableRule(profile.name, reason)
+                findings += AutomationLintFinding(
+                    code = AutomationLintCode.UNREACHABLE_RULE,
+                    severity = AutomationLintSeverity.BLOCKING,
+                    profileIds = listOf(profile.id),
+                    profileNames = listOf(profile.name),
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
+                )
+            }
+
+            val enterWrites = directSettingWrites(enterTask)
+            val exitWrites = directSettingWrites(profile.exitTaskId?.let(taskById::get))
+            val revertOverlap = (enterWrites intersect exitWrites).toList().sorted()
+            if (revertOverlap.isNotEmpty()) {
+                val copy = strings.actionRevertPair(profile.name, revertOverlap.joinToString())
+                findings += AutomationLintFinding(
+                    code = AutomationLintCode.ACTION_REVERT_PAIR,
                     severity = AutomationLintSeverity.WARNING,
                     profileIds = listOf(profile.id),
                     profileNames = listOf(profile.name),
@@ -108,8 +159,8 @@ object AutomationLint {
                 val left = enabledProfiles[leftIndex]
                 val right = enabledProfiles[rightIndex]
                 if (!contextsMayOverlap(left, right)) continue
-                val leftWrites = settingWrites(left, tasks).mapTo(hashSetOf(), SettingWrite::key)
-                val rightWrites = settingWrites(right, tasks).mapTo(hashSetOf(), SettingWrite::key)
+                val leftWrites = writesByProfileId[left.id].orEmpty().mapTo(hashSetOf(), SettingWrite::key)
+                val rightWrites = writesByProfileId[right.id].orEmpty().mapTo(hashSetOf(), SettingWrite::key)
                 val overlap = (leftWrites intersect rightWrites).toList().sorted()
                 if (overlap.isEmpty()) continue
                 val leftPriority = left.priority
@@ -132,8 +183,71 @@ object AutomationLint {
                     detail = copy.detail,
                     suggestedFix = copy.suggestedFix,
                 )
+
+                if (leftPriority != rightPriority && contextsEquivalent(left, right)) {
+                    val shadowing = if (leftPriority > rightPriority) left else right
+                    val shadowed = if (leftPriority > rightPriority) right else left
+                    val shadowCopy = strings.shadowedRule(
+                        shadowingProfileName = shadowing.name,
+                        shadowedProfileName = shadowed.name,
+                        overlap = overlap.joinToString(),
+                        shadowingPriority = shadowing.priority,
+                        shadowedPriority = shadowed.priority,
+                    )
+                    findings += AutomationLintFinding(
+                        code = AutomationLintCode.SHADOWED_RULE,
+                        severity = AutomationLintSeverity.WARNING,
+                        profileIds = listOf(shadowing.id, shadowed.id),
+                        profileNames = listOf(shadowing.name, shadowed.name),
+                        title = shadowCopy.title,
+                        detail = shadowCopy.detail,
+                        suggestedFix = shadowCopy.suggestedFix,
+                    )
+                }
             }
         }
+
+        AutomationInvariantPolicy.normalize(invariants)
+            .filter(AutomationInvariant::enabled)
+            .forEach { invariant ->
+                val guard = ContextSpec(
+                    type = ContextType.STATE,
+                    config = mapOf(
+                        "key" to invariant.guard.key,
+                        "operator" to invariant.guard.operator.symbol,
+                        "value" to invariant.guard.value,
+                    ),
+                )
+                val violatingProfiles = enabledProfiles.filter { profile ->
+                    writesByProfileId[profile.id].orEmpty().any { write ->
+                        write.key.equals(invariant.forbiddenWriteKey, ignoreCase = true)
+                    } && profileMaySatisfy(profile, guard)
+                }
+                if (violatingProfiles.isEmpty()) return@forEach
+                val displayedNames = violatingProfiles
+                    .take(MAX_INVARIANT_PROFILE_NAMES)
+                    .map(Profile::name)
+                    .toMutableList()
+                if (violatingProfiles.size > MAX_INVARIANT_PROFILE_NAMES) {
+                    displayedNames += "+${violatingProfiles.size - MAX_INVARIANT_PROFILE_NAMES} more"
+                }
+                val copy = strings.invariantViolation(
+                    invariantName = invariant.name,
+                    guard = "${invariant.guard.key} ${invariant.guard.operator.symbol} ${invariant.guard.value}",
+                    profileNames = displayedNames.joinToString(),
+                    forbiddenWriteKey = invariant.forbiddenWriteKey,
+                )
+                findings += AutomationLintFinding(
+                    code = AutomationLintCode.INVARIANT_VIOLATION,
+                    severity = AutomationLintSeverity.BLOCKING,
+                    profileIds = violatingProfiles.map(Profile::id).distinct().sorted(),
+                    profileNames = violatingProfiles.map(Profile::name),
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
+                    invariantId = invariant.id,
+                )
+            }
 
         interProfileCycles(profiles, tasks).forEach { cycle ->
             val copy = strings.interProfileLoop(
@@ -151,6 +265,36 @@ object AutomationLint {
         }
 
         return AutomationLintReport(findings.toList())
+    }
+
+    private fun unreachableReason(profile: Profile, enterTask: Task?, nowMs: Long?): String? = when {
+        enterTask == null -> "its enter task ${profile.enterTaskId} is missing"
+        profile.contextExpression != null && !profile.contextExpression.isValidForContextCount(profile.contexts.size) ->
+            "its context expression is invalid"
+        profile.contexts.size > 1 && profile.contexts.indices.any { leftIndex ->
+            profile.contexts.drop(leftIndex + 1).any { right ->
+                !contextPairMayOverlap(profile.contexts[leftIndex], right)
+            }
+        } -> "its context entries contain contradictory conditions"
+        profile.lifetime == ProfileLifetime.ONCE && profile.lifetimeConsumed ->
+            "its one-shot lifetime has already been consumed"
+        profile.lifetime == ProfileLifetime.UNTIL_DATE && profile.expiresAtMs == null ->
+            "its lifetime has no expiry"
+        profile.lifetime == ProfileLifetime.UNTIL_DATE && nowMs != null &&
+            profile.expiresAtMs?.let { expiresAt -> expiresAt <= nowMs } == true ->
+            "its lifetime has expired"
+        else -> null
+    }
+
+    private fun contextsEquivalent(left: Profile, right: Profile): Boolean =
+        left.contextExpression == right.contextExpression && canonicalContexts(left) == canonicalContexts(right)
+
+    private fun canonicalContexts(profile: Profile): List<ContextSpec> = profile.contexts
+        .sortedWith(compareBy<ContextSpec> { it.type.name }.thenBy { it.config.entries.sortedBy(Map.Entry<String, String>::key).toString() })
+
+    private fun profileMaySatisfy(profile: Profile, guard: ContextSpec): Boolean {
+        if (profile.contextExpression != null) return true
+        return profile.contexts.none { context -> !contextPairMayOverlap(context, guard) }
     }
 
     private fun hasRetriggerGuard(profile: Profile, enterTask: Task?): Boolean {
@@ -173,6 +317,14 @@ object AutomationLint {
         AutomationSensitivityRegistry.reachableTasks(profile, tasks)
             .flatMap { task -> task.actions.mapNotNull { action -> action.toSettingWrite(task) } }
             .distinctBy { it.taskId to (it.key to it.automaticallyReversed) }
+
+    private fun directSettingWrites(task: Task?): Set<String> = task
+        ?.let { candidate ->
+            candidate.actions
+                .mapNotNull { action -> action.toSettingWrite(candidate) }
+                .mapTo(hashSetOf(), SettingWrite::key)
+        }
+        ?: emptySet()
 
     private fun ActionSpec.toSettingWrite(task: Task): SettingWrite? {
         val key = when (type) {
@@ -276,6 +428,8 @@ object AutomationLint {
         val leftValue = leftPredicate.third.lowercase(Locale.US)
         val rightValue = rightPredicate.third.lowercase(Locale.US)
         if (leftPredicate.second == "=" && rightPredicate.second == "=" && leftValue != rightValue) return false
+        if (leftPredicate.second == "=" && rightPredicate.second == "!=" && leftValue == rightValue) return false
+        if (leftPredicate.second == "!=" && rightPredicate.second == "=" && leftValue == rightValue) return false
         val leftNumber = leftValue.toIntOrNull()
         val rightNumber = rightValue.toIntOrNull()
         if (leftNumber != null && rightNumber != null) {
@@ -350,7 +504,7 @@ object AutomationLint {
     }
 
     private fun parsePredicate(value: String): Triple<String, String, String>? {
-        val operator = listOf(">=", "<=", ">", "<", "=").firstOrNull { value.contains(it) } ?: return null
+        val operator = listOf(">=", "<=", "!=", ">", "<", "=").firstOrNull { value.contains(it) } ?: return null
         val parts = value.split(operator, limit = 2)
         if (parts.size != 2 || parts[0].isBlank() || parts[1].isBlank()) return null
         return Triple(parts[0].trim().lowercase(Locale.US), operator, parts[1].trim())
@@ -397,5 +551,6 @@ object AutomationLint {
     )
 
     private val TEMPORARY_TARGET_ACTIONS = setOf("brightness.set", "volume.set", "ringer.set", "dnd.set")
+    private const val MAX_INVARIANT_PROFILE_NAMES = 8
     private const val MINUTES_PER_DAY = 24 * 60
 }

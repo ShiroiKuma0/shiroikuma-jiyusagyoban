@@ -24,6 +24,7 @@ internal data class ImportResourceBudget(
     val maxEntities: Long = 5_000,
     val maxProjects: Long = 100,
     val maxBlueprints: Long = 128,
+    val maxInvariants: Long = 64,
     val maxBlueprintInputs: Long = 5_000,
     val maxActions: Long = 20_000,
     val maxContexts: Long = 10_000,
@@ -116,13 +117,15 @@ internal object ImportResourceGuard {
     ): ImportBudgetExceededException? {
         violation("projects", bundle.projects.size.toLong(), budget.maxProjects)?.let { return it }
         violation("blueprints", bundle.blueprints.size.toLong(), budget.maxBlueprints)?.let { return it }
+        violation("automation invariants", bundle.invariants.size.toLong(), budget.maxInvariants)?.let { return it }
         val blueprintInputCount = bundle.blueprints.sumOf { it.inputs.size.toLong() }
         violation("blueprint inputs", blueprintInputCount, budget.maxBlueprintInputs)?.let { return it }
         val entityCount = bundle.tasks.size.toLong() +
             bundle.profiles.size +
             bundle.variables.size +
             bundle.scenes.size +
-            bundle.blueprints.size
+            bundle.blueprints.size +
+            bundle.invariants.size
         violation("entities", entityCount, budget.maxEntities)?.let { return it }
 
         val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() } +
@@ -206,6 +209,12 @@ internal object ImportResourceGuard {
                     bytes += value.utf8ByteLength()
                 }
             }
+        }
+        invariants.forEach { invariant ->
+            bytes += invariant.name.utf8ByteLength()
+            bytes += invariant.guard.key.utf8ByteLength()
+            bytes += invariant.guard.value.utf8ByteLength()
+            bytes += invariant.forbiddenWriteKey.utf8ByteLength()
         }
         return bytes
     }

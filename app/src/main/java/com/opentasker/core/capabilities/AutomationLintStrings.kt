@@ -15,6 +15,37 @@ interface AutomationLintStrings {
     fun repeatedTriggering(profileName: String): AutomationLintCopy
     fun priorityConflict(leftName: String, rightName: String, overlap: String, leftPriority: Int, rightPriority: Int, equalPriority: Boolean): AutomationLintCopy
     fun interProfileLoop(path: String): AutomationLintCopy
+    fun shadowedRule(
+        shadowingProfileName: String,
+        shadowedProfileName: String,
+        overlap: String,
+        shadowingPriority: Int,
+        shadowedPriority: Int,
+    ): AutomationLintCopy = English.shadowedRule(
+        shadowingProfileName,
+        shadowedProfileName,
+        overlap,
+        shadowingPriority,
+        shadowedPriority,
+    )
+
+    fun unreachableRule(profileName: String, reason: String): AutomationLintCopy =
+        English.unreachableRule(profileName, reason)
+
+    fun actionRevertPair(profileName: String, overlap: String): AutomationLintCopy =
+        English.actionRevertPair(profileName, overlap)
+
+    fun invariantViolation(
+        invariantName: String,
+        guard: String,
+        profileNames: String,
+        forbiddenWriteKey: String,
+    ): AutomationLintCopy = English.invariantViolation(
+        invariantName,
+        guard,
+        profileNames,
+        forbiddenWriteKey,
+    )
 
     companion object {
         fun from(resources: Resources): AutomationLintStrings = ResourceAutomationLintStrings(resources)
@@ -65,6 +96,54 @@ private class ResourceAutomationLintStrings(
         detail = resources.getString(R.string.automation_lint_inter_profile_loop_detail, path),
         suggestedFix = resources.getString(R.string.automation_lint_inter_profile_loop_fix),
     )
+
+    override fun shadowedRule(
+        shadowingProfileName: String,
+        shadowedProfileName: String,
+        overlap: String,
+        shadowingPriority: Int,
+        shadowedPriority: Int,
+    ): AutomationLintCopy = AutomationLintCopy(
+        title = resources.getString(R.string.automation_lint_shadowed_rule_title),
+        detail = resources.getString(
+            R.string.automation_lint_shadowed_rule_detail,
+            shadowedProfileName,
+            shadowingProfileName,
+            overlap,
+            shadowingPriority,
+            shadowedPriority,
+        ),
+        suggestedFix = resources.getString(R.string.automation_lint_shadowed_rule_fix),
+    )
+
+    override fun unreachableRule(profileName: String, reason: String): AutomationLintCopy = AutomationLintCopy(
+        title = resources.getString(R.string.automation_lint_unreachable_rule_title),
+        detail = resources.getString(R.string.automation_lint_unreachable_rule_detail, profileName, reason),
+        suggestedFix = resources.getString(R.string.automation_lint_unreachable_rule_fix),
+    )
+
+    override fun actionRevertPair(profileName: String, overlap: String): AutomationLintCopy = AutomationLintCopy(
+        title = resources.getString(R.string.automation_lint_action_revert_pair_title),
+        detail = resources.getString(R.string.automation_lint_action_revert_pair_detail, profileName, overlap),
+        suggestedFix = resources.getString(R.string.automation_lint_action_revert_pair_fix),
+    )
+
+    override fun invariantViolation(
+        invariantName: String,
+        guard: String,
+        profileNames: String,
+        forbiddenWriteKey: String,
+    ): AutomationLintCopy = AutomationLintCopy(
+        title = resources.getString(R.string.automation_lint_invariant_violation_title),
+        detail = resources.getString(
+            R.string.automation_lint_invariant_violation_detail,
+            invariantName,
+            guard,
+            profileNames,
+            forbiddenWriteKey,
+        ),
+        suggestedFix = resources.getString(R.string.automation_lint_invariant_violation_fix),
+    )
 }
 
 private object EnglishAutomationLintStrings : AutomationLintStrings {
@@ -101,5 +180,40 @@ private object EnglishAutomationLintStrings : AutomationLintStrings {
         title = "Inter-profile loop",
         detail = "Profiles form a direct task cycle: $path.",
         suggestedFix = "Remove one task.run edge or add an explicit state guard so the chain cannot retrigger itself.",
+    )
+
+    override fun shadowedRule(
+        shadowingProfileName: String,
+        shadowedProfileName: String,
+        overlap: String,
+        shadowingPriority: Int,
+        shadowedPriority: Int,
+    ): AutomationLintCopy = AutomationLintCopy(
+        title = "Shadowed rule",
+        detail = "$shadowedProfileName can be active with $shadowingProfileName, which writes $overlap at priority $shadowingPriority versus $shadowedPriority.",
+        suggestedFix = "Make the contexts mutually exclusive, or confirm that the lower-priority rule should remain available.",
+    )
+
+    override fun unreachableRule(profileName: String, reason: String): AutomationLintCopy = AutomationLintCopy(
+        title = "Unreachable rule",
+        detail = "$profileName cannot run: $reason.",
+        suggestedFix = "Restore the referenced task or adjust the context and lifetime constraints so the profile can run.",
+    )
+
+    override fun actionRevertPair(profileName: String, overlap: String): AutomationLintCopy = AutomationLintCopy(
+        title = "Action/revert pair",
+        detail = "$profileName writes $overlap in both its enter and exit tasks.",
+        suggestedFix = "Verify that the exit task restores the intended previous state instead of repeating the enter action.",
+    )
+
+    override fun invariantViolation(
+        invariantName: String,
+        guard: String,
+        profileNames: String,
+        forbiddenWriteKey: String,
+    ): AutomationLintCopy = AutomationLintCopy(
+        title = "Invariant violation",
+        detail = "Invariant $invariantName ($guard) may be violated by $profileNames writing $forbiddenWriteKey.",
+        suggestedFix = "Disable or constrain the violating profile, or revise the invariant if the write is intentional.",
     )
 }

@@ -3,11 +3,13 @@ package com.opentasker.core.transfer
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.InvariantStatePredicate
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.Project
@@ -494,6 +496,32 @@ class OpenTaskerBundleCodecTest {
         assertEquals(withBlueprint, OpenTaskerBundleCodec.decode(encoded))
         assertFalse(emptyEncoded.contains("\"blueprints\""))
         assertTrue(OpenTaskerBundleCodec.validate(withBlueprint).canImport)
+    }
+
+    @Test
+    fun invariantBlockRoundTripsAndIsOmittedFromEmptyLegacyExports() {
+        val invariant = AutomationInvariant(
+            id = 7,
+            name = "Keep display bright",
+            guard = InvariantStatePredicate(key = "charging", value = "true"),
+            forbiddenWriteKey = "brightness",
+        )
+        val withInvariant = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.84",
+            exportedAtEpochMs = 123L,
+            profiles = emptyList(),
+            tasks = emptyList(),
+            invariants = listOf(invariant),
+        )
+        val encoded = OpenTaskerBundleCodec.encode(withInvariant)
+        val emptyEncoded = OpenTaskerBundleCodec.encode(
+            OpenTaskerBundle(appVersion = "0.2.84", exportedAtEpochMs = 123L),
+        )
+
+        assertTrue(encoded.contains("\"invariants\""))
+        assertEquals(withInvariant, OpenTaskerBundleCodec.decode(encoded))
+        assertFalse(emptyEncoded.contains("\"invariants\""))
+        assertTrue(OpenTaskerBundleCodec.validate(withInvariant).canImport)
     }
 
     @Test

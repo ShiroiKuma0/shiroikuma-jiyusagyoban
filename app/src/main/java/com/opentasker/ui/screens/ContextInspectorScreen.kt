@@ -63,13 +63,16 @@ import com.opentasker.core.contexts.inspectProfiles
 import com.opentasker.core.contexts.observationStatus
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintFinding
+import com.opentasker.core.capabilities.AutomationLintReport
 import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.capabilities.AutomationLintStrings
+import com.opentasker.core.capabilities.AutomationInvariantStore
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ContextType
+import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecycleStrings
 import com.opentasker.core.model.Task
@@ -106,6 +109,7 @@ class ContextInspectorViewModel(
     private val sourceCollectorJobs = mutableMapOf<String, Job>()
     private var refreshJob: Job? = null
     private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
+    private val invariantStore = AutomationInvariantStore(appContext)
 
     /** The profile a synthetic-trigger simulation is running against; survives rotation. */
     private val _simulationProfile = MutableStateFlow<Profile?>(null)
@@ -142,12 +146,25 @@ class ContextInspectorViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val lintFindings: StateFlow<Map<Long, List<AutomationLintFinding>>> = combine(profiles, tasks) { profiles, tasks ->
+    private val _invariants = MutableStateFlow(invariantStore.load())
+    val invariants: StateFlow<List<AutomationInvariant>> = _invariants.asStateFlow()
+
+    fun updateInvariants(value: List<AutomationInvariant>) {
+        _invariants.value = invariantStore.save(value)
+    }
+
+    val lintReport: StateFlow<AutomationLintReport> = combine(profiles, tasks, invariants) { profiles, tasks, invariants ->
         AutomationLint.analyze(
             profiles,
             tasks,
             strings = AutomationLintStrings.from(appContext.resources),
-        ).findings
+            invariants = invariants,
+            nowMs = clock(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AutomationLintReport())
+
+    val lintFindings: StateFlow<Map<Long, List<AutomationLintFinding>>> = lintReport.map { report ->
+        report.findings
             .flatMap { finding -> finding.profileIds.map { profileId -> profileId to finding } }
             .groupBy({ it.first }, { it.second })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -264,6 +281,8 @@ fun ContextInspectorScreen(
     val snapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val lintFindings by viewModel.lintFindings.collectAsState()
+    val invariants by viewModel.invariants.collectAsState()
+    val lintReport by viewModel.lintReport.collectAsState()
     val simulationProfile by viewModel.simulationProfile.collectAsState()
 
     DisposableEffect(viewModel) {
@@ -271,7 +290,7 @@ fun ContextInspectorScreen(
         onDispose { viewModel.stopObserving() }
     }
 
-    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty()) {
+    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty() && invariants.isEmpty()) {
         InspectorEmptyState(contentPadding)
         return
     }
@@ -304,6 +323,13 @@ fun ContextInspectorScreen(
             item {
                 StorageDecodeWarningCard(storageDecodeIssues)
             }
+        }
+        item {
+            AutomationInvariantPanel(
+                invariants = invariants,
+                report = lintReport,
+                onUpdate = viewModel::updateInvariants,
+            )
         }
         if (oem.needsExtraSteps) {
             item {

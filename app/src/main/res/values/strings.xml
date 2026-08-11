@@ -580,6 +580,48 @@
     <string name="automation_lint_inter_profile_loop_title">Inter-profile loop</string>
     <string name="automation_lint_inter_profile_loop_detail">Profiles form a direct task cycle: %1$s.</string>
     <string name="automation_lint_inter_profile_loop_fix">Remove one task.run edge or add an explicit state guard so the chain cannot retrigger itself.</string>
+    <string name="automation_lint_shadowed_rule_title">Shadowed rule</string>
+    <string name="automation_lint_shadowed_rule_detail">%1$s can be active with %2$s, which writes %3$s at priority %4$d versus %5$d.</string>
+    <string name="automation_lint_shadowed_rule_fix">Make the contexts mutually exclusive, or confirm that the lower-priority rule should remain available.</string>
+    <string name="automation_lint_unreachable_rule_title">Unreachable rule</string>
+    <string name="automation_lint_unreachable_rule_detail">%1$s cannot run: %2$s.</string>
+    <string name="automation_lint_unreachable_rule_fix">Restore the referenced task or adjust the context and lifetime constraints so the profile can run.</string>
+    <string name="automation_lint_action_revert_pair_title">Action/revert pair</string>
+    <string name="automation_lint_action_revert_pair_detail">%1$s writes %2$s in both its enter and exit tasks.</string>
+    <string name="automation_lint_action_revert_pair_fix">Verify that the exit task restores the intended previous state instead of repeating the enter action.</string>
+    <string name="automation_lint_invariant_violation_title">Invariant violation</string>
+    <string name="automation_lint_invariant_violation_detail">Invariant %1$s (%2$s) may be violated by %3$s writing %4$s.</string>
+    <string name="automation_lint_invariant_violation_fix">Disable or constrain the violating profile, or revise the invariant if the write is intentional.</string>
+    <string name="automation_invariant_panel_title">Device-state invariants</string>
+    <string name="automation_invariant_panel_body">Declare state that enabled profiles must preserve. Diagnostics checks these rules away from the automation engine.</string>
+    <string name="automation_invariant_empty">No invariants declared yet.</string>
+    <string name="automation_invariant_add">Add invariant</string>
+    <string name="automation_invariant_edit">Edit invariant</string>
+    <string name="automation_invariant_delete">Delete invariant</string>
+    <string name="automation_invariant_guard">Guard: %1$s %2$s %3$s</string>
+    <string name="automation_invariant_forbidden_write">Forbidden write: %1$s</string>
+    <string name="automation_invariant_add_title">Add device-state invariant</string>
+    <string name="automation_invariant_edit_title">Edit device-state invariant</string>
+    <string name="automation_invariant_editor_body">When the guard is true, the selected setting write is reported as a policy violation.</string>
+    <string name="automation_invariant_name_label">Invariant name</string>
+    <string name="automation_invariant_guard_key_label">Guard state key</string>
+    <string name="automation_invariant_operator_value">Operator: %1$s</string>
+    <string name="automation_invariant_guard_value_label">Guard value</string>
+    <string name="automation_invariant_forbidden_key_label">Forbidden setting key</string>
+    <string name="automation_invariant_forbidden_key_helper">Examples: wifi, brightness, dnd, volume:music</string>
+    <string name="automation_invariant_validation_name">Enter a name of at most 64 characters.</string>
+    <string name="automation_invariant_validation_guard_key">Use a letter followed by letters, numbers, dots, underscores, colons, or hyphens.</string>
+    <string name="automation_invariant_validation_guard_value">Enter a value of at most 96 characters.</string>
+    <string name="automation_invariant_validation_write_key">Enter a valid setting key.</string>
+    <string name="automation_invariant_validation_generic">Complete all invariant fields with valid values.</string>
+    <string name="automation_invariant_save">Save invariant</string>
+    <string name="automation_invariant_cancel">Cancel</string>
+    <string name="automation_invariant_operator_equals">equals (=)</string>
+    <string name="automation_invariant_operator_not_equals">does not equal (!=)</string>
+    <string name="automation_invariant_operator_greater_than">greater than (&gt;)</string>
+    <string name="automation_invariant_operator_greater_or_equal">at least (&gt;=)</string>
+    <string name="automation_invariant_operator_less_than">less than (&lt;)</string>
+    <string name="automation_invariant_operator_less_or_equal">at most (&lt;=)</string>
 
     <!-- Scenes screen -->
     <string name="scenes_create">Create Scene</string>
