@@ -8,6 +8,31 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.85.2026-08-11.g6c6f1aab+003 — 2026-08-11
+
+**A volume key pressed while the phone is ringing now reaches the phone.** The grabber consumed a
+single tap whenever the screen was on and re-injected it only when the screen was off — and a
+ringing call lights the screen, so the one moment the key most needs to reach the system was exactly
+the moment it was swallowed. Neither the framework nor the dialer ever learned it had been pressed,
+and the volume panel opened over the call screen instead. A ringing flag now sits beside the
+screen-state flag in the grabber, pushed over the same privileged path, and a short tap is
+re-injected whenever either says so. The panel is suppressed for that same press at the source, so
+`物理鍵 音量下単` never matches and nothing opens over the call. Long, double and triple presses are
+untouched and stay ours.
+
+The ringing state is read from the phone-state broadcast, seeded whenever the grabber binds so a
+rebind mid-call cannot miss it, and falls back to the audio mode where the Phone permission is not
+granted. One cost is unchanged: the re-injected press is synthesised through `input keyevent`, which
+is asynchronous, so it lands a beat later than a real press.
+
+**Rebased onto upstream 0.2.85**, whose own release fixed the build broken by its staged module
+split, added a true-black AMOLED theme and an opt-in Material You, bounded the exported broadcast
+target's database work, and put profile execution slots under one lock for every automation mode.
+Four of its additions are deliberately not taken here — the API-36 AppFunctions prototype, the
+release-update check, the automation-invariant screen, and the module split itself — each because it
+contradicts a bridge, a version scheme or a build arrangement this fork already owns. The reasons are
+recorded in the commits and in `settings.gradle.kts`.
+
 ## 0.2.84.2026-08-11.g9b75aac5+018 — 2026-08-11
 
 **Only an Activity may now claim to have come to the front.** `TYPE_WINDOW_STATE_CHANGED` is fired by
