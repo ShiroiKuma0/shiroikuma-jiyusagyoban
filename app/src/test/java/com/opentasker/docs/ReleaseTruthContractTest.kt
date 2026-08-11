@@ -91,8 +91,8 @@ class ReleaseTruthContractTest {
             """\${'$'}ExpectedGradleWrapperJarSha256 = "([0-9a-f]{64})""",
         )
 
-        assertEquals(OFFICIAL_GRADLE_9_6_1_BIN_SHA256, distributionHash)
-        assertEquals(OFFICIAL_GRADLE_9_6_1_WRAPPER_JAR_SHA256, pinnedJarHash)
+        assertEquals(OFFICIAL_GRADLE_9_7_0_BIN_SHA256, distributionHash)
+        assertEquals(OFFICIAL_GRADLE_9_7_0_WRAPPER_JAR_SHA256, pinnedJarHash)
         assertEquals(pinnedJarHash, wrapperJarHash)
         assertTrue(gate.contains("\$ExpectedGradleDistributionSha256 = \"$distributionHash\""))
     }
@@ -383,10 +383,10 @@ class ReleaseTruthContractTest {
     }
 
     private companion object {
-        const val OFFICIAL_GRADLE_9_6_1_BIN_SHA256 =
-            "9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14"
-        const val OFFICIAL_GRADLE_9_6_1_WRAPPER_JAR_SHA256 =
-            "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7"
+        const val OFFICIAL_GRADLE_9_7_0_BIN_SHA256 =
+            "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
+        const val OFFICIAL_GRADLE_9_7_0_WRAPPER_JAR_SHA256 =
+            "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
     }
 }
 
