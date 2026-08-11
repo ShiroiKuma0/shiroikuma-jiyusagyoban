@@ -1309,6 +1309,16 @@
     <string name="ui_flow_target_missing">Flow target no longer exists</string>
     <string name="ui_error_message">Error: %1$s</string>
     <string name="ui_error_generic">Operation failed</string>
+    <!-- A rejection that already explains itself; the reason comes from the validation that
+         refused the change, so this carries it through without prefixing it with noise. -->
+    <string name="ui_error_reason">%1$s</string>
+    <string name="ui_error_project_name_required">Enter a project name.</string>
+    <string name="ui_error_project_name_too_long">Project names must be 64 characters or fewer.</string>
+    <string name="ui_error_project_name_duplicate">A project with that name already exists.</string>
+    <string name="ui_error_project_delete_default">The Default project cannot be deleted.</string>
+    <string name="ui_error_project_delete_same_target">Choose a different project to move this work into.</string>
+    <string name="ui_error_project_delete_variable_collision">Moving these variables would overwrite %1$s in the destination project. Rename or remove them first.</string>
+    <string name="ui_error_variable_referenced">%1$s is still used by %2$s. Remove those references first.</string>
     <string name="ui_error_corrupt_record">Saved data could not be read. Restore a backup or delete the affected item.</string>
     <string name="ui_error_diagnostics_refresh">Diagnostics could not be refreshed</string>
     <string name="ui_error_task_delete">Task delete failed</string>

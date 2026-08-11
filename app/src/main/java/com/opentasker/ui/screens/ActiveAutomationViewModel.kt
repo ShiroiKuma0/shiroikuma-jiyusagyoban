@@ -173,23 +173,6 @@ sealed interface UiMessageAction {
     ) : UiMessageAction
 }
 
-data class UiMessage(
-    // Deliberately unannotated: this is a string resource when [quantity] is null and a plurals
-    // resource otherwise. The message() and pluralMessage() factories carry the precise type.
-    val resId: Int,
-    val args: List<Any> = emptyList(),
-    /** Set when [resId] names a plurals resource rather than a string. */
-    val quantity: Int? = null,
-    val action: UiMessageAction? = null,
-) {
-    @SuppressLint("ResourceType")
-    fun resolve(context: Context): String = if (quantity == null) {
-        context.getString(resId, *args.toTypedArray())
-    } else {
-        context.resources.getQuantityString(resId, quantity, *args.toTypedArray())
-    }
-}
-
 internal data class OpenTaskerBundleReviewState(
     val bundle: OpenTaskerBundle,
     val plan: BundleImportPlan,
@@ -304,7 +287,7 @@ class ActiveAutomationViewModel(
 
     private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage {
         AppLogger.error("OpenTasker.UI", "Operation failed", error)
-        return message(uiErrorResource(error, fallbackRes))
+        return uiErrorMessage(error, fallbackRes)
     }
 
     private suspend fun recordEdit(
@@ -575,7 +558,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createTask(name: String, priority: Int, collisionMode: CollisionMode, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage(R.string.ui_message_task_created) {
+    fun createTask(
+        name: String,
+        priority: Int,
+        collisionMode: CollisionMode,
+        projectId: Long = DEFAULT_PROJECT_ID,
+        onSaved: () -> Unit = {},
+    ) = launchWithMessage(R.string.ui_message_task_created, onSaved = onSaved) {
         db.taskDao().insert(
             Task(
                 name = name.trim(),
@@ -616,7 +605,8 @@ class ActiveAutomationViewModel(
         task: Task,
         @StringRes successMessageRes: Int = R.string.ui_message_task_updated,
         successAction: UiMessageAction? = null,
-    ) = launchWithMessage(successMessageRes, successAction) {
+        onSaved: () -> Unit = {},
+    ) = launchWithMessage(successMessageRes, successAction, onSaved) {
         // Wrapped like updateScene: the corrupt-record check, history snapshot, prune, and
         // update must be atomic so a concurrent writer can't interleave and lose a revision.
         db.withTransaction {
@@ -873,8 +863,9 @@ class ActiveAutomationViewModel(
         burstLimit: Int? = null,
         overflowPolicy: ProfileOverflowPolicy = ProfileOverflowPolicy.LOG,
         fallbackTaskId: Long? = null,
+        onSaved: () -> Unit = {},
     ) =
-        launchWithMessage(R.string.ui_message_profile_created) {
+        launchWithMessage(R.string.ui_message_profile_created, onSaved = onSaved) {
             val profile = ProfileLifecyclePolicy.normalize(
                 Profile(
                 name = name.trim(),
@@ -928,7 +919,8 @@ class ActiveAutomationViewModel(
         profile: Profile,
         @StringRes successMessageRes: Int = R.string.ui_message_profile_updated,
         successAction: UiMessageAction? = null,
-    ) = launchWithMessage(successMessageRes, successAction) {
+        onSaved: () -> Unit = {},
+    ) = launchWithMessage(successMessageRes, successAction, onSaved) {
             val reviewedProfile = reviewFeedbackRisk(ProfileLifecyclePolicy.normalize(profile))
             requireValidProfileFieldLimits(reviewedProfile)
             val lint = requireAutomationLint(reviewedProfile)
@@ -980,7 +972,7 @@ class ActiveAutomationViewModel(
         )
     }
 
-    fun createProject(name: String) = launchWithMessage(R.string.ui_message_project_created) {
+    fun createProject(name: String, onSaved: () -> Unit = {}) = launchWithMessage(R.string.ui_message_project_created, onSaved = onSaved) {
         val normalized = validateProjectName(name)
         require(db.projectDao().getAll().none { it.name.equals(normalized, ignoreCase = true) }) {
             "A project with that name already exists."
@@ -2211,7 +2203,10 @@ class ActiveAutomationViewModel(
                         )
                         if (!guard.canCommit) {
                             val sites = guard.blocked.map { it.describe() }.distinct().joinToString("; ")
-                            throw IllegalStateException("Cannot delete %${variable.name}; it is referenced by: $sites")
+                            throw UiRejection(
+                                R.string.ui_error_variable_referenced,
+                                listOf("%${variable.name}", sites),
+                            )
                         }
                         delete(variable.name, projectId)
                         deletedVariableBinding = LocaleConditionGrantStore.variableKey(projectId, variable.name)
@@ -2296,26 +2291,29 @@ class ActiveAutomationViewModel(
         )
     }
 
+    /**
+     * [onSaved] runs only when [block] succeeded. Editors use it to close themselves: closing
+     * unconditionally at the call site is what discarded a whole form whenever validation the
+     * dialog cannot perform (automation lint, duplicate names, reference guards) rejected the save.
+     */
     private fun launchWithMessage(
         @StringRes successMessageRes: Int,
         successAction: UiMessageAction? = null,
+        onSaved: () -> Unit = {},
         block: suspend () -> Unit,
     ) {
         viewModelScope.launch {
             runCatching { block() }
-                .onSuccess { events.send(UiMessage(successMessageRes, action = successAction)) }
+                .onSuccess {
+                    onSaved()
+                    events.send(UiMessage(successMessageRes, action = successAction))
+                }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
 }
 
 internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
-
-internal fun uiErrorResource(error: Throwable, @StringRes fallbackRes: Int): Int = when (error) {
-    is CorruptRecordOverwriteException,
-    is CorruptStoredRecordException -> R.string.ui_error_corrupt_record
-    else -> fallbackRes
-}
 
 internal fun defaultProfileShareSlug(name: String): String {
     val slug = name

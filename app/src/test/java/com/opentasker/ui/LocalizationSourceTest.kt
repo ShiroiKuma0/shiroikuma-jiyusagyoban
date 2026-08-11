@@ -110,7 +110,13 @@ class LocalizationSourceTest {
 
         val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
         assertTrue("UI failures must be logged with their raw throwable", "AppLogger.error" in viewModel)
-        assertTrue("Known corrupt records must map to a generic resource", "R.string.ui_error_corrupt_record" in viewModel)
+        // Asserted across the package rather than one file: the failure-to-copy mapping lives in
+        // UiMessages.kt, and pinning it to a filename made an extraction look like a regression.
+        val screenSources = screenFiles.joinToString("\n") { it.readText() }
+        assertTrue(
+            "Known corrupt records must map to a generic resource",
+            "R.string.ui_error_corrupt_record" in screenSources,
+        )
     }
 
     @Test

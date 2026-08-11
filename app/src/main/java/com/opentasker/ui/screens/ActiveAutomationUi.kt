@@ -600,7 +600,7 @@ fun ActiveAutomationUi(
                         projects = projects,
                         selectedProjectId = selectedProjectId,
                         onSelectProject = { selectedProjectId = it },
-                        onCreateProject = viewModel::createProject,
+                        onCreateProject = { name, onCreated -> viewModel.createProject(name, onCreated) },
                         onRenameProject = viewModel::renameProject,
                         onReorderProject = viewModel::reorderProject,
                         onDeleteProject = viewModel::deleteProject,
@@ -1105,8 +1105,8 @@ fun ActiveAutomationUi(
             task = null,
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority, collisionMode ->
-            viewModel.createTask(name, priority, collisionMode, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
-                showCreateTaskDialog = false
+                val projectId = selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID
+                viewModel.createTask(name, priority, collisionMode, projectId) { showCreateTaskDialog = false }
             },
         )
     }
@@ -1122,8 +1122,8 @@ fun ActiveAutomationUi(
                         priority = priority.coerceIn(0, 10),
                         collisionMode = collisionMode,
                     ),
+                    onSaved = { clearTaskDialog() },
                 )
-                clearTaskDialog()
             },
         )
     }
@@ -1133,8 +1133,7 @@ fun ActiveAutomationUi(
             tasks = projectTasks,
             onDismiss = { showCreateProfileDialog = false },
             onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId ->
-                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId)
-                showCreateProfileDialog = false
+                viewModel.createProfile(name, enabled, enterTaskId, exitTaskId, cooldown, automationMode, group, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, priority, gracePeriod, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId) { showCreateProfileDialog = false }
             },
         )
     }
@@ -1195,8 +1194,9 @@ fun ActiveAutomationUi(
                         maxActiveExecutions = maxActiveExecutions, burstLimit = burstLimit, overflowPolicy = overflowPolicy,
                         fallbackTaskId = fallbackTaskId,
                         lifetimeConsumed = if (lifetime == profile.lifetime) profile.lifetimeConsumed else false,
-                    ))
-                clearProfileDialog()
+                    ),
+                    onSaved = { clearProfileDialog() },
+                )
             },
             onSimulate = { editedProfile -> openSimulation(editedProfile) },
         )
@@ -1228,8 +1228,8 @@ fun ActiveAutomationUi(
                 viewModel.updateTask(
                     state.task.copy(actions = updatedActions),
                     if (state.index == null) R.string.ui_message_action_added else R.string.ui_message_action_updated,
+                    onSaved = { clearActionEdit() },
                 )
-                clearActionEdit()
             },
         )
     }
@@ -1275,8 +1275,8 @@ fun ActiveAutomationUi(
                 viewModel.updateProfile(
                     state.profile.copy(contexts = updatedContexts, contextExpression = updatedExpression),
                     if (state.index == null) R.string.ui_message_context_added else R.string.ui_message_context_updated,
+                    onSaved = { clearContextEdit() },
                 )
-                clearContextEdit()
             },
         )
     }
@@ -1289,8 +1289,8 @@ fun ActiveAutomationUi(
                 viewModel.updateProfile(
                     profile.copy(contextExpression = expression),
                     R.string.context_logic_updated,
+                    onSaved = { clearContextLogic() },
                 )
-                clearContextLogic()
             },
         )
     }
