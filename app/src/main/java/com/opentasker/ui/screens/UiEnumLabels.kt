@@ -112,9 +112,17 @@ internal fun sceneElementTypeLabelRes(type: SceneElementType): Int = when (type)
     SceneElementType.OVAL -> R.string.scene_element_type_oval
     SceneElementType.RECTANGLE -> R.string.scene_element_type_rectangle
     SceneElementType.DOODLE -> R.string.scene_element_type_doodle
+    // Fork-only element types upstream's enum does not carry.
+    SceneElementType.PROGRESS -> R.string.scene_element_type_progress
+    SceneElementType.METEOR -> R.string.scene_element_type_meteor
 }
 
+/**
+ * Upstream resolves this through `ActionMetadata.nameRes`. The fork keeps action names as inline
+ * strings on the metadata, so the name is read directly and the generic resource is only the
+ * fallback for an action id with no registered metadata.
+ */
 @Composable
-internal fun actionDisplayName(actionId: String): String = stringResource(
-    ActionMetadataRegistry.get(actionId)?.nameRes ?: R.string.action_unknown_name,
-)
+internal fun actionDisplayName(actionId: String): String =
+    ActionMetadataRegistry.get(actionId)?.name?.takeUnless(String::isBlank)
+        ?: stringResource(R.string.action_unknown_name)
