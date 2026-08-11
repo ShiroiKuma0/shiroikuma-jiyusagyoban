@@ -1043,6 +1043,21 @@ val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
         check("StartupTimingMetric" in macrobenchmarkSourceText && "FrameTimingMetric" in macrobenchmarkSourceText) {
             "Macrobenchmark suite must cover startup and first-navigation timing."
         }
+
+        // Freshness, on the same principle as the store screenshots: the checks above are
+        // substring greps over sources in the same trust domain as the thing they certify, so a
+        // profile captured many releases ago passed forever. The recorded version code is what
+        // makes "this profile describes this build" falsifiable.
+        val capturedAt = profileFile.asFile.resolveSibling("baseline-prof-captured-at-version-code.txt")
+        check(capturedAt.isFile) {
+            "Missing ${capturedAt.name}; regenerate the baseline profile " +
+                "(:app:generateBaselineProfile on an API 35+ device) and record the version code."
+        }
+        val recorded = capturedAt.readText().trim()
+        check(recorded == appVersionCode.toString()) {
+            "The baseline profile was captured at version code $recorded but this release is " +
+                "$appVersionCode. Regenerate it so the shipped profile matches the shipped code."
+        }
         println(
             "Performance evidence harness passed: ${profile.size} profile rules; " +
                 "API 35+ device evidence is collected explicitly with :app:generateBaselineProfile " +
