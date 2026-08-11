@@ -236,6 +236,29 @@ class LocalizationSourceTest {
         assertTrue("Locale completeness failures: $failures", failures.isEmpty())
     }
 
+    @Test
+    fun releaseLocaleGateIgnoresNonLocaleResourceQualifiers() {
+        val gateSource = moduleRoot.toAbsolutePath().normalize().parent
+            .resolve("buildSrc/src/main/kotlin/com/opentasker/build/VerifyResourceTasks.kt")
+            .readText()
+
+        assertTrue(
+            "The release gate must filter values directories by locale qualifier",
+            "isLocaleValuesDirectory(it.name)" in gateSource,
+        )
+        assertTrue(
+            "The release gate must recognize BCP-47 and Android locale qualifiers",
+            "LOCALE_QUALIFIER" in gateSource,
+        )
+        assertFalse(
+            "values-night must not be treated as a translated locale",
+            isLocaleValuesDirectory("values-night"),
+        )
+        assertTrue(isLocaleValuesDirectory("values-en"))
+        assertTrue(isLocaleValuesDirectory("values-pt-rBR"))
+        assertTrue(isLocaleValuesDirectory("values-b+zh+Hans"))
+    }
+
     /**
      * True only for a `values-<locale>` directory: a two- or three-letter language, optionally with
      * an `-rXX` region, or a BCP-47 `b+` qualifier.
