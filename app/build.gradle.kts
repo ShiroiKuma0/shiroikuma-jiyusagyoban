@@ -11,9 +11,12 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.testing.jacoco.tasks.JacocoReport
 import com.opentasker.build.VerifyLocaleResourcesTask
 import com.opentasker.build.VerifyReleaseTruthTask
@@ -385,6 +388,113 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4-accessibility")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Fuzzing is deliberately isolated from every Android and release configuration. The target
+// source lives under src/fuzzTest, the dependency is resolved only by these opt-in tasks, and the
+// normal localQualityGate never depends on either task.
+val fuzzRuntimeClasspath = configurations.create("fuzzRuntimeClasspath") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+dependencies {
+    add(fuzzRuntimeClasspath.name, libs.jazzer)
+    add(fuzzRuntimeClasspath.name, libs.junit)
+}
+
+val debugKotlinClasses = layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")
+val debugJavaClasses = layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
+val unitTestKotlinClasses = layout.buildDirectory.dir("intermediates/built_in_kotlinc/debugUnitTest/compileDebugUnitTestKotlin/classes")
+val unitTestJavaClasses = layout.buildDirectory.dir("intermediates/javac/debugUnitTest/compileDebugUnitTestJavaWithJavac/classes")
+val fuzzSourceDirectory = layout.projectDirectory.dir("src/fuzzTest/java")
+val fuzzClassesDirectory = layout.buildDirectory.dir("intermediates/fuzzTest/classes")
+val fuzzCorpusDirectory = layout.projectDirectory.dir("src/fuzzTest/corpus/external-decoders")
+val fuzzRegressionDirectory = layout.projectDirectory.dir("src/fuzzTest/regression/external-decoders")
+val fuzzWorkingCorpusDirectory = layout.buildDirectory.dir("fuzz/corpus")
+val fuzzClasspath = files(
+    debugKotlinClasses,
+    debugJavaClasses,
+    unitTestKotlinClasses,
+    unitTestJavaClasses,
+    fuzzRuntimeClasspath,
+)
+
+val compileFuzzTestJava = tasks.register<JavaCompile>("compileFuzzTestJava") {
+    group = "verification"
+    description = "Compiles the opt-in JVM fuzz target without adding it to an Android variant."
+    dependsOn(
+        "compileDebugKotlin",
+        "compileDebugJavaWithJavac",
+        "compileDebugUnitTestKotlin",
+        "compileDebugUnitTestJavaWithJavac",
+    )
+    source(fileTree(fuzzSourceDirectory))
+    destinationDirectory.set(fuzzClassesDirectory)
+    classpath = fuzzClasspath
+    doFirst {
+        classpath = files(
+            fuzzClasspath,
+            tasks.named<JavaCompile>("compileDebugJavaWithJavac").get().classpath,
+        )
+    }
+    options.encoding = "UTF-8"
+    options.release.set(17)
+}
+
+val fuzzSeconds = providers.gradleProperty("fuzzSeconds").orElse("30")
+val fuzzArtifactsDirectory = layout.buildDirectory.dir("fuzz/artifacts")
+val fuzzStderrFile = layout.buildDirectory.file("fuzz/stderr.log")
+val fuzzJavaExecClasspath = files(fuzzClassesDirectory, fuzzClasspath)
+val prepareFuzzCorpus = tasks.register<Sync>("prepareFuzzCorpus") {
+    group = "verification"
+    description = "Copies the checked-in decoder seeds into the ignored fuzz workspace."
+    from(fuzzCorpusDirectory)
+    into(fuzzWorkingCorpusDirectory)
+}
+
+tasks.register<JavaExec>("fuzzExternalDecoders") {
+    group = "verification"
+    description = "Runs the opt-in coverage-guided fuzz target for external decoders."
+    dependsOn(compileFuzzTestJava, prepareFuzzCorpus)
+    mainClass.set("com.code_intelligence.jazzer.Jazzer")
+    classpath = fuzzJavaExecClasspath
+    doFirst {
+        fuzzArtifactsDirectory.get().asFile.mkdirs()
+        fuzzStderrFile.get().asFile.parentFile.mkdirs()
+        errorOutput = fuzzStderrFile.get().asFile.outputStream()
+        classpath = files(
+            fuzzJavaExecClasspath,
+            tasks.named<JavaCompile>("compileDebugJavaWithJavac").get().classpath,
+        )
+    }
+    workingDir = rootProject.projectDir
+    args(
+        "--target_class=com.opentasker.fuzz.ExternalDecoderFuzzTarget",
+        "--instrumentation_includes=com.opentasker.**",
+        "-max_total_time=${fuzzSeconds.get()}",
+        "-artifact_prefix=${fuzzArtifactsDirectory.get().asFile.absolutePath}${File.separator}",
+        fuzzWorkingCorpusDirectory.get().asFile.absolutePath,
+    )
+}
+
+tasks.register<JavaExec>("fuzzExternalDecoderRegression") {
+    group = "verification"
+    description = "Runs the checked-in deterministic external-decoder crash regression corpus."
+    dependsOn(compileFuzzTestJava)
+    mainClass.set("org.junit.runner.JUnitCore")
+    classpath = fuzzJavaExecClasspath
+    doFirst {
+        check(fuzzRegressionDirectory.asFile.isDirectory) {
+            "Missing decoder regression corpus at ${fuzzRegressionDirectory.asFile}"
+        }
+        classpath = files(
+            fuzzJavaExecClasspath,
+            tasks.named<JavaCompile>("compileDebugJavaWithJavac").get().classpath,
+        )
+    }
+    workingDir = rootProject.projectDir
+    args("com.opentasker.fuzz.ExternalDecoderRegressionTest")
 }
 
 abstract class VerifyResolvedDependencyPolicyTask : org.gradle.api.DefaultTask() {
@@ -767,6 +877,17 @@ val releaseRuntimeCoordinates = providers.provider {
     configuration.incoming.resolutionResult.allComponents.mapNotNull { component ->
         val id = component.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier
         id?.let { "${it.group}:${it.module}:${it.version}" }
+    }
+}
+
+tasks.register("verifyFuzzDependencyIsolation") {
+    group = "verification"
+    description = "Checks that the opt-in fuzzing dependency stays out of release runtime resolution."
+    doLast {
+        check(releaseRuntimeCoordinates.get().none { it.startsWith("com.code-intelligence:") }) {
+            "Jazzer must not appear in the release runtime dependency graph."
+        }
+        println("Fuzz dependency isolation passed: Jazzer is absent from release runtime resolution.")
     }
 }
 
