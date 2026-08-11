@@ -681,18 +681,13 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name="com.opentasker.core.external.OpenTaskerAppFunctionService"
-            android:exported="true"
-            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
-            tools:targetApi="36">
-            <property
-                android:name="android.app.appfunctions"
-                android:value="open_tasker_app_functions.xml" />
-            <intent-filter>
-                <action android:name="android.app.appfunctions.AppFunctionService" />
-            </intent-filter>
-        </service>
+        <!--
+            Upstream's API-36 AppFunctions prototype is not declared by this fork. It hands the
+            caller an execution id it minted itself and then asks the run-task broadcast to adopt
+            it; this fork's bridge mints the id inside AutomationTargetReceiver and returns it, so
+            honouring a supplied one would mean letting a caller choose its own key in the shared
+            external-execution ledger. See the note in OpenTaskerAppFunctionService's absence.
+        -->
 
         <receiver
             android:name="com.opentasker.core.actions.PackageArchiveStatusReceiver"

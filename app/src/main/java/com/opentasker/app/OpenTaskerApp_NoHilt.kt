@@ -12,7 +12,6 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
-import com.opentasker.core.updates.UpdateCheckWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.PendingRestoreApplyResult
@@ -154,7 +153,9 @@ class OpenTaskerApp_NoHilt : Application() {
 
             RunLogPruneWorker.enqueue(this)
             ConfigurationSnapshotWorker.enqueueIfEnabled(this)
-            UpdateCheckWorker.enqueueIfEnabled(this)
+            // Upstream's opt-in release check polls SysAdminDoc/OpenTasker and compares its tag to
+            // appVersionName. This fork ships its own build tail on top of that name, so upstream's
+            // newest tag is never the newest 自由作業盤 — the check is not wired in here.
             com.opentasker.core.engine.BandPruneWorker.enqueue(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
