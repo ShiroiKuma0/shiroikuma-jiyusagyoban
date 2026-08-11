@@ -195,6 +195,11 @@ The external-decoder fuzzer is opt-in and is not part of the release or local qu
 `./gradlew :app:fuzzExternalDecoders -PfuzzSeconds=30` for a bounded coverage-guided pass, or
 `./gradlew :app:fuzzExternalDecoderRegression` to replay the checked-in regression corpus.
 
+Compose screenshot references are generated and validated headlessly. Run
+`./gradlew :app:updateDebugScreenshotTest` after an intentional UI change to update the checked-in
+references, then run `./gradlew :app:validateDebugScreenshotTest` to compare every theme, font-scale,
+and RTL case.
+
 Release build (signed with the repo-owned self-host key when no keystore env vars are set):
 ```bash
 ./gradlew :app:assembleRelease

@@ -144,6 +144,7 @@ plugins {
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.baselineprofile)
+    alias(libs.plugins.screenshot)
     jacoco
 }
 
@@ -195,6 +196,7 @@ android {
     namespace = "com.opentasker.app"
     compileSdk = 37
     buildToolsVersion = "36.0.0"
+    experimentalProperties["android.experimental.enableScreenshotTest"] = true
 
     defaultConfig {
         applicationId = "com.opentasker.app"
@@ -388,6 +390,8 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4-accessibility")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    screenshotTestImplementation(libs.screenshot.validation.api)
+    screenshotTestImplementation(libs.androidx.compose.ui.tooling)
 }
 
 // Fuzzing is deliberately isolated from every Android and release configuration. The target
@@ -1286,6 +1290,7 @@ tasks.register("localQualityGate") {
         "verifyNativePageAlignment",
         verifyPerformanceEvidence,
         verifyDocumentationTruth,
+        "validateDebugScreenshotTest",
     )
 }
 
