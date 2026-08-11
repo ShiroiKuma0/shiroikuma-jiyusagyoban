@@ -257,6 +257,8 @@ object MqttWireCodec {
         return bytes.toByteArray()
     }
 
+    private const val MAX_INBOUND_PACKET_BYTES = 8 * 1024
+
     private fun readPacket(input: InputStream): Pair<Int, ByteArray> {
         val first = input.read().takeIf { it >= 0 } ?: throw EOFException("MQTT packet ended unexpectedly")
         var multiplier = 1
@@ -267,6 +269,12 @@ object MqttWireCodec {
             multiplier *= 128
             require(multiplier <= 128 * 128 * 128 * 128) { "MQTT remaining length is invalid" }
         } while ((encoded and 128) != 0)
+        // Only CONNACK, PUBACK and friends are read here, all of which are a handful of bytes. The
+        // length is broker-supplied, so without a cap a hostile or broken broker could make the app
+        // allocate up to the 256 MB the varint allows and get itself OOM-killed with one packet.
+        require(remaining <= MAX_INBOUND_PACKET_BYTES) {
+            "MQTT response packet is oversized ($remaining bytes)"
+        }
         val payload = ByteArray(remaining)
         var offset = 0
         while (offset < payload.size) {

@@ -401,7 +401,11 @@ class AutomationService : Service() {
         synchronized(pulseContinuities) {
             pulseContinuities.keys.removeAll { it !in activeIds }
         }
-        cooldownStore.pruneDeleted(activeIds)
+        // Prune against profiles that still exist, not the enabled ones: activeIds comes from
+        // getAllEnabled(), so disabling a profile mid-cooldown deleted its persisted deadline while
+        // the in-memory reservation survived. Whether the cooldown still applied then depended on
+        // whether the service happened to restart before the profile was switched back on.
+        cooldownStore.pruneDeleted(db.profileDao().getAllIds().toSet())
         synchronized(queuedProfileTasks) {
             // Slots are keyed +id for enter tasks and -id for exit tasks; prune both.
             queuedProfileTasks.keys.removeAll { kotlin.math.abs(it) !in activeIds }

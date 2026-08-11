@@ -25,10 +25,16 @@ class PingAction : DeclaredAction(ActionCatalog.require("ping")) {
         val host = args["host"] ?: return ActionResult.Failure("missing host")
         val varName = args["var"] ?: "result"
         if (!HOST_PATTERN.matches(host)) return ActionResult.Failure("invalid host")
-        checkLocalNetworkPermission(ctx)?.let { return it }
         val timeoutMs = (args["timeout_sec"]?.toIntOrNull() ?: 5).coerceIn(1, 30) * 1000
         return try {
-            val reachable = java.net.InetAddress.getByName(host).isReachable(timeoutMs)
+            val target = java.net.InetAddress.getByName(host)
+            // Resolve first, then gate. Demanding ACCESS_LOCAL_NETWORK before knowing the target
+            // made `ping 8.8.8.8` fail closed on Android 17 without a permission it never needed,
+            // contradicting both the capability copy and how http.request gates the same thing.
+            if (isPrivateOrLocalAddress(target)) {
+                checkLocalNetworkPermission(ctx)?.let { return it }
+            }
+            val reachable = target.isReachable(timeoutMs)
             ctx.variables.set(varName, reachable.toString())
             ctx.logger("Ping $host → $reachable")
             ActionResult.Success
@@ -111,6 +117,12 @@ class WakeOnLanAction : DeclaredAction(ActionCatalog.require("wol")) {
 
         return try {
             val addr = InetAddress.getByName(broadcast)
+            // The capability gates this action permanently on the premise that it "only ever
+            // targets a private address"; nothing enforced that, so a task could aim an
+            // unsolicited packet at any public host and port.
+            if (!addr.isBroadcastLikeOrPrivate()) {
+                return ActionResult.Failure("wol only targets a local network address: $broadcast")
+            }
             DatagramSocket().use { socket ->
                 socket.broadcast = true
                 socket.send(DatagramPacket(packet, packet.size, addr, port))
@@ -168,6 +180,13 @@ internal fun enforceHttpPolicy(url: URL, args: Map<String, String>): ActionResul
  * IPv6 Unique Local (fc00::/7) address. `InetAddress.isSiteLocalAddress` does NOT cover IPv6 ULA,
  * so it is detected explicitly; without this a `fd00::` LAN host would be treated as public.
  */
+/** A LAN broadcast, multicast, or private address - the only destinations a magic packet has. */
+private fun InetAddress.isBroadcastLikeOrPrivate(): Boolean =
+    isAnyLocalAddress ||
+        isMulticastAddress ||
+        address.all { it.toInt() and 0xff == 0xff } ||
+        isPrivateOrLocalAddress(this)
+
 internal fun isPrivateOrLocalAddress(addr: InetAddress): Boolean {
     if (addr.isLoopbackAddress || addr.isLinkLocalAddress || addr.isSiteLocalAddress) return true
     if (addr is java.net.Inet6Address) {
