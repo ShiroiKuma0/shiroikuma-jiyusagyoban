@@ -26,6 +26,9 @@ class SessionRegisterTest {
         nocturnalHr = MarkerReading(RecoveryMarker.NOCTURNAL_HR, hr, 60.0, 55.0, 65.0, 0.0, RecoveryBand.USUAL, true),
         sleep = MarkerReading(RecoveryMarker.SLEEP, 480.0, 480.0, 450.0, 510.0, 0.0, RecoveryBand.USUAL, true),
         felt = MarkerReading(RecoveryMarker.FELT, 3.0, 3.0, 2.0, 4.0, 0.0, RecoveryBand.USUAL, true),
+        temperature = MarkerReading(
+            RecoveryMarker.TEMPERATURE, 36.4, 36.4, 36.1, 36.7, 0.0, RecoveryBand.USUAL, false,
+        ),
         adverseCount = 0,
     )
 
@@ -139,5 +142,102 @@ class SessionRegisterTest {
         assertEquals("the first night has no past to be judged against", RecoveryBand.UNKNOWN, read.first().nocturnalHr.band)
         assertEquals("the last one is plainly high", RecoveryBand.HIGH, read.last().nocturnalHr.band)
         assertEquals(1, read.last().adverseCount)
+    }
+
+    /**
+     * Every night reaches the register, newest first.
+     *
+     * The grid can only carry a count per day, and the per-session cards only ever covered nights
+     * that followed a marked session — so with no session marked, nothing stored was printed at all.
+     * The screen lists these, so this is the contract that keeps it possible.
+     */
+    @Test
+    fun `every night is carried out of the register, newest first`() {
+        val r = SessionRegister.build(
+            sessions = emptyList(),
+            nights = listOf(night(2, 60.0), night(4, 62.0), night(3, 61.0)),
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 6,
+        )
+        assertTrue("no session marked must not hide the nights", r.entries.isEmpty())
+        assertEquals(3, r.nights.size)
+        assertEquals(
+            listOf(night(4, 0.0).startMs, night(3, 0.0).startMs, night(2, 0.0).startMs),
+            r.nights.map { it.startMs },
+        )
+    }
+
+    /** `yyyyMMdd` for a night's start instant, at the UTC offset these fixtures use. */
+    private fun dateKey(ms: Long): Long = java.time.Instant.ofEpochMilli(ms)
+        .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+        .let { it.year * 10_000L + it.monthValue * 100L + it.dayOfMonth }
+
+    /**
+     * A rating filed against a date the band never recorded a night for is still a line.
+     *
+     * This is the hole 白い熊 fell into (2026-08-11: "where's the fourth data point?"). The table used
+     * to be driven by the band's nights alone, so a rating with no night beside it was stored,
+     * counted in the baseline, and displayed nowhere at all — indistinguishable from never having
+     * been entered. Nothing may be invisible merely because the band has nothing to say about it.
+     */
+    @Test
+    fun `a rating with no night of its own is still listed`() {
+        val nights = listOf(night(2, 60.0), night(3, 61.0))
+        val orphanDate = dateKey(night(4, 0.0).startMs)
+        val r = SessionRegister.build(
+            sessions = emptyList(),
+            nights = nights,
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 6,
+            ratings = mapOf(
+                dateKey(night(2, 0.0).startMs) to 3,
+                orphanDate to 5,
+            ),
+            dateOfNight = ::dateKey,
+        )
+        assertEquals("two nights plus the night-less rating", 3, r.rows.size)
+        assertEquals("newest first", orphanDate, r.rows.first().dateKey)
+        val orphan = r.rows.first()
+        assertNull("there is no night to show beside it", orphan.night)
+        assertEquals("but the score is not lost", 5, orphan.felt)
+        assertNotNull("a rated night still carries its night", r.rows[2].night)
+        assertEquals(3, r.rows[2].felt)
+    }
+
+    /** The grid carries the score itself, not only a count of markers that were off. */
+    @Test
+    fun `each day cell carries that night's rating`() {
+        val history = (0 until 8).map {
+            RecoverySource.NightMetrics(base + it * day, 60.0, 480.0, 36.4)
+        }
+        val read = SessionRegister.readNights(history) { 4.0 }
+        val r = SessionRegister.build(
+            sessions = emptyList(), nights = read,
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 8,
+        )
+        val rated = r.days.filter { it.felt != null }
+        assertEquals("every night with a rating shows it on the grid", read.size, rated.size)
+        assertTrue("and it is the rating, not the marker count", rated.all { it.felt == 4 })
+    }
+
+    /**
+     * Temperature is reported but never counted — the same rule the 回復 card follows, so the register
+     * and the card can never disagree about how many markers were off on one night.
+     */
+    @Test
+    fun `a warm night is reported without being counted`() {
+        val history = (0 until 20).map {
+            RecoverySource.NightMetrics(
+                startMs = base + it * day,
+                nocturnalHr = 60.0,
+                sleepMinutes = 480.0,
+                skinTemp = if (it == 19) 37.6 else 36.4,
+            )
+        }
+        val last = SessionRegister.readNights(history) { 3.0 }.last()
+        assertEquals("the warm night is banded", RecoveryBand.HIGH, last.temperature.band)
+        assertEquals(37.6, last.temperature.value!!, 0.001)
+        assertEquals("but it is not one of the three counted", 0, last.adverseCount)
     }
 }
