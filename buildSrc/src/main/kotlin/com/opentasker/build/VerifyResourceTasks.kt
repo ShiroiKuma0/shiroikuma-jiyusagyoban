@@ -30,11 +30,14 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
 
         val localeDirectories = resources.listFiles()
             ?.filter { it.isDirectory && isLocaleValuesDirectory(it.name) }
-            ?.filter { localeXmlFiles(it).isNotEmpty() }
             .orEmpty()
             .sortedBy { it.name }
         val failures = localeDirectories.mapNotNull { directory ->
-            val localeValues = localeStringValues(localeXmlFiles(directory))
+            val localeFiles = localeXmlFiles(directory)
+            if (localeFiles.isEmpty()) {
+                return@mapNotNull "${directory.name} contains no XML resources."
+            }
+            val localeValues = localeStringValues(localeFiles)
             val unknownNames = localeValues.keys - defaultValues.keys
             if (unknownNames.isNotEmpty()) {
                 return@mapNotNull "${directory.name} defines unknown string(s): ${unknownNames.sorted().joinToString()}"
@@ -55,12 +58,13 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
             "Locale resource completeness gate failed:\n${failures.joinToString("\n")}"
         }
         val shipped = localeDirectories.joinToString { it.name.removePrefix("values-") }
+        val examined = "${localeDirectories.size} locale director" + if (localeDirectories.size == 1) "y" else "ies"
         println(
             if (shipped.isBlank()) {
-                "Locale resource gate passed: English is the only shipped locale; no incomplete locale directories found."
+                "Locale resource gate passed: English is the only shipped locale; examined $examined."
             } else {
                 "Locale resource gate passed: shipped locales $shipped meet the " +
-                    "${"%.0f%%".format(threshold * 100.0)} completion threshold."
+                    "${"%.0f%%".format(threshold * 100.0)} completion threshold; examined $examined."
             },
         )
     }

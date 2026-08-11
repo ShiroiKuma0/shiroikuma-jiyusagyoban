@@ -282,7 +282,7 @@ class LocalizationSourceTest {
             val localeFiles = Files.list(directory).use { paths ->
                 paths.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".xml") }.toList()
             }
-            if (localeFiles.isEmpty()) return@mapNotNull null
+            if (localeFiles.isEmpty()) return@mapNotNull "${directory.fileName} contains no XML resources"
             val invalidFiles = localeFiles.mapNotNull { file ->
                 runCatching {
                     val root = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile()).documentElement.nodeName
@@ -309,6 +309,22 @@ class LocalizationSourceTest {
         }
 
         assertTrue("Locale completeness failures: $failures", failures.isEmpty())
+    }
+
+    @Test
+    fun localeGateRejectsAnEmptyLocaleDirectoryByName() {
+        val gateSource = moduleRoot.toAbsolutePath().normalize().parent
+            .resolve("buildSrc/src/main/kotlin/com/opentasker/build/VerifyResourceTasks.kt")
+            .readText()
+
+        assertFalse(
+            "The release gate must not skip empty locale directories",
+            ".filter { localeXmlFiles(it).isNotEmpty() }" in gateSource,
+        )
+        assertTrue(
+            "An empty locale directory must be reported by name",
+            "${'$'}{directory.name} contains no XML resources." in gateSource,
+        )
     }
 
     @Test
