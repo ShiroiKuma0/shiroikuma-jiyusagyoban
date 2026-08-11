@@ -33,6 +33,38 @@ class ProfileMatcherTest {
     }
 
     @Test
+    fun anEventThatDoesNotMatchTheSpecLeavesThePulseSequenceAlone() {
+        // Every EVENT context receives every bridge's traffic, so a notification reaches an NFC
+        // context. Advancing on arrival is what let `EVENT(nfc) OR STATE(...)` fire on unrelated
+        // traffic while the STATE leaf was already true.
+        assertEquals(4L, pulseSequenceAfterObservation(matched = false, observedSequence = 5L, previousSequence = 4L))
+        assertEquals(6L, pulseSequenceAfterObservation(matched = true, observedSequence = 6L, previousSequence = 4L))
+    }
+
+    @Test
+    fun unrelatedPulsesDoNotActivateAProfileWhoseOtherBranchIsAlreadyTrue() = runBlocking {
+        // `EVENT(nfc) OR STATE(wifi=Home)` on the home network: allMatched stays true throughout,
+        // so only a real sequence advance may activate. Two unrelated events arrive, then a tag.
+        var sequence = 4L
+        val afterFirstUnrelated = pulseSequenceAfterObservation(false, observedSequence = 5L, previousSequence = sequence)
+        val afterSecondUnrelated = pulseSequenceAfterObservation(false, observedSequence = 6L, previousSequence = afterFirstUnrelated)
+        val afterTag = pulseSequenceAfterObservation(true, observedSequence = 7L, previousSequence = afterSecondUnrelated)
+
+        val changes = profileStateChangesFromSnapshots(
+            snapshots = flowOf(
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = sequence),
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = afterFirstUnrelated),
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = afterSecondUnrelated),
+                ProfileMatchSnapshot(allMatched = true, pulseSequence = afterTag),
+            ),
+            hasPulseContexts = true,
+            initialPulseSequence = sequence,
+        ).toList()
+
+        assertEquals(listOf(ProfileStateChange.Activated(null)), changes)
+    }
+
+    @Test
     fun inheritedPulseBaselineDoesNotRefireThePulseThatStartedDuringReconcile() = runBlocking {
         val changes = profileStateChangesFromSnapshots(
             snapshots = flowOf(

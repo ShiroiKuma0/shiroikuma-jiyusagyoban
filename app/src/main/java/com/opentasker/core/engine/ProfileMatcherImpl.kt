@@ -113,7 +113,11 @@ internal class ProfileMatcher(
                     ContextMatchUpdate(
                         matched = effectiveMatched,
                         pulseContext = isPulseContext,
-                        pulseSequence = pulseObservation?.sequence ?: 0L,
+                        pulseSequence = pulseSequenceAfterObservation(
+                            matched = matched,
+                            observedSequence = pulseObservation?.sequence,
+                            previousSequence = previous.pulseSequence,
+                        ),
                         event = if (isPulseContext && effectiveMatched) preparedEvent else null,
                     )
                 }.onEach { update ->
@@ -259,6 +263,24 @@ internal data class ContextMatchUpdate(
             ContextMatchUpdate(matched = false, pulseContext = pulseContext, pulseSequence = pulseSequence)
     }
 }
+
+/**
+ * The pulse sequence a context reports after observing an event.
+ *
+ * Only an event the context is actually watching advances it. Every EVENT context is subscribed to
+ * every bridge, so advancing on arrival alone made a profile activate whenever its expression
+ * happened to be true for another reason: `EVENT(nfc) OR STATE(wifi=Home)` re-fired on every
+ * notification while on that network, and two OR'd EVENT leaves turned one physical event into two
+ * activations because each leaf advanced the shared sequence in turn.
+ *
+ * [matched] is the raw spec match, before inversion: the pulse means "the awaited event arrived",
+ * which an inverted leaf never observes.
+ */
+internal fun pulseSequenceAfterObservation(
+    matched: Boolean,
+    observedSequence: Long?,
+    previousSequence: Long,
+): Long = if (matched) observedSequence ?: 0L else previousSequence
 
 internal data class ProfileMatchSnapshot(
     val allMatched: Boolean,
