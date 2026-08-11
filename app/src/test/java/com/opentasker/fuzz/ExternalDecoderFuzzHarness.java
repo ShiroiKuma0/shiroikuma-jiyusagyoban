@@ -33,9 +33,15 @@ public final class ExternalDecoderFuzzHarness {
                 case 3 -> runStructured(bounded);
                 default -> throw new AssertionError("unreachable decoder route");
             }
-        } catch (Exception ignored) {
-            // Malformed input is expected. Errors (including resource exhaustion) deliberately
-            // escape so Jazzer can turn an actual crash into a checked-in reproducer.
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            // The failures these decoders raise deliberately for malformed input.
+            // (kotlinx.serialization's SerializationException extends IllegalArgumentException.)
+            //
+            // A blanket `catch (Exception)` here defeated the point of fuzzing a pure-JVM decoder:
+            // every unexpected RuntimeException - NullPointerException, IndexOutOfBoundsException,
+            // ClassCastException - is exactly what Jazzer exists to surface from attacker-supplied
+            // import files, and catching Exception reclassified all of them as "expected malformed
+            // input". Only StackOverflowError, OOM and JVM crashes could ever be reported.
         }
     }
 

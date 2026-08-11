@@ -44,6 +44,10 @@ class LocalizationSourceTest {
         )
         val forbiddenPatterns = mapOf(
             "Text literal" to Regex("""\bText\s*\(\s*""" + "\""),
+            // Text(text = "...") is the same defect wearing a named argument; the
+            // positional-only pattern above never matched it.
+            "Text named-argument literal" to Regex("""Text\s*\(\s*text\s*=\s*""" + "\""),
+            "supportingText literal" to Regex("""supportingText\s*=\s*\{\s*Text\s*\(\s*""" + "\""),
             "Button text literal" to Regex("""\bButton\s*\([^)]*\)\s*\{\s*Text\s*\(\s*""" + "\"", RegexOption.DOT_MATCHES_ALL),
             "contentDescription literal" to Regex("""contentDescription\s*=\s*""" + "\""),
             "label text literal" to Regex("""label\s*=\s*\{\s*Text\s*\(\s*""" + "\""),

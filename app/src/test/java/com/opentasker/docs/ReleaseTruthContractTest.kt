@@ -254,6 +254,9 @@ class ReleaseTruthContractTest {
         )
     }
 
+    /** Documents that are committed, so a missing one is a defect rather than a local absence. */
+    private val REQUIRED_DOCUMENTS = setOf("README.md")
+
     private fun documentRules(): List<DocumentTruthRule> = listOf(
         DocumentTruthRule(
             "README.md",
@@ -336,7 +339,17 @@ class ReleaseTruthContractTest {
     )
 
     private fun assertDocumentTruthWhenPresent(rule: DocumentTruthRule) {
-        val text = optionalDoc(rule.path) ?: return
+        val text = optionalDoc(rule.path)
+        if (text == null) {
+            // A rule for a document that is not there protects nothing. Committed documents must
+            // exist, otherwise deleting one silently deletes its stale-claim protection with it.
+            // The docs tree is gitignored, so only committed paths are required.
+            assertFalse(
+                "${rule.path} is required but missing; its truth rules were silently skipped",
+                rule.path in REQUIRED_DOCUMENTS,
+            )
+            return
+        }
         val violations = documentTruthViolations(text, rule)
         assertTrue(violations.joinToString("\n"), violations.isEmpty())
     }

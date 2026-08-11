@@ -103,6 +103,26 @@ abstract class VerifyLocaleResourcesTask : DefaultTask() {
     }
 }
 
+/**
+ * Schema files that differ from what git has committed (modified or untracked). Returns empty when
+ * git is unavailable, which keeps a source-only checkout building; the release wrapper still runs
+ * its own check.
+ */
+internal fun gitDirtySchemaFiles(schemaDir: File): List<String> = runCatching {
+    val process = ProcessBuilder("git", "status", "--porcelain", "--", schemaDir.absolutePath)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().readText()
+    if (!process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS) || process.exitValue() != 0) {
+        return@runCatching emptyList()
+    }
+    output.lineSequence()
+        .map(String::trim)
+        .filter { it.isNotEmpty() }
+        .mapNotNull { it.substringAfterLast(' ').substringAfterLast('/').takeIf { name -> name.endsWith(".json") } }
+        .toList()
+}.getOrDefault(emptyList())
+
 abstract class VerifyRoomSchemaTask : DefaultTask() {
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -127,6 +147,24 @@ abstract class VerifyRoomSchemaTask : DefaultTask() {
         check(missing.isEmpty()) {
             "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to regenerate, then commit."
         }
-        println("Room schema drift gate passed: versions 1..$currentVersion present.")
+
+        // Existence is not drift detection. Change an entity without bumping the version and KSP
+        // silently rewrites the current schema JSON in place: every file still exists, the
+        // migration test validates against the regenerated file and passes, and the gate that
+        // exists to catch this reports success - while every upgrading user crashes at open with
+        // Room's identity-hash mismatch. Only the release wrapper script noticed, via git.
+        val drifted = gitDirtySchemaFiles(schemaDir)
+        check(drifted.isEmpty()) {
+            buildString {
+                append("Room schema drift: ")
+                append(drifted.sorted().joinToString())
+                append(" differ from the committed copy. KSP regenerates the schema for the ")
+                append("current version, so an entity change without a bump of ")
+                append("OPEN_TASKER_DATABASE_SCHEMA_VERSION rewrites it in place and breaks every ")
+                append("upgrading install. Bump the version and add a migration, or commit the ")
+                append("regenerated schema if the change is intentional.")
+            }
+        }
+        println("Room schema drift gate passed: versions 1..$currentVersion present and unmodified.")
     }
 }

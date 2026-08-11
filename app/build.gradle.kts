@@ -22,7 +22,9 @@ import com.opentasker.build.VerifyLocaleResourcesTask
 import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
 
-private val JVM_TEST_FLOOR = 1049
+// Kept close under the current count. A floor far below it lets a large batch of tests be
+// deleted silently; the headroom only absorbs intentional consolidation.
+private val JVM_TEST_FLOOR = 1200
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)
@@ -394,7 +396,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.bouncycastle.bcpkix)
-    testImplementation("androidx.work:work-testing:2.11.2")
+    testImplementation(libs.work.testing)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.room.testing)
@@ -692,7 +694,9 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
         fun count(attribute: String): Int = reports.sumOf { report ->
             Regex("""\b$attribute="(\d+)"""").find(report.readText())?.groupValues?.get(1)?.toInt() ?: 0
         }
-        val tests = count("tests")
+        // JUnit's tests= attribute includes skipped tests, so an assumption-skip or @Ignore could
+        // satisfy the floor while asserting nothing.
+        val tests = count("tests") - count("skipped")
         val failures = count("failures")
         val errors = count("errors")
         val floor = minimumTests.get()
@@ -1299,6 +1303,7 @@ tasks.register("localQualityGate") {
         verifyLocaleResources,
         verifyQualityGateSeed,
         "verifyNativePageAlignment",
+        "verifyFuzzDependencyIsolation",
         verifyPerformanceEvidence,
         verifyDocumentationTruth,
         "validateDebugScreenshotTest",
@@ -1310,6 +1315,19 @@ tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
     description = "Checks that packaged native ELFs are read-only and have 16 KB PT_LOAD alignment."
     dependsOn("packageDebug")
     apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+}
+
+/**
+ * The same audit against the artifact that actually ships. Packaging is identical across build
+ * types today, so the debug check transfers - but that is a coincidence the release must not rely
+ * on, and a release-only packaging change would otherwise escape the 16 KB gate entirely.
+ */
+tasks.register<VerifyNativePageAlignmentTask>("verifyReleaseNativePageAlignment") {
+    group = "verification"
+    description = "Checks 16 KB PT_LOAD alignment in the release APK that ships."
+    dependsOn("packageRelease")
+    // Same single source of truth the build recipe and reproducibility harness use.
+    apk.set(rootProject.layout.projectDirectory.file(expectedReleaseApkPath))
 }
 
 /**
