@@ -215,4 +215,30 @@ class TaskerXmlExportTest {
             .forEach { code -> assertTrue("missing Tasker code $code", report.xml.contains("<code>$code</code>")) }
         assertTrue(report.xml.contains("content://media/song"))
     }
+
+
+    @Test
+    fun variablesSurviveAnExportImportRoundTrip() {
+        // The exporter writes <n>/<v>; the importer used to read only nme/val, so a file this app
+        // produced and then re-imported dropped every variable as "skipped because it had no name".
+        val report = TaskerXmlExporter.export(
+            profiles = emptyList(),
+            tasks = emptyList(),
+            variables = listOf(
+                Variable("MODE", "commute", isGlobal = true),
+                Variable("THRESHOLD", "20", isGlobal = true),
+            ),
+        )
+
+        val imported = TaskerXmlImporter.parse(report.xml, appVersion = "test")
+
+        // Names carry Tasker's % sigil inside the bundle and are normalised at storage time.
+        assertEquals(
+            listOf("%MODE" to "commute", "%THRESHOLD" to "20"),
+            imported.bundle.variables.map { it.name to it.value },
+        )
+        assertFalse(
+            imported.lossyWarnings.any { it.contains("had no name") },
+        )
+    }
 }

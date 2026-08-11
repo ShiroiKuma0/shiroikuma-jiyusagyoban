@@ -9,6 +9,7 @@ import org.jsoup.Jsoup
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
+import com.opentasker.core.transfer.ImportResourceGuard
 
 /**
  * Deterministic, on-device parser that turns a JSON / CSV / XML / HTML string into one or more variable
@@ -155,14 +156,23 @@ object StructuredDataReader {
     private fun readXml(source: String, path: String): List<String>? {
         val names = path.trim().trim('/').split('/').map { it.trim() }.filter { it.isNotEmpty() }
         if (names.isEmpty()) return null
+        // DOCTYPE is rejected in text first, because the Apache feature below cannot be relied on:
+        // Android's Harmony/Expat factory throws SAXNotRecognizedException for that URI, and since
+        // the throw happened inside runCatching every XML read failed on device while desktop
+        // Xerces kept the JVM tests green. This is the same defect that broke Tasker XML import
+        // (issue #5); the sanitizer is the enforcement, the feature is belt and braces.
+        val sanitized = runCatching { ImportResourceGuard.sanitizeTaskerXml(source) }.getOrNull()
+            ?: return null
         val doc = runCatching {
             val factory = DocumentBuilderFactory.newInstance().apply {
-                // Harden against XXE / entity-expansion in untrusted input.
-                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
+                setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
+                setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
+                setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
                 isExpandEntityReferences = false
                 isNamespaceAware = false
             }
-            factory.newDocumentBuilder().parse(InputSource(source.reader()))
+            factory.newDocumentBuilder().parse(InputSource(sanitized.reader()))
         }.getOrNull() ?: return null
 
         val rootEl = doc.documentElement ?: return null
@@ -172,6 +182,14 @@ object StructuredDataReader {
             current = current.flatMap { el -> el.childElements().filter { it.tagName == name } }
         }
         return current.map { it.textContent.trim() }
+    }
+
+    /**
+     * Android's XML factories throw for feature URIs they do not recognise; a fatal setFeature is
+     * what made every XML read fail on device.
+     */
+    private fun DocumentBuilderFactory.setFeatureSafely(name: String, value: Boolean) {
+        runCatching { setFeature(name, value) }
     }
 
     private fun Element.childElements(): List<Element> {
