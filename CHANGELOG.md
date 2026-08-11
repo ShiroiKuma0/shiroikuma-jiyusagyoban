@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Setup permission, preference, companion, push-token, and grant snapshots now load through an IO-backed ViewModel, so returning from system settings refreshes without blocking composition.
 - Profile, task, and scene deletion now snapshots the complete entity for snackbar Undo/Redo, while action, context, and scene-element removal is immediate and undoable without a confirmation dialog.
 - Exported Locale condition queries now require revocable grants bound to the selected profile, context, or variable; unauthorized queries return unknown before database access, and the receiver reuses a bounded scope.
 - MQTT TLS publishes now pin the vetted TCP address while preserving the broker hostname for HTTPS endpoint verification and SNI; a mismatched certificate is rejected before credentials or payloads are sent.
