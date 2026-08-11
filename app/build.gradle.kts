@@ -397,32 +397,6 @@ android {
 }
 
 kotlin {
-    sourceSets {
-        configureEach {
-            kotlin.exclude(
-            "com/opentasker/core/logging/AppLogger.kt",
-            "com/opentasker/core/storage/**",
-            "com/opentasker/core/engine/ActiveExecutionRegistry.kt",
-            "com/opentasker/core/engine/AutomationLiveConditionState.kt",
-            "com/opentasker/core/engine/CausalExecutionTracker.kt",
-            "com/opentasker/core/engine/CooldownReservations.kt",
-            "com/opentasker/core/engine/CooldownStore.kt",
-            "com/opentasker/core/engine/EngineHeartbeatStore.kt",
-            "com/opentasker/core/engine/ExecutionEnvelope.kt",
-            "com/opentasker/core/engine/RunLogSource.kt",
-            "com/opentasker/core/engine/TaskFailure.kt",
-            "com/opentasker/core/model/ContextSpec.kt",
-            "com/opentasker/core/model/Profile.kt",
-            "com/opentasker/core/model/ProfileConcurrencyPolicy.kt",
-            "com/opentasker/core/model/Project.kt",
-            "com/opentasker/core/model/RunLogEntry.kt",
-            "com/opentasker/core/model/Scene.kt",
-            "com/opentasker/core/model/Task.kt",
-            "com/opentasker/core/model/Variable.kt",
-            "com/opentasker/core/model/VariableNamePolicy.kt",
-            )
-        }
-    }
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
@@ -434,11 +408,7 @@ ksp {
 }
 
 dependencies {
-    implementation(project(":core:common"))
-    implementation(project(":core:model"))
-    implementation(project(":core:storage"))
-    implementation(project(":core:engine"))
-    implementation(project(":feature:automation"))
+    // Upstream's core/* and feature/* modules are not wired in: see the note in settings.gradle.kts.
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
