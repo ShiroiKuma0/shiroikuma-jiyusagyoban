@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -78,86 +80,137 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.engine.tryRetryPlan
 import com.opentasker.ui.theme.DesignSystem
 
-private data class LocalizedActionMetadata(
+internal data class LocalizedActionMetadata(
     val metadata: ActionMetadata,
     val name: String,
     val description: String,
     val category: String,
 )
 
+internal fun filterActionPickerItems(
+    items: List<LocalizedActionMetadata>,
+    query: String,
+): List<LocalizedActionMetadata> {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isEmpty()) return items
+    return items.filter { item ->
+        item.name.contains(normalizedQuery, ignoreCase = true) ||
+            item.description.contains(normalizedQuery, ignoreCase = true) ||
+            item.metadata.id.contains(normalizedQuery, ignoreCase = true)
+    }
+}
+
 internal const val ACTION_CONTINUE_ON_ERROR_TAG = "action_continue_on_error"
 internal const val ACTION_VARIABLE_PICKER_TAG = "action_variable_picker"
 
 @Composable
+@SuppressLint("LocalContextGetResourceValueCall")
 internal fun ActionPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ActionMetadata) -> Unit,
 ) {
-    val localizedActions = mutableListOf<LocalizedActionMetadata>()
-    for (metadata in ActionMetadataRegistry.all()) {
-        if (!metadata.pickerVisible) continue
-        localizedActions += LocalizedActionMetadata(
-            metadata = metadata,
-            name = stringResource(metadata.nameRes),
-            description = stringResource(metadata.descriptionRes),
-            category = stringResource(metadata.categoryRes),
-        )
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    var query by rememberSaveable { mutableStateOf("") }
+    val localizedActions = remember(configuration) {
+        ActionMetadataRegistry.all()
+            .asSequence()
+            .filter { it.pickerVisible }
+            .map { metadata ->
+                LocalizedActionMetadata(
+                    metadata = metadata,
+                    name = context.getString(metadata.nameRes),
+                    description = context.getString(metadata.descriptionRes),
+                    category = context.getString(metadata.categoryRes),
+                )
+            }
+            .toList()
     }
-    val actionGroups = localizedActions
-        .groupBy { it.category }
-        .toSortedMap()
-        .map { (category, actions) -> category to actions.sortedBy { it.name } }
+    val filteredActions = remember(localizedActions, query) { filterActionPickerItems(localizedActions, query) }
+    val actionGroups = remember(filteredActions) {
+        filteredActions
+            .groupBy { it.category }
+            .toSortedMap()
+            .map { (category, actions) -> category to actions.sortedBy { it.name } }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_add_action)) },
         text = {
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
-                verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                actionGroups.forEach { (category, actions) ->
-                    item(key = "category-$category") {
-                        Text(
-                            category,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
-                    items(actions, key = { it.metadata.id }) { localized ->
-                        val metadata = localized.metadata
-                        val capability = ActionCapabilityRegistry.get(metadata.id)
-                        Card(
-                            onClick = { onSelect(metadata) },
-                            enabled = capability.canAdd,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (capability.canAdd) {
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
-                                },
-                            ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                                Row(
+            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.action_picker_search_label)) },
+                    placeholder = { Text(stringResource(R.string.action_picker_search_hint)) },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        {
+                            TextButton(onClick = { query = "" }) {
+                                Text(stringResource(R.string.action_picker_clear_search))
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                    singleLine = true,
+                )
+                if (actionGroups.isEmpty()) {
+                    Text(
+                        stringResource(R.string.action_picker_no_results),
+                        modifier = Modifier.padding(vertical = 24.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                    ) {
+                        actionGroups.forEach { (category, actions) ->
+                            item(key = "category-$category") {
+                                Text(
+                                    category,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                            items(actions, key = { it.metadata.id }) { localized ->
+                                val metadata = localized.metadata
+                                val capability = ActionCapabilityRegistry.get(metadata.id)
+                                Card(
+                                    onClick = { onSelect(metadata) },
+                                    enabled = capability.canAdd,
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (capability.canAdd) {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                                        },
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+                                    shape = RoundedCornerShape(14.dp),
                                 ) {
-                                    Text(localized.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                    if (capability.level != CapabilityLevel.Supported) {
-                                        StatusPill(
-                                            if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
-                                            if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                        )
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                                        ) {
+                                            Text(localized.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                            if (capability.level != CapabilityLevel.Supported) {
+                                                StatusPill(
+                                                    if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
+                                                    if (capability.level == CapabilityLevel.Unsupported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                )
+                                            }
+                                        }
+                                        Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        if (capability.level != CapabilityLevel.Supported) {
+                                            Text(stringResource(capability.reasonRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                        }
                                     }
-                                }
-                                Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (capability.level != CapabilityLevel.Supported) {
-                                    Text(stringResource(capability.reasonRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                 }
                             }
                         }
