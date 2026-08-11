@@ -1,12 +1,36 @@
 package com.opentasker.core.actions
 
 import com.opentasker.core.engine.ActionResult
-import com.opentasker.core.actions.MqttWireCodec
+import java.math.BigInteger
+import java.net.InetAddress
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.KeyStore
+import java.security.SecureRandom
+import java.security.Security
+import java.util.Date
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.net.InetAddress
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SNIHostName
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLParameters
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.TrustManagerFactory
+import kotlin.concurrent.thread
+import kotlinx.coroutines.runBlocking
+import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x509.Extension
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 
 class MqttPublishProtocolTest {
     @Test
@@ -69,6 +93,117 @@ class MqttPublishProtocolTest {
             InetAddress.getByName("10.0.0.5"),
             MqttNetworkPolicy.resolvePrivateOnly("broker") { arrayOf(InetAddress.getByName("10.0.0.5")) },
         )
+    }
+
+    @Test
+    fun tlsParametersRequireHostnameVerificationAndSendSni() {
+        val parameters = SSLParameters().apply {
+            endpointIdentificationAlgorithm = "HTTPS"
+            serverNames = listOf(SNIHostName("broker.example.test"))
+        }
+
+        assertEquals("HTTPS", parameters.endpointIdentificationAlgorithm)
+        assertEquals("broker.example.test", (parameters.serverNames.single() as SNIHostName).asciiName)
+    }
+
+    @Test
+    fun tlsPolicyKeepsHostnameVerificationForPinnedAddressesWithoutIpSni() {
+        val socket = javax.net.ssl.SSLContext.getDefault().socketFactory.createSocket() as javax.net.ssl.SSLSocket
+        socket.use {
+            MqttTlsPolicy.configure(it, "broker.example.test")
+            assertEquals("HTTPS", it.sslParameters.endpointIdentificationAlgorithm)
+            assertEquals("broker.example.test", (it.sslParameters.serverNames.single() as SNIHostName).asciiName)
+
+            MqttTlsPolicy.configure(it, "192.0.2.10")
+            assertEquals("HTTPS", it.sslParameters.endpointIdentificationAlgorithm)
+            assertTrue(it.sslParameters.serverNames.isNullOrEmpty())
+        }
+    }
+
+    @Test
+    fun tlsPublishRejectsAReachableCertificateForAnotherHostname() {
+        Security.addProvider(BouncyCastleProvider())
+        val keyPair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048, SecureRandom()) }.generateKeyPair()
+        val certificate = wrongHostnameCertificate(keyPair)
+        val password = "changeit".toCharArray()
+        val serverKeys = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+            load(null, password)
+            setKeyEntry("server", keyPair.private, password, arrayOf(certificate))
+        }
+        val serverKeyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
+            init(serverKeys, password)
+        }
+        val serverContext = SSLContext.getInstance("TLS").apply {
+            init(serverKeyManagers.keyManagers, null, SecureRandom())
+        }
+        val server = (serverContext.serverSocketFactory.createServerSocket(0) as javax.net.ssl.SSLServerSocket).apply {
+            soTimeout = 5_000
+        }
+        val serverThread = thread(isDaemon = true) {
+            runCatching {
+                (server.accept() as SSLSocket).use { it.startHandshake() }
+            }
+        }
+
+        try {
+            val trustedCertificate = KeyStore.getInstance(KeyStore.getDefaultType()).apply {
+                load(null, password)
+                setCertificateEntry("server", certificate)
+            }
+            val clientTrustManagers = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
+                init(trustedCertificate)
+            }
+            val clientContext = SSLContext.getInstance("TLS").apply {
+                init(null, clientTrustManagers.trustManagers, SecureRandom())
+            }
+            val config = MqttPublishConfig(
+                host = "expected.example.test",
+                port = server.localPort,
+                tls = true,
+                topic = "opentasker/event",
+                payload = byteArrayOf(),
+                qos = 0,
+                retain = false,
+                username = null,
+                password = null,
+                timeoutSeconds = 3,
+            )
+
+            val failure = runCatching {
+                runBlocking {
+                    SocketMqttPublishTransport(clientContext.socketFactory as javax.net.ssl.SSLSocketFactory)
+                        .publish(config, InetAddress.getLoopbackAddress())
+                }
+            }.exceptionOrNull()
+
+            assertNotNull("A certificate for the wrong hostname must fail the TLS handshake", failure)
+            if (failure != null) {
+                assertTrue(generateSequence(failure) { it.cause }.any { it is SSLHandshakeException })
+            }
+        } finally {
+            server.close()
+            serverThread.join(5_000)
+        }
+    }
+
+    private fun wrongHostnameCertificate(keyPair: KeyPair): java.security.cert.X509Certificate {
+        val subject = X500Name("CN=wrong.example.test")
+        val now = Date()
+        val builder = JcaX509v3CertificateBuilder(
+            subject,
+            BigInteger.valueOf(now.time),
+            Date(now.time - 60_000),
+            Date(now.time + 300_000),
+            subject,
+            keyPair.public,
+        )
+        builder.addExtension(
+            Extension.subjectAlternativeName,
+            false,
+            GeneralNames(GeneralName(GeneralName.dNSName, "wrong.example.test")),
+        )
+        val signer = JcaContentSignerBuilder("SHA256withRSA").setProvider("BC").build(keyPair.private)
+        return JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer))
     }
 
     @Test

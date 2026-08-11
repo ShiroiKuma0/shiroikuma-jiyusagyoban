@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MQTT TLS publishes now pin the vetted TCP address while preserving the broker hostname for HTTPS endpoint verification and SNI; a mismatched certificate is rejected before credentials or payloads are sent.
 - Success feedback now remains resource-backed from the call site through snackbar collection, so profile toggles and editor removals cannot fall through an English literal map and appear as errors; variable and scene messages retain their arguments until the active locale resolves them.
 - Split model, common logging, storage, engine state, and automation blueprint input presentation into dependency-directed `core/*` and `feature/*` modules, with source-boundary contracts and an interim screen-size ceiling enforced by tests.
 - Converted starter templates into versioned, serializable automation blueprints with typed selectors, collapsible input sections, bounded bundle validation, local installation tracking, and review-only update diffs that never overwrite instantiated profiles.
