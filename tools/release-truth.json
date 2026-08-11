@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "requiredArtifactCommit": "983f682cb541ee1337c213127142854fa009b1ae",
+  "requiredArtifactCommit": "5a97f53eba08a9dc1c12d7076ed6e2983c2848da",
   "releaseTag": "v0.2.85",
   "releaseTagCommit": "1c232b0a5e576c81e342ac5a042e5b5d96e2608c",
   "application": {
