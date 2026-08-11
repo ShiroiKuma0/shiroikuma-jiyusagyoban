@@ -85,6 +85,12 @@ data class AutomationBlueprint(
     val contexts: List<TemplateContext>,
     val actions: List<TemplateAction>,
     val enabledByDefault: Boolean = false,
+    /**
+     * Repeat guard for blueprints whose trigger is a window rather than an instant. A window
+     * context is re-observed while it lasts, so without this an hour-long calendar event ran its
+     * task once a minute.
+     */
+    val cooldownSec: Int = 0,
 ) {
     /** Compatibility view for the existing guided-template screen. */
     val slots: List<BlueprintInput>
@@ -133,6 +139,7 @@ data class AutomationBlueprint(
             // gate through metadata.
             enabled = false,
             enterTaskId = 0,
+            cooldownSec = cooldownSec,
             contexts = contexts.map { context ->
                 ContextSpec(
                     type = context.type,
@@ -375,6 +382,9 @@ object ProfileTemplateCatalog {
             actions = listOf(
                 TemplateAction("volume.set", "Lower notification volume", mapOf("stream" to "notification", "level" to "0")),
             ),
+            // A meeting is a window, so belt and braces with the event's stable identity: even if
+            // an occurrence is re-observed, the task will not run again within the hour.
+            cooldownSec = 3_600,
         ),
         ProfileTemplate(
             id = "nightstand-nfc-sleep",

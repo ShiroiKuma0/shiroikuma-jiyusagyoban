@@ -2,6 +2,7 @@ package com.opentasker.core.contexts
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
@@ -130,5 +131,51 @@ class CalendarSunContextEventsTest {
 
     private companion object {
         const val MILLIS_PER_MINUTE = 60_000L
+    }
+
+    @Test
+    fun aRunningEventKeepsOneIdentityForEveryMinuteItIsObserved() {
+        // The producer re-emits every minute for the whole window. Without a stable identity each
+        // minute looked like a new pulse, so a 60-minute meeting ran its enter task ~60 times.
+        val begin = epochMillis(2026, 5, 5, 14, 0)
+        val instance = CalendarInstance(
+            calendarName = "Work",
+            calendarId = 7,
+            beginMs = begin,
+            endMs = begin + 60 * MILLIS_PER_MINUTE,
+            allDay = false,
+            availability = "busy",
+        )
+
+        val ids = (1..5).map { minute ->
+            CalendarSunContextEvents
+                .selectCalendarEvent(listOf(instance), nowMs = begin + minute * MILLIS_PER_MINUTE)
+                .metadata["eventId"]
+        }
+
+        assertEquals(1, ids.distinct().size)
+        assertEquals("7:$begin:during", ids.first())
+    }
+
+    @Test
+    fun upcomingAndDuringAreDistinctPulsesForTheSameEvent() {
+        val begin = epochMillis(2026, 5, 5, 14, 0)
+        val instance = CalendarInstance(
+            calendarName = "Work",
+            calendarId = 7,
+            beginMs = begin,
+            endMs = begin + 30 * MILLIS_PER_MINUTE,
+            allDay = false,
+            availability = "busy",
+        )
+
+        val upcoming = CalendarSunContextEvents
+            .selectCalendarEvent(listOf(instance), nowMs = begin - 5 * MILLIS_PER_MINUTE)
+        val during = CalendarSunContextEvents
+            .selectCalendarEvent(listOf(instance), nowMs = begin + 5 * MILLIS_PER_MINUTE)
+
+        assertEquals("upcoming", upcoming.metadata["state"])
+        assertEquals("during", during.metadata["state"])
+        assertNotEquals(upcoming.metadata["eventId"], during.metadata["eventId"])
     }
 }

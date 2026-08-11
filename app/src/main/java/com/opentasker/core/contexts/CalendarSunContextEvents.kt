@@ -182,6 +182,12 @@ object CalendarSunContextEvents {
     private fun CalendarInstance.metadata(state: String, nowMs: Long): Map<String, String> = buildMap {
         put("event", "calendar")
         put("state", state)
+        // The producer re-emits a matching event every minute for as long as the window lasts.
+        // Without a stable identity PulseEventContinuity treats each minute as a fresh pulse, so a
+        // 60-minute meeting ran its enter task ~60 times - once per minute - and the shipped
+        // meeting-mode template sets no cooldown to blunt it. Identity is the occurrence plus the
+        // state, so "upcoming" and "during" still fire once each.
+        put("eventId", "$calendarId:$beginMs:$state")
         put("calendar", calendarName)
         put("calendarId", calendarId.toString())
         put("allDay", allDay.toString())
