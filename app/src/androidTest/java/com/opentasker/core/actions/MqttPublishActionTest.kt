@@ -20,7 +20,7 @@ class MqttPublishActionTest {
     @Test
     fun successUsesTheInjectedTransportWithoutLoggingPayload() = runBlocking {
         val logs = mutableListOf<String>()
-        val action = MqttPublishAction(MqttPublishTransport { config ->
+        val action = MqttPublishAction(MqttPublishTransport { config, _ ->
             assertEquals("opentasker/event", config.topic)
             assertEquals("secret", config.payload.toString(Charsets.UTF_8))
         })
@@ -38,7 +38,7 @@ class MqttPublishActionTest {
     @Test
     fun cleartextPublicBrokerIsRejectedBeforeTransport() = runBlocking {
         var called = false
-        val action = MqttPublishAction(MqttPublishTransport { called = true })
+        val action = MqttPublishAction(MqttPublishTransport { _, _ -> called = true })
         val result = action.run(
             ActionContext(context, VariableStore()),
             mapOf("host" to "broker.example", "topic" to "opentasker/event", "tls" to "false"),
@@ -51,7 +51,7 @@ class MqttPublishActionTest {
 
     @Test
     fun transportTimeoutIsReturnedAsFailure() = runBlocking {
-        val action = MqttPublishAction(MqttPublishTransport { throw SocketTimeoutException("timed out") })
+        val action = MqttPublishAction(MqttPublishTransport { _, _ -> throw SocketTimeoutException("timed out") })
         val result = action.run(
             ActionContext(context, VariableStore()),
             mapOf("host" to "broker.example", "topic" to "opentasker/event"),
