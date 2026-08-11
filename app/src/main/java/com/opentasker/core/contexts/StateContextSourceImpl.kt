@@ -107,8 +107,13 @@ class StateContextSourceImpl : StateDemandContextSource {
         val deviceStateJob = launch {
             DeviceStateEvents.events.collect(::publishPatch)
         }
-        val mediaPlaybackJob = launch {
-            MediaPlaybackStateEvents.events(app).collect(::publishPatch)
+        // Demand-gated like the sensor sub-source. Every STATE context started this 2 s
+        // MediaSessionManager poll, so a battery_level context paid for media polling it never
+        // read; a null key means the Inspector wants every key.
+        val mediaPlaybackJob = if (requestedStateKey == null || requestedStateKey in MEDIA_STATE_KEYS) {
+            launch { MediaPlaybackStateEvents.events(app).collect(::publishPatch) }
+        } else {
+            null
         }
         val sensorJob = launch {
             StateSensorEvents.events(app, requestedStateKey).collect(::publishPatch)
@@ -116,7 +121,7 @@ class StateContextSourceImpl : StateDemandContextSource {
 
         awaitClose {
             deviceStateJob.cancel()
-            mediaPlaybackJob.cancel()
+            mediaPlaybackJob?.cancel()
             sensorJob.cancel()
             runCatching { app.unregisterReceiver(receiver) }
         }
@@ -175,6 +180,8 @@ internal fun stateContextKey(spec: ContextSpec): String? {
         ?: spec.config["key"]
     return rawKey?.let(::normalizeStateKey)?.takeIf(String::isNotBlank)
 }
+
+private val MEDIA_STATE_KEYS = setOf("media_active", "media_package")
 
 internal fun seedInitialState(app: Context): Map<String, String> {
     val seed = mutableMapOf<String, String>()

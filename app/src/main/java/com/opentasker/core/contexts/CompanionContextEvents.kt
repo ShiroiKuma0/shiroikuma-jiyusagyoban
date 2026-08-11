@@ -15,11 +15,11 @@ object CompanionContextEvents {
     val events: SharedFlow<ContextEvent> = events_.asSharedFlow()
 
     fun publishPresent(associationId: String, label: String = "") {
-        events_.tryEmit(buildEvent(STATE_PRESENT, associationId, label))
+        events_.tryEmitPulse("companion-device", buildEvent(STATE_PRESENT, associationId, label))
     }
 
     fun publishAbsent(associationId: String, label: String = "") {
-        events_.tryEmit(buildEvent(STATE_ABSENT, associationId, label))
+        events_.tryEmitPulse("companion-device", buildEvent(STATE_ABSENT, associationId, label))
     }
 
     fun buildEvent(state: String, associationId: String, label: String = ""): ContextEvent =

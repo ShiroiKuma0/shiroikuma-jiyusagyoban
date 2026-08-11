@@ -30,7 +30,7 @@ object UsbDeviceContextEvents {
             val device = intent.usbDevice()
             val name = device?.productName.orEmpty().ifBlank { device?.deviceName.orEmpty() }
             AppLogger.debug(TAG, "USB event: state=$state, device=${name.ifBlank { UNKNOWN_DEVICE }}")
-            events_.tryEmit(
+            events_.tryEmitPulse("usb", 
                 buildEvent(
                     state = state,
                     deviceName = name,

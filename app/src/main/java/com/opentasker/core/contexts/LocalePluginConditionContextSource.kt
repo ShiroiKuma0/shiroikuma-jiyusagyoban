@@ -10,11 +10,26 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.shareIn
 
 class LocalePluginConditionContextSource : ContextSource {
     override val type = "plugin"
 
-    override fun events(app: Context): Flow<ContextEvent> = callbackFlow {
+    /**
+     * One poll loop for the whole process, shared by every PLUGIN context.
+     *
+     * Each collector used to start its own loop that queried *all* registered subscriptions, so N
+     * plugin contexts issued N x N ordered broadcasts every interval - each one holding a
+     * broadcast and a timeout on the plugin app. The results are identical for every collector,
+     * which is exactly what a shared upstream is for.
+     */
+    override fun events(app: Context): Flow<ContextEvent> = sharedEvents(app.applicationContext)
+
+    private fun pollEvents(app: Context): Flow<ContextEvent> = callbackFlow {
         val host = LocalePluginHost(app)
         val pollJob = launch {
             while (isActive) {
@@ -55,6 +70,23 @@ class LocalePluginConditionContextSource : ContextSource {
     companion object {
         private const val TAG = "PluginConditionSource"
         private const val POLL_INTERVAL_MS = 30_000L
+
+        private val sharedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val sharedLock = Any()
+        private var shared: Flow<ContextEvent>? = null
+
+        private fun LocalePluginConditionContextSource.sharedEvents(app: Context): Flow<ContextEvent> =
+            synchronized(sharedLock) {
+                shared ?: pollEvents(app)
+                    .shareIn(
+                        scope = sharedScope,
+                        // Stops polling once the last context unsubscribes, and survives a brief
+                        // gap while the engine rebuilds matchers on a profile reload.
+                        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+                        replay = 0,
+                    )
+                    .also { shared = it }
+            }
     }
 }
 

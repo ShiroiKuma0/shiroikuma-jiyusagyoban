@@ -12,7 +12,7 @@ object ShakeContextEvents {
     val events: SharedFlow<ContextEvent> = shakes.asSharedFlow()
 
     fun publish(magnitude: Float) {
-        shakes.tryEmit(
+        shakes.tryEmitPulse("shake", 
             ContextEvent(
                 type = "event",
                 matched = true,

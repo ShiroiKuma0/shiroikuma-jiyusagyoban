@@ -792,7 +792,12 @@ enum class ActionTraceStatus {
 
 private fun actionTimeoutMs(actionType: String): Long = when {
     actionType == "flow.wait" -> MAX_WAIT_TIMEOUT_MS
-    actionType.startsWith("http.") || actionType == "download" || actionType == "ping" -> 120_000L
+    // The two other network actions belong in this bucket too. The HA webhook's own contract
+    // allows timeout_sec=30 across four attempts plus backoff (~140 s) and MQTT allows a 30 s
+    // connect plus three 30 s reads, so the 60 s default silently truncated retries the user
+    // configured and reported a timeout instead.
+    actionType.startsWith("http.") || actionType == "download" || actionType == "ping" ||
+        actionType == "mqtt.publish" || actionType == "integration.home_assistant.webhook" -> 120_000L
     // Playback and speech suspend until completion; a long sound file or near-limit TTS
     // text legitimately outlives the default 60 s budget.
     actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS
