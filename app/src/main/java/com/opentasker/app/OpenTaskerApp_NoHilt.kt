@@ -33,6 +33,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Application singleton keeps startup deterministic while Hilt is not active.
 class OpenTaskerApp_NoHilt : Application() {
@@ -64,6 +65,23 @@ class OpenTaskerApp_NoHilt : Application() {
                 databaseReady.await(DATABASE_READY_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 return _db ?: throw IllegalStateException("Database not initialized.")
             }
+
+        /** The database if preparation has finished, without waiting. */
+        val readyDb: AppDatabase?
+            get() = _db
+
+        /**
+         * Suspends until the database is ready, without blocking the caller's thread.
+         *
+         * UI must use this rather than [db]: the blocking getter waits up to 30 seconds, and the
+         * launch that pays that cost is exactly the one after staging a restore - a full-file copy
+         * of up to 100 MB plus a possible cipher migration - so composing against [db] parked the
+         * main thread through the slowest start the app has, and threw if the deadline expired.
+         */
+        suspend fun awaitDb(): AppDatabase {
+            _db?.let { return it }
+            return withContext(Dispatchers.IO) { db }
+        }
 
         private const val DATABASE_READY_TIMEOUT_SECONDS = 30L
     }

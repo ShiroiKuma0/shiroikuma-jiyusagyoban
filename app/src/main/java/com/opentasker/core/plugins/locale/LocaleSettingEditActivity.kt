@@ -36,6 +36,8 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 
 class LocaleSettingEditActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -46,9 +48,9 @@ class LocaleSettingEditActivity : ComponentActivity() {
         // on black - invisible - on Android 8 through 14. MainActivity already does this.
         enableEdgeToEdge()
 
-        val db = OpenTaskerApp_NoHilt.db
         val grantStore = LocaleGrantStore(this)
-        val tasksFlow = db.taskDao().getAllAsFlow().map { tasks ->
+        // Awaited on first collection rather than in onCreate; see MainActivity.
+        val tasksFlow = flow { emitAll(OpenTaskerApp_NoHilt.awaitDb().taskDao().getAllAsFlow()) }.map { tasks ->
             tasks.map { TaskPickerItem(it.id, it.name) }
         }
 

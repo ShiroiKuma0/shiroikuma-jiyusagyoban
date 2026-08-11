@@ -55,6 +55,8 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 
 class TaskWidgetConfigActivity : ComponentActivity() {
 
@@ -78,7 +80,9 @@ class TaskWidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        val tasksFlow = OpenTaskerApp_NoHilt.db.taskDao().getAllAsFlow()
+        // Cold flow: the database is awaited when the flow is first collected, not while
+        // onCreate runs, so a startup still applying a staged restore cannot stall this window.
+        val tasksFlow = flow { emitAll(OpenTaskerApp_NoHilt.awaitDb().taskDao().getAllAsFlow()) }
             .map { entities ->
                 val results = entities.map { it.toDomainDecodeResult() }
                 WidgetTaskState(

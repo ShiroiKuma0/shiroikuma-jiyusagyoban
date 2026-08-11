@@ -54,6 +54,8 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
 
 class QuickSettingsTileConfigActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +73,8 @@ class QuickSettingsTileConfigActivity : ComponentActivity() {
 
         val store = QuickSettingsTileStore(this)
         val initial = store.load(slot)
-        val tasksFlow = OpenTaskerApp_NoHilt.db.taskDao().getAllAsFlow().map { entities ->
+        // Awaited on first collection rather than in onCreate; see MainActivity.
+        val tasksFlow = flow { emitAll(OpenTaskerApp_NoHilt.awaitDb().taskDao().getAllAsFlow()) }.map { entities ->
             entities.mapNotNull { entity ->
                 val decoded = entity.toDomainDecodeResult()
                 decoded.value.takeIf { decoded.issue == null }

@@ -19,6 +19,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.produceState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.NfcContextEvents
 import com.opentasker.core.contexts.NfcTagWriteSession
@@ -27,6 +32,18 @@ import com.opentasker.ui.screens.ActiveAutomationUi
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
+
+/**
+ * Shown while startup finishes preparing the database. Applying a staged restore copies up to
+ * 100 MB and may run a cipher migration, so this is the honest state for that launch rather than a
+ * frozen main thread.
+ */
+@Composable
+private fun StartupPreparingScreen() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
 
 class MainActivity : ComponentActivity() {
     private val rootBackCallback = object : OnBackPressedCallback(true) {
@@ -52,7 +69,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ActiveAutomationUi(db = OpenTaskerApp_NoHilt.db)
+                    // Never OpenTaskerApp_NoHilt.db here: that getter blocks up to 30 seconds,
+                    // and the launch that pays it is the one right after staging a restore.
+                    val database by produceState(OpenTaskerApp_NoHilt.readyDb) {
+                        if (value == null) value = OpenTaskerApp_NoHilt.awaitDb()
+                    }
+                    database?.let { ActiveAutomationUi(db = it) } ?: StartupPreparingScreen()
                 }
             }
         }
