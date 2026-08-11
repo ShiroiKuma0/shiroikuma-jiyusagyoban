@@ -103,8 +103,11 @@ private val Amoled = darkColorScheme(
     // Cards and dialogs need to separate from the background; keep them as dark as legibility allows.
     surfaceVariant = Color(0xFF141614),
     onSurfaceVariant = TextSecondary,
-    outline = Color(0xFF2E3532),
-    outlineVariant = Color(0xFF1B1F1D),
+    outline = Color(0xFF3A423E),
+    // Raised from #1B1F1D: against pure black, alpha-washed at the call sites, the old value
+    // landed near 1.07:1 and card and section boundaries simply vanished. Text was never the
+    // problem here - the grouping cues were.
+    outlineVariant = Color(0xFF313833),
     surfaceContainerLowest = Color.Black,
     surfaceContainerLow = Color(0xFF0A0C0B),
     surfaceContainer = Color(0xFF0E100F),
