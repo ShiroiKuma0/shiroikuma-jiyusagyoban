@@ -87,7 +87,7 @@ class HttpRequestAction(
                     config.responseVariable?.let { ctx.variables.set(it, attempt.body.orEmpty()) }
                     val destination = config.outputFile?.name?.let { " to $it" }.orEmpty()
                     ctx.logger("HTTP $method ${url.host} -> ${attempt.status}$destination")
-                    return if (attempt.status in 200..299) {
+                    return if (attempt.status in SUCCESS_CODES) {
                         ActionResult.Success
                     } else {
                         ActionResult.Failure("HTTP ${attempt.status}")
@@ -148,8 +148,14 @@ class HttpRequestAction(
             throw IllegalStateException("response exceeds ${config.maxResponseBytes} byte limit")
         }
 
-        val bodyText = if (config.outputFile != null) {
+        // A failed request must not touch the destination. Writing first and reporting the status
+        // afterwards replaced a good file with the error body every time a scheduled download hit
+        // a 404 or 503, while the run log honestly said the action failed.
+        val bodyText = if (config.outputFile != null && response.code in SUCCESS_CODES) {
             writeResponseAtomically(responseBody.byteStream(), config.outputFile, config.maxResponseBytes)
+            null
+        } else if (config.outputFile != null) {
+            responseBody.byteStream().readBoundedBytes(config.maxResponseBytes)
             null
         } else {
             val bytes = responseBody.byteStream().readBoundedBytes(config.maxResponseBytes)
@@ -161,6 +167,9 @@ class HttpRequestAction(
 
     companion object {
         const val ID = "http.request"
+
+        /** 2xx. The only statuses whose body is the resource the caller asked for. */
+        private val SUCCESS_CODES = 200..299
 
         private val DEFAULT_HTTP_CLIENT = OkHttpClient.Builder()
             .followRedirects(false)

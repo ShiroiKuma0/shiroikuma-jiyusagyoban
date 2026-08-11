@@ -18,6 +18,9 @@ import com.opentasker.core.platform.AudioUsageEligibility
  *   - "path": file path or URI (e.g., content://media/external/audio/media/123)
  *   - "volume": 0-100 (optional)
  */
+/** Schemes MediaPlayer may open directly: everything else must go through the HTTP action. */
+private val LOCAL_SOUND_SCHEMES = setOf("file", "content", "android.resource")
+
 class PlaySoundAction : DeclaredAction(ActionCatalog.require("sound.play")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -27,6 +30,16 @@ class PlaySoundAction : DeclaredAction(ActionCatalog.require("sound.play")) {
 
         val player = try {
             val uri = if (path.contains("://")) Uri.parse(path) else Uri.parse("file://$path")
+            // Local sources only. MediaPlayer will happily stream a remote URL, and that traffic
+            // never passes the HTTP action's policy checks - which is the sole justification for
+            // the manifest's cleartext allowance - so a public http:// sound would have punched
+            // straight through the private-network rule this app documents as enforced in code.
+            val scheme = uri.scheme?.lowercase()
+            if (scheme != null && scheme !in LOCAL_SOUND_SCHEMES) {
+                return ActionResult.Failure(
+                    "sound.play accepts a file path or content URI; $scheme:// sources are not supported",
+                )
+            }
             MediaPlayer.create(ctx.app, uri)
                 ?: return ActionResult.Failure("could not create player for: $path")
         } catch (ex: Exception) {
