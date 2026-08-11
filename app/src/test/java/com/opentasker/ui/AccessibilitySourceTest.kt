@@ -122,7 +122,7 @@ class AccessibilitySourceTest {
                 "stateDescription = if (enabled) onLabel else offLabel",
                 "enabled = canSave",
                 "R.string.ui_info_content_description",
-                "R.string.delete_cannot_undo",
+                "R.string.delete_undo_helper",
             ),
             "screens/ImportedProfileRiskDialog.kt" to listOf(
                 "Checkbox(checked = acknowledged",

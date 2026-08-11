@@ -417,6 +417,7 @@ class CriticalFlowComposeTest {
                     tasks = emptyList(),
                     onCreateScene = { name, width, height -> createdScene = "$name:$width:$height" },
                     onUpdateScene = { _, _ -> },
+                    onRemoveElement = { _, _ -> },
                     onDeleteScene = {},
                     contentPadding = PaddingValues(0.dp),
                 )
