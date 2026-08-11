@@ -50,6 +50,12 @@ static volatile int g_stop = 0;
 // our profiles, e.g. the volume panel); 0 = screen off → the single tap is re-injected so system volume
 // still works exactly as before. Long/double/triple are always consumed regardless. Default on.
 static volatile int g_screen_on = 1;
+// Ringing state, pushed from the app (setRinging). An incoming call lights the screen, so the screen-on
+// rule above would swallow the single tap exactly when the phone is ringing — the framework never learns
+// the key was pressed and the ringer cannot be silenced with it. While ringing, the single tap is
+// re-injected regardless of screen state; the app suppresses its own volume panel for the same press.
+// Default off, so nothing changes until a phone-state signal actually arrives.
+static volatile int g_ringing = 0;
 static int g_wakefd = -1;
 static int g_evfd[MAX_DEV];
 static int g_ndev = 0;
@@ -96,12 +102,13 @@ static void reinject_short(int evcode) {
 }
 
 // Report a completed tap run: count 1 = short, 2 = double, 3+ = triple. Always report to Java. A short tap
-// is re-injected ONLY when the screen is off (system volume unchanged); screen-on shorts are consumed so
+// is re-injected when the screen is off (system volume unchanged) OR while a call is ringing (the ring
+// lights the screen, and the dialer must still see the key); otherwise screen-on shorts are consumed so
 // our profiles can repurpose them (volume panel / per-app keycodes). Double/triple are always consumed.
 static void fire_tap(JNIEnv *env, jobject thiz, jmethodID onKey, int code, int count) {
     int type = (count <= 1) ? TYPE_SHORT : (count == 2) ? TYPE_DOUBLE : TYPE_TRIPLE;
     (*env)->CallVoidMethod(env, thiz, onKey, (jint)code, (jint)type);
-    if (type == TYPE_SHORT && !g_screen_on) reinject_short(code);
+    if (type == TYPE_SHORT && (!g_screen_on || g_ringing)) reinject_short(code);
 }
 
 static void release_grabs(void) {
@@ -281,6 +288,13 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeSetScreenOn(JNIEnv *env, 
     (void)env;
     (void)thiz;
     g_screen_on = on ? 1 : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_opentasker_core_input_KeyGrabberService_nativeSetRinging(JNIEnv *env, jobject thiz, jboolean ringing) {
+    (void)env;
+    (void)thiz;
+    g_ringing = ringing ? 1 : 0;
 }
 
 JNIEXPORT void JNICALL
