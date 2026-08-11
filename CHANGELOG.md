@@ -8,6 +8,61 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.84.2026-08-11.g08847560+011 — 2026-08-11
+
+**The 体感 rating was a night out of step, and 運動と回復 could not show it either way.**
+
+**Upstream sync: 2 commits, both security.** MQTT TLS built its socket without a hostname, which
+silently disables certificate hostname verification — any broker with a valid chain for *any* host
+was accepted, credentials and payload included. The TLS layer now keeps the hostname as the logical
+peer while the TCP connection stays pinned to the SSRF-vetted address, with `HTTPS` endpoint
+identification and SNI set explicitly. And the exported Locale condition receiver checked its grant
+only on the variable branch, so any app could ask "is profile 17 active" and read the answer off the
+ordered-broadcast result code; the grant is now keyed per binding and checked before Room is touched.
+The fork's own `deleteVariable` had lost that revocation at an earlier sync — `revokeAllForVariable`
+had zero callers — so a grant outlived the variable it named.
+
+**Ratings now attach to the night they describe, and the old ones were re-keyed.** The fix of
+`+029` changed what a `yyyyMMdd` key *means* — from the day the answer was typed on to the start date
+of the night it describes — and moved nothing already on file, so every stored rating read a night
+late. On the morning of the 11th the answer typed on the 10th appeared as last night's, with no empty
+slot for the new one. The one-time shift is calendar arithmetic and injective, flag-guarded because
+the store cannot tell the two schemes apart by inspection and a second run would walk the history
+backwards in silence. The read-back had drifted from the write too: `?.let {} ?: rating(today)` yields
+null for "no recovery" and "no rating" alike, so an unrated night fell through to a key nothing writes
+any more. Both sides go through one function now, and the row names the night instead of claiming
+"Today" — which was wrong every single morning.
+
+**運動と回復 shows what is stored.** It showed nothing: every banded value was reachable only through
+the per-session cards, which render one per *marked* session, so with none marked the page was an
+empty note, a bar grid and three anonymous dots — and a dot triple says the same thing for a night
+rated 3 and a night never rated. The table is now driven by the union of the band's nights and the
+stored ratings, because a rating whose date has no sleep session was counted in the baseline and
+displayed nowhere at all.
+
+**Heart rate and sleep are graded against published ranges, not 白い熊's own median.** A within-person
+scale cannot call a six-hour habit short — six hours *is* that person's usual. Sleep uses the NSF
+consensus with the AASM line breaking the tie inside "may be appropriate", so short and long are
+deliberately asymmetric; heart rate uses Jensen's resting decades, with the caveat printed on screen
+that those are daytime rates and a sleeping heart rate runs below them. Skin temperature gets no
+absolute band and will not: the wrist sensor tracks the room at r = 0.961, so a threshold would be
+grading the bedroom.
+
+**One 1–5 colour vocabulary**, chosen by search against `PaletteCheck` rather than by eye — worst
+adjacent pair ΔE 9.9 for a red-green reader against a target of 8, 16.3 in full colour against a floor
+of 15. The band roles are not reused: `BAND_WARN` sits within a few ΔE of this theme's yellow ink,
+which is why an amber value beside a yellow one read as one state twice. Step 1 is dark blood with a
+pale ring rather than more red, because red and orange separate only by hue at chip size.
+
+Column headings appear once instead of four labels a night, dates carry the year and weekday, week
+rules run at Sun/Mon and Fri/Sat, and the way in from the 回復 card is a full-width pill with its own
+counts — as a caption it was the smallest thing on a long card, and the whole record sat behind it.
+
+**Tests: 1383**, 26 new — the migration's calendar arithmetic across month, year and leap boundaries;
+every published band boundary; the deliberate short-versus-long asymmetry; monotonicity across the
+heart-rate range; the palette clearing every hard gate; and a rating with no night still reaching the
+table, which is the hole the whole session started in.
+
 ## 0.2.82.2026-08-10.ga481b77a+035 — 2026-08-10
 
 **Recovery tasks and held-run replay — the last two things the 0.2.82 sync left stored but inert.**
