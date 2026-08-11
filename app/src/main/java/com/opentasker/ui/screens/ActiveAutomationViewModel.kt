@@ -77,6 +77,7 @@ import com.opentasker.core.storage.ConfigurationSnapshotSettings
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.DatabaseBackupManager
+import com.opentasker.core.storage.StorageDecodeResult
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.RestoreCandidate
@@ -1010,19 +1011,23 @@ class ActiveAutomationViewModel(
     fun deleteProject(project: Project, targetProject: Project) = launchWithMessage(R.string.ui_message_project_deleted) {
         require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be deleted." }
         require(project.id != targetProject.id) { "Choose a different destination project." }
-        db.withTransaction {
-            val sourceVariables = db.variableDao().getAllInProject(project.id)
-            val targetNames = db.variableDao().getAllInProject(targetProject.id).map { it.name }.toSet()
-            val collisions = sourceVariables.map { it.name }.filter { it in targetNames }
-            require(collisions.isEmpty()) {
-                "Reassignment would overwrite variables: ${collisions.joinToString()}. Rename or remove them first."
+        // Mutation lock first, then the transaction: the reverse order deadlocks against the
+        // engine's variable commit path.
+        variableRepository.withMutationLock {
+            db.withTransaction {
+                val sourceVariables = db.variableDao().getAllInProject(project.id)
+                val targetNames = db.variableDao().getAllInProject(targetProject.id).map { it.name }.toSet()
+                val collisions = sourceVariables.map { it.name }.filter { it in targetNames }
+                require(collisions.isEmpty()) {
+                    "Reassignment would overwrite variables: ${collisions.joinToString()}. Rename or remove them first."
+                }
+                db.taskDao().reassignProject(project.id, targetProject.id)
+                db.profileDao().reassignProject(project.id, targetProject.id)
+                db.sceneDao().reassignProject(project.id, targetProject.id)
+                // Secrets must be re-encrypted, not row-copied: their envelope binds the project id.
+                reassignProject(project.id, targetProject.id)
+                check(db.projectDao().deleteIfNotDefault(project.id) == 1) { "Project no longer exists." }
             }
-            db.taskDao().reassignProject(project.id, targetProject.id)
-            db.profileDao().reassignProject(project.id, targetProject.id)
-            db.sceneDao().reassignProject(project.id, targetProject.id)
-            sourceVariables.forEach { db.variableDao().insert(it.copy(projectId = targetProject.id)) }
-            db.variableDao().deleteAllInProject(project.id)
-            check(db.projectDao().deleteIfNotDefault(project.id) == 1) { "Project no longer exists." }
         }
     }
 
@@ -2134,60 +2139,50 @@ class ActiveAutomationViewModel(
                 if (previous == null || previous.name == globalName) {
                     variableRepository.upsert(updated)
                 } else {
-                    db.withTransaction {
-                        val profiles = db.profileDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val tasks = db.taskDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val scenes = db.sceneDao().getAll().map { entity ->
-                            val decoded = entity.toDomainDecodeResult()
-                            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                            decoded.value
-                        }
-                        val rewrite = AutomationReferenceRewriter.renameVariable(
-                            target = previous,
-                            replacementName = globalName,
-                            profiles = profiles,
-                            tasks = tasks,
-                            scenes = scenes,
-                        )
-                        rewrite.profiles.forEach { rewritten ->
-                            val current = profiles.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_PROFILE,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
+                    // Mutation lock first, then the transaction: the reverse order deadlocks
+                    // against the engine's variable commit path.
+                    variableRepository.withMutationLock {
+                        db.withTransaction {
+                            val (profiles, tasks, scenes) = loadDecodedAutomation()
+                            val rewrite = AutomationReferenceRewriter.renameVariable(
+                                target = previous,
+                                replacementName = globalName,
+                                profiles = profiles,
+                                tasks = tasks,
+                                scenes = scenes,
                             )
-                            db.profileDao().upsert(rewritten.toEntity())
+                            rewrite.profiles.forEach { rewritten ->
+                                val current = profiles.first { it.id == rewritten.id }
+                                recordEdit(
+                                    entityType = EditHistoryDao.TYPE_PROFILE,
+                                    entityId = rewritten.id,
+                                    previousJson = StorageJson.encodeToString(current),
+                                    nextJson = StorageJson.encodeToString(rewritten),
+                                )
+                                db.profileDao().upsert(rewritten.toEntity())
+                            }
+                            rewrite.tasks.forEach { rewritten ->
+                                val current = tasks.first { it.id == rewritten.id }
+                                recordEdit(
+                                    entityType = EditHistoryDao.TYPE_TASK,
+                                    entityId = rewritten.id,
+                                    previousJson = StorageJson.encodeToString(current),
+                                    nextJson = StorageJson.encodeToString(rewritten),
+                                )
+                                db.taskDao().update(rewritten.toEntity())
+                            }
+                            rewrite.scenes.forEach { rewritten ->
+                                val current = scenes.first { it.id == rewritten.id }
+                                recordEdit(
+                                    entityType = EditHistoryDao.TYPE_SCENE,
+                                    entityId = rewritten.id,
+                                    previousJson = StorageJson.encodeToString(current),
+                                    nextJson = StorageJson.encodeToString(rewritten),
+                                )
+                                db.sceneDao().update(rewritten.toEntity())
+                            }
+                            rename(previous.name, updated)
                         }
-                        rewrite.tasks.forEach { rewritten ->
-                            val current = tasks.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_TASK,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
-                            )
-                            db.taskDao().update(rewritten.toEntity())
-                        }
-                        rewrite.scenes.forEach { rewritten ->
-                            val current = scenes.first { it.id == rewritten.id }
-                            recordEdit(
-                                entityType = EditHistoryDao.TYPE_SCENE,
-                                entityId = rewritten.id,
-                                previousJson = StorageJson.encodeToString(current),
-                                nextJson = StorageJson.encodeToString(rewritten),
-                            )
-                            db.sceneDao().update(rewritten.toEntity())
-                        }
-                        variableRepository.rename(previous.name, updated)
                     }
                 }
                 events.send(successMessage)
@@ -2201,36 +2196,26 @@ class ActiveAutomationViewModel(
         var deletedVariableBinding: String? = null
         viewModelScope.launch {
             runCatching {
-                db.withTransaction {
-                    val variable = variableRepository.get(name, projectId)
-                        ?: throw IllegalStateException("Variable '%$name' no longer exists.")
-                    val profiles = db.profileDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
+                // Mutation lock first, then the transaction: the reverse order deadlocks against
+                // the engine's variable commit path.
+                variableRepository.withMutationLock {
+                    db.withTransaction {
+                        val variable = get(name, projectId)
+                            ?: throw IllegalStateException("Variable '%$name' no longer exists.")
+                        val (profiles, tasks, scenes) = loadDecodedAutomation()
+                        val guard = AutomationReferenceRewriter.guardVariableDeletion(
+                            target = variable,
+                            profiles = profiles,
+                            tasks = tasks,
+                            scenes = scenes,
+                        )
+                        if (!guard.canCommit) {
+                            val sites = guard.blocked.map { it.describe() }.distinct().joinToString("; ")
+                            throw IllegalStateException("Cannot delete %${variable.name}; it is referenced by: $sites")
+                        }
+                        delete(variable.name, projectId)
+                        deletedVariableBinding = LocaleConditionGrantStore.variableKey(projectId, variable.name)
                     }
-                    val tasks = db.taskDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
-                    }
-                    val scenes = db.sceneDao().getAll().map { entity ->
-                        val decoded = entity.toDomainDecodeResult()
-                        decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
-                        decoded.value
-                    }
-                    val guard = AutomationReferenceRewriter.guardVariableDeletion(
-                        target = variable,
-                        profiles = profiles,
-                        tasks = tasks,
-                        scenes = scenes,
-                    )
-                    if (!guard.canCommit) {
-                        val sites = guard.blocked.map { it.describe() }.distinct().joinToString("; ")
-                        throw IllegalStateException("Cannot delete %${variable.name}; it is referenced by: $sites")
-                    }
-                    variableRepository.delete(variable.name, projectId)
-                    deletedVariableBinding = LocaleConditionGrantStore.variableKey(projectId, variable.name)
                 }
             }
                 .onSuccess {
@@ -2292,6 +2277,23 @@ class ActiveAutomationViewModel(
         if (warningCount > 0) {
             events.send(pluralMessage(R.plurals.ui_profile_lint_warnings, warningCount, warningCount))
         }
+    }
+
+    /**
+     * Every profile, task, and scene decoded, refusing to proceed if any stored record is corrupt.
+     * Variable rename and delete both rewrite references across all three, so they must read the
+     * same consistent view rather than silently skipping a record they could not decode.
+     */
+    private suspend fun loadDecodedAutomation(): Triple<List<Profile>, List<Task>, List<Scene>> {
+        fun <T> decode(decoded: StorageDecodeResult<T>): T {
+            decoded.issue?.let { throw CorruptRecordOverwriteException(it) }
+            return decoded.value
+        }
+        return Triple(
+            db.profileDao().getAll().map { decode(it.toDomainDecodeResult()) },
+            db.taskDao().getAll().map { decode(it.toDomainDecodeResult()) },
+            db.sceneDao().getAll().map { decode(it.toDomainDecodeResult()) },
+        )
     }
 
     private fun launchWithMessage(
