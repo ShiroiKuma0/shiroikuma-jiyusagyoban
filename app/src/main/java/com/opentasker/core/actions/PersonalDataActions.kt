@@ -12,6 +12,7 @@ import android.provider.ContactsContract
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.platform.AppVisibilityTracker
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val MAX_CLIPBOARD_CHARS = 64 * 1024
@@ -25,15 +26,26 @@ class ClipboardGetAction : DeclaredAction(ActionCatalog.require("clipboard.get")
         val output = outputVariable(args, "Clipboard") ?: return ActionResult.Failure("invalid output variable")
         val clipboard = ctx.app.getSystemService(ClipboardManager::class.java)
             ?: return ActionResult.Failure("clipboard service unavailable")
-        val text = runCatching {
-            clipboard.primaryClip
-                ?.takeIf { it.itemCount > 0 }
-                ?.getItemAt(0)
-                ?.text
-                ?.toString()
-                ?.take(MAX_CLIPBOARD_CHARS)
-                .orEmpty()
-        }.getOrElse { return ActionResult.Failure("clipboard read failed: ${it.message}") }
+        val clip = runCatching { clipboard.primaryClip }
+            .getOrElse { return ActionResult.Failure("clipboard read failed: ${it.message}") }
+
+        // Android 10+ returns null rather than throwing when the caller is not the focused window
+        // or the default IME. Automations run from the background service, so that is the normal
+        // case, and treating null as "" reported Success with an empty value - indistinguishable
+        // from a genuinely empty clipboard, and silently feeding blank data to whatever came next.
+        if (clip == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !AppVisibilityTracker.isAppVisible) {
+            return ActionResult.Failure(
+                "Android blocks clipboard reads from the background; run this action while OpenTasker is open",
+            )
+        }
+
+        val text = clip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.text
+            ?.toString()
+            ?.take(MAX_CLIPBOARD_CHARS)
+            .orEmpty()
 
         ctx.variables.set(output, text, sensitive = true)
         ctx.variables.set("${output}_has_text", text.isNotEmpty().toString())

@@ -214,6 +214,35 @@ class HttpRequestActionTest {
     }
 
     @Test
+    fun anErrorStatusLeavesAnExistingDownloadUntouched() = withServer { server ->
+        // A scheduled download to a fixed path used to overwrite the good file with the error
+        // page whenever the server returned 4xx/5xx, while still reporting failure.
+        server.enqueue(MockResponse.Builder().code(503).body("<html>Service Unavailable</html>").build())
+        val filesDir = Files.createTempDirectory("opentasker-http-error-status").toFile()
+        try {
+            val destination = File(filesDir, "user_files/report.json").apply {
+                parentFile?.mkdirs()
+                writeText("""{"good":true}""")
+            }
+
+            val result = runAction(
+                mapOf(
+                    "url" to server.url("/report").toString(),
+                    "output_file" to "report.json",
+                    "allow_http" to "true",
+                ),
+                filesDir = filesDir,
+            )
+
+            assertFailure(result, "HTTP 503")
+            assertEquals("""{"good":true}""", destination.readText())
+            assertTrue(destination.parentFile?.listFiles()?.none { it.name.endsWith(".part") } == true)
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun oversizedFileResponseKeepsExistingDestinationAndCleansStaging() = withServer { server ->
         server.enqueue(MockResponse.Builder().code(200).body("too-large").build())
         val filesDir = Files.createTempDirectory("opentasker-http-atomic").toFile()
