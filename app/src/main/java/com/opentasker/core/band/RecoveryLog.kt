@@ -4,7 +4,11 @@ import android.content.Context
 import androidx.core.content.edit
 
 /**
- * 白い熊's own daily answer to "how do you feel?", one integer per calendar day.
+ * 白い熊's own daily answer to "how do you feel?", one integer per night.
+ *
+ * Keyed by the date the rated night STARTED, not by the morning the answer was typed on — a night
+ * begun at 23:xx on the 9th is never the 10th, and the marker looks a night's rating up by the
+ * night's own start date. See [migrateToNightKeys] for what that cost before it was true.
  *
  * ## Why this modest thing is here at all
  *
@@ -29,7 +33,7 @@ import androidx.core.content.edit
  *
  * ## Storage
  *
- * SharedPreferences, one `yyyyMMdd=n` pair per day, rather than a Room table. It is a few hundred
+ * SharedPreferences, one `yyyyMMdd=n` pair per night, rather than a Room table. It is a few hundred
  * bytes a year and needs no migration, no DAO and no schema bump — and unlike the band's samples it
  * is authored rather than synced, so it does not belong in the same store as measurements.
  *
@@ -40,6 +44,7 @@ object RecoveryLog {
 
     private const val PREFS = "recovery_log"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_NIGHT_KEYED = "night_keyed"
 
     const val MIN_RATING = 1
     const val MAX_RATING = 5
@@ -47,6 +52,61 @@ object RecoveryLog {
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .also(::migrateToNightKeys)
+
+    /**
+     * Re-key ratings written before the night-keying fix, once.
+     *
+     * The fix of 2026-08-10 changed what a key MEANS — from the calendar day the answer was typed on
+     * to the start date of the night it describes, which is the day before — without moving the
+     * entries already on file. Every one of them therefore read a night late: the answer typed on the
+     * morning of the 10th sat under `20260810`, which now names the night that started that evening,
+     * so on the 11th the card offered yesterday's answer as last night's rating. Reported 2026-08-11.
+     *
+     * Shifting every existing key back one day is exactly right because no rating was entered between
+     * the fix shipping and this migration (白い熊, 2026-08-11) — so nothing on file is already
+     * night-keyed and there is nothing here that could be shifted twice. The flag makes sure of the
+     * rest: the store cannot tell the two schemes apart by inspection, so running this a second time
+     * would silently walk the whole history backwards.
+     */
+    private fun migrateToNightKeys(prefs: android.content.SharedPreferences) {
+        if (prefs.getBoolean(KEY_NIGHT_KEYED, false)) return
+        val before = ratingsIn(prefs.all)
+        val after = shiftedToNightKeys(before)
+        prefs.edit {
+            // Remove every old key BEFORE writing the new ones: the two sets overlap on a run of
+            // consecutive days, so interleaving them would delete a value just written.
+            before.keys.forEach { remove(keyOf(it)) }
+            after.forEach { (date, rating) -> putInt(keyOf(date), rating) }
+            putBoolean(KEY_NIGHT_KEYED, true)
+        }
+    }
+
+    /** The `yyyyMMdd`→rating pairs in a raw preferences map, ignoring [KEY_ENABLED] and friends. */
+    private fun ratingsIn(all: Map<String, Any?>): Map<Long, Int> =
+        all.entries.mapNotNull { (key, value) ->
+            val date = key.toLongOrNull() ?: return@mapNotNull null
+            val rating = (value as? Int)?.takeIf { it in MIN_RATING..MAX_RATING } ?: return@mapNotNull null
+            date to rating
+        }.toMap()
+
+    /**
+     * The pure part of [migrateToNightKeys]: every rating moved to the day before.
+     *
+     * Injective, so no two ratings can land on the same night and none is lost. A key that is not a
+     * real date is dropped rather than guessed at — there is nothing to recover from `20260231`.
+     */
+    internal fun shiftedToNightKeys(ratings: Map<Long, Int>): Map<Long, Int> =
+        ratings.mapNotNull { (date, rating) -> previousDay(date)?.let { it to rating } }.toMap()
+
+    /** `yyyyMMdd` one calendar day earlier, or null if the key is not a real date. */
+    private fun previousDay(date: Long): Long? = runCatching {
+        java.time.LocalDate.of(
+            (date / 10_000L).toInt(),
+            ((date / 100L) % 100L).toInt(),
+            (date % 100L).toInt(),
+        ).minusDays(1)
+    }.getOrNull()?.let { it.year * 10_000L + it.monthValue * 100L + it.dayOfMonth }
 
     /** `yyyyMMdd` — the same local-date key shape the band's own records use. */
     fun keyOf(localDate: Long): String = localDate.toString()
