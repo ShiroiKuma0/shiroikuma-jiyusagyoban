@@ -186,7 +186,7 @@ class ExternalExecutionStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "opentasker_external_executions"
         private const val KEY_RECORDS = "records"
-        private const val FIELD_SEPARATOR = ""
+        private const val FIELD_SEPARATOR = "\u001F"
         private const val FIELD_COUNT = 8
         private const val MAX_FIELD_CHARS = 256
     }

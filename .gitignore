@@ -46,9 +46,16 @@ build.sh
 # Markdown files local-only (except README and the changelog).
 # ROADMAP.md and RESEARCH.md were tracked for a while despite this rule; they are untracked
 # now so working-tree churn stops being published.
+# The negations are rooted with a leading slash on purpose: a bare `!README.md` matches at any
+# depth, which is how docs/archive/ui-snapshots/README.md ended up tracked while every file it
+# described stayed ignored.
 *.md
-!README.md
-!CHANGELOG.md
+!/README.md
+!/CHANGELOG.md
+
+# The local documentation tree is working notes, not published material. Publishing it is a
+# separate, deliberate decision; until then nothing under docs/ is tracked.
+docs/
 
 # AI config
 AGENTS.md
