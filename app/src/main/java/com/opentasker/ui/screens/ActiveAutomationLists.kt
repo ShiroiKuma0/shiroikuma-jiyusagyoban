@@ -104,6 +104,7 @@ internal fun ProfilesScreen(
     onDeleteContext: (Profile, Int) -> Unit,
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
 ) {
     // An unread database and an empty one look identical from here; without this gate a cold
     // start with existing data flashes the first-run screen before Room's first emission.
@@ -245,6 +246,8 @@ internal fun ProfilesScreen(
                 onEdit = { onEditProfile(profile) },
                 onUndo = { onUndoProfileEdit(profile) },
                 onRedo = { onRedoProfileEdit(profile) },
+                canUndo = historyAvailability.canUndoProfile(profile.id),
+                canRedo = historyAvailability.canRedoProfile(profile.id),
                 onDelete = { onDeleteProfile(profile) },
                 onDuplicate = { onDuplicateProfile(profile) },
                 onToggle = { onToggleProfile(profile, it) },
@@ -464,6 +467,8 @@ private fun ProfileCard(
     profile: Profile,
     enterTaskName: String,
     onEdit: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
@@ -625,7 +630,7 @@ private fun ProfileCard(
                     Text(stringResource(R.string.profile_delete))
                 }
             }
-            HistoryButtons(onUndo = onUndo, onRedo = onRedo)
+            HistoryButtons(onUndo = onUndo, onRedo = onRedo, canUndo = canUndo, canRedo = canRedo)
         }
     }
 }
@@ -649,6 +654,7 @@ internal fun TasksScreen(
     onMoveAction: (Task, Int, Int) -> Unit,
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
 ) {
     if (!contentLoaded) {
         ContentLoadingState(contentPadding)
@@ -712,6 +718,8 @@ internal fun TasksScreen(
                 onEdit = { onEditTask(task) },
                 onUndo = { onUndoTaskEdit(task) },
                 onRedo = { onRedoTaskEdit(task) },
+                canUndo = historyAvailability.canUndoTask(task.id),
+                canRedo = historyAvailability.canRedoTask(task.id),
                 onDelete = { onDeleteTask(task) },
                 onDuplicate = { onDuplicateTask(task) },
                 onRun = { onRunTask(task) },
@@ -730,6 +738,8 @@ internal fun TasksScreen(
 private fun TaskCard(
     task: Task,
     onEdit: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onDelete: () -> Unit,
@@ -888,7 +898,7 @@ private fun TaskCard(
                     }
                 }
             }
-            HistoryButtons(onUndo = onUndo, onRedo = onRedo)
+            HistoryButtons(onUndo = onUndo, onRedo = onRedo, canUndo = canUndo, canRedo = canRedo)
         }
     }
 }
@@ -929,15 +939,33 @@ internal fun DuplicateMenu(
 private fun HistoryButtons(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
 ) {
+    // Disabled rather than always-live: pressing these with no history only produced a snackbar,
+    // and a screen reader had no way to know the action was unavailable before trying it.
+    val nothingToUndo = stringResource(R.string.history_nothing_to_undo)
+    val nothingToRedo = stringResource(R.string.history_nothing_to_redo)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
     ) {
-        OutlinedButton(onClick = onUndo, modifier = Modifier.weight(1f)) {
+        OutlinedButton(
+            onClick = onUndo,
+            enabled = canUndo,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { if (!canUndo) stateDescription = nothingToUndo },
+        ) {
             Text(stringResource(R.string.action_undo))
         }
-        OutlinedButton(onClick = onRedo, modifier = Modifier.weight(1f)) {
+        OutlinedButton(
+            onClick = onRedo,
+            enabled = canRedo,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { if (!canRedo) stateDescription = nothingToRedo },
+        ) {
             Text(stringResource(R.string.action_redo))
         }
     }
