@@ -8,6 +8,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
+import javax.net.ssl.SNIHostName
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import kotlinx.coroutines.Dispatchers
@@ -116,48 +117,89 @@ fun interface MqttPublishTransport {
     suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?)
 }
 
-class SocketMqttPublishTransport : MqttPublishTransport {
-    override suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?) = withContext(Dispatchers.IO) {
-        val socket = if (config.tls) {
-            SSLSocketFactory.getDefault().createSocket()
-        } else {
-            Socket()
+internal object MqttTlsPolicy {
+    /**
+     * Applies the identity checks that are otherwise lost when an SSL socket is created without a
+     * hostname. The hostname remains the logical peer even when the TCP connection is pinned to a
+     * previously vetted address.
+     */
+    fun configure(socket: SSLSocket, host: String) {
+        val parameters = socket.sslParameters.apply {
+            endpointIdentificationAlgorithm = "HTTPS"
+            if (!isIpLiteral(host)) {
+                serverNames = listOf(SNIHostName(host))
+            } else {
+                serverNames = emptyList()
+            }
         }
-        socket.use { connection ->
+        socket.sslParameters = parameters
+    }
+
+    private fun isIpLiteral(host: String): Boolean {
+        val candidate = if (host.startsWith("[") && host.endsWith("]")) {
+            host.substring(1, host.length - 1)
+        } else {
+            host
+        }
+        return candidate.contains(':') || IPV4_LITERAL.matches(candidate)
+    }
+
+    private val IPV4_LITERAL = Regex("\\d{1,3}(?:\\.\\d{1,3}){3}")
+}
+
+class SocketMqttPublishTransport(
+    private val tlsSocketFactory: SSLSocketFactory = defaultTlsSocketFactory(),
+) : MqttPublishTransport {
+    override suspend fun publish(config: MqttPublishConfig, pinnedAddress: InetAddress?) = withContext(Dispatchers.IO) {
+        Socket().use { rawSocket ->
             val endpoint = pinnedAddress
                 ?.let { InetSocketAddress(it, config.port) }
                 ?: InetSocketAddress(config.host, config.port)
-            connection.connect(endpoint, config.timeoutSeconds * 1_000)
-            connection.soTimeout = config.timeoutSeconds * 1_000
-            (connection as? SSLSocket)?.startHandshake()
-            val clientId = "ot-${UUID.randomUUID().toString().replace("-", "").take(16)}"
-            connection.outputStream.use { output ->
-                output.write(
-                    MqttWireCodec.connectPacket(
-                        clientId = clientId,
-                        username = config.username,
-                        password = config.password,
-                    ),
-                )
-                output.flush()
-                val connAckCode = MqttWireCodec.readConnAck(connection.inputStream)
-                require(connAckCode == 0) { "MQTT broker rejected CONNECT with code $connAckCode" }
-                val packetId = 1
-                output.write(
-                    MqttWireCodec.publishPacket(
-                        topic = config.topic,
-                        payload = config.payload,
-                        qos = config.qos,
-                        retain = config.retain,
-                        packetId = packetId,
-                    ),
-                )
-                output.flush()
-                if (config.qos == 1) MqttWireCodec.readPubAck(connection.inputStream, packetId)
-                output.write(MqttWireCodec.disconnectPacket())
-                output.flush()
+            rawSocket.connect(endpoint, config.timeoutSeconds * 1_000)
+            val connection = if (config.tls) {
+                (tlsSocketFactory.createSocket(rawSocket, config.host, config.port, true) as SSLSocket)
+                    .also { MqttTlsPolicy.configure(it, config.host) }
+            } else {
+                rawSocket
+            }
+            connection.use {
+                connection.soTimeout = config.timeoutSeconds * 1_000
+                (connection as? SSLSocket)?.startHandshake()
+                val clientId = "ot-${UUID.randomUUID().toString().replace("-", "").take(16)}"
+                connection.outputStream.use { output ->
+                    output.write(
+                        MqttWireCodec.connectPacket(
+                            clientId = clientId,
+                            username = config.username,
+                            password = config.password,
+                        ),
+                    )
+                    output.flush()
+                    val connAckCode = MqttWireCodec.readConnAck(connection.inputStream)
+                    require(connAckCode == 0) { "MQTT broker rejected CONNECT with code $connAckCode" }
+                    val packetId = 1
+                    output.write(
+                        MqttWireCodec.publishPacket(
+                            topic = config.topic,
+                            payload = config.payload,
+                            qos = config.qos,
+                            retain = config.retain,
+                            packetId = packetId,
+                        ),
+                    )
+                    output.flush()
+                    if (config.qos == 1) MqttWireCodec.readPubAck(connection.inputStream, packetId)
+                    output.write(MqttWireCodec.disconnectPacket())
+                    output.flush()
+                }
             }
         }
+    }
+
+    companion object {
+        private fun defaultTlsSocketFactory(): SSLSocketFactory =
+            (SSLSocketFactory.getDefault() as? SSLSocketFactory)
+                ?: error("Default MQTT TLS socket factory is unavailable")
     }
 }
 
@@ -254,7 +296,7 @@ class MqttPublishAction(
             checkLocalNetworkPermission(ctx)?.let { return it }
         }
         return runCatching {
-            transport.publish(config, privateAddress.takeIf { !config.tls })
+            transport.publish(config, privateAddress)
             ctx.logger("MQTT publish succeeded for ${config.host}:${config.port} qos=${config.qos} retain=${config.retain}")
             ActionResult.Success
         }.getOrElse { error ->

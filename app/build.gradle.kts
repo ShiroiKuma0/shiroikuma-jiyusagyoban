@@ -374,6 +374,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.bouncycastle.bcpkix)
     testImplementation("androidx.work:work-testing:2.11.2")
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
