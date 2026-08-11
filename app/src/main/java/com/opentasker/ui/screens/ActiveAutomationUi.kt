@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -195,7 +196,7 @@ private const val DELETE_TARGET_TASK = "task"
 private const val DELETE_TARGET_SCENE = "scene"
 
 
-private enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
+internal enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
     Profiles(R.string.nav_profiles),
     Tasks(R.string.nav_tasks),
     Vars(R.string.nav_variables),
@@ -205,11 +206,13 @@ private enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
     Setup(R.string.nav_setup),
     RunLog(R.string.nav_run_log),
     Diagnostics(R.string.nav_diagnostics),
+    Settings(R.string.nav_settings),
 }
 private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Profiles,
     OpenTaskerScreen.Tasks,
     OpenTaskerScreen.Setup,
+    OpenTaskerScreen.Settings,
     OpenTaskerScreen.RunLog,
 )
 
@@ -226,7 +229,11 @@ private fun OpenTaskerScreen.icon(): ImageVector = when (this) {
     OpenTaskerScreen.Setup -> Icons.Outlined.Settings
     OpenTaskerScreen.RunLog -> Icons.Outlined.History
     OpenTaskerScreen.Diagnostics -> Icons.Outlined.MonitorHeart
+    OpenTaskerScreen.Settings -> Icons.Outlined.Tune
 }
+
+internal fun shouldNavigateBackToProfiles(screen: OpenTaskerScreen): Boolean =
+    screen != OpenTaskerScreen.Profiles
 
 internal data class ActionEditState(
     val task: Task,
@@ -558,6 +565,10 @@ fun ActiveAutomationUi(
     }
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = shouldNavigateBackToProfiles(screen)) {
+        screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+        showMoreDestinations = false
+    }
     val headerDetail = when (screen) {
         OpenTaskerScreen.Profiles -> stringResource(R.string.header_profiles_detail, profiles.count { it.enabled }, profiles.size)
         OpenTaskerScreen.Tasks -> stringResource(R.string.header_tasks_detail, tasks.sumOf { it.actions.size }, tasks.size)
@@ -568,6 +579,7 @@ fun ActiveAutomationUi(
         OpenTaskerScreen.Setup -> stringResource(R.string.header_setup_detail)
         OpenTaskerScreen.RunLog -> stringResource(R.string.header_run_log_detail, runLogPage.totalCount)
         OpenTaskerScreen.Diagnostics -> stringResource(R.string.header_diagnostics_detail)
+        OpenTaskerScreen.Settings -> stringResource(R.string.header_settings_detail)
     }
 
     Scaffold(
@@ -635,7 +647,9 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Scenes,
                 OpenTaskerScreen.Inspector,
                 OpenTaskerScreen.Setup,
-                OpenTaskerScreen.RunLog -> Unit
+                OpenTaskerScreen.RunLog,
+                OpenTaskerScreen.Settings,
+                -> Unit
                 OpenTaskerScreen.Diagnostics -> Unit
             }
         },
@@ -689,6 +703,23 @@ fun ActiveAutomationUi(
             }
         },
     ) { innerPadding ->
+        val permissionScreen: @Composable (Boolean) -> Unit = { settingsOnly ->
+            PermissionOnboardingScreen(
+                contentPadding = innerPadding,
+                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                backupState = backupSetupState,
+                onCreateBackup = viewModel::createDatabaseBackup,
+                onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
+                onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
+                onCancelPendingRestore = viewModel::cancelPendingRestore,
+                onSnapshotPolicyChanged = viewModel::updateSnapshotPolicy,
+                profiles = profiles,
+                tasks = tasks,
+                globalFallbackTaskId = globalFallbackTaskId,
+                onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
+                settingsOnly = settingsOnly,
+            )
+        }
         Row(Modifier.fillMaxSize()) {
             if (useNavigationRail) {
                 NavigationRail(
@@ -861,20 +892,8 @@ fun ActiveAutomationUi(
                 contentPadding = innerPadding,
             )
 
-            OpenTaskerScreen.Setup -> PermissionOnboardingScreen(
-                contentPadding = innerPadding,
-                onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
-                backupState = backupSetupState,
-                onCreateBackup = viewModel::createDatabaseBackup,
-                onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
-                onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
-                onCancelPendingRestore = viewModel::cancelPendingRestore,
-                onSnapshotPolicyChanged = viewModel::updateSnapshotPolicy,
-                profiles = profiles,
-                tasks = tasks,
-                globalFallbackTaskId = globalFallbackTaskId,
-                onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
-            )
+            OpenTaskerScreen.Setup -> permissionScreen(false)
+            OpenTaskerScreen.Settings -> permissionScreen(true)
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
 

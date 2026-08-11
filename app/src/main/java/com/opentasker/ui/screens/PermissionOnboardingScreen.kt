@@ -302,6 +302,7 @@ fun PermissionOnboardingScreen(
     tasks: List<Task> = emptyList(),
     globalFallbackTaskId: Long? = null,
     onGlobalFallbackTaskChange: (Long?) -> Unit = {},
+    settingsOnly: Boolean = false,
 ) {
     val context = LocalContext.current
     val viewModelFactory = remember(context) {
@@ -385,7 +386,7 @@ fun PermissionOnboardingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
+        if (!settingsOnly) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
@@ -438,109 +439,99 @@ fun PermissionOnboardingScreen(
             }
         }
 
-        item {
-            ThemeSetupCard(
-                currentMode = themeMode,
-                onSelectMode = setupViewModel::setThemeMode,
-            )
-        }
-
-        item {
-            DirectBootSetupCard(
-                enabled = directBootEnabled,
-                onEnabledChange = setupViewModel::setDirectBootEnabled,
-            )
-        }
-
-        if (advancedProtectionEnabled) {
+        if (settingsOnly) {
+            item { SettingsIntroCard() }
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.42f)),
-                    shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.lg),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(stringResource(R.string.setup_advanced_protection_title), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.setup_advanced_protection_body),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                        )
+                ThemeSetupCard(
+                    currentMode = themeMode,
+                    onSelectMode = setupViewModel::setThemeMode,
+                )
+            }
+            item {
+                DirectBootSetupCard(
+                    enabled = directBootEnabled,
+                    onEnabledChange = setupViewModel::setDirectBootEnabled,
+                )
+            }
+            if (advancedProtectionEnabled) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.42f)),
+                        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.lg),
+                    ) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(stringResource(R.string.setup_advanced_protection_title), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.setup_advanced_protection_body),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
                     }
                 }
             }
+            item {
+                BackupSetupCard(
+                    state = backupState,
+                    onCreateBackup = onCreateBackup,
+                    onExportBackup = onExportBackup,
+                    onImportBackup = onImportBackup,
+                    onCancelPendingRestore = onCancelPendingRestore,
+                    onSnapshotPolicyChanged = onSnapshotPolicyChanged,
+                )
+            }
+            item {
+                GlobalFallbackTaskCard(
+                    taskId = globalFallbackTaskId,
+                    tasks = tasks,
+                    onTaskChange = onGlobalFallbackTaskChange,
+                )
+            }
+            item { TermuxScriptAllowlistCard(onMessage) }
+            item {
+                PushTriggerSetupCard(
+                    token = pushToken,
+                    registration = pushRegistration,
+                    onChooseDistributor = {
+                        setupViewModel.chooseUnifiedPushDistributor(context) { selected ->
+                            onMessage(
+                                if (selected) pushDistributorSelectedMessage else pushDistributorUnavailableMessage,
+                            )
+                        }
+                    },
+                    onRegister = {
+                        setupViewModel.registerUnifiedPush(context) { requested ->
+                            onMessage(
+                                if (requested) pushRegistrationRequestedMessage else pushRegistrationFailedMessage,
+                            )
+                        }
+                    },
+                    onUnregister = {
+                        setupViewModel.unregisterUnifiedPush()
+                        onMessage(pushUnregisteredMessage)
+                    },
+                    onMessage = onMessage,
+                )
+            }
+            item {
+                CompanionSetupCard(
+                    associations = associations,
+                    onRefresh = setupViewModel::refreshAssociations,
+                    onMessage = onMessage,
+                )
+            }
+            item {
+                LocaleGrantManagementCard(
+                    tasks = tasks,
+                    grants = localeGrants,
+                    onRevoke = setupViewModel::revokeLocaleGrant,
+                )
+            }
         }
 
-        item {
-            BackupSetupCard(
-                state = backupState,
-                onCreateBackup = onCreateBackup,
-                onExportBackup = onExportBackup,
-                onImportBackup = onImportBackup,
-                onCancelPendingRestore = onCancelPendingRestore,
-                onSnapshotPolicyChanged = onSnapshotPolicyChanged,
-            )
-        }
-
-        item {
-            GlobalFallbackTaskCard(
-                taskId = globalFallbackTaskId,
-                tasks = tasks,
-                onTaskChange = onGlobalFallbackTaskChange,
-            )
-        }
-
-        item { TermuxScriptAllowlistCard(onMessage) }
-        item {
-            PushTriggerSetupCard(
-                token = pushToken,
-                registration = pushRegistration,
-                onChooseDistributor = {
-                    setupViewModel.chooseUnifiedPushDistributor(context) { selected ->
-                        onMessage(
-                            if (selected) {
-                                pushDistributorSelectedMessage
-                            } else {
-                                pushDistributorUnavailableMessage
-                            },
-                        )
-                    }
-                },
-                onRegister = {
-                    setupViewModel.registerUnifiedPush(context) { requested ->
-                        onMessage(
-                            if (requested) {
-                                pushRegistrationRequestedMessage
-                            } else {
-                                pushRegistrationFailedMessage
-                            },
-                        )
-                    }
-                },
-                onUnregister = {
-                    setupViewModel.unregisterUnifiedPush()
-                    onMessage(pushUnregisteredMessage)
-                },
-                onMessage = onMessage,
-            )
-        }
-        item {
-            CompanionSetupCard(
-                associations = associations,
-                onRefresh = setupViewModel::refreshAssociations,
-                onMessage = onMessage,
-            )
-        }
-        item {
-            LocaleGrantManagementCard(
-                tasks = tasks,
-                grants = localeGrants,
-                onRevoke = setupViewModel::revokeLocaleGrant,
-            )
-        }
-
-        SetupSection.entries.forEach { section ->
+        if (!settingsOnly) SetupSection.entries.forEach { section ->
             val itemsForSection = sectionItems.getValue(section)
             if (itemsForSection.isNotEmpty()) {
                 item {
@@ -586,6 +577,25 @@ fun PermissionOnboardingScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsIntroCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
+            Text(
+                stringResource(R.string.settings_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
