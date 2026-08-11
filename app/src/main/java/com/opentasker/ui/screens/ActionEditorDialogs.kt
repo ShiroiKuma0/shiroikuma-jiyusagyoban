@@ -395,12 +395,22 @@ internal fun ActionConfigDialog(
                             },
                             shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         ) {
-                            Text(
-                                stringResource(capability.reasonRes),
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+                                Text(
+                                    stringResource(capability.reasonRes),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                // The reason alone told users what was missing but not where to
+                                // fix it, which is what sent people to edit the manifest instead.
+                                if (capability.level == CapabilityLevel.RequiresSetup) {
+                                    Text(
+                                        stringResource(R.string.capability_grant_from_setup),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(12.dp))

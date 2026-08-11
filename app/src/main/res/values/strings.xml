@@ -790,6 +790,7 @@
     <string name="label_on">On</string>
     <string name="label_off">Off</string>
     <string name="label_setup">Setup</string>
+    <string name="capability_grant_from_setup">Grant this from the Setup tab; elevated device actions need Shizuku, which Setup can guide you through.</string>
     <string name="label_enabled">Enabled</string>
     <string name="label_paused">Paused</string>
     <string name="label_unsupported">Unsupported</string>
