@@ -94,6 +94,9 @@ import com.opentasker.core.storage.normalized
 import com.opentasker.core.storage.openSnapshot
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.templates.ProfileTemplate
+import com.opentasker.core.templates.BlueprintCatalogStore
+import com.opentasker.core.templates.BlueprintInstallation
+import com.opentasker.core.templates.BlueprintInstallationStore
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
@@ -266,7 +269,14 @@ class ActiveAutomationViewModel(
 ) : ViewModel() {
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
     private val variableRepository = VariableRepository(db.variableDao())
-    private val bundleRepository = OpenTaskerBundleRepository(db, variableRepository)
+    private val blueprintCatalogStore = BlueprintCatalogStore(appContext)
+    private val blueprintInstallationStore = BlueprintInstallationStore(appContext)
+    private val bundleRepository = OpenTaskerBundleRepository(
+        db = db,
+        variableRepository = variableRepository,
+        blueprintCatalogStore = blueprintCatalogStore,
+        blueprintInstallationStore = blueprintInstallationStore,
+    )
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val fallbackTaskSettings = FallbackTaskSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
@@ -981,10 +991,25 @@ class ActiveAutomationViewModel(
     fun installProfileTemplate(template: ProfileTemplate, slotValues: Map<String, String>) =
         launchWithMessage("Template installed as a disabled profile") {
             val applied = template.instantiate(slotValues)
+            val resolvedValues = template.defaults() + slotValues.mapValues { it.value.trim() }
+            var taskId = 0L
+            var profileId = 0L
             db.withTransaction {
-                val taskId = db.taskDao().insert(applied.task.toEntity())
-                db.profileDao().upsert(applied.profile.copy(enterTaskId = taskId).toEntity())
+                taskId = db.taskDao().insert(applied.task.toEntity())
+                profileId = db.profileDao().insert(
+                    applied.profile.copy(enabled = false, enterTaskId = taskId).toEntity(),
+                )
             }
+            blueprintCatalogStore.merge(listOf(template))
+            blueprintInstallationStore.record(
+                BlueprintInstallation(
+                    blueprintId = template.id,
+                    blueprintVersion = template.version,
+                    profileId = profileId,
+                    taskId = taskId,
+                    inputValues = resolvedValues,
+                ),
+            )
         }
 
     fun previewLocalProfileShare(appVersion: String) {

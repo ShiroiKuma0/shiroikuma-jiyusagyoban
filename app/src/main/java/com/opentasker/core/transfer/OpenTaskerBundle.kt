@@ -25,7 +25,14 @@ import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.isEffectivelySecret
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.scenes.SceneElementConfigValidator
+import com.opentasker.core.templates.AutomationBlueprint
+import com.opentasker.core.templates.BlueprintCatalogStore
+import com.opentasker.core.templates.BlueprintInstallationStore
+import com.opentasker.core.templates.BlueprintUpdatePlanner
+import com.opentasker.core.templates.BlueprintUpdateReview
+import com.opentasker.core.templates.validationError
 import com.opentasker.core.validation.InputValidation
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
@@ -43,7 +50,10 @@ const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION = 1
 private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS =
     MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION..OPEN_TASKER_BUNDLE_SCHEMA_VERSION
 private fun projectVariableKey(projectId: Long, name: String): String = "$projectId:$name"
+private val BLUEPRINT_ID_PATTERN = Regex("^[a-z0-9][a-z0-9._-]{0,63}$")
+private val BLUEPRINT_INPUT_KEY_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9_-]{0,63}$")
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class OpenTaskerBundle(
     val schemaVersion: Int = OPEN_TASKER_BUNDLE_SCHEMA_VERSION,
@@ -55,6 +65,9 @@ data class OpenTaskerBundle(
     val profiles: List<Profile> = emptyList(),
     val variables: List<Variable> = emptyList(),
     val scenes: List<Scene> = emptyList(),
+    /** Optional additive content; empty legacy exports stay byte-compatible with schema 2. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val blueprints: List<AutomationBlueprint> = emptyList(),
 )
 
 @Serializable
@@ -98,6 +111,7 @@ data class BundleImportPlan(
     val powerRequests: List<RecipePowerRequest> = emptyList(),
     val variableConflicts: List<VariableImportConflict> = emptyList(),
     val semanticDiff: SemanticDiffDocument = SemanticDiffDocument(),
+    val blueprintUpdates: List<BlueprintUpdateReview> = emptyList(),
 )
 
 enum class VariableConflictAction {
@@ -124,6 +138,7 @@ data class BundleImportReport(
     val insertedScenes: Int,
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
+    val importedBlueprints: Int = 0,
 )
 
 object OpenTaskerBundleCodec {
@@ -155,6 +170,7 @@ object OpenTaskerBundleCodec {
         omittedSecretVariableCount: Int = 0,
         name: String = "OpenTasker Export",
         description: String = "",
+        blueprints: List<AutomationBlueprint> = emptyList(),
     ): OpenTaskerBundle {
         val sortedTasks = tasks.sortedWith(compareBy<Task> { it.name.lowercase() }.thenBy { it.id })
         // A consumed one-shot is runtime state, not portable configuration. Export its declared
@@ -167,6 +183,8 @@ object OpenTaskerBundleCodec {
             .filterNot { it.isSecret }
             .sortedWith(compareBy<Variable> { it.projectId }.thenBy { it.name.lowercase() }.thenBy { it.name })
         val sortedScenes = scenes.sortedWith(compareBy<Scene> { it.name.lowercase() }.thenBy { it.id })
+        val sortedBlueprints = blueprints
+            .sortedWith(compareBy<AutomationBlueprint> { it.category.lowercase() }.thenBy { it.title.lowercase() }.thenBy { it.id })
         val sortedProjects = (projects.ifEmpty { listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)) })
             .sortedWith(compareBy<Project> { it.position }.thenBy { it.name.lowercase() }.thenBy { it.id })
         val capabilityRequirements = capabilityRequirements(sortedTasks)
@@ -190,6 +208,7 @@ object OpenTaskerBundleCodec {
             profiles = sortedProfiles,
             variables = sortedVariables,
             scenes = sortedScenes,
+            blueprints = sortedBlueprints,
         )
         val plan = validate(base)
         return base.copy(
@@ -353,6 +372,35 @@ object OpenTaskerBundleCodec {
             warnings += "Bundle contains secret variable values; ordinary JSON bundles must omit secrets."
         }
 
+        duplicateStrings(bundle.blueprints.map { it.id }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+            warnings += "Bundle has duplicate blueprint ids: ${duplicates.joinToString()}."
+        }
+        bundle.blueprints.forEach { blueprint ->
+            if (!blueprint.id.matches(BLUEPRINT_ID_PATTERN) || blueprint.title.isBlank()) {
+                warnings += "Invalid blueprint '${blueprint.id}' (id/title)."
+            }
+            if (blueprint.version <= 0) {
+                warnings += "Invalid blueprint '${blueprint.id}' (version must be positive)."
+            }
+            if (blueprint.inputs.isEmpty() || blueprint.actions.isEmpty() || blueprint.contexts.isEmpty()) {
+                warnings += "Invalid blueprint '${blueprint.id}' (inputs, contexts, and actions are required)."
+            }
+            duplicateStrings(blueprint.inputs.map { it.key }).takeIf { it.isNotEmpty() }?.let { duplicates ->
+                warnings += "Invalid blueprint '${blueprint.id}' (duplicate input keys: ${duplicates.joinToString()})."
+            }
+            blueprint.inputs.forEach { input ->
+                if (!input.key.matches(BLUEPRINT_INPUT_KEY_PATTERN) || input.label.isBlank() || input.section.isBlank()) {
+                    warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}' has invalid metadata)."
+                }
+                if (input.minimum != null && input.maximum != null && input.minimum > input.maximum) {
+                    warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}' has reversed bounds)."
+                }
+                input.validationError(input.defaultValue)?.let { issue ->
+                    warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}': $issue)."
+                }
+            }
+        }
+
         val taskIds = bundle.tasks.map { it.id }.toSet()
         val tasksById = bundle.tasks.associateBy { it.id }
         val profilesById = bundle.profiles.associateBy { it.id }
@@ -501,6 +549,8 @@ object OpenTaskerBundleCodec {
             startsWith("Variable '") && contains("references missing project") ||
             startsWith("Bundle has duplicate variable names") ||
             startsWith("Bundle has duplicate normalized variable names") ||
+            startsWith("Bundle has duplicate blueprint ids") ||
+            startsWith("Invalid blueprint ") ||
             startsWith("Bundle contains secret variable values") ||
             startsWith("Bundle contains unknown unclassified actions") ||
             startsWith("Import budget exceeded") ||
@@ -568,6 +618,8 @@ object OpenTaskerBundleCodec {
 class OpenTaskerBundleRepository(
     private val db: AppDatabase,
     private val variableRepository: VariableRepository = VariableRepository(db.variableDao()),
+    private val blueprintCatalogStore: BlueprintCatalogStore? = null,
+    private val blueprintInstallationStore: BlueprintInstallationStore? = null,
 ) {
     suspend fun planImport(bundle: OpenTaskerBundle): BundleImportPlan {
         val base = OpenTaskerBundleCodec.validate(bundle)
@@ -605,8 +657,23 @@ class OpenTaskerBundleRepository(
         val existingVariables = db.variableDao().getAll()
             .filterNot { it.isEffectivelySecret() }
             .map { it.toDomain() }
+        val blueprintUpdates = bundle.blueprints.flatMap { blueprint ->
+            blueprintInstallationStore?.forBlueprint(blueprint.id).orEmpty().mapNotNull { installation ->
+                BlueprintUpdatePlanner.plan(
+                    blueprint = blueprint,
+                    installation = installation,
+                    currentProfile = existingProfiles.firstOrNull { it.id == installation.profileId },
+                    currentTask = existingTasks.firstOrNull { it.id == installation.taskId },
+                )
+            }
+        }
+        val blueprintWarnings = blueprintUpdates.mapNotNull { review ->
+            review.error?.let { "Blueprint '${review.blueprintTitle}' update cannot be reviewed: $it" }
+        }
         return base.copy(
+            warnings = base.warnings + blueprintWarnings,
             variableConflicts = conflicts,
+            blueprintUpdates = blueprintUpdates,
             semanticDiff = AutomationSemanticDiff.compareBundle(
                 bundle = bundle,
                 existingTasks = existingTasks,
@@ -629,6 +696,9 @@ class OpenTaskerBundleRepository(
         val variableExport = variableRepository.ordinaryExport()
         val scenes = db.sceneDao().getAll().map { it.toDomain() }
         val projects = db.projectDao().getAll().map { it.toDomain() }
+        val blueprints = blueprintInstallationStore?.load()
+            ?.mapNotNull { installation -> blueprintCatalogStore?.resolve(installation.blueprintId) }
+            .orEmpty()
 
         return OpenTaskerBundleCodec.sanitizeForExport(
             OpenTaskerBundleCodec.build(
@@ -642,6 +712,7 @@ class OpenTaskerBundleRepository(
                 omittedSecretVariableCount = variableExport.omittedSecretCount,
                 name = name,
                 description = description,
+                blueprints = blueprints,
             ),
             secretVariableNames = variableExport.omittedSecretNames,
             secretVariableValues = variableRepository.decodedForExportRedaction()
@@ -765,6 +836,11 @@ class OpenTaskerBundleRepository(
             }
         }
 
+        if (bundle.blueprints.isNotEmpty()) {
+            blueprintCatalogStore?.merge(bundle.blueprints)
+            importWarnings += "${bundle.blueprints.size} blueprint definition(s) were reviewed and saved; existing instantiated profiles were not overwritten."
+        }
+
         return BundleImportReport(
             insertedTasks = insertedTasks,
             insertedProfiles = insertedProfiles,
@@ -772,6 +848,7 @@ class OpenTaskerBundleRepository(
             insertedScenes = insertedScenes,
             warnings = importWarnings,
             lossyWarnings = lossyWarnings.distinct(),
+            importedBlueprints = bundle.blueprints.size,
         )
     }
 

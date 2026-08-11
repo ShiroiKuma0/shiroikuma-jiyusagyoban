@@ -79,7 +79,9 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.ProfileTemplateCatalog
+import com.opentasker.core.templates.BlueprintSelectorKind
 import com.opentasker.core.templates.TemplateAvailability
+import com.opentasker.core.templates.validationError
 import com.opentasker.core.validation.InputValidation
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
@@ -95,6 +97,7 @@ internal fun TemplatePickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ProfileTemplate) -> Unit,
     onSkip: (() -> Unit)? = null,
+    templates: List<ProfileTemplate> = ProfileTemplateCatalog.all,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -104,7 +107,7 @@ internal fun TemplatePickerDialog(
                 modifier = Modifier.heightIn(max = 460.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(ProfileTemplateCatalog.all, key = { it.id }) { template ->
+                items(templates, key = { it.id }) { template ->
                     val status = when (template.availability) {
                         TemplateAvailability.Ready -> stringResource(R.string.status_ready)
                         TemplateAvailability.RequiresSetup -> stringResource(R.string.status_needs_setup)
@@ -164,7 +167,14 @@ internal fun TemplateSlotDialog(
     onInstall: (Map<String, String>) -> Unit,
 ) {
     var values by rememberSaveable(template.id) { mutableStateOf(template.defaults()) }
-    val missingRequired = template.slots.any { it.required && values[it.key].isNullOrBlank() }
+    var collapsedSection by rememberSaveable(template.id + ":sections") { mutableStateOf<String?>(null) }
+    val missingRequired = template.inputs.any { it.required && values[it.key].isNullOrBlank() }
+    val invalidInputs = template.inputs.mapNotNull { input ->
+        input.validationError(values[input.key].orEmpty())?.let { input.key to it }
+    }.toMap()
+    val sections = remember(template.id, template.inputs) {
+        template.inputs.groupBy { it.section }.toList()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -188,21 +198,39 @@ internal fun TemplateSlotDialog(
                         )
                     }
                 }
-                items(template.slots, key = { it.key }) { slot ->
-                    OutlinedTextField(
-                        value = values[slot.key].orEmpty(),
-                        onValueChange = { values = values + (slot.key to it) },
-                        label = { Text(slot.label + if (slot.required) " *" else "") },
-                        placeholder = slot.hint?.let { { Text(it) } },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                sections.forEach { (section, inputs) ->
+                    item(key = "blueprint-section-$section") {
+                        TextButton(
+                            onClick = { collapsedSection = if (collapsedSection == section) null else section },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (collapsedSection == section) {
+                                    stringResource(R.string.blueprint_section_expand, section)
+                                } else {
+                                    stringResource(R.string.blueprint_section_collapse, section)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Start,
+                            )
+                        }
+                    }
+                    if (collapsedSection != section) {
+                        items(inputs, key = { it.key }) { input ->
+                            BlueprintInputField(
+                                input = input,
+                                value = values[input.key].orEmpty(),
+                                error = invalidInputs[input.key],
+                                onValueChange = { values = values + (input.key to it) },
+                            )
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
             Button(
-                enabled = !missingRequired && template.installable,
+                enabled = !missingRequired && invalidInputs.isEmpty() && template.installable,
                 onClick = { onInstall(values) },
             ) {
                 Text(stringResource(R.string.action_create_for_review))
@@ -211,6 +239,67 @@ internal fun TemplateSlotDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
+
+@Composable
+private fun BlueprintInputField(
+    input: com.opentasker.core.templates.BlueprintInput,
+    value: String,
+    error: String?,
+    onValueChange: (String) -> Unit,
+) {
+    val selectorLabel = blueprintSelectorLabel(input.selector)
+    val bounds = listOfNotNull(
+        input.minimum?.let { "≥ ${it.blueprintNumber()}" },
+        input.maximum?.let { "≤ ${it.blueprintNumber()}" },
+    ).joinToString(" ")
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(input.label + if (input.required) " *" else "") },
+        placeholder = input.hint?.let { { Text(it) } },
+        supportingText = {
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error)
+            } else if (bounds.isNotEmpty()) {
+                Text(stringResource(R.string.blueprint_input_bounds, selectorLabel, bounds))
+            } else {
+                Text(stringResource(R.string.blueprint_input_supporting, selectorLabel))
+            }
+        },
+        isError = error != null,
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = input.selector.keyboardType()),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun blueprintSelectorLabel(selector: BlueprintSelectorKind): String = stringResource(
+    when (selector) {
+        BlueprintSelectorKind.TEXT -> R.string.blueprint_input_type_text
+        BlueprintSelectorKind.APP -> R.string.blueprint_input_type_app
+        BlueprintSelectorKind.WIFI_SSID -> R.string.blueprint_input_type_wifi_ssid
+        BlueprintSelectorKind.LOCATION -> R.string.blueprint_input_type_location
+        BlueprintSelectorKind.TASK_REFERENCE -> R.string.blueprint_input_type_task_reference
+        BlueprintSelectorKind.VARIABLE -> R.string.blueprint_input_type_variable
+        BlueprintSelectorKind.DURATION -> R.string.blueprint_input_type_duration
+        BlueprintSelectorKind.INTEGER -> R.string.blueprint_input_type_integer
+        BlueprintSelectorKind.DECIMAL -> R.string.blueprint_input_type_decimal
+        BlueprintSelectorKind.TIME -> R.string.blueprint_input_type_time
+    },
+)
+
+private fun BlueprintSelectorKind.keyboardType(): KeyboardType = when (this) {
+    BlueprintSelectorKind.INTEGER,
+    BlueprintSelectorKind.DURATION,
+    BlueprintSelectorKind.TASK_REFERENCE,
+    -> KeyboardType.Number
+    BlueprintSelectorKind.DECIMAL -> KeyboardType.Decimal
+    BlueprintSelectorKind.TIME -> KeyboardType.Ascii
+    else -> KeyboardType.Text
+}
+
+private fun Double.blueprintNumber(): String = toString().removeSuffix(".0")
 
 @Composable
 internal fun TaskEditorDialog(

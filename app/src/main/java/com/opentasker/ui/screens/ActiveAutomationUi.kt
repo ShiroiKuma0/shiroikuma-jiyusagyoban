@@ -165,7 +165,7 @@ import com.opentasker.core.transfer.TaskerImportPreview
 import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.templates.ProfileTemplate
-import com.opentasker.core.templates.ProfileTemplateCatalog
+import com.opentasker.core.templates.BlueprintCatalogStore
 import com.opentasker.core.templates.TemplateAvailability
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -252,6 +252,8 @@ fun ActiveAutomationUi(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
+    val blueprintCatalogStore = remember(context) { BlueprintCatalogStore(context) }
+    val availableBlueprints = remember(blueprintCatalogStore) { blueprintCatalogStore.available() }
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
@@ -350,7 +352,7 @@ fun ActiveAutomationUi(
     val profileDialog = profileDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
         ?.let { profileId -> profiles.firstOrNull { it.id == profileId } }
     val selectedTemplate = selectedTemplateId
-        ?.let { templateId -> ProfileTemplateCatalog.all.firstOrNull { it.id == templateId } }
+        ?.let { templateId -> availableBlueprints.firstOrNull { it.id == templateId } }
     val actionPickerTask = actionPickerTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }
         ?.let { taskId -> tasks.firstOrNull { it.id == taskId } }
     val actionEdit = actionEditTaskId.takeIf { it != NO_DIALOG_ENTITY_ID }?.let { taskId ->
@@ -1126,6 +1128,7 @@ fun ActiveAutomationUi(
 
     if (showTemplateDialog) {
         TemplatePickerDialog(
+            templates = availableBlueprints,
             onDismiss = {
                 showTemplateDialog = false
                 onboardingTemplateFlow = false

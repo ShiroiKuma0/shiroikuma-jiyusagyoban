@@ -615,6 +615,7 @@
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
     <string name="import_count_scenes">Scenes</string>
+    <string name="import_count_blueprints">Blueprints</string>
     <string name="import_count_contexts">Contexts</string>
     <string name="import_count_setup_notes">Setup notes</string>
     <string name="import_count_warnings">Warnings</string>
@@ -987,6 +988,25 @@
 
     <string name="status_planned">Planned</string>
     <string name="template_disabled_review">Profiles created from templates start disabled so you can review permissions, actions, and contexts before enabling.</string>
+    <string name="blueprint_input_type_text">Text</string>
+    <string name="blueprint_input_type_app">App package</string>
+    <string name="blueprint_input_type_wifi_ssid">Wi-Fi network name</string>
+    <string name="blueprint_input_type_location">Location coordinates</string>
+    <string name="blueprint_input_type_task_reference">Task reference</string>
+    <string name="blueprint_input_type_variable">Local variable</string>
+    <string name="blueprint_input_type_duration">Duration</string>
+    <string name="blueprint_input_type_integer">Whole number</string>
+    <string name="blueprint_input_type_decimal">Decimal number</string>
+    <string name="blueprint_input_type_time">Time</string>
+    <string name="blueprint_input_supporting">Input type: %1$s</string>
+    <string name="blueprint_input_bounds">%1$s · allowed range %2$s</string>
+    <string name="blueprint_section_collapse">Collapse %1$s</string>
+    <string name="blueprint_section_expand">Expand %1$s</string>
+    <string name="blueprint_update_review">Blueprint updates are review-only; existing profiles and tasks are never overwritten.</string>
+    <string name="blueprint_update_versions">%1$s · installed v%2$d → incoming v%3$d</string>
+    <string name="blueprint_update_no_changes">The newer definition produces no semantic changes for this instance.</string>
+    <string name="blueprint_update_unavailable">This installed instance cannot be compared: %1$s</string>
+    <string name="blueprint_update_changes">Changes from the newer blueprint</string>
     <string name="task_priority_invalid">Enter a value from 0 to 10.</string>
     <string name="profile_enable_after_save_helper">Leave off until contexts and actions are reviewed.</string>
     <string name="profile_cooldown_invalid">Enter seconds as a whole number.</string>
