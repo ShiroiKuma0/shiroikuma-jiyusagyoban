@@ -41,6 +41,8 @@ class TaskRunner(
     private val executionChain: Set<Long> = emptySet(),
     private val originatingProfileId: Long? = null,
     private val originatingProfileName: String? = null,
+    /** Injectable clock for deterministic scenario tests; production uses wall-clock time. */
+    private val now: () -> Long = System::currentTimeMillis,
 ) {
     /** A live `flow.foreach` iteration in progress. */
     private class LoopFrame(
@@ -65,7 +67,7 @@ class TaskRunner(
 
     suspend fun run(task: Task): TaskRunReport {
         ctx.variables.pushScope()
-        val started = System.currentTimeMillis()
+        val started = now()
         val results = mutableListOf<ActionResult>()
         val traces = mutableListOf<ActionExecutionTrace>()
 
@@ -209,7 +211,7 @@ class TaskRunner(
             taskId = task.id,
             taskName = task.name,
             startedAt = started,
-            durationMs = System.currentTimeMillis() - started,
+            durationMs = now() - started,
             results = results,
             traces = traces,
             success = !unhandledFailure && results.withIndex().all { (index, result) ->
@@ -230,7 +232,7 @@ class TaskRunner(
             taskId = task.id,
             taskName = task.name,
             startedAt = started,
-            durationMs = System.currentTimeMillis() - started,
+            durationMs = now() - started,
             results = listOf(failure),
             traces = listOf(
                 ActionExecutionTrace(
@@ -543,7 +545,7 @@ class TaskRunner(
     )
 
     private suspend fun runOne(index: Int, spec: ActionSpec): Pair<ActionResult, ActionExecutionTrace> {
-        val started = System.currentTimeMillis()
+        val started = now()
         if (!shouldRun(spec)) {
             val result = ActionResult.Skip
             return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
@@ -633,6 +635,7 @@ class TaskRunner(
             executionChain = executionChain + target.id,
             originatingProfileId = originatingProfileId,
             originatingProfileName = originatingProfileName,
+            now = now,
         )
         ctx.variables.pushScope()
         val report = try {
@@ -686,7 +689,7 @@ class TaskRunner(
         index = index,
         actionType = spec.type,
         label = spec.label ?: spec.type,
-        durationMs = System.currentTimeMillis() - started,
+        durationMs = now() - started,
         status = when (result) {
             is ActionResult.Success -> ActionTraceStatus.SUCCESS
             is ActionResult.Failure -> if (result.message.startsWith("timed out")) ActionTraceStatus.TIMEOUT else ActionTraceStatus.FAILURE
