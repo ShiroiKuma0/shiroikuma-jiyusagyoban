@@ -116,6 +116,10 @@ import com.opentasker.core.plugins.locale.LocaleGrant
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.updates.UpdateCheckAvailability
+import com.opentasker.core.updates.UpdateCheckSettings
+import com.opentasker.core.updates.UpdateCheckState
+import com.opentasker.core.updates.UpdateCheckWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -196,6 +200,11 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.System)
 
+    private val _updateCheckState = MutableStateFlow(
+        if (UpdateCheckAvailability.isAvailable()) UpdateCheckSettings(context).load() else UpdateCheckState(),
+    )
+    val updateCheckState: StateFlow<UpdateCheckState> = _updateCheckState.asStateFlow()
+
     private val _associations = MutableStateFlow<List<CompanionAssociation>>(emptyList())
     val associations: StateFlow<List<CompanionAssociation>> = _associations.asStateFlow()
 
@@ -217,6 +226,7 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
     fun refresh() {
         refreshTick.update { it + 1L }
         refreshExternalState()
+        refreshUpdateCheckState()
     }
 
     fun setDirectBootEnabled(enabled: Boolean) {
@@ -229,6 +239,16 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch(Dispatchers.IO) {
             ThemePreference.set(context, mode)
+        }
+    }
+
+    fun setUpdateChecksEnabled(enabled: Boolean) {
+        if (!UpdateCheckAvailability.isAvailable()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val settings = UpdateCheckSettings(context)
+            settings.setEnabled(enabled)
+            UpdateCheckWorker.sync(context)
+            _updateCheckState.value = settings.load()
         }
     }
 
@@ -274,6 +294,16 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
             _localeGrants.value = LocaleGrantStore(context).grants()
         }
     }
+
+    private fun refreshUpdateCheckState() {
+        if (!UpdateCheckAvailability.isAvailable()) {
+            _updateCheckState.value = UpdateCheckState()
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _updateCheckState.value = UpdateCheckSettings(context).load()
+        }
+    }
 }
 
 private class PermissionOnboardingViewModelFactory(
@@ -315,6 +345,7 @@ fun PermissionOnboardingScreen(
     val items by setupViewModel.permissionItems.collectAsState()
     val directBootEnabled by setupViewModel.directBootEnabled.collectAsState()
     val themeMode by setupViewModel.themeMode.collectAsState()
+    val updateCheckState by setupViewModel.updateCheckState.collectAsState()
     val associations by setupViewModel.associations.collectAsState()
     val pushToken by setupViewModel.pushToken.collectAsState()
     val pushRegistration by setupViewModel.pushRegistration.collectAsState()
@@ -441,6 +472,17 @@ fun PermissionOnboardingScreen(
 
         if (settingsOnly) {
             item { SettingsIntroCard() }
+            if (UpdateCheckAvailability.isAvailable()) {
+                item {
+                    UpdateCheckSetupCard(
+                        state = updateCheckState,
+                        onEnabledChange = setupViewModel::setUpdateChecksEnabled,
+                        onOpenRelease = { url ->
+                            openSettingsIntent(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)), onMessage)
+                        },
+                    )
+                }
+            }
             item {
                 ThemeSetupCard(
                     currentMode = themeMode,
@@ -596,6 +638,64 @@ private fun SettingsIntroCard() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun UpdateCheckSetupCard(
+    state: UpdateCheckState,
+    onEnabledChange: (Boolean) -> Unit,
+    onOpenRelease: (String) -> Unit,
+) {
+    val stateText = when {
+        !state.enabled -> stringResource(R.string.setup_update_status_off)
+        state.newerVersion != null -> stringResource(R.string.setup_update_status_available, state.newerVersion)
+        state.lastCheckedAtMs != null -> stringResource(R.string.setup_update_status_current)
+        else -> stringResource(R.string.setup_update_status_pending)
+    }
+    val toggleDescription = stringResource(
+        if (state.enabled) R.string.setup_update_enabled else R.string.setup_update_disabled,
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(value = state.enabled, onValueChange = onEnabledChange, role = Role.Switch)
+                    .semantics(mergeDescendants = true) { stateDescription = toggleDescription },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.setup_update_title), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.setup_update_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stateText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (state.newerVersion != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        },
+                    )
+                }
+                Switch(checked = state.enabled, onCheckedChange = null)
+            }
+            if (state.newerVersion != null && state.releaseUrl != null) {
+                OutlinedButton(onClick = { onOpenRelease(state.releaseUrl) }) {
+                    Text(stringResource(R.string.setup_update_open_release))
+                }
+            }
         }
     }
 }
