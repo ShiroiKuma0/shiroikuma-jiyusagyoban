@@ -168,7 +168,9 @@ internal fun ProfilesScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
+        // Extra bottom inset so the extended FAB never sits on top of the last row; Scaffold's
+        // innerPadding does not reserve floating-action-button height.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
@@ -678,7 +680,9 @@ internal fun TasksScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
+        // Extra bottom inset so the extended FAB never sits on top of the last row; Scaffold's
+        // innerPadding does not reserve floating-action-button height.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
         item {
