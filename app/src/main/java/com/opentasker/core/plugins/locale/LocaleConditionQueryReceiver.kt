@@ -13,11 +13,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /** Locale/Tasker condition-plugin endpoint for OpenTasker's own condition selections. */
 class LocaleConditionQueryReceiver : BroadcastReceiver() {
+    private val queryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != LocalePluginContract.ACTION_QUERY_CONDITION) return
 
         val pendingResult = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        queryScope.launch {
             try {
                 val state = withTimeoutOrNull(MAX_QUERY_MS) {
                     runCatching {
@@ -43,6 +45,13 @@ class LocaleConditionQueryReceiver : BroadcastReceiver() {
         }.getOrNull() ?: return LocalePluginConditionState.Unknown
         val spec = runCatching { LocaleConditionTarget.parse(values) }.getOrNull()
             ?: return LocalePluginConditionState.Unknown
+        val authorized = runCatching {
+            LocaleConditionGrantStore(context).isValid(
+                spec.grantToken,
+                LocaleConditionGrantStore.bindingKey(spec),
+            )
+        }.getOrDefault(false)
+        if (!authorized) return LocalePluginConditionState.Unknown
         val db = runCatching { OpenTaskerApp_NoHilt.db }.getOrNull()
             ?: return LocalePluginConditionState.Unknown
 
@@ -74,14 +83,6 @@ class LocaleConditionQueryReceiver : BroadcastReceiver() {
             }
             LocaleConditionKind.VARIABLE_COMPARE -> {
                 val variableName = spec.variableName ?: return LocalePluginConditionState.Unknown
-                // The receiver is exported without a permission, so the only thing separating a
-                // legitimate host from an app probing variables one comparison at a time is the
-                // grant the user minted when they chose this variable.
-                val authorized = LocaleConditionGrantStore(context).isValid(
-                    spec.grantToken,
-                    LocaleConditionGrantStore.variableKey(spec.variableProjectId, variableName),
-                )
-                if (!authorized) return LocalePluginConditionState.Unknown
                 val entity = db.variableDao().getInProject(variableName, spec.variableProjectId)
                     ?: return LocalePluginConditionState.Unknown
                 LocaleConditionEvaluator.evaluate(

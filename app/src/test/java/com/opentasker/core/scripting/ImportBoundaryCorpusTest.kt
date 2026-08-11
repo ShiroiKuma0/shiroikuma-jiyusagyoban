@@ -152,9 +152,9 @@ class ImportBoundaryCorpusTest {
                 LocaleConditionTarget.BUNDLE_KEY_SCHEMA to LocaleConditionTarget.SCHEMA_VERSION,
                 LocaleConditionTarget.BUNDLE_KEY_KIND to "future_kind",
             ),
-            "invalid profile" to LocaleConditionTarget.profileActive(1, "Work") +
+            "invalid profile" to LocaleConditionTarget.profileActive(1, "Work", "grant-token") +
                 (LocaleConditionTarget.BUNDLE_KEY_PROFILE_ID to "0"),
-            "invalid context" to LocaleConditionTarget.contextSatisfied(1, "Work", 0, "State") +
+            "invalid context" to LocaleConditionTarget.contextSatisfied(1, "Work", 0, "State", "grant-token") +
                 (LocaleConditionTarget.BUNDLE_KEY_CONTEXT_INDEX to "1025"),
         )
         invalidConditionBundles.forEach { (label, values) ->

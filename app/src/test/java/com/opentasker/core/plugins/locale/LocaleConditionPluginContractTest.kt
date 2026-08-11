@@ -31,9 +31,12 @@ class LocaleConditionPluginContractTest {
         val source = source("com/opentasker/core/plugins/locale/LocaleConditionQueryReceiver.kt")
 
         assertTrue(source.contains("goAsync()"))
+        assertTrue(source.contains("private val queryScope = CoroutineScope"))
+        assertTrue(source.contains("queryScope.launch"))
         assertTrue(source.contains("withTimeoutOrNull(MAX_QUERY_MS)"))
         assertTrue(source.contains("LocalePluginConditionState.Unknown"))
         assertTrue(source.contains("LocalePluginContract.MAX_BUNDLE_JSON_BYTES"))
+        assertTrue(source.contains("LocaleConditionGrantStore.bindingKey(spec)"))
     }
 
     @Test

@@ -25,7 +25,7 @@ data class LocaleConditionSpec(
     val variableProjectId: Long = DEFAULT_PROJECT_ID,
     val operator: LocaleConditionOperator? = null,
     val expectedValue: String? = null,
-    /** Configure-time read grant; required for [LocaleConditionKind.VARIABLE_COMPARE]. */
+    /** Configure-time read grant; required for every exported condition query. */
     val grantToken: String? = null,
 )
 
@@ -56,11 +56,12 @@ object LocaleConditionTarget {
     const val MAX_CONTEXT_INDEX = 1_024
     const val MAX_EXPECTED_VALUE_BYTES = 4 * 1_024
 
-    fun profileActive(profileId: Long, profileName: String): Map<String, String> = mapOf(
+    fun profileActive(profileId: Long, profileName: String, grantToken: String): Map<String, String> = mapOf(
         BUNDLE_KEY_SCHEMA to SCHEMA_VERSION,
         BUNDLE_KEY_KIND to LocaleConditionKind.PROFILE_ACTIVE.wireName,
         BUNDLE_KEY_PROFILE_ID to requirePositiveId(profileId).toString(),
         BUNDLE_KEY_PROFILE_NAME to profileName.trim().take(120),
+        BUNDLE_KEY_GRANT to requireGrantToken(grantToken),
     )
 
     fun contextSatisfied(
@@ -68,6 +69,7 @@ object LocaleConditionTarget {
         profileName: String,
         contextIndex: Int,
         contextLabel: String,
+        grantToken: String,
     ): Map<String, String> = mapOf(
         BUNDLE_KEY_SCHEMA to SCHEMA_VERSION,
         BUNDLE_KEY_KIND to LocaleConditionKind.CONTEXT_SATISFIED.wireName,
@@ -75,6 +77,7 @@ object LocaleConditionTarget {
         BUNDLE_KEY_PROFILE_NAME to profileName.trim().take(120),
         BUNDLE_KEY_CONTEXT_INDEX to requireContextIndex(contextIndex).toString(),
         BUNDLE_KEY_CONTEXT_LABEL to contextLabel.trim().take(120),
+        BUNDLE_KEY_GRANT to requireGrantToken(grantToken),
     )
 
     fun variableCompare(
@@ -110,12 +113,14 @@ object LocaleConditionTarget {
                 kind = kind,
                 profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID])
                     ?: error("Invalid profile identifier."),
+                grantToken = requireGrantToken(values[BUNDLE_KEY_GRANT].orEmpty()),
             )
             LocaleConditionKind.CONTEXT_SATISFIED -> LocaleConditionSpec(
                 kind = kind,
                 profileId = parsePositiveId(values[BUNDLE_KEY_PROFILE_ID])
                     ?: error("Invalid profile identifier."),
                 contextIndex = parseContextIndex(values[BUNDLE_KEY_CONTEXT_INDEX]),
+                grantToken = requireGrantToken(values[BUNDLE_KEY_GRANT].orEmpty()),
             )
             LocaleConditionKind.VARIABLE_COMPARE -> LocaleConditionSpec(
                 kind = kind,

@@ -166,7 +166,11 @@ private fun LocaleConditionEditor(
                         detail = stringResource(R.string.locale_condition_profile_active),
                         onClick = {
                             onConfigured(
-                                LocaleConditionTarget.profileActive(profile.id, profile.name),
+                                LocaleConditionTarget.profileActive(
+                                    profile.id,
+                                    profile.name,
+                                    onIssueGrant(LocaleConditionGrantStore.profileKey(profile.id)),
+                                ),
                                 "Profile active: ${profile.name}",
                             )
                         },
@@ -189,6 +193,9 @@ private fun LocaleConditionEditor(
                                     context.profileName,
                                     context.index,
                                     context.label,
+                                    onIssueGrant(
+                                        LocaleConditionGrantStore.contextKey(context.profileId, context.index),
+                                    ),
                                 ),
                                 "Context satisfied: ${context.profileName} #${context.index + 1}",
                             )
