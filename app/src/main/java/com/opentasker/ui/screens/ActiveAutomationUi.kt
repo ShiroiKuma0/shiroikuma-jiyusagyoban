@@ -262,7 +262,7 @@ fun ActiveAutomationUi(
     val availableBlueprints = remember(blueprintCatalogStore) { blueprintCatalogStore.available() }
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
-    val profiles by viewModel.profiles.collectAsState()
+    val profiles by viewModel.profiles.collectAsState(); val contentLoaded by viewModel.contentLoaded.collectAsState()
     val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val projects by viewModel.projects.collectAsState()
@@ -799,7 +799,7 @@ fun ActiveAutomationUi(
                 onDeleteContext = { profile, index ->
                     if (profile.contexts.getOrNull(index) != null) viewModel.removeProfileContext(profile, index)
                 },
-                contentPadding = innerPadding,
+                contentPadding = innerPadding, contentLoaded = contentLoaded,
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
@@ -834,7 +834,7 @@ fun ActiveAutomationUi(
                 onMoveAction = { task, fromIndex, toIndex ->
                     viewModel.moveTaskAction(task.id, fromIndex, toIndex)
                 },
-                contentPadding = innerPadding,
+                contentPadding = innerPadding, contentLoaded = contentLoaded,
             )
 
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
@@ -889,7 +889,7 @@ fun ActiveAutomationUi(
                 onUndoSceneEdit = { viewModel.undoLastSceneEdit(it.id) },
                 onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },
                 onDeleteScene = { openDeleteScene(it) }, onDuplicateScene = viewModel::duplicateScene,
-                contentPadding = innerPadding,
+                contentPadding = innerPadding, contentLoaded = contentLoaded,
             )
 
             OpenTaskerScreen.Setup -> permissionScreen(false)

@@ -103,7 +103,14 @@ internal fun ProfilesScreen(
     onEditContext: (Profile, Int, ContextSpec) -> Unit,
     onDeleteContext: (Profile, Int) -> Unit,
     contentPadding: PaddingValues,
+    contentLoaded: Boolean = true,
 ) {
+    // An unread database and an empty one look identical from here; without this gate a cold
+    // start with existing data flashes the first-run screen before Room's first emission.
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
     if (tasks.isEmpty()) {
         EmptyState(
             title = stringResource(R.string.empty_first_automation_title),
@@ -641,7 +648,12 @@ internal fun TasksScreen(
     onDeleteAction: (Task, Int) -> Unit,
     onMoveAction: (Task, Int, Int) -> Unit,
     contentPadding: PaddingValues,
+    contentLoaded: Boolean = true,
 ) {
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
     if (tasks.isEmpty()) {
         EmptyState(
             title = stringResource(R.string.empty_tasks_title),

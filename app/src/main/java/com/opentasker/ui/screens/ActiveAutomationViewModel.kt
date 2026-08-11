@@ -350,6 +350,9 @@ class ActiveAutomationViewModel(
         db.editHistoryDao().pruneOld(entityType, entityId)
     }
 
+    /** See [contentLoadedSignal]: screens gate first-run empty states on this. */
+    val contentLoaded: StateFlow<Boolean> = contentLoadedSignal(db, viewModelScope)
+
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
         .map { entities -> entities.map { it.toDomainDecodeResult() } }

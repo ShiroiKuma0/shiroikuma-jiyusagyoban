@@ -1052,6 +1052,7 @@
 
     <string name="ui_error_content_description">Error</string>
     <string name="ui_info_content_description">Info</string>
+    <string name="ui_loading_content">Loading</string>
     <string name="ui_retry_content_description">Retry this action</string>
     <string name="ui_retry_loading_content_description">Retry loading this content</string>
     <string name="ui_loading_in_progress">%1$s in progress</string>
