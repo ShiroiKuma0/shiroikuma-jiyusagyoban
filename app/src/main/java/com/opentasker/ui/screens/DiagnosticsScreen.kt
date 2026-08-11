@@ -489,7 +489,7 @@ private fun AppLogCard(entry: AppLogEntry, formatter: SimpleDateFormat) {
         title = stringResource(
             R.string.diagnostics_log_record,
             formatter.format(Date(entry.timestampMillis)),
-            entry.level.name,
+            stringResource(appLogLevelLabelRes(entry.level)),
             entry.tag,
         ),
         body = entry.message,

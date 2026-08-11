@@ -541,7 +541,7 @@ private fun ProfileCard(
                         )
                     }
                 }
-                item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { StatusPill(stringResource(automationModeTitleRes(profile.automationMode)), MaterialTheme.colorScheme.onSurfaceVariant) }
                 profile.group?.let { group ->
                     item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }
                 }
@@ -764,7 +764,7 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        stringResource(R.string.workspace_task_priority, task.priority, task.collisionMode.name.lowercase().replace('_', ' ')),
+                        stringResource(R.string.workspace_task_priority, task.priority, collisionModeTitle(task.collisionMode)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -789,7 +789,7 @@ private fun TaskCard(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 item { StatusPill(stringResource(R.string.label_action_count, task.actions.size), MaterialTheme.colorScheme.primary) }
                 item { StatusPill(stringResource(R.string.label_priority_short, task.priority), MaterialTheme.colorScheme.secondary) }
-                item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { StatusPill(collisionModeTitle(task.collisionMode), MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (task.actions.isEmpty()) {
                 InlineNotice(
@@ -947,7 +947,7 @@ private fun ActionRow(
     val capability = ActionCapabilityRegistry.get(action.type)
     val metadataName = metadata?.let { stringResource(it.nameRes) }
     val metadataDescription = metadata?.let { stringResource(it.descriptionRes) }
-    val actionLabel = action.label ?: metadataName ?: action.type
+    val actionLabel = action.label ?: metadataName ?: stringResource(R.string.action_unknown_name)
     val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
     val moveUpDescription = stringResource(R.string.a11y_move_action_up, index + 1, actionLabel)

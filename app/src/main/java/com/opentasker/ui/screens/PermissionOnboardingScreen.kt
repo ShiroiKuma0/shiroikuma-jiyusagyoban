@@ -111,6 +111,7 @@ import com.opentasker.core.engine.DirectBootTriggerStore
 import com.opentasker.core.contexts.CompanionAssociation
 import com.opentasker.core.contexts.CompanionAssociationResult
 import com.opentasker.core.contexts.CompanionDeviceAssociation
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleGrant
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.model.Profile
@@ -1702,9 +1703,11 @@ private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (Str
     try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (ex: ActivityNotFoundException) {
-        onMessage(context.getString(R.string.setup_settings_unavailable, ex.message ?: context.getString(R.string.setup_error_no_handler)))
+        AppLogger.warn("OpenTasker.Setup", "Settings activity is unavailable", ex)
+        onMessage(context.getString(R.string.setup_settings_unavailable, context.getString(R.string.setup_error_no_handler)))
     } catch (ex: SecurityException) {
-        onMessage(context.getString(R.string.setup_settings_open_failed, ex.message ?: context.getString(R.string.setup_error_permission_denied)))
+        AppLogger.warn("OpenTasker.Setup", "Settings activity was denied", ex)
+        onMessage(context.getString(R.string.setup_settings_open_failed, context.getString(R.string.setup_error_permission_denied)))
     }
 }
 
@@ -1742,7 +1745,8 @@ private fun openOemSettings(context: Context, action: PermissionAction.OemSettin
             onMessage(context.getString(R.string.setup_oem_fallback_opened))
         }
     } catch (ex: ActivityNotFoundException) {
-        onMessage(context.getString(R.string.setup_oem_guide_unavailable, ex.message ?: context.getString(R.string.setup_error_no_handler)))
+        AppLogger.warn("OpenTasker.Setup", "OEM guide activity is unavailable", ex)
+        onMessage(context.getString(R.string.setup_oem_guide_unavailable, context.getString(R.string.setup_error_no_handler)))
     }
 }
 

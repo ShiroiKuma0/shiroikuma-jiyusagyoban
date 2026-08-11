@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- User-facing automation labels, setup requirements, capability levels, share trust, diagnostics levels, and scene element types now resolve through localized resources; unknown action IDs and operation failures use safe generic copy while raw details remain in diagnostics logs.
 - Compose instrumentation now runs the Accessibility Test Framework across the primary UI flows, with regression fixtures for unlabeled controls and undersized touch targets.
 - Locale verification now examines every existing locale directory, rejects empty directories by name, reports how many it examined, and documents that the current release ships English only.
 - Shizuku now binds a versioned AIDL user service for the six allowlisted elevated actions, rechecks exact argv in the privileged process, keeps the persisted kill switch and fail-closed behavior, and unbinds the service during application teardown.

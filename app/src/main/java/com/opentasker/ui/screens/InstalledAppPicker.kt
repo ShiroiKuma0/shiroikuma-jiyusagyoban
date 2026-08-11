@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.opentasker.app.R
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.apps.InstalledApp
 import com.opentasker.core.apps.InstalledAppRepository
 import com.opentasker.core.apps.InstalledAppSearch
@@ -124,7 +125,15 @@ internal fun InstalledAppPickerDialog(
                 runCatching { InstalledAppRepository(appContext).loadVisibleApps() }
                     .fold(
                         onSuccess = { InstalledAppLoadState(apps = it) },
-                        onFailure = { InstalledAppLoadState(error = it.message ?: it::class.java.simpleName) },
+                        onFailure = {
+                            AppLogger.warn("OpenTasker.InstalledAppPicker", "Installed-app query failed", it)
+                            InstalledAppLoadState(
+                                error = appContext.getString(
+                                    R.string.app_picker_load_error,
+                                    appContext.getString(R.string.ui_error_generic),
+                                ),
+                            )
+                        },
                     )
             }
         }

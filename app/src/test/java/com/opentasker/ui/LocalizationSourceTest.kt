@@ -83,6 +83,37 @@ class LocalizationSourceTest {
     }
 
     @Test
+    fun presentationSurfacesDoNotRenderInternalEnumNamesOrThrowableMessages() {
+        val screensDir = sourceRoot.resolve("com/opentasker/ui/screens")
+        val screenFiles = Files.list(screensDir).use { stream ->
+            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".kt") }
+                .toList()
+        }
+        val forbiddenPatterns = linkedMapOf(
+            "enum name" to Regex(
+                """\b(?:automationMode|collisionMode|lifetime|overflowPolicy|trustLevel|riskLevel|level)\.name\b""",
+            ),
+            "setup enum formatting" to Regex("""\.name\.lowercase\(\)\.replace\('_', ' '\)"""),
+            "exception message" to Regex("""\b(?:error|ex|exception|throwable)\.(?:message|localizedMessage)\b"""),
+        )
+        val offenders = screenFiles.flatMap { file ->
+            val source = file.readText()
+            forbiddenPatterns.mapNotNull { (name, pattern) ->
+                if (pattern.containsMatchIn(source)) "${screensDir.relativize(file)}: $name" else null
+            }
+        }
+
+        assertTrue(
+            "Presentation code must map enums and failures before rendering: $offenders",
+            offenders.isEmpty(),
+        )
+
+        val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+        assertTrue("UI failures must be logged with their raw throwable", "AppLogger.error" in viewModel)
+        assertTrue("Known corrupt records must map to a generic resource", "R.string.ui_error_corrupt_record" in viewModel)
+    }
+
+    @Test
     fun secondarySurfaceViewModelMessagesResolveFromResourcesAtTheCollector() {
         val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
         val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()

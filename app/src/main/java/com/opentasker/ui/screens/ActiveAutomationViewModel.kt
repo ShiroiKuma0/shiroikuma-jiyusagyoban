@@ -73,6 +73,7 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotSettings
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
+import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
@@ -296,8 +297,10 @@ class ActiveAutomationViewModel(
     private fun pluralMessage(@PluralsRes resId: Int, quantity: Int, vararg args: Any): UiMessage =
         UiMessage(resId, args.toList(), quantity)
 
-    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage =
-        message(R.string.ui_error_message, error.message ?: appContext.getString(fallbackRes))
+    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage {
+        AppLogger.error("OpenTasker.UI", "Operation failed", error)
+        return message(uiErrorResource(error, fallbackRes))
+    }
 
     private suspend fun recordEdit(
         entityType: String,
@@ -1283,7 +1286,7 @@ class ActiveAutomationViewModel(
                     // of the object '{'" in front of the user, along with their raw input.
                     if (error is SerializationException) {
                         AppLogger.warn("OpenTasker", "Rejected an OpenTasker bundle that failed to decode", error)
-                        events.send(message(R.string.ui_error_message, appContext.getString(R.string.ui_error_bundle_not_recognized)))
+                        events.send(message(R.string.ui_error_bundle_not_recognized))
                     } else {
                         events.send(errorMessage(error, R.string.ui_error_bundle_preview))
                     }
@@ -1303,9 +1306,10 @@ class ActiveAutomationViewModel(
                 )
             }
             .onFailure { error ->
+                AppLogger.warn("OpenTasker.UI", "Profile share validation failed", error)
                 _profileShareReview.value = current.copy(
                     draft = draft,
-                    draftError = error.message ?: "Invalid share details.",
+                    draftError = appContext.getString(R.string.profile_share_invalid_details_body),
                 )
             }
     }
@@ -2287,6 +2291,12 @@ class ActiveAutomationViewModel(
 }
 
 internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
+
+internal fun uiErrorResource(error: Throwable, @StringRes fallbackRes: Int): Int = when (error) {
+    is CorruptRecordOverwriteException,
+    is CorruptStoredRecordException -> R.string.ui_error_corrupt_record
+    else -> fallbackRes
+}
 
 internal fun defaultProfileShareSlug(name: String): String {
     val slug = name

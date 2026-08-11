@@ -68,6 +68,7 @@ import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecycleStrings
@@ -198,8 +199,9 @@ class ContextInspectorViewModel(
             sourceCollectorJobs[key] = viewModelScope.launch {
                 source.events(appContext)
                     .catch { error ->
+                        AppLogger.warn("OpenTasker.ContextInspector", "Context source failed for $key", error)
                         sourceErrors.update { current ->
-                            current + (key to (error.message ?: error::class.java.simpleName))
+                            current + (key to appContext.getString(R.string.inspector_source_error))
                         }
                     }
                     .collect { event ->
@@ -744,7 +746,7 @@ private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
                     stringResource(
                         R.string.inspector_oem_risk,
                         oem.oemName,
-                        oem.riskLevel.name.lowercase(Locale.US),
+                        stringResource(oemRiskLevelLabelRes(oem.riskLevel)),
                     ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,

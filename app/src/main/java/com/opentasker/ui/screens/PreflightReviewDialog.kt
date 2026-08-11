@@ -56,10 +56,12 @@ internal fun PreflightReviewDialog(
     val report = state.report
     val scrollState = rememberScrollState()
     val setupRequirements = report.setupRequirements
-        .joinToString { it.name.lowercase().replace('_', ' ') }
+        .map { requirement -> stringResource(setupRequirementLabelRes(requirement)) }
+        .joinToString()
         .ifBlank { stringResource(R.string.preflight_no_values) }
     val missingSetup = report.missingSetupRequirements
-        .joinToString { it.name.lowercase().replace('_', ' ') }
+        .map { requirement -> stringResource(setupRequirementLabelRes(requirement)) }
+        .joinToString()
         .ifBlank { stringResource(R.string.preflight_no_values) }
 
     AlertDialog(
@@ -115,7 +117,7 @@ internal fun PreflightReviewDialog(
                             stringResource(
                                 R.string.preflight_context_detail,
                                 index + 1,
-                                context.type,
+                                stringResource(contextTitleRes(context.type)),
                                 context.configuration.entries.joinToString { (key, value) -> "$key=$value" },
                             ),
                         )
@@ -148,6 +150,8 @@ internal fun PreflightReviewDialog(
 private fun PreflightStepCard(step: PreflightStep) {
     val resources = LocalContext.current.resources
     val actionSummary = ActionSummaryFormatter.format(resources, step.actionType, step.expandedArguments)
+    val actionName = actionDisplayName(step.actionType)
+    val label = step.label.takeUnless { it == step.actionType } ?: actionName
     val status = when (step.status) {
         PreflightStepStatus.SIMULATED -> stringResource(R.string.preflight_status_simulated)
         PreflightStepStatus.SKIPPED -> stringResource(R.string.preflight_status_skipped)
@@ -164,7 +168,7 @@ private fun PreflightStepCard(step: PreflightStep) {
     ) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                stringResource(R.string.preflight_step_detail, step.actionIndex + 1, step.label, step.actionType, status),
+                stringResource(R.string.preflight_step_detail, step.actionIndex + 1, label, actionName, status),
                 color = statusColor,
                 style = MaterialTheme.typography.labelLarge,
             )
