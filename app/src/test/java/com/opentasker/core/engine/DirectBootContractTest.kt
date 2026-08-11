@@ -72,7 +72,12 @@ class DirectBootContractTest {
             "Setup must say that only the app-owned minute trigger is covered",
             "only its app-owned minute time trigger" in strings,
         )
-        assertTrue("Setup must disclose that Room waits for unlock", "Room" in strings)
+        // Asserts the disclosure, not the library name: users are told "your saved data",
+        // because "Room" is an implementation term that means nothing to them.
+        assertTrue(
+            "Setup must disclose that saved data waits for unlock",
+            "your saved data" in strings,
+        )
         assertTrue("Setup must disclose that secrets wait for unlock", "secrets" in strings)
         assertTrue("Setup must say other trigger families wait", "every other trigger family wait" in strings)
     }
