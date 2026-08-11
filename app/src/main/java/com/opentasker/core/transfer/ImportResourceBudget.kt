@@ -116,24 +116,18 @@ internal object ImportResourceGuard {
         budget: ImportResourceBudget = ImportResourceBudget.Default,
     ): ImportBudgetExceededException? {
         violation("projects", bundle.projects.size.toLong(), budget.maxProjects)?.let { return it }
-        violation("blueprints", bundle.blueprints.size.toLong(), budget.maxBlueprints)?.let { return it }
-        violation("automation invariants", bundle.invariants.size.toLong(), budget.maxInvariants)?.let { return it }
-        val blueprintInputCount = bundle.blueprints.sumOf { it.inputs.size.toLong() }
-        violation("blueprint inputs", blueprintInputCount, budget.maxBlueprintInputs)?.let { return it }
+        // Upstream also budgets blueprints and their inputs. This fork's bundle (schema 5, the
+        // name-based BundleFile format) carries no blueprints, so there is nothing to count.
         val entityCount = bundle.tasks.size.toLong() +
             bundle.profiles.size +
             bundle.variables.size +
-            bundle.scenes.size +
-            bundle.blueprints.size +
-            bundle.invariants.size
+            bundle.scenes.size
         violation("entities", entityCount, budget.maxEntities)?.let { return it }
 
-        val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() } +
-            bundle.blueprints.sumOf { blueprint -> blueprint.actions.size.toLong() }
+        val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() }
         violation("actions", actionCount, budget.maxActions)?.let { return it }
 
-        val contextCount = bundle.profiles.sumOf { profile -> profile.contexts.size.toLong() } +
-            bundle.blueprints.sumOf { blueprint -> blueprint.contexts.size.toLong() }
+        val contextCount = bundle.profiles.sumOf { profile -> profile.contexts.size.toLong() }
         violation("contexts", contextCount, budget.maxContexts)?.let { return it }
 
         val sceneElementCount = bundle.scenes.sumOf { scene -> scene.elements.size.toLong() }
@@ -172,35 +166,6 @@ internal object ImportResourceGuard {
         scenes.forEach { scene ->
             bytes += scene.name.utf8ByteLength()
             scene.elements.forEach { element -> bytes += element.aggregateStringBytes() }
-        }
-        blueprints.forEach { blueprint ->
-            bytes += blueprint.id.utf8ByteLength()
-            bytes += blueprint.title.utf8ByteLength()
-            bytes += blueprint.summary.utf8ByteLength()
-            bytes += blueprint.category.utf8ByteLength()
-            bytes += blueprint.safetyNote.utf8ByteLength()
-            blueprint.inputs.forEach { input ->
-                bytes += input.key.utf8ByteLength()
-                bytes += input.label.utf8ByteLength()
-                bytes += input.defaultValue.utf8ByteLength()
-                bytes += input.hint?.utf8ByteLength() ?: 0L
-                bytes += input.section.utf8ByteLength()
-            }
-            blueprint.contexts.forEach { context -> bytes += context.aggregateStringBytes() }
-            blueprint.actions.forEach { action ->
-                bytes += action.type.utf8ByteLength()
-                bytes += action.label.utf8ByteLength()
-                action.args.forEach { (key, value) ->
-                    bytes += key.utf8ByteLength()
-                    bytes += value.utf8ByteLength()
-                }
-            }
-        }
-        invariants.forEach { invariant ->
-            bytes += invariant.name.utf8ByteLength()
-            bytes += invariant.guard.key.utf8ByteLength()
-            bytes += invariant.guard.value.utf8ByteLength()
-            bytes += invariant.forbiddenWriteKey.utf8ByteLength()
         }
         return bytes
     }
