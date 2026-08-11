@@ -400,22 +400,18 @@ class DatabaseBackupManager(
     }
 
     /**
-     * Runs [block] over a plaintext, device-independent copy of [managedBackup], then shreds it.
+     * Runs [block] over a device-independent copy of [managedBackup].
      *
-     * Managed backups are SQLCipher ciphertext under a key that dies with the install, so
-     * exporting them verbatim produced artifacts that could never be restored anywhere. The
-     * portable copy is validated before it leaves the app and only ever exists inside app-private
-     * storage.
+     * Fork note: upstream stages a decrypted copy here and shreds it afterwards, because its
+     * managed backups are SQLCipher ciphertext under a key that dies with the install — exporting
+     * them verbatim produced artifacts that could never be restored anywhere. This fork keeps the
+     * database in plaintext (see DatabaseSecurity's fork note) precisely so that backups stay
+     * portable, so a managed backup already is the portable artifact: there is nothing to convert,
+     * and nothing to shred. The validation upstream performs on the staged copy still runs.
      */
     private fun <T> withPortableCopy(managedBackup: File, block: (File) -> T): T {
-        val portable = File(backupDir, "${managedBackup.name}.portable.tmp")
-        try {
-            DatabaseSecurity.writePortableCopy(managedBackup, portable, context)
-            validateDatabaseFile(portable)
-            return block(portable)
-        } finally {
-            shredFile(portable)
-        }
+        validateDatabaseFile(managedBackup)
+        return block(managedBackup)
     }
 
     private fun requireManagedBackupFile(backupFile: File): File {
