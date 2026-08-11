@@ -22,7 +22,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), **remapped physical volume keys** (short / long / double / triple, working screen-off), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -214,6 +214,18 @@ the name costs a line, and nothing already recorded is ever rewritten.
 ### 📊 Monitor, widgets & theme
 A **Monitor** tab aggregates engine task-activity and widget pulls. A styled-bitmap **home-screen widget engine** with a visual layout editor (Tasker Widget V2 import) and a **named-template library**. A black-and-yellow **AMOLED theme** + a kxkb-styled UI-customization page (text-wide underlined headings), unified JSON import/export, multi-select, and an in-app Help/Docs tab.
 
+### ⌨️ Physical volume keys, remapped
+A Shizuku **UserService** loads a native evdev grabber straight from the APK — no binary copied to
+`/data/local/tmp`, nothing exec'd — `EVIOCGRAB`s the volume nodes and classifies **short, long,
+double and triple** presses, so each one can drive a task. It reads below the framework's input
+policy, so it works with the **screen off**, and it grabs only simple volume nodes: touchscreens,
+keyboards and the power button are left alone by construction.
+
+Presses this fork does not claim are handed straight back, so system volume behaves exactly as
+before — including **while a call is ringing**, where the ring lights the screen and the tap would
+otherwise have been swallowed just when the dialer needed it. Where grabbing is impossible it falls
+back to detect-only, which sees the keys without consuming them.
+
 ---
 
 ## Triggers (contexts)
@@ -233,7 +245,7 @@ A profile is active while **all** its contexts match. Seven families:
 | **Event** | one-shot triggers (below) |
 | **Plugin** | a Locale/Tasker **condition plugin**'s satisfied/unsatisfied state (polled) |
 
-**Event triggers:** boot · notification posted · NFC tag · calendar event · **app changed** (foreground) · **device orientation / fold** · shake · **sunrise / sunset** · **per-minute tick** · **per-second (sub-minute) tick** · system broadcast · camera / microphone in use · Bluetooth · package added/removed · Quick-Settings tile.
+**Event triggers:** boot · notification posted · NFC tag · calendar event · **app changed** (foreground) · **device orientation / fold** · shake · **sunrise / sunset** · **per-minute tick** · **per-second (sub-minute) tick** · system broadcast · camera / microphone in use · Bluetooth · package added/removed · Quick-Settings tile · **hardware key** (volume, short/long/double/triple).
 
 ---
 
