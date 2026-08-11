@@ -276,6 +276,7 @@ object ImportedProfileEnablePolicy {
         profile: Profile,
         tasks: List<Task>,
         otherProfiles: List<Profile> = emptyList(),
+        strings: AutomationLintStrings = AutomationLintStrings.English,
     ): ImportedProfileEnableReview {
         val reachable = AutomationSensitivityRegistry.reachableTasks(profile, tasks)
         val unsupported = reachable
@@ -290,7 +291,12 @@ object ImportedProfileEnablePolicy {
         return ImportedProfileEnableReview(
             risk = AutomationSensitivityRegistry.summarize(profile, tasks),
             feedbackLoopRisks = AutomationFeedbackRiskAnalyzer.analyze(profile, tasks),
-            lintFindings = AutomationLint.analyze(profile.copy(enabled = true), tasks, otherProfiles).forProfile(profile.id),
+            lintFindings = AutomationLint.analyze(
+                profile.copy(enabled = true),
+                tasks,
+                otherProfiles,
+                strings,
+            ).forProfile(profile.id),
             unsupportedActionIds = unsupported,
             missingTaskIds = missingTaskIds,
             requiresAcknowledgement = profile.requiresRiskAcknowledgement,

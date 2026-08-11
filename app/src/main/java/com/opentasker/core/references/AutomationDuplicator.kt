@@ -9,12 +9,16 @@ import java.util.Locale
 
 /** Pure copy policy shared by the workspace duplicate actions and their tests. */
 object AutomationDuplicator {
-    fun copyName(original: String, existingNames: Collection<String>): String {
-        val cleanOriginal = original.trim().ifBlank { "Untitled" }
+    fun copyName(
+        original: String,
+        existingNames: Collection<String>,
+        strings: AutomationDuplicateStrings = AutomationDuplicateStrings.English,
+    ): String {
+        val cleanOriginal = original.trim().ifBlank { strings.untitled() }
         val occupied = existingNames.map { it.trim().lowercase(Locale.ROOT) }.toSet()
         var copyNumber = 1
         while (true) {
-            val suffix = if (copyNumber == 1) " (copy)" else " (copy $copyNumber)"
+            val suffix = strings.copySuffix(copyNumber)
             val prefixLength = (InputValidation.MAX_NAME_LENGTH - suffix.length).coerceAtLeast(1)
             val candidate = cleanOriginal.take(prefixLength).trimEnd() + suffix
             if (candidate.lowercase(Locale.ROOT) !in occupied) return candidate

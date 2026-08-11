@@ -14,6 +14,7 @@ import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintReport
 import com.opentasker.core.capabilities.AutomationLintSeverity
+import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
@@ -59,6 +60,7 @@ import com.opentasker.core.diff.SemanticDiffDocument
 import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.references.AutomationDuplicator
+import com.opentasker.core.references.AutomationDuplicateStrings
 import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.ReferenceResolution
 import com.opentasker.core.references.TaskReference
@@ -569,7 +571,11 @@ class ActiveAutomationViewModel(
                     val source = db.taskDao().getById(task.id)?.toDomainDecodeResult()?.also { result ->
                         result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
                     }?.value ?: error("Task no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.taskDao().getAll().map { it.name })
+                    val name = AutomationDuplicator.copyName(
+                        source.name,
+                        db.taskDao().getAll().map { it.name },
+                        AutomationDuplicateStrings.from(appContext.resources),
+                    )
                     val staged = AutomationDuplicator.taskPayload(source, name)
                     val newId = db.taskDao().insert(staged.toEntity())
                     val duplicate = AutomationReferenceRewriter.remapDuplicateSelfReferences(
@@ -730,7 +736,11 @@ class ActiveAutomationViewModel(
                     val source = db.sceneDao().getById(scene.id)?.toDomainDecodeResult()?.also { result ->
                         result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
                     }?.value ?: error("Scene no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.sceneDao().getAll().map { it.name })
+                    val name = AutomationDuplicator.copyName(
+                        source.name,
+                        db.sceneDao().getAll().map { it.name },
+                        AutomationDuplicateStrings.from(appContext.resources),
+                    )
                     val duplicate = AutomationDuplicator.scenePayload(source, name)
                     val newId = db.sceneDao().insert(duplicate.toEntity())
                     val persisted = duplicate.copy(id = newId)
@@ -816,7 +826,11 @@ class ActiveAutomationViewModel(
                     val source = db.profileDao().getById(profile.id)?.toDomainDecodeResult()?.also { result ->
                         result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
                     }?.value ?: error("Profile no longer exists.")
-                    val name = AutomationDuplicator.copyName(source.name, db.profileDao().getAll().map { it.name })
+                    val name = AutomationDuplicator.copyName(
+                        source.name,
+                        db.profileDao().getAll().map { it.name },
+                        AutomationDuplicateStrings.from(appContext.resources),
+                    )
                     val duplicate = AutomationDuplicator.profilePayload(source, name)
                     requireValidProfileFieldLimits(duplicate)
                     val newId = db.profileDao().insert(duplicate.toEntity())
@@ -939,7 +953,12 @@ class ActiveAutomationViewModel(
                     result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
                 }.value
             }
-            val review = ImportedProfileEnablePolicy.review(current, tasks, peers)
+            val review = ImportedProfileEnablePolicy.review(
+                profile = current,
+                tasks = tasks,
+                otherProfiles = peers,
+                strings = AutomationLintStrings.from(appContext.resources),
+            )
             check(review.canAcknowledge) {
                 "Resolve unsupported actions, missing references, and blocking automation lint findings before enabling this imported profile."
             }
@@ -1566,10 +1585,10 @@ class ActiveAutomationViewModel(
                 )
             }.onSuccess { result ->
                 val status = when {
-                    result.held -> "held"
-                    result.skippedReason != null -> "skipped"
-                    result.report.success -> "succeeded"
-                    else -> "failed"
+                    result.held -> appContext.getString(R.string.ui_run_status_held)
+                    result.skippedReason != null -> appContext.getString(R.string.ui_run_status_skipped)
+                    result.report.success -> appContext.getString(R.string.ui_run_status_succeeded)
+                    else -> appContext.getString(R.string.ui_run_status_failed)
                 }
                 events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
                 // A manual run can be held, which adds a row the run-log page should show.
@@ -1592,9 +1611,9 @@ class ActiveAutomationViewModel(
                 )
             }.onSuccess { result ->
                 val status = when {
-                    result.held -> "held"
-                    result.report.success -> "succeeded"
-                    else -> "failed"
+                    result.held -> appContext.getString(R.string.ui_run_status_held)
+                    result.report.success -> appContext.getString(R.string.ui_run_status_succeeded)
+                    else -> appContext.getString(R.string.ui_run_status_failed)
                 }
                 events.send(message(R.string.ui_message_run_replayed, entry.taskName, status, result.report.durationMs))
                 refreshRunLogPage()
@@ -2017,7 +2036,11 @@ class ActiveAutomationViewModel(
                 result.issue?.let { issue -> throw CorruptRecordOverwriteException(issue) }
             }.value
         }
-        val report = AutomationLint.analyze(peers + profile, tasks)
+        val report = AutomationLint.analyze(
+            peers + profile,
+            tasks,
+            strings = AutomationLintStrings.from(appContext.resources),
+        )
         val blockers = report.blockingFor(profile.id)
         require(blockers.isEmpty()) {
             blockers.joinToString(" ") { finding ->

@@ -64,11 +64,13 @@ import com.opentasker.core.contexts.observationStatus
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintFinding
 import com.opentasker.core.capabilities.AutomationLintSeverity
+import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.ProfileLifecycleStrings
 import com.opentasker.core.model.Task
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
@@ -140,7 +142,11 @@ class ContextInspectorViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val lintFindings: StateFlow<Map<Long, List<AutomationLintFinding>>> = combine(profiles, tasks) { profiles, tasks ->
-        AutomationLint.analyze(profiles, tasks).findings
+        AutomationLint.analyze(
+            profiles,
+            tasks,
+            strings = AutomationLintStrings.from(appContext.resources),
+        ).findings
             .flatMap { finding -> finding.profileIds.map { profileId -> profileId to finding } }
             .groupBy({ it.first }, { it.second })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
@@ -173,6 +179,7 @@ class ContextInspectorViewModel(
                     }
                 },
                 nowMs = now,
+                lifecycleStrings = ProfileLifecycleStrings.from(appContext.resources),
             ),
             causalLoop = causalLoop,
         )

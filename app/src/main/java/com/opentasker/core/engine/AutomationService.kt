@@ -49,6 +49,7 @@ import com.opentasker.core.model.AutomationMode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifecyclePolicy
 import com.opentasker.core.model.ProfileLifetime
+import com.opentasker.core.model.ProfileLifecycleStrings
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
@@ -364,7 +365,11 @@ class AutomationService : Service() {
                 return@mapNotNull null
             }
             val profile = decoded.value
-            val suppression = ProfileLifecyclePolicy.suppressionReason(profile, nowMs)
+            val suppression = ProfileLifecyclePolicy.suppressionReason(
+                profile,
+                nowMs,
+                ProfileLifecycleStrings.from(resources),
+            )
             if (suppression != null) {
                 AppLogger.info(TAG, "Profile ${profile.id} is not registered: $suppression")
                 db.profileDao().upsert(profile.copy(enabled = false).toEntity())
@@ -467,7 +472,11 @@ class AutomationService : Service() {
 
     private suspend fun onProfileActivated(profile: com.opentasker.core.model.Profile, event: ContextEvent?) {
         val pulseProfile = profile.contexts.any { it.type == com.opentasker.core.model.ContextType.EVENT }
-        val suppression = ProfileLifecyclePolicy.suppressionReason(profile, System.currentTimeMillis())
+        val suppression = ProfileLifecyclePolicy.suppressionReason(
+            profile,
+            System.currentTimeMillis(),
+            ProfileLifecycleStrings.from(resources),
+        )
         if (suppression != null) {
             AutomationLiveConditionState.updateProfile(profile.id, false)
             AppLogger.info(TAG, "Profile ${profile.id} activation suppressed: $suppression")
@@ -493,7 +502,11 @@ class AutomationService : Service() {
         // iterating the synchronized map outside it can throw ConcurrentModificationException.
         val suppressedBy = synchronized(matchedProfiles) {
             if (!pulseProfile) matchedProfiles[profile.id] = profile
-            ProfileLifecyclePolicy.suppressionByPriority(profile, matchedProfiles.values + profile)
+            ProfileLifecyclePolicy.suppressionByPriority(
+                profile,
+                matchedProfiles.values + profile,
+                ProfileLifecycleStrings.from(resources),
+            )
         }
         if (suppressedBy != null) {
             logProfileSkippedRun(profile, decoded.value, suppressedBy)

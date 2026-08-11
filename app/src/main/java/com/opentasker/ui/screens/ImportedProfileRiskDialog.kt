@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.AutomationLintSeverity
+import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -36,7 +37,13 @@ internal fun ImportedProfileRiskDialog(
     onDismiss: () -> Unit,
     onAcknowledgeAndEnable: () -> Unit,
 ) {
-    val review = ImportedProfileEnablePolicy.review(profile, tasks, otherProfiles)
+    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+    val review = ImportedProfileEnablePolicy.review(
+        profile = profile,
+        tasks = tasks,
+        otherProfiles = otherProfiles,
+        strings = AutomationLintStrings.from(resources),
+    )
     val reachableTasks = AutomationSensitivityRegistry.reachableTasks(profile, tasks)
     var acknowledged by rememberSaveable(profile.id) { mutableStateOf(false) }
     val powerLabels = review.risk.powers.map { power -> automationPowerLabel(power) }

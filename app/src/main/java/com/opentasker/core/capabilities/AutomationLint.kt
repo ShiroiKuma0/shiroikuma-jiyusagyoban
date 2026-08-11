@@ -54,10 +54,19 @@ data class AutomationLintReport(
  * uncertain cases remain warnings or are omitted rather than becoming noisy blockers.
  */
 object AutomationLint {
-    fun analyze(profile: Profile, tasks: List<Task>, otherProfiles: List<Profile> = emptyList()): AutomationLintReport =
-        analyze((otherProfiles.filterNot { it.id == profile.id } + profile), tasks)
+    fun analyze(
+        profile: Profile,
+        tasks: List<Task>,
+        otherProfiles: List<Profile> = emptyList(),
+        strings: AutomationLintStrings = AutomationLintStrings.English,
+    ): AutomationLintReport =
+        analyze((otherProfiles.filterNot { it.id == profile.id } + profile), tasks, strings)
 
-    fun analyze(profiles: List<Profile>, tasks: List<Task>): AutomationLintReport {
+    fun analyze(
+        profiles: List<Profile>,
+        tasks: List<Task>,
+        strings: AutomationLintStrings = AutomationLintStrings.English,
+    ): AutomationLintReport {
         if (profiles.isEmpty()) return AutomationLintReport()
         val findings = linkedSetOf<AutomationLintFinding>()
         val taskById = tasks.associateBy(Task::id)
@@ -67,26 +76,28 @@ object AutomationLint {
             val writes = settingWrites(profile, tasks)
             val unreversed = writes.filterNot(SettingWrite::automaticallyReversed)
             if (profile.exitTaskId == null && unreversed.isNotEmpty()) {
+                val copy = strings.missingReversal(profile.name, unreversed.joinToString { it.key })
                 findings += AutomationLintFinding(
                     code = AutomationLintCode.MISSING_REVERSAL,
                     severity = AutomationLintSeverity.WARNING,
                     profileIds = listOf(profile.id),
                     profileNames = listOf(profile.name),
-                    title = "Missing reversal",
-                    detail = "${profile.name} writes ${unreversed.joinToString { it.key }} when it enters but has no exit task.",
-                    suggestedFix = "Add an exit task that restores the setting, or use a bounded temporary-state action.",
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
                 )
             }
 
             if (profile.contexts.any { it.type == ContextType.STATE } && !hasRetriggerGuard(profile, enterTask)) {
+                val copy = strings.repeatedTriggering(profile.name)
                 findings += AutomationLintFinding(
                     code = AutomationLintCode.REPEATED_TRIGGERING,
                     severity = AutomationLintSeverity.WARNING,
                     profileIds = listOf(profile.id),
                     profileNames = listOf(profile.name),
-                    title = "Repeated triggering",
-                    detail = "${profile.name} has a state context without a cooldown, dwell, or explicit idempotency guard.",
-                    suggestedFix = "Add a cooldown, a dwell requirement, or an explicit guard condition to the enter task.",
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
                 )
             }
         }
@@ -104,31 +115,38 @@ object AutomationLint {
                 val leftPriority = left.priority
                 val rightPriority = right.priority
                 val equalPriority = leftPriority == rightPriority
+                val copy = strings.priorityConflict(
+                    leftName = left.name,
+                    rightName = right.name,
+                    overlap = overlap.joinToString(),
+                    leftPriority = leftPriority,
+                    rightPriority = rightPriority,
+                    equalPriority = equalPriority,
+                )
                 findings += AutomationLintFinding(
                     code = AutomationLintCode.PRIORITY_CONFLICT,
                     severity = if (equalPriority) AutomationLintSeverity.BLOCKING else AutomationLintSeverity.WARNING,
                     profileIds = listOf(left.id, right.id).sorted(),
                     profileNames = listOf(left.name, right.name),
-                    title = "Priority conflict",
-                    detail = "${left.name} and ${right.name} can both write ${overlap.joinToString()} while their profile priorities are $leftPriority and $rightPriority.",
-                    suggestedFix = if (equalPriority) {
-                        "Raise one task priority or make the contexts mutually exclusive."
-                    } else {
-                        "Confirm that the higher-priority task should win, or make the contexts mutually exclusive."
-                    },
+                    title = copy.title,
+                    detail = copy.detail,
+                    suggestedFix = copy.suggestedFix,
                 )
             }
         }
 
         interProfileCycles(profiles, tasks).forEach { cycle ->
+            val copy = strings.interProfileLoop(
+                cycle.joinToString(" → ") { it.name } + " → ${cycle.first().name}",
+            )
             findings += AutomationLintFinding(
                 code = AutomationLintCode.INTER_PROFILE_LOOP,
                 severity = AutomationLintSeverity.WARNING,
                 profileIds = cycle.map(Profile::id),
                 profileNames = cycle.map(Profile::name),
-                title = "Inter-profile loop",
-                detail = "Profiles form a direct task cycle: ${cycle.joinToString(" → ") { it.name }} → ${cycle.first().name}.",
-                suggestedFix = "Remove one task.run edge or add an explicit state guard so the chain cannot retrigger itself.",
+                title = copy.title,
+                detail = copy.detail,
+                suggestedFix = copy.suggestedFix,
             )
         }
 

@@ -87,29 +87,37 @@ data class ExecutionAdmissionRejection(
     val circuitStrikeCount: Int = 0,
     val circuitReason: String? = null,
 ) {
-    fun render(nowMs: Long): String {
-        val countsDetail = "Counts: active global=${counts.activeGlobal}/${globalActiveLimit ?: "-"}, " +
-            "profile=${counts.activeProfile}/${profileActiveLimit ?: "-"}; " +
-            "burst global=${counts.globalBurst}/${globalBurstLimit ?: "-"}, " +
-            "profile=${counts.profileBurst}/${profileBurstLimit ?: "-"}."
+    fun render(
+        nowMs: Long,
+        strings: ExecutionAdmissionStrings = ExecutionAdmissionStrings.English,
+    ): String {
         val message = when (kind) {
             ExecutionAdmissionRejectionKind.CIRCUIT_OPEN -> buildString {
                 val remaining = (circuitOpenUntilMs ?: nowMs).minus(nowMs).coerceAtLeast(0L)
-                append("Execution circuit is open for ${remainingSeconds(remaining)} more seconds.")
-                circuitReason?.takeIf(String::isNotBlank)?.let { append(" Trip reason: $it") }
+                append(strings.circuitOpen(remainingSeconds(remaining)))
+                circuitReason?.takeIf(String::isNotBlank)?.let { append(" ").append(strings.tripReason(it)) }
             }
             ExecutionAdmissionRejectionKind.GLOBAL_ACTIVE ->
-                "Global execution limit reached (${globalActiveLimit ?: "configured"} active)."
+                strings.globalActive(globalActiveLimit?.toString() ?: "configured")
             ExecutionAdmissionRejectionKind.PROFILE_ACTIVE ->
-                "Profile execution limit reached (${profileActiveLimit ?: "configured"} active)."
+                strings.profileActive(profileActiveLimit?.toString() ?: "configured")
             ExecutionAdmissionRejectionKind.GLOBAL_BURST ->
-                "Burst limit exceeded (the global window)."
+                strings.globalBurst()
             ExecutionAdmissionRejectionKind.PROFILE_BURST ->
-                "Burst limit exceeded (the per-profile window)."
+                strings.profileBurst()
             ExecutionAdmissionRejectionKind.GLOBAL_AND_PROFILE_BURST ->
-                "Burst limit exceeded (global and per-profile windows)."
+                strings.globalAndProfileBurst()
         }
-        return "$message $countsDetail"
+        return "$message ${strings.counts(
+            activeGlobal = counts.activeGlobal,
+            globalActiveLimit = globalActiveLimit?.toString() ?: "-",
+            activeProfile = counts.activeProfile,
+            profileActiveLimit = profileActiveLimit?.toString() ?: "-",
+            globalBurst = counts.globalBurst,
+            globalBurstLimit = globalBurstLimit?.toString() ?: "-",
+            profileBurst = counts.profileBurst,
+            profileBurstLimit = profileBurstLimit?.toString() ?: "-",
+        )}"
     }
 
     private fun remainingSeconds(ms: Long): Long = (ms / 1_000L).coerceAtLeast(1L)
@@ -236,6 +244,7 @@ class ExecutionAdmissionController(
     fun tryAcquire(
         profileId: Long? = null,
         profileLimits: ExecutionAdmissionProfileLimits? = null,
+        strings: ExecutionAdmissionStrings = ExecutionAdmissionStrings.English,
     ): ExecutionAdmissionDecision = synchronized(lock) {
         val current = now()
         prune(current)
@@ -256,6 +265,7 @@ class ExecutionAdmissionController(
                     circuitReason = circuit.lastReason,
                 ),
                 current,
+                strings = strings,
             )
         }
         if (circuit.openUntilMs != 0L && circuit.openUntilMs <= current) {
@@ -276,6 +286,7 @@ class ExecutionAdmissionController(
                     profileBurstLimit = profileBurstLimit.takeIf { profileId != null },
                 ),
                 current,
+                strings = strings,
             )
         }
         if (profileId != null && activeProfile >= profileMaxActive) {
@@ -289,6 +300,7 @@ class ExecutionAdmissionController(
                     profileBurstLimit = profileBurstLimit,
                 ),
                 current,
+                strings = strings,
             )
         }
 
@@ -304,7 +316,7 @@ class ExecutionAdmissionController(
             }
             val strikes = circuit.strikeCount + 1
             val opened = strikes >= limits.circuitTripCount
-            val tripReason = "Burst limit exceeded (${burstLimitLabel(globalBurst, profileBurst)})."
+            val tripReason = burstLimitReason(globalBurst, profileBurst, strings)
             val next = circuit.copy(
                 openUntilMs = if (opened) current + limits.circuitOpenMs else circuit.openUntilMs,
                 strikeCount = strikes,
@@ -325,6 +337,7 @@ class ExecutionAdmissionController(
                     circuitReason = tripReason,
                 ),
                 current,
+                strings = strings,
                 circuitOpened = opened,
             )
         }
@@ -359,6 +372,7 @@ class ExecutionAdmissionController(
     fun preview(
         profileId: Long? = null,
         profileLimits: ExecutionAdmissionProfileLimits? = null,
+        strings: ExecutionAdmissionStrings = ExecutionAdmissionStrings.English,
     ): ExecutionAdmissionDecision = synchronized(lock) {
         val current = now()
         prune(current)
@@ -379,6 +393,7 @@ class ExecutionAdmissionController(
                     circuitReason = circuit.lastReason,
                 ),
                 current,
+                strings = strings,
             )
         }
         if (snapshot.activeGlobal >= limits.globalMaxActive) {
@@ -392,6 +407,7 @@ class ExecutionAdmissionController(
                     profileBurstLimit = profileBurstLimit.takeIf { profileId != null },
                 ),
                 current,
+                strings = strings,
             )
         }
         if (profileId != null && (snapshot.activeByProfile[profileId] ?: 0) >= profileMaxActive) {
@@ -405,6 +421,7 @@ class ExecutionAdmissionController(
                     profileBurstLimit = profileBurstLimit,
                 ),
                 current,
+                strings = strings,
             )
         }
         val globalBurst = snapshot.globalBurstCount >= limits.globalBurstLimit
@@ -426,11 +443,12 @@ class ExecutionAdmissionController(
                     profileBurstLimit = profileBurstLimit.takeIf { profileId != null },
                 ),
                 current,
+                strings = strings,
             )
         }
         ExecutionAdmissionDecision(
             accepted = true,
-            reason = "Admission budget is available (preview only).",
+            reason = strings.previewAvailable(),
         )
     }
 
@@ -485,18 +503,23 @@ class ExecutionAdmissionController(
     private fun rejected(
         rejection: ExecutionAdmissionRejection,
         current: Long,
+        strings: ExecutionAdmissionStrings,
         circuitOpened: Boolean = false,
     ) = ExecutionAdmissionDecision(
         accepted = false,
-        reason = rejection.render(current),
+        reason = rejection.render(current, strings),
         circuitOpened = circuitOpened,
         rejection = rejection,
     )
 
-    private fun burstLimitLabel(global: Boolean, profile: Boolean): String = when {
-        global && profile -> "global and per-profile windows"
-        global -> "the global window"
-        else -> "the per-profile window"
+    private fun burstLimitReason(
+        global: Boolean,
+        profile: Boolean,
+        strings: ExecutionAdmissionStrings,
+    ): String = when {
+        global && profile -> strings.globalAndProfileBurst()
+        global -> strings.globalBurst()
+        else -> strings.profileBurst()
     }
 
     private fun ExecutionAdmissionSnapshot.counts(profileId: Long?): ExecutionAdmissionCounts =
@@ -558,8 +581,9 @@ object ExecutionAdmissionRegistry {
         context: Context,
         profileId: Long,
         profileLimits: ExecutionAdmissionProfileLimits? = null,
-    ): ExecutionAdmissionDecision = activeController?.preview(profileId, profileLimits)
-        ?: ExecutionAdmissionController.persisted(context.applicationContext).preview(profileId, profileLimits)
+        strings: ExecutionAdmissionStrings = ExecutionAdmissionStrings.English,
+    ): ExecutionAdmissionDecision = activeController?.preview(profileId, profileLimits, strings)
+        ?: ExecutionAdmissionController.persisted(context.applicationContext).preview(profileId, profileLimits, strings)
 
     fun snapshot(context: Context): ExecutionAdmissionSnapshot = activeController?.snapshot()
         ?: ExecutionAdmissionController.persisted(context.applicationContext).snapshot()

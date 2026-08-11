@@ -12,6 +12,41 @@ import org.junit.Test
 
 class AutomationLintTest {
     @Test
+    fun findingCopyComesFromTheCallerSuppliedStringProvider() {
+        val task = settingTask(10, "Dim display", priority = 5)
+        val profile = profile(
+            id = 1,
+            name = "Night",
+            enterTaskId = task.id,
+            contexts = listOf(ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example.reader"))),
+        )
+        val localized = object : AutomationLintStrings {
+            override fun missingReversal(profileName: String, writes: String) =
+                AutomationLintCopy("localized-title", "localized-detail", "localized-fix")
+
+            override fun repeatedTriggering(profileName: String) =
+                AutomationLintCopy("unused", "unused", "unused")
+
+            override fun priorityConflict(
+                leftName: String,
+                rightName: String,
+                overlap: String,
+                leftPriority: Int,
+                rightPriority: Int,
+                equalPriority: Boolean,
+            ) = AutomationLintCopy("unused", "unused", "unused")
+
+            override fun interProfileLoop(path: String) = AutomationLintCopy("unused", "unused", "unused")
+        }
+
+        val finding = AutomationLint.analyze(profile, listOf(task), strings = localized).findings.single()
+
+        assertEquals("localized-title", finding.title)
+        assertEquals("localized-detail", finding.detail)
+        assertEquals("localized-fix", finding.suggestedFix)
+    }
+
+    @Test
     fun persistentSettingWithoutExitReportsMissingReversal() {
         val task = Task(
             id = 10,
