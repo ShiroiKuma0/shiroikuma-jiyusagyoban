@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Converted starter templates into versioned, serializable automation blueprints with typed selectors, collapsible input sections, bounded bundle validation, local installation tracking, and review-only update diffs that never overwrite instantiated profiles.
 - New lint findings, lifecycle suppression reasons, admission decisions, duplicate names, semantic-diff labels and enum values, and run-status words now resolve through resource-backed presentation adapters, so localized screens no longer inherit English-only copy from the core engine.
 - The WorkManager 2.12 metrics evaluation records the beta-only API's incremental stop-count, runtime, and retry evidence, its experimental dependency cost, and the stable-release trigger; OpenTasker remains on 2.11.2 until that trigger is met.
 - The pinned build tuple is refreshed to Gradle 9.7.0, KSP 2.3.11, and Compose BOM 2026.06.01, with wrapper, checksum, release-truth, and documentation contracts updated together.

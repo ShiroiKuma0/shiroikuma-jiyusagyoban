@@ -38,6 +38,7 @@ data class ProfileShareManifest(
     val contextCount: Int,
     val variableCount: Int,
     val sceneCount: Int,
+    val blueprintCount: Int = 0,
     val screenshotCount: Int,
     val capabilityRequirements: List<CapabilityRequirement>,
     val findings: List<ShareSafetyFinding>,
@@ -128,6 +129,7 @@ object ProfileShareLibrary {
             contextCount = bundle.profiles.sumOf { it.contexts.size },
             variableCount = bundle.variables.size,
             sceneCount = bundle.scenes.size,
+            blueprintCount = bundle.blueprints.size,
             screenshotCount = draft.screenshots.size,
             capabilityRequirements = capabilityRequirements,
             findings = findings,
@@ -152,6 +154,7 @@ object ProfileShareLibrary {
             |- Actions: ${manifest.actionCount}
             |- Contexts: ${manifest.contextCount}
             |- Scenes: ${manifest.sceneCount}
+            |- Blueprints: ${manifest.blueprintCount}
             |- Screenshots: ${manifest.screenshotCount}
             |- Submission channel: ${manifest.submissionChannel} (${SUBMISSION_URL})
             |

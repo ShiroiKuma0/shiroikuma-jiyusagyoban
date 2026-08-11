@@ -23,6 +23,8 @@ internal data class ImportResourceBudget(
     val maxXmlChars: Int = 4 * 1024 * 1024,
     val maxEntities: Long = 5_000,
     val maxProjects: Long = 100,
+    val maxBlueprints: Long = 128,
+    val maxBlueprintInputs: Long = 5_000,
     val maxActions: Long = 20_000,
     val maxContexts: Long = 10_000,
     val maxSceneElements: Long = 10_000,
@@ -113,16 +115,22 @@ internal object ImportResourceGuard {
         budget: ImportResourceBudget = ImportResourceBudget.Default,
     ): ImportBudgetExceededException? {
         violation("projects", bundle.projects.size.toLong(), budget.maxProjects)?.let { return it }
+        violation("blueprints", bundle.blueprints.size.toLong(), budget.maxBlueprints)?.let { return it }
+        val blueprintInputCount = bundle.blueprints.sumOf { it.inputs.size.toLong() }
+        violation("blueprint inputs", blueprintInputCount, budget.maxBlueprintInputs)?.let { return it }
         val entityCount = bundle.tasks.size.toLong() +
             bundle.profiles.size +
             bundle.variables.size +
-            bundle.scenes.size
+            bundle.scenes.size +
+            bundle.blueprints.size
         violation("entities", entityCount, budget.maxEntities)?.let { return it }
 
-        val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() }
+        val actionCount = bundle.tasks.sumOf { task -> task.actions.size.toLong() } +
+            bundle.blueprints.sumOf { blueprint -> blueprint.actions.size.toLong() }
         violation("actions", actionCount, budget.maxActions)?.let { return it }
 
-        val contextCount = bundle.profiles.sumOf { profile -> profile.contexts.size.toLong() }
+        val contextCount = bundle.profiles.sumOf { profile -> profile.contexts.size.toLong() } +
+            bundle.blueprints.sumOf { blueprint -> blueprint.contexts.size.toLong() }
         violation("contexts", contextCount, budget.maxContexts)?.let { return it }
 
         val sceneElementCount = bundle.scenes.sumOf { scene -> scene.elements.size.toLong() }
@@ -176,6 +184,29 @@ internal object ImportResourceGuard {
             bytes += scene.name.utf8ByteLength()
             scene.elements.forEach { element -> bytes += element.aggregateStringBytes() }
         }
+        blueprints.forEach { blueprint ->
+            bytes += blueprint.id.utf8ByteLength()
+            bytes += blueprint.title.utf8ByteLength()
+            bytes += blueprint.summary.utf8ByteLength()
+            bytes += blueprint.category.utf8ByteLength()
+            bytes += blueprint.safetyNote.utf8ByteLength()
+            blueprint.inputs.forEach { input ->
+                bytes += input.key.utf8ByteLength()
+                bytes += input.label.utf8ByteLength()
+                bytes += input.defaultValue.utf8ByteLength()
+                bytes += input.hint?.utf8ByteLength() ?: 0L
+                bytes += input.section.utf8ByteLength()
+            }
+            blueprint.contexts.forEach { context -> bytes += context.aggregateStringBytes() }
+            blueprint.actions.forEach { action ->
+                bytes += action.type.utf8ByteLength()
+                bytes += action.label.utf8ByteLength()
+                action.args.forEach { (key, value) ->
+                    bytes += key.utf8ByteLength()
+                    bytes += value.utf8ByteLength()
+                }
+            }
+        }
         return bytes
     }
 
@@ -192,6 +223,15 @@ internal object ImportResourceGuard {
 
     private fun ContextSpec.aggregateStringBytes(): Long {
         var bytes = orGroup?.utf8ByteLength() ?: 0L
+        config.forEach { (key, value) ->
+            bytes += key.utf8ByteLength()
+            bytes += value.utf8ByteLength()
+        }
+        return bytes
+    }
+
+    private fun com.opentasker.core.templates.TemplateContext.aggregateStringBytes(): Long {
+        var bytes = type.name.utf8ByteLength()
         config.forEach { (key, value) ->
             bytes += key.utf8ByteLength()
             bytes += value.utf8ByteLength()

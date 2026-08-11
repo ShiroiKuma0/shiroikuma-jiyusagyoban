@@ -139,11 +139,57 @@ internal fun OpenTaskerBundleReviewDialog(
                         SummaryMetric("${reviewWarnings.size}", stringResource(R.string.import_count_warnings), Modifier.weight(1f))
                     }
                 }
+                if (bundle.blueprints.isNotEmpty()) {
+                    item {
+                        SummaryMetric(
+                            "${bundle.blueprints.size}",
+                            stringResource(R.string.import_count_blueprints),
+                            Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
                 if (!plan.semanticDiff.isEmpty) {
                     item {
                         SemanticDiffSummary(plan.semanticDiff)
                     }
                     SemanticDiffDetails(plan.semanticDiff)
+                }
+                if (plan.blueprintUpdates.isNotEmpty()) {
+                    item {
+                        InlineNotice(
+                            title = stringResource(R.string.blueprint_update_changes),
+                            body = stringResource(R.string.blueprint_update_review),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    plan.blueprintUpdates.forEach { update ->
+                        item(key = "blueprint-update-${update.blueprintId}-${update.profileId}") {
+                            val body = update.error?.let {
+                                stringResource(R.string.blueprint_update_unavailable, it)
+                            } ?: stringResource(
+                                R.string.blueprint_update_versions,
+                                update.blueprintTitle,
+                                update.installedVersion,
+                                update.incomingVersion,
+                            )
+                            InlineNotice(
+                                title = if (update.error == null && !update.hasChanges) {
+                                    stringResource(R.string.blueprint_update_no_changes)
+                                } else {
+                                    stringResource(R.string.blueprint_update_changes)
+                                },
+                                body = body,
+                                color = if (update.error == null) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                            )
+                        }
+                        if (update.error == null && update.hasChanges) {
+                            SemanticDiffDetails(update.document)
+                        }
+                    }
                 }
                 if (!plan.canImport) {
                     item {

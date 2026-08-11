@@ -16,6 +16,9 @@ import com.opentasker.core.model.SceneElement
 import com.opentasker.core.model.SceneElementType
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.templates.BlueprintInput
+import com.opentasker.core.templates.BlueprintSelectorKind
+import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.validation.InputValidation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -470,6 +473,51 @@ class OpenTaskerBundleCodecTest {
         assertEquals(listOf("COUNT"), bundle.variables.map { it.name })
         assertFalse(encoded.contains("must-not-export"))
         assertTrue(bundle.metadata.warnings.any { it.contains("must be re-entered") })
+    }
+
+    @Test
+    fun blueprintBlockRoundTripsAndIsOmittedFromEmptyLegacyExports() {
+        val blueprint = ProfileTemplateCatalog.get("app-usage-reminder")!!.copy(version = 2)
+        val withBlueprint = OpenTaskerBundleCodec.build(
+            appVersion = "0.2.84",
+            exportedAtEpochMs = 123L,
+            profiles = emptyList(),
+            tasks = emptyList(),
+            blueprints = listOf(blueprint),
+        )
+        val encoded = OpenTaskerBundleCodec.encode(withBlueprint)
+        val emptyEncoded = OpenTaskerBundleCodec.encode(
+            OpenTaskerBundle(appVersion = "0.2.84", exportedAtEpochMs = 123L),
+        )
+
+        assertTrue(encoded.contains("\"blueprints\""))
+        assertEquals(withBlueprint, OpenTaskerBundleCodec.decode(encoded))
+        assertFalse(emptyEncoded.contains("\"blueprints\""))
+        assertTrue(OpenTaskerBundleCodec.validate(withBlueprint).canImport)
+    }
+
+    @Test
+    fun invalidBlueprintDefaultsAreRejectedAtTheImportBoundary() {
+        val invalid = ProfileTemplateCatalog.get("app-usage-reminder")!!.copy(
+            inputs = listOf(
+                BlueprintInput(
+                    key = "package",
+                    label = "App package",
+                    defaultValue = "not a package",
+                    selector = BlueprintSelectorKind.APP,
+                ),
+            ),
+        )
+        val bundle = OpenTaskerBundle(
+            appVersion = "0.2.84",
+            exportedAtEpochMs = 123L,
+            blueprints = listOf(invalid),
+        )
+
+        val plan = OpenTaskerBundleCodec.validate(bundle)
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.startsWith("Invalid blueprint") })
     }
 
     @Test(expected = IllegalArgumentException::class)

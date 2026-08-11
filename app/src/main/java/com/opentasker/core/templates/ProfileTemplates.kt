@@ -5,27 +5,58 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.model.VariableNamePolicy
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class TemplateAvailability {
     Ready,
     RequiresSetup,
     Planned,
 }
 
-data class TemplateSlot(
+/** The input widget/validator contract carried by a reusable automation blueprint. */
+@Serializable
+enum class BlueprintSelectorKind {
+    TEXT,
+    APP,
+    WIFI_SSID,
+    LOCATION,
+    TASK_REFERENCE,
+    VARIABLE,
+    DURATION,
+    INTEGER,
+    DECIMAL,
+    TIME,
+}
+
+@Serializable
+data class BlueprintInput(
     val key: String,
     val label: String,
     val defaultValue: String,
     val required: Boolean = true,
     val hint: String? = null,
+    val selector: BlueprintSelectorKind = BlueprintSelectorKind.TEXT,
+    val minimum: Double? = null,
+    val maximum: Double? = null,
+    val section: String = "General",
 )
 
+/** Source-compatible name retained for the existing guided-template UI. */
+typealias TemplateSlot = BlueprintInput
+
+@Serializable
 data class TemplateAction(
     val type: String,
     val label: String,
     val args: Map<String, String> = emptyMap(),
 )
 
+@Serializable
 data class TemplateContext(
     val type: ContextType,
     val config: Map<String, String> = emptyMap(),
@@ -37,30 +68,51 @@ data class AppliedProfileTemplate(
     val profile: Profile,
 )
 
-data class ProfileTemplate(
+/**
+ * A local, versioned blueprint. Inputs are typed selectors rather than anonymous text fields;
+ * the same definition drives validation, the picker, and instantiation.
+ */
+@Serializable
+data class AutomationBlueprint(
     val id: String,
+    val version: Int = 1,
     val title: String,
     val summary: String,
     val category: String,
     val availability: TemplateAvailability,
     val safetyNote: String,
-    val slots: List<TemplateSlot>,
+    val inputs: List<BlueprintInput>,
     val contexts: List<TemplateContext>,
     val actions: List<TemplateAction>,
     val enabledByDefault: Boolean = false,
 ) {
+    /** Compatibility view for the existing guided-template screen. */
+    val slots: List<BlueprintInput>
+        get() = inputs
+
     val installable: Boolean
         get() = availability != TemplateAvailability.Planned
 
-    fun defaults(): Map<String, String> = slots.associate { it.key to it.defaultValue }
+    fun defaults(): Map<String, String> = inputs.associate { it.key to it.defaultValue }
 
     fun instantiate(slotValues: Map<String, String>): AppliedProfileTemplate {
-        require(installable) { "Template '$title' is not installable yet." }
+        require(installable) { "Blueprint '$title' is not installable yet." }
 
+        val unknownKeys = slotValues.keys - inputs.mapTo(linkedSetOf()) { it.key }
+        require(unknownKeys.isEmpty()) {
+            "Invalid blueprint values: unknown input(s) ${unknownKeys.sorted().joinToString()}"
+        }
         val values = defaults() + slotValues.mapValues { it.value.trim() }
-        val missing = slots.filter { it.required && values[it.key].isNullOrBlank() }
+        val missing = inputs.filter { it.required && values[it.key].isNullOrBlank() }
         require(missing.isEmpty()) {
-            "Missing template values: ${missing.joinToString { it.label }}"
+            "Missing blueprint values: ${missing.joinToString { it.label }}"
+        }
+        val invalid = inputs.mapNotNull { input ->
+            val value = values[input.key].orEmpty()
+            input.validationError(value)?.let { "${input.label}: $it" }
+        }
+        require(invalid.isEmpty()) {
+            "Invalid blueprint values: ${invalid.joinToString()}"
         }
 
         val taskName = expand("$title Task", values)
@@ -76,7 +128,10 @@ data class ProfileTemplate(
         )
         val profile = Profile(
             name = expand(title, values),
-            enabled = enabledByDefault,
+            // Every blueprint installation is a review artifact. Enabling is an explicit user
+            // action after capability, lint, and safety checks; a definition cannot bypass that
+            // gate through metadata.
+            enabled = false,
             enterTaskId = 0,
             contexts = contexts.map { context ->
                 ContextSpec(
@@ -100,6 +155,59 @@ data class ProfileTemplate(
     }
 }
 
+/** Source-compatible alias while consumers migrate from `ProfileTemplate` terminology. */
+typealias ProfileTemplate = AutomationBlueprint
+
+fun BlueprintInput.validationError(value: String): String? {
+    if (value.isBlank() && !required) return null
+    return when (selector) {
+        BlueprintSelectorKind.TEXT -> null
+        BlueprintSelectorKind.APP -> if (value.matches(APP_ID_PATTERN)) null else "enter an Android package name"
+        BlueprintSelectorKind.WIFI_SSID -> when {
+            value.length > 32 -> "must be at most 32 characters"
+            value.any(Char::isISOControl) -> "cannot contain control characters"
+            else -> null
+        }
+        BlueprintSelectorKind.LOCATION -> {
+            val coordinates = value.split(',', limit = 2).map { it.trim().toDoubleOrNull() }
+            if (coordinates.size == 2 && coordinates.all { it != null } &&
+                coordinates[0]!! in -90.0..90.0 && coordinates[1]!! in -180.0..180.0
+            ) null else "use latitude,longitude"
+        }
+        BlueprintSelectorKind.TASK_REFERENCE -> {
+            if (value.toLongOrNull()?.let { it > 0L } == true) null else "choose a positive task id"
+        }
+        BlueprintSelectorKind.VARIABLE -> {
+            if (VariableNamePolicy.normalizeForScope(value, isGlobal = false) != null) null
+            else "use a valid variable name"
+        }
+        BlueprintSelectorKind.DURATION -> numericError(value, wholeNumber = true, defaultMaximum = 86_400_000.0)
+        BlueprintSelectorKind.INTEGER -> numericError(value, wholeNumber = true)
+        BlueprintSelectorKind.DECIMAL -> numericError(value, wholeNumber = false)
+        BlueprintSelectorKind.TIME -> try {
+            LocalTime.parse(value, DateTimeFormatter.ofPattern("HH:mm"))
+            null
+        } catch (_: DateTimeParseException) {
+            "use HH:mm"
+        }
+    }
+}
+
+private fun BlueprintInput.numericError(value: String, wholeNumber: Boolean, defaultMaximum: Double? = null): String? {
+    val number = (if (wholeNumber) value.toLongOrNull()?.toDouble() else value.toDoubleOrNull())
+        ?: return "must be numeric"
+    val upperBound = maximum ?: defaultMaximum
+    return when {
+        minimum != null && number < minimum -> "must be at least ${minimum.stripTrailingZero()}"
+        upperBound != null && number > upperBound -> "must be at most ${upperBound.stripTrailingZero()}"
+        else -> null
+    }
+}
+
+private fun Double.stripTrailingZero(): String = toString().removeSuffix(".0")
+
+private val APP_ID_PATTERN = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
 object ProfileTemplateCatalog {
     val all: List<ProfileTemplate> = listOf(
         ProfileTemplate(
@@ -109,10 +217,10 @@ object ProfileTemplateCatalog {
             category = "Focus",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile. Review DND/volume access before enabling.",
-            slots = listOf(
-                TemplateSlot("start", "Start time", "09:00", hint = "HH:mm"),
-                TemplateSlot("end", "End time", "17:00", hint = "HH:mm"),
-                TemplateSlot("level", "Notification volume", "20", hint = "0-100"),
+            inputs = listOf(
+                TemplateSlot("start", "Start time", "09:00", hint = "HH:mm", selector = BlueprintSelectorKind.TIME),
+                TemplateSlot("end", "End time", "17:00", hint = "HH:mm", selector = BlueprintSelectorKind.TIME),
+                TemplateSlot("level", "Notification volume", "20", hint = "0-100", selector = BlueprintSelectorKind.INTEGER, minimum = 0.0, maximum = 100.0),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.TIME, mapOf("start" to "{start}", "end" to "{end}")),
@@ -129,8 +237,8 @@ object ProfileTemplateCatalog {
             category = "Media",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile and may need DND/volume access.",
-            slots = listOf(
-                TemplateSlot("level", "Media volume", "55", hint = "0-100"),
+            inputs = listOf(
+                TemplateSlot("level", "Media volume", "55", hint = "0-100", selector = BlueprintSelectorKind.INTEGER, minimum = 0.0, maximum = 100.0),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.STATE, mapOf("key" to "headphones", "value" to "true")),
@@ -147,9 +255,9 @@ object ProfileTemplateCatalog {
             category = "Battery",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile and needs Write Settings access for brightness.",
-            slots = listOf(
-                TemplateSlot("threshold", "Battery threshold", "20", hint = "Percent"),
-                TemplateSlot("brightness", "Brightness", "48", hint = "0-255"),
+            inputs = listOf(
+                TemplateSlot("threshold", "Battery threshold", "20", hint = "Percent", selector = BlueprintSelectorKind.INTEGER, minimum = 0.0, maximum = 100.0),
+                TemplateSlot("brightness", "Brightness", "48", hint = "0-255", selector = BlueprintSelectorKind.INTEGER, minimum = 0.0, maximum = 255.0),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.STATE, mapOf("key" to "battery_level", "operator" to "<=", "value" to "{threshold}")),
@@ -166,8 +274,8 @@ object ProfileTemplateCatalog {
             category = "Location-lite",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile and may need nearby WiFi/location permission.",
-            slots = listOf(
-                TemplateSlot("ssid", "WiFi SSID", "Home WiFi", hint = "Exact SSID"),
+            inputs = listOf(
+                TemplateSlot("ssid", "WiFi SSID", "Home WiFi", hint = "Exact SSID", selector = BlueprintSelectorKind.WIFI_SSID),
                 TemplateSlot("message", "Message", "Arrived on {ssid}"),
             ),
             contexts = listOf(
@@ -185,12 +293,12 @@ object ProfileTemplateCatalog {
             category = "Location",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile. Requires foreground/background location permissions and device Location before enabling.",
-            slots = listOf(
-                TemplateSlot("latitude", "Latitude", "40.7580", hint = "Decimal degrees"),
-                TemplateSlot("longitude", "Longitude", "-73.9855", hint = "Decimal degrees"),
-                TemplateSlot("radiusMeters", "Radius meters", "150", hint = "Meters"),
-                TemplateSlot("maxAccuracyMeters", "Max accuracy meters", "100", hint = "Meters"),
-                TemplateSlot("dwellSeconds", "Dwell seconds", "0", hint = "0 disables dwell"),
+            inputs = listOf(
+                TemplateSlot("latitude", "Latitude", "40.7580", hint = "Decimal degrees", selector = BlueprintSelectorKind.DECIMAL, minimum = -90.0, maximum = 90.0),
+                TemplateSlot("longitude", "Longitude", "-73.9855", hint = "Decimal degrees", selector = BlueprintSelectorKind.DECIMAL, minimum = -180.0, maximum = 180.0),
+                TemplateSlot("radiusMeters", "Radius meters", "150", hint = "Meters", selector = BlueprintSelectorKind.INTEGER, minimum = 1.0, maximum = 100_000.0),
+                TemplateSlot("maxAccuracyMeters", "Max accuracy meters", "100", hint = "Meters", selector = BlueprintSelectorKind.INTEGER, minimum = 1.0, maximum = 100_000.0),
+                TemplateSlot("dwellSeconds", "Dwell seconds", "0", hint = "0 disables dwell", selector = BlueprintSelectorKind.DURATION, minimum = 0.0, maximum = 86_400.0),
             ),
             contexts = listOf(
                 TemplateContext(
@@ -219,9 +327,9 @@ object ProfileTemplateCatalog {
             category = "Habits",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile and requires Usage Access plus notification permission.",
-            slots = listOf(
-                TemplateSlot("package", "App package", "com.android.chrome", hint = "com.example.app"),
-                TemplateSlot("delayMillis", "Delay milliseconds", "900000", hint = "900000 = 15 minutes"),
+            inputs = listOf(
+                TemplateSlot("package", "App package", "com.android.chrome", hint = "com.example.app", selector = BlueprintSelectorKind.APP),
+                TemplateSlot("delayMillis", "Delay milliseconds", "900000", hint = "900000 = 15 minutes", selector = BlueprintSelectorKind.DURATION, minimum = 0.0),
                 TemplateSlot("message", "Reminder", "Time check: {package} has been open long enough for a break."),
             ),
             contexts = listOf(
@@ -239,8 +347,8 @@ object ProfileTemplateCatalog {
             category = "Safety",
             availability = TemplateAvailability.Planned,
             safetyNote = "Blocked until external trigger intents are exposed safely.",
-            slots = listOf(
-                TemplateSlot("trigger", "Trigger action", "com.opentasker.intent.FIND_PHONE"),
+            inputs = listOf(
+                TemplateSlot("trigger", "Trigger action", "com.opentasker.intent.FIND_PHONE", selector = BlueprintSelectorKind.TEXT),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.EVENT, mapOf("event" to "intent", "filter" to "{trigger}")),
@@ -258,8 +366,8 @@ object ProfileTemplateCatalog {
             category = "Calendar",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile. Requires Calendar access plus DND/volume access before enabling.",
-            slots = listOf(
-                TemplateSlot("calendar", "Calendar name", "Work"),
+            inputs = listOf(
+                TemplateSlot("calendar", "Calendar name", "Work", selector = BlueprintSelectorKind.TEXT, section = "Calendar"),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.EVENT, mapOf("event" to "calendar", "state" to "during", "calendar" to "{calendar}")),
@@ -275,8 +383,8 @@ object ProfileTemplateCatalog {
             category = "Sleep",
             availability = TemplateAvailability.RequiresSetup,
             safetyNote = "Creates a disabled profile. Requires NFC hardware and Write Settings/volume access before enabling.",
-            slots = listOf(
-                TemplateSlot("tagId", "NFC tag ID", "04AABBCC", hint = "Scan a tag and copy its ID from Inspector"),
+            inputs = listOf(
+                TemplateSlot("tagId", "NFC tag ID", "04AABBCC", hint = "Scan a tag and copy its ID from Inspector", selector = BlueprintSelectorKind.TEXT, section = "NFC"),
             ),
             contexts = listOf(
                 TemplateContext(ContextType.EVENT, mapOf("event" to "nfc", "tagId" to "{tagId}")),
