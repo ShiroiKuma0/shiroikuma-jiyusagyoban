@@ -2,6 +2,7 @@
 
 ## v0.2.85
 
+- Fixed the release build, which had failed since the staged module split: the core/* modules compile sources that still live under `app/`, so every shared class was compiled twice and R8 rejected the duplicate types. `:app` holds the only copy that ships and the module jars are no longer merged into the APK.
 - The action editor now says where to satisfy a setup-gated action, not just what is missing — elevated device actions point at the Setup tab and Shizuku rather than leaving the manifest looking like the answer.
 - Added an **AMOLED black** theme that uses true `#000000` surfaces, so an OLED panel can actually switch pixels off — the existing dark scheme is `#101211` and is unchanged, now named for what it is. Body text keeps 18.6:1 and secondary text 9.3:1 on black.
 - Added an opt-in **Material You** theme on Android 12+, which follows the system light/dark setting and is not offered on older releases where it would do nothing.
