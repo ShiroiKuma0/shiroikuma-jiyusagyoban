@@ -10,6 +10,9 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -234,4 +237,184 @@ class BandGattClient(private val context: Context) {
 sealed interface BandConnectResult {
     data class Ready(val mtu: Int) : BandConnectResult
     data class Failed(val reason: String) : BandConnectResult
+}
+
+sealed interface BandScanOutcome {
+    /** The window completed. An empty list is a real answer, not an error. */
+    data class Heard(val devices: List<BandScanDevice>) : BandScanOutcome
+    data class Failed(val reason: String) : BandScanOutcome
+}
+
+/**
+ * The listening half of the radio.
+ *
+ * It lives in this file for one reason: `BandSafetyGuardTest.exactlyOneFileTouchesBluetooth` allows
+ * `android.bluetooth` in `BandGattClient.kt` and nowhere else in `core/band`. Putting the scanner in
+ * its own file would have meant either weakening that test or moving the radio outside the package
+ * that owns it — so the scan sits beside the connect, and everything it *concludes* lives in
+ * `BandScanReport`, which a JVM test can reach.
+ *
+ * Same battery discipline as the rest of this file: a fixed window, `stopScan` in a `finally`, and
+ * no callback left registered on any path. `BandSyncEngine` never calls this — a sync is addressed
+ * by MAC and needs no scan at all, which is why the app asked for BLUETOOTH_SCAN only now.
+ */
+class BandScanner(private val context: Context) {
+
+    /**
+     * @param onTick called about four times a second with the elapsed time and everything heard so
+     *   far — the devices themselves, not just a count, so a caller can show each one the moment it
+     *   arrives instead of a number that goes up. Returning false stops the scan early, which is how
+     *   a 中止 button reaches a scan already in flight.
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun scan(
+        seconds: Int,
+        onTick: (elapsedMs: Long, heard: List<BandScanDevice>) -> Boolean = { _, _ -> true },
+    ): BandScanOutcome {
+        // Checked rather than assumed, so the failure names the fix. BLUETOOTH_SCAN is declared
+        // neverForLocation, so on S+ no location permission is involved; below S the platform
+        // derives scanning from the location permission instead, hence the two branches.
+        val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Manifest.permission.BLUETOOTH_SCAN
+        } else {
+            Manifest.permission.ACCESS_FINE_LOCATION
+        }
+        if (ContextCompat.checkSelfPermission(context, needed) != PackageManager.PERMISSION_GRANTED) {
+            return BandScanOutcome.Failed("Nearby-devices permission not granted — grant it in Setup")
+        }
+
+        val manager = ContextCompat.getSystemService(context, BluetoothManager::class.java)
+            ?: return BandScanOutcome.Failed("Bluetooth unavailable on this device")
+        val adapter: BluetoothAdapter = manager.adapter
+            ?: return BandScanOutcome.Failed("Bluetooth unavailable on this device")
+        if (!adapter.isEnabled) return BandScanOutcome.Failed("Bluetooth is switched off")
+        val scanner = adapter.bluetoothLeScanner
+            ?: return BandScanOutcome.Failed("the Bluetooth scanner is unavailable right now")
+
+        // Merged by address as sightings arrive: one device advertises many times in a window, and
+        // the fields differ between packets — the name often appears only in the scan response.
+        val seen = LinkedHashMap<String, BandScanDevice>()
+        val failure = CompletableDeferred<String>()
+
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                val found = result ?: return
+                val address = runCatching { found.device?.address }.getOrNull() ?: return
+                seen[address] = merge(seen[address], found, address)
+            }
+
+            override fun onBatchScanResults(results: MutableList<ScanResult>?) {
+                results?.forEach { onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it) }
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                if (!failure.isCompleted) failure.complete(describeScanFailure(errorCode))
+            }
+        }
+
+        val settings = ScanSettings.Builder()
+            // The band is a plain BLE peripheral, so legacy advertising is what it uses and the
+            // default (legacy-only) is the right net. Low latency because the window is seconds
+            // long and ends by itself — this is not a background scan.
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
+            .setReportDelay(0)
+            .build()
+
+        return try {
+            // No filters: the whole point is to find a band whose address is not yet known, and a
+            // ScanFilter on fff0 would hide any band that keeps its service UUID out of the
+            // advertisement — which is common, and would look exactly like "no band here".
+            scanner.startScan(emptyList(), settings, callback)
+            // Sliced rather than one long await: the window is the only part of this that takes real
+            // time, and a caller with nothing to show for eight seconds is indistinguishable from a
+            // wedged one. Each slice also re-asks whether to carry on, which is what makes a running
+            // scan cancellable at all.
+            val windowMs = seconds.coerceIn(MIN_SCAN_SEC, MAX_SCAN_SEC) * 1000L
+            var elapsed = 0L
+            var failed: String? = null
+            while (elapsed < windowMs) {
+                val slice = minOf(TICK_MS, windowMs - elapsed)
+                failed = withTimeoutOrNull(slice) { failure.await() }
+                if (failed != null) break
+                elapsed += slice
+                if (!onTick(elapsed, seen.values.toList())) break
+            }
+            if (failed != null) BandScanOutcome.Failed(failed) else BandScanOutcome.Heard(seen.values.toList())
+        } catch (t: Throwable) {
+            BandScanOutcome.Failed(t.message ?: "the scan could not be started")
+        } finally {
+            runCatching { scanner.stopScan(callback) }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun merge(previous: BandScanDevice?, result: ScanResult, address: String): BandScanDevice {
+        val record = result.scanRecord
+        // scanRecord.deviceName, never device.name: the latter reads the bonded-name cache and needs
+        // BLUETOOTH_CONNECT, which a scan is not required to hold.
+        val name = record?.deviceName?.trim().orEmpty().ifBlank { previous?.name.orEmpty() }
+        val services = record?.serviceUuids.orEmpty()
+            .map { BandScanReport.shortUuid(it.uuid.toString()) }
+            .let { fresh -> (previous?.serviceUuids.orEmpty() + fresh).distinct() }
+
+        val manufacturer = record?.manufacturerSpecificData
+        val ids = buildList {
+            addAll(previous?.manufacturerIds.orEmpty())
+            if (manufacturer != null) for (index in 0 until manufacturer.size()) add(manufacturer.keyAt(index))
+        }.distinct()
+        val hex = manufacturer?.takeIf { it.size() > 0 }?.valueAt(0)
+            ?.let { BandScanReport.hex(it) }
+            ?: previous?.manufacturerHex.orEmpty()
+
+        val txPower = record?.txPowerLevel
+            ?.takeIf { it != NO_TX_POWER }
+            ?: previous?.txPower
+        val connectable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            result.isConnectable || (previous?.connectable == true)
+        } else {
+            previous?.connectable
+        }
+
+        return BandScanDevice(
+            address = address,
+            name = name,
+            // Strongest, not latest: a single weak packet from a device otherwise heard loudly would
+            // otherwise push it down the list and out of the probe order.
+            rssi = maxOf(result.rssi, previous?.rssi ?: Int.MIN_VALUE),
+            serviceUuids = services,
+            manufacturerIds = ids,
+            manufacturerHex = hex,
+            txPower = txPower,
+            connectable = connectable,
+            sightings = (previous?.sightings ?: 0) + 1,
+        )
+    }
+
+    private fun describeScanFailure(errorCode: Int): String = when (errorCode) {
+        ScanCallback.SCAN_FAILED_ALREADY_STARTED -> "a scan is already running"
+        ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "the system refused to register the scan"
+        ScanCallback.SCAN_FAILED_INTERNAL_ERROR -> "the Bluetooth stack reported an internal error"
+        ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED -> "this device does not support BLE scanning"
+        SCAN_FAILED_TOO_FREQUENT -> "Android is rate-limiting scans — wait about 30 seconds and try again"
+        else -> "the scan failed (code $errorCode)"
+    }
+
+    companion object {
+        const val MIN_SCAN_SEC = 1
+        const val MAX_SCAN_SEC = 60
+        const val DEFAULT_SCAN_SEC = 8
+
+        /** How often the window is interrupted to report progress and re-ask about cancellation. */
+        const val TICK_MS = 250L
+
+        /** `ScanRecord.TX_POWER_NOT_PRESENT`, which is `@hide` on some API levels. */
+        private const val NO_TX_POWER = Int.MIN_VALUE
+
+        /**
+         * `SCAN_FAILED_SCANNING_TOO_FREQUENTLY` (6). Android allows five scans per 30 seconds per
+         * app and then silently refuses; naming it turns a mystifying empty result into a wait.
+         */
+        private const val SCAN_FAILED_TOO_FREQUENT = 6
+    }
 }

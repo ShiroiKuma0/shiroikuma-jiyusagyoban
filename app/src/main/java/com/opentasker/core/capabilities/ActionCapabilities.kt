@@ -127,6 +127,7 @@ object ActionCapabilityRegistry {
         // MAC — so BLUETOOTH_CONNECT is the entire requirement.
         "band.charts" to ActionCapability(CapabilityLevel.Supported, "Opens the 健康 window on data already stored on this device. Needs no permission.", blocking = false),
         "band.sync" to ActionCapability(CapabilityLevel.RequiresSetup, "Reads the Hume Band's stored health history over Bluetooth — needs the Nearby devices (Bluetooth) permission.", CapabilityRequirement.Bluetooth, blocking = true),
+        "band.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Listens for nearby Bluetooth devices to find the band's address — needs the Nearby devices (Bluetooth) permission.", CapabilityRequirement.Bluetooth, blocking = true),
         "location.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Reads the device's position into variables — needs the Location permission.", CapabilityRequirement.Location, blocking = true),
         // Upstream 0.2.88. Android returns the last cached scan whether or not a fresh one was
         // accepted, so the permission is the whole gate the user can act on.

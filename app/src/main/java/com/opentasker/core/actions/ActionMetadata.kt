@@ -954,6 +954,29 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "band.scan",
+            name = "Find Band",
+            description = "Listen for nearby Bluetooth devices and work out which one is a Hume band, with the evidence for saying so. Use it after a new or factory-reset band changes its address; hands the address back in a variable and changes no setting by itself",
+            category = "Health",
+            fields = listOf(
+                ActionField("seconds", "Listen for (s)", FieldType.NUMBER, hint = "default 8, coerced 1..60. A band advertises every second or two, so a short window is usually enough"),
+                ActionField("verify", "Confirm by connecting", FieldType.CHECKBOX, hint = "default on — connects to the best candidates and checks for fff0/fff6/fff7, the same gate a sync passes. The only conclusive test"),
+                ActionField("max_verify", "Confirm at most", FieldType.NUMBER, hint = "default 3, coerced 0..5. Stops at the first device that answers"),
+                ActionField("show_all", "List every device", FieldType.CHECKBOX, hint = "default on — also lists the devices that look nothing like a band, so nothing is hidden"),
+                ActionField("known_address", "Known address", FieldType.TEXT, hint = "blank = the configured one. Marked in the report as the address currently in use"),
+                ActionField("lang", "Language", FieldType.TEXT, hint = "blank = the 健康 setting. en-US or ja-JP"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default BANDSCAN_ — writes <prefix>Spin, Phase, Pct, Note and List about four times a second, so a Scene bound to them turns and fills up live. When it finishes, List becomes the full report and Note the verdict, so the same window shows the answer"),
+                ActionField("cancel_var", "Cancel variable", FieldType.TEXT, hint = "a scene button sets this to 1 to stop the scan within a quarter of a second; blank = only a progress panel's 中止 can stop it"),
+                ActionField("store", "Store report in", FieldType.TEXT, hint = "default Band_ScanReport — the full descriptive text, ready for a dialog"),
+                ActionField("store_address", "Store address in", FieldType.TEXT, hint = "default Band_ScanAddress — the best MAC found, or blank if nothing was conclusive"),
+                ActionField("store_count", "Store device count in", FieldType.TEXT, hint = "default Band_ScanCount"),
+                ActionField("store_verdict", "Store verdict in", FieldType.TEXT, hint = "default Band_ScanVerdict — confirmed / likely / possible / none"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "band.session",
             name = "Mark Training Session",
             description = "Bookend a workout the band cannot see \u2014 strength work leaves almost no trace in a wrist sensor. Bind it to a shortcut or widget and tap at the start and end; 回復 then counts the session's real heart-rate load instead of missing it",

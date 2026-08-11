@@ -206,6 +206,9 @@ object ActionCatalog {
         define("location.get", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::GetLocationAction),
         define("location.mode", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::LocationModeAction),
         define("band.sync", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandSyncAction),
+        // IDEMPOTENT: a scan reads the air and writes only variables, so a retry costs a few seconds
+        // and changes nothing — unlike band.sync, which moves records into the archive.
+        define("band.scan", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandScanAction),
         define("band.session", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandSessionAction),
         define("band.charts", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandChartsAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
