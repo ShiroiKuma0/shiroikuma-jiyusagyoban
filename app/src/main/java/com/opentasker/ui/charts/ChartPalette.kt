@@ -122,4 +122,33 @@ object ChartPalette {
     val BAND_WARN = Color(0xFFFAB219)
     val BAND_SERIOUS = Color(0xFFEC835A)
     val BAND_CRITICAL = Color(0xFFD03B3B)
+
+    /**
+     * The shared 1–5 scale — one colour vocabulary for every graded value in 回復.
+     *
+     * Diverging around 3, so the colour carries the SIGN of a deviation and not merely its size: 1 and
+     * 2 are worse than usual, 3 is usual, 4 and 5 are better. Used for 白い熊's own 体感 rating and for
+     * every measured marker beside it, because a reader who has learned one column has then learned
+     * all of them — the previous scheme spent a different vocabulary on each and left the eye nothing
+     * to carry across. (白い熊, 2026-08-11: "we need to have clear 5 distinct colors, used everywhere".)
+     *
+     * Chosen by search against [PaletteCheck], not by eye, and pinned there: every adjacent pair clears
+     * the red-green gate at ΔE 9.9 against a target of 8, and the full-colour gate at 16.3 against a
+     * floor of 15. 2 and 4 sit a little above the lightness ceiling on purpose — they are drawn as
+     * single digits and small type, where the extra brightness is what makes them legible at all.
+     *
+     * The band roles above are NOT reused here. `BAND_WARN` is within a few ΔE of this theme's own
+     * yellow ink, which is exactly the collision 白い熊 reported: an amber value beside a yellow one
+     * reads as the same state twice.
+     */
+    val SCALE = listOf(
+        Color(0xFFD8382F), // 1 — red
+        Color(0xFFD8860F), // 2 — orange
+        Color(0xFF8672DC), // 3 — violet, the neutral midpoint
+        Color(0xFF22AED8), // 4 — cyan
+        Color(0xFF2CA159), // 5 — green
+    )
+
+    /** [SCALE] by its 1–5 step, clamped. */
+    fun scale(step: Int): Color = SCALE[(step - 1).coerceIn(0, SCALE.lastIndex)]
 }

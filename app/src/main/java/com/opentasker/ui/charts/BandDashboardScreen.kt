@@ -123,8 +123,11 @@ fun BandDashboardScreen(
                 awakeMinutes = state.sleep?.sessions?.maxByOrNull { it.startMs }?.awake,
                 regime = state.regime,
                 feltToday = state.feltToday,
+                feltNight = state.feltNight,
                 feltEnabled = state.feltEnabled,
                 onFelt = model::setFeltToday,
+                registerNights = state.register?.rows?.size ?: 0,
+                registerRated = state.register?.rows?.count { it.felt != null } ?: 0,
                 onOpenRegister = { onOpenMetric(MetricSpecs.KEY_REGISTER) },
                 onClick = { onOpenMetric(MetricSpecs.KEY_RECOVERY) },
             )

@@ -136,8 +136,10 @@ object BandText {
         "Heart rate up and sleep short together — the pattern that tracks illness. Worth watching, not a diagnosis.",
         "心拍が上がり睡眠が短い — 体調不良と相関するパターン。診断ではないが、注意する価値はある。",
     )
-    val recoveryAsk = Loc("How do you feel today?", "今日の体感は？")
-    val recoveryAskDone = Loc("Today: %s", "今日：%s")
+    // Both name the night being rated. "Today" was a lie every morning — the night started the
+    // evening before — and it is what let a rating filed against another night read as this one's.
+    val recoveryAsk = Loc("Night of %s — how did you feel?", "%s の夜：体感は？")
+    val recoveryAskDone = Loc("Night of %s: %s", "%s の夜：%s")
     val feltScale1 = Loc("Wrecked", "最悪")
     val feltScale2 = Loc("Below par", "いまひとつ")
     val feltScale3 = Loc("Normal", "普通")
@@ -154,15 +156,54 @@ object BandText {
     val loadFromSessions = Loc("of which %d from sessions", "うち %d は運動から")
     // ---- 運動と回復（記録簿）------------------------------------------------------------------
     val registerTitle = Loc("Training and recovery", "運動と回復")
-    val registerOpen = Loc("See every session ▸", "記録した運動をすべて見る ▸")
+    val registerOpen = Loc("Every night and session", "夜と運動の記録をすべて")
+    val registerOpenCounts = Loc("%d nights on record · %d rated", "記録 %d 晩 ・ 評価 %d 件")
     val registerEmpty = Loc(
         "No sessions marked yet. Mark one with 運動記録, and the night that follows it will appear here beside it.",
         "まだ運動が記録されていない。運動記録で記録すれば、その次の夜がここに並んで出る。",
     )
     val registerLegend = Loc(
-        "Bar = session load that day. Dots = markers outside your usual range on the night that started that day.",
-        "棒はその日の運動量。点はその日の夜に平常の範囲外だった指標の数。",
+        "Each tile is the night that started that day, filled and ringed in your 体感's own colour from the scale below. A 1 is drawn dark with a pale ring so the worst nights are a different shape and not merely a different hue. A thicker ring means one measured marker was outside your usual range that night, thicker still two or more. The bar underneath is session load, its width the MET-minutes.",
+        "各タイルはその日に始まった夜で、下の尺度と同じ体感の色で塗り、同じ色で縁取る。1 だけは暗い地に淡い縁 — 最悪の夜は色相だけでなく形からして違うように。縁が太いのは測定指標が平常の範囲外だった夜、さらに太ければ二つ以上。下の棒はその日の運動量で、幅が MET分。",
     )
+    // ---- 夜ごとの記録 --------------------------------------------------------------------------
+    // The grid can only show a count, and a count is not a reading. These print what is stored.
+    val registerNightsTitle = Loc("Every night and every rating — %d lines, %d rated", "夜と評価のすべて — %d 行、うち %d 件は評価あり")
+    val registerNightsNote = Loc(
+        "Newest first. 体感 is the number you tapped. Night HR and 実睡眠 are graded against published reference ranges — tap the i above for the cut points and their sources. 皮膚温 keeps the within-person reading, because a wrist sensor tracks the room almost as closely as the wearer and has no absolute band worth having. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it.",
+        "新しい順。体感は押した数字そのもの。夜間心拍と実睡眠は公表された基準範囲で採点する — 区切りと出典は上の i を押せば出る。皮膚温だけは自分自身との比較のまま。手首のセンサーは装着者とほぼ同じくらい部屋の温度を測っており、絶対的な基準を置く意味がないため。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。",
+    )
+    // ---- the reference bands, behind the i ------------------------------------------------------
+    val bandsTitle = Loc("The bands, and where they come from", "この区切りと、その出典")
+    val bandsBody = Loc(
+        "実睡眠 — the National Sleep Foundation's consensus for adults 26–64 (Hirshkowitz 2015): 7–9 h recommended, 6–7 h and 9–10 h \"may be appropriate\", outside that not recommended. The AASM and Sleep Research Society are stronger and break the tie inside that middle category — \"adults should sleep 7 or more hours per night on a regular basis\" (Watson 2015) — so short and long are NOT symmetric here: 9–10 h scores 4, while 6–7 h scores 3. 5–6 h and 10–11 h score 2, beyond that 1.\n\n" +
+            "Night HR — the resting-heart-rate decades of Jensen 2013 (16-year follow-up), across which mortality rises monotonically: under 50 is 5, 50–59 is 4, 60–69 is 3, 70–79 is 2, 80 and over is 1. Aune 2017 puts the slope at about 9 % higher all-cause mortality per 10 bpm. Caveat worth knowing: those are DAYTIME resting rates, and a sleeping heart rate runs below its owner's daytime resting — so these bands are generous applied to a nocturnal value, not harsh.\n\n" +
+            "皮膚温 — no reference band, deliberately. The wrist sensor correlates with the room at r = 0.961 (Sato 2024) and the ambient term is several times the physiological one, so an absolute threshold would be grading your bedroom. It stays a comparison against your own nights.\n\n" +
+            "体感 — the number you tapped. Nothing to convert.\n\n" +
+            "Separately, the ring on a calendar tile still means \"outside YOUR usual range that night\". That is a different question from these bands and neither is derived from the other.",
+        "実睡眠 — 全米睡眠財団の成人（26〜64歳）向け合意（Hirshkowitz 2015）：7〜9 時間が推奨、6〜7 時間と 9〜10 時間は「適切な場合もある」、その外は非推奨。AASM と睡眠研究学会はより強く、その中間帯の順位を決める — 「成人は日常的に 7 時間以上眠るべき」（Watson 2015）。よって短い側と長い側は対称ではない：9〜10 時間は 4、6〜7 時間は 3。5〜6 時間と 10〜11 時間は 2、その外は 1。\n\n" +
+            "夜間心拍 — Jensen 2013（16年追跡）の安静時心拍の十年区分。死亡率はこの区切りに沿って単調に上がる：50 未満が 5、50〜59 が 4、60〜69 が 3、70〜79 が 2、80 以上が 1。Aune 2017 によれば 10 bpm ごとに全死因死亡が約 9 % 増える。注意：これらは「日中の」安静時心拍であり、睡眠中の心拍は日中の安静時より低い。つまり夜間の値に当てると厳しいどころか甘い。\n\n" +
+            "皮膚温 — 基準帯は意図的に置かない。手首のセンサーは室温と r = 0.961 で相関し（Sato 2024）、環境の項が生理的な項の数倍ある。絶対値で切れば寝室を採点することになる。ここだけは自分自身の夜との比較のまま。\n\n" +
+            "体感 — 押した数字そのもの。変換するものがない。\n\n" +
+            "なお暦のタイルの縁は今も「その夜が自分の平常の範囲外だったか」を意味する。ここの基準帯とは別の問いで、どちらも他方から導いてはいない。",
+    )
+    // Column headings, printed once. The values under them keep their own colour. Prefixed because
+    // the day-table further down already owns the bare col* names for a different set of columns.
+    val regColDate = Loc("Date", "日付")
+    val regColFelt = Loc("How you felt", "体感")
+    val regColHr = Loc("Night HR", "夜間心拍")
+    val regColSleep = Loc("Asleep", "実睡眠")
+    val regColTemp = Loc("Temp °C", "体温 ℃")
+    val registerNightsEmpty = Loc(
+        "No nights recorded yet. A sleep session has to sync from the band before anything appears here.",
+        "まだ夜の記録がない。バンドから睡眠が同期されるまでここには何も出ない。",
+    )
+    /** The same note before there is a baseline to quote a threshold from. */
+    val registerNightsNotePlain = Loc(
+        "Newest first. 体感 is the number you tapped. The measured columns are graded against your own recent median, not against anyone else: 3 is inside your usual range, 2 and 4 are outside it, 1 and 5 twice as far out again. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it. Grey means there is no baseline yet to judge against.",
+        "新しい順。体感はあなたが押した数字そのもの。測定値は他人ではなく自分自身の直近の中央値と比べる：3 は平常の範囲内、2 と 4 はその外、1 と 5 はさらに倍だけ外。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。灰色はまだ比べる基準がない値。",
+    )
+    val registerNightUnrated = Loc("not rated", "未評価")
     val registerSession = Loc("%s · %d min · %d MET-min", "%s ・ %d 分 ・ %d MET分")
     val registerPeak = Loc("peak %d bpm", "最高 %d bpm")
     val registerNoNight = Loc("→ no night recorded after it yet", "→ その後の夜はまだ記録されていない")
