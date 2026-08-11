@@ -95,4 +95,16 @@ class ActiveAutomationModuleSplitTest {
             assertTrue("Missing extracted active-automation module: $fileName", Files.exists(screensSourceRoot.resolve(fileName)))
         }
     }
+
+    @Test
+    fun everyScreenSourceStaysBelowTheInterimResponsibilityCeiling() {
+        Files.list(screensSourceRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }.forEach { source ->
+                assertTrue(
+                    "${source.fileName} should stay below the 2,400-line interim split ceiling",
+                    Files.readAllLines(source).size < 2_400,
+                )
+            }
+        }
+    }
 }

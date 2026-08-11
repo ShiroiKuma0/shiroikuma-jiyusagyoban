@@ -10,6 +10,7 @@ import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.AppDatabaseProvider
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
@@ -150,7 +151,7 @@ class OpenTaskerApp_NoHilt : Application() {
                 }
             })
             .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
-            .build()
+            .build().also(AppDatabaseProvider::publish)
     }
 
     /**

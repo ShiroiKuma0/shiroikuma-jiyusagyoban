@@ -83,6 +83,8 @@ import com.opentasker.core.templates.BlueprintSelectorKind
 import com.opentasker.core.templates.TemplateAvailability
 import com.opentasker.core.templates.validationError
 import com.opentasker.core.validation.InputValidation
+import com.opentasker.feature.automation.AutomationBlueprintInputField
+import com.opentasker.feature.automation.AutomationInputKeyboard
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
 import java.time.Instant
@@ -217,10 +219,22 @@ internal fun TemplateSlotDialog(
                     }
                     if (collapsedSection != section) {
                         items(inputs, key = { it.key }) { input ->
-                            BlueprintInputField(
-                                input = input,
+                            val selectorLabel = blueprintSelectorLabel(input.selector)
+                            val bounds = listOfNotNull(
+                                input.minimum?.let { "≥ ${it.blueprintNumber()}" },
+                                input.maximum?.let { "≤ ${it.blueprintNumber()}" },
+                            ).joinToString(" ")
+                            AutomationBlueprintInputField(
+                                label = input.label + if (input.required) " *" else "",
                                 value = values[input.key].orEmpty(),
-                                error = invalidInputs[input.key],
+                                placeholder = input.hint,
+                                supportingText = if (bounds.isNotEmpty()) {
+                                    stringResource(R.string.blueprint_input_bounds, selectorLabel, bounds)
+                                } else {
+                                    stringResource(R.string.blueprint_input_supporting, selectorLabel)
+                                },
+                                errorText = invalidInputs[input.key],
+                                keyboard = input.selector.automationInputKeyboard(),
                                 onValueChange = { values = values + (input.key to it) },
                             )
                         }
@@ -241,39 +255,6 @@ internal fun TemplateSlotDialog(
 }
 
 @Composable
-private fun BlueprintInputField(
-    input: com.opentasker.core.templates.BlueprintInput,
-    value: String,
-    error: String?,
-    onValueChange: (String) -> Unit,
-) {
-    val selectorLabel = blueprintSelectorLabel(input.selector)
-    val bounds = listOfNotNull(
-        input.minimum?.let { "≥ ${it.blueprintNumber()}" },
-        input.maximum?.let { "≤ ${it.blueprintNumber()}" },
-    ).joinToString(" ")
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(input.label + if (input.required) " *" else "") },
-        placeholder = input.hint?.let { { Text(it) } },
-        supportingText = {
-            if (error != null) {
-                Text(error, color = MaterialTheme.colorScheme.error)
-            } else if (bounds.isNotEmpty()) {
-                Text(stringResource(R.string.blueprint_input_bounds, selectorLabel, bounds))
-            } else {
-                Text(stringResource(R.string.blueprint_input_supporting, selectorLabel))
-            }
-        },
-        isError = error != null,
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = input.selector.keyboardType()),
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
 private fun blueprintSelectorLabel(selector: BlueprintSelectorKind): String = stringResource(
     when (selector) {
         BlueprintSelectorKind.TEXT -> R.string.blueprint_input_type_text
@@ -289,14 +270,14 @@ private fun blueprintSelectorLabel(selector: BlueprintSelectorKind): String = st
     },
 )
 
-private fun BlueprintSelectorKind.keyboardType(): KeyboardType = when (this) {
+private fun BlueprintSelectorKind.automationInputKeyboard(): AutomationInputKeyboard = when (this) {
     BlueprintSelectorKind.INTEGER,
     BlueprintSelectorKind.DURATION,
     BlueprintSelectorKind.TASK_REFERENCE,
-    -> KeyboardType.Number
-    BlueprintSelectorKind.DECIMAL -> KeyboardType.Decimal
-    BlueprintSelectorKind.TIME -> KeyboardType.Ascii
-    else -> KeyboardType.Text
+    -> AutomationInputKeyboard.NUMBER
+    BlueprintSelectorKind.DECIMAL -> AutomationInputKeyboard.DECIMAL
+    BlueprintSelectorKind.TIME -> AutomationInputKeyboard.ASCII
+    else -> AutomationInputKeyboard.TEXT
 }
 
 private fun Double.blueprintNumber(): String = toString().removeSuffix(".0")

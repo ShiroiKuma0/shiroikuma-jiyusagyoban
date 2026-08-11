@@ -6,7 +6,6 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.logging.AppLogger
 import java.util.concurrent.TimeUnit
 
@@ -27,7 +26,7 @@ class ConfigurationSnapshotWorker(
         val policy = settings.load()
         if (!policy.enabled) return Result.success()
 
-        val manager = DatabaseBackupManager(applicationContext, OpenTaskerApp_NoHilt.db)
+        val manager = DatabaseBackupManager(applicationContext, AppDatabaseProvider.await())
         val now = System.currentTimeMillis()
         return manager.backup().fold(
             onSuccess = {
