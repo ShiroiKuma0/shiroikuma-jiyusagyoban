@@ -154,6 +154,12 @@ val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
 val appVersionCode = 86
 val appVersionName = "0.2.84"
+// F-Droid store listing limits, from the F-Droid build metadata reference.
+val FDROID_SHORT_DESCRIPTION_MAX_CHARS = 80
+val FDROID_CHANGELOG_MAX_CHARS = 500
+val FDROID_MIN_SCREENSHOTS = 4
+/** Store metadata files are LF regardless of the build host. */
+val NEWLINE = 10.toChar().toString()
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -751,7 +757,7 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
     resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
-    reportFile.set(layout.buildDirectory.file("reports/opentasker/jvm-test-count.json"))
+    reportFile.set(rootProject.layout.buildDirectory.file("reports/opentasker/jvm-test-count.json"))
     minimumTests.set(JVM_TEST_FLOOR)
 }
 
@@ -1016,6 +1022,51 @@ tasks.register("verifyFdroidMetadata") {
                 "configuration actually produces for distribution=$selectedDistribution"
         }
 
+        // The store listing is part of the release contract: F-Droid renders whatever is in
+        // fastlane/, so a listing that lags the build is what users actually see.
+        val listing = rootProject.file("fastlane/metadata/android/en-US")
+        check(listing.isDirectory) {
+            "Missing F-Droid store listing at fastlane/metadata/android/en-US"
+        }
+        listOf("title.txt", "short_description.txt", "full_description.txt").forEach { name ->
+            val file = listing.resolve(name)
+            check(file.isFile && file.readText().isNotBlank()) {
+                "F-Droid store listing is missing a non-empty $name"
+            }
+        }
+        val shortDescription = listing.resolve("short_description.txt").readText().trim()
+        check(shortDescription.length <= FDROID_SHORT_DESCRIPTION_MAX_CHARS) {
+            "F-Droid short_description.txt is ${shortDescription.length} characters; the limit is " +
+                "$FDROID_SHORT_DESCRIPTION_MAX_CHARS"
+        }
+
+        val changelog = listing.resolve("changelogs/$appVersionCode.txt")
+        check(changelog.isFile && changelog.readText().isNotBlank()) {
+            "Missing F-Droid changelog for version code $appVersionCode. Run " +
+                ":app:generateFdroidChangelog after bumping the version."
+        }
+        check(changelog.readText().trim().length <= FDROID_CHANGELOG_MAX_CHARS) {
+            "F-Droid changelog $appVersionCode.txt exceeds $FDROID_CHANGELOG_MAX_CHARS characters"
+        }
+
+        // Screenshots are captured per release. Pinning the capture to a version code is what makes
+        // a stale listing fail the build instead of quietly showing an old UI on the store page.
+        val screenshotDir = listing.resolve("images/phoneScreenshots")
+        val screenshots = screenshotDir.listFiles { file -> file.extension.lowercase() == "png" }
+            .orEmpty()
+            .sortedBy { it.name }
+        check(screenshots.size >= FDROID_MIN_SCREENSHOTS) {
+            "F-Droid listing needs at least $FDROID_MIN_SCREENSHOTS phone screenshots, found ${screenshots.size}"
+        }
+        val capturedAt = screenshotDir.resolve("captured-at-version-code.txt")
+        check(capturedAt.isFile) {
+            "Missing ${capturedAt.name}; re-capture the store screenshots and record the version code"
+        }
+        check(capturedAt.readText().trim() == appVersionCode.toString()) {
+            "Store screenshots were captured at version code ${capturedAt.readText().trim()} but this " +
+                "release is $appVersionCode. Re-capture them so the listing matches the build."
+        }
+
         if (rootProject.file(".git").exists()) {
             val process = ProcessBuilder("git", "cat-file", "-e", "$releaseCommit^{commit}")
                 .directory(rootProject.projectDir)
@@ -1084,4 +1135,48 @@ tasks.register<VerifyNativePageAlignmentTask>("verifyNativePageAlignment") {
     description = "Checks that packaged native ELFs are read-only and have 16 KB PT_LOAD alignment."
     dependsOn("packageDebug")
     apk.set(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+}
+
+/**
+ * Writes the F-Droid per-version changelog from the current CHANGELOG section.
+ *
+ * F-Droid renders one file per version code and truncates hard, so the section is condensed to its
+ * bullet leads rather than copied verbatim. Review the result before releasing; this produces a
+ * starting point, it does not replace judgement.
+ */
+tasks.register("generateFdroidChangelog") {
+    group = "release"
+    description = "Writes fastlane/metadata/android/en-US/changelogs/<versionCode>.txt from CHANGELOG.md."
+
+    val changelogFile = rootProject.file("CHANGELOG.md")
+    val versionName = appVersionName
+    val versionCode = appVersionCode
+    val outputFile = rootProject.file("fastlane/metadata/android/en-US/changelogs/$versionCode.txt")
+    inputs.file(changelogFile)
+    outputs.file(outputFile)
+
+    doLast {
+        val section = changelogFile.readText()
+            .substringAfter("## v$versionName", "")
+            .substringBefore(NEWLINE + "## ")
+        check(section.isNotBlank()) {
+            "CHANGELOG.md has no '## v$versionName' section to generate a store changelog from"
+        }
+        val bullets = section.lines()
+            .map(String::trim)
+            .filter { it.startsWith("- ") }
+            .map { it.removePrefix("- ").replace(Regex("[`*]"), "") }
+        check(bullets.isNotEmpty()) { "The '## v$versionName' CHANGELOG section has no entries" }
+
+        val body = StringBuilder()
+        for (bullet in bullets) {
+            val line = bullet.substringBefore(". ").trimEnd('.') + "."
+            if (body.length + line.length + 1 > FDROID_CHANGELOG_MAX_CHARS) break
+            if (body.isNotEmpty()) body.append(NEWLINE)
+            body.append(line)
+        }
+        outputFile.parentFile.mkdirs()
+        outputFile.writeText(body.toString().trim() + NEWLINE)
+        println("Wrote ${outputFile.relativeTo(rootProject.projectDir)} (${outputFile.readText().length} chars)")
+    }
 }

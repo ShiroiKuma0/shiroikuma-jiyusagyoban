@@ -75,7 +75,7 @@ class LocalReleaseGateContractTest {
         val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
 
         assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1049").findAll(build).count())
-        assertTrue(build.contains("reportFile.set(layout.buildDirectory.file(\"reports/opentasker/jvm-test-count.json\"))"))
+        assertTrue(build.contains("reportFile.set(rootProject.layout.buildDirectory.file(\"reports/opentasker/jvm-test-count.json\"))"))
         assertTrue(script.contains("jvm-test-count.json"))
         assertTrue(script.contains("observedJvmTests"))
         assertTrue(script.contains("jvmTestFloor"))
