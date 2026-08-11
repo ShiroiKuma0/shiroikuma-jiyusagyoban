@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.app.R
 import kotlinx.coroutines.suspendCancellableCoroutine
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
@@ -62,7 +63,8 @@ class NotifyAction : DeclaredAction(ActionCatalog.require("notify.show")) {
         val notifId = args["id"]?.toIntOrNull() ?: nextNotificationId.getAndIncrement()
 
         val builder = NotificationCompat.Builder(ctx.app, channelDef.id)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(ContextCompat.getColor(ctx.app, R.color.notification_accent))
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -151,7 +153,7 @@ class ProgressNotificationAction : DeclaredAction(ActionCatalog.require("notify.
                 style.setProgressSegments(segments.map { Notification.ProgressStyle.Segment(it) })
             }
             val builder = Notification.Builder(ctx.app, channelDef.id)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setCategory(Notification.CATEGORY_PROGRESS)
@@ -168,7 +170,7 @@ class ProgressNotificationAction : DeclaredAction(ActionCatalog.require("notify.
             )
         } else {
             NotificationCompat.Builder(ctx.app, channelDef.id)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setProgress(100, progress, false)
