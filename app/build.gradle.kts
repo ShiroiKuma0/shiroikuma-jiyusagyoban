@@ -401,43 +401,6 @@ android {
     }
 }
 
-// Owned and compiled by the core/* modules; see the Android source-set filter above.
-val MODULE_OWNED_SOURCES: List<String> = listOf(
-            "com/opentasker/core/logging/AppLogger.kt",
-            "com/opentasker/core/storage/**",
-            "com/opentasker/core/engine/ActiveExecutionRegistry.kt",
-            "com/opentasker/core/engine/AutomationLiveConditionState.kt",
-            "com/opentasker/core/engine/CausalExecutionTracker.kt",
-            "com/opentasker/core/engine/CooldownReservations.kt",
-            "com/opentasker/core/engine/CooldownStore.kt",
-            "com/opentasker/core/engine/EngineHeartbeatStore.kt",
-            "com/opentasker/core/engine/ExecutionEnvelope.kt",
-            "com/opentasker/core/engine/RunLogSource.kt",
-            "com/opentasker/core/engine/TaskFailure.kt",
-            "com/opentasker/core/model/ContextSpec.kt",
-            "com/opentasker/core/model/Profile.kt",
-            "com/opentasker/core/model/ProfileConcurrencyPolicy.kt",
-            "com/opentasker/core/model/Project.kt",
-            "com/opentasker/core/model/RunLogEntry.kt",
-            "com/opentasker/core/model/Scene.kt",
-            "com/opentasker/core/model/Task.kt",
-            "com/opentasker/core/model/Variable.kt",
-            "com/opentasker/core/model/VariableNamePolicy.kt",
-)
-
-// NOTE ON THE STAGED MODULE SPLIT
-//
-// The core/* and feature/* modules point their source sets at files that still live under
-// app/src/main/java, so :app and the modules compile the same sources. Neither
-// `kotlin { sourceSets { configureEach { kotlin.exclude(...) } } }` nor a compile-task filter
-// suppresses that under AGP's built-in Kotlin compilation — both were tried and both are inert,
-// which is why MODULE_OWNED_SOURCES below documents intent rather than enforcing it.
-//
-// :app therefore holds the only copy of every class that ships. The module dependencies are
-// compileOnly so their duplicate jars are never merged into the APK: D8 tolerated the duplicate
-// types in debug, but R8 rejects them, and every release build failed from the split until this
-// was corrected. Making the modules the real owners is the XL item in ROADMAP.md.
-
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -450,11 +413,7 @@ ksp {
 }
 
 dependencies {
-    compileOnly(project(":core:common"))
-    compileOnly(project(":core:model"))
-    compileOnly(project(":core:storage"))
-    compileOnly(project(":core:engine"))
-    compileOnly(project(":feature:automation"))
+    // Upstream's core/* and feature/* modules are not wired in: see the note in settings.gradle.kts.
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
