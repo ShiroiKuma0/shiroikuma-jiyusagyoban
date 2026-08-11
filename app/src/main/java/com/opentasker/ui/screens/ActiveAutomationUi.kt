@@ -1103,6 +1103,7 @@ fun ActiveAutomationUi(
 
     if (showCreateTaskDialog) {
         TaskEditorDialog(
+            existingTaskNames = tasks.map { it.name },
             task = null,
             onDismiss = { showCreateTaskDialog = false },
             onSave = { name, priority, collisionMode ->
@@ -1114,6 +1115,7 @@ fun ActiveAutomationUi(
 
     taskDialog?.let { task ->
         TaskEditorDialog(
+            existingTaskNames = tasks.map { it.name },
             task = task,
             onDismiss = { clearTaskDialog() },
             onSave = { name, priority, collisionMode ->

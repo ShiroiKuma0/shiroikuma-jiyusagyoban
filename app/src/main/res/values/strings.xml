@@ -1308,6 +1308,7 @@
     <string name="ui_error_reason">%1$s</string>
     <!-- Shown as the activity title inside Tasker/Locale host apps. -->
     <string name="locale_setting_edit_title">OpenTasker task</string>
+    <string name="task_name_duplicate_warning">Another task already uses this name. References that name a task become ambiguous.</string>
     <string name="run_log_load_failed_title">Run log could not be loaded</string>
     <string name="run_log_load_failed_body">The stored run history could not be read. Retry, or check Diagnostics if it keeps failing.</string>
     <string name="ui_error_project_name_required">Enter a project name.</string>

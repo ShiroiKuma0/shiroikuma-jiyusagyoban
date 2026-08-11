@@ -41,12 +41,13 @@ internal fun ContextGroupingDialog(
     onDismiss: () -> Unit,
     onSave: (ContextExpressionNode) -> Unit,
 ) {
-    val initialExpression = remember(profile.id, profile.contextExpression, profile.contexts) {
+    // Keyed on the profile alone. Keying on contextExpression/contexts meant any background write
+    // to the row - the engine consuming a ONCE lifetime, an import, another dialog saving - re-ran
+    // this and silently wiped a half-built AND/OR tree mid-edit.
+    val initialExpression = remember(profile.id) {
         profile.contextExpression ?: ContextExpressionNode.implicitAnd(profile.contexts.size)
     }
-    var expression by remember(profile.id, profile.contextExpression, profile.contexts) {
-        mutableStateOf(initialExpression)
-    }
+    var expression by remember(profile.id) { mutableStateOf(initialExpression) }
     val valid = expression?.isValidForContextCount(profile.contexts.size) == true
 
     AlertDialog(

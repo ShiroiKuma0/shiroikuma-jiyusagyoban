@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
@@ -195,6 +196,10 @@ internal fun ContextConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
+        // These forms carry many fields, and discarding them has no undo because nothing was
+        // saved yet.
+        properties = DialogProperties(dismissOnClickOutside = false),
         title = { Text(stringResource(contextTitleRes(state.type))) },
         text = {
             LazyColumn(
