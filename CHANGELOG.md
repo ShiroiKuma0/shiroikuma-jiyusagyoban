@@ -11,6 +11,10 @@
 - Speed contexts now unregister a partially registered location listener when a later provider rejects registration, preventing repeated GPS listeners and continuous battery drain.
 - `screen.off` now sends Android's non-toggling sleep key instead of the power toggle, so repeating it cannot wake an already-dark display.
 
+### Changed
+
+- The release coverage gate now protects the production `VariableExpander` path at a 70% instruction floor instead of measuring an unreachable resilience shim, which has been removed.
+
 ## v0.2.86
 
 Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships all of them plus a critical defect the audit itself missed.

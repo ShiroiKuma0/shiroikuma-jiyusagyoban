@@ -1116,7 +1116,9 @@ val verifyCoverageFloor = tasks.register<VerifyCoverageFloorTask>("verifyCoverag
     areaFloors.set(
         mapOf(
             "com/opentasker/core/scheduling" to 50.0,
-            "com/opentasker/core/resilience" to 80.0,
+            // VariableExpander feeds runtime action arguments through VariableStore; silent
+            // regressions here can corrupt every profile that composes or transforms variables.
+            "com/opentasker/core/engine/variables" to 70.0,
             "com/opentasker/automation/receiver" to 15.0,
             "com/opentasker/ui/utils" to 15.0,
         ),
