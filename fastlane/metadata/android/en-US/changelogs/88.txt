@@ -1,0 +1,7 @@
+Selecting any guided template crashed immediately.
+Tasks could not run on any real device.
+Deleting a project destroyed every secret variable it held.
+The database could freeze permanently.
+Automations fired on unrelated events.
+NFC taps stacked a new copy of the app.
+A scheduled download to a fixed path replaced the good file with the 404 or 503 error body before the status was checked.
