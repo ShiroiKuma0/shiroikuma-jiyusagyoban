@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Speed contexts now unregister a partially registered location listener when a later provider rejects registration, preventing repeated GPS listeners and continuous battery drain.
+
 ## v0.2.86
 
 Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships all of them plus a critical defect the audit itself missed.

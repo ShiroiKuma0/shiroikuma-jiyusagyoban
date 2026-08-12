@@ -316,14 +316,13 @@ object StateSensorEvents {
         emit: (Map<String, String>) -> Unit,
     ): RecheckingRegistration {
         val locationManager = app.getSystemService(LocationManager::class.java)
-        var listener: LocationListener? = null
-        var activeProviders: Set<String> = emptySet()
+        val registration = LocationListenerRegistrationState { registeredListener ->
+            runCatching { locationManager?.removeUpdates(registeredListener) }
+        }
         var previous: SpeedSample? = null
 
         fun stop() {
-            listener?.let { runCatching { locationManager?.removeUpdates(it) } }
-            listener = null
-            activeProviders = emptySet()
+            registration.stop()
             previous = null
         }
 
@@ -363,8 +362,8 @@ object StateSensorEvents {
                 emitSetup(emit, "speed", "Open Setup and enable a GPS or network location provider before using Speed context values.")
                 return
             }
-            if (listener != null && activeProviders == providers) return
-            stop()
+            if (registration.isActiveFor(providers)) return
+            previous = null
             val candidate = object : LocationListener {
                 override fun onLocationChanged(location: Location) = emitLocation(location)
                 override fun onProviderEnabled(provider: String) = Unit
@@ -374,12 +373,12 @@ object StateSensorEvents {
                 override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
             }
             try {
-                providers.forEach { provider ->
+                registration.replaceProviders(providers, candidate) { provider, registeredListener ->
                     locationManager.requestLocationUpdates(
                         provider,
                         SPEED_MIN_TIME_MS,
                         SPEED_MIN_DISTANCE_METERS,
-                        candidate,
+                        registeredListener,
                         Looper.getMainLooper(),
                     )
                 }
@@ -392,8 +391,6 @@ object StateSensorEvents {
                 emitSetup(emit, "speed", "Open Setup to review speed context support; Android could not register a location provider.")
                 return
             }
-            listener = candidate
-            activeProviders = providers
             providers.mapNotNull { provider -> runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() }
                 .maxByOrNull(Location::getTime)
                 ?.let(::emitLocation)

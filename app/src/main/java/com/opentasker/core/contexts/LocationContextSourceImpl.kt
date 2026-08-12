@@ -114,17 +114,15 @@ class LocationContextSourceImpl(
                 override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
             }
 
-            registration.replace(providerSet, listener) {
-                providers.forEach { provider ->
-                    val cadence = requestPolicy.cadenceFor(provider)
-                    locationManager.requestLocationUpdates(
-                        provider,
-                        cadence.minTimeMs,
-                        cadence.minDistanceMeters,
-                        listener,
-                        Looper.getMainLooper(),
-                    )
-                }
+            registration.replaceProviders(providerSet, listener) { provider, registeredListener ->
+                val cadence = requestPolicy.cadenceFor(provider)
+                locationManager.requestLocationUpdates(
+                    provider,
+                    cadence.minTimeMs,
+                    cadence.minDistanceMeters,
+                    registeredListener,
+                    Looper.getMainLooper(),
+                )
             }
 
             if (!emitBestLastKnown(providers)) {
@@ -220,6 +218,16 @@ internal class LocationListenerRegistrationState(
         activeListener?.let(removeUpdates)
         activeListener = null
         activeProviders = emptySet()
+    }
+}
+
+internal fun LocationListenerRegistrationState.replaceProviders(
+    providers: Set<String>,
+    listener: LocationListener,
+    registerProvider: (provider: String, listener: LocationListener) -> Unit,
+) {
+    replace(providers, listener) {
+        providers.forEach { provider -> registerProvider(provider, listener) }
     }
 }
 

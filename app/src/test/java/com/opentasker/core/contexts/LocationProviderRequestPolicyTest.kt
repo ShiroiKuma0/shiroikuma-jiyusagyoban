@@ -59,19 +59,25 @@ class LocationProviderRequestPolicyTest {
     }
 
     @Test
-    fun registrationStateRemovesNewListenerWhenRegistrationFails() {
+    fun providerRegistrationRemovesNewListenerWhenSecondProviderFails() {
         val removed = mutableListOf<LocationListener>()
+        val requested = mutableListOf<String>()
         val state = LocationListenerRegistrationState { removed += it }
         val listener = testListener()
+        val providers = linkedSetOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
 
         try {
-            state.replace(setOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER), listener) {
-                throw IllegalStateException("network provider rejected listener")
+            state.replaceProviders(providers, listener) { provider, _ ->
+                requested += provider
+                if (provider == LocationManager.NETWORK_PROVIDER) {
+                    throw IllegalStateException("network provider rejected listener")
+                }
             }
             fail("Expected registration failure")
         } catch (_: IllegalStateException) {
+            assertEquals(listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER), requested)
             assertEquals(listOf(listener), removed)
-            assertFalse(state.isActiveFor(setOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)))
+            assertFalse(state.isActiveFor(providers))
         }
     }
 
