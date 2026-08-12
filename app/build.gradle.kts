@@ -327,16 +327,18 @@ val MODULE_OWNED_SOURCES: List<String> = listOf(
 
 // NOTE ON THE STAGED MODULE SPLIT
 //
-// The core/* and feature/* modules point their source sets at files that still live under
-// app/src/main/java, so :app and the modules compile the same sources. Neither
+// The core/* modules point their source sets at files that still live under app/src/main/java,
+// so :app and those modules compile the same sources. Neither
 // `kotlin { sourceSets { configureEach { kotlin.exclude(...) } } }` nor a compile-task filter
 // suppresses that under AGP's built-in Kotlin compilation — both were tried and both are inert,
 // which is why MODULE_OWNED_SOURCES below documents intent rather than enforcing it.
 //
-// :app therefore holds the only copy of every class that ships. The module dependencies are
-// compileOnly so their duplicate jars are never merged into the APK: D8 tolerated the duplicate
-// types in debug, but R8 rejects them, and every release build failed from the split until this
-// was corrected. Making the modules the real owners is the XL item in ROADMAP.md.
+// :app therefore holds the only copy of every core class that ships. Those module dependencies
+// are compileOnly so their duplicate jars are never merged into the APK: D8 tolerated the
+// duplicate types in debug, but R8 rejects them, and every release build failed from the split
+// until this was corrected. :feature:automation genuinely owns its source and must remain an
+// implementation dependency so its classes are packaged. Making core modules the real owners is
+// the XL item in ROADMAP.md.
 
 kotlin {
     compilerOptions {
@@ -354,7 +356,7 @@ dependencies {
     compileOnly(project(":core:model"))
     compileOnly(project(":core:storage"))
     compileOnly(project(":core:engine"))
-    compileOnly(project(":feature:automation"))
+    implementation(project(":feature:automation"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)

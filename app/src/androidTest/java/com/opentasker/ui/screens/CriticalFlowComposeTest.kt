@@ -32,6 +32,7 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
+import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.VariableConflictAction
@@ -47,6 +48,26 @@ import org.junit.Test
 class CriticalFlowComposeTest {
     @get:Rule
     val composeTestRule = createAccessibilityComposeRule()
+
+    @Test
+    fun templateSlotDialogRendersPackagedAutomationFields() {
+        val template = requireNotNull(ProfileTemplateCatalog.get("work-hours-focus"))
+
+        composeTestRule.setContent {
+            TestTheme {
+                TemplateSlotDialog(
+                    template = template,
+                    onDismiss = {},
+                    onInstall = {},
+                )
+            }
+        }
+        composeTestRule.performAccessibilityChecks()
+
+        composeTestRule.onNodeWithText("Work-hours focus").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Start time *").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Create for Review").assertIsEnabled()
+    }
 
     @Test
     fun setupOnboardingShowsThemeAndBackupEntryPoints() {
