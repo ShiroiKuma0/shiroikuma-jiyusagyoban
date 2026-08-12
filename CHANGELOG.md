@@ -8,6 +8,68 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86.2026-08-11.g9b9d18dd+001 — 2026-08-12
+
+**Rebased onto upstream 0.2.86**, an audit-driven release: a deep multi-pass audit filed sixty
+findings and upstream shipped all of them, plus one critical defect the audit itself missed. That
+defect never reached this fork — upstream's `TaskRunner` compiled its array-reference regex with bare
+closing braces, which desktop `java.util.regex` accepts and Android's ICU engine rejects, and because
+it sits in a companion initializer the result was an `ExceptionInInitializerError` that stopped
+*every* task from running on a real device. This fork keeps that helper at file level and had already
+escaped the braces, so builds from 2026-08-10 on ran tasks normally throughout.
+
+**Automations no longer fire on unrelated events.** A pulse advanced whenever any event reached an
+EVENT context, whether or not that context was watching for it. Every EVENT context is subscribed to
+every bridge, so a profile whose expression was already true for another reason activated on
+unrelated traffic — `EVENT(nfc) OR STATE(wifi=Home)` ran on every notification while on that network
+— and two OR'd EVENT leaves turned one physical event into two runs. Only an event a context
+actually matches advances its sequence now. The per-invocation event snapshot the fork threads
+through `ContextMatchUpdate.vars` is unchanged.
+
+**A cooldown survives disabling its profile.** The persisted deadline was pruned against the
+*enabled* profiles, so switching a profile off mid-cooldown deleted it while the in-memory
+reservation stood; whether the cooldown still applied then depended on whether the engine happened
+to restart before the profile came back on. Pruning is against the profiles that still exist.
+
+**Widgets.** A widget or shortcut run is admitted by the engine's live admission controller instead
+of a private in-memory one, so it respects the saturated-profile and circuit-breaker limits the
+in-app Run button already documents as mandatory; a second tap while the same task is still running
+is refused rather than starting a concurrent run with real side effects; and renaming or deleting a
+task now asks the widgets to re-read it, instead of leaving a stale label and a tap that can only
+answer "Task not found".
+
+Upstream also finishes `TaskRunActivity` before the run so a long widget task cannot leave the
+launcher under an invisible, touch-consuming window. **That one is deliberately not taken here.**
+This fork passes `visibleActivity = true` precisely because the tap opened a real window, and that
+is what lets a widget task play audio, dispatch a media key or change the volume on Android 17+,
+which restrict those to a visible app. 話す時計 and the volume tasks depend on it; finishing first
+would make the claim false. The reasoning is recorded at the call site.
+
+**Smaller fixes taken:** `ping` resolves its target before demanding local-network access, so
+pinging a public host no longer fails closed on Android 17 for a permission it never needed;
+Wake-on-LAN now enforces the private-address premise its permanent capability gate rests on;
+`sound.play` accepts only file and content URIs, so a remote sound can no longer bypass the
+private-network policy the HTTP action enforces; the Tasker XML importer accepts `<v>` as well as
+`val`/`value`, so a file this app exported and re-imported no longer drops every variable; the
+foreground-service notification uses the app's own monochrome mark and sage accent rather than a
+platform holo drawable; the action and context editors ignore a stray tap on the scrim, which had no
+undo because nothing was saved yet; and the engine scope carries an exception handler, so a database
+that misses its readiness deadline on a cold boot fails that launch instead of killing the process
+into a watchdog crash loop. The fork's `SupervisorJob` and `Dispatchers.Main` are unchanged — the
+engine drives scene overlays and the edge bar through `WindowManager`.
+
+**Not applicable to this fork**, and recorded here so the gap is not mistaken for an oversight:
+upstream's project-delete secret re-encryption (this fork never moves variables between projects),
+its variable-mutation-lock/transaction ordering fix and the `LockedMutations` refactor around it
+(the fork owns a different storage layer with a different DAO), the run-log SQL paging and
+failed-load state, the resource-backed `UiMessage` architecture, and the JSON-paste import dialog.
+The files upstream added for those — `UiMessages.kt`, `InlineNotice.kt`, `UiErrorMessageTest.kt` —
+are removed; the fork defines its own `InlineNotice`.
+
+`CHANGELOG.md`'s embedded copy of upstream's changelog is refreshed to upstream's current file. It
+had gone stale at 0.2.82, which is why this file conflicted at all: the anchor the arrangement above
+depends on no longer matched.
+
 ## 0.2.85.2026-08-11.g6c6f1aab+003 — 2026-08-11
 
 **A volume key pressed while the phone is ringing now reaches the phone.** The grabber consumed a
@@ -3521,8 +3583,126 @@ The action catalogue grew from a few dozen built-ins to **~100**. New built-in a
 
 # Changelog
 
-## Unreleased
+## v0.2.86
 
+Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships all of them plus a critical defect the audit itself missed.
+
+### Fixed — critical
+
+- **Tasks could not run on any real device.** `TaskRunner` compiled a regex with unescaped closing braces in a class initializer. Desktop `java.util.regex` accepts that; Android's ICU engine rejects it, so the initializer threw on first use and every task execution failed — not only ones using array references. Present since 2026-08-10 and invisible to 1255 green JVM tests. Found by the new end-to-end instrumented test.
+- **Deleting a project destroyed every secret variable it held.** Variables were moved by copying the stored row to the new project, but a secret's envelope authenticates its project id, so each relocated secret failed verification and decoded as empty and unavailable with no way back. Secrets are now decrypted and re-encrypted under the destination, and a secret that cannot be decrypted aborts the move rather than being relocated as dead ciphertext.
+- **The database could freeze permanently.** The variable mutation lock and Room's write transaction were acquired in both orders — bundle import, variable rename and delete took the transaction first, the engine's commit path took the lock first — so the two could interleave and hold the single write connection until the process died. Lock order is now always mutation lock, then transaction.
+- **Automations fired on unrelated events.** A pulse advanced whenever any event reached an EVENT context, whether or not the context was watching for it, so a profile whose expression was already true for another reason activated on unrelated traffic: `EVENT(nfc) OR STATE(wifi=Home)` ran on every notification while on that network, and two OR'd EVENT leaves turned one physical event into two runs.
+- **NFC taps stacked a new copy of the app.** Manifest NFC dispatch starts a new activity unless the target is `singleTop`, so `onNewIntent` never ran and the armed tag-write editor stayed buried while its result went to an instance the user could no longer see.
+
+### Fixed — data and execution
+
+- A scheduled download to a fixed path replaced the good file with the 404 or 503 error body before the status was checked.
+- `clipboard.get` turned Android's background-read denial into an empty string and reported success, silently feeding blank data to whatever came next.
+- `sound.play` streamed arbitrary remote URLs, bypassing the private-network and cleartext policy the HTTP action enforces in code.
+- `app.archive`/`app.unarchive` advertised themselves as supported but could never succeed: Android's confirmation response was treated as a terminal failure.
+- The `unlocked` device state latched true after the first unlock for the rest of the service's life.
+- Calendar automations ran once a minute for the whole event; a 60-minute meeting ran its task about 60 times.
+- `data.read` with `format=xml` failed on every device — the same parser-parity defect as the Tasker XML import bug, in the one parser that never got the fix.
+- Tasker XML export then re-import dropped every variable.
+- Widget and shortcut runs ignored the concurrency limits and circuit breakers the in-app Run button respects, and a second tap started a concurrent run.
+- Wake-on-LAN could target any public address; `ping` demanded local-network permission even for public hosts; a broker could make the MQTT client allocate up to 256 MB.
+- A persisted cooldown was deleted when a profile was merely disabled.
+
+### Fixed — interface
+
+- A refused save no longer discards the whole form, and now says why: automation lint, duplicate names, and reference guards state their reason instead of "Operation failed".
+- Cold start no longer blocks the main thread waiting for the database — the launch after staging a restore could freeze for up to 30 seconds.
+- The Run Log keeps its entries while reloading, reports a failed load as a failure rather than "no runs match", and debounces search.
+- Task widgets refresh after a rename or delete instead of showing a stale label and a run that cannot succeed.
+- A widget task no longer leaves an invisible overlay covering the launcher for the duration of the run.
+- Large editors ignore a stray tap on the scrim, the context-logic editor survives background writes, and the elapsed counter on a running task advances.
+- Status bar icons are visible in the widget, quick-settings and Locale editors in light theme; light mode no longer flashes black on launch; warning text meets contrast; notifications use the app's own icon and accent.
+- AMOLED card and section borders are visible again, disabled action-picker entries look disabled, and search announces its result to screen readers.
+- Duplicated automations are named "Name (copy)" rather than "Name(copy)"; export and retention messages are proper plurals; and one term is used per concept throughout.
+
+### Changed
+
+- Verification: the Room schema gate now detects real drift rather than checking that files exist, the decoder fuzz harness can surface unexpected exceptions instead of swallowing them, the baseline profile must be recaptured for the release it ships in, capability counts are checked against the compiled runtime, and the JVM test floor no longer counts skipped tests.
+- Performance: one shared Locale-plugin poll replaces one per context (previously N x N broadcasts per interval), and media polling only runs for contexts that read media state.
+
+## v0.2.85
+
+- Fixed the release build, which had failed since the staged module split: the core/* modules compile sources that still live under `app/`, so every shared class was compiled twice and R8 rejected the duplicate types. `:app` holds the only copy that ships and the module jars are no longer merged into the APK.
+- The action editor now says where to satisfy a setup-gated action, not just what is missing — elevated device actions point at the Setup tab and Shizuku rather than leaving the manifest looking like the answer.
+- Added an **AMOLED black** theme that uses true `#000000` surfaces, so an OLED panel can actually switch pixels off — the existing dark scheme is `#101211` and is unchanged, now named for what it is. Body text keeps 18.6:1 and secondary text 9.3:1 on black.
+- Added an opt-in **Material You** theme on Android 12+, which follows the system light/dark setting and is not offered on older releases where it would do nothing.
+- Profile and task lists reserve room for the floating action button, so the last row is no longer permanently covered, and empty states scroll — at large font scale their last action could previously sit off-screen with no way to reach it.
+- Undo and Redo on profile, task, and scene cards are now disabled when there is nothing to undo or redo, and announce why to a screen reader, instead of being permanently live and answering with a snackbar. A setup item with no available action shows status text rather than a button that only reported the item was already ready.
+- Profiles, Tasks, and Scenes now show a loading state until Room delivers its first snapshot, instead of flashing the first-run "Build your first automation" screen at every cold start for users who already have data.
+- Profile execution slots now decide and store under one lock for every automation mode, not only QUEUED, so a second dispatch path reaching the same slot cannot start a SINGLE profile twice or leave a superseded RESTART job running untracked. The queue consumer takes the same lock order, and the invariant is covered by concurrency tests.
+- The exported automation broadcast target now answers status and name-lookup requests with bounded `COUNT(*)` and indexed name queries instead of loading the whole profile and task tables inside the `goAsync()` window, and reuses one supervisor scope rather than creating one per broadcast. Name matching moved into SQLite's `COLLATE NOCASE`, which folds ASCII only — two names differing solely in the case of a non-ASCII letter are now distinct.
+- Added an opt-in, coverage-guided JVM fuzz task for bundle, Tasker XML, template-expression, and structured-data decoders, with a checked-in seed and regression corpus kept out of release dependency graphs.
+- Added headless Compose screenshot regression coverage for primary screens and shared states across system, light, dark, and high-contrast themes, 1×/2× font scales, and an RTL pseudolocale; reference validation is part of the local quality gate.
+- Automation lint now reports shadowed, unreachable, and action/revert rules, and supports bounded device-state invariants with localized diagnostics, a reusable predicate editor, and optional bundle import/export.
+- Added an opt-in, non-F-Droid release update check that reports newer GitHub releases without downloading or installing them.
+- Added a disabled-by-default, API-36-only AppFunctions prototype that can submit only user-approved task IDs through the existing signature-protected execution boundary.
+- Follow-up audit covered scene editing/runtime, legacy context producers, search/grouping/share dialogs, and widget/quick-settings configuration; no new defect was found, with large-font and inert-history-control follow-ups remaining tracked separately.
+-Home Assistant Companion `message`/`data` notification envelopes are now first-class webhook inputs, and ntfy's documented push field names are accepted by the token-authenticated push bridge so a `broadcast` action can trigger OpenTasker without a relay app.
+-Release truth now records the annotated release tag and sync target; the verification gate checks every versioned changelog release from v0.2.58 onward, rejects lightweight or mismatched tags, and requires the current release to be tagged before publishing its manifest.
+-Scene canvas elements now announce their localized type, label, position, size, and selection state; screen-reader users can select, nudge, and resize them through custom actions, while the resize handle keeps a labeled 48dp target and the visible canvas text includes the element type.
+- Action and context pickers now have clearable search across localized names, descriptions, and stable IDs; empty queries show a clear no-match state, and localized catalogs are rebuilt only when the configuration changes.
+- Back navigation now returns from secondary destinations to Profiles and exits only from the start screen; app-wide settings have a dedicated primary destination separate from the permission checklist, with navigation state retained across recreation.
+- Dismissing the first-run starter-template picker now completes onboarding, including Back/scrim dismissal and cancelling the template details step; the template browser remains available from the workspace.
+- User-facing automation labels, setup requirements, capability levels, share trust, diagnostics levels, and scene element types now resolve through localized resources; unknown action IDs and operation failures use safe generic copy while raw details remain in diagnostics logs.
+- Compose instrumentation now runs the Accessibility Test Framework across the primary UI flows, with regression fixtures for unlabeled controls and undersized touch targets.
+- Locale verification now examines every existing locale directory, rejects empty directories by name, reports how many it examined, and documents that the current release ships English only.
+- Shizuku now binds a versioned AIDL user service for the six allowlisted elevated actions, rechecks exact argv in the privileged process, keeps the persisted kill switch and fail-closed behavior, and unbinds the service during application teardown.
+- UnifiedPush registration now uses the official connector service for distributor discovery, SDK-versioned identity registration, RFC 8291 decryption, endpoint persistence, failure status, and delivery acknowledgement; ntfy's standard JSON reaches `event=push`, while the bounded/redacted legacy broadcast remains compatible.
+- Setup permission, preference, companion, push-token, and grant snapshots now load through an IO-backed ViewModel, so returning from system settings refreshes without blocking composition.
+- Profile, task, and scene deletion now snapshots the complete entity for snackbar Undo/Redo, while action, context, and scene-element removal is immediate and undoable without a confirmation dialog.
+- Exported Locale condition queries now require revocable grants bound to the selected profile, context, or variable; unauthorized queries return unknown before database access, and the receiver reuses a bounded scope.
+- MQTT TLS publishes now pin the vetted TCP address while preserving the broker hostname for HTTPS endpoint verification and SNI; a mismatched certificate is rejected before credentials or payloads are sent.
+- Success feedback now remains resource-backed from the call site through snackbar collection, so profile toggles and editor removals cannot fall through an English literal map and appear as errors; variable and scene messages retain their arguments until the active locale resolves them.
+- Split model, common logging, storage, engine state, and automation blueprint input presentation into dependency-directed `core/*` and `feature/*` modules, with source-boundary contracts and an interim screen-size ceiling enforced by tests.
+- Converted starter templates into versioned, serializable automation blueprints with typed selectors, collapsible input sections, bounded bundle validation, local installation tracking, and review-only update diffs that never overwrite instantiated profiles.
+- New lint findings, lifecycle suppression reasons, admission decisions, duplicate names, semantic-diff labels and enum values, and run-status words now resolve through resource-backed presentation adapters, so localized screens no longer inherit English-only copy from the core engine.
+- The WorkManager 2.12 metrics evaluation records the beta-only API's incremental stop-count, runtime, and retry evidence, its experimental dependency cost, and the stable-release trigger; OpenTasker remains on 2.11.2 until that trigger is met.
+- The pinned build tuple is refreshed to Gradle 9.7.0, KSP 2.3.11, and Compose BOM 2026.06.01, with wrapper, checksum, release-truth, and documentation contracts updated together.
+- The repository now carries the English F-Droid store listing, four current phone screenshots, and a versioned changelog; the release gate verifies the listing and screenshot capture version.
+- The JSON bundle format document describes schema v2 rather than v1, including what importing a v1 bundle does and which versions are accepted. It had claimed v1 since the v2 migration shipped.
+- The bundle's supported import range is published in `tools/release-truth.json` and checked against the codec and the format document, so narrowing or widening what OpenTasker will import can no longer happen without updating the published contract.
+- Two checked-in bundle fixtures pin the compatibility contract: a v1 document and exactly the v2 document the codec produces from it.
+
+## v0.2.84
+
+- Upgrading a database created before OpenTasker encrypted its storage no longer discards it. The conversion copied the new empty file onto itself instead of reading the old one, leaving a database with no tables; the app then refused to open it. The migration now verifies it carried the tables across before publishing the result.
+- Exported backups restore on a different device and after a reinstall. Both export paths wrote the on-disk ciphertext, which is keyed to a randomly generated key that is destroyed with the app's data and never transferred, so every exported `.otbackup` was unopenable in exactly the situations backups exist for. Exports now carry a portable copy inside the passphrase-encrypted envelope, and the staging copy is shredded afterwards. First-class secret values still stay on the device that created them.
+- Startup recovery no longer marks a just-started execution as interrupted. Recovery runs alongside engine startup, so a boot-triggered run that reached the journal first was reported as interrupted, written to the run log twice, and then blocked from recording its real result.
+- Applying a staged restore and converting a legacy database now happen off the main thread, so a large database cannot stall app start or exhaust the boot broadcast's time budget.
+- The exported Locale condition receiver answers a variable comparison only for a variable the user explicitly exposed. It is exported without a permission by contract, and its bundle is supplied by the caller, so any app could previously name any non-secret variable and read its contents a comparison at a time from the result code. Choosing a variable in the condition editor now mints a read grant bound to that variable. Conditions configured before this change report unknown until the variable is re-selected.
+- Simulating a trigger from the profile editor now simulates what is on screen and leaves the editor open behind it. It previously closed the editor, discarded the pending edits, and reported the values from the last save.
+- Testing a synthetic event from the context editor keeps the editor open, so a fully configured context is no longer lost the moment its simulation is dismissed.
+- A simulation dialog survives rotation instead of vanishing.
+- Nodes changed by an undo or redo stay highlighted on the Flow tab after the review dialog closes. The highlight was tied to the dialog that covered Flow, so the dialog's own "highlighted in Flow" note pointed at something no one could ever see.
+- `verifyDocumentationTruth` now checks the CHANGELOG and release-truth files it already declared as inputs, so a release with no matching changelog section fails instead of passing silently.
+- The F-Droid release verifier's tag check accepts the repository's documented two-commit release flow, so it no longer has to be skipped on every release. An always-true assertion in the F-Droid readiness check is gone.
+- Changed nodes on the flow canvas carry the same "Changed" pill as the list, and a screen reader now hears that a node changed along with the variables it produces. The canvas previously marked a change with border colour alone.
+- The home-screen widget follows the app's palette and the light/dark setting instead of shipping the retired purple-on-navy colours in permanent dark.
+- One name for the simulation feature, "Profile lifetime" instead of "Automation lifetime" beside the other profile settings, and real plurals in place of "(s)" in the diff, lint, and admission summaries.
+- The locale completeness gate no longer counts non-locale resource folders such as values-night as untranslated languages.
+- Tasker XML export is reachable: the workspace card has an Export Tasker XML button. The exporter shipped with no caller at all, so the changelog announced a feature nobody could run and its redaction path never ran outside tests.
+- A JSON export now redacts an action argument that contains a literal copy of a secret variable's value, matching what the Tasker XML exporter already did. `docs/OPEN_JSON_BUNDLE.md` describes what export redaction does and does not cover.
+- Secret variables are encrypted with the project bound into the authenticated data, so an envelope can no longer be moved between two same-named secrets in different projects and still decrypt. Existing secrets keep working and are rewritten in the new format the next time they are saved.
+- Opening the trigger simulation no longer reads preferences on the UI thread, and long diff or import lists render only the rows on screen.
+- Execution journal progress writes are rate-bounded instead of one database update per action, which a long flow could repeat tens of thousands of times in a single run.
+- The import boundary corpus covers the DOCTYPE internal-subset scanner, the share-intent payload boundary, and the secret-variable refusal in the Locale condition receiver.
+- Setup can turn on automatic local snapshots: a scheduled local database snapshot with a bounded count and age, a status line showing the last result and disk use, and a retention choice. Snapshots never leave the device and are never applied automatically - restoring one still goes through the existing review.
+- Backups no longer leave orphaned `-wal`/`-shm` files beside them, and deleting or pruning a backup takes its sidecars with it.
+- Two tasks in Wait mode that run each other no longer deadlock the engine. Each held a per-task lock for its whole run and acquired them in opposite orders, and because a sub-task returns before the per-action timeout nothing bounded the wait; the stuck runs then held admission leases until the engine's global cap wedged.
+
+## v0.2.83
+
+- The pre-unlock time trigger setting is now a single toggleable row, so a screen reader announces its name along with its state instead of an unnamed on/off switch.
+- Trigger lint findings name their severity in text, and the profile editor's option groups expose radio-button selection state, so neither depends on colour alone.
+- The trigger simulation dialog's cooldown and admission copy comes from string resources, with a proper plural for the countdown.
+- The localization gate scans every file in the screens package instead of a hand-written list, which had let new dialogs ship uncovered.
+- Run now and Replay ignore repeat taps while a run is in flight.
 - Cleartext MQTT now requires every address a host resolves to be private, and connects to the address it vetted. Accepting a host because any one record was private, then letting the socket re-resolve the name, could send the connect packet and its credentials to a public address.
 - `url.open` rejects a URI with no scheme instead of passing it through the scheme allowlist unchecked.
 - Pasting something that is not an OpenTasker bundle now explains that in plain language instead of showing the JSON parser's own message and echoing the pasted text back.
@@ -3917,6 +4097,15 @@ Premium UX polish pass.
 - **Variables**: upgraded the Variables tab into a summary-driven variable vault with metrics, clear search, polished empty states, consistent cards, and explicit sensitive-value masking labels.
 - **Design system**: added reusable screen spacing and opacity tokens to reduce hardcoded visual decisions across Compose surfaces.
 
+## v0.2.70 - 2026-06-16
+
+Profile organization and diagnostic sharing.
+
+- **Profile groups**: profiles carry an optional group, set from a new editor field, shown as a pill badge on profile cards and offered as filter chips in the profile list once any group exists. Room migration v4→v5 adds the column, and the field carries through JSON export/import.
+- **Diagnostic share**: the Run Log summary card can share a redacted diagnostic bundle — app version, device info, recent run logs, and permission state — through the Android share sheet, with regression coverage for the redaction.
+- **Action guard coverage**: missing-argument validation tests for `ReadFile`, `WriteFile`, `PlaySound`, `LaunchApp`, `SetVariable`, and `SayAction`'s text length cap, plus the expanded `OpenUrl` scheme allowlist (`tel`, `mailto`, `geo`, `data`, `blob`).
+- **Supply chain**: pinned the then-current GitHub Actions from mutable `v4` tags to full commit SHAs.
+
 ## v0.2.69 - 2026-06-16
 
 Locale condition plugin context UX (N7).
@@ -3963,6 +4152,24 @@ Deep engineering, security, and UX audit pass.
 - **UX**: added `contentDescription` to navigation bar icons for screen reader accessibility.
 - **Design system**: added `Radii.xxl` (18dp) token and `SemanticColor.warningDark`/`warningLight` to the design system. Replaced ~11 hardcoded `RoundedCornerShape(18.dp)` instances across all screens with the design token.
 
+## v0.2.66 - 2026-06-15
+
+Shell navigation and scene control polish.
+
+- Reworked the app shell's navigation surface and the scene library's control layout and state handling.
+
+## v0.2.65 - 2026-06-15
+
+Scene editor state and destructive affordances.
+
+- Clarified scene editor state transitions and destructive-action affordances; aligned the Variables surface with the same treatment.
+
+## v0.2.64 - 2026-06-15
+
+Form state and accessibility polish.
+
+- Improved form state handling and accessibility across the active automation shell and the scene library, and fixed compact-width navigation layout.
+
 ## v0.2.63 - 2026-06-15
 
 Release-polish pass.
@@ -4002,7 +4209,7 @@ Security hardening, platform readiness, and new actions/functions.
 - **Registry-metadata parity test**: bidirectional contract test ensuring every runtime action has UI metadata and vice versa.
 - **Action guard tests**: new `ActionGuardsTest` covering POST body cap, URI scheme allowlist, wait duration cap, HTTP policy, ping host validation, missing-argument failures, and WoL packet construction.
 
-## Unreleased
+## v0.2.60 - 2026-06-14
 
 - Fixed State context matching so battery, charging, headphones, and screen facts persist across partial broadcasts instead of replacing one another.
 - Added State context aliases and fail-closed numeric predicate handling for malformed thresholds.
