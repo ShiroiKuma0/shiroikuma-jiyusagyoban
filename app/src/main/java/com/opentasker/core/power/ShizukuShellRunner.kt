@@ -228,7 +228,7 @@ internal object ShizukuCommandPolicy {
             listOf("svc", "power", "reboot", "false"),
         ),
         "screen.off" to listOf(
-            listOf("input", "keyevent", "26"),
+            listOf("input", "keyevent", "223"),
         ),
         "wake" to listOf(
             listOf("input", "keyevent", "224"),
