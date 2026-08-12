@@ -221,12 +221,14 @@ class TaskerXmlExportTest {
     fun variablesSurviveAnExportImportRoundTrip() {
         // The exporter writes <n>/<v>; the importer used to read only nme/val, so a file this app
         // produced and then re-imported dropped every variable as "skipped because it had no name".
+        // The fork derives scope from the name's first character, so an uppercase name is global
+        // by construction and there is no isGlobal argument to pass.
         val report = TaskerXmlExporter.export(
             profiles = emptyList(),
             tasks = emptyList(),
             variables = listOf(
-                Variable("MODE", "commute", isGlobal = true),
-                Variable("THRESHOLD", "20", isGlobal = true),
+                Variable("MODE", "commute"),
+                Variable("THRESHOLD", "20"),
             ),
         )
 
