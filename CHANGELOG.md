@@ -10,6 +10,7 @@
 
 - Speed contexts now unregister a partially registered location listener when a later provider rejects registration, preventing repeated GPS listeners and continuous battery drain.
 - `screen.off` now sends Android's non-toggling sleep key instead of the power toggle, so repeating it cannot wake an already-dark display.
+- Removed the exported AppFunctions service, metadata, and dormant policy prototype; the feature had no user approval path and therefore could never run, but still exposed a platform-bound component.
 
 ### Changed
 
