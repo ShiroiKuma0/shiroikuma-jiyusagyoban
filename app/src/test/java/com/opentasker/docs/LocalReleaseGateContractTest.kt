@@ -35,6 +35,7 @@ class LocalReleaseGateContractTest {
             "verifyJvmTestCount",
             "verifyCoverageFloor",
             "verifyLocaleResources",
+            "verifyPackagedTypeCompleteness",
         ).forEach { task -> assertTrue("Local gate must include $task", build.contains(task)) }
 
         assertTrue(script.contains("openTaskerDistribution=play"))

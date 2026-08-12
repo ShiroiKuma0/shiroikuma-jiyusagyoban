@@ -41,6 +41,7 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 
 ### Changed
 
+- Packaging verification now parses every `classes*.dex` entry in both debug and release APKs and fails when an `Lcom/opentasker/` type is referenced but absent. The detector is wired into the local quality gate and was fault-tested against the missing automation-feature dependency.
 - Verification: the Room schema gate now detects real drift rather than checking that files exist, the decoder fuzz harness can surface unexpected exceptions instead of swallowing them, the baseline profile must be recaptured for the release it ships in, capability counts are checked against the compiled runtime, and the JVM test floor no longer counts skipped tests.
 - Performance: one shared Locale-plugin poll replaces one per context (previously N x N broadcasts per interval), and media polling only runs for contexts that read media state.
 
