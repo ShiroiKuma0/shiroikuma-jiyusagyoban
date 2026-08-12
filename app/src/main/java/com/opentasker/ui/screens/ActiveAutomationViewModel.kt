@@ -75,6 +75,7 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotSettings
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
+import com.opentasker.core.storage.configureConfigurationSnapshotDestination
 import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.StorageDecodeResult
@@ -466,7 +467,9 @@ class ActiveAutomationViewModel(
             runCatching { reconcileGlobalFallbackTask() }
         }
         viewModelScope.launch {
-            runCatching { refreshBackupSetupState(busy = false) }
+            ConfigurationSnapshotSettings(appContext).changes().collect {
+                runCatching { refreshBackupSetupState(busy = false) }
+            }
         }
         refreshDiagnostics()
         viewModelScope.launch {
@@ -1651,17 +1654,13 @@ class ActiveAutomationViewModel(
         // the main thread (debug StrictMode flags them otherwise).
         val loaded = withContext(Dispatchers.IO) {
             val settings = ConfigurationSnapshotSettings(appContext)
-            val (snapshotCount, snapshotBytes) = databaseBackupManager.snapshotStorage()
             BackupSetupState(
                 busy = busy,
                 latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
                 pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
                 snapshotPolicy = settings.load(),
-                snapshotStatus = settings.loadStatus().copy(
-                    snapshotCount = snapshotCount,
-                    storageBytes = snapshotBytes,
-                ),
+                snapshotStatus = settings.loadStatus(),
             )
         }
         _backupSetupState.value = loaded
@@ -1684,6 +1683,37 @@ class ActiveAutomationViewModel(
                     message(R.string.ui_message_snapshots_disabled)
                 },
             )
+        }
+    }
+
+    /** Persists the SAF grant and Keystore-wrapped passphrase before enabling the schedule. */
+    fun updateSnapshotDestination(uri: Uri, passphrase: CharArray, enableSchedule: Boolean) {
+        launchBackupOperation {
+            try {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        configureConfigurationSnapshotDestination(appContext, uri, passphrase, enableSchedule)
+                    }
+                }.onSuccess { policy ->
+                    events.send(
+                        if (policy.enabled) {
+                            message(R.string.ui_message_snapshots_enabled, policy.maxSnapshots, policy.maxAgeDays)
+                        } else {
+                            message(R.string.ui_message_snapshot_destination_saved)
+                        },
+                    )
+                }.onFailure { error ->
+                    withContext(Dispatchers.IO) {
+                        ConfigurationSnapshotSettings(appContext).recordFailure(
+                            System.currentTimeMillis(),
+                            appContext.getString(R.string.setup_snapshots_destination_save_failed),
+                        )
+                    }
+                    events.send(errorMessage(error, R.string.ui_error_snapshot_destination))
+                }
+            } finally {
+                passphrase.fill('\u0000')
+            }
         }
     }
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Scheduled configuration snapshots can now be written as encrypted `.otbackup` v2 archives to a user-selected Storage Access Framework folder. OpenTasker retains the folder grant, applies count-and-age retention only to its own archives, and reports lost access in Setup; the user-held passphrase remains required after reinstall or on another device.
+
 ### Fixed
 
 - Speed contexts now unregister a partially registered location listener when a later provider rejects registration, preventing repeated GPS listeners and continuous battery drain.

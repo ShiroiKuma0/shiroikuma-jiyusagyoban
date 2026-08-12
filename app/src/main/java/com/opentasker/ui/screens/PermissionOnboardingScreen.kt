@@ -44,12 +44,14 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.FilterChip
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
@@ -73,6 +75,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -328,6 +331,9 @@ fun PermissionOnboardingScreen(
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit = {},
     onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit = {},
+    onSnapshotDestinationSelected: (Uri, CharArray, Boolean) -> Unit = { _, passphrase, _ ->
+        passphrase.fill('\u0000')
+    },
     profiles: List<Profile> = emptyList(),
     tasks: List<Task> = emptyList(),
     globalFallbackTaskId: Long? = null,
@@ -522,6 +528,7 @@ fun PermissionOnboardingScreen(
                     onImportBackup = onImportBackup,
                     onCancelPendingRestore = onCancelPendingRestore,
                     onSnapshotPolicyChanged = onSnapshotPolicyChanged,
+                    onSnapshotDestinationSelected = onSnapshotDestinationSelected,
                 )
             }
             item {
@@ -1191,6 +1198,7 @@ private fun BackupSetupCard(
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit,
     onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
+    onSnapshotDestinationSelected: (Uri, CharArray, Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1252,6 +1260,7 @@ private fun BackupSetupCard(
                     status = state.snapshotStatus,
                     enabled = !state.busy,
                     onPolicyChanged = onSnapshotPolicyChanged,
+                    onDestinationSelected = onSnapshotDestinationSelected,
                 )
             }
         }
@@ -1876,11 +1885,9 @@ private fun openOemSettings(context: Context, action: PermissionAction.OemSettin
 }
 
 /**
- * Opt-in local snapshot schedule.
+ * Opt-in encrypted snapshot schedule.
  *
- * Snapshots are local-only and never applied automatically: restoring one still goes through the
- * existing inspect-then-stage review, so turning this on cannot overwrite a live database or a
- * restore the user already staged.
+ * Archives are written only to the user-selected SAF tree and never applied automatically.
  */
 @Composable
 private fun SnapshotScheduleControls(
@@ -1888,8 +1895,19 @@ private fun SnapshotScheduleControls(
     status: ConfigurationSnapshotStatus,
     enabled: Boolean,
     onPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
+    onDestinationSelected: (Uri, CharArray, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    var pendingDestinationUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var enableAfterSelection by rememberSaveable { mutableStateOf(false) }
+    val destinationPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        pendingDestinationUri = uri?.toString()
+    }
+    fun chooseDestination(enableSchedule: Boolean) {
+        enableAfterSelection = enableSchedule
+        destinationPicker.launch(policy.destinationTreeUri?.let(Uri::parse))
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -1898,7 +1916,13 @@ private fun SnapshotScheduleControls(
                     value = policy.enabled,
                     enabled = enabled,
                     role = Role.Switch,
-                    onValueChange = { checked -> onPolicyChanged(policy.copy(enabled = checked)) },
+                    onValueChange = { checked ->
+                        if (checked && policy.destinationTreeUri == null) {
+                            chooseDestination(enableSchedule = true)
+                        } else {
+                            onPolicyChanged(policy.copy(enabled = checked))
+                        }
+                    },
                 ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1912,6 +1936,39 @@ private fun SnapshotScheduleControls(
                 )
             }
             Switch(checked = policy.enabled, onCheckedChange = null, enabled = enabled)
+        }
+        if (policy.enabled || policy.destinationTreeUri != null) {
+            Text(
+                stringResource(
+                    if (policy.destinationTreeUri == null) {
+                        R.string.setup_snapshots_destination_missing
+                    } else {
+                        R.string.setup_snapshots_destination_ready
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (policy.destinationTreeUri == null) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            OutlinedButton(
+                onClick = { chooseDestination(enableSchedule = policy.enabled) },
+                enabled = enabled,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(
+                    stringResource(
+                        if (policy.destinationTreeUri == null) {
+                            R.string.setup_snapshots_destination_choose
+                        } else {
+                            R.string.setup_snapshots_destination_change
+                        },
+                    ),
+                )
+            }
         }
         if (policy.enabled) {
             Text(
@@ -1951,9 +2008,81 @@ private fun SnapshotScheduleControls(
             )
         }
     }
+
+    pendingDestinationUri?.let { encodedUri ->
+        SnapshotRecoveryPassphraseDialog(
+            onDismiss = { pendingDestinationUri = null },
+            onConfirm = { passphrase ->
+                pendingDestinationUri = null
+                onDestinationSelected(Uri.parse(encodedUri), passphrase, enableAfterSelection)
+            },
+        )
+    }
+}
+
+@Composable
+private fun SnapshotRecoveryPassphraseDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (CharArray) -> Unit,
+) {
+    var passphrase by rememberSaveable { mutableStateOf("") }
+    var confirmation by rememberSaveable { mutableStateOf("") }
+    val longEnough = passphrase.length >= SNAPSHOT_MIN_PASSPHRASE_CHARS
+    val matches = passphrase == confirmation
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.setup_snapshots_passphrase_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(stringResource(R.string.setup_snapshots_passphrase_body))
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text(stringResource(R.string.setup_snapshots_passphrase_label)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    isError = passphrase.isNotEmpty() && !longEnough,
+                )
+                OutlinedTextField(
+                    value = confirmation,
+                    onValueChange = { confirmation = it },
+                    label = { Text(stringResource(R.string.setup_snapshots_passphrase_confirm)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    isError = confirmation.isNotEmpty() && !matches,
+                )
+                if ((passphrase.isNotEmpty() && !longEnough) || (confirmation.isNotEmpty() && !matches)) {
+                    Text(
+                        stringResource(R.string.setup_snapshots_passphrase_error, SNAPSHOT_MIN_PASSPHRASE_CHARS),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val recoveryPassphrase = passphrase.toCharArray()
+                    passphrase = ""
+                    confirmation = ""
+                    onConfirm(recoveryPassphrase)
+                },
+                enabled = longEnough && matches,
+            ) {
+                Text(stringResource(R.string.setup_snapshots_passphrase_save))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
 }
 
 private val SNAPSHOT_RETENTION_CHOICES = listOf(3 to 7, 5 to 14, 10 to 30)
+private const val SNAPSHOT_MIN_PASSPHRASE_CHARS = 12
 
 private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotStatus): String {
     val storage = android.text.format.Formatter.formatShortFileSize(context, status.storageBytes)

@@ -1,6 +1,7 @@
 package com.opentasker.core.storage
 
 import android.content.Context
+import android.net.Uri
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -8,13 +9,14 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.opentasker.core.logging.AppLogger
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 /**
- * Takes a local configuration snapshot on a schedule when the user has opted in.
+ * Takes an encrypted off-device configuration snapshot when the user has opted in.
  *
- * A snapshot is an ordinary managed backup, so it inherits the WAL checkpoint, schema validation,
- * and atomic-publication guarantees already in [DatabaseBackupManager]. Nothing here restores
- * anything: a snapshot is only ever applied through the existing inspect-then-stage review.
+ * The temporary managed backup inherits [DatabaseBackupManager]'s WAL checkpoint and schema
+ * validation. Its portable copy is streamed into the selected SAF tree through the authenticated
+ * v2 `.otbackup` format. Nothing here restores anything.
  */
 class ConfigurationSnapshotWorker(
     appContext: Context,
@@ -26,23 +28,59 @@ class ConfigurationSnapshotWorker(
         val policy = settings.load()
         if (!policy.enabled) return Result.success()
 
-        val manager = DatabaseBackupManager(applicationContext, AppDatabaseProvider.await())
         val now = System.currentTimeMillis()
-        return manager.backup().fold(
-            onSuccess = {
-                val removed = manager.pruneSnapshots(policy, now)
-                settings.recordSuccess(now)
-                AppLogger.info(TAG, "Configuration snapshot created; pruned $removed expired snapshot(s)")
-                Result.success()
-            },
-            onFailure = { error ->
-                settings.recordFailure(now, error.message)
-                AppLogger.error(TAG, "Configuration snapshot failed", error)
-                // Retrying keeps a transient failure (a busy WAL checkpoint) from silently
-                // skipping a whole interval.
+        var passphrase: CharArray? = null
+        return try {
+            val treeUri = policy.destinationTreeUri?.let(Uri::parse)
+                ?: throw SnapshotDestinationUnavailableException(
+                    "Choose a snapshot destination folder in Setup.",
+                )
+            val archiveStore = ConfigurationSnapshotArchiveStore(applicationContext)
+            archiveStore.requirePersistedAccess(treeUri)
+            passphrase = settings.loadRecoveryPassphrase()
+
+            val manager = DatabaseBackupManager(applicationContext, AppDatabaseProvider.await())
+            val managedBackup = manager.backup().getOrThrow()
+            var internalRemoved = 0
+            val inventory = try {
+                val archiveName = configurationSnapshotArchiveName(now)
+                val archiveUri = archiveStore.createArchive(treeUri, archiveName)
+                try {
+                    manager.exportEncryptedBackup(managedBackup, archiveUri, passphrase).getOrThrow()
+                } catch (error: Throwable) {
+                    runCatching { archiveStore.deleteArchive(treeUri, archiveUri) }
+                    throw error
+                }
+                archiveStore.enforceRetention(treeUri, policy, now)
+            } finally {
+                internalRemoved = manager.pruneSnapshots(policy, now)
+            }
+
+            settings.recordSuccess(now, inventory.snapshotCount, inventory.storageBytes)
+            AppLogger.info(
+                TAG,
+                "Encrypted configuration snapshot created; pruned ${inventory.removedCount} archive(s) " +
+                    "and $internalRemoved internal backup(s)",
+            )
+            Result.success()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            settings.recordFailure(now, error.message)
+            AppLogger.error(TAG, "Configuration snapshot failed", error)
+            if (
+                error is SnapshotDestinationUnavailableException ||
+                error is SnapshotRecoveryPassphraseUnavailableException
+            ) {
+                Result.failure()
+            } else {
+                // A busy WAL or temporarily unavailable document provider should be retried rather
+                // than silently skipping the whole interval.
                 Result.retry()
-            },
-        )
+            }
+        } finally {
+            passphrase?.fill('\u0000')
+        }
     }
 
     companion object {
