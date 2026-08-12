@@ -66,13 +66,35 @@ class ConfigurationSnapshotsTest {
 
     @Test
     fun policyValuesAreClampedToTheSupportedRange() {
-        val tooSmall = ConfigurationSnapshotPolicy(maxSnapshots = 0, maxAgeDays = 0).normalized()
+        val tooSmall = ConfigurationSnapshotPolicy(
+            maxSnapshots = 0,
+            maxAgeDays = 0,
+            destinationTreeUri = "",
+        ).normalized()
         val tooLarge = ConfigurationSnapshotPolicy(maxSnapshots = 9_999, maxAgeDays = 9_999).normalized()
 
         assertEquals(ConfigurationSnapshotPolicy.MIN_SNAPSHOTS, tooSmall.maxSnapshots)
         assertEquals(ConfigurationSnapshotPolicy.MIN_AGE_DAYS, tooSmall.maxAgeDays)
+        assertEquals(null, tooSmall.destinationTreeUri)
         assertEquals(ConfigurationSnapshotPolicy.MAX_SNAPSHOTS, tooLarge.maxSnapshots)
         assertEquals(ConfigurationSnapshotPolicy.MAX_AGE_DAYS, tooLarge.maxAgeDays)
+    }
+
+    @Test
+    fun archiveNamesAreStableUtcV2BackupNames() {
+        val name = configurationSnapshotArchiveName(1_700_000_000_123L)
+
+        assertEquals("opentasker_snapshot_2023-11-14_22-13-20_123Z.otbackup", name)
+        assertTrue(isConfigurationSnapshotArchive(name))
+        assertEquals(1_700_000_000_123L, configurationSnapshotTimestamp(name))
+    }
+
+    @Test
+    fun archiveRetentionNeverClaimsUnrelatedOrPartialFiles() {
+        assertTrue(isConfigurationSnapshotArchive("opentasker_snapshot_2026-08-12_12-00-00_000Z.otbackup"))
+        assertTrue(!isConfigurationSnapshotArchive("family-photos.otbackup"))
+        assertTrue(!isConfigurationSnapshotArchive("opentasker_snapshot_2026-08-12.partial"))
+        assertEquals(null, configurationSnapshotTimestamp("opentasker_snapshot_invalid.otbackup"))
     }
 
     private companion object {

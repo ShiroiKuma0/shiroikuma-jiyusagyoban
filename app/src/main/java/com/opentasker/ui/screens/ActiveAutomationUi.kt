@@ -713,6 +713,7 @@ fun ActiveAutomationUi(
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
                 onCancelPendingRestore = viewModel::cancelPendingRestore,
                 onSnapshotPolicyChanged = viewModel::updateSnapshotPolicy,
+                onSnapshotDestinationSelected = viewModel::updateSnapshotDestination,
                 profiles = profiles,
                 tasks = tasks,
                 globalFallbackTaskId = globalFallbackTaskId,
@@ -1472,4 +1473,3 @@ internal fun StatusPill(
         }
     }
 }
-
