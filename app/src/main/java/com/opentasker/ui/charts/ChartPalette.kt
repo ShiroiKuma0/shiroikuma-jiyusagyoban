@@ -126,29 +126,65 @@ object ChartPalette {
     /**
      * The shared 1–5 scale — one colour vocabulary for every graded value in 回復.
      *
-     * Diverging around 3, so the colour carries the SIGN of a deviation and not merely its size: 1 and
-     * 2 are worse than usual, 3 is usual, 4 and 5 are better. Used for 白い熊's own 体感 rating and for
-     * every measured marker beside it, because a reader who has learned one column has then learned
-     * all of them — the previous scheme spent a different vocabulary on each and left the eye nothing
-     * to carry across. (白い熊, 2026-08-11: "we need to have clear 5 distinct colors, used everywhere".)
+     * **1 is the best step and 5 the worst** (白い熊, 2026-08-12; it ran the other way until then).
+     * Used for 白い熊's own 体感 rating and for every measured marker beside it, because a reader who
+     * has learned one column has then learned all of them.
      *
-     * Chosen by search against [PaletteCheck], not by eye, and pinned there: every adjacent pair clears
-     * the red-green gate at ΔE 9.9 against a target of 8, and the full-colour gate at 16.3 against a
-     * floor of 15. 2 and 4 sit a little above the lightness ceiling on purpose — they are drawn as
-     * single digits and small type, where the extra brightness is what makes them legible at all.
+     * ## How these five were arrived at
      *
-     * The band roles above are NOT reused here. `BAND_WARN` is within a few ΔE of this theme's own
-     * yellow ink, which is exactly the collision 白い熊 reported: an amber value beside a yellow one
-     * reads as the same state twice.
+     * 白い熊 chose the anchors and rejected everything else by eye across five rounds of rendered
+     * strips: pure yellow at the good end, pure red at 4, and the same red pressed down at 5. Each
+     * candidate was measured first and drawn second, so what was rejected was rejected knowing its
+     * numbers.
+     *
+     * The measurements that shaped it, all against 白い熊's own red-green deficiency:
+     *
+     * - **Pure green `#00FF00` cannot sit beside pure yellow** — ΔE 3.5 under deuteranopia. `#00D084`
+     *   is the emerald that survives it (18.6) without drifting into teal.
+     * - **The middle of the orange family was unusable while 4 was a pure red**: everything from about
+     *   `#E5760A` down to `#A34B00` measured under ΔE 6 against it. Moving the dark red to 5 is what
+     *   opened the orange-red at 4 back up.
+     * - **Violet cannot sit beside blue** — the failure this file's header already records — so every
+     *   violet and purple candidate for 4 was dropped.
+     * - **A lighter 4 is limited by the EMERALD, never by the dark red.** A light red and a light
+     *   green are the same colour to a red-green reader: `#FF8080` measures ΔE 1.5 against the 2.
+     *   `#F4511E` is as light as the 4 can go while holding 11.7 against it — and it holds that
+     *   because an orange-red carries yellow, which is the axis colour deficiency leaves alone.
+     *
+     * Adjacent pairs, ordinary vision / worst of protanopia and deuteranopia: 26.7/18.6, 40.3/35.9,
+     * 44.4/32.9, 27.0/21.3. The worst of ALL ten pairs is 11.7 — the green at 2 against the 4, which
+     * is the ceiling of any palette holding both a green and a red.
+     *
+     * 4 and 5 are deliberately one family getting worse rather than two hues, so the bad end is read
+     * by lightness, which no colour deficiency touches.
      */
     val SCALE = listOf(
-        Color(0xFFD8382F), // 1 — red
-        Color(0xFFD8860F), // 2 — orange
-        Color(0xFF8672DC), // 3 — violet, the neutral midpoint
-        Color(0xFF22AED8), // 4 — cyan
-        Color(0xFF2CA159), // 5 — green
+        Color(0xFFFFFF00), // 1 — yellow, best
+        Color(0xFF00D084), // 2 — emerald
+        Color(0xFF1E5AFF), // 3 — blue, the neutral middle
+        Color(0xFFF4511E), // 4 — orange-red
+        Color(0xFFA00000), // 5 — dark red, worst
+    )
+
+    /**
+     * The ink each step carries, chosen by 白い熊 pill by pill rather than computed.
+     *
+     * Two of them are deliberately not the maximum-contrast choice: blue on the yellow and yellow on
+     * the blue are the pairing the rest of 「健康」 already uses for data-against-explanation, and
+     * white on the red reads as a warning label where black on it reads as a road sign. All five clear
+     * 4:1 against their fill, which is above the 3:1 large-text floor these pills are drawn at.
+     */
+    val SCALE_INK = listOf(
+        Color(0xFF1E5AFF), // on yellow
+        Color(0xFF000000), // on emerald
+        Color(0xFFFFFF00), // on blue
+        Color(0xFF000000), // on orange-red
+        Color(0xFFFFFFFF), // on dark red
     )
 
     /** [SCALE] by its 1–5 step, clamped. */
     fun scale(step: Int): Color = SCALE[(step - 1).coerceIn(0, SCALE.lastIndex)]
+
+    /** [SCALE_INK] by its 1–5 step, clamped. */
+    fun scaleInk(step: Int): Color = SCALE_INK[(step - 1).coerceIn(0, SCALE_INK.lastIndex)]
 }
