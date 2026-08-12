@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -215,11 +217,15 @@ private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
                             val skin = scaleSkin(felt, style.grid, sectionNote)
                             // Thickness, not colour, carries how many MEASURED markers were off — the
                             // tile's colour is already spoken for by the rating, and a second hue on
-                            // the same square would read as a second rating.
+                            // the same square would read as a second rating. It is drawn in the
+                            // tile's OWN ink rather than in the fill's hue: since 2026-08-12 the
+                            // fills are solid, so a ring tinted from the fill would be invisible on
+                            // it, and a nought-marker tile now has no ring at all rather than a thin
+                            // one nobody could tell from a thick one.
                             val ringWidth = when (cell.adverseCount ?: 0) {
-                                0 -> 1.dp
+                                0 -> 0.dp
                                 1 -> 2.dp
-                                else -> 3.dp
+                                else -> 3.5.dp
                             }
                             Box(
                                 Modifier
@@ -228,9 +234,11 @@ private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
                                     .clip(RoundedCornerShape(5.dp))
                                     .background(skin.fill)
                                     .then(
-                                        skin.edge?.let {
-                                            Modifier.border(ringWidth, it, RoundedCornerShape(5.dp))
-                                        } ?: Modifier,
+                                        if (ringWidth > 0.dp) {
+                                            Modifier.border(ringWidth, skin.ink, RoundedCornerShape(5.dp))
+                                        } else {
+                                            Modifier
+                                        },
                                     ),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -354,44 +362,67 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>) {
  * The scale is shared by 白い熊's own rating and by every measured value beside it, so it is worth one
  * row of the screen: learn it here and the whole table and the grid above are readable without a
  * second key.
+ *
+ * **Each step is the same filled pill the table draws, stretched to share the width with the i**
+ * (白い熊, 2026-08-12). It was a row of 16 dp swatches with the names loose beside them, which made
+ * the key a different object from the thing it was a key to — and left the row ragged, ending
+ * wherever the fifth word happened to end.
  */
 @Composable
 private fun ScaleLegend(onInfo: () -> Unit) {
     val lang = LocalBandLanguage.current
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
         for (step in 1..5) {
             val skin = scaleSkin(step, ChartPalette.scale(step), sectionNote)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(skin.fill)
-                        .then(skin.edge?.let { Modifier.border(1.5.dp, it, RoundedCornerShape(4.dp)) } ?: Modifier),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "$step",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = skin.ink,
-                    )
-                }
-                Spacer(Modifier.width(5.dp))
+            val label = feltLabel(step)[lang]
+            // Weighted by what each pill has to hold, not equally: five equal fifths would clip
+            // "Below par" while leaving air around "Good". The row still fills the line exactly —
+            // the widths just land where the words are.
+            Row(
+                Modifier
+                    .weight(legendWeight(label))
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(skin.fill)
+                    .padding(horizontal = 3.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    feltLabel(step)[lang],
+                    "$step",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = skin.ink,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    label,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (step == 1) ChartPalette.scale(1) else skin.ink,
+                    fontWeight = FontWeight.Bold,
+                    color = skin.ink,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
                 )
             }
         }
-        Spacer(Modifier.width(4.dp))
-        InfoCircle(diameter = 26.dp, onClick = onInfo)
+        InfoCircle(diameter = 30.dp, onClick = onInfo)
     }
+}
+
+/**
+ * How much of the legend row one pill is owed: the digit, a gap, and the word.
+ *
+ * A CJK glyph is a full em where a Latin one is roughly half, so 「いまひとつ」 needs the width of ten
+ * Latin characters and not five. Counting that way keeps the row honest in both languages without
+ * measuring text — the numbers only have to be proportional to each other, not exact.
+ */
+private fun legendWeight(label: String): Float {
+    val units = label.sumOf { if (it.code > 0x2E80) 2 else 1 }
+    return (units + 3).toFloat()
 }
 
 /**
@@ -403,25 +434,103 @@ private fun ScaleLegend(onInfo: () -> Unit) {
 @Composable
 private fun ReferenceBandsPanel() {
     val lang = LocalBandLanguage.current
+    val accent = sectionInk
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .clip(RoundedCornerShape(18.dp))
+            .border(1.5.dp, accent, RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(
-            BandText.bandsTitle[lang],
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = sectionInk,
-        )
-        Text(
-            BandText.bandsBody[lang],
-            style = MaterialTheme.typography.bodyMedium,
-            color = sectionNote,
-        )
+        InfoHeading(BandText.bandsTitle[lang])
+
+        // 実睡眠 — five rungs, each with the exact times that land a night on it and why they are
+        // there. Prose could say all of this and did; a reader looking up "what counts as 7h40"
+        // then had to find it inside a paragraph. (白い熊, 2026-08-12.)
+        BandSection(BandText.bandsSleepTitle[lang]) {
+            BandRung(1, BandText.bandsSleep1[lang], BandText.bandsSleep1Why[lang])
+            BandRung(2, BandText.bandsSleep2[lang], BandText.bandsSleep2Why[lang])
+            BandRung(3, BandText.bandsSleep3[lang], BandText.bandsSleep3Why[lang])
+            BandRung(4, BandText.bandsSleep4[lang], BandText.bandsSleep4Why[lang])
+            BandRung(5, BandText.bandsSleep5[lang], BandText.bandsSleep5Why[lang])
+        }
+
+        // 夜間心拍 — one shared reason for the whole ladder, because there IS one: it is a single
+        // published series of decades, not five separately-argued cut points.
+        BandSection(BandText.bandsHrTitle[lang]) {
+            BandRung(1, BandText.bandsHr1[lang])
+            BandRung(2, BandText.bandsHr2[lang])
+            BandRung(3, BandText.bandsHr3[lang])
+            BandRung(4, BandText.bandsHr4[lang])
+            BandRung(5, BandText.bandsHr5[lang])
+            InfoBody(BandText.bandsHrWhy[lang])
+            InfoBody(BandText.bandsHrCaveat[lang])
+        }
+
+        BandSection(BandText.bandsTempTitle[lang]) {
+            InfoBody(BandText.bandsTempNoBand[lang], bold = true)
+            InfoBody(BandText.bandsTempWhy[lang])
+        }
+
+        BandSection(BandText.bandsFeltTitle[lang]) {
+            InfoBody(BandText.bandsFeltWhy[lang])
+        }
+
+        InfoBody(BandText.bandsRingNote[lang])
+    }
+}
+
+/** One metric inside the panel: its name as a heading, then whatever explains it. */
+@Composable
+private fun BandSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        InfoHeading(title)
+        content()
+    }
+}
+
+/**
+ * One rung: the step as the same coloured box the table uses, then the values, then the reason.
+ *
+ * The box is the point — a reader who has seen a 4 in the 実睡眠 column can find the same 4 here and
+ * read what it took to earn it, without translating between a colour and a number on the way.
+ */
+@Composable
+private fun BandRung(step: Int, range: String, why: String? = null) {
+    val skin = scaleSkin(step, Color.Transparent, sectionNote)
+    val lang = LocalBandLanguage.current
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Row(
+            Modifier
+                .width(126.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(skin.fill)
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "$step",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = skin.ink,
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                feltLabel(step)[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = skin.ink,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            InfoBody(range, bold = true)
+            why?.let { InfoBody(it) }
+        }
     }
 }
 
@@ -496,7 +605,6 @@ private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float) {
             .padding(end = 4.dp)
             .clip(RoundedCornerShape(5.dp))
             .background(skin.fill)
-            .then(skin.edge?.let { Modifier.border(1.dp, it, RoundedCornerShape(5.dp)) } ?: Modifier)
             .padding(horizontal = 5.dp, vertical = 5.dp),
     ) {
         Text(

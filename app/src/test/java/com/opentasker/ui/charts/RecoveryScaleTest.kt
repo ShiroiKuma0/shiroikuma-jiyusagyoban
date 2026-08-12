@@ -10,10 +10,12 @@ import org.junit.Test
 /**
  * The shared 1–5 scale: its colours, and what a measured value has to be to land on each step.
  *
- * 白い熊 rejected the previous scheme on sight (2026-08-11): the red was not red, the orange was
- * within a few ΔE of this theme's own yellow ink, and every column spoke a different vocabulary. The
- * replacement was chosen by search against [PaletteCheck] rather than by eye, so it is pinned here —
- * a colour edited by hand later has to clear the same gates the search did.
+ * **1 is the best step since 2026-08-12** — 白い熊 flipped it, and the expectations below flipped with
+ * it. The scale itself was settled over five rounds of rendered strips: yellow, emerald, blue, red,
+ * dark red, with the anchors chosen by 白い熊 and every candidate measured before it was drawn.
+ *
+ * These pin the result. A colour edited by hand later has to clear the same gates the search did, and
+ * the step numbers have to keep running the way the words on them do.
  */
 class RecoveryScaleTest {
 
@@ -58,10 +60,10 @@ class RecoveryScaleTest {
 
     @Test
     fun `a high nocturnal heart rate is worse and a low one is better`() {
-        assertEquals(2, reading(RecoveryMarker.NOCTURNAL_HR, 67.0, band = RecoveryBand.HIGH)!!.scaleStep)
-        assertEquals(1, reading(RecoveryMarker.NOCTURNAL_HR, 71.0, band = RecoveryBand.HIGH)!!.scaleStep)
-        assertEquals(4, reading(RecoveryMarker.NOCTURNAL_HR, 53.0, band = RecoveryBand.LOW)!!.scaleStep)
-        assertEquals(5, reading(RecoveryMarker.NOCTURNAL_HR, 49.0, band = RecoveryBand.LOW)!!.scaleStep)
+        assertEquals(4, reading(RecoveryMarker.NOCTURNAL_HR, 67.0, band = RecoveryBand.HIGH)!!.scaleStep)
+        assertEquals(5, reading(RecoveryMarker.NOCTURNAL_HR, 71.0, band = RecoveryBand.HIGH)!!.scaleStep)
+        assertEquals(2, reading(RecoveryMarker.NOCTURNAL_HR, 53.0, band = RecoveryBand.LOW)!!.scaleStep)
+        assertEquals(1, reading(RecoveryMarker.NOCTURNAL_HR, 49.0, band = RecoveryBand.LOW)!!.scaleStep)
     }
 
     /** Sleep runs the other way: short is the bad end, long is not a problem. */
@@ -70,17 +72,34 @@ class RecoveryScaleTest {
         val short = MarkerReading(
             RecoveryMarker.SLEEP, 330.0, 480.0, 450.0, 510.0, null, RecoveryBand.LOW, true,
         )
-        assertEquals(1, short.scaleStep)
+        assertEquals(5, short.scaleStep)
         // 8h45 is one and a half half-widths past usual — outside it, but not at the far step.
         val longish = MarkerReading(
             RecoveryMarker.SLEEP, 525.0, 480.0, 450.0, 510.0, null, RecoveryBand.HIGH, true,
         )
-        assertEquals(4, longish.scaleStep)
+        assertEquals(2, longish.scaleStep)
         // 9h is two, which is where the far step begins.
         val long = MarkerReading(
             RecoveryMarker.SLEEP, 540.0, 480.0, 450.0, 510.0, null, RecoveryBand.HIGH, true,
         )
-        assertEquals(5, long.scaleStep)
+        assertEquals(1, long.scaleStep)
+    }
+
+    /**
+     * 体感 moved sides in the 2026-08-12 flip.
+     *
+     * It is the one marker whose VALUE is itself on the scale, so when the scale inverted, a high
+     * rating stopped meaning a good night. Nothing else in the file changes direction, and a test that
+     * did not exist before is the only thing that would have caught it staying put.
+     */
+    @Test
+    fun `a high felt rating is now the bad end`() {
+        val bad = MarkerReading(RecoveryMarker.FELT, 5.0, 3.0, 2.0, 4.0, null, RecoveryBand.HIGH, true)
+        assertEquals(5, bad.scaleStep)
+        assertTrue("a 5 is the worst night, so it must count", bad.adverse)
+        val good = MarkerReading(RecoveryMarker.FELT, 1.0, 3.0, 2.0, 4.0, null, RecoveryBand.LOW, true)
+        assertEquals(1, good.scaleStep)
+        assertTrue("a 1 is the best night, so it must not", !good.adverse)
     }
 
     /**
@@ -96,7 +115,7 @@ class RecoveryScaleTest {
         val warm = MarkerReading(
             RecoveryMarker.TEMPERATURE, 37.4, 36.4, 36.1, 36.7, null, RecoveryBand.HIGH, false,
         )
-        assertEquals(1, warm.scaleStep)
+        assertEquals(5, warm.scaleStep)
     }
 
     @Test
