@@ -404,19 +404,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name="com.opentasker.core.external.OpenTaskerAppFunctionService"
-            android:exported="true"
-            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
-            tools:targetApi="36">
-            <property
-                android:name="android.app.appfunctions"
-                android:value="open_tasker_app_functions.xml" />
-            <intent-filter>
-                <action android:name="android.app.appfunctions.AppFunctionService" />
-            </intent-filter>
-        </service>
-
         <receiver
             android:name="com.opentasker.core.actions.PackageArchiveStatusReceiver"
             android:exported="false" />
