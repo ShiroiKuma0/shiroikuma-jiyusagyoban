@@ -8,6 +8,58 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86.2026-08-11.g9b9d18dd+003 — 2026-08-12
+
+**A lighter 4, and the Health Index bars now mean something.**
+
+The 4 is `#F4511E`, an orange-red with black ink, up from the pure red it shipped as this morning.
+It puts ΔE 21.3 between 4 and 5 where there were 14.5. The constraint on a lighter 4 turned out to be
+the emerald at 2 rather than the dark red at 5 — a light red and a light green are the same colour to
+a red-green reader, `#FF8080` measuring 1.5 against the 2 — and an orange-red survives being light
+precisely because it carries yellow, the axis colour deficiency leaves alone. It also only became
+available once the dark red moved to 5: against a pure red at 5 every orange in this range measured
+under 3.
+
+**The index's component bars are banded instead of tinted.** They were one blue running light at 0 to
+dark at 100, so the shade said the same thing as the bar's length and the number at the end of the
+row, a third time, in the one form that cannot be named — 白い熊 asked why one bar was darker and one
+bluer, and there was no answer worth giving. Each bar now takes its colour from the index's OWN cut
+points (85 / 70 / 55 / 40), the ones the headline has always printed "Good" from, and prints that
+band word beside itself in the same colour. Reading down the card now says which component is holding
+the index down — on the morning it was built, four bands were fine and Steps alone was Low.
+
+Applying a total's bands to one component is an extension rather than a published rule; both are
+0–100 on the same construction, which is what makes it defensible, and it is why the word carries the
+claim and the colour only agrees with it. The headline word and the bands are one function now, so
+they cannot drift apart.
+
+## 0.2.86.2026-08-11.g9b9d18dd+002 — 2026-08-12
+
+**The 1–5 scale runs best-first, and is a new set of colours.** 1 is now the best night and 5 the
+worst, throughout: 白い熊's own 体感 rating, the published 実睡眠 and 夜間心拍 bands, and the
+within-person step every other graded value uses. The cut points did not move — 7 h is still 7 h,
+50 bpm still 50 bpm — only the numbers printed on them. **The ratings already on file are re-numbered
+once** by `6 − n`, behind a run-once flag: the store holds bare integers with no scale marker in
+them, so a rating written before the flip would otherwise have gone on meaning its own opposite, and
+feeding the baseline and the adverse count that way.
+
+The colours were settled over five rounds of rendered strips, with 白い熊 choosing the anchors and
+every candidate measured before it was drawn: **yellow `#FFFF00`, emerald `#00D084`, blue `#1E5AFF`,
+red `#FF0000`, dark red `#A00000`**. What the measurements ruled out is worth recording — pure green
+`#00FF00` cannot sit beside pure yellow (ΔE 3.5 under deuteranopia), the whole middle of the orange
+family is indistinguishable from a pure red, and violet cannot sit beside blue. 4 and 5 are
+deliberately one family getting worse rather than two hues, so the bad end is read by lightness,
+which no colour deficiency touches. Fills are solid with a paired ink instead of a 30 %-alpha wash
+inside a ring, and nothing on the row is outlined any more.
+
+**The scale legend is the same pill the table draws**, five of them stretched with the ⓘ to fill the
+line, weighted by what each has to hold rather than into equal fifths.
+
+**The reference-band panel is structured instead of prose.** Each rung of 実睡眠 and 夜間心拍 is now
+its own coloured box, the exact cut points that land a night on it, and why that cut point is where
+it is — inside a rounded yellow frame, at the info typography the rest of 「健康」 uses. 皮膚温 and
+体感 keep their explanations of why they have no reference band at all.
+
 ## 0.2.86.2026-08-11.g9b9d18dd+001 — 2026-08-12
 
 **Rebased onto upstream 0.2.86**, an audit-driven release: a deep multi-pass audit filed sixty

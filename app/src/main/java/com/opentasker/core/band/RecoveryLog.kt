@@ -38,13 +38,15 @@ import androidx.core.content.edit
  * is authored rather than synced, so it does not belong in the same store as measurements.
  *
  * The scale is 1–5 with 3 as "normal", deliberately short: a 1–10 scale invites false precision from
- * an instrument whose whole value is that it takes one tap.
+ * an instrument whose whole value is that it takes one tap. Since 2026-08-12 **1 is the best night
+ * and 5 the worst** — see [migrateToBestFirst] for what that cost the ratings already on file.
  */
 object RecoveryLog {
 
     private const val PREFS = "recovery_log"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_NIGHT_KEYED = "night_keyed"
+    private const val KEY_BEST_FIRST = "best_first"
 
     const val MIN_RATING = 1
     const val MAX_RATING = 5
@@ -53,6 +55,7 @@ object RecoveryLog {
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .also(::migrateToNightKeys)
+            .also(::migrateToBestFirst)
 
     /**
      * Re-key ratings written before the night-keying fix, once.
@@ -81,6 +84,34 @@ object RecoveryLog {
             putBoolean(KEY_NIGHT_KEYED, true)
         }
     }
+
+    /**
+     * Re-number every stored rating for the 2026-08-12 flip, once.
+     *
+     * The scale ran 1 = Wrecked … 5 = Great until that day and now runs the other way. **The store
+     * holds bare integers with no scale marker in them**, so a rating written under the old scheme
+     * does not merely display differently afterwards — it means the opposite. 白い熊's four ratings
+     * would have read as their own mirror image, and worse, would have gone on feeding the baseline
+     * and the adverse count in the wrong direction, silently, for as long as they stayed on file.
+     *
+     * `6 − n` is the whole conversion: an involution on 1..5, so 2 ↔ 4, 1 ↔ 5, and 3 is its own
+     * opposite. The flag is what stops it running twice — the store cannot tell the two schemes apart
+     * by inspection, and applying an involution a second time would put everything back.
+     */
+    private fun migrateToBestFirst(prefs: android.content.SharedPreferences) {
+        if (prefs.getBoolean(KEY_BEST_FIRST, false)) return
+        val before = ratingsIn(prefs.all)
+        prefs.edit {
+            flippedToBestFirst(before).forEach { (date, rating) -> putInt(keyOf(date), rating) }
+            putBoolean(KEY_BEST_FIRST, true)
+        }
+    }
+
+    /**
+     * The pure part of [migrateToBestFirst]. Keys are untouched, so nothing can collide or be lost.
+     */
+    internal fun flippedToBestFirst(ratings: Map<Long, Int>): Map<Long, Int> =
+        ratings.mapValues { (_, rating) -> MIN_RATING + MAX_RATING - rating }
 
     /** The `yyyyMMdd`→rating pairs in a raw preferences map, ignoring [KEY_ENABLED] and friends. */
     private fun ratingsIn(all: Map<String, Any?>): Map<Long, Int> =

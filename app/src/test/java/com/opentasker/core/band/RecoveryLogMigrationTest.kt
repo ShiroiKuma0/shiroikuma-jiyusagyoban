@@ -59,4 +59,42 @@ class RecoveryLogMigrationTest {
         val after = RecoveryLog.shiftedToNightKeys(before)
         assertTrue("the shift must not lose a rating", after.size == before.size)
     }
+
+    // --- the 2026-08-12 flip: 1 = Wrecked … 5 = Great became 1 = Great … 5 = Wrecked ---------------
+
+    /**
+     * The store holds bare integers, so a rating written under the old scheme does not merely display
+     * differently after the flip — it means its own opposite, and goes on feeding the baseline and the
+     * adverse count that way.
+     */
+    @Test
+    fun `every rating is re-numbered onto the best-first scale`() {
+        assertEquals(
+            mapOf(20260811L to 4, 20260810L to 5, 20260809L to 4, 20260808L to 4),
+            RecoveryLog.flippedToBestFirst(
+                // 白い熊's four ratings as they stood: two "Below par", one "Wrecked", one more.
+                mapOf(20260811L to 2, 20260810L to 1, 20260809L to 2, 20260808L to 2),
+            ),
+        )
+    }
+
+    @Test
+    fun `the middle step is its own opposite`() {
+        assertEquals(mapOf(20260810L to 3), RecoveryLog.flippedToBestFirst(mapOf(20260810L to 3)))
+    }
+
+    /** An involution: applying it twice is what the run-once flag exists to prevent. */
+    @Test
+    fun `flipping twice is the identity, which is why it must run once`() {
+        val before = (1..5).associate { (20260800L + it) to it }
+        assertEquals(before, RecoveryLog.flippedToBestFirst(RecoveryLog.flippedToBestFirst(before)))
+    }
+
+    @Test
+    fun `the flip keeps every key and every rating in range`() {
+        val before = (1..40).associate { (20260700L + it) to (it % 5) + 1 }
+        val after = RecoveryLog.flippedToBestFirst(before)
+        assertEquals(before.keys, after.keys)
+        assertTrue("nothing may leave 1..5", after.values.all { it in 1..5 })
+    }
 }

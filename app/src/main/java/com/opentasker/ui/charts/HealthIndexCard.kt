@@ -90,7 +90,10 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
             // The score column has to fit "100" — three digits at bold body weight. It was a 28 dp
             // guess, which wrapped the moment a component actually scored 100 (白い熊, 2026-08-10).
         val valueWidth = labelColumnWidth(index.components.map { it.score?.toString() ?: "—" } + "100")
-        index.components.forEach { ComponentRow(it, labelWidth, valueWidth) }
+            // Measured over EVERY band word, not only the ones on screen today: the column must not
+            // change width when a component moves from "Good" to "Very low" overnight.
+        val bandWidth = labelColumnWidth((0..100 step 10).map { HealthIndex.bandOf(it)[lang] })
+        index.components.forEach { ComponentRow(it, labelWidth, valueWidth, bandWidth) }
 
         if (index.partial) {
             NoteText(
@@ -131,7 +134,7 @@ private fun labelColumnWidth(labels: List<String>): Dp {
 }
 
 @Composable
-private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp) {
+private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp, bandWidth: Dp) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         val lang = LocalBandLanguage.current
         Text(
@@ -148,6 +151,18 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp) {
             ScoreBar(c.score)
         }
         Spacer(Modifier.width(10.dp))
+        // The band word, in the bar's own colour. The colour is an extension of a rule written for
+        // the total (see HealthIndex.step), so the word carries the claim and the colour agrees with
+        // it — rather than a hue asserting a grade on its own.
+        Text(
+            HealthIndex.bandOf(c.score)[lang],
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(bandWidth),
+            color = c.score?.let { ChartPalette.scale(HealthIndex.step(it)) } ?: sectionNote,
+        )
+        Spacer(Modifier.width(8.dp))
         Text(
             if (c.score == null) "—" else "${c.score}",
             style = MaterialTheme.typography.bodyMedium,
@@ -163,12 +178,19 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp) {
 /**
  * One component's 0–100, as a bar.
  *
+ * **Banded on the index's own cut points, in the shared 1–5 colours** (白い熊, 2026-08-12). It used
+ * to be [ChartPalette.sequential] — one blue tinted light at 0 and dark at 100 — which said the same
+ * thing as the bar's length and the number at the end of the row, a third time, in the one form that
+ * cannot be named: "why is one darker, one bluer". Now a bar is the colour of its band, and 白い熊 can
+ * read down the card and see which component is holding the index down.
+ *
  * A missing component draws an empty track rather than a zero-length bar, because those are
  * different claims: "we measured nothing" and "we measured the worst possible value" must not look
  * the same.
  */
 @Composable
 private fun ScoreBar(score: Int?) {
+    val tint = score?.let { ChartPalette.scale(HealthIndex.step(it)) }
     Canvas(Modifier.fillMaxWidth().height(6.dp)) {
         val r = size.height / 2f
         drawRoundRect(
@@ -176,11 +198,11 @@ private fun ScoreBar(score: Int?) {
             size = size,
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
         )
-        if (score == null) return@Canvas
+        if (tint == null || score == null) return@Canvas
         val w = size.width * (score / 100f)
         if (w <= 0f) return@Canvas
         drawRoundRect(
-            color = ChartPalette.sequential(score / 100f),
+            color = tint,
             size = Size(w.coerceAtLeast(size.height), size.height),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
         )
@@ -289,8 +311,10 @@ fun HealthIndexDetail(index: HealthIndexResult) {
         index.components.forEach { c ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row {
+                    // The same banded colour the card's bar carries, so the detail page and the card
+                    // are one reading of the same component rather than two.
                     Box(Modifier.size(10.dp).clip(CircleShape).background(
-                        if (c.score == null) ChartPalette.UNKNOWN else ChartPalette.sequential(c.score / 100f),
+                        if (c.score == null) ChartPalette.UNKNOWN else ChartPalette.scale(HealthIndex.step(c.score)),
                     ).align(Alignment.CenterVertically))
                     Spacer(Modifier.width(8.dp))
                     InfoBody(c.label[lang], Modifier.weight(1f), bold = true)

@@ -272,4 +272,44 @@ class HealthIndexTest {
         assertTrue("expected a low index, got ${r.value}", r.value!! < 30)
         assertEquals("Very low", r.band.en)
     }
+
+    // --- the bands, now that a component's BAR is painted with them ------------------------------
+
+    /**
+     * The cut points did not move when the bars started using them (2026-08-12) — they are the same
+     * edges the headline has printed a word from all along, which is the only thing that makes
+     * colouring a component with them defensible.
+     */
+    @Test
+    fun `the index bands step where they always did`() {
+        assertEquals(1, HealthIndex.step(100))
+        assertEquals(1, HealthIndex.step(85))
+        assertEquals(2, HealthIndex.step(84))
+        assertEquals(2, HealthIndex.step(70))
+        assertEquals(3, HealthIndex.step(69))
+        assertEquals(3, HealthIndex.step(55))
+        assertEquals(4, HealthIndex.step(54))
+        assertEquals(4, HealthIndex.step(40))
+        assertEquals(5, HealthIndex.step(39))
+        assertEquals(5, HealthIndex.step(0))
+    }
+
+    /** Best-first, like every other 1–5 in this window: a better score can never step higher. */
+    @Test
+    fun `a better score never lands on a worse step`() {
+        var previous = 6
+        for (score in 0..100) {
+            val step = HealthIndex.step(score)
+            assertTrue("$score stepped the wrong way", step <= previous)
+            previous = step
+        }
+    }
+
+    /** One source for the word and the colour — a headline that disagreed with its own bar. */
+    @Test
+    fun `the headline word is the band of the headline number`() {
+        val r = HealthIndex.compute(inputs(restingHr = 58.0, iqr = 6.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.4))
+        assertEquals(HealthIndex.bandOf(r.value).en, r.band.en)
+        assertEquals("—", HealthIndex.bandOf(null).en)
+    }
 }
