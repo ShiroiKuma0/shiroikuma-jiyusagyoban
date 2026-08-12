@@ -70,20 +70,37 @@ class ShizukuPowerBackendTest {
     }
 
     @Test
-    fun allowlistAcceptsOnlyExactCommandVariants() {
-        assertTrue(
-            ShizukuCommandPolicy.isExact(
-                "reboot",
-                listOf("svc", "power", "reboot", "false"),
+    fun allowlistPinsEveryElevatedCommandVariant() {
+        val expected = mapOf(
+            "airplane.toggle" to listOf(
+                listOf("settings", "put", "global", "airplane_mode_on", "1"),
+                listOf("settings", "put", "global", "airplane_mode_on", "0"),
             ),
+            "mobile.toggle" to listOf(
+                listOf("svc", "data", "enable"),
+                listOf("svc", "data", "disable"),
+            ),
+            "screenshot.take" to listOf(listOf("screencap", "-p")),
+            "reboot" to listOf(listOf("svc", "power", "reboot", "false")),
+            "screen.off" to listOf(listOf("input", "keyevent", "223")),
+            "wake" to listOf(listOf("input", "keyevent", "224")),
         )
+
+        assertEquals(ShizukuPowerBackend.elevatedActionIds, expected.keys)
+        expected.forEach { (actionId, variants) ->
+            assertEquals("$actionId variant count", variants.size, ShizukuCommandPolicy.variantCount(actionId))
+            variants.forEachIndexed { index, argv ->
+                assertEquals("$actionId variant $index", argv, ShizukuCommandPolicy.command(actionId, index))
+                assertTrue("$actionId should accept its pinned variant", ShizukuCommandPolicy.isExact(actionId, argv))
+            }
+        }
+
         assertFalse(
             ShizukuCommandPolicy.isExact(
                 "reboot",
                 listOf("svc", "power", "reboot", "true"),
             ),
         )
-        assertTrue(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1")))
         assertFalse(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1", "--user", "0")))
     }
 
