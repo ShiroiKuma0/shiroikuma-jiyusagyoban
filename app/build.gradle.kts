@@ -790,6 +790,146 @@ abstract class VerifyQualityGateSeedTask : org.gradle.api.DefaultTask() {
     }
 }
 
+abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val apks: ConfigurableFileCollection
+
+    @TaskAction
+    fun verify() {
+        val apkFiles = apks.files.sortedBy { it.name }
+        check(apkFiles.isNotEmpty()) { "No APKs were supplied for packaged-type verification." }
+
+        apkFiles.forEach { apkFile ->
+            check(apkFile.isFile) {
+                "APK for packaged-type verification is missing: ${apkFile.absolutePath}"
+            }
+            val referenced = linkedSetOf<String>()
+            val defined = linkedSetOf<String>()
+            var dexCount = 0
+
+            ZipFile(apkFile).use { archive ->
+                archive.entries().asSequence()
+                    .filter { entry -> DEX_ENTRY_PATTERN.matches(entry.name) }
+                    .sortedBy { entry -> entry.name }
+                    .forEach { entry ->
+                        check(entry.size in 1..MAX_DEX_BYTES) {
+                            "${apkFile.name}/${entry.name} has an invalid audit size: ${entry.size} bytes"
+                        }
+                        val inventory = dexTypeInventory(
+                            archive.getInputStream(entry).use { stream -> stream.readBytes() },
+                            "${apkFile.name}/${entry.name}",
+                        )
+                        referenced += inventory.referenced
+                        defined += inventory.defined
+                        dexCount += 1
+                    }
+            }
+
+            check(dexCount > 0) { "${apkFile.name} contains no classes*.dex entries." }
+            val missing = (referenced - defined).sorted()
+            check(missing.isEmpty()) {
+                buildString {
+                    appendLine("${apkFile.name} references OpenTasker types that it does not define:")
+                    missing.forEach { descriptor -> appendLine("  $descriptor") }
+                    append("Every Lcom/opentasker/ reference must be packaged in the same APK.")
+                }
+            }
+            println(
+                "Packaged-type completeness passed for ${apkFile.name}: " +
+                    "$dexCount dex file(s), ${defined.size} OpenTasker type(s) defined.",
+            )
+        }
+    }
+
+    private fun dexTypeInventory(bytes: ByteArray, source: String): DexTypeInventory {
+        check(bytes.size >= DEX_HEADER_BYTES) { "$source is too small to be a DEX file." }
+        check(bytes[0] == 'd'.code.toByte() && bytes[1] == 'e'.code.toByte() &&
+            bytes[2] == 'x'.code.toByte() && bytes[3] == '\n'.code.toByte()) {
+            "$source does not use the standard DEX format."
+        }
+
+        fun uint(offset: Int): Long {
+            check(offset >= 0 && offset + 4 <= bytes.size) { "$source has a truncated DEX integer." }
+            return (bytes[offset].toLong() and 0xff) or
+                ((bytes[offset + 1].toLong() and 0xff) shl 8) or
+                ((bytes[offset + 2].toLong() and 0xff) shl 16) or
+                ((bytes[offset + 3].toLong() and 0xff) shl 24)
+        }
+
+        fun table(sizeOffset: Int, dataOffset: Int, width: Int, label: String): Pair<Int, Int> {
+            val count = uint(sizeOffset)
+            val offset = uint(dataOffset)
+            check(count <= Int.MAX_VALUE && offset <= Int.MAX_VALUE) {
+                "$source has an oversized $label table."
+            }
+            check(offset + count * width <= bytes.size.toLong()) {
+                "$source has a truncated $label table."
+            }
+            return count.toInt() to offset.toInt()
+        }
+
+        val (stringCount, stringOffset) = table(56, 60, 4, "string-id")
+        val (typeCount, typeOffset) = table(64, 68, 4, "type-id")
+        val (classCount, classOffset) = table(96, 100, 32, "class-def")
+        val stringCache = arrayOfNulls<String>(stringCount)
+
+        fun stringAt(index: Int): String {
+            check(index in 0 until stringCount) { "$source references invalid string index $index." }
+            stringCache[index]?.let { return it }
+            val dataOffset = uint(stringOffset + index * 4)
+            check(dataOffset < bytes.size) { "$source references a string outside the DEX file." }
+            var cursor = dataOffset.toInt()
+            var lengthBytes = 0
+            var value: Int
+            do {
+                check(cursor < bytes.size && lengthBytes < 5) {
+                    "$source has a malformed string length."
+                }
+                value = bytes[cursor].toInt() and 0xff
+                cursor += 1
+                lengthBytes += 1
+            } while (value and 0x80 != 0)
+            var end = cursor
+            while (end < bytes.size && bytes[end] != 0.toByte()) end += 1
+            check(end < bytes.size) { "$source has an unterminated DEX string." }
+            return String(bytes, cursor, end - cursor, Charsets.UTF_8).also { stringCache[index] = it }
+        }
+
+        val typeDescriptors = ArrayList<String>(typeCount)
+        repeat(typeCount) { index ->
+            val descriptorIndex = uint(typeOffset + index * 4)
+            check(descriptorIndex <= Int.MAX_VALUE) { "$source has an oversized descriptor index." }
+            typeDescriptors += stringAt(descriptorIndex.toInt())
+        }
+        val referenced = typeDescriptors.mapNotNullTo(linkedSetOf(), ::openTaskerDescriptor)
+        val defined = linkedSetOf<String>()
+        repeat(classCount) { index ->
+            val classIndex = uint(classOffset + index * 32)
+            check(classIndex < typeDescriptors.size) { "$source has an invalid class type index." }
+            openTaskerDescriptor(typeDescriptors[classIndex.toInt()])?.let(defined::add)
+        }
+        return DexTypeInventory(referenced = referenced, defined = defined)
+    }
+
+    private fun openTaskerDescriptor(descriptor: String): String? {
+        val component = descriptor.dropWhile { character -> character == '[' }
+        return component.takeIf { value -> value.startsWith(OPEN_TASKER_DESCRIPTOR_PREFIX) }
+    }
+
+    private data class DexTypeInventory(
+        val referenced: Set<String>,
+        val defined: Set<String>,
+    )
+
+    private companion object {
+        val DEX_ENTRY_PATTERN = Regex("classes(?:\\d+)?\\.dex")
+        const val DEX_HEADER_BYTES = 112
+        const val MAX_DEX_BYTES = 256L * 1024 * 1024
+        const val OPEN_TASKER_DESCRIPTOR_PREFIX = "Lcom/opentasker/"
+    }
+}
+
 abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
     @get:org.gradle.api.tasks.InputFile
     @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
@@ -1304,6 +1444,18 @@ tasks.register("verifyPlayManifestPolicy") {
     }
 }
 
+val verifyPackagedTypeCompleteness = tasks.register<VerifyPackagedTypeCompletenessTask>(
+    "verifyPackagedTypeCompleteness",
+) {
+    group = "verification"
+    description = "Checks debug and release DEX files for referenced OpenTasker types missing from the APK."
+    dependsOn("packageDebug", "packageRelease")
+    apks.from(
+        layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"),
+        rootProject.layout.projectDirectory.file(expectedReleaseApkPath),
+    )
+}
+
 tasks.register("localQualityGate") {
     group = "verification"
     description = "Runs the deterministic local debug-quality and dependency-report gate."
@@ -1319,6 +1471,7 @@ tasks.register("localQualityGate") {
         verifyCoverageFloor,
         verifyLocaleResources,
         verifyQualityGateSeed,
+        verifyPackagedTypeCompleteness,
         "verifyNativePageAlignment",
         "verifyFuzzDependencyIsolation",
         verifyPerformanceEvidence,
