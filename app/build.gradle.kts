@@ -1,6 +1,9 @@
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 import java.net.URLEncoder
 import java.util.zip.ZipEntry
@@ -177,8 +180,10 @@ val FDROID_MIN_SCREENSHOTS = 4
 val NEWLINE = 10.toChar().toString()
 
 // --- shiroikuma fork: per-build version tail ---
-// forkVersionName = "<upstreamBase>.<base date>.g<base sha>+NNN", forkVersionCode = <upstreamCode>*10000 + N,
-// where N = BUILD_NUMBER from gradle.properties, bumped by every build.
+// forkVersionName = "<upstreamBase>+<base date>.<HH-MM>.g<base sha>+NNN",
+// forkVersionCode = <upstreamCode>*10000 + N, where N = BUILD_NUMBER from gradle.properties, bumped
+// by every build. `+` separates the three top-level groups — upstream's version, the pin, our
+// counter — while the pin's own date, time and sha stay dot-joined, since they describe one commit.
 //
 // N runs MONOTONICALLY. It is reset to 1 only when appVersionCode itself moves — never merely because
 // a sync moved the .g<sha> pin. An installer compares versionCode and nothing else; the date and sha
@@ -212,18 +217,34 @@ fun gitOutput(vararg command: String): String = try {
 // master's tip (which overstates it when custom is not yet rebased).
 val upstreamBaseSha = gitOutput("git", "merge-base", "HEAD", "master").take(8)
 
-// That same commit's date, so versions sort chronologically — a bare sha orders them at random.
-// The commit's committer date, never build time: every build on one upstream base must share a pin.
-val upstreamBaseDate = if (upstreamBaseSha.length == 8) {
-    gitOutput("git", "show", "-s", "--format=%cd", "--date=format:%Y-%m-%d", upstreamBaseSha)
+// That same commit's timestamp, so versions sort chronologically — a bare sha orders them at
+// random, and a bare date ties the moment two syncs land on one day, which is exactly what happened
+// the week upstream got busy: the next field along is then the random sha, so the newer build sorts
+// wherever its hex falls. Hence HH-MM (白い熊, 2026-08-12). Committer date, never build time —
+// every build on one upstream base must share a pin.
+//
+// In UTC: format the raw epoch, NOT --date=format: (the commit's own zone, which this repo used
+// until 2026-08-12) and NOT --date=format-local: (this host's). A watcher reading the same commit
+// back from the GitHub API sees a Z-normalised date, so only UTC lets both sides compute the same
+// string — and with HH-MM a wrong zone misstates the hour on every build instead of quietly
+// skewing ~5% of them by a day.
+val upstreamBaseStamp = if (upstreamBaseSha.length == 8) {
+    gitOutput("git", "show", "-s", "--format=%ct", upstreamBaseSha).toLongOrNull()?.let {
+        Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd.HH-mm"))
+    } ?: ""
 } else {
     ""
 }
 
+// `+` opens each top-level group. Never `~`: git check-ref-format rejects it, so /publish-version
+// could not tag the release; it sorts above every digit (putting 0.2.8 after 0.2.86); and dpkg
+// reads it as a pre-release marker. Never `_` either — not a legal character in a Debian version,
+// which the electron-builder sister forks build from this same string.
 val upstreamPin = when {
     upstreamBaseSha.length != 8 -> ""
-    upstreamBaseDate.length == 10 -> ".$upstreamBaseDate.g$upstreamBaseSha"
-    else -> ".g$upstreamBaseSha"          // git present but the date lookup failed
+    upstreamBaseStamp.length == 16 -> "+$upstreamBaseStamp.g$upstreamBaseSha"
+    else -> "+g$upstreamBaseSha"          // git present but the timestamp lookup failed
 }
 
 // Zero-padded in the NAME only, so +002 sorts before +010. versionCode keeps the plain integer.
