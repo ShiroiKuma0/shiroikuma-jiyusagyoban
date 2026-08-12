@@ -17,6 +17,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.MainActivity
+import com.opentasker.app.R
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.bubbles.FlashBubbleOverlayManager
 import com.opentasker.core.bubbles.FreezeBubbleOverlayManager
