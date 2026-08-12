@@ -80,15 +80,7 @@ data class HealthIndexResult(
     val availableWeight: Double
         get() = components.filter { it.score != null }.sumOf { it.weight }
 
-    val band: Loc
-        get() = when (value) {
-            null -> Loc("—", "—")
-            in 85..100 -> Loc("Excellent", "とても良い")
-            in 70..84 -> Loc("Good", "良い")
-            in 55..69 -> Loc("Standard", "標準")
-            in 40..54 -> Loc("Low", "低い")
-            else -> Loc("Very low", "とても低い")
-        }
+    val band: Loc get() = HealthIndex.bandOf(value)
 }
 
 /** The measurements the index consumes. Any may be null; null means "not measured", never zero. */
@@ -114,6 +106,36 @@ data class HealthIndexInputs(
 )
 
 object HealthIndex {
+
+    /**
+     * The index's own bands, as a step on the shared 1–5 scale.
+     *
+     * These are the cut points the headline has always used to print "Good" beside a 72; naming them
+     * as a step is what lets a component's BAR carry the same claim as the word (白い熊, 2026-08-12:
+     * the bars were tinted by value along one blue, so a shade meant something real but nothing
+     * nameable, and the card looked arbitrary).
+     *
+     * **Applying a total's bands to one component is an extension, not a published rule** — both are
+     * 0–100 on the same construction, which is what makes it defensible, and it is why each bar prints
+     * its band word beside it rather than letting the colour assert it alone.
+     */
+    fun step(score: Int): Int = when {
+        score >= 85 -> 1
+        score >= 70 -> 2
+        score >= 55 -> 3
+        score >= 40 -> 4
+        else -> 5
+    }
+
+    /** The word for a 0–100, or an em dash when there is nothing to band. */
+    fun bandOf(score: Int?): Loc = when (score?.let(::step)) {
+        null -> Loc("—", "—")
+        1 -> Loc("Excellent", "とても良い")
+        2 -> Loc("Good", "良い")
+        3 -> Loc("Standard", "標準")
+        4 -> Loc("Low", "低い")
+        else -> Loc("Very low", "とても低い")
+    }
 
     /**
      * Breakpoints, and where they come from.

@@ -85,23 +85,26 @@ data class MarkerReading(
             RecoveryMarker.NOCTURNAL_HR -> band == RecoveryBand.HIGH
             // Sleeping much longer than usual is not a problem to report.
             RecoveryMarker.SLEEP -> band == RecoveryBand.LOW
-            RecoveryMarker.FELT -> band == RecoveryBand.LOW
+            // 体感 runs 1 = best … 5 = worst since 2026-08-12, so a HIGH rating is now the bad night.
+            // The stored ratings were re-numbered the same day (see RecoveryLog), which is what keeps
+            // this one-word change honest: history is on the new scale too, not half on each.
+            RecoveryMarker.FELT -> band == RecoveryBand.HIGH
             RecoveryMarker.TEMPERATURE -> band == RecoveryBand.HIGH
         }
 
     /**
      * This reading on the shared 1–5 scale, or null when there is nothing to grade.
      *
-     * 3 is inside the usual range; 2 and 1 are outside it in the direction that means worse, 4 and 5
+     * 3 is inside the usual range; 4 and 5 are outside it in the direction that means worse, 2 and 1
      * outside it in the direction that means better, with the far step reached at twice the band's own
      * half-width. It is a re-expression of the banding that is already computed and NOT a new statistic:
      * the same baseline, the same half-width, the same directions [adverse] uses. Nothing is averaged
      * and no threshold is invented — the scale only says which side of the band the value fell, and
      * how far.
      *
-     * Temperature never reaches 4 or 5. It is banded one-sided because only elevation is meaningful at
-     * the wrist; a cool night is unremarkable, not good, and colouring it green would assert something
-     * the measurement cannot support.
+     * Temperature never reaches 1 or 2. It is banded one-sided because only elevation is meaningful at
+     * the wrist; a cool night is unremarkable, not good, and colouring it as a best-step night would
+     * assert something the measurement cannot support.
      */
     val scaleStep: Int?
         get() {
@@ -111,17 +114,20 @@ data class MarkerReading(
             if (band == RecoveryBand.UNKNOWN) return null
             val deviations = (v - b) / halfWidth
             if (deviations in -1.0..1.0) return 3
+            // 体感 sits with heart rate and temperature since the 2026-08-12 flip: on the new scale a
+            // HIGHER number is a worse night, the same direction those two already ran in.
             val worse = when (marker) {
-                RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE -> deviations > 0
-                RecoveryMarker.SLEEP, RecoveryMarker.FELT -> deviations < 0
+                RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE, RecoveryMarker.FELT ->
+                    deviations > 0
+                RecoveryMarker.SLEEP -> deviations < 0
             }
             val far = kotlin.math.abs(deviations) >= 2.0
             if (!worse && marker == RecoveryMarker.TEMPERATURE) return 3
             return when {
-                worse && far -> 1
-                worse -> 2
-                far -> 5
-                else -> 4
+                worse && far -> 5
+                worse -> 4
+                far -> 1
+                else -> 2
             }
         }
 }

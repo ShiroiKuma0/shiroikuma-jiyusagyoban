@@ -3,6 +3,11 @@ package com.opentasker.ui.charts
 /**
  * The 1–5 scale for the values that HAVE a published reference range.
  *
+ * **1 is the best step and 5 the worst** (白い熊, 2026-08-12). It ran the other way until then, and
+ * the ladders below were inverted rather than re-derived: the cut points are the published ones and
+ * did not move, only the numbers printed on them did. `RecoveryLog` re-numbers the stored 体感
+ * ratings the same day and by the same rule, so nothing on file changes meaning.
+ *
  * ## Why this exists beside the within-person banding
  *
  * [Recovery] answers "is tonight unusual **for 白い熊**" — a within-person comparison, which is the
@@ -50,32 +55,32 @@ object RecoveryReference {
     const val SLEEP_RECOMMENDED_MAX = 9 * 60.0
 
     /**
-     * Sleep duration → 1–5.
+     * Sleep duration → 1–5, best first.
      *
-     * 5 is the recommended 7–9 h. 4 is 9–10 h, long but "may be appropriate". 3 is 6–7 h: inside the
-     * same NSF category as 9–10 h but below the AASM line, and so ranked under it. 2 is one further
-     * hour out on either side, 1 beyond that.
+     * 1 is the recommended 7–9 h. 2 is 9–10 h, long but "may be appropriate". 3 is 6–7 h: inside the
+     * same NSF category as 9–10 h but below the AASM line, and so ranked under it. 4 is one further
+     * hour out on either side, 5 beyond that.
      */
     fun sleepStep(minutes: Double): Int = when {
-        minutes >= SLEEP_RECOMMENDED_MIN && minutes <= SLEEP_RECOMMENDED_MAX -> 5
-        minutes > SLEEP_RECOMMENDED_MAX && minutes <= 10 * 60 -> 4
+        minutes >= SLEEP_RECOMMENDED_MIN && minutes <= SLEEP_RECOMMENDED_MAX -> 1
+        minutes > SLEEP_RECOMMENDED_MAX && minutes <= 10 * 60 -> 2
         minutes >= 6 * 60 && minutes < SLEEP_RECOMMENDED_MIN -> 3
-        minutes >= 5 * 60 && minutes < 6 * 60 -> 2
-        minutes > 10 * 60 && minutes <= 11 * 60 -> 2
-        else -> 1
+        minutes >= 5 * 60 && minutes < 6 * 60 -> 4
+        minutes > 10 * 60 && minutes <= 11 * 60 -> 4
+        else -> 5
     }
 
     /**
-     * Nocturnal heart rate → 1–5, on Jensen's resting-rate decades.
+     * Nocturnal heart rate → 1–5, on Jensen's resting-rate decades, best first.
      *
      * Below 50 through 80-and-over, one step per decade. Monotone by construction, because the risk
      * it is standing in for is monotone across exactly these cut points.
      */
     fun nocturnalHrStep(bpm: Double): Int = when {
-        bpm < 50 -> 5
-        bpm < 60 -> 4
+        bpm < 50 -> 1
+        bpm < 60 -> 2
         bpm < 70 -> 3
-        bpm < 80 -> 2
-        else -> 1
+        bpm < 80 -> 4
+        else -> 5
     }
 }

@@ -400,17 +400,23 @@ private fun FeltRow(feltToday: Int?, feltNight: Long?, onFelt: (Int) -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = if (feltToday == null) sectionInk else sectionNote,
         )
+        // The buttons wear the scale's own colours, so the thing 白い熊 taps and the thing the table
+        // prints afterwards are the same object. An unselected step is its colour at low strength
+        // with the colour as ink; the selected one is the filled pill itself.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (n in RecoveryLogScale) {
                 val selected = feltToday == n
+                val tint = ChartPalette.scale(n)
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .then(
                             if (selected) {
-                                Modifier.background(ChartPalette.HEART_RATE.copy(alpha = 0.22f))
+                                Modifier.background(tint)
                             } else {
-                                Modifier.border(1.dp, style.grid, RoundedCornerShape(10.dp))
+                                Modifier
+                                    .background(tint.copy(alpha = 0.20f))
+                                    .border(1.dp, tint, RoundedCornerShape(10.dp))
                             },
                         )
                         // padding BEFORE clickable: the other order makes the touch target the
@@ -422,15 +428,15 @@ private fun FeltRow(feltToday: Int?, feltNight: Long?, onFelt: (Int) -> Unit) {
                 ) {
                     Text(
                         "$n",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (selected) sectionInk else sectionNote,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selected) ChartPalette.scaleInk(n) else tint,
                     )
                 }
             }
             Spacer(Modifier.weight(1f))
             Text(
-                "1 = ${BandText.feltScale1[lang]} · 5 = ${BandText.feltScale5[lang]}",
+                "1 = ${BandText.feltGreat[lang]} · 5 = ${BandText.feltWrecked[lang]}",
                 style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
                 color = sectionNote,
             )
@@ -511,15 +517,15 @@ data class ScaleSkin(val fill: Color, val edge: Color?, val ink: Color)
  * One appearance for every graded value, so a calendar tile and a table cell showing the same step
  * are the same object twice and not two things that happen to share a hue.
  *
- * Step 1 is deliberately not "more red". Red and orange are neighbours on any hue wheel, so at chip
- * size they separated only by hue — the one cue that fails a red-green reader and a glance alike. The
- * worst step therefore gets a different LIGHTNESS and a different ink: dark blood, pale ring, pale
- * numeral. (白い熊's own suggestion, 2026-08-11.)
+ * **Full-strength fill, no outline** (白い熊, 2026-08-12). It used to be a 30 %-alpha wash with the
+ * hue as a ring around it, which made every graded value a tinted outline of the black card rather
+ * than a block of colour, and left the darkest step needing a pale ring to be visible at all. The
+ * colours now carry themselves: each is drawn solid with the ink [ChartPalette.SCALE_INK] pairs it
+ * with. An ungraded value keeps the caller's [neutral], which is the only case with no colour to use.
  */
 fun scaleSkin(step: Int?, neutral: Color, neutralInk: Color): ScaleSkin = when (step) {
     null -> ScaleSkin(neutral, null, neutralInk)
-    1 -> ScaleSkin(Color(0xFF4E100D), Color(0xFFFFDCD8), Color(0xFFFFDCD8))
-    else -> ChartPalette.scale(step).let { ScaleSkin(it.copy(alpha = 0.30f), it, it) }
+    else -> ScaleSkin(ChartPalette.scale(step), null, ChartPalette.scaleInk(step))
 }
 
 /**
@@ -545,12 +551,20 @@ fun nightDateFull(key: Long, lang: BandLanguage): String {
     }
 }
 
+/**
+ * The word for a step, on the scale that runs **1 = best … 5 = worst** (白い熊, 2026-08-12).
+ *
+ * The names are held by meaning rather than by number precisely so a flip like that one is a change
+ * to this table and to nothing else — `feltScale1` meaning "Wrecked" was a trap waiting for exactly
+ * this day. Ratings already on file are re-numbered once by `RecoveryLog`, so a stored 2 that meant
+ * "Below par" is a 4 afterwards and still means it.
+ */
 fun feltLabel(n: Int): Loc = when (n) {
-    1 -> BandText.feltScale1
-    2 -> BandText.feltScale2
-    4 -> BandText.feltScale4
-    5 -> BandText.feltScale5
-    else -> BandText.feltScale3
+    1 -> BandText.feltGreat
+    2 -> BandText.feltGood
+    4 -> BandText.feltBelowPar
+    5 -> BandText.feltWrecked
+    else -> BandText.feltNormal
 }
 
 /** Each marker in its own unit, rounded to the precision it actually has. */
