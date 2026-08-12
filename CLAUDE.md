@@ -47,20 +47,23 @@ the per-item JSON directly instead of asking 白い熊 to screenshot. Rebuild it
 | namespace (R/BuildConfig pkg) | `com.opentasker.app` (**unchanged** from upstream) | `app/build.gradle.kts` |
 | App label | `白い熊 自由作業盤` | `app_name` in `app/src/main/res/values/strings.xml` |
 | App icon | black-yellow (yellow foreground + black background) | `app/src/main/res/mipmap/*`, `values/colors.xml` |
-| Version tail | `versionName = "<base>.<base date>.g<sha8>+NNN"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
+| Version tail | `versionName = "<base>+<base date>.<HH-MM>.g<sha8>+NNN"`, `versionCode = <base>*10000+N` | `app/build.gradle.kts` fork blocks |
 | Signing | gitignored `keystore.properties` → `~/.android-keystores/shiroikuma-jiyusagyoban.jks` (alias `sagyoban`) | `app/build.gradle.kts` |
 
 ### Versioning & APK naming
 - **Upstream tracking: `git`** — `custom` is rebased onto every upstream commit, so the fork
-  versionName pins the upstream base: `<upstream>.<base date>.g<sha>+<BUILD_NUMBER, 3 digits>`.
+  versionName pins the upstream base: `<upstream>+<base date>.<HH-MM>.g<sha>+<BUILD_NUMBER, 3 digits>`.
   See the global **`git-versioning`** skill. (Upstream sat on `0.2.79` for the whole 10-commit
   stretch that became `+2`/`+3` — the literal alone says nothing about how current we are.)
 - Upstream base lives in `app/build.gradle.kts` as `appVersionName` (e.g. `0.2.79`) / `appVersionCode`
   (e.g. `81`) — these track upstream and update automatically on rebase. **Never hand-edit them.**
 - The pin is `git merge-base HEAD master` (the upstream commit our patches sit on — not our HEAD, not
-  `master`'s tip) shortened to 8 chars, plus that commit's own committer date. It moves only on a sync.
+  `master`'s tip) shortened to 8 chars, plus that commit's own committer date **and time, in UTC**
+  (`%ct` epoch → `yyyy-MM-dd.HH-mm`; never `--date=format:`, which renders the commit's own zone).
+  It moves only on a sync. The time is not decoration: two syncs on one day used to leave the random
+  sha as the deciding sort field, so the newer APK landed anywhere in the list (白い熊, 2026-08-12).
 - `BUILD_NUMBER` (in `gradle.properties`) is our per-build `N`:
-  `versionName = "<base>.<YYYY-MM-DD>.g<sha8>+<NNN>"`, `versionCode = <base code>*10000 + N`.
+  `versionName = "<base>+<YYYY-MM-DD>.<HH-MM>.g<sha8>+<NNN>"`, `versionCode = <base code>*10000 + N`.
   Zero-padded to 3 digits **in the name only**; `versionCode` and `gradle.properties` keep the plain
   integer. The `buildFork` task bumps it after every successful build.
 - **`BUILD_NUMBER` runs MONOTONICALLY. Reset it to `1` ONLY when `appVersionCode` itself moves** —
@@ -78,8 +81,12 @@ the per-item JSON directly instead of asking 白い熊 to screenshot. Rebuild it
   rollback to an older APK, not the routine path for a sync. Never `adb uninstall` to work around an
   install refusal — that wipes the workspace database.
 - APK: `shiroikuma-jiyusagyoban_<versionName>_arm64-v8a.apk`, copied to `~/tmp/`. The versionName
-  contains no `_`, so the `shiroikuma-jiyusagyoban_*.apk` globs in `/adb-push`, `/scp` and
-  `/publish-version` still resolve one field per `_`.
+  contains no `_` — but **not** for the reason this file used to give. Those globs are
+  `shiroikuma-jiyusagyoban_*.apk` with a greedy `*`, picked with `ls -t`, and nothing splits an APK
+  name on `_`, so an underscore would not break them (checked 2026-08-12). The real ban is
+  **Debian**: `_` is not legal in a Debian version and the electron-builder sister forks build
+  `.deb`/`.rpm` from this same string. `~` is banned too — `git check-ref-format` rejects it, so
+  `/publish-version` could not tag the release.
 
 ### Build commands
 ```bash
