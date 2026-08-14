@@ -1246,6 +1246,7 @@ fun registerActionMetadata() {
                 ActionField("only", "Keep only", hint = "optional — keep just these item keys (the selected ones); blank = all of them"),
                 ActionField("separator", "Separator", hint = "how Items / labels are split (default a comma)"),
                 ActionField("label", "Rename step", hint = "optional — replace the row's display name"),
+                ActionField("note", "Fold-out note", hint = "an extra line kept off the row itself and shown when the row is unfolded — e.g. where a backup was written"),
             )
         )
     )
@@ -1458,16 +1459,24 @@ fun registerActionMetadata() {
                 ActionField("target", "Dispatch target", FieldType.DROPDOWN, hint = "activity / foreground-service / service / broadcast"),
                 ActionField("extra1_key", "Extra 1 key", hint = "account"),
                 ActionField("extra1_value", "Extra 1 value", hint = "default"),
+                // Every slot can send a typed extra; the receiving app decides whether that matters —
+                // Poweramp's API_COMMAND `rating` reads getIntExtra and ignores a String outright.
+                ActionField("extra1_type", "Extra 1 type", FieldType.DROPDOWN, hint = "blank = a String extra; int / long / float / bool send that type instead (a value that won't parse falls back to the String)", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("extra2_key", "Extra 2 key", hint = "peer"),
                 ActionField("extra2_value", "Extra 2 value", hint = "jami:<40-hex>"),
+                ActionField("extra2_type", "Extra 2 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("extra3_key", "Extra 3 key", hint = "text"),
                 ActionField("extra3_value", "Extra 3 value", hint = "Hello from a task"),
+                ActionField("extra3_type", "Extra 3 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("extra4_key", "Extra 4 key", hint = "token"),
                 ActionField("extra4_value", "Extra 4 value", hint = "automation token"),
+                ActionField("extra4_type", "Extra 4 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("extra5_key", "Extra 5 key"),
                 ActionField("extra5_value", "Extra 5 value"),
+                ActionField("extra5_type", "Extra 5 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("extra6_key", "Extra 6 key"),
                 ActionField("extra6_value", "Extra 6 value"),
+                ActionField("extra6_type", "Extra 6 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
                 ActionField("result_var", "Result variable (broadcast)", hint = "stores the receiver's reply"),
                 ActionField("reply_via", "Reply channel", FieldType.DROPDOWN, options = listOf("", "receiver"),
@@ -1624,8 +1633,11 @@ fun registerActionMetadata() {
             description = "Adjust volume for a stream",
             category = "Settings",
             fields = listOf(
-                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
-                ActionField("level", "Level", FieldType.NUMBER, required = true, hint = "0..max for the stream, or mute / unmute"),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system", options = listOf("music", "ring", "alarm", "notification", "call", "system")),
+                // TEXT, not NUMBER: the numeric input strips every non-digit, so this field could not
+                // hold the mute / unmute its own hint documents (nor a %variable).
+                ActionField("level", "Level", required = true, hint = "0..max for the stream (0..100 with Percent on), or mute / unmute"),
+                ActionField("percent", "Level is a percentage", FieldType.CHECKBOX, hint = "read Level as 0–100 of this stream's maximum, so one value fits every stream (they have different maxima)"),
             )
         )
     )
@@ -1637,8 +1649,9 @@ fun registerActionMetadata() {
             description = "Read the current volume of a stream into a variable",
             category = "Settings",
             fields = listOf(
-                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system"),
-                ActionField("var", "Store in variable", required = true, hint = "Variable name (e.g. VOL) to receive 0..max"),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, required = true, hint = "music / ring / alarm / notification / call / system", options = listOf("music", "ring", "alarm", "notification", "call", "system")),
+                ActionField("var", "Store in variable", required = true, hint = "Variable name (e.g. VOL) to receive 0..max — or 0..100 with Percent on"),
+                ActionField("percent", "Read as a percentage", FieldType.CHECKBOX, hint = "store 0–100 of this stream's maximum instead of the raw step, so the value compares across streams"),
             )
         )
     )
@@ -1990,6 +2003,7 @@ fun registerActionMetadata() {
                 ActionField("project", "Project", required = true),
                 ActionField("group", "Group", required = true),
                 ActionField("suffix", "Task name suffix"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
             )
         )
     )
@@ -2006,6 +2020,7 @@ fun registerActionMetadata() {
                 ActionField("separator", "Separator", hint = "joins the packages (default: space)"),
                 ActionField("include_self", "Include this app", FieldType.DROPDOWN, options = listOf("", "true"),
                     hint = "true = 白い熊 自由作業盤 itself appears in the grid (for backup-target lists); default hides it"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
             )
         )
     )
