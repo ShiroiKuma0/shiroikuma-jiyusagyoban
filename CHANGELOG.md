@@ -8,6 +8,35 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-11.22-10.g9b9d18dd+007 — 2026-08-14
+
+**Every argument the action runtime reads now has a field in its editor form.**
+
+The previous release closed the Show Scene gap; this one closes the rest, found by auditing the
+runtime rather than the workspace — every action class sliced by brace depth, every `args["…"]` it
+reads, checked against what its form declares. Auditing the workspace only finds the arguments that
+happen to be in use, which is why it reported four gaps where there were eight.
+
+**`volume.set` and `volume.get` gain `percent`** — read or write the level as 0–100 of that stream's
+maximum, so one value fits streams whose maxima differ. **`progress.row` gains `note`**, the fold-out
+line deliberately kept off the row itself so the list stays readable. **`intent.send` gains a type
+selector for all six extra slots**, not only the first one this workspace uses: a form where slot 1
+can send an int and slots 2–6 cannot is a worse trap than no typing at all. (Typed extras exist
+because some app APIs read `getIntExtra` and ignore a String outright — Poweramp's `rating` is the
+case that forced it.) **`app.pickmulti` and `tasks.launchers` gain the `timeout`** their shared
+dialog helper has always read, so those two dialogs can stop waiting forever; `dialog.input` and
+`dialog.list` have had the field all along.
+
+**`volume.set`'s Level stops being a numeric field.** The numeric input strips every character that
+is not a digit, so the field could not hold the `mute` / `unmute` its own hint documented, nor a
+`%variable` — the same defect the placement knobs had. Both Stream dropdowns now list their values in
+the picker instead of only in prose.
+
+The audit is pinned as a test rather than left as a one-off script, so the forms cannot drift from
+the runtime again. What remains unclaimed is only the legacy aliases each action resolves internally
+(`ocr.recognize` `result`→`var`, `ocr.article` `image`→`images` and `prefix`→`var`), which prefer the
+current key and are therefore safe under the argument-preservation rule shipped in +006.
+
 ## 0.2.86+2026-08-11.22-10.g9b9d18dd+006 — 2026-08-14
 
 **Show Scene's placement knobs are in the editor at last — and declaring them closed a silent
