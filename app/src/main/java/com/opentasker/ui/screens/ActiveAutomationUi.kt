@@ -158,7 +158,6 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.storage.AppDatabase
-import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.VariableEntity
