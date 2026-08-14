@@ -59,6 +59,25 @@ class RuntimeRegistriesTest {
         assertFieldKeys("http.post", "url", "data", "var", "allow_http")
     }
 
+    /**
+     * Every arg `ShowSceneAction` / `HideSceneAction` read had to be hand-written into a bundle's JSON
+     * because no field declared it — and, worse, the editor rebuilds args from its fields, so opening
+     * such an action and saving dropped them (a `scene.hide` without `scene` dismisses EVERY scene).
+     * Keep the forms and the runtime argument lists in step.
+     */
+    @Test
+    fun sceneFormsExposeEveryRuntimeArgument() {
+        registerActionMetadata()
+
+        assertFieldKeys(
+            "scene.show",
+            "scene", "keepScreenOn", "position", "modal", "dismissOnOutside", "timeout",
+            "inset", "vAlign", "heightFraction", "widthFraction", "hAlign",
+            "fullWidth", "fullscreen", "edgeCenter", "showWhenLocked",
+        )
+        assertFieldKeys("scene.hide", "scene")
+    }
+
     @Test
     fun coreContextSourcesIncludeLiveLocationSource() {
         registerCoreRuntime()
