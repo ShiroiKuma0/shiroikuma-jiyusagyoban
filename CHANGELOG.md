@@ -8,6 +8,43 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+008 — 2026-08-14
+
+**Upstream sync: 10 commits.** Upstream did not move its own version literals — still `0.2.86` /
+code 88 — so only the pin advances: `.2026-08-11.22-10.g9b9d18dd` → `.2026-08-12.15-45.ga1fe8154`.
+The build counter therefore keeps running rather than resetting, which is the whole point of the
+rule: `versionCode` is `appVersionCode * 10000 + N`, and resetting `N` here would have offered
+880002 against 880007 installed.
+
+**Inherited, and worth having: `screen.off` is idempotent.** It sent the power *toggle*, so firing
+it at an already-dark display woke the phone up. It now sends Android's non-toggling sleep key.
+Also inherited: speed contexts unwind a partially registered location listener when a later
+provider rejects registration, instead of stacking a fresh GPS listener on every retry and draining
+the battery continuously.
+
+**Not inherited: the new snapshot destination, and that decision is older than this sync.** Upstream's
+one real feature this round writes scheduled configuration snapshots as encrypted `.otbackup` v2
+archives into a Storage Access Framework folder. An earlier sync had already stripped the entire
+snapshot-schedule UI out of `PermissionOnboardingScreen` and its plumbing out of
+`ActiveAutomationViewModel`, so the new `updateSnapshotDestination` and its passphrase dialog arrive
+attached to code this fork does not have. Keeping our side was the resolution; re-importing a
+surface we deliberately removed was not. The storage classes do merge in and
+`ConfigurationSnapshotWorker.enqueueIfEnabled(…)` still runs at start, but nothing in this build can
+enable the policy, so the path is dormant end to end.
+
+**Upstream deleted the AppFunctions surface, so our note about not declaring it went with it.** The
+manifest carried a comment explaining why this fork withholds upstream's API-36 AppFunctions
+service. Upstream has now removed that service, its metadata and the prototype outright — the
+feature had no user approval path and could never run, while still exposing a platform-bound
+exported component. The comment described a file absent from both trees and pointed at a symbol that
+no longer exists, so it is gone. The reasoning it guarded is untouched and still holds in the code:
+`AutomationTargetReceiver` mints the execution id itself and returns it, rather than adopting one a
+caller chose, so no caller can pick its own key in the shared external-execution ledger.
+
+Upstream also removed an unreachable resilience shim and pointed its release coverage gate at the
+production `VariableExpander` path, and added a packaging check that fails when an APK references an
+`Lcom/opentasker/` type it does not define.
+
 ## 0.2.86+2026-08-11.22-10.g9b9d18dd+007 — 2026-08-14
 
 **Every argument the action runtime reads now has a field in its editor form.**
