@@ -1185,10 +1185,22 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("scene", "Scene name", required = true, hint = "the scene's name — resolves within this task's project first, so a name reused in another project still finds the right one (a numeric id also works)"),
                 ActionField("keepScreenOn", "Keep screen on", FieldType.CHECKBOX, hint = "the overlay blocks the screen timeout while it is shown"),
-                ActionField("position", "Position", FieldType.DROPDOWN, hint = "top / center / bottom (default center)"),
+                ActionField("position", "Position", FieldType.DROPDOWN, hint = "center (default), top, bottom, left or right — left/right are the edge HUDs the two placement fields below position", options = listOf("center", "top", "bottom", "left", "right")),
                 ActionField("modal", "Modal", FieldType.CHECKBOX, hint = "block the app underneath (on) vs tap-through HUD (off)"),
                 ActionField("dismissOnOutside", "Tap outside closes", FieldType.CHECKBOX, hint = "default on; off = close only via Back, a button, or timeout"),
                 ActionField("timeout", "Auto-dismiss (s)", FieldType.NUMBER, hint = "seconds before it closes itself; blank = stay"),
+                // The placement knobs below were reachable only by hand-editing a bundle's JSON. They stay
+                // TEXT rather than NUMBER so a %variable can drive them (the NUMBER field strips anything
+                // that isn't a digit) — which is how the 音楽 buttons and the edge strips are tuned.
+                ActionField("inset", "Edge inset (dp)", hint = "left/right only: dp pulled in from that edge, so the panel sits further towards the centre (blank/0 = flush at the edge, which is also inside the OEM's edge-gesture strip). A %variable works"),
+                ActionField("vAlign", "Vertical centre", hint = "left/right only: 0–1 places the scene's CENTRE at that fraction of the screen height (0.75 = three quarters down) and follows every fold state; or top / center / bottom for a third. A %variable works"),
+                ActionField("heightFraction", "Height fraction", hint = "left/right edge strip: 0–1 of the screen height, re-sized on fold/rotation, extended to the true screen edge. Blank = wrap the scene"),
+                ActionField("widthFraction", "Width fraction", hint = "bottom edge strip: 0–1 of the screen width. Blank = wrap the scene"),
+                ActionField("hAlign", "Horizontal third", FieldType.DROPDOWN, hint = "bottom bar only: which side it sits on (default centre)", options = listOf("left", "center", "right")),
+                ActionField("fullWidth", "Full width", FieldType.CHECKBOX, hint = "span the whole screen width over the status bar, keeping the scene's height (the battery line / clock strip)"),
+                ActionField("fullscreen", "Fullscreen", FieldType.CHECKBOX, hint = "cover the whole screen and pass every touch through — a purely visual overlay (the music edge light)"),
+                ActionField("edgeCenter", "Centre vertically (legacy)", FieldType.CHECKBOX, hint = "left/right only: sit at the vertical centre instead of the media-HUD drop. Superseded by Vertical centre"),
+                ActionField("showWhenLocked", "Show over lockscreen", FieldType.CHECKBOX, hint = "render over the lockscreen without unlocking, waking the screen (shown as an Activity, so it covers the screen)"),
             )
         )
     )
@@ -1288,9 +1300,13 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "scene.hide",
             name = "Hide Scene",
-            description = "Dismiss any scene currently shown.",
+            description = "Dismiss a shown scene — or every one of them when no scene is named.",
             category = "System",
-            fields = emptyList(),
+            fields = listOf(
+                // The runtime has always read this; without a field the editor could not show it, and
+                // saving an edited action dropped it — turning a targeted hide into "hide everything".
+                ActionField("scene", "Scene name", hint = "the scene to dismiss, resolved within this task's project first. Blank = dismiss EVERY shown scene"),
+            ),
         )
     )
 
