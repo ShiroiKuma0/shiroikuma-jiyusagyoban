@@ -78,6 +78,33 @@ class RuntimeRegistriesTest {
         assertFieldKeys("scene.hide", "scene")
     }
 
+    /**
+     * The remaining arguments a form never declared, each found by auditing what the runtime actually
+     * reads: a volume in percent rather than raw steps, the progress row's fold-out note, a typed
+     * intent extra per slot (Poweramp's `rating` wants an int), and the auto-dismiss on the two
+     * dialogs that had no way to set one. Pinned so the forms don't drift from the runtime again.
+     */
+    @Test
+    fun formsDeclareTheArgumentsTheirActionsRead() {
+        registerActionMetadata()
+
+        assertFieldKeys("volume.set", "stream", "level", "percent")
+        assertFieldKeys("volume.get", "stream", "var", "percent")
+        assertFieldKeys(
+            "progress.row",
+            "index", "state", "detail", "items", "item_labels", "parents", "only", "separator",
+            "label", "note",
+        )
+        assertFieldKeys("app.pickmulti", "variable", "title", "separator", "include_self", "timeout")
+        assertFieldKeys("tasks.launchers", "project", "group", "suffix", "timeout")
+
+        // Every extra slot can be typed, not just the first — an inconsistent form is its own trap.
+        val intentFields = ActionMetadataRegistry.get("intent.send")!!.fields.map { it.key }
+        (1..6).forEach { slot ->
+            assertTrue("intent.send missing extra${slot}_type", "extra${slot}_type" in intentFields)
+        }
+    }
+
     @Test
     fun coreContextSourcesIncludeLiveLocationSource() {
         registerCoreRuntime()
