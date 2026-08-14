@@ -8,6 +8,37 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+009 — 2026-08-14
+
+**The backup machinery the fork stopped showing is gone — 182 lines.** An earlier sync removed
+upstream's backup and snapshot UI from the Setup screen and left everything behind it running.
+`BackupSetupCard` and `BackupStateBanner` were defined and never called. The ViewModel kept a
+`backupSetupState` flow that **no composable collected**, and refreshed it by enumerating the backup
+directory, checking for a pending restore and summarising it — real filesystem I/O, dispatched at
+every start, feeding a card no screen showed. `createDatabaseBackup`, `exportDatabaseBackup` and
+`importDatabaseBackup` had no callers anywhere, tests included, and neither did
+`DATABASE_BACKUP_MIME_TYPES` or `databaseBackupExportName()`, orphaned when the fork removed the
+file-picker launchers that used them.
+
+`ConfigurationSnapshotWorker.enqueueIfEnabled` also ran at every start, only to read a policy nothing
+in this build can enable and cancel work that was never scheduled.
+
+**Upstream's `ConfigurationSnapshot*` storage classes are deliberately kept, unreferenced.** They
+merge cleanly on every sync — they did so again in `+008` — and deleting files upstream still
+actively develops would convert that silent success into a modify/delete conflict to re-adjudicate
+by hand every time. Unreferenced code that costs nothing beats a recurring conflict. The reasoning
+sits in `PermissionOnboardingScreen` where the next sync will find it.
+
+`DatabaseBackupManager` itself stays wired: `OpenTaskerApp_NoHilt` still calls
+`applyPendingRestoreIfPresent` at startup, so a staged restore still applies on the next launch.
+Only the ViewModel's unused instance went.
+
+**Upstream's scheduled encrypted backups are not being adopted** (白い熊, 2026-08-14). The SAF
+`.otbackup` v2 archives that arrived in `+008` rest on a user-held passphrase that is required again
+after a reinstall or on another device, and an archive that cannot be decrypted is worse than no
+archive — it reads as protection that isn't there. This fork's backup story stays its own: the
+app-state Export/Import, the sister-app backup window, and the adb workspace bridge.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+008 — 2026-08-14
 
 **Upstream sync: 10 commits.** Upstream did not move its own version literals — still `0.2.86` /
