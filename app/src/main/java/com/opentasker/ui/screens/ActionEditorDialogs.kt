@@ -212,22 +212,52 @@ internal fun ActionPickerDialog(
     )
 }
 
+/**
+ * Older spellings a form field still reads its value from, keyed by (action id, field key). The
+ * editor migrates the value into the current field, so on save the stale key must NOT be carried
+ * over — it would sit alongside the edited one and shadow it. See [preservedActionArgs].
+ */
+private val LEGACY_ARG_ALIASES: Map<Pair<String, String>, String> = mapOf(
+    ("brightness.set" to "brightness") to "level",
+    ("screenshot.take" to "path") to "filename",
+    ("file.read" to "var") to "variable",
+    ("file.write" to "text") to "content",
+    ("file.append" to "text") to "content",
+    ("file.list" to "var") to "variable",
+    ("http.get" to "var") to "variable",
+    ("http.post" to "data") to "body",
+    ("http.post" to "var") to "variable",
+)
+
 internal fun existingActionArgValue(
     actionId: String,
     key: String,
     args: Map<String, String>,
-): String = args[key] ?: when (actionId to key) {
-    "brightness.set" to "brightness" -> args["level"]
-    "screenshot.take" to "path" -> args["filename"]
-    "file.read" to "var" -> args["variable"]
-    "file.write" to "text" -> args["content"]
-    "file.append" to "text" -> args["content"]
-    "file.list" to "var" -> args["variable"]
-    "http.get" to "var" -> args["variable"]
-    "http.post" to "data" -> args["body"]
-    "http.post" to "var" -> args["variable"]
-    else -> null
-}.orEmpty()
+): String = (args[key] ?: LEGACY_ARG_ALIASES[actionId to key]?.let { args[it] }).orEmpty()
+
+/**
+ * The action's existing args that no form field covers — carried across a save untouched.
+ *
+ * The editor rebuilds `args` from its visible fields alone, so anything the metadata doesn't declare
+ * would be dropped by the act of opening an action and pressing Save. That is silent and destructive:
+ * a `scene.hide` losing its `scene` becomes "dismiss EVERY scene", and a `task.return` loses its
+ * `ret:<name>` payload. Rescuing them keeps an edit to one field from rewriting the rest.
+ *
+ * Three kinds of key are deliberately NOT rescued: the field keys themselves (the form owns those,
+ * including one the user just cleared), the [LEGACY_ARG_ALIASES] a field read its value through (the
+ * old key would shadow the new one), and Run Task's `param:` args (its own editor below owns them, so
+ * a parameter deleted there must stay deleted).
+ */
+internal fun preservedActionArgs(
+    actionId: String,
+    fieldKeys: List<String>,
+    existing: Map<String, String>,
+): Map<String, String> {
+    val owned = fieldKeys.toSet() + fieldKeys.mapNotNull { LEGACY_ARG_ALIASES[actionId to it] }
+    return existing.filterKeys { key ->
+        key !in owned && !(actionId == SUB_TASK_ACTION_ID && key.startsWith(SUB_TASK_PARAM_PREFIX))
+    }
+}
 
 @Composable
 internal fun ActionConfigDialog(
@@ -342,7 +372,11 @@ internal fun ActionConfigDialog(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
                             label = label.trim().ifBlank { state.metadata.name },
-                            args = values.filterValues { it.isNotBlank() } + paramArgs,
+                            args = preservedActionArgs(
+                                actionId = state.metadata.id,
+                                fieldKeys = state.metadata.fields.map { it.key },
+                                existing = state.existing?.args.orEmpty(),
+                            ) + values.filterValues { it.isNotBlank() } + paramArgs,
                             continueOnError = state.existing?.continueOnError ?: false,
                             condition = state.existing?.condition,
                         )
