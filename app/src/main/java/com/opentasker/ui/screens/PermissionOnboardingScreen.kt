@@ -98,12 +98,6 @@ private data class PermissionSetupItem(
     val optional: Boolean = false,
 )
 
-data class BackupSetupState(
-    val busy: Boolean,
-    val latestBackupName: String? = null,
-    val pendingRestore: Boolean = false,
-)
-
 private sealed interface PermissionAction {
     data class RuntimePermission(val permission: String) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
@@ -318,105 +312,15 @@ fun PermissionOnboardingScreen(
 // palette, font family, weight and scale — not from upstream's light/dark/high-contrast/AMOLED/
 // Material You modes. The card was left behind unreferenced through several syncs and had to be
 // hand-extended every time upstream added a mode, so it is gone rather than dead.
-@Composable
-internal fun BackupSetupCard(
-    state: BackupSetupState,
-    onCreateBackup: () -> Unit,
-    onExportBackup: () -> Unit,
-    onImportBackup: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Backup and restore", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Create a local database snapshot, export a copy, or stage an import for the next restart.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            BackupStateBanner(state)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = onCreateBackup,
-                    enabled = !state.busy,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                ) {
-                    Text(if (state.busy) "Working..." else "Create Local Backup")
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = onExportBackup,
-                        enabled = !state.busy,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                    ) {
-                        Text("Export", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    OutlinedButton(
-                        onClick = onImportBackup,
-                        enabled = !state.busy,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                    ) {
-                        Text("Import", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackupStateBanner(state: BackupSetupState) {
-    val color = when {
-        state.pendingRestore -> MaterialTheme.colorScheme.primary
-        state.latestBackupName != null -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.secondary
-    }
-    val title = when {
-        state.pendingRestore -> "Restore staged"
-        state.latestBackupName != null -> "Backup available"
-        else -> "No backup yet"
-    }
-    val body = when {
-        state.pendingRestore -> "Restart 白い熊 自由作業盤 to apply the staged restore before the database opens."
-        state.latestBackupName != null -> "Latest backup: ${state.latestBackupName}"
-        else -> "Create a local backup before testing imports or risky automation changes."
-    }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = color.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(
-                if (state.latestBackupName != null || state.pendingRestore) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                contentDescription = title,
-                tint = color,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
+// Upstream's backup card (BackupSetupCard/BackupStateBanner over a BackupSetupState, plus the
+// snapshot-schedule controls that used to sit inside it) is not part of this fork's Setup screen
+// either. An earlier sync removed the controls; the card itself was then left behind uncalled, and
+// the ViewModel went on maintaining the state that fed it — enumerating the backup directory and
+// checking for a pending restore off the main thread at every start, for a card no screen showed.
+// This fork's backup story is its own: the app-state Export/Import, the sister-app backup window,
+// and the adb workspace bridge. Upstream's ConfigurationSnapshot* storage classes are deliberately
+// left in place unreferenced — deleting files upstream still develops would turn their clean
+// auto-merges into a modify/delete conflict on every sync. (白い熊, 2026-08-14.)
 @Composable
 private fun PermissionSetupCard(
     item: PermissionSetupItem,

@@ -28,7 +28,6 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.StorageJson
-import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.ItemGroupEntity
@@ -83,16 +82,6 @@ internal const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
 internal const val OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024
 internal val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
 internal val OPEN_TASKER_BUNDLE_MIME_TYPES = arrayOf("application/json", "text/json", "text/*", "*/*")
-internal val DATABASE_BACKUP_MIME_TYPES = arrayOf(
-    "application/octet-stream",
-    "application/x-sqlite3",
-    "application/vnd.sqlite3",
-    "*/*",
-)
-
-internal fun databaseBackupExportName(): String =
-    "opentasker_backup_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.db"
-
 /** A filesystem-safe timestamp (yyyy-MM-dd_HH-mm-ss) shared by every export's default filename. */
 internal fun exportStamp(): String = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
 
@@ -122,7 +111,6 @@ class ActiveAutomationViewModel(
     private val locationDwellStateStore = LocationDwellStateStore(appContext)
     private val bundleRepository = OpenTaskerBundleRepository(db)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
-    private val databaseBackupManager = DatabaseBackupManager(appContext, db)
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -421,11 +409,6 @@ class ActiveAutomationViewModel(
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
 
-    // Starts with a cheap placeholder; the real state (which enumerates the filesystem) is
-    // loaded off the main thread in init and refreshed after each backup operation.
-    private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
-    val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
-
     private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
     internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
 
@@ -450,9 +433,6 @@ class ActiveAutomationViewModel(
     init {
         viewModelScope.launch {
             runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
-        }
-        viewModelScope.launch {
-            runCatching { refreshBackupSetupState(busy = false) }
         }
     }
 
@@ -900,60 +880,6 @@ class ActiveAutomationViewModel(
                 events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
             }
         }
-    }
-
-    fun createDatabaseBackup() {
-        launchBackupOperation {
-            databaseBackupManager.backup()
-                .onSuccess { backup ->
-                    events.send("Backup created: ${backup.name}")
-                }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup failed"}") }
-        }
-    }
-
-    fun exportDatabaseBackup(uri: Uri) {
-        launchBackupOperation {
-            val backup = databaseBackupManager.backup().getOrElse {
-                events.send("Error: ${it.message ?: "Database backup failed"}")
-                return@launchBackupOperation
-            }
-            databaseBackupManager.exportBackup(backup, uri)
-                .onSuccess { events.send("Backup exported: ${backup.name}") }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup export failed"}") }
-        }
-    }
-
-    fun importDatabaseBackup(uri: Uri) {
-        launchBackupOperation {
-            databaseBackupManager.stageRestore(uri)
-                .onSuccess { events.send("Backup imported. Restart 白い熊 自由作業盤 to apply the restore.") }
-                .onFailure { events.send("Error: ${it.message ?: "Database backup import failed"}") }
-        }
-    }
-
-    private fun launchBackupOperation(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            _backupSetupState.value = _backupSetupState.value.copy(busy = true)
-            try {
-                block()
-            } finally {
-                refreshBackupSetupState(busy = false)
-            }
-        }
-    }
-
-    private suspend fun refreshBackupSetupState(busy: Boolean) {
-        // Backup enumeration and pending-restore checks hit the filesystem; keep them off
-        // the main thread (debug StrictMode flags them otherwise).
-        val loaded = withContext(Dispatchers.IO) {
-            BackupSetupState(
-                busy = busy,
-                latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
-                pendingRestore = databaseBackupManager.hasPendingRestore(),
-            )
-        }
-        _backupSetupState.value = loaded
     }
 
     /**
