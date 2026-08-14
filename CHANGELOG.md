@@ -8,6 +8,35 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-11.22-10.g9b9d18dd+006 — 2026-08-14
+
+**Show Scene's placement knobs are in the editor at last — and declaring them closed a silent
+data-loss path that had been open the whole time.**
+
+Nine arguments `ShowSceneAction` has always read had no field in the form, so the only way to set
+them was to hand-write the JSON of a bundle and import it: `inset`, `vAlign`, `heightFraction`,
+`widthFraction`, `hAlign`, `fullWidth`, `fullscreen`, `edgeCenter`, `showWhenLocked`. They are not
+exotic — the 音楽 良/削 buttons, the side and bottom edge strips, the battery line, the clock strip
+and the wakedance are all steered by them. `inset` and the two fractions are **text** fields rather
+than numeric ones on purpose: the numeric input filters out every character that is not a digit,
+which would have eaten the `%variable` that drives them on the first edit. `position` gained its
+picker and lost a hint that advertised top / center / bottom while `left` and `right` are what the
+edge HUDs actually use, and **Hide Scene** finally shows its one and only argument.
+
+**Any argument the form does not declare now survives a save.** The editor rebuilt an action's
+`args` from its visible fields alone, so opening an action and pressing Save dropped everything else
+— across the workspace, 145 arguments in 17 shapes. The worst of them was the scene name on all 45
+`scene.hide` actions, which had no field at all: an empty `scene` means *dismiss every scene*, so
+editing one of them would have taken down the clock strip and the battery line along with the
+intended panel. `task.return`'s `ret:<name>` payloads were in the same boat. The rescue deliberately
+does not cover the three kinds of key the form legitimately owns — a field the user just cleared, the
+legacy spelling a field read its value through (keeping it would shadow the edit), and Run Task's
+`param:` arguments, whose own editor may have just deleted one.
+
+**Versions now pin the upstream base to the minute.** The version name groups the pin with a `+` and
+carries the time — `0.2.86+2026-08-11.22-10.g9b9d18dd+006` — because two syncs on one day used to
+leave the random sha as the deciding sort field, landing the newer APK anywhere in a file listing.
+
 ## 0.2.86.2026-08-11.g9b9d18dd+003 — 2026-08-12
 
 **A lighter 4, and the Health Index bars now mean something.**
