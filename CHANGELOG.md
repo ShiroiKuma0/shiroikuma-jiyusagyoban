@@ -8,6 +8,33 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+010 — 2026-08-15
+
+**Any past night can now be rated, and any rating changed.** The 回復 card asks about exactly one
+night, because one night is what the card is about — so a morning spent away from the phone left a
+permanent hole, and a step tapped wrong stayed wrong. Both are now fixed where every night already
+lives: in 運動と回復, **every calendar tile and every line of the night table is a button**, and each
+opens the same editor for that one night.
+
+The editor names the night in full — `2026-08-12（水）の夜` — above the five steps, because a rating
+filed against the wrong night is worse than no rating: it is wrong data that looks authored, and it
+goes on feeding the baseline and the counting rule silently. The steps are full-width rows in the
+scale's own solid colours, the one on file carries a ✓, and tapping it withdraws the rating exactly as
+tapping the selected pill does on the card. That rule is now shared code rather than duplicated
+(`setFeltToday` → `setFelt(dateKey, rating)`), so one gesture cannot come to mean two things depending
+on which screen made it.
+
+A night filled in three weeks late is not a lesser rating: same store, same night-start key, same
+baseline, same ≥2-of-3 count, all of it recomputed on the spot.
+
+**A rating on a day the band recorded nothing now shows on its own tile.** The grid's `felt` came from
+the recorded nights alone, so such a rating was visible only in the table below — which is precisely
+the day most likely to be missing one, and now precisely the tile most likely to be tapped. It falls
+back to the store, so a tap fills the blank square in rather than appearing to do nothing at all. This
+is the same hole the night table closed a level up (`+2026-08-11`: "where's the fourth data point?").
+The two directions between a grid day and a rating key (`dateKeyOf` / `epochDayOf`) are one pair of
+functions beside the grid they serve, and a test walks 41 consecutive days through both.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+009 — 2026-08-14
 
 **The backup machinery the fork stopped showing is gone — 182 lines.** An earlier sync removed

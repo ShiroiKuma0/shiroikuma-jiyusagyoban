@@ -222,6 +222,48 @@ class SessionRegisterTest {
     }
 
     /**
+     * A rating on a day the band recorded no night for still fills its own tile.
+     *
+     * The grid is where such a night is rated — it is the only place that HAS a square for a day with
+     * nothing measured on it, which is exactly the day a rating is most likely to be missing from. If
+     * the tile were driven by the nights alone it would stay blank after the tap, and the one visible
+     * consequence of rating a past night would be that nothing visibly happened.
+     */
+    @Test
+    fun `a rating with no night of its own still fills its tile`() {
+        val orphan = dateKey(base + 4 * day)
+        val r = SessionRegister.build(
+            sessions = emptyList(),
+            nights = listOf(night(2, 60.0)),
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 6,
+            ratings = mapOf(orphan to 2),
+            dateOfNight = ::dateKey,
+        )
+        val cell = r.days.first { it.epochDay == base / day + 4 }
+        assertEquals("the tapped rating is on the tile", 2, cell.felt)
+        assertNull("without inventing a night to hang it on", cell.adverseCount)
+    }
+
+    /**
+     * The grid's day index and the table's date key name the same night in both directions.
+     *
+     * Tapping a tile has to produce the key the table, the store and the counting rule already use;
+     * anything else would file the rating one row away from where it is read back, which is the exact
+     * shape of the night-keying bug of 2026-08-10.
+     */
+    @Test
+    fun `a grid day and its rating key convert both ways`() {
+        (0..40).forEach { i ->
+            val epochDay = base / day + i
+            val key = SessionRegister.dateKeyOf(epochDay)
+            assertEquals("the table would print the same date", dateKey(epochDay * day), key)
+            assertEquals("and it converts back", epochDay, SessionRegister.epochDayOf(key))
+        }
+        assertNull("a key that is not a date is not guessed at", SessionRegister.epochDayOf(20260231L))
+    }
+
+    /**
      * Temperature is reported but never counted — the same rule the 回復 card follows, so the register
      * and the card can never disagree about how many markers were off on one night.
      */

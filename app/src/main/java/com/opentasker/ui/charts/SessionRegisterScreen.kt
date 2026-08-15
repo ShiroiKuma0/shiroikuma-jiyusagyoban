@@ -3,6 +3,7 @@ package com.opentasker.ui.charts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -56,17 +59,31 @@ import kotlin.math.roundToInt
  *
  * Expect it to look sparse for a fortnight. That is the honest state of a register with one session
  * in it, and padding it out with derived numbers is precisely what this whole feature refuses to do.
+ *
+ * ## Why the past is editable here and nowhere else
+ *
+ * The 回復 card rates exactly one night, because one night is what the card is about. Everything else
+ * 白い熊 has lived through is on this screen — so a night missed because the phone was elsewhere that
+ * morning, or one tapped a step wrong, could be seen here and changed nowhere. Both the tiles and the
+ * table lines are therefore the way in to [RateNightDialog], and the rating they write is the ordinary
+ * one: same store, same night-start key, same baseline. See [BandDashboardModel.setFelt].
  */
 @Composable
 fun SessionRegisterScreen(
     register: SessionRegister.Register?,
     contentPadding: PaddingValues,
+    /** `yyyyMMdd` of the night, then the 1–5 step. Re-tapping the step on file withdraws it. */
+    onRate: (Long, Int) -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
     val zone = remember { ZoneId.systemDefault() }
+    // The night being rated, by the key it is filed under — one piece of state for both entry points,
+    // so a tile and a table line cannot open two different editors. Saveable because a rotation with
+    // the dialog open must not silently drop the night 白い熊 had chosen.
+    var rating by rememberSaveable { mutableStateOf<Long?>(null) }
 
     Column(
         Modifier
@@ -94,7 +111,8 @@ fun SessionRegisterScreen(
             register?.let { r ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Grid(r.days, zone)
+                        Grid(r.days, zone, onRate = { rating = SessionRegister.dateKeyOf(it) })
+                        RateHint()
                         Text(
                             BandText.registerLegend[lang],
                             style = MaterialTheme.typography.bodyMedium,
@@ -103,7 +121,23 @@ fun SessionRegisterScreen(
                     }
                 }
 
-                NightsCard(r.rows)
+                NightsCard(r.rows, onRate = { rating = it })
+
+                rating?.let { key ->
+                    RateNightDialog(
+                        dateKey = key,
+                        // Straight from the store's own row, never from the night's banded marker: the
+                        // dialog offers back the number 白い熊 typed, so tapping it again withdraws it
+                        // rather than re-writing something adjacent to it. A day with neither a night
+                        // nor a rating has no row at all, which is exactly "not rated yet".
+                        current = r.rows.firstOrNull { it.dateKey == key }?.felt,
+                        onPick = { step ->
+                            onRate(key, step)
+                            rating = null
+                        },
+                        onDismiss = { rating = null },
+                    )
+                }
 
                 r.contrast?.let { c ->
                     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -148,9 +182,20 @@ fun SessionRegisterScreen(
  * a night rated 3 and a night never rated: a count of markers is not a reading, and 白い熊 could not
  * tell one from the other (2026-08-11). The count survives as the tile's ring, where it qualifies the
  * score instead of standing in for it, and the session load as the bar beneath.
+ *
+ * **Every tile is a button.** A tile is the smallest thing on the screen that names one night, so it
+ * is the natural place to reach for when a night is wrong — and unlike the table below it, the grid
+ * has a square for a day the band recorded nothing at all, which is precisely the day a rating is
+ * most likely to be missing from. Ratings on such days reach [SessionRegister.DayCell.felt] straight
+ * from the store, so a tap fills a blank tile in rather than appearing to do nothing.
  */
 @Composable
-private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
+private fun Grid(
+    days: List<SessionRegister.DayCell>,
+    zone: ZoneId,
+    /** The tapped tile's epoch day. */
+    onRate: (Long) -> Unit,
+) {
     val style = LocalChartStyle.current
     val maxLoad = days.mapNotNull { it.sessionLoad }.maxOrNull()?.takeIf { it > 0 } ?: 1.0
     val labels = remember(zone) { DateTimeFormatter.ofPattern("d").withZone(zone) }
@@ -239,7 +284,11 @@ private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
                                         } else {
                                             Modifier
                                         },
-                                    ),
+                                    )
+                                    // The whole tile, not the digit inside it: these squares are a
+                                    // seventh of a phone's width, and a hit area any smaller than the
+                                    // paint would be a target 白い熊 has to aim at.
+                                    .clickable { onRate(cell.epochDay) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
@@ -295,7 +344,7 @@ private fun Grid(days: List<SessionRegister.DayCell>, zone: ZoneId) {
  * reading is visible as an absence instead of being silently closed over.
  */
 @Composable
-private fun NightsCard(rows: List<SessionRegister.NightRow>) {
+private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> Unit) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -320,6 +369,7 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>) {
                 var showBands by remember { mutableStateOf(false) }
                 ScaleLegend(onInfo = { showBands = !showBands })
                 if (showBands) ReferenceBandsPanel()
+                RateHint()
                 // The field names appear ONCE, as column headings. Repeating them on every line was
                 // four labels a night of pure noise, and it buried the numbers they were labelling.
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -335,7 +385,7 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>) {
                 // the Friday before it. Weeks are how a run of nights is actually remembered — "that
                 // was the weekend" — and without them ten dates are just ten dates.
                 rows.forEachIndexed { i, row ->
-                    NightTableRow(row)
+                    NightTableRow(row, onRate = { onRate(row.dateKey) })
                     if (i < rows.lastIndex) {
                         when (weekdayOf(row.dateKey)) {
                             java.time.DayOfWeek.MONDAY -> 2.5.dp
@@ -552,10 +602,15 @@ private fun RowScope.HeadCell(text: String, weight: Float) {
  * than a gap, because an absence is itself a fact about the night.
  */
 @Composable
-private fun NightTableRow(row: SessionRegister.NightRow) {
+private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
     val lang = LocalBandLanguage.current
     val n = row.night
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 3.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        // clickable OUTSIDE the padding, so the gap between two lines belongs to one of them rather
+        // than to neither — the rows are 3 dp apart and a dead strip there would be most of the misses.
+        modifier = Modifier.clickable(onClick = onRate).padding(vertical = 3.dp),
+    ) {
         Text(
             nightDateFull(row.dateKey, lang),
             Modifier.weight(0.28f),
@@ -613,6 +668,122 @@ private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float) {
             fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
             color = skin.ink,
         )
+    }
+}
+
+/**
+ * That the nights can be tapped, said out loud — on both cards, in the same words.
+ *
+ * A tile and a table line look exactly as they did before they became buttons, and nothing else on
+ * this screen is tappable, so there is no established gesture to infer this one from. It is printed in
+ * the data ink rather than the note ink for that reason: it is an instruction, not a caveat.
+ */
+@Composable
+private fun RateHint() {
+    val lang = LocalBandLanguage.current
+    Text(
+        BandText.registerRateHint[lang],
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold,
+        color = sectionInk,
+    )
+}
+
+/**
+ * Rate one named night — the editor behind every tile and every table line.
+ *
+ * ## Why a dialog, and why the date is the first thing in it
+ *
+ * The card's row of five pills works because there is only one night it could mean. Here there are
+ * five weeks of them, and a rating filed against the wrong night is worse than no rating: it is wrong
+ * data that looks authored, and it goes on feeding the baseline and the counting rule silently. So the
+ * night is named in full, weekday and all, above the thing that writes it — and the editor is modal so
+ * the only night on screen while choosing is the one being chosen for.
+ *
+ * The steps are full-width rows rather than the card's compact pills, in the same scale colours and
+ * the same order. A row is unmissable at arm's length where a 12 dp pill is not, and this is the
+ * screen where a slip is least likely to be noticed afterwards.
+ *
+ * Any tap closes the dialog. Nothing is "applied" separately: with one value to set there is no state
+ * to accumulate, and a picker that then wants confirming is a second chance to file the wrong thing.
+ */
+@Composable
+private fun RateNightDialog(
+    dateKey: Long,
+    current: Int?,
+    onPick: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val lang = LocalBandLanguage.current
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.5.dp, sectionInk, RoundedCornerShape(18.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                BandText.recoveryAsk[lang].format(nightDateFull(dateKey, lang)),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+            for (step in 1..5) {
+                val skin = scaleSkin(step, Color.Transparent, sectionNote)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(skin.fill)
+                        .clickable { onPick(step) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "$step",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = skin.ink,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        feltLabel(step)[lang],
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = skin.ink,
+                    )
+                    // The rating on file is marked by a GLYPH, not by a lighter fill or a ring: the
+                    // five colours are fixed and solid by 白い熊's own decision (2026-08-12), and a
+                    // sixth appearance for "this one is selected" would be a colour to learn on a
+                    // screen whose whole point is that the colours already mean something.
+                    if (current == step) {
+                        Text(
+                            "✓",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = skin.ink,
+                        )
+                    }
+                }
+            }
+            NoteText(BandText.rateClearHint[lang])
+            NoteText(BandText.rateLateNote[lang])
+            Text(
+                BandText.rateClose[lang],
+                Modifier
+                    .align(Alignment.End)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+        }
     }
 }
 
