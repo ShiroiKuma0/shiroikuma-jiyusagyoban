@@ -102,6 +102,7 @@ class BandChartsActivity : ComponentActivity() {
                             SessionRegisterScreen(
                                 register = state.register,
                                 contentPadding = insets,
+                                onRate = model::setFelt,
                                 onBack = { selected = null },
                             )
                         } else if (selected == MetricSpecs.KEY_MARK_SESSION) {

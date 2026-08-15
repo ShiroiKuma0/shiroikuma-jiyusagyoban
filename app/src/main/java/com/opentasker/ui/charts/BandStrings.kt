@@ -168,6 +168,25 @@ object BandText {
         "Each tile is the night that started that day, filled in your 体感's own colour from the scale below — 1 is the best night, 5 the worst. A ring means one measured marker was outside your usual range that night, a thicker ring two or more. The bar underneath is session load, its width the MET-minutes.",
         "各タイルはその日に始まった夜で、下の尺度と同じ体感の色で塗る — 1 が最良、5 が最悪。縁があるのは測定指標が平常の範囲外だった夜、太ければ二つ以上。下の棒はその日の運動量で、幅が MET分。",
     )
+    // ---- 過去の夜を評価する ----------------------------------------------------------------------
+    //
+    // The card can only ever rate LAST night, because that is the only night it is about. Every other
+    // night 白い熊 has lived through is on this screen, so this is where a missed one is filled in and
+    // a mistaken one corrected. The hint is printed on both cards, in the same words, because the
+    // gesture is invisible until someone says it exists.
+    val registerRateHint = Loc(
+        "Tap any night — a tile above, or a line of the table — to rate it, or to change a rating already given.",
+        "どの夜でも押せる。上のタイルでも、表の行でも、押せばその夜の体感を付けられる。付け直しも同じ。",
+    )
+    val rateClearHint = Loc(
+        "Tapping the number already chosen removes the rating — a night can always go back to unrated.",
+        "すでに選ばれている数字をもう一度押すと評価を取り消す。いつでも未評価に戻せる。",
+    )
+    val rateLateNote = Loc(
+        "A night filled in late counts exactly like one rated that morning: same store, same baseline, same counting rule.",
+        "あとから付けた評価も、その朝に付けたものとまったく同じに扱う。保存先も、比較の基準も、数え方も同じ。",
+    )
+    val rateClose = Loc("Close", "閉じる")
     // ---- 夜ごとの記録 --------------------------------------------------------------------------
     // The grid can only show a count, and a count is not a reading. These print what is stored.
     val registerNightsTitle = Loc("Every night and every rating — %d lines, %d rated", "夜と評価のすべて — %d 行、うち %d 件は評価あり")
