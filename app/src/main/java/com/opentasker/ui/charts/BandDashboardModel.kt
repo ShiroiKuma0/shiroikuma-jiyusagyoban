@@ -360,14 +360,31 @@ class BandDashboardModel(
         // therefore filed every morning's answer against a night that had not happened yet, and the
         // card showed the previous day's rating for ever. Reported 2026-08-10: rated 2, card said
         // Normal.
-        val key = feltKey(state.value.recovery?.nightStartMs, zone)
+        setFelt(feltKey(state.value.recovery?.nightStartMs, zone), rating)
+    }
+
+    /**
+     * Rate — or un-rate — ONE named night, whichever night it is.
+     *
+     * The general form of [setFeltToday], and the whole of what the register's editor needs: there the
+     * night is chosen by tapping a calendar tile or a table line, so its key arrives as an argument
+     * instead of being derived from what the card happens to be showing.
+     *
+     * A rating written here is not a lesser kind of rating. It goes into the same store under the same
+     * night-start key, so the counting rule, the baseline every marker is banded against, the grid and
+     * the table all pick it up on the [refresh] below — an evening filled in three weeks late counts
+     * exactly as one filled in that morning.
+     */
+    fun setFelt(dateKey: Long, rating: Int) {
         // Tapping the value already selected REMOVES it. A rating you can change but never withdraw
         // is a trap: a stray tap becomes permanent data 白い熊 did not author, and the marker would
-        // then be counted against a number nobody meant. (Found exactly that way, 2026-08-09.)
-        if (RecoveryLog.rating(appContext, key) == rating) {
-            RecoveryLog.clear(appContext, key)
+        // then be counted against a number nobody meant. (Found exactly that way, 2026-08-09.) It has
+        // to behave identically here, or the same gesture would mean two different things depending
+        // on which screen it was made from.
+        if (RecoveryLog.rating(appContext, dateKey) == rating) {
+            RecoveryLog.clear(appContext, dateKey)
         } else {
-            RecoveryLog.setRating(appContext, key, rating)
+            RecoveryLog.setRating(appContext, dateKey, rating)
         }
         refresh()
     }

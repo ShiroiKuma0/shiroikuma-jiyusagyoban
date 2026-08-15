@@ -35,6 +35,29 @@ object SessionRegister {
     /** A night is "after" a session if it starts within this long of the session ending. */
     const val PAIRING_WINDOW_MS = 20 * 3_600_000L
 
+    /**
+     * The two directions between a grid day and the key its rating is filed under.
+     *
+     * The grid counts in epoch days because that is what the load and the nights are bucketed by; a
+     * rating is keyed `yyyyMMdd` because that is the shape the band's own daily records use. Tapping a
+     * tile has to cross between them, so the conversion lives here, next to the grid it serves, rather
+     * than being written out twice in the screen.
+     *
+     * Both are the LOCAL date: the caller's `zoneOffsetMs` has already been added by the time a day
+     * index reaches these, exactly as it has for every other cell on the row.
+     */
+    fun dateKeyOf(epochDay: Long): Long = java.time.LocalDate.ofEpochDay(epochDay)
+        .let { it.year * 10_000L + it.monthValue * 100L + it.dayOfMonth }
+
+    /** `yyyyMMdd` → epoch day. Null rather than a guess when the key is not a real date. */
+    fun epochDayOf(dateKey: Long): Long? = runCatching {
+        java.time.LocalDate.of(
+            (dateKey / 10_000L).toInt(),
+            ((dateKey / 100L) % 100L).toInt(),
+            (dateKey % 100L).toInt(),
+        ).toEpochDay()
+    }.getOrNull()
+
     /** Below this on either side, the contrast is not a comparison. */
     const val MIN_CONTRAST_NIGHTS = 4
 
@@ -186,8 +209,15 @@ object SessionRegister {
         val feltByDay = nights.mapNotNull { n ->
             n.felt.value?.let { dayOf(n.startMs) to it.toInt() }
         }.toMap()
+        // A rating filed against a date the band recorded no night for has no [NightReading] to carry
+        // it, so its tile would sit empty while the table below printed the score — the same hole the
+        // rows fixed, one level up. Now that a tile is also where a rating is TAPPED, an empty tile
+        // after a tap would read as the tap having done nothing at all. The store is therefore the
+        // fallback, and a tile means one thing either way: the rating filed for the night that started
+        // that day.
+        val ratingByDay = ratings.mapNotNull { (date, r) -> epochDayOf(date)?.let { it to r } }.toMap()
         val days = (fromEpochDay..toEpochDay).map { d ->
-            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d])
+            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d])
         }
 
         // The union, so a rating whose date the band never recorded is still a line. Newest first.
