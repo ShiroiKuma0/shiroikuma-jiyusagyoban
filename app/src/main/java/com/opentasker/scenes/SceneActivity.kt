@@ -70,6 +70,8 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhoneInTalk
+import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -1061,9 +1063,15 @@ private fun sceneBool(s: String): Boolean = s.trim().lowercase() in setOf("true"
 private fun sliderIcon(name: String?): ImageVector? = when (name?.trim()?.lowercase()) {
     "brightness", "light", "sun" -> Icons.Filled.LightMode
     "media", "music", "song", "note" -> Icons.Filled.MusicNote
-    "ring", "ringer", "notification", "notif", "bell" -> Icons.Filled.Notifications
+    // The ringer and the notification stream are separate sliders on 音量パネル, so they must not share
+    // the bell: ring = the incoming-call ringtone (handset under sound rays), notification = the bell.
+    "ring", "ringer", "ringtone" -> Icons.Filled.RingVolume
+    "notification", "notif", "bell" -> Icons.Filled.Notifications
     "alarm", "clock" -> Icons.Filled.Alarm
-    "call", "phone" -> Icons.Filled.Call
+    // Likewise `call` is the in-call earpiece volume, drawn as a handset mid-conversation; `handset`
+    // keeps the plain receiver reachable for scenes that mean "a phone call" generically.
+    "call", "phone", "incall", "voicecall" -> Icons.Filled.PhoneInTalk
+    "handset", "dialer" -> Icons.Filled.Call
     "mic", "microphone" -> Icons.Filled.Mic
     "volume", "vol" -> Icons.AutoMirrored.Filled.VolumeUp
     else -> null
