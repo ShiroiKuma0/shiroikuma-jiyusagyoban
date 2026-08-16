@@ -48,6 +48,17 @@ object ShizukuPowerBackend {
     private const val PREFERENCES = "shizuku-power"
     private const val KEY_KILL_SWITCH = "kill-switch-enabled"
 
+    /**
+     * Every action that can only run through the privileged transport, so [hintForAction] can say so.
+     *
+     * This has to hold exactly the keys [ShizukuCommandPolicy] pins commands for. It is a second list
+     * of the same fact, and it drifted: `wake` was pinned there and never added here, so the one thing
+     * this set exists to do — explain WHY a blocked action is blocked — fell through to the generic
+     * "Optional elevated backend is not active." for the one action that fails without Shizuku
+     * outright ([com.opentasker.core.actions.WakeAction] returns "Screen wake needs Shizuku" and stops).
+     * `screen.off` survived the same omission only because it tries accessibility first.
+     * `allowlistPinsEveryElevatedCommandVariant` is what compares the two; keep them in step.
+     */
     val elevatedActionIds: Set<String> = setOf(
         "airplane.toggle",
         "mobile.toggle",
@@ -55,6 +66,7 @@ object ShizukuPowerBackend {
         "screenshot.take",
         "reboot",
         "screen.off",
+        "wake",
     )
 
     /** Defaults on so a process restart never enables privileged behavior before preferences load. */

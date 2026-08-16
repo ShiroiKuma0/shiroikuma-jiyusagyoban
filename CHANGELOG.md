@@ -8,6 +8,35 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+013 — 2026-08-16
+
+**A blocked 画面点灯 now says it is Shizuku that is missing.** `wake` had a pinned privileged command
+and a Shizuku capability declaration, but was left out of `elevatedActionIds` — the set that exists for
+exactly one purpose, explaining WHY a blocked elevated action is blocked. So the one action that fails
+without Shizuku outright (`WakeAction` returns "Screen wake needs Shizuku" and stops) was the one whose
+explanation fell through to the generic "Optional elevated backend is not active." `screen.off` was
+omitted the same way and only escaped it by trying accessibility first.
+
+The set now matches the pinned command allowlist, which is what the test comparing them was saying all
+along — its two arguments were the wrong way round, so JUnit named the stale set as the expectation and
+the pin as the error, and the failure read as though the test were at fault. Pin first now.
+
+## 0.2.86+2026-08-12.15-45.ga1fe8154+011 — 2026-08-16
+
+**The 着信 and 通知 sliders no longer wear the same bell.** `sliderIcon()` folded `ring`, `ringer`,
+`notification`, `notif` and `bell` onto one icon, so 音量パネル drew an identical bell on two adjacent
+bands that control different streams — the one place an icon has real work to do is telling neighbours
+apart, and there it said nothing at all.
+
+Split by sense rather than by name: `ring` / `ringer` / `ringtone` take `RingVolume`, a handset under
+sound rays, which is the incoming call; `notification` / `notif` / `bell` keep the bell. The 通話 band
+moves the same way, because it had the reverse problem — `call` is the in-call earpiece volume, so it
+takes `PhoneInTalk` (a handset mid-conversation), and the plain receiver stays reachable under the new
+`handset` / `dialer` names for scenes that mean "a phone call" generically.
+
+No scene data changed: 音量パネル.json already named its two streams apart, so this is the app finally
+drawing the distinction the scene had been making all along.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+010 — 2026-08-15
 
 **Any past night can now be rated, and any rating changed.** The 回復 card asks about exactly one
@@ -418,55 +447,6 @@ per changelog release from v0.2.58 onward, matching `releaseTagCommit` and an an
 fork's capability counts (172 actions, bundle schema 5, Room 27); the gate itself hangs only off
 `verifyFdroidMetadata` and `localQualityGate`, neither of which `buildFork` runs, and the fork ships
 no F-Droid metadata to verify. The upstream test asserting those keys stays retired here.
-
-## 0.2.84.2026-08-11.g5c01f064+012 — 2026-08-11
-
-**Upstream sync: 11 commits, 71 files. Upstream did not move its own version literals**, so the pin
-alone advances: `.2026-08-11.g08847560` → `.2026-08-11.g5c01f064`. The build counter therefore keeps
-running — `+011` → `+012`, `versionCode 860012` — because `versionCode` is the only thing an installer
-compares, and resetting `N` while `appVersionCode` stands still would make the sync a downgrade.
-
-**What landed from upstream.** Elevated actions now run through a versioned Shizuku AIDL user service
-that rechecks exact argv inside the privileged process and unbinds on teardown; the fork takes the
-service and its `reboot` path, which previously just refused. UnifiedPush registration became a real
-distributor-neutral connector — discovery, SDK-versioned identity registration, RFC 8291 decryption,
-endpoint persistence and delivery acknowledgement — with ntfy's standard JSON reaching `event=push`
-and the legacy token broadcast still accepted. Scene-canvas elements announce their type, label,
-position, size and selection state with custom select/nudge/resize actions, user-facing enum and error
-copy moved behind resources, and the locale gate now rejects an empty locale directory by name instead
-of skipping it.
-
-**The action and context pickers gained search — on the fork's own labels.** Upstream's search filters
-a localized triple it builds by resolving three `@StringRes` ids per item. The fork keeps names,
-descriptions and categories as inline strings on `ActionMetadata` itself — some of them Japanese, and
-far more actions than upstream ships — so the filter runs straight over the metadata instead, matching
-display name, description or stable id (`file.read` finds the action as readily as "Read file" does).
-Both catalogues are built once inside `remember` rather than rebuilt on every keystroke.
-
-**Upstream deleted two sealed members the fork still uses, and git applied it cleanly.** Making
-action and context removal immediate-and-undoable let upstream drop `DeleteTarget.ActionTarget` and
-`ContextTarget`. The fork never touched those lines, so the deletion was not a conflict — it simply
-landed, in a tree whose `ActiveAutomationUi` still routes both removals through the confirmation
-dialog. Both members are restored with their exhaustive `when` branches. A clean merge is not evidence
-that nothing was lost.
-
-**The fork's own privileged actions stand.** Upstream rerouted airplane mode, mobile data, screen-off,
-wake and screenshot through its new user service. The fork's implementations are the tested ones and
-each is deliberately different: screen-off prefers the accessibility global action so it sleeps the
-screen without locking the device, the airplane toggle keeps its best-effort `AIRPLANE_MODE` broadcast
-because that broadcast is system-only and its failure used to fail an action whose setting had already
-applied, mobile data uses `svc data` and needs no phone-state permission to read its own state, and
-the screenshot stores the path it wrote. Four upstream UX changes are **declined** for now, each
-entangled with a screen the fork has rewritten: undoable deletions, the new *Settings* destination
-split out of Setup, the back-to-Profiles handler, and the IO-backed setup ViewModel.
-
-**The suite says what the fork actually is.** Upstream swapped its "genuinely unsupported" exemplar
-from `reboot` to `app.kill`, its polarity being the opposite of ours — the fork drives `app.kill`
-through Shizuku, and keeps `reboot` unsupported because shell access is not enough for it and it wants
-device-owner privilege. Three share/bundle capability tests are reverted to `reboot` with that reason
-recorded inline. `UiEnumLabels` learned the fork's `PROGRESS` and `METEOR` scene element types and
-reads action names from the metadata; the picker-search test was rewritten for the fork's shape, and
-the two tests covering declined features were dropped. 1391 tests pass.
 
 ## 0.2.84.2026-08-11.g08847560+011 — 2026-08-11
 
