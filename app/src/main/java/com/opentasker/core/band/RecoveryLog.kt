@@ -6,9 +6,10 @@ import androidx.core.content.edit
 /**
  * 白い熊's own daily answer to "how do you feel?", one integer per night.
  *
- * Keyed by the date the rated night STARTED, not by the morning the answer was typed on — a night
- * begun at 23:xx on the 9th is never the 10th, and the marker looks a night's rating up by the
- * night's own start date. See [migrateToNightKeys] for what that cost before it was true.
+ * Keyed by the MORNING 白い熊 woke on and answered, which is the date the rated night ENDED. A night
+ * begun at 23:09 and one begun at 00:21 both end on the morning they are rated on, where their start
+ * dates differ by a day — see [migrateToMorningKeys], and [migrateToNightKeys] for the start-keying
+ * this replaced.
  *
  * ## Why this modest thing is here at all
  *
@@ -47,6 +48,17 @@ object RecoveryLog {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_NIGHT_KEYED = "night_keyed"
     private const val KEY_BEST_FIRST = "best_first"
+    private const val KEY_MORNING_KEYED = "morning_keyed"
+
+    /**
+     * The one rating 白い熊 retired by hand, dropped as part of [migrateToMorningKeys].
+     *
+     * It was filed against 2026-08-14, a date the band recorded no night starting on, and it described
+     * the same night as the rating on 2026-08-13 — which under morning keys moves ONTO 2026-08-14.
+     * Two answers, one morning, and only 白い熊 could say which was meant: "Delete the current 14
+     * score." (2026-08-16.)
+     */
+    internal const val RETIRED_KEY = 20260814L
 
     const val MIN_RATING = 1
     const val MAX_RATING = 5
@@ -105,6 +117,76 @@ object RecoveryLog {
             flippedToBestFirst(before).forEach { (date, rating) -> putInt(keyOf(date), rating) }
             putBoolean(KEY_BEST_FIRST, true)
         }
+    }
+
+    /**
+     * Re-key every rating from the night's start date to the MORNING it ended, once.
+     *
+     * Until 2026-08-16 a rating was filed under the date the night STARTED. That is one day before the
+     * morning it was given on whenever the bedtime fell before midnight, and the same day when it fell
+     * after — so 白い熊's grid held thirteen scores a tile to the left of the morning they belonged to
+     * and one on it, with nothing to show which was which. It also made the morning after a night the
+     * band missed unfileable: its name was already taken by the night that began that same evening.
+     *
+     * The move is driven by the band's own sessions rather than by arithmetic on the key. `+1 day`
+     * would be right for thirteen of the fourteen nights on file and wrong for the fourteenth, and a
+     * rating moved onto the wrong morning is worse than one left alone: it looks authored, it feeds
+     * the baseline and the ≥2-of-3 count, and nothing about it ever looks wrong again. So
+     * [morningOfNightStarting] is built from the recorded nights — start date → the date it ended —
+     * and a rating moves only where a real night says where it ends.
+     *
+     * Refuses rather than guesses, and does NOT set its flag when it refuses, so the next load tries
+     * again with whatever has since synced:
+     *
+     * - no recorded nights at all — the sessions have not loaded yet, and migrating against an empty
+     *   map would strand every rating and then mark the job done;
+     * - two ratings landing on one morning, which would silently destroy one of them.
+     *
+     * A rating whose night is no longer among the recorded sessions cannot be placed; it keeps its key
+     * and is counted in the return value rather than moved on a guess.
+     */
+    fun migrateToMorningKeys(context: Context, morningOfNightStarting: Map<Long, Long>): Int {
+        val prefs = prefs(context)
+        if (prefs.getBoolean(KEY_MORNING_KEYED, false)) return 0
+        if (morningOfNightStarting.isEmpty()) return -1
+        val before = ratingsIn(prefs.all)
+        val move = movedToMorningKeys(before, morningOfNightStarting) ?: return -1
+        prefs.edit {
+            // Every old key goes before any new one is written: the two sets overlap wherever a night
+            // began after midnight, so interleaving would delete a value just written.
+            before.keys.forEach { remove(keyOf(it)) }
+            move.moved.forEach { (date, rating) -> putInt(keyOf(date), rating) }
+            putBoolean(KEY_MORNING_KEYED, true)
+        }
+        return move.unresolved.size
+    }
+
+    /** What [movedToMorningKeys] worked out: where everything lands, and what it could not place. */
+    internal data class MorningMove(val moved: Map<Long, Int>, val unresolved: Set<Long>)
+
+    /**
+     * The pure part of [migrateToMorningKeys]. Null means refuse — two ratings want one morning.
+     *
+     * [RETIRED_KEY] is dropped before anything else, which is also what keeps 白い熊's own store free
+     * of exactly that collision.
+     */
+    internal fun movedToMorningKeys(
+        ratings: Map<Long, Int>,
+        morningOfNightStarting: Map<Long, Long>,
+    ): MorningMove? {
+        val kept = ratings - RETIRED_KEY
+        val moved = HashMap<Long, Int>(kept.size)
+        val unresolved = HashSet<Long>()
+        for ((date, rating) in kept) {
+            val morning = morningOfNightStarting[date]
+            if (morning == null) {
+                unresolved += date
+                if (moved.put(date, rating) != null) return null
+            } else if (moved.put(morning, rating) != null) {
+                return null
+            }
+        }
+        return MorningMove(moved, unresolved)
     }
 
     /**

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -180,8 +181,11 @@ fun SessionRegisterScreen(
  * ones are different shapes on the page — which is the only thing a five-week grid is actually good
  * at, and the reason it exists at all. It replaced three anonymous dots that said the same thing for
  * a night rated 3 and a night never rated: a count of markers is not a reading, and 白い熊 could not
- * tell one from the other (2026-08-11). The count survives as the tile's ring, where it qualifies the
- * score instead of standing in for it, and the session load as the bar beneath.
+ * tell one from the other (2026-08-11). The session load survives as the bar beneath. The marker count
+ * does not survive here at all: it rang the tile in the tile's own ink, which meant a yellow border on
+ * every 3 and a white one on every 5, and once today had a border of its own that was three borders
+ * saying three things in one grid (白い熊, 2026-08-16). It is on every line of the table below instead,
+ * beside the values it counts — which is where a count belongs when the tile is already a reading.
  *
  * **Every tile is a button.** A tile is the smallest thing on the screen that names one night, so it
  * is the natural place to reach for when a night is wrong — and unlike the table below it, the grid
@@ -197,6 +201,10 @@ private fun Grid(
     onRate: (Long) -> Unit,
 ) {
     val style = LocalChartStyle.current
+    // Today, marked wherever it lands. Five weeks of squares are five weeks of squares: without a
+    // fixed point 白い熊 has to count columns to find the morning being asked about, and the tile most
+    // likely to be tapped is exactly the one hardest to locate. (白い熊, 2026-08-16.)
+    val todayEpochDay = remember(zone) { LocalDate.now(zone).toEpochDay() }
     val maxLoad = days.mapNotNull { it.sessionLoad }.maxOrNull()?.takeIf { it > 0 } ?: 1.0
     val labels = remember(zone) { DateTimeFormatter.ofPattern("d").withZone(zone) }
 
@@ -260,31 +268,39 @@ private fun Grid(
                             // a substitute for it.
                             val felt = cell.felt
                             val skin = scaleSkin(felt, style.grid, sectionNote)
-                            // Thickness, not colour, carries how many MEASURED markers were off — the
-                            // tile's colour is already spoken for by the rating, and a second hue on
-                            // the same square would read as a second rating. It is drawn in the
-                            // tile's OWN ink rather than in the fill's hue: since 2026-08-12 the
-                            // fills are solid, so a ring tinted from the fill would be invisible on
-                            // it, and a nought-marker tile now has no ring at all rather than a thin
-                            // one nobody could tell from a thick one.
-                            val ringWidth = when (cell.adverseCount ?: 0) {
-                                0 -> 0.dp
-                                1 -> 2.dp
-                                else -> 3.5.dp
-                            }
+                            // A border on a tile means TODAY, and means nothing else.
+                            //
+                            // The marker count used to ring the tile in its own ink, which put a
+                            // yellow border on every 3 and a white one on every 5 — so the moment
+                            // today got a border of its own there were three different borders in one
+                            // grid and a 3 two weeks ago looked exactly like this morning. The ring is
+                            // gone rather than recoloured: the fills have been solid and unbordered by
+                            // 白い熊's own decision since 2026-08-12, and any ring at all is a border
+                            // on a solid fill. (白い熊, 2026-08-16: "remove the yellow border from
+                            // ordinary 3s and the white border from 5s".) The count it carried is on
+                            // every line of the table below, beside the values that produced it.
+                            //
+                            // Outside the tile with a gap, not on its edge, so the fill stays exactly
+                            // the solid rectangle the scale specifies.
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (cell.epochDay == todayEpochDay) {
+                                            Modifier
+                                                .border(1.5.dp, sectionInk, RoundedCornerShape(8.dp))
+                                                .padding(2.5.dp)
+                                        } else {
+                                            Modifier.padding(2.5.dp)
+                                        },
+                                    ),
+                            ) {
                             Box(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(34.dp)
                                     .clip(RoundedCornerShape(5.dp))
                                     .background(skin.fill)
-                                    .then(
-                                        if (ringWidth > 0.dp) {
-                                            Modifier.border(ringWidth, skin.ink, RoundedCornerShape(5.dp))
-                                        } else {
-                                            Modifier
-                                        },
-                                    )
                                     // The whole tile, not the digit inside it: these squares are a
                                     // seventh of a phone's width, and a hit area any smaller than the
                                     // paint would be a target 白い熊 has to aim at.
@@ -297,6 +313,7 @@ private fun Grid(
                                     fontWeight = FontWeight.Bold,
                                     color = skin.ink,
                                 )
+                            }
                             }
                             // Session load, only when there was one — an empty track on every rest
                             // day is noise on a grid whose subject is the nights. Width carries the
@@ -725,8 +742,15 @@ private fun RateNightDialog(
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // The morning in full, then the night it appraises — "2026-08-16 (Sun) · the night 15→16".
+            // A score put on the wrong day is worse than none: it looks authored and it goes on
+            // feeding the baseline silently, so the dialog names its subject twice over, by the day
+            // 白い熊 woke and by the span they slept.
             Text(
-                BandText.recoveryAsk[lang].format(nightDateFull(dateKey, lang)),
+                BandText.recoveryAsk[lang].format(
+                    BandText.morningOfNight[lang]
+                        .format(nightDateFull(dateKey, lang), nightSpanLabel(dateKey)),
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = sectionInk,

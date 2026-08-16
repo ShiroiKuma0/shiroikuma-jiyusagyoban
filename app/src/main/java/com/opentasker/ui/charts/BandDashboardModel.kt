@@ -142,6 +142,13 @@ data class DashboardState(
     val feltToday: Int? = null,
     /** `yyyyMMdd` start date of the night [feltToday] belongs to, so the row can name it. */
     val feltNight: Long? = null,
+    /**
+     * `yyyyMMdd` start date of the night the markers describe — null when none is on record.
+     *
+     * Carried beside [feltNight] rather than assumed equal to it: with the band off the wrist they
+     * are two different nights, and the card has to be able to say so. See [RecoveryBuild.ratableNight].
+     */
+    val recordedNight: Long? = null,
     val feltEnabled: Boolean = true,
     /** The full extent of everything stored, so a viewport can pan across all of it. */
     val bounds: LongRange = 0L..0L,
@@ -243,13 +250,36 @@ class BandDashboardModel(
 
         val today = LocalDate.now(zone)
         val zoneOffsetMs = zone.rules.getOffset(java.time.Instant.now()).totalSeconds * 1000L
+
+        // Before anything reads a rating: the store changed what a key MEANS on 2026-08-16, and only
+        // the recorded nights can say where each one moves. This is the one place that holds both, and
+        // it runs before RecoveryLog.all() below rather than after, so nothing is ever assembled from
+        // a half-migrated store. It is a no-op after the first successful run.
+        //
+        // 400 sleep segments are loaded above — over a month of nights, where the oldest rating on
+        // file is days old — so the map is comfortably wider than the store it has to place. A
+        // rating older than that window would be left where it is and counted, not guessed at.
+        RecoveryLog.migrateToMorningKeys(
+            appContext,
+            RecoverySource.nights(sleep.sessions).associate {
+                localDateKeyOf(it.startMs, zone) to localDateKeyOf(it.endMs, zone)
+            },
+        ).let { unresolved ->
+            if (unresolved > 0) {
+                com.opentasker.core.logging.AppLogger.warn(
+                    "RecoveryLog",
+                    "$unresolved rating(s) had no recorded night to place them by; left on their old key",
+                )
+            }
+        }
+
         val assembled = RecoveryBuild.build(
             metrics = metrics,
             sessions = sleep.sessions,
             ratings = RecoveryLog.all(appContext),
             sessions_ = TrainingSessions.all(appContext),
             sessionOpen = TrainingSessions.openStart(appContext) != null,
-            localDateOf = { ms -> localDateKey(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()) },
+            localDateOf = { ms -> localDateKeyOf(ms, zone) },
             zoneOffsetMs = zoneOffsetMs,
             todayEpochDay = (System.currentTimeMillis() + zoneOffsetMs) / 86_400_000L,
             nowMs = System.currentTimeMillis(),
@@ -291,8 +321,9 @@ class BandDashboardModel(
             // through to today's calendar date whenever the night had no rating — `?.let {}` yields
             // null for "no recovery" and for "no rating alike" — which is a key nothing writes any
             // more, so the only thing it could ever surface was a stale pre-night-keying entry.
-            feltNight = feltKey(assembled.recovery?.nightStartMs, zone),
-            feltToday = RecoveryLog.rating(appContext, feltKey(assembled.recovery?.nightStartMs, zone)),
+            feltNight = feltKey(zone),
+            feltToday = RecoveryLog.rating(appContext, feltKey(zone)),
+            recordedNight = recordedMorningKey(assembled.recovery?.nightEndMs, zone),
             feltEnabled = RecoveryLog.enabled(appContext),
         )
     }
@@ -332,36 +363,31 @@ class BandDashboardModel(
     private fun localDateKey(date: LocalDate): Long =
         date.year * 10_000L + date.monthValue * 100L + date.dayOfMonth
 
-    /**
-     * The key a felt rating is filed under: the START date of the night it describes.
-     *
-     * One function for both the read and the write, so the buttons can never show a value the marker
-     * is not using. With no night on record yet there is still a night to rate — the one that ended
-     * this morning, which started yesterday — so the fallback is yesterday rather than today. Today's
-     * calendar date would be the night about to begin, which 白い熊 cannot have an opinion on yet.
-     */
-    private fun feltKey(nightStartMs: Long?, zone: ZoneId): Long =
-        nightStartMs
-            ?.let { localDateKey(java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()) }
-            ?: localDateKey(LocalDate.now(zone).minusDays(1))
+    /** `yyyyMMdd` of an instant in [zone]. */
+    private fun localDateKeyOf(ms: Long, zone: ZoneId): Long =
+        localDateKey(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate())
 
     /**
-     * Record how 白い熊 feels today, then reload so the counting rule picks it up at once.
-     *
-     * Filed under today's date; [RecoveryBuild] attributes it to the night that STARTED on the
-     * previous evening, which is the night it describes.
+     * The morning a score is filed under: today's, always. See [RecoveryBuild.ratableMorning] for why
+     * it needs nothing from the band — the rule lives there because it is pure and therefore testable,
+     * where this is not.
      */
-    fun setFeltToday(rating: Int) {
-        val zone = ZoneId.systemDefault()
-        // Filed against the NIGHT IT DESCRIBES, not against the calendar day it was typed on.
-        //
-        // 白い熊 wakes on the 10th and rates how the night went; that night STARTED on the 9th, and
-        // the marker looks a night's rating up by the night's own start date. Keying on "today"
-        // therefore filed every morning's answer against a night that had not happened yet, and the
-        // card showed the previous day's rating for ever. Reported 2026-08-10: rated 2, card said
-        // Normal.
-        setFelt(feltKey(state.value.recovery?.nightStartMs, zone), rating)
-    }
+    private fun feltKey(zone: ZoneId): Long =
+        RecoveryBuild.ratableMorning(java.time.LocalDateTime.now(zone))
+
+    /** `yyyyMMdd` morning of the night the card's markers describe, or null if none is on record. */
+    private fun recordedMorningKey(nightEndMs: Long?, zone: ZoneId): Long? =
+        nightEndMs?.let { localDateKeyOf(it, zone) }
+
+    /**
+     * Record how 白い熊 woke this morning, then reload so the counting rule picks it up at once.
+     *
+     * Filed under this morning — see [RecoveryBuild.ratableMorning]. It takes nothing from the band on
+     * purpose: the morning after a night the band missed is exactly the one most likely to need typing
+     * in by hand, and the old rule, which read the key off the last recorded night, could not offer it
+     * at all. (白い熊, 2026-08-16.)
+     */
+    fun setFeltToday(rating: Int) = setFelt(feltKey(ZoneId.systemDefault()), rating)
 
     /**
      * Rate — or un-rate — ONE named night, whichever night it is.

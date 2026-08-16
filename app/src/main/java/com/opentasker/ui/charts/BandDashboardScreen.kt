@@ -124,6 +124,7 @@ fun BandDashboardScreen(
                 regime = state.regime,
                 feltToday = state.feltToday,
                 feltNight = state.feltNight,
+                recordedNight = state.recordedNight,
                 feltEnabled = state.feltEnabled,
                 onFelt = model::setFeltToday,
                 registerNights = state.register?.rows?.size ?: 0,

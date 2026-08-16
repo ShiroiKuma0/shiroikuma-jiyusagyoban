@@ -66,6 +66,8 @@ fun RecoveryCard(
     feltToday: Int?,
     /** `yyyyMMdd` start date of the night [feltToday] belongs to; the row names it rather than "today". */
     feltNight: Long?,
+    /** `yyyyMMdd` of the night the markers describe, so the card can own up when it is not [feltNight]. */
+    recordedNight: Long?,
     feltEnabled: Boolean,
     onFelt: (Int) -> Unit,
     /** How much is behind the register, so the way in can say so rather than merely exist. */
@@ -128,6 +130,17 @@ fun RecoveryCard(
             // Regime notes go LAST and in amber: they qualify everything above them, so they read
             // as a caveat on the card rather than as another marker on it.
         regime?.let { RegimeNotes(it) }
+        // A morning after a night the band did not record is still a morning to score, so the row
+        // below can be about a later morning than everything above it. Said out loud, in amber,
+        // immediately above the row that names the other one — the two dates side by side are the
+        // whole explanation, and without it the card looks as though it is contradicting itself.
+        if (recordedNight != null && feltNight != null && recordedNight != feltNight) {
+            Note(
+                BandText.recoveryNightMissing[lang]
+                    .format(nightDateLabel(feltNight), nightDateLabel(recordedNight)),
+                warn = true,
+            )
+        }
         if (feltEnabled) FeltRow(feltToday, feltNight, onFelt)
     }
 }
@@ -392,11 +405,14 @@ private fun LoadRow(load: RecoveryBuild.LoadReading) {
 private fun FeltRow(feltToday: Int?, feltNight: Long?, onFelt: (Int) -> Unit) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
-    val night = feltNight?.let { nightDateLabel(it) } ?: "—"
+    val morning = feltNight?.let { nightDateLabel(it) } ?: "—"
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            feltToday?.let { BandText.recoveryAskDone[lang].format(night, feltLabel(it)[lang]) }
-                ?: BandText.recoveryAsk[lang].format(night),
+            // Unanswered, the card is only ever asking about THIS morning — [RecoveryBuild.ratableMorning]
+            // offers no other — so it says so in the words 白い熊 would use rather than reciting a date
+            // back at them. Answered, the date returns: that is the line that has to be checkable.
+            feltToday?.let { BandText.recoveryAskDone[lang].format(morning, feltLabel(it)[lang]) }
+                ?: BandText.recoveryAskToday[lang],
             style = MaterialTheme.typography.bodyMedium,
             color = if (feltToday == null) sectionInk else sectionNote,
         )
@@ -535,6 +551,24 @@ fun scaleSkin(step: Int?, neutral: Color, neutralInk: Color): ScaleSkin = when (
  * "which night was that" is answered by the day of the week far more often than by the number, and a
  * bare `08-10` answers neither on its own.
  */
+/**
+ * The night a morning key appraises, as the two day-numbers it ran between: `15→16`.
+ *
+ * Day numbers alone, not full dates — the morning beside it already carries the month and the year,
+ * and the point of this half is the SPAN, which is what tells 白い熊 that "the morning of the 16th"
+ * is the night they went to bed on the 15th. A month boundary still reads correctly (`31→1`).
+ */
+fun nightSpanLabel(morningKey: Long): String {
+    val morning = runCatching {
+        java.time.LocalDate.of(
+            (morningKey / 10_000L).toInt(),
+            ((morningKey / 100L) % 100L).toInt(),
+            (morningKey % 100L).toInt(),
+        )
+    }.getOrNull() ?: return nightDateLabel(morningKey)
+    return "%d→%d".format(morning.minusDays(1).dayOfMonth, morning.dayOfMonth)
+}
+
 fun nightDateFull(key: Long, lang: BandLanguage): String {
     val date = runCatching {
         java.time.LocalDate.of(

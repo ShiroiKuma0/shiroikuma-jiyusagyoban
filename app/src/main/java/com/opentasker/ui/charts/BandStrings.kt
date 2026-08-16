@@ -121,7 +121,7 @@ object BandText {
     )
     val markerNocturnalHr = Loc("Nocturnal heart rate", "夜間心拍")
     val markerSleep = Loc("Time asleep", "実睡眠")
-    val markerFelt = Loc("How you felt", "体感")
+    val markerFelt = Loc("How you woke", "目覚め")
     val markerTemperature = Loc("Skin temperature", "皮膚温")
     val bandUsual = Loc("usual", "平常")
     val bandHigh = Loc("high", "高い")
@@ -136,10 +136,22 @@ object BandText {
         "Heart rate up and sleep short together — the pattern that tracks illness. Worth watching, not a diagnosis.",
         "心拍が上がり睡眠が短い — 体調不良と相関するパターン。診断ではないが、注意する価値はある。",
     )
-    // Both name the night being rated. "Today" was a lie every morning — the night started the
-    // evening before — and it is what let a rating filed against another night read as this one's.
-    val recoveryAsk = Loc("Night of %s — how did you feel?", "%s の夜：体感は？")
-    val recoveryAskDone = Loc("Night of %s: %s", "%s の夜：%s")
+    // A score is a MORNING thing — made on waking, about the night just ended — so the morning is what
+    // it is named by. "Night of" was ambiguous exactly where it mattered: the night of the 15th could
+    // be the one that ended that morning or the one that began that evening, and with a bedtime either
+    // side of midnight it was silently sometimes one and sometimes the other.
+    val recoveryAskToday = Loc("This morning — how did you wake?", "今朝の目覚めは？")
+    val recoveryAsk = Loc("Morning of %s — how did you wake?", "%s の朝：目覚めは？")
+    val recoveryAskDone = Loc("Morning of %s: %s", "%s の朝：%s")
+    /** The morning, then the night it appraises: 「8月16日（日）の朝 ・ 15→16 の夜」. */
+    val morningOfNight = Loc("%s · the night %s", "%s ・ %s の夜")
+    // Printed only when the two mornings differ. The card names no morning on its own, so an older
+    // night's numbers read as last night's unless something says otherwise — and the rating row below
+    // names a DIFFERENT morning, which without this would look like the card contradicting itself.
+    val recoveryNightMissing = Loc(
+        "The band recorded no night ending %s, so the markers above are the morning of %s.",
+        "%s に明けた夜は記録なし。上の指標は %s の朝のもの。",
+    )
     // Named by meaning, never by step number: the scale flipped on 2026-08-12 and a constant called
     // `feltScale1` holding "Wrecked" would have had to be renamed or, worse, left lying.
     val feltGreat = Loc("Great", "絶好調")
@@ -165,8 +177,8 @@ object BandText {
         "まだ運動が記録されていない。運動記録で記録すれば、その次の夜がここに並んで出る。",
     )
     val registerLegend = Loc(
-        "Each tile is the night that started that day, filled in your 体感's own colour from the scale below — 1 is the best night, 5 the worst. A ring means one measured marker was outside your usual range that night, a thicker ring two or more. The bar underneath is session load, its width the MET-minutes.",
-        "各タイルはその日に始まった夜で、下の尺度と同じ体感の色で塗る — 1 が最良、5 が最悪。縁があるのは測定指標が平常の範囲外だった夜、太ければ二つ以上。下の棒はその日の運動量で、幅が MET分。",
+        "Each tile is a morning: how you woke that day, after the day before it — filled in that score's own colour from the scale below, 1 the best and 5 the worst. A yellow border marks today, and marks nothing else. The bar underneath is that day's own training, and its effect shows in the NEXT morning's score.",
+        "各タイルは朝 — その日どう目覚めたか、前の日を経て。下の尺度と同じ色で塗る（1 が最良、5 が最悪）。黄色の枠は今日、それ以外の意味はない。下の棒はその日自身の運動量で、効いてくるのは翌朝の点数。",
     )
     // ---- 過去の夜を評価する ----------------------------------------------------------------------
     //
@@ -175,15 +187,15 @@ object BandText {
     // a mistaken one corrected. The hint is printed on both cards, in the same words, because the
     // gesture is invisible until someone says it exists.
     val registerRateHint = Loc(
-        "Tap any night — a tile above, or a line of the table — to rate it, or to change a rating already given.",
-        "どの夜でも押せる。上のタイルでも、表の行でも、押せばその夜の体感を付けられる。付け直しも同じ。",
+        "Tap any morning — a tile above, or a line of the table — to score it, or to change a score already given.",
+        "どの朝でも押せる。上のタイルでも、表の行でも、押せばその朝の目覚めを付けられる。付け直しも同じ。",
     )
     val rateClearHint = Loc(
-        "Tapping the number already chosen removes the rating — a night can always go back to unrated.",
-        "すでに選ばれている数字をもう一度押すと評価を取り消す。いつでも未評価に戻せる。",
+        "Tapping the number already chosen removes the score — a morning can always go back to unscored.",
+        "すでに選ばれている数字をもう一度押すと取り消す。いつでも未記入に戻せる。",
     )
     val rateLateNote = Loc(
-        "A night filled in late counts exactly like one rated that morning: same store, same baseline, same counting rule.",
+        "A morning filled in late counts exactly like one answered on the day: same store, same baseline, same counting rule.",
         "あとから付けた評価も、その朝に付けたものとまったく同じに扱う。保存先も、比較の基準も、数え方も同じ。",
     )
     val rateClose = Loc("Close", "閉じる")
@@ -267,7 +279,7 @@ object BandText {
     // Column headings, printed once. The values under them keep their own colour. Prefixed because
     // the day-table further down already owns the bare col* names for a different set of columns.
     val regColDate = Loc("Date", "日付")
-    val regColFelt = Loc("How you felt", "体感")
+    val regColFelt = Loc("How you woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
     val regColSleep = Loc("Asleep", "実睡眠")
     val regColTemp = Loc("Temp °C", "体温 ℃")

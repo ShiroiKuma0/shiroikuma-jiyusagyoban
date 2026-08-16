@@ -8,6 +8,67 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+015 — 2026-08-16
+
+**A border on a calendar tile now means today, and means nothing else.** The marker count rang the
+tile in the tile's OWN ink — which is yellow on a 3 and white on a 5 — so the moment today gained a
+border of its own the grid held three different borders saying three different things, and a 3 from
+two weeks ago was indistinguishable from this morning.
+
+The ring is gone rather than recoloured. The fills have been solid and unbordered by 白い熊's own
+decision since 2026-08-12, so any ring at all was a border on a solid fill; recolouring it would have
+kept the collision and merely moved which step it lands on. The count it carried is on every line of
+the table below, beside the values that produced it — which is where a count belongs once the tile
+itself is a reading rather than a tally. (白い熊: "remove the yellow border from ordinary 3s and the
+white border from 5s".)
+
+## 0.2.86+2026-08-12.15-45.ga1fe8154+014 — 2026-08-16
+
+**A score is now filed under the morning it was given, not the evening the night began.** It is an
+appraisal made on waking — so the morning is what names it, and the calendar tile for the 16th is the
+morning of the 16th, whatever time the light went out.
+
+Keyed on the night's START, the name depended on which side of midnight the bedtime fell. 白い熊's own
+archive settles what that meant: of the fourteen nights on record, **thirteen began before midnight and
+one began at 00:21**. So thirteen scores sat one tile to the left of the morning they were given on and
+one sat on it, and the odd tile out was simply the one nobody could see was odd. Worse, the two names
+collide — a night begun at 00:21 on the 15th and the night begun that same evening are both "the 15th"
+— so the morning of the 16th had nowhere to be filed at all, and the card handed back the 15th's answer
+instead of asking for a new one. **Two nights can never end on the same morning**, so the collision
+cannot recur, before or after midnight.
+
+The morning offered is simply **today's**, with the day boundary at 04:00 so being awake at 01:00 still
+offers the morning last woken on rather than one not yet slept into. It asks the band for nothing: the
+morning after a night off the wrist is exactly the one most likely to need typing in by hand, and the
+old rule, which read the key off the last recorded night, could not offer it at all.
+
+**The ratings already on file were moved to match, driven by the band's own sessions rather than by
+arithmetic.** `+1 day` is right for thirteen of those fourteen nights and wrong for the fourteenth, and
+a score moved onto the wrong morning is worse than one left alone — it looks authored, it feeds the
+baseline and the ≥2-of-3 count, and nothing about it ever looks wrong again. So each rating moves only
+where a recorded night says where it ended. The migration **refuses and retries** rather than guessing:
+no recorded nights at all (the sessions have not loaded, and migrating against an empty map would
+strand everything and then mark the job done), or two scores landing on one morning. A rating whose
+night is no longer among the retained sessions keeps its key and is counted in the log rather than
+moved on a guess.
+
+One score was retired by hand as part of it: a rating on 2026-08-14, filed against a date no night
+started on, describing the same night as the 08-13 rating — which under morning keys moves onto
+2026-08-14. Two answers, one morning, and only 白い熊 could say which was meant. ("Delete the current
+14 score.")
+
+**Today's tile now carries a yellow border.** Five weeks of squares are five weeks of squares; without
+a fixed point the tile most likely to be tapped is also the hardest to find. It is drawn OUTSIDE the
+tile with a gap, because the tile's own edge is already the adverse ring, and two borders on one
+rectangle would be one ambiguous rectangle.
+
+**And the wording follows the meaning.** 「体感」 becomes 「目覚め」 — how you woke. Unanswered, the card
+asks 「今朝の目覚めは？」 rather than reciting a date back; answered, the date returns, because that is
+the line that has to be checkable. The editor names its subject twice over — 「2026-08-16（日）の朝 ・
+15→16 の夜」 — by the day 白い熊 woke and by the span they slept. The grid legend now says what a tile
+is: a morning, how you woke into it after the day before — and that the bar underneath is that day's
+own training, whose effect shows up in the NEXT morning's score, not that one's.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+013 — 2026-08-16
 
 **A blocked 画面点灯 now says it is Shizuku that is missing.** `wake` had a pinned privileged command
@@ -20,6 +81,36 @@ omitted the same way and only escaped it by trying accessibility first.
 The set now matches the pinned command allowlist, which is what the test comparing them was saying all
 along — its two arguments were the wrong way round, so JUnit named the stale set as the expectation and
 the pin as the error, and the failure read as though the test were at fault. Pin first now.
+
+## 0.2.86+2026-08-12.15-45.ga1fe8154+012 — 2026-08-16
+
+**A night the band did not record can now be rated from the card.** The 回復 card took the night to
+rate from the last night *on record*, with "yesterday" used only when there was no night on record at
+all. That guarded the wrong hole. The hole is not "no data ever" — that happens once, on a fresh
+install; it is "no data for **last** night", which happens every time the band is off the wrist, and
+that is exactly the night most likely to want an answer typed by hand, because nothing else recorded
+it. So the card went on naming the night before, offering back the rating already filed against it —
+and a tap would have **overwritten that rating** rather than filling in the missing one. (白い熊,
+2026-08-16: band off overnight, card still asking about 2026-08-14.)
+
+The night offered is now the later of the last recorded night and the night that ended this morning.
+Later, rather than simply yesterday, is what keeps a bedtime after midnight right: a night begun at
+00:30 carries today's date as its start date, so it is that night and not the one before it. The floor
+is yesterday and never today, because today's key names the night about to begin — which cannot be
+rated yet. The rule is a pure function beside the assembly it serves (`RecoveryBuild.ratableNight`),
+keyed through the same `dateKeyOf` the register's grid uses so a tile and the card cannot come to
+disagree about where a night's rating lives, and a test walks a whole five-week grid through it along
+with the month, year and leap-day boundaries that make `yyyyMMdd − 1` wrong.
+
+**And the card now says when its markers are not last night's.** It named no night anywhere, so
+`4h 41m` against `usual 7h 29m–8h 29m` read as last night whether or not it was — and with the rating
+row below now naming a *different* night, the card would have looked like it was contradicting itself.
+When the two differ it says so in amber, both dates in one line, immediately above the row that names
+the other one.
+
+A rating filed for an unrecorded night does not move the card's own 体感 marker — that night has no
+measured markers to sit beside — but it is the ordinary kind of rating everywhere else: same store,
+same night-start key, feeding the baseline, the ≥2-of-3 count, the grid and the night table.
 
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+011 — 2026-08-16
 
@@ -447,6 +538,55 @@ per changelog release from v0.2.58 onward, matching `releaseTagCommit` and an an
 fork's capability counts (172 actions, bundle schema 5, Room 27); the gate itself hangs only off
 `verifyFdroidMetadata` and `localQualityGate`, neither of which `buildFork` runs, and the fork ships
 no F-Droid metadata to verify. The upstream test asserting those keys stays retired here.
+
+## 0.2.84.2026-08-11.g5c01f064+012 — 2026-08-11
+
+**Upstream sync: 11 commits, 71 files. Upstream did not move its own version literals**, so the pin
+alone advances: `.2026-08-11.g08847560` → `.2026-08-11.g5c01f064`. The build counter therefore keeps
+running — `+011` → `+012`, `versionCode 860012` — because `versionCode` is the only thing an installer
+compares, and resetting `N` while `appVersionCode` stands still would make the sync a downgrade.
+
+**What landed from upstream.** Elevated actions now run through a versioned Shizuku AIDL user service
+that rechecks exact argv inside the privileged process and unbinds on teardown; the fork takes the
+service and its `reboot` path, which previously just refused. UnifiedPush registration became a real
+distributor-neutral connector — discovery, SDK-versioned identity registration, RFC 8291 decryption,
+endpoint persistence and delivery acknowledgement — with ntfy's standard JSON reaching `event=push`
+and the legacy token broadcast still accepted. Scene-canvas elements announce their type, label,
+position, size and selection state with custom select/nudge/resize actions, user-facing enum and error
+copy moved behind resources, and the locale gate now rejects an empty locale directory by name instead
+of skipping it.
+
+**The action and context pickers gained search — on the fork's own labels.** Upstream's search filters
+a localized triple it builds by resolving three `@StringRes` ids per item. The fork keeps names,
+descriptions and categories as inline strings on `ActionMetadata` itself — some of them Japanese, and
+far more actions than upstream ships — so the filter runs straight over the metadata instead, matching
+display name, description or stable id (`file.read` finds the action as readily as "Read file" does).
+Both catalogues are built once inside `remember` rather than rebuilt on every keystroke.
+
+**Upstream deleted two sealed members the fork still uses, and git applied it cleanly.** Making
+action and context removal immediate-and-undoable let upstream drop `DeleteTarget.ActionTarget` and
+`ContextTarget`. The fork never touched those lines, so the deletion was not a conflict — it simply
+landed, in a tree whose `ActiveAutomationUi` still routes both removals through the confirmation
+dialog. Both members are restored with their exhaustive `when` branches. A clean merge is not evidence
+that nothing was lost.
+
+**The fork's own privileged actions stand.** Upstream rerouted airplane mode, mobile data, screen-off,
+wake and screenshot through its new user service. The fork's implementations are the tested ones and
+each is deliberately different: screen-off prefers the accessibility global action so it sleeps the
+screen without locking the device, the airplane toggle keeps its best-effort `AIRPLANE_MODE` broadcast
+because that broadcast is system-only and its failure used to fail an action whose setting had already
+applied, mobile data uses `svc data` and needs no phone-state permission to read its own state, and
+the screenshot stores the path it wrote. Four upstream UX changes are **declined** for now, each
+entangled with a screen the fork has rewritten: undoable deletions, the new *Settings* destination
+split out of Setup, the back-to-Profiles handler, and the IO-backed setup ViewModel.
+
+**The suite says what the fork actually is.** Upstream swapped its "genuinely unsupported" exemplar
+from `reboot` to `app.kill`, its polarity being the opposite of ours — the fork drives `app.kill`
+through Shizuku, and keeps `reboot` unsupported because shell access is not enough for it and it wants
+device-owner privilege. Three share/bundle capability tests are reverted to `reboot` with that reason
+recorded inline. `UiEnumLabels` learned the fork's `PROGRESS` and `METEOR` scene element types and
+reads action names from the metadata; the picker-search test was rewritten for the fork's shape, and
+the two tests covering declined features were dropped. 1391 tests pass.
 
 ## 0.2.84.2026-08-11.g08847560+011 — 2026-08-11
 

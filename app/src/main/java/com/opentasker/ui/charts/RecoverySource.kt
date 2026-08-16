@@ -28,6 +28,14 @@ object RecoverySource {
     /** One night's extracted numbers, before any banding. */
     data class NightMetrics(
         val startMs: Long,
+        /**
+         * When the night ended — the instant that NAMES it.
+         *
+         * A night is filed under the morning it ended, not the evening it began, because that is the
+         * morning 白い熊 woke on and rated. Carried here rather than recomputed from the session
+         * because every consumer of a night needs it and none of them holds the session any more.
+         */
+        val endMs: Long,
         val nocturnalHr: Double?,
         val sleepMinutes: Double?,
         val skinTemp: Double?,
@@ -102,6 +110,7 @@ object RecoverySource {
         tempPoints: List<ChartPoint>,
     ): NightMetrics = NightMetrics(
         startMs = session.startMs,
+        endMs = session.endMs,
         nocturnalHr = nocturnalHr(session, hrPoints),
         sleepMinutes = sleepMinutes(session),
         skinTemp = skinTemp(session, tempPoints),
