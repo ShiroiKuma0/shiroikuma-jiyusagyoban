@@ -153,6 +153,8 @@ enum class RecoveryConfidence {
 /** Everything the 回復 card and screen draw. */
 data class RecoveryResult(
     val nightStartMs: Long?,
+    /** When that night ended — the morning it is named and filed by. See [RecoveryBuild.ratableMorning]. */
+    val nightEndMs: Long? = null,
     val markers: List<MarkerReading>,
     val confidence: RecoveryConfidence,
     val nightsOfHistory: Int,
@@ -326,6 +328,7 @@ object Recovery {
      */
     fun assemble(
         nightStartMs: Long?,
+        nightEndMs: Long? = null,
         nocturnalHr: MarkerReading,
         sleep: MarkerReading,
         felt: MarkerReading,
@@ -344,6 +347,7 @@ object Recovery {
         val illness = (nocturnalHr.z ?: 0.0) >= 0.5 && (sleep.z ?: 0.0) <= -0.5
         return RecoveryResult(
             nightStartMs = nightStartMs,
+            nightEndMs = nightEndMs,
             markers = markers,
             confidence = confidence,
             nightsOfHistory = nightsOfHistory,

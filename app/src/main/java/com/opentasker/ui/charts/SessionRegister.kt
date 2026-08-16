@@ -72,6 +72,8 @@ object SessionRegister {
     /** One night, banded against the nights before it. */
     data class NightReading(
         val startMs: Long,
+        /** When it ended — the morning that names it. See [RecoverySource.NightMetrics.endMs]. */
+        val endMs: Long,
         val nocturnalHr: MarkerReading,
         val sleep: MarkerReading,
         val felt: MarkerReading,
@@ -165,6 +167,7 @@ object SessionRegister {
         )
         NightReading(
             startMs = night.startMs,
+            endMs = night.endMs,
             nocturnalHr = hr,
             sleep = sleep,
             felt = felt,
@@ -185,7 +188,7 @@ object SessionRegister {
         toEpochDay: Long,
         /** Every stored rating, so one filed against a date with no night is still listed. */
         ratings: Map<Long, Int> = emptyMap(),
-        /** A night's start instant → the `yyyyMMdd` its rating is filed under. */
+        /** An instant → its `yyyyMMdd` local date. Applied to a night's END, which names it. */
         dateOfNight: (Long) -> Long = { 0L },
     ): Register {
         fun dayOf(ms: Long) = (ms + zoneOffsetMs) / 86_400_000L
@@ -205,23 +208,30 @@ object SessionRegister {
             .mapValues { (_, v) ->
                 v.sumOf { s -> restingHr?.let { RecoverySource.sessionLoad(s, spotPoints, it) } ?: 0.0 }
             }
-        val adverseByDay = nights.associate { dayOf(it.startMs) to it.adverseCount }
+        // A night sits on the MORNING it ended, never the evening it began — that is the day 白い熊
+        // woke on and rated, and it is the only placement that survives a bedtime either side of
+        // midnight. Keyed on the start, a night begun at 23:09 sat one tile left of the morning it
+        // was rated on while one begun at 00:21 sat on it, so the same habit drew two different
+        // pictures. (白い熊, 2026-08-16 — the band's own archive: 13 nights begun before midnight,
+        // one after.) The load bar below is deliberately NOT moved: it is the training done on that
+        // calendar day, and its effect shows up in the NEXT morning's score.
+        val adverseByDay = nights.associate { dayOf(it.endMs) to it.adverseCount }
         val feltByDay = nights.mapNotNull { n ->
-            n.felt.value?.let { dayOf(n.startMs) to it.toInt() }
+            n.felt.value?.let { dayOf(n.endMs) to it.toInt() }
         }.toMap()
         // A rating filed against a date the band recorded no night for has no [NightReading] to carry
         // it, so its tile would sit empty while the table below printed the score — the same hole the
         // rows fixed, one level up. Now that a tile is also where a rating is TAPPED, an empty tile
         // after a tap would read as the tap having done nothing at all. The store is therefore the
-        // fallback, and a tile means one thing either way: the rating filed for the night that started
-        // that day.
+        // fallback, and a tile means one thing either way: the rating filed for the morning of that
+        // day — the night that ended on it, recorded or not.
         val ratingByDay = ratings.mapNotNull { (date, r) -> epochDayOf(date)?.let { it to r } }.toMap()
         val days = (fromEpochDay..toEpochDay).map { d ->
             DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d])
         }
 
         // The union, so a rating whose date the band never recorded is still a line. Newest first.
-        val nightByDate = nights.associateBy { dateOfNight(it.startMs) }
+        val nightByDate = nights.associateBy { dateOfNight(it.endMs) }
         val rows = (nightByDate.keys + ratings.keys).sortedDescending().map { date ->
             NightRow(date, nightByDate[date], ratings[date])
         }

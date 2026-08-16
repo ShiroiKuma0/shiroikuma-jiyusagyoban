@@ -23,6 +23,9 @@ class SessionRegisterTest {
 
     private fun night(dayIndex: Int, hr: Double) = SessionRegister.NightReading(
         startMs = base + dayIndex * day + 23 * 3_600_000L,
+        // Bed at 23:00, up at 07:00 — the night ends on the NEXT day, which is the day it is filed
+        // and drawn under since 2026-08-16.
+        endMs = base + dayIndex * day + 31 * 3_600_000L,
         nocturnalHr = MarkerReading(RecoveryMarker.NOCTURNAL_HR, hr, 60.0, 55.0, 65.0, 0.0, RecoveryBand.USUAL, true),
         sleep = MarkerReading(RecoveryMarker.SLEEP, 480.0, 480.0, 450.0, 510.0, 0.0, RecoveryBand.USUAL, true),
         felt = MarkerReading(RecoveryMarker.FELT, 3.0, 3.0, 2.0, 4.0, 0.0, RecoveryBand.USUAL, true),
@@ -92,7 +95,11 @@ class SessionRegisterTest {
         assertEquals(5, r.days.size)
         val withSession = r.days.first { it.epochDay == base / day + 2 }
         assertTrue("the session's load lands on its own day", (withSession.sessionLoad ?: 0.0) > 0.0)
-        assertEquals(0, withSession.adverseCount)
+        // The training and the night that followed it sit on DIFFERENT tiles, and must: the bar is
+        // what was done on day 2, the night is the morning of day 3 that it was slept off into. Put
+        // on one tile they would read as cause and effect when the effect is a day later.
+        assertNull("the night is not on the day it began", withSession.adverseCount)
+        assertEquals(0, r.days.first { it.epochDay == base / day + 3 }.adverseCount)
         assertNull(r.days.first { it.epochDay == base / day }.sessionLoad)
     }
 
@@ -132,6 +139,7 @@ class SessionRegisterTest {
         val history = (0 until 20).map {
             RecoverySource.NightMetrics(
                 startMs = base + it * day,
+                endMs = base + it * day + 8 * 3_600_000L,
                 nocturnalHr = if (it == 19) 75.0 else 60.0,
                 sleepMinutes = 480.0,
                 skinTemp = 36.4,
@@ -183,14 +191,16 @@ class SessionRegisterTest {
     @Test
     fun `a rating with no night of its own is still listed`() {
         val nights = listOf(night(2, 60.0), night(3, 61.0))
-        val orphanDate = dateKey(night(4, 0.0).startMs)
+        // A morning no night ended on — the shape of a night the band missed entirely.
+        val orphanDate = dateKey(base + 6 * day)
         val r = SessionRegister.build(
             sessions = emptyList(),
             nights = nights,
             spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
             fromEpochDay = base / day, toEpochDay = base / day + 6,
             ratings = mapOf(
-                dateKey(night(2, 0.0).startMs) to 3,
+                // By the night's END: the morning it is filed under.
+                dateKey(night(2, 0.0).endMs) to 3,
                 orphanDate to 5,
             ),
             dateOfNight = ::dateKey,
@@ -204,11 +214,41 @@ class SessionRegisterTest {
         assertEquals(3, r.rows[2].felt)
     }
 
+    /**
+     * The case the whole morning-keying change exists for.
+     *
+     * 白い熊's nights begin before midnight — thirteen of the fourteen on record — and one began at
+     * 00:21. Keyed on the start, that one sat on the day it began while every other sat on the day
+     * BEFORE the morning it was rated on, so one habit drew two different pictures and the odd tile
+     * out was the one nobody could see was odd. Keyed on the morning, both land on the morning.
+     */
+    @Test
+    fun `a night before midnight and one after land on the same morning tile`() {
+        val eveningBefore = night(2, 60.0) // 23:00 on day 2 → 07:00 on day 3
+        val afterMidnight = night(2, 60.0).copy(
+            startMs = base + 3 * day + 21_000L * 60L, // 00:21 on day 3
+            endMs = base + 3 * day + 334_000L * 60L, // 05:34 on day 3
+        )
+        listOf(eveningBefore, afterMidnight).forEach { n ->
+            val r = SessionRegister.build(
+                sessions = emptyList(), nights = listOf(n),
+                spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+                fromEpochDay = base / day, toEpochDay = base / day + 6,
+                dateOfNight = ::dateKey,
+            )
+            assertEquals(
+                "both nights ended on the morning of day 3",
+                dateKey(base + 3 * day),
+                r.rows.single().dateKey,
+            )
+        }
+    }
+
     /** The grid carries the score itself, not only a count of markers that were off. */
     @Test
     fun `each day cell carries that night's rating`() {
         val history = (0 until 8).map {
-            RecoverySource.NightMetrics(base + it * day, 60.0, 480.0, 36.4)
+            RecoverySource.NightMetrics(base + it * day, base + it * day + 8 * 3_600_000L, 60.0, 480.0, 36.4)
         }
         val read = SessionRegister.readNights(history) { 4.0 }
         val r = SessionRegister.build(
@@ -272,6 +312,7 @@ class SessionRegisterTest {
         val history = (0 until 20).map {
             RecoverySource.NightMetrics(
                 startMs = base + it * day,
+                endMs = base + it * day + 8 * 3_600_000L,
                 nocturnalHr = 60.0,
                 sleepMinutes = 480.0,
                 skinTemp = if (it == 19) 37.6 else 36.4,
