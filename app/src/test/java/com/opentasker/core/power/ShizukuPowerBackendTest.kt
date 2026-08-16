@@ -86,7 +86,10 @@ class ShizukuPowerBackendTest {
             "wake" to listOf(listOf("input", "keyevent", "224")),
         )
 
-        assertEquals(ShizukuPowerBackend.elevatedActionIds, expected.keys)
+        // Pin first, live set second: JUnit prints these as "expected" and "was", and reversed they
+        // named the stale set as the expectation — the failure that found `wake` missing read as
+        // though the pin were the thing at fault.
+        assertEquals(expected.keys, ShizukuPowerBackend.elevatedActionIds)
         expected.forEach { (actionId, variants) ->
             assertEquals("$actionId variant count", variants.size, ShizukuCommandPolicy.variantCount(actionId))
             variants.forEachIndexed { index, argv ->
