@@ -192,6 +192,8 @@ object ActionCatalog {
         define("dialog.list", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::ListDialogAction),
         define("dialog.pickmulti", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::PickListToVariableAction),
         define("dialog.text", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TextDialogAction),
+        define("scene.gestures", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SceneGesturesAction),
+        define("key.bindings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::KeyBindingsAction),
         define("shell.run", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::ShellRunAction),
         define("net.speedtest", ActionCategory.NET, ActionRetrySafety.NEVER, ::SpeedTestAction),
         define("net.speedtest.cancel", ActionCategory.NET, ActionRetrySafety.IDEMPOTENT, ::CancelSpeedTestAction),

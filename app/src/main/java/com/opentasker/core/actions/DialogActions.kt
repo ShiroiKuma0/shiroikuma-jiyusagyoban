@@ -204,7 +204,13 @@ class PickListToVariableAction : Action {
     }
 }
 
-/** `Text Dialog` (Tasker 377) — show text with OK/Cancel; store which was pressed. */
+/**
+ * `Text Dialog` (Tasker 377) — show text with OK/Cancel; store which was pressed.
+ *
+ * `size` ("normal" / "large" / "full") and `markup` turn the same action into a readable page: a
+ * reference sheet needs the width, and headings/bold/underline, that the default narrow dialog of
+ * unstyled text cannot give it. Both default off, so every existing dialog looks exactly as before.
+ */
 class TextDialogAction : Action {
     override val id = "dialog.text"
     override val category = ActionCategory.SYSTEM
@@ -215,6 +221,14 @@ class TextDialogAction : Action {
             putExtra(DialogActivity.EXTRA_TEXT, args["text"].orEmpty())
             putExtra(DialogActivity.EXTRA_OK, args["ok"].orEmpty())
             putExtra(DialogActivity.EXTRA_CANCEL, args["cancel"].orEmpty())
+            putExtra(
+                DialogActivity.EXTRA_MARKUP,
+                args["markup"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on"),
+            )
+            putExtra(DialogActivity.EXTRA_SIZE, args["size"].orEmpty())
+            // Unset or unreadable (an unexpanded "%Sheet_Scale" before its settings task has ever
+            // run) means the theme's own sizes — never a broken dialog.
+            putExtra(DialogActivity.EXTRA_TEXT_SCALE, args["text_scale"]?.trim()?.toFloatOrNull() ?: 1f)
         }
         args["store"]?.trim()?.takeIf { it.isNotEmpty() }?.let { store ->
             ctx.variables.set(store, if (outcome is DialogOutcome.Confirmed) "true" else "false")

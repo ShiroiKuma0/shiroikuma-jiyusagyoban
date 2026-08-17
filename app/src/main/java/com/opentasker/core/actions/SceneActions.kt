@@ -146,3 +146,168 @@ class HideSceneAction : Action {
         return ActionResult.Success
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// scene.gestures — what is bound to what.
+//
+// The edge bars (画面操作) are invisible strips whose whole content is their gesture bindings, and
+// those bindings live only in each scene element's free-form config map: nothing in the app ever
+// SHOWS them, and there is no editor field for them either. So the only way to know which swipe on
+// which bar runs which task was to read an export. This action reads them back out of the database,
+// which is what makes a printed reference sheet worth having: it cannot go stale, because it is
+// generated from the same rows the gesture detector reads.
+// ---------------------------------------------------------------------------------------------
+
+/** Gesture config keys, in the order a sheet should list them, with the label in each language. */
+private val GESTURE_LABELS: List<Triple<String, String, String>> = listOf(
+    Triple("tap", "タップ", "Tap"),
+    Triple("doubleTap", "ダブルタップ", "Double tap"),
+    Triple("longPress", "長押し", "Long press"),
+    Triple("swipeUp", "スワイプ ↑", "Swipe ↑"),
+    Triple("swipeDown", "スワイプ ↓", "Swipe ↓"),
+    Triple("swipeLeft", "スワイプ ←", "Swipe ←"),
+    Triple("swipeRight", "スワイプ →", "Swipe →"),
+    Triple("longSwipeUp", "ロングスワイプ ↑", "Long swipe ↑"),
+    Triple("longSwipeDown", "ロングスワイプ ↓", "Long swipe ↓"),
+    Triple("longSwipeLeft", "ロングスワイプ ←", "Long swipe ←"),
+    Triple("longSwipeRight", "ロングスワイプ →", "Long swipe →"),
+    Triple("moveDebug", "初動（デバッグ）", "First move (debug)"),
+)
+
+/** `tap` and `longPress` are element columns, not config keys — everything else lives in the map. */
+private val GESTURE_CONFIG_KEYS: Set<String> =
+    GESTURE_LABELS.map { it.first }.toSet() - setOf("tap", "longPress")
+
+/**
+ * Every gesture bound on [element], as (printable gesture, task name) in [GESTURE_LABELS] order.
+ *
+ * A binding is stored as a task NAME (current) or a legacy id string, exactly as the gesture detector
+ * accepts both; an id is resolved through [taskNameById] so the sheet never prints a bare number, and
+ * an id that no longer resolves is called out rather than silently dropped — a dangling binding is
+ * precisely the thing a reference sheet should expose.
+ */
+private fun gesturesOf(
+    element: com.opentasker.core.model.SceneElement,
+    taskNameById: Map<Long, String>,
+    lang: SheetLang,
+): List<Pair<String, String>> {
+    fun taskName(ref: String?): String? {
+        val trimmed = ref?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val id = trimmed.toLongOrNull() ?: return trimmed
+        return taskNameById[id] ?: ("#$id " + lang.of("（見つからない）", "(not found)"))
+    }
+    val bound = buildMap {
+        taskName(element.tapTaskName.ifBlank { element.tapTaskId?.toString().orEmpty() })
+            ?.let { put("tap", it) }
+        taskName(element.longPressTaskName.ifBlank { element.longPressTaskId?.toString().orEmpty() })
+            ?.let { put("longPress", it) }
+        element.config.forEach { (key, value) ->
+            if (key in GESTURE_CONFIG_KEYS) taskName(value)?.let { put(key, it) }
+        }
+    }
+    return GESTURE_LABELS.mapNotNull { (key, ja, en) -> bound[key]?.let { lang.of(ja, en) to it } }
+}
+
+/** One heading of the sheet and the scenes filed under it. A null heading = an unheaded flat list. */
+private data class GestureSection(val heading: String?, val sceneRefs: List<String>)
+
+/**
+ * Read the `scenes` argument.
+ *
+ * `右辺|Right edge: 右上, 右中, 右下` on its own line opens a section; a line with no colon is a plain
+ * list of scenes with no heading, which is also what a single comma-separated line means. The heading
+ * may carry both languages, `日本語|English`. Heading and membership both have to be spelled out
+ * because neither is stored: the app groups the edge scenes as 辺/右辺/… in the Scenes tab, but that
+ * tree carries the tab's own ordering, not the order the bars should be READ in (right, bottom, left).
+ */
+private fun parseGestureSections(raw: String, lang: SheetLang): List<GestureSection> =
+    raw.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.map { line ->
+        val cut = line.indexOfFirst { it == ':' || it == '：' }
+        val heading = if (cut > 0) lang.pick(line.substring(0, cut)).takeIf { it.isNotEmpty() } else null
+        val list = if (cut > 0) line.substring(cut + 1) else line
+        GestureSection(heading, list.split(',', '、').map { it.trim() }.filter { it.isNotEmpty() })
+    }.filter { it.sceneRefs.isNotEmpty() }
+
+/**
+ * `Scene Gestures` — write a ready-to-show listing of which gesture on which scene runs which task.
+ *
+ * Scenes with no gesture at all are skipped, so an unused edge bar never takes up a heading — and a
+ * section whose scenes are ALL empty prints no heading either. The text is emitted in `dialog.text`'s
+ * markup, so `scene.gestures` → `dialog.text (markup, size=full)` is the whole reference sheet.
+ */
+class SceneGesturesAction : Action {
+    override val id = "scene.gestures"
+    override val category = ActionCategory.SYSTEM
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "gestures"
+        val lang = sheetLangOf(args["lang"])
+        val sceneDao = OpenTaskerApp_NoHilt.db.sceneDao()
+        val taskNameById = OpenTaskerApp_NoHilt.db.taskDao().getAll().associate { it.id to it.name }
+        // An explicit list is both the filter AND the order. With none given, fall back to every scene
+        // in the caller's project, in the order the Scenes tab shows them.
+        val sections = parseGestureSections(args["scenes"].orEmpty(), lang).ifEmpty {
+            listOf(
+                GestureSection(
+                    heading = null,
+                    sceneRefs = sceneDao.getAll()
+                        .filter { (it.projectId ?: 0L) == ctx.variables.projectId }
+                        .sortedWith(compareBy({ it.position }, { it.name }))
+                        .map { it.name },
+                ),
+            )
+        }
+        // A heading anywhere pushes the scene names one level down, so the sides read as the top level.
+        val sceneLevel = if (sections.any { it.heading != null }) 3 else 2
+
+        val out = StringBuilder()
+        var listed = 0
+        for (section in sections) {
+            val scenes: List<Scene> = section.sceneRefs
+                .mapNotNull { resolveScene(sceneDao, it, ctx.variables.projectId) }
+                .distinctBy { it.id }.map { it.toDomain() }
+            // Built into a buffer first: a side with nothing bound on any of its bars must not leave a
+            // bare heading behind.
+            val body = StringBuilder()
+            for (scene in scenes) {
+                val blocks = scene.elements.mapIndexedNotNull { index, element ->
+                    gesturesOf(element, taskNameById, lang).takeIf { it.isNotEmpty() }?.let { gestures ->
+                        val label = element.config["label"]?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: lang.of("要素 ${index + 1}", "Element ${index + 1}")
+                        label to gestures
+                    }
+                }
+                if (blocks.isEmpty()) continue
+                listed++
+                body.append("#".repeat(sceneLevel)).append(' ').append(scene.name).append('\n')
+                for ((label, gestures) in blocks) {
+                    // A single-element scene (every edge bar) is its own heading already; only a panel
+                    // with several gesture-bearing elements needs to say which one it is talking about.
+                    if (blocks.size > 1) {
+                        body.append("#".repeat(sceneLevel + 1)).append(' ').append(label).append('\n')
+                    }
+                    gestures.forEach { (gesture, task) ->
+                        body.append("**").append(gesture).append("** → __").append(task).append("__\n")
+                    }
+                }
+                body.append('\n')
+            }
+            if (body.isEmpty()) continue
+            section.heading?.let { out.append("## ").append(it).append('\n') }
+            out.append(body)
+        }
+        if (listed == 0) {
+            out.append(
+                lang.pick(args["empty_text"]).takeIf { it.isNotEmpty() }
+                    ?: lang.of("ジェスチャーは登録されていません。", "No gesture is bound."),
+            )
+        }
+        appendSheetFooter(out, args["footer"], lang, listed)
+
+        ctx.variables.set(store, out.toString().trimEnd())
+        ctx.variables.set("${store}_count", listed.toString())
+        ctx.variables.set("${store}_title", lang.pick(args["title"]))
+        ctx.logger("Gesture sheet: $listed scene(s) → %$store")
+        return ActionResult.Success
+    }
+}

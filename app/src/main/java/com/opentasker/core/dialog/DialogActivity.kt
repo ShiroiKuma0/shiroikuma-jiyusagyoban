@@ -7,11 +7,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -31,12 +37,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.screens.AppMultiSelectDialog
 import com.opentasker.ui.theme.OpenTaskerTheme
@@ -116,6 +131,9 @@ class DialogActivity : ComponentActivity() {
                         onConfirm = { picked -> settle(DialogOutcome.Confirmed(picked.joinToString("\n"))) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     else -> TextDialog(title, text, okLabel, textCancelLabel, settingsTargets,
+                        markup = intent.getBooleanExtra(EXTRA_MARKUP, false),
+                        size = dialogSizeOf(intent.getStringExtra(EXTRA_SIZE).orEmpty()),
+                        textScale = intent.getFloatExtra(EXTRA_TEXT_SCALE, 1f).coerceIn(0.5f, 3f),
                         onOpenSettings = { req -> openSettingsFor(req) },
                         onConfirm = { settle(DialogOutcome.Confirmed("true")) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
@@ -196,6 +214,9 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_CANCEL = "cancel"
         const val EXTRA_SETTINGS_REQS = "settings_reqs"     // CapabilityRequirement names → deep-link pills
         const val EXTRA_SETTINGS_LABELS = "settings_labels" // parallel labels for the pills
+        const val EXTRA_MARKUP = "markup" // TEXT: read the body as the lightweight markup below
+        const val EXTRA_SIZE = "size"     // TEXT: "normal" (default) / "large" / "full"
+        const val EXTRA_TEXT_SCALE = "text_scale" // TEXT: font multiplier, 1 = the theme's own sizes
 
         const val TYPE_INPUT = "input"
         const val TYPE_LIST = "list"
@@ -366,19 +387,36 @@ private fun TextDialog(
     okLabel: String,
     cancelLabel: String?,
     settingsTargets: List<Pair<String, String>>,
+    markup: Boolean,
+    size: DialogSize,
+    textScale: Float,
     onOpenSettings: (String) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
     AlertDialog(
-        modifier = dialogModifier(),
+        modifier = dialogModifier().then(size.surfaceModifier()),
         // With no cancel button an outside/back dismissal resolves as OK — the only outcome — so the
         // dialog can never get stuck; with a cancel button it keeps the distinct Cancelled outcome.
         onDismissRequest = if (cancelLabel == null) onConfirm else onCancel,
-        title = { if (title.isNotBlank()) Text(title) },
+        // headlineSmall is AlertDialog's own default for this slot, restated so the scale can reach it.
+        title = {
+            if (title.isNotBlank()) {
+                Text(title, style = MaterialTheme.typography.headlineSmall.scaledBy(textScale))
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyMedium)
+            // A long body scrolls instead of being clipped — the reason a reference sheet can be shown
+            // here at all. The scroll container is height-bounded by the dialog itself (the text slot
+            // is weighted), so this changes nothing for a body that already fits.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                if (text.isNotBlank()) {
+                    if (markup) MarkupBody(text, textScale)
+                    else Text(text, style = MaterialTheme.typography.bodyMedium.scaledBy(textScale))
+                }
                 // One tap-through pill per missing permission → opens its System settings page.
                 settingsTargets.forEach { (reqName, label) -> SettingsPill(label) { onOpenSettings(reqName) } }
             }
@@ -387,7 +425,272 @@ private fun TextDialog(
         // An explicitly blank cancel label (dialog.text with cancel="") drops the dismiss button —
         // for acknowledgment-only dialogs where there is nothing to cancel.
         dismissButton = cancelLabel?.let { { TextButton(onClick = onCancel) { Text(it) } } },
+        // "large"/"full" have to opt out of the platform's fixed dialog width before any fillMaxWidth
+        // on the surface can take effect.
+        properties = DialogProperties(usePlatformDefaultWidth = size == DialogSize.NORMAL),
     )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Text-dialog sizing and markup.
+//
+// A `dialog.text` is the app's only way to put a page of prose in front of the user, and at the
+// platform's default width a reference sheet (which gesture on which edge bar runs which task) is
+// unreadable. `size` widens the surface; `markup` gives the body headings, bold and underline so the
+// sheet has structure rather than being one grey block.
+// ---------------------------------------------------------------------------------------------
+
+/** How much of the screen a text dialog claims. */
+internal enum class DialogSize { NORMAL, LARGE, FULL }
+
+internal fun dialogSizeOf(raw: String): DialogSize = when (raw.trim().lowercase()) {
+    "large", "big" -> DialogSize.LARGE
+    "full", "fullscreen", "max" -> DialogSize.FULL
+    else -> DialogSize.NORMAL
+}
+
+/** Leave a margin at every size: a dialog flush with the screen edge reads as a broken Activity. */
+private fun DialogSize.surfaceModifier(): Modifier = when (this) {
+    DialogSize.NORMAL -> Modifier
+    DialogSize.LARGE -> Modifier.fillMaxWidth(0.94f)
+    DialogSize.FULL -> Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.92f)
+}
+
+/**
+ * One line of the markup. The syntax is deliberately tiny — it is written by tasks (often assembled
+ * by an action, e.g. `scene.gestures`), so anything that needs escaping rules would be a trap:
+ *
+ *   `# text`   title      `## text` section (underlined)   `### text` / `#### text` sub-headings
+ *   `- text`   bullet     `---`     horizontal rule
+ *   inline: `**bold**`, `__underline__`, `*italic*`
+ *
+ * A line that matches nothing is body text, so plain text stays plain.
+ *
+ * Indentation is not written out: it follows the headings. A `##` sits flush, `###` one step in, and
+ * a line of content steps in past the heading it belongs to — so the same document reads as a proper
+ * outline without the author counting spaces. Two leading spaces on a line add one further step, for
+ * the cases the outline cannot know about (a note that belongs under the line above it). A `---`
+ * closes the outline and returns to the margin.
+ */
+private sealed interface MarkupBlock {
+    data class Heading(val level: Int, val text: String) : MarkupBlock
+    data class Bullet(val text: String, val extraIndent: Int) : MarkupBlock
+    data class Body(val text: String, val extraIndent: Int) : MarkupBlock
+    data object Rule : MarkupBlock
+    data object Blank : MarkupBlock
+}
+
+private fun parseMarkup(text: String): List<MarkupBlock> = text.lines().map { raw ->
+    val line = raw.trimEnd()
+    val trimmed = line.trim()
+    // Leading whitespace is an explicit extra step (2 spaces = 1 step); a tab counts as one step.
+    val lead = line.takeWhile { it == ' ' || it == '\t' }
+    val extra = lead.count { it == '\t' } + lead.count { it == ' ' } / 2
+    when {
+        trimmed.isEmpty() -> MarkupBlock.Blank
+        trimmed.length >= 3 && trimmed.all { it == '-' } -> MarkupBlock.Rule
+        trimmed.startsWith("#### ") -> MarkupBlock.Heading(4, trimmed.removePrefix("#### "))
+        trimmed.startsWith("### ") -> MarkupBlock.Heading(3, trimmed.removePrefix("### "))
+        trimmed.startsWith("## ") -> MarkupBlock.Heading(2, trimmed.removePrefix("## "))
+        trimmed.startsWith("# ") -> MarkupBlock.Heading(1, trimmed.removePrefix("# "))
+        trimmed.startsWith("- ") -> MarkupBlock.Bullet(trimmed.removePrefix("- "), extra)
+        else -> MarkupBlock.Body(trimmed, extra)
+    }
+}
+
+// Ordered alternation: `**` is tried before `*`, so bold never decays into two italics.
+private val INLINE_MARKUP_RE = Regex("""\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*""")
+
+private fun inlineSpans(text: String): AnnotatedString {
+    if ('*' !in text && '_' !in text) return AnnotatedString(text)
+    return buildAnnotatedString {
+        var last = 0
+        for (m in INLINE_MARKUP_RE.findAll(text)) {
+            if (m.range.first > last) append(text.substring(last, m.range.first))
+            val bold = m.groupValues[1]
+            val underline = m.groupValues[2]
+            when {
+                bold.isNotEmpty() -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(bold) }
+                underline.isNotEmpty() ->
+                    withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(underline) }
+                else -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(m.groupValues[3]) }
+            }
+            last = m.range.last + 1
+        }
+        if (last < text.length) append(text.substring(last))
+    }
+}
+
+/**
+ * Grow (or shrink) a style by [scale]. lineHeight moves with fontSize — scaling the glyphs alone
+ * leaves 1.5× text crammed into 1× leading, which is what makes enlarged text look broken.
+ */
+private fun TextStyle.scaledBy(scale: Float): TextStyle =
+    if (scale == 1f) this else copy(
+        fontSize = if (fontSize.isSpecified) fontSize * scale else fontSize,
+        lineHeight = if (lineHeight.isSpecified) lineHeight * scale else lineHeight,
+    )
+
+/**
+ * One indent step, scaled with the text. The UI-customization page steps its rows by 16dp per level
+ * ([com.opentasker.ui.screens] `rowStartPadding`); 13dp here, because a dialog on the folded cover
+ * panel has a third of that page's width to spend and still owes two full steps.
+ */
+private fun indentStep(scale: Float) = 13.dp * scale
+
+@Composable
+private fun MarkupBody(text: String, scale: Float) {
+    val blocks = parseMarkup(text)
+    Column(Modifier.fillMaxWidth()) {
+        // depth = the level of the heading currently in force; content sits one step past it.
+        var depth = 0
+        var seenSection = false
+        var index = 0
+        while (index < blocks.size) {
+            when (val block = blocks[index]) {
+                is MarkupBlock.Heading -> {
+                    MarkupHeading(block, scale, hairlineAbove = block.level == 2 && seenSection)
+                    if (block.level == 2) seenSection = true
+                    depth = block.level
+                    index++
+                }
+                MarkupBlock.Rule -> {
+                    // A rule closes the outline: what follows it (a footer, a second document) is not
+                    // filed under the last heading and must not inherit its indent.
+                    HorizontalDivider(
+                        modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    depth = 0
+                    index++
+                }
+                MarkupBlock.Blank -> {
+                    Spacer(Modifier.height(9.dp * scale))
+                    index++
+                }
+                else -> {
+                    // Take the whole run of content belonging to this heading in one go, so the rail
+                    // beside it is one continuous line rather than one stub per row.
+                    val run = mutableListOf<MarkupBlock>()
+                    while (index < blocks.size &&
+                        blocks[index] !is MarkupBlock.Heading &&
+                        blocks[index] != MarkupBlock.Rule
+                    ) {
+                        run += blocks[index]
+                        index++
+                    }
+                    while (run.isNotEmpty() && run.last() == MarkupBlock.Blank) run.removeAt(run.size - 1)
+                    MarkupRun(run, depth, scale)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A heading, in the visual language of the UI-customization page: a `##` is that page's section
+ * header — accent-coloured, with a 2dp accent rule as wide as the text itself and a full-width
+ * hairline separating it from the section above — and `###`/`####` are its quieter sub-headers.
+ */
+@Composable
+private fun MarkupHeading(block: MarkupBlock.Heading, scale: Float, hairlineAbove: Boolean) {
+    val step = indentStep(scale)
+    val indent = step * (block.level - 2).coerceAtLeast(0)
+    if (hairlineAbove) {
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 18.dp),
+            thickness = 1.dp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+        )
+    }
+    when (block.level) {
+        1, 2 -> Column(
+            Modifier
+                .padding(start = indent, top = if (hairlineAbove) 12.dp else 2.dp, bottom = 6.dp)
+                // Max, not Min: with a CJK heading every character is a break point, so the minimum
+                // intrinsic width is one glyph and the rule would shrink to it. (Same trap the UI
+                // page's section header documents.)
+                .width(IntrinsicSize.Max),
+        ) {
+            Text(
+                inlineSpans(block.text),
+                style = (if (block.level == 1) MaterialTheme.typography.headlineSmall
+                else MaterialTheme.typography.titleMedium).scaledBy(scale),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(3.dp))
+            HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
+        }
+        else -> Text(
+            inlineSpans(block.text),
+            style = (if (block.level == 3) MaterialTheme.typography.labelLarge
+            else MaterialTheme.typography.bodyMedium).scaledBy(scale),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Closer to what it introduces than to what came before it.
+            modifier = Modifier.fillMaxWidth().padding(start = indent, top = 10.dp, bottom = 3.dp),
+        )
+    }
+}
+
+/**
+ * The content under a heading: indented one step past it and, from the second step in, tied together
+ * by a thin accent rail running down its left edge. The rail is what makes a long list of
+ * gesture → task lines read as belonging to the bar named above it rather than floating.
+ */
+@Composable
+private fun MarkupRun(run: List<MarkupBlock>, depth: Int, scale: Float) {
+    if (run.isEmpty()) return
+    val step = indentStep(scale)
+    val steps = (depth - 1).coerceAtLeast(0)
+    if (steps == 0) {
+        Column(Modifier.fillMaxWidth()) { MarkupLines(run, scale) }
+        return
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            // The rail stands at the PARENT's indent, so the text after it lands exactly on this
+            // level's own step — the gutter is spent on the rail rather than added to the indent.
+            .padding(start = step * (steps - 1))
+            .height(IntrinsicSize.Min),
+    ) {
+        Box(
+            Modifier
+                .width(2.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(1.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+        )
+        Spacer(Modifier.width(step - 2.dp))
+        Column(Modifier.weight(1f)) { MarkupLines(run, scale) }
+    }
+}
+
+@Composable
+private fun MarkupLines(run: List<MarkupBlock>, scale: Float) {
+    val step = indentStep(scale)
+    val body = MaterialTheme.typography.bodyMedium.scaledBy(scale)
+    run.forEach { block ->
+        when (block) {
+            MarkupBlock.Blank -> Spacer(Modifier.height(9.dp * scale))
+            is MarkupBlock.Bullet -> Row(
+                Modifier.fillMaxWidth().padding(start = step * block.extraIndent, bottom = 3.dp),
+            ) {
+                Text("•  ", style = body, color = MaterialTheme.colorScheme.primary)
+                Text(inlineSpans(block.text), style = body)
+            }
+            is MarkupBlock.Body -> Text(
+                inlineSpans(block.text),
+                style = body,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = step * block.extraIndent, bottom = 3.dp),
+            )
+            // Headings and rules are consumed by the caller and never reach a run.
+            else -> Unit
+        }
+    }
 }
 
 /** A rounded, tap-through pill that opens a System settings page. */
