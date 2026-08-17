@@ -911,8 +911,45 @@ fun registerActionMetadata() {
                 ActionField("text", "Text", FieldType.MULTILINE),
                 ActionField("ok", "OK label", hint = "default: OK"),
                 ActionField("cancel", "Cancel label", hint = "default: Cancel"),
+                ActionField("size", "Size", hint = "normal (default) / large / full — full nearly fills the screen and the body scrolls"),
+                ActionField("markup", "Formatted text", FieldType.CHECKBOX, hint = "read the body as markup: # title, ## section (underlined), ### / #### sub, - bullet, --- rule, **bold**, __underline__, *italic*"),
+                ActionField("text_scale", "Font scale", hint = "1 = the theme's own size (default), 1.5 = half again as big. Clamped 0.5–3"),
                 ActionField("store", "Store OK in", hint = "variable set to true/false (optional)"),
                 ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "scene.gestures",
+            name = "List Scene Gestures",
+            description = "Write a formatted listing of which gesture on which scene runs which task. Scenes with no gesture bound are left out. Pair it with a Text Dialog set to formatted text for a reference sheet that cannot go stale",
+            category = "Alert",
+            fields = listOf(
+                ActionField("scenes", "Scenes", FieldType.MULTILINE, hint = "comma-separated scene names, in the order to list them. One line per section to group them: \"右辺|Right edge: 右上, 右中, 右下\". Blank = every scene in this project"),
+                ActionField("lang", "Language", hint = "blank = follow the device; ja / en force one. Only the words this action supplies are translated — your scene and task names stay as written"),
+                ActionField("title", "Sheet name", hint = "optional, \"日本語|English\" — resolved into <store>_title for the dialog to use as its title"),
+                ActionField("footer", "Footer", hint = "optional, \"日本語|English\" — closes the sheet with a rule and an italic line. {count} = how many were listed"),
+                ActionField("store", "Store in", hint = "variable name (default: gestures). Also writes <name>_count and <name>_title"),
+                ActionField("empty_text", "When nothing is bound", hint = "text stored if no scene has a gesture (\"日本語|English\")"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "key.bindings",
+            name = "List Key Bindings",
+            description = "Write a formatted listing of which physical-key gesture runs which task, read from the profiles themselves — including the conditions that pick between two bindings on the same press, and whether a profile is switched off",
+            category = "Alert",
+            fields = listOf(
+                ActionField("scope", "Scope", hint = "blank = this task's project (default); \"all\" = every project on the device"),
+                ActionField("lang", "Language", hint = "blank = follow the device; ja / en force one. Only the words this action supplies are translated — your profile and task names stay as written"),
+                ActionField("title", "Sheet name", hint = "optional, \"日本語|English\" — resolved into <store>_title for the dialog to use as its title"),
+                ActionField("footer", "Footer", hint = "optional, \"日本語|English\" — closes the sheet with a rule and an italic line. {count} = how many were listed"),
+                ActionField("store", "Store in", hint = "variable name (default: bindings). Also writes <name>_count and <name>_title"),
+                ActionField("empty_text", "When nothing is bound", hint = "text stored if no profile triggers on a hardware key (\"日本語|English\")"),
             )
         )
     )

@@ -110,6 +110,8 @@ object ActionCapabilityRegistry {
         "screen.lock" to accessibilityCapability(),
         "screen.lockdown" to ActionCapability(CapabilityLevel.RequiresSetup, "Enable 白い熊 自由作業盤 as a Device Admin (Permissions screen) so it can lock and require the PIN/password.", CapabilityRequirement.DeviceAdmin, blocking = true),
         "scene.show" to accessibilityCapability(),
+        "scene.gestures" to ActionCapability(CapabilityLevel.Supported, "Reads the scenes already stored on this device to list their gesture bindings; shows nothing and needs no permission."),
+        "key.bindings" to ActionCapability(CapabilityLevel.Supported, "Reads the profiles already stored on this device to list what the physical keys are mapped to; shows nothing and needs no permission."),
         "call.place" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to dial directly; otherwise opens the dialer."),
         "brightness.auto" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", CapabilityRequirement.WriteSettings, blocking = true),
         "setting.put" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access; only the System namespace is writable without Shizuku.", CapabilityRequirement.WriteSettings, blocking = true),

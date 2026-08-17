@@ -128,6 +128,8 @@ object AutomationSensitivityRegistry {
         "progress.item",
         "progress.row",
         "progress.show",
+        "key.bindings",
+        "scene.gestures",
         "scene.hide",
         "scene.show",
         "screen.lock",
