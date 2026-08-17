@@ -8,6 +8,42 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+023 — 2026-08-17
+
+Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
+
+**Nothing in the app changed.** This release exists because the fork can now *look* at its own UI
+without a phone, and the layouts of the previous release are the first thing it looked at.
+
+`app/src/screenshotTest/` renders `@Preview` composables to PNGs on the build machine, and it had
+never once worked here. It failed with *"There are test sources present … did not discover any
+tests"*, which reads like a misconfigured source set and sends you after Gradle, AGP and plugin
+versions. The real cause is that the screenshot engine discovers methods annotated
+`com.android.tools.screenshot.PreviewTest`, **not** `@Preview` — and nothing in this toolchain
+generates that annotation. It is a public annotation in `screenshot-validation-api`, already on the
+screenshotTest classpath; applying it by hand is the entire fix. Ruled out along the way, so they are
+not re-investigated: the plugin version (alpha15 and alpha16 behave identically, and alpha15 stays
+pinned), the JUnit Platform version, `testClassesDirs`, and the class scan itself — running the
+engine's own `PreviewMethodFinder` standalone against the real config found the preview immediately.
+The break was purely in discovery.
+
+Upstream's `ComposeScreenshotPreviews.kt` is deleted with its 44 reference images. It was written
+against upstream's screen signatures and this fork has moved them — `OpenTaskerTheme` no longer takes
+`darkTheme`/`amoled`/`highContrast`, `ProfilesScreen` gained `groupOps`/`projectFilter`/`projects`/
+`onReorderProjects`, `DiagnosticsScreen` is gone outright — so it could not compile and took the whole
+source set down with it. Repairing it would be a tax paid on every upstream sync for previews of
+screens this fork has changed; the fork keeps its own instead.
+
+Those are the 辺一覧 and 鍵一覧 sheets at both panel widths and in both languages, with the markup
+exactly as `scene.gestures` and `key.bindings` emit it and the dialog's own text-slot padding, so the
+render matches the phone rather than inventing artefacts of the fixture. The committed baselines make
+`validateDebugScreenshotTest` a regression gate on the layout as well as a way to see it.
+
+This is worth a release of its own because of what it prevents. Those sheets shipped twice —
+indentation, rails, section rules, then the language variants — compile-verified, unit-tested, and
+never once looked at, because the phone is normally locked and a screenshot of it is not something
+the build machine can take.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+022 — 2026-08-17
 
 Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
