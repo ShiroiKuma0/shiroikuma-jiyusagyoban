@@ -349,6 +349,8 @@ fun ActiveAutomationUi(
         deleteGroup = { viewModel.deleteGroup(it) },
         // Drag-to-reorder from the list: file the moved item into its drop group + rewrite the tab's order.
         reorder = { key, gid, ordered -> viewModel.reorderItem(tab, key, gid, ordered) },
+        // Hold a group header and drag: rewrite that run of siblings' positions.
+        reorderGroups = { ordered -> viewModel.reorderGroups(ordered) },
     )
     val visibleProfiles = when (val f = projectFilter) {
         ProjectFilter.All -> profiles
