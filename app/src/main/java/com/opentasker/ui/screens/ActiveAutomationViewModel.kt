@@ -369,6 +369,27 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * Persist a drag-to-reorder of the GROUPS: [orderedGroupIds] is one set of siblings in their new
+     * visual order, and each gets its index written as `position`.
+     *
+     * Positions are only unique within a parent, and only the siblings passed here are touched, so a
+     * reorder inside one branch cannot disturb another. Unlike [reorderItem] this does NOT force the
+     * tab to MANUAL sort: group order has always come from `position` alone — the sort method applies
+     * to the items inside a group, not to the groups.
+     */
+    fun reorderGroups(orderedGroupIds: List<Long>) = viewModelScope.launch {
+        runCatching {
+            db.withTransaction {
+                orderedGroupIds.forEachIndexed { index, id ->
+                    db.itemGroupDao().getById(id)?.let { group ->
+                        if (group.position != index) db.itemGroupDao().upsert(group.copy(position = index))
+                    }
+                }
+            }
+        }.onFailure { events.send("Error: ${it.message ?: "Group reorder failed"}") }
+    }
+
     fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
         val pos = db.itemGroupDao().getForTab(tab).size
         val gid = db.itemGroupDao().upsert(ItemGroupEntity(projectId = projectId, tab = tab, name = name.trim(), position = pos))

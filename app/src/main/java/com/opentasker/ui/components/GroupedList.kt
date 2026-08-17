@@ -1,11 +1,10 @@
 package com.opentasker.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -138,6 +139,8 @@ class GroupOps(
     // Drag-to-REORDER: persist the moved item's group + the tab's whole new member order. Defaulted so the
     // widgets/vars tabs (which don't wire it) still construct a GroupOps. Wired by groupOpsFor → the VM.
     val reorder: (movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) -> Unit = { _, _, _ -> },
+    // Drag-to-reorder the GROUPS: the dragged group's siblings in their new order. Same defaulting.
+    val reorderGroups: (orderedGroupIds: List<Long>) -> Unit = { },
 )
 
 /**
@@ -159,6 +162,9 @@ fun <T> LazyListScope.groupedItems(
     // Drag-to-reorder commit: moved item-key, the group it was dropped into, and the tab's whole new member
     // order (Members only). Defaulted to no-op so tabs that don't wire it (widgets/vars) still compile.
     onReorder: (movedKey: String, targetGroupId: Long?, orderedKeys: List<String>) -> Unit = { _, _, _ -> },
+    // Group drag-to-reorder commit: the dragged group's siblings in their new order. Defaulted so tabs
+    // that don't wire it still compile.
+    onReorderGroups: (orderedGroupIds: List<Long>) -> Unit = { },
     itemContent: @Composable (T) -> Unit,
 ) {
     val rows = buildGroupRows(items, keyOf, ops.groups, ops.groupIdOf, dragActive = drag.draggingKey != null)
@@ -170,6 +176,14 @@ fun <T> LazyListScope.groupedItems(
     // Which group each member is filed under (null = top level) — from stored meta, filtered to live groups.
     val liveGroupIds = ops.groups.mapTo(mutableSetOf()) { it.id }
     fun memberGroupId(key: String): Long? = ops.groupIdOf(key)?.takeIf { it in liveGroupIds }
+
+    // Each group's peers, in the order they are drawn. A parent that isn't live leaves its children at
+    // top level — the same normalisation buildGroupRows does, so the two agree on who is a sibling.
+    val siblingsByParent = ops.groups
+        .groupBy { g -> g.parentGroupId?.takeIf { it in liveGroupIds } }
+        .mapValues { (_, peers) -> peers.sortedBy { it.position }.map { it.id } }
+    fun siblingsOf(group: ItemGroupEntity): List<Long> =
+        siblingsByParent[group.parentGroupId?.takeIf { it in liveGroupIds }].orEmpty()
 
     // Ordered drop anchors used to translate the lifted row's center Y into (targetGroup, insertionIndex).
     // Each header contributes "first slot in its group"; each (non-moved) member contributes "after me".
@@ -220,26 +234,51 @@ fun <T> LazyListScope.groupedItems(
                 )
             }
             is GroupRow.Header -> item(key = "grp:${row.group.id}") {
-                GroupHeaderRow(
-                    group = row.group,
-                    memberCount = row.memberCount,
-                    depth = row.depth,
-                    highlighted = drag.draggingKey != null && drag.dropGroupId == row.group.id,
-                    selected = row.group.id in selectedGroupIds,
-                    selectionActive = selectedGroupIds.isNotEmpty(),
-                    onToggleSelect = { onToggleSelectGroup(row.group) },
-                    onLongPress = { onLongPressGroup(row.group) },
-                    onToggleExpanded = { ops.toggleGroup(row.group) },
-                    onRename = { ops.renameGroup(row.group, it) },
-                    onDelete = { ops.deleteGroup(row.group) },
-                    onMoveInto = { onMoveGroup(row.group) },
-                    onMoveOut = { ops.setGroupParent(row.group, null) },
-                    onAddSubgroup = { ops.createSubgroup(row.group, it) },
-                    modifier = Modifier.onGloballyPositioned {
-                        val b = it.boundsInWindow()
-                        drag.headerBounds[row.group.id] = b.top..b.bottom
-                    },
-                )
+                val isDraggingGroup = drag.draggingGroupId == row.group.id
+                // Where the lifted group will land: a line above the sibling currently occupying that
+                // slot, or below the last sibling when the target is the end of the run.
+                val peers = siblingsOf(row.group).filter { it != drag.draggingGroupId }
+                val myPeerIndex = peers.indexOf(row.group.id)
+                val showAbove = drag.draggingGroupId != null && drag.groupDragMoved &&
+                    myPeerIndex >= 0 && drag.groupDropIndex == myPeerIndex
+                val showBelow = drag.draggingGroupId != null && drag.groupDragMoved &&
+                    row.group.id == peers.lastOrNull() && drag.groupDropIndex == peers.size
+                Column(Modifier.zIndex(if (isDraggingGroup) 1f else 0f)) {
+                    if (showAbove) DropIndicator(row.depth)
+                    GroupHeaderRow(
+                        group = row.group,
+                        memberCount = row.memberCount,
+                        depth = row.depth,
+                        highlighted = drag.draggingKey != null && drag.dropGroupId == row.group.id,
+                        selected = row.group.id in selectedGroupIds,
+                        selectionActive = selectedGroupIds.isNotEmpty(),
+                        onToggleSelect = { onToggleSelectGroup(row.group) },
+                        onLongPress = { onLongPressGroup(row.group) },
+                        onToggleExpanded = { ops.toggleGroup(row.group) },
+                        onRename = { ops.renameGroup(row.group, it) },
+                        onDelete = { ops.deleteGroup(row.group) },
+                        onMoveInto = { onMoveGroup(row.group) },
+                        onMoveOut = { ops.setGroupParent(row.group, null) },
+                        onAddSubgroup = { ops.createSubgroup(row.group, it) },
+                        dragging = isDraggingGroup,
+                        dragOffsetY = drag.groupOffsetY,
+                        onHoldStart = { drag.startGroupDrag(row.group.id, siblingsOf(row.group)) },
+                        onHoldDrag = { drag.moveGroup(it) },
+                        // No travel → this was the long-press that has always started a selection.
+                        onHoldEnd = {
+                            val ordered = drag.endGroupDrag()
+                            if (ordered != null) onReorderGroups(ordered) else onLongPressGroup(row.group)
+                        },
+                        onHoldCancel = { drag.cancelGroupDrag() },
+                        modifier = Modifier.onGloballyPositioned {
+                            val b = it.boundsInWindow()
+                            // Untranslated bounds: onGloballyPositioned sits before the lift's
+                            // graphicsLayer, so the drop maths is not fed the offset twice.
+                            drag.headerBounds[row.group.id] = b.top..b.bottom
+                        },
+                    )
+                    if (showBelow) DropIndicator(row.depth)
+                }
             }
             is GroupRow.Member -> item(key = "itm:${keyOf(row.item)}") {
                 val key = keyOf(row.item)
@@ -334,7 +373,6 @@ private fun DropIndicator(depth: Int) {
 }
 
 /** Foldable group header — chevron + name + member count + an overflow menu (rename / delete / nest). */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GroupHeaderRow(
     group: ItemGroupEntity,
@@ -352,16 +390,33 @@ fun GroupHeaderRow(
     onMoveInto: () -> Unit,
     onMoveOut: () -> Unit,
     onAddSubgroup: (String) -> Unit,
+    // Hold-to-reorder. [onHoldStart] arms the drag (the long press has fired), [onHoldDrag] feeds it
+    // the travel, and [onHoldEnd] decides between committing a reorder and falling back to onLongPress.
+    dragging: Boolean = false,
+    dragOffsetY: Float = 0f,
+    onHoldStart: () -> Unit = {},
+    onHoldDrag: (Float) -> Unit = {},
+    onHoldEnd: () -> Unit = {},
+    onHoldCancel: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var addingSub by remember { mutableStateOf(false) }
     val themePrefs by ThemeStore.state.collectAsState()
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = modifier
             .padding(start = (depth * groupIndentDp()).dp)
             .fillMaxWidth()
+            // The lift rides above the background/clip so the header visibly leaves the list while held.
+            .graphicsLayer {
+                if (dragging) {
+                    translationY = dragOffsetY
+                    shadowElevation = 12f
+                    alpha = 0.95f
+                }
+            }
             .clip(RoundedCornerShape(12.dp))
             // Normal header colour is user-settable (ARGB); selection/highlight keep the accent tints so
             // multi-select stays visible. Optional user border (default a thin yellow). 白い熊
@@ -381,11 +436,25 @@ fun GroupHeaderRow(
                     )
                 } else Modifier,
             )
-            // Tap = fold (or toggle selection while selecting); long-press = start/extend a group selection.
-            .combinedClickable(
-                onClick = { if (selectionActive) onToggleSelect() else onToggleExpanded() },
-                onLongClick = onLongPress,
-            )
+            // Tap = fold (or toggle selection while selecting). The long press is NOT wired here: it
+            // belongs to the drag detector below, which is the only place that can tell a hold-and-
+            // release (select) from a hold-and-drag (reorder). Wiring onLongClick as well would fire
+            // the selection the instant the timeout elapsed, halfway into a reorder.
+            .clickable { if (selectionActive) onToggleSelect() else onToggleExpanded() }
+            .pointerInput(group.id) {
+                detectDragGesturesAfterLongPress(
+                    // The buzz IS the affordance: nothing else tells you the hold has been long
+                    // enough and the header is now yours to move. It fires the moment the long press
+                    // lands — before any travel — so it also confirms the press was registered at all.
+                    onDragStart = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onHoldStart()
+                    },
+                    onDrag = { change, amount -> change.consume(); onHoldDrag(amount.y) },
+                    onDragEnd = { onHoldEnd() },
+                    onDragCancel = { onHoldCancel() },
+                )
+            }
             .padding(horizontal = 12.dp, vertical = themePrefs.groupHeaderVPadDp.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -543,6 +612,89 @@ class GroupDragState {
     fun cancel() = reset()
 
     private fun reset() { draggingKey = null; offsetY = 0f; dropIndex = -1; dropGroupId = null }
+
+    // -----------------------------------------------------------------------------------------
+    // Reordering the GROUPS themselves.
+    //
+    // A member has a dedicated drag handle; a group header has no room for one (it already carries a
+    // chevron, a count and a ⋮ menu) and its whole width is the fold target. So a group is lifted by
+    // pressing and HOLDING it — the long press that used to only start a multi-selection now also arms
+    // the drag, and which of the two you get is decided by whether you then move: hold-and-release
+    // still selects, hold-and-drag reorders. Nothing that worked before stops working.
+    //
+    // A drag moves a group among its SIBLINGS only. Re-parenting stays on the ⋮ menu, where the target
+    // is named explicitly — inferring "did they mean to nest this or just pass over it?" from a
+    // position between a parent and its first child is the kind of guess that loses people's layouts.
+    // -----------------------------------------------------------------------------------------
+
+    var draggingGroupId by mutableStateOf<Long?>(null)
+        private set
+    var groupOffsetY by mutableStateOf(0f)
+        private set
+    /** Insertion index among the siblings with the dragged group removed; -1 = nothing to commit. */
+    var groupDropIndex by mutableStateOf(-1)
+        private set
+    /** True once the finger has actually travelled — what separates a reorder from a plain long-press. */
+    var groupDragMoved by mutableStateOf(false)
+        private set
+
+    private var groupStartCenterY = 0f
+    private var groupSiblings: List<Long> = emptyList()
+
+    /** [siblings] are the dragged group's peers in visual order, INCLUDING it. */
+    fun startGroupDrag(id: Long, siblings: List<Long>) {
+        draggingGroupId = id
+        groupOffsetY = 0f
+        groupDragMoved = false
+        groupSiblings = siblings.filter { it != id }
+        val b = headerBounds[id]
+        groupStartCenterY = if (b != null) (b.start + b.endInclusive) / 2f else 0f
+        recomputeGroup()
+    }
+
+    fun moveGroup(dy: Float) {
+        groupOffsetY += dy
+        // A few pixels of travel is a shaky finger, not an intent to move the group.
+        if (kotlin.math.abs(groupOffsetY) > 8f) groupDragMoved = true
+        recomputeGroup()
+    }
+
+    private fun recomputeGroup() {
+        if (draggingGroupId == null) { groupDropIndex = -1; return }
+        val center = groupStartCenterY + groupOffsetY
+        var index = 0
+        groupSiblings.forEachIndexed { i, sid ->
+            val b = headerBounds[sid] ?: return@forEachIndexed
+            // Cross the middle of a sibling's HEADER to land after it — its folded-out children do not
+            // extend the target, so passing a large expanded group takes one gesture, not a scroll.
+            if (center >= (b.start + b.endInclusive) / 2f) index = i + 1
+        }
+        groupDropIndex = index
+    }
+
+    /**
+     * End a group drag. Returns the sibling order to persist, or null when the press was a plain
+     * long-press (no travel) — the caller then treats it as the selection gesture it always was.
+     */
+    fun endGroupDrag(): List<Long>? {
+        val id = draggingGroupId
+        val moved = groupDragMoved
+        val index = groupDropIndex
+        val siblings = groupSiblings
+        resetGroup()
+        if (id == null || !moved || index < 0) return null
+        return siblings.toMutableList().apply { add(index.coerceIn(0, size), id) }
+    }
+
+    fun cancelGroupDrag() = resetGroup()
+
+    private fun resetGroup() {
+        draggingGroupId = null
+        groupOffsetY = 0f
+        groupDropIndex = -1
+        groupDragMoved = false
+        groupSiblings = emptyList()
+    }
 }
 
 @Composable
