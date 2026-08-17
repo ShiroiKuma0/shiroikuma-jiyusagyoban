@@ -8,6 +8,61 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+022 — 2026-08-17
+
+Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
+
+**Two of this workspace's most-used bindings were, until now, unreadable.** An edge bar is a
+transparent strip whose entire content is its gesture config — and that config has no field in the
+scene editor, so the only way to learn which swipe ran which task was to read an export. A physical
+key is worse: the map is not a table anywhere, it is spread across one profile per gesture, several
+of them further narrowed by a device state, so answering "what does a double-press do?" meant opening
+eight profiles one at a time.
+
+**`scene.gestures` and `key.bindings` read those rows back out.** One lists side → bar → gesture →
+task, the other key → press → task, and because both are generated from the same rows the gesture
+detector and the profile engine read, a sheet cannot disagree with what the finger actually does. The
+key sheet prints the condition that picks between two bindings on one press — Vol-Down short is
+録音停止 *while recording* and 下・単押し otherwise — names the profile to open to change it, and marks
+any profile switched off. A bar with nothing bound is skipped rather than printed empty, and a whole
+side with nothing bound prints no heading at all. A legacy numeric binding is resolved to its task's
+name; one that no longer resolves is called out rather than silently dropped, which is precisely the
+thing a reference sheet ought to expose.
+
+**`dialog.text` became a page rather than a paragraph** to show them: a `size` that drops the
+platform's fixed dialog width and lets the body scroll, a `markup` body with headings, bold,
+underline, rules and bullets, and `text_scale` for reading at arm's length — line spacing and indent
+steps scale with the glyphs, so enlarged text is neither cramped nor pushed off the folded cover
+panel. **Indentation is not written out; it follows the headings**, so an outline needs no counted
+spaces. The visual language is the appearance page's own — accent section headers ruled to the width
+of their own text (`IntrinsicSize.Max`, because a CJK heading's *minimum* intrinsic width is one
+glyph), a hairline between sections, quieter sub-headers, an accent rail down each indented block —
+so a generated sheet looks like the rest of the app. Every knob defaults off: existing dialogs are
+pixel-identical.
+
+**One `lang` argument switches the whole document.** Unset follows the device; `ja` and `en` force
+one regardless, so the same map can be read in English on a phone that is never in English. Caller
+strings that differ by language are written `日本語|English` and picked the same way, and the footer
+moved into the action — it has to, since `%<store>_count` does not exist yet when the action's own
+arguments are expanded, hence a `{count}` placeholder. What is never translated is your own names:
+scenes, tasks and profiles print exactly as written.
+
+**Groups can be reordered at last.** Their order came from a `position` written once when the group
+was created, and nothing since could change it — nesting, renaming, folding and deleting all existed,
+but not moving. A group header now **vibrates and lifts on a long press**, and dragging drops it among
+its siblings with an accent line showing the landing slot.
+
+The long press was already taken by group multi-select. Rather than pick a winner the two split on
+whether you move: **hold-and-release still selects exactly as before, hold-and-drag reorders.** That
+required taking `onLongClick` off the header's clickable entirely and driving both outcomes from
+`detectDragGesturesAfterLongPress`, because a long-click wired in parallel fires the selection the
+instant the timeout elapses — halfway into a reorder. Crossing the middle of a sibling's *header*
+lands you after it, so passing a large expanded group is one gesture rather than a scroll past all of
+its children. Re-parenting stays on the ⋮ menu, where the target is named: inferring "nest this, or
+just passing over it?" from a position between a parent and its first child is the kind of guess that
+quietly loses a layout. The drop arithmetic is unit-tested off-device — an off-by-one there reads as
+the feature being broken while looking perfectly fine in a screenshot.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+015 — 2026-08-16
 
 **A border on a calendar tile now means today, and means nothing else.** The marker count rang the
