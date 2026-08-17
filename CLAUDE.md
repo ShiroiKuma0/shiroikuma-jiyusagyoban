@@ -98,6 +98,31 @@ JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleRelease
 Distribution profiles (`-PopenTaskerDistribution=standard|fdroid|play`) are upstream's; we ship the
 default **`standard`**.
 
+### Seeing the UI without the phone — Compose screenshot previews
+```bash
+# Render every @PreviewTest preview to app/src/screenshotTestDebug/reference/ (and .../outputs/…/rendered/)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew updateDebugScreenshotTest < /dev/null
+# Compare the current render against those committed references instead of overwriting them
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew validateDebugScreenshotTest < /dev/null
+```
+Previews live in `app/src/screenshotTest/kotlin/…`. This is how a layout gets LOOKED at from this end:
+白い熊's phone is normally locked, so `adb shell screencap` returns black or the keyguard and no
+screenshot of the running app is possible.
+
+- **Every preview needs `@PreviewTest` (`com.android.tools.screenshot.PreviewTest`) as well as
+  `@Preview`.** The engine discovers methods carrying `@PreviewTest`; `@Preview` alone is invisible to
+  it and the task dies with *"There are test sources present … did not discover any tests"*, which
+  reads like a broken source set rather than a missing annotation. Nothing in this toolchain generates
+  the annotation — searched: it exists only in `screenshot-validation-api`, and neither the Gradle
+  plugin, the Compose compiler plugin, KSP, nor `compose-preview-detector` emits it. (Diagnosed
+  2026-08-17; the plugin version is not the cause — alpha15 and alpha16 behave identically.)
+- **Upstream's own `ComposeScreenshotPreviews.kt` was deleted from the fork**, with its 44 reference
+  PNGs. It was written against upstream's screen signatures, which this fork has changed
+  (`OpenTaskerTheme(darkTheme=/amoled=/highContrast=)`, `ProfilesScreen`'s added `groupOps`/
+  `projectFilter`/`projects`/`onReorderProjects`, `DiagnosticsScreen` removed outright), so it could
+  not compile and took the whole source set down with it. On a sync, **keep our deletion** — same call
+  as the snapshot-schedule UI.
+
 ### Toolchain
 - JDK **21** at `/usr/lib/jvm/java-21-openjdk-amd64` (the host default `java` is JDK 11; Gradle 9.x
   aborts on it — always set `JAVA_HOME`).

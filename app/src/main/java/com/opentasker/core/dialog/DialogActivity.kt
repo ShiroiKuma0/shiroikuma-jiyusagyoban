@@ -539,7 +539,7 @@ private fun TextStyle.scaledBy(scale: Float): TextStyle =
 private fun indentStep(scale: Float) = 13.dp * scale
 
 @Composable
-private fun MarkupBody(text: String, scale: Float) {
+internal fun MarkupBody(text: String, scale: Float) {
     val blocks = parseMarkup(text)
     Column(Modifier.fillMaxWidth()) {
         // depth = the level of the heading currently in force; content sits one step past it.
