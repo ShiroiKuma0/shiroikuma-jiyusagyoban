@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.86+2026-08-12.15-45.ga1fe8154+015`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.86+2026-08-12.15-45.ga1fe8154+022`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.86-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -236,6 +236,24 @@ back to detect-only, which sees the keys without consuming them.
 
 ---
 
+### 📄 A sheet of what runs what — generated, so it cannot go stale
+
+Two bindings in this workspace are invisible by construction. An **edge bar** is a transparent strip whose entire content is its gesture config, and that config has no editor field at all. A **physical-key map** is not a table anywhere — it is spread across one profile per gesture, several of them further qualified by a device state, so reading it means opening eight profiles one at a time.
+
+`scene.gestures` and `key.bindings` read those same rows back out and lay them on a near-fullscreen page: side, then bar, then gesture → task; or key, then press → task, with the condition that picks between two bindings on one press ("Vol-Down short is 録音停止 *while recording*, 下・単押し otherwise") and a mark on any profile switched off. Because the sheet is generated from the rows the gesture detector reads, it cannot disagree with what your finger actually does — and a bar with nothing bound is skipped rather than printed empty.
+
+Showing it made `dialog.text` into a page rather than a paragraph: a `size` that drops the platform's fixed dialog width, **headings, bold, underline, rules and bullets**, an indent cascade taken from the headings themselves so an outline needs no counted spaces, and a `text_scale` for reading at arm's length. The look — accent section headers ruled to the width of their own text, a hairline between sections, an accent rail down each indented block — is the appearance page's own, so a generated sheet looks like the rest of the app. One `lang` argument switches every word the sheet supplies between Japanese and English (your own scene, task and profile names are never touched), so the same map can be read either way on a phone that never changes language.
+
+---
+
+### ✋ Hold a group header and drag it
+
+Groups could be created, nested, renamed and folded — but never reordered: their order came from a `position` written once at creation, and nothing afterwards could change it. Now a **long press vibrates and lifts the header**, and dragging drops it among its siblings, with an accent line showing where it will land.
+
+The long press was already spoken for by group multi-select, so the two split on whether you move: **hold-and-release still selects, hold-and-drag reorders.** Crossing the middle of a sibling's *header* is what lands you after it, so passing a large expanded group takes one gesture rather than a scroll past all of its children. Re-parenting stays on the menu, where the target is named — guessing "nest this, or just passing over it?" from a position between a parent and its first child is how a layout quietly gets lost.
+
+---
+
 ## Triggers (contexts)
 
 - **7 context families** — application, time, day, location, state, event and plugin
@@ -259,9 +277,9 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (173 registered + 10 engine-handled)
+### Actions (175 registered + 10 engine-handled)
 
-**173 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**175 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/actions/ActionCatalog.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.
@@ -288,7 +306,7 @@ recomputes both figures from source and fails the build if this line drifts.
 
 **Notification (5)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech) · Progress Notification
 
-**Alert (4)** — Input Dialog · List Dialog · Text Dialog · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)*
+**Alert (6)** — Input Dialog · List Dialog · **Text Dialog** *(＋ near-fullscreen `size`, a `markup` body with headings/bold/underline and a heading-driven indent, and `text_scale`)* · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)* · **List Scene Gestures** *(which gesture on which scene runs which task)* · **List Key Bindings** *(which physical-key press runs which task, with its conditions)*
 
 **Tasks (4)** — **Add Action to Task** *(idempotent, optionally re-sorting the matched block)* · **Task Exists** · **Sort Tasks** · **Edit Action**
 
