@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.opentasker.ui.theme.isNarrowScreen
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -220,10 +223,41 @@ private fun Grid(
         listOf("月", "火", "水", "木", "金", "土", "日")
     }
 
+    // The rows are a fixed window that SCROLLS, not a list that grows: the register reaches a month
+    // and a half back (see [RecoveryBuild.gridStart]) while the card stays the height it is today, so
+    // the screen below it does not move as the weeks accumulate. It opens at the BOTTOM — today's
+    // week — because that is the row every other row is read relative to, and scrolling back through
+    // the months is the gesture this window exists for. (白い熊, 2026-08-18.)
+    //
+    // Derived from the type rather than hardcoded: everything in a week row is a fixed dp except the
+    // date label, which grows with the font-scale preference, and a viewport pinned at a literal 370
+    // would clip the last row the moment 白い熊 moved that slider.
+    val density = LocalDensity.current
+    val lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
+    val dateLine = if (lineHeight.isSp) with(density) { lineHeight.toDp() } else 21.dp
+    // vertical padding + date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load bar
+    val weekRow = 6.dp + dateLine + 2.dp + 39.dp + 2.dp + 4.dp
+    val headLine = MaterialTheme.typography.titleMedium.lineHeight
+    val monthRule = (if (headLine.isSp) with(density) { headLine.toDp() } else 22.dp) + 12.dp
+    val viewport = weekRow * VISIBLE_WEEKS + monthRule
+
+    val weeks = cells.chunked(7)
+    val scroll = rememberScrollState()
+    var openedAtToday by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(scroll.maxValue) {
+        if (!openedAtToday && scroll.maxValue > 0) {
+            scroll.scrollTo(scroll.maxValue)
+            openedAtToday = true
+        }
+    }
+
     // No gap between the rows: the weekend rule has to run unbroken down the grid, and a segment
     // cannot cover space that belongs to the parent's arrangement. The breathing room moved inside
     // each day cell instead, where the rule spans it too. (白い熊, 2026-08-11: "make it a full line".)
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        // Outside the scrolling box, so the column a square sits in is still nameable after scrolling
+        // back six weeks — a weekday header that scrolls away is a header that is never there when
+        // it is wanted.
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.height(IntrinsicSize.Min),
@@ -240,7 +274,14 @@ private fun Grid(
                 if (i == 4) Box(Modifier.width(1.5.dp).fillMaxHeight().background(sectionInk))
             }
         }
-        cells.chunked(7).forEach { week ->
+        Column(Modifier.height(viewport).verticalScroll(scroll)) {
+        weeks.forEachIndexed { wi, week ->
+            // Which month this row opens, if any: the one whose 1st it contains — and for the first
+            // row in the window, simply the month it starts in, so the top of the grid is labelled
+            // too rather than only the boundaries below it.
+            monthOpenedBy(week, wi == 0)?.let { ym ->
+                MonthDivider(ym, topPadding = if (wi == 0) 0.dp else 6.dp)
+            }
             // Only where the rule actually separates two days. On the last row the grid runs out
             // mid-week, and a line hanging past the final date divides nothing.
             val ruleHere = week.getOrNull(4) != null && week.getOrNull(5) != null
@@ -344,7 +385,28 @@ private fun Grid(
                 }
             }
         }
+        }
     }
+}
+
+/** How many week rows the calendar shows at once; the rest of the window scrolls into view. */
+private const val VISIBLE_WEEKS = 5
+
+/**
+ * The month a grid row opens, or null when it opens none.
+ *
+ * A month boundary almost never falls on a Monday, so the rule cannot be drawn between two rows and
+ * be honest about where the month starts. It is drawn above the row that CONTAINS the 1st instead:
+ * that row is the first one with any of the new month in it, which is what "the beginning of the
+ * month" means to someone scrolling. [isFirst] labels the top row whatever its dates, because the
+ * top of the window has no preceding rule to inherit a month from.
+ */
+private fun monthOpenedBy(week: List<SessionRegister.DayCell?>, isFirst: Boolean): java.time.YearMonth? {
+    val days = week.filterNotNull()
+    if (days.isEmpty()) return null
+    days.firstOrNull { LocalDate.ofEpochDay(it.epochDay).dayOfMonth == 1 }
+        ?.let { return BandMonths.ofEpochDay(it.epochDay) }
+    return if (isFirst) BandMonths.ofEpochDay(days.first().epochDay) else null
 }
 
 /**
@@ -389,21 +451,37 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                 RateHint()
                 // The field names appear ONCE, as column headings. Repeating them on every line was
                 // four labels a night of pure noise, and it buried the numbers they were labelling.
+                val cols = nightColumns()
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    HeadCell(BandText.regColDate[lang], 0.28f)
-                    HeadCell(BandText.regColFelt[lang], 0.24f)
-                    HeadCell(BandText.regColHr[lang], 0.16f)
-                    HeadCell(BandText.regColSleep[lang], 0.18f)
-                    HeadCell(BandText.regColTemp[lang], 0.14f)
+                    HeadCell(BandText.regColDate[lang], cols.date)
+                    HeadCell(BandText.regColFelt[lang], cols.felt)
+                    HeadCell(BandText.regColHr[lang], cols.hr)
+                    HeadCell(BandText.regColSleep[lang], cols.sleep)
+                    HeadCell(BandText.regColTemp[lang], cols.temp)
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(style.grid))
                 // Week rules, drawn BELOW the row that ends a week reading downwards: the list runs
                 // newest first, so a Monday is followed by the Sunday before it, and a Saturday by
                 // the Friday before it. Weeks are how a run of nights is actually remembered — "that
                 // was the weekend" — and without them ten dates are just ten dates.
+                //
+                // Month rules are the same idea one level up, and are drawn ABOVE the first line of
+                // each month for the same reason the calendar draws them above the row that opens
+                // one: reading downwards the list goes backwards in time, so the heading has to
+                // arrive before the days it names. They carry the year, which is why the narrow
+                // layout can take it off every line.
                 rows.forEachIndexed { i, row ->
-                    NightTableRow(row, onRate = { onRate(row.dateKey) })
-                    if (i < rows.lastIndex) {
+                    val ym = BandMonths.ofDateKey(row.dateKey)
+                    val previous = if (i == 0) null else BandMonths.ofDateKey(rows[i - 1].dateKey)
+                    if (ym != null && ym != previous) {
+                        MonthDivider(ym, topPadding = if (i == 0) 2.dp else 10.dp)
+                    }
+                    NightTableRow(row, cols, onRate = { onRate(row.dateKey) })
+                    // Never under the last line of a month: the month rule below it says the same
+                    // thing louder, and two rules three pixels apart read as a rendering fault.
+                    val opensAMonth = i < rows.lastIndex &&
+                        BandMonths.ofDateKey(rows[i + 1].dateKey) != ym
+                    if (i < rows.lastIndex && !opensAMonth) {
                         when (weekdayOf(row.dateKey)) {
                             java.time.DayOfWeek.MONDAY -> 2.5.dp
                             java.time.DayOfWeek.SATURDAY -> 1.dp
@@ -437,46 +515,75 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
  */
 @Composable
 private fun ScaleLegend(onInfo: () -> Unit) {
-    val lang = LocalBandLanguage.current
+    // Five pills and an ⓘ need about 350 dp of words to stay unclipped, and a folded panel offers
+    // 377 dp of line for the whole card — so on the narrow layout the key breaks over two rows,
+    // 1–2–3 then 4–5, rather than shrinking. It was clipping to "1 Grea" / "2 Goo" / "4 Below p",
+    // which turns a key into five colours with no names at all. (白い熊, 2026-08-18.)
+    if (isNarrowScreen()) {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                for (step in 1..3) LegendPill(step)
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                for (step in 4..5) LegendPill(step)
+                InfoCircle(diameter = 30.dp, onClick = onInfo)
+            }
+        }
+        return
+    }
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
-        for (step in 1..5) {
-            val skin = scaleSkin(step, ChartPalette.scale(step), sectionNote)
-            val label = feltLabel(step)[lang]
-            // Weighted by what each pill has to hold, not equally: five equal fifths would clip
-            // "Below par" while leaving air around "Good". The row still fills the line exactly —
-            // the widths just land where the words are.
-            Row(
-                Modifier
-                    .weight(legendWeight(label))
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(skin.fill)
-                    .padding(horizontal = 3.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "$step",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = skin.ink,
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = skin.ink,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                )
-            }
-        }
+        for (step in 1..5) LegendPill(step)
         InfoCircle(diameter = 30.dp, onClick = onInfo)
+    }
+}
+
+/**
+ * One step of the key, as the same filled pill the table draws.
+ *
+ * Weighted by what it has to hold, not equally: five equal fifths would clip "Below par" while
+ * leaving air around "Good". The row still fills the line exactly — the widths just land where the
+ * words are.
+ */
+@Composable
+private fun RowScope.LegendPill(step: Int) {
+    val lang = LocalBandLanguage.current
+    val skin = scaleSkin(step, ChartPalette.scale(step), sectionNote)
+    val label = feltLabel(step)[lang]
+    Row(
+        Modifier
+            .weight(legendWeight(label))
+            .clip(RoundedCornerShape(6.dp))
+            .background(skin.fill)
+            .padding(horizontal = 3.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "$step",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = skin.ink,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = skin.ink,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+        )
     }
 }
 
@@ -618,9 +725,33 @@ private fun RowScope.HeadCell(text: String, weight: Float) {
  * its number so nothing is expressed by hue alone. A value the band never recorded is a dash rather
  * than a gap, because an absence is itself a fact about the night.
  */
+/**
+ * How wide each column of the night table is, as a share of the line.
+ *
+ * Two sets, because the same five columns cannot be laid out the same way on a 916 dp unfolded panel
+ * and a 413 dp folded one. On the narrow set the date gives up more than half its share — it prints
+ * `08-18` over `Tue` instead of `2026-08-18 (Tue)` on one line — and hands it to the three value
+ * columns, which had been squeezing `36.4` onto two lines. (白い熊, 2026-08-18: the folded screenshots.)
+ */
+private class NightColumns(
+    val date: Float,
+    val felt: Float,
+    val hr: Float,
+    val sleep: Float,
+    val temp: Float,
+)
+
 @Composable
-private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
+private fun nightColumns(): NightColumns = if (isNarrowScreen()) {
+    NightColumns(date = 0.16f, felt = 0.26f, hr = 0.19f, sleep = 0.20f, temp = 0.19f)
+} else {
+    NightColumns(date = 0.28f, felt = 0.24f, hr = 0.16f, sleep = 0.18f, temp = 0.14f)
+}
+
+@Composable
+private fun NightTableRow(row: SessionRegister.NightRow, cols: NightColumns, onRate: () -> Unit) {
     val lang = LocalBandLanguage.current
+    val narrow = isNarrowScreen()
     val n = row.night
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -628,17 +759,47 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         // than to neither — the rows are 3 dp apart and a dead strip there would be most of the misses.
         modifier = Modifier.clickable(onClick = onRate).padding(vertical = 3.dp),
     ) {
-        Text(
-            nightDateFull(row.dateKey, lang),
-            Modifier.weight(0.28f),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Bold,
-            color = sectionInk,
-        )
+        if (narrow) {
+            // The weekday under the date rather than in brackets after it: it is the shorter of the
+            // two lines either way, so stacking costs no width at all and buys the whole bracket.
+            val (day, weekday) = nightDateParts(row.dateKey, lang)
+            Column(Modifier.weight(cols.date)) {
+                Text(
+                    day,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = sectionInk,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                Text(
+                    weekday,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = sectionNote,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        } else {
+            Text(
+                nightDateFull(row.dateKey, lang),
+                Modifier.weight(cols.date),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+        }
+        // Narrow: the step on its own line and the word under it, so "Below par" stops breaking
+        // across three lines and dragging the whole row's height with it.
         ValueCell(
-            row.felt?.let { "$it  ${feltLabel(it)[lang]}" } ?: BandText.registerNightUnrated[lang],
-            row.felt,
-            0.24f,
+            text = if (narrow) {
+                row.felt?.toString() ?: BandText.registerNightUnrated[lang]
+            } else {
+                row.felt?.let { "$it  ${feltLabel(it)[lang]}" } ?: BandText.registerNightUnrated[lang]
+            },
+            step = row.felt,
+            weight = cols.felt,
+            sub = if (narrow) row.felt?.let { feltLabel(it)[lang] } else null,
         )
         // Heart rate and sleep are graded against the published reference ranges, NOT against 白い熊's
         // own median: a within-person scale can only call a six-hour habit "usual", never short.
@@ -650,14 +811,14 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
                     (n.nocturnalHr.delta?.let { d -> " %+d".format(d.roundToInt()) } ?: "")
             },
             n?.nocturnalHr?.value?.let { RecoveryReference.nocturnalHrStep(it) },
-            0.16f,
+            cols.hr,
         )
         ValueCell(
             n?.sleep?.value?.let { "${(it / 60).toInt()}h${"%02d".format((it % 60).roundToInt())}" },
             n?.sleep?.value?.let { RecoveryReference.sleepStep(it) },
-            0.18f,
+            cols.sleep,
         )
-        ValueCell(n?.temperature?.value?.let { "%.1f".format(it) }, n?.temperature?.scaleStep, 0.14f)
+        ValueCell(n?.temperature?.value?.let { "%.1f".format(it) }, n?.temperature?.scaleStep, cols.temp)
     }
 }
 
@@ -669,7 +830,7 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
  * same box cell display for the bottom table".)
  */
 @Composable
-private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float) {
+private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float, sub: String? = null) {
     val skin = scaleSkin(step, Color.Transparent, sectionNote)
     Box(
         Modifier
@@ -679,12 +840,23 @@ private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float) {
             .background(skin.fill)
             .padding(horizontal = 5.dp, vertical = 5.dp),
     ) {
-        Text(
-            text ?: "—",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
-            color = skin.ink,
-        )
+        Column {
+            Text(
+                text ?: "—",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
+                color = skin.ink,
+            )
+            // Same ink as the number above it, not the note ink: it is inside a filled step chip, and
+            // the chip's fill is chosen to carry exactly one foreground.
+            sub?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = skin.ink,
+                )
+            }
+        }
     }
 }
 

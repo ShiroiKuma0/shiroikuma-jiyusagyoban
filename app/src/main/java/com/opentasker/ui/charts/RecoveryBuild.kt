@@ -120,9 +120,7 @@ object RecoveryBuild {
         val regime = RecoveryRegime.detect(offsetsByDay, todayEpochDay, spo2ByNight)
 
         val restingSpot = RecoverySource.restingSpotHr(spotPoints)
-        // Five weeks ending today: long enough to see a training pattern, short enough that every
-        // square on screen is a day 白い熊 might remember.
-        val gridFrom = todayEpochDay - 34
+        val gridFrom = gridStart(todayEpochDay)
         val history = nights.map { RecoverySource.metricsFor(it, hrPoints, tempPoints) }
         // By the night's END: the morning it is filed under. See [ratableMorning].
         val feltFor = { m: RecoverySource.NightMetrics -> ratings[localDateOf(m.endMs)]?.toDouble() }
@@ -214,6 +212,26 @@ object RecoveryBuild {
      * anything), so there is nothing to double-count. A marked WALK would be counted twice — which is
      * why the action's own description says to mark what the band cannot see, not everything.
      */
+    /**
+     * The calendar's window: seven whole weeks ending on today's, Monday-aligned.
+     *
+     * A month and a half rather than the five weeks it used to be, and **fixed** — it does not grow
+     * with the data and does not shrink when there is none. The card that draws it gives the rows a
+     * fixed height and scrolls them, so the window's length is a statement about how far back the
+     * calendar reaches, not about how tall the card is. (白い熊, 2026-08-18: "make the view fixed to
+     * cca month and a half going back … the days should scroll within the fixed view".)
+     *
+     * Monday-aligned at the start because the grid's first column is Monday: aligning here means the
+     * first row is a whole week, and — more to the point — that the window's length does not shift
+     * by up to six days depending on which weekday today happens to be. `today - 44` lands 45 days
+     * back and the alignment rounds that out to 45–51.
+     */
+    fun gridStart(todayEpochDay: Long): Long =
+        java.time.LocalDate.ofEpochDay(todayEpochDay)
+            .minusDays(44)
+            .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+            .toEpochDay()
+
     private fun buildLoad(
         stepPoints: List<ChartPoint>,
         spotPoints: List<ChartPoint>,

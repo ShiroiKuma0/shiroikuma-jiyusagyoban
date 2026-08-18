@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.opentasker.ui.theme.isNarrowScreen
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -180,42 +181,80 @@ private fun Headline(r: RecoveryResult) {
     }
 }
 
+/**
+ * One marker: its name, its value, its band, and the range that band was judged against.
+ *
+ * On a wide panel that is one line. On a **narrow** one it is two, and it has to be: the name alone
+ * runs to 145 dp ("Nocturnal heart rate"), the value takes 86 and the chip another 55, which on the
+ * folded Mate XT's 355 dp of card leaves the range about 60 dp — and because the range is the only
+ * part with no width floor, Compose gave it the leftovers and broke `usual 58–68` down the right
+ * edge one character per line. (白い熊, 2026-08-18, the folded screenshot: a column of `u/s/u/a/l`.)
+ *
+ * The range moves to its own line under the value rather than being dropped or shortened: `58 bpm ·
+ * usual 55–61` is the whole design brief of this card, and a banded number with its band's range
+ * hidden is exactly the reading it refuses to give.
+ */
 @Composable
 private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            markerLabel(m.marker)[lang],
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.width(labelWidth),
-            color = if (m.value == null) sectionNote else sectionInk,
+    val narrow = isNarrowScreen()
+    val usual = if (m.usualLo != null && m.usualHi != null) {
+        BandText.usualRange[lang].format(
+            format(m.marker, m.usualLo, lang, unit = false),
+            format(m.marker, m.usualHi, lang, unit = false),
         )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            m.value?.let { format(m.marker, it, lang) } ?: "—",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = sectionInk,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.width(86.dp),
-        )
-        BandChip(m)
-        Spacer(Modifier.weight(1f))
-        // The usual range, on every row, always. This is the whole point of the card.
-        if (m.usualLo != null && m.usualHi != null) {
+    } else {
+        null
+    }
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                BandText.usualRange[lang].format(
-                    format(m.marker, m.usualLo, lang, unit = false),
-                    format(m.marker, m.usualHi, lang, unit = false),
-                ),
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                color = sectionNote,
+                markerLabel(m.marker)[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                // Narrow: the name takes what is left rather than a measured width, so it ellipsises
+                // instead of pushing the value and the chip off the line.
+                modifier = if (narrow) Modifier.weight(1f, fill = false) else Modifier.width(labelWidth),
+                color = if (m.value == null) sectionNote else sectionInk,
             )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                m.value?.let { format(m.marker, it, lang) } ?: "—",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+                maxLines = 1,
+                softWrap = false,
+                modifier = if (narrow) Modifier else Modifier.width(86.dp),
+            )
+            Spacer(Modifier.width(if (narrow) 8.dp else 0.dp))
+            BandChip(m)
+            if (!narrow) {
+                Spacer(Modifier.weight(1f))
+                // The usual range, on every row, always. This is the whole point of the card.
+                usual?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                        color = sectionNote,
+                    )
+                }
+            }
+        }
+        if (narrow) {
+            usual?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+                    color = sectionNote,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            }
         }
     }
 }
@@ -583,6 +622,35 @@ fun nightDateFull(key: Long, lang: BandLanguage): String {
     } else {
         "%s（%s）".format(date, listOf("月", "火", "水", "木", "金", "土", "日")[dow - 1])
     }
+}
+
+/**
+ * The same date split for a narrow column: `08-18` and `Tue` / `08-18` and `火`.
+ *
+ * For the narrow layouts only, and only under a [MonthDivider] — the year has not been dropped, it
+ * has moved to the rule at the top of the month, where it is written once instead of on every line.
+ * A folded panel is 413 dp wide and the five columns of the night table do not fit with `2026-` on
+ * the front of each one; they wrapped to two lines instead, which cost far more than the year was
+ * worth. (白い熊, 2026-08-18.)
+ *
+ * Returned as two strings rather than one, because the column stacks them: the weekday is the
+ * shorter line either way, so putting it under the date costs no width and saves the brackets.
+ */
+fun nightDateParts(key: Long, lang: BandLanguage): Pair<String, String> {
+    val date = runCatching {
+        java.time.LocalDate.of(
+            (key / 10_000L).toInt(),
+            ((key / 100L) % 100L).toInt(),
+            (key % 100L).toInt(),
+        )
+    }.getOrNull() ?: return nightDateLabel(key) to ""
+    val dow = date.dayOfWeek.value // 1 = Monday
+    val names = if (lang == BandLanguage.EN) {
+        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    } else {
+        listOf("月", "火", "水", "木", "金", "土", "日")
+    }
+    return "%02d-%02d".format(date.monthValue, date.dayOfMonth) to names[dow - 1]
 }
 
 /**
