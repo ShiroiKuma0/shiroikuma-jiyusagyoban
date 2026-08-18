@@ -8,6 +8,62 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+024 — 2026-08-18
+
+Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
+
+**The 健康 screens now fit the phone folded, and every list of days says which month it is in.**
+
+The phone is a tri-fold. Its cover panel is **413 dp wide** — measured off the running app rather
+than guessed, from 34 dp tiles rendering 83 px at the device's 390 dpi override — against 840 dp
+semi-folded and 916 dp unfolded. Three screens had been laid out for the wide ones only:
+
+- **日ごとの記録** was six columns of fixed dp adding to 748. Folded, three of them were off the
+  right-hand edge of the screen with no way to reach them. It now has a narrow set — the same six
+  columns at 15 sp, fitting in 366 dp. Not fewer columns: a column that is off the screen and a
+  column that was never rendered read identically, and only one of them is honest about it.
+- **The 1–5 key** clipped to `1 Grea` / `2 Goo` / `4 Below p`, which turns a key into five colours
+  with no names attached. It breaks over two rows folded, 1–2–3 then 4–5, rather than shrinking.
+- **The 回復 card's usual range** was the only cell on a marker row with no width floor, so Compose
+  handed it the leftovers and broke `usual 58–68` down the right edge one character per line. It
+  moves to its own line under the value. It is not shortened and not dropped — `58 bpm · usual
+  55–61` is the whole brief of that card, and a banded number with its band hidden is precisely the
+  reading it refuses to give.
+- **The night table** wrapped `2026-08-18 (Tue)` and `36.4` onto two lines each. The date stacks as
+  `08-18` over `Tue`, the rating puts its word under its digit, and the width freed goes to the
+  three value columns.
+
+Every one of those is gated on the `isNarrowScreen()` the list screens already use, which is true
+folded and false in both other states, so no wide layout moves.
+
+**The calendar in 運動と回復 became a fixed window that scrolls.** It was five weeks that grew with
+the data; it is now seven Monday-aligned weeks — about a month and a half — inside a card of fixed
+height, opening at the bottom on today. Fixed so the screen below it stops moving as the weeks
+accumulate; Monday-aligned so the window's length does not depend on which weekday today happens to
+be. The weekday header stays outside the scroll, because a header that scrolls away is never there
+when it is wanted.
+
+**Which makes month rules worth having** — and they are also what paid for the narrow tables. A date
+on every line is not orientation: forty dates are forty dates and the eye reads none of them. Each
+month now opens with one yellow rule carrying its name, in the calendar and in both day tables,
+drawn above the row that contains the 1st. Because that rule carries the year, the narrow tables can
+take the year off every line, which is exactly the width the date column needed.
+
+In Japanese the rule reads **令和八年 八月** — the imperial year, kanji numerals only, `元年` for the
+first year of an era. That is the rendering the sister calendar fork already prints, reached by a
+different road: `java.time.chrono.JapaneseDate` and a dozen lines of numerals rather than ICU,
+because the whole problem here is two small integers, and staying off `android.icu` means the
+strings are pinned by ordinary JVM unit tests and render in the offline previews. An ICU call would
+do neither. The era comes from the calendar and not from arithmetic, so January 2019 is 平成
+三十一年 and May 2019 is 令和元年.
+
+`HealthFoldedPreviews.kt` renders 回復, 運動と回復, 日ごとの記録 and 健康指数 at both panel widths
+and in both languages, which is how all of the above was checked — the phone is normally locked, so
+`screencap` returns the keyguard and the build machine cannot photograph a running layout. Its
+fixture is anchored a month in the past deliberately: the calendar rings today from the clock, so an
+anchor on the day of writing would make every committed reference differ a day later for reasons
+that have nothing to do with the layout.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+023 — 2026-08-17
 
 Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
