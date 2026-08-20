@@ -41,9 +41,27 @@ object RecoverySource {
         val skinTemp: Double?,
     )
 
-    /** Real nights only, oldest first. */
-    fun nights(sessions: List<SleepSession>): List<SleepSession> =
-        sessions.filter { it.totalMinutes >= MIN_NIGHT_MINUTES }.sortedBy { it.startMs }
+    /**
+     * Real nights only, oldest first.
+     *
+     * Two independent tests, because they exclude different things. [MIN_NIGHT_MINUTES] is about
+     * whether there is ENOUGH of a session to estimate from — the nocturnal-HR window below needs
+     * onset + 30 min and then four hours, and a shorter session cannot fill it. The midpoint test is
+     * about whether the session is a night AT ALL: a four-hour sleep on a Sunday afternoon clears the
+     * length floor easily and has no business in a baseline of nights (白い熊, 2026-08-20).
+     *
+     * On the data to hand this second test changes nothing — the longest nap on record is 178
+     * minutes, already below the floor — so it is defence rather than repair. That is the point:
+     * the day it does something will be a day nobody is looking.
+     */
+    fun nights(
+        sessions: List<SleepSession>,
+        minuteOfDayOf: (Long) -> Double,
+    ): List<SleepSession> =
+        sessions
+            .filter { it.totalMinutes >= MIN_NIGHT_MINUTES }
+            .filter { SleepShape.isNightMidpoint(minuteOfDayOf(SleepShape.midpointMs(it)).toInt()) }
+            .sortedBy { it.startMs }
 
     /**
      * Nocturnal heart rate over the Sleep4h window — the single best-evidenced marker here.

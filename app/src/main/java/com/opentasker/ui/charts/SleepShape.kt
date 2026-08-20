@@ -1,5 +1,8 @@
 package com.opentasker.ui.charts
 
+import java.time.Instant
+import java.time.ZoneId
+
 /**
  * Turning the band's sleep segments into something drawable.
  *
@@ -124,6 +127,55 @@ object SleepShape {
         if (current.isNotEmpty()) out += SleepSession(start, end, current)
         return out
     }
+
+    /**
+     * The nocturnal window, tested against a session's **midpoint**: 21:00 to 09:00.
+     *
+     * A night is defined by WHEN it happened, not by how long it lasted. That is the honest
+     * definition — a half-hour doze at 03:00 is part of the night, and three hours on the sofa at
+     * 16:00 is a nap — and on 白い熊's own data it is also the one that works. Over the 24 sessions
+     * of 2026-08 the two populations do not overlap anywhere near this window:
+     *
+     * | | midpoints |
+     * | --- | --- |
+     * | the 19 nights | 01:27 – 04:50 |
+     * | the 5 naps | 11:32, 15:53, 16:23, 18:11, 19:11 |
+     *
+     * The nearest nap sits 1 h 49 m outside the window; the nearest night, 4 h 10 m inside it.
+     *
+     * **Duration was tried and is wrong.** [RecoverySource.MIN_NIGHT_MINUTES] is four hours, and on
+     * 2026-08-04 白い熊 slept 03:21–06:19 — 178 minutes, a short broken night with a midpoint of
+     * 04:50. A length test files that as a nap. This one does not. (The four-hour floor is right
+     * where it stands, for a different reason: the recovery estimator needs a session long enough to
+     * fill its "onset + 30 min, then four hours" window, and 178 minutes cannot.)
+     */
+    const val NIGHT_FROM_MINUTE = 21 * 60
+    const val NIGHT_TO_MINUTE = 9 * 60
+
+    /** The instant halfway through a session — what [isNightMidpoint] is asked about. */
+    fun midpointMs(session: SleepSession): Long =
+        session.startMs + (session.endMs - session.startMs) / 2
+
+    /** The rule itself, as arithmetic: no clock, no zone, trivially testable. */
+    fun isNightMidpoint(minuteOfDay: Int): Boolean =
+        minuteOfDay >= NIGHT_FROM_MINUTE || minuteOfDay < NIGHT_TO_MINUTE
+
+    fun minuteOfDay(ms: Long, zone: ZoneId): Int =
+        Instant.ofEpochMilli(ms).atZone(zone).toLocalTime().let { it.hour * 60 + it.minute }
+
+    fun isNight(session: SleepSession, zone: ZoneId): Boolean =
+        isNightMidpoint(minuteOfDay(midpointMs(session), zone))
+
+    /**
+     * The night the screen should be talking about: the most recent one, naps ignored.
+     *
+     * Null when nothing on record is a night. That is deliberate — falling back to "the most recent
+     * session" would put an afternoon nap in the headline in exactly the case this exists to prevent
+     * (白い熊, 2026-08-20). A dash and a day table full of dated rows underneath is the truthful
+     * answer to "no night has been recorded".
+     */
+    fun latestNight(sessions: List<SleepSession>, zone: ZoneId): SleepSession? =
+        sessions.filter { isNight(it, zone) }.maxByOrNull { it.endMs }
 
     /** The stages, in the order their rows stack on the hypnogram: deep at the bottom. */
     val ROWS: List<Char> = listOf('5', '3', '2', '1')
