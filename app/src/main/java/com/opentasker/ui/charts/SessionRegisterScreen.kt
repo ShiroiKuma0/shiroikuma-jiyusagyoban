@@ -79,6 +79,7 @@ fun SessionRegisterScreen(
     /** `yyyyMMdd` of the night, then the 1–5 step. Re-tapping the step on file withdraws it. */
     onRate: (Long, Int) -> Unit,
     onBack: () -> Unit,
+    onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
@@ -98,7 +99,13 @@ fun SessionRegisterScreen(
                 bottom = contentPadding.calculateBottomPadding() + 24.dp,
             ),
     ) {
-        DetailHeader(BandText.registerTitle[lang], hasInfo = false, onBack = onBack, onInfo = {})
+        DetailHeader(
+            BandText.registerTitle[lang],
+            hasInfo = false,
+            onBack = onBack,
+            onInfo = {},
+            onSwitchLanguage = onSwitchLanguage,
+        )
 
         Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (register == null || register.entries.isEmpty()) {

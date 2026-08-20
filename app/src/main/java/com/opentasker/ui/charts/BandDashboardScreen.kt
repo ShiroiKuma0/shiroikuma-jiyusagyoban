@@ -30,7 +30,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -76,6 +79,12 @@ fun BandDashboardScreen(
     model: BandDashboardModel,
     contentPadding: PaddingValues,
     onOpenMetric: (String) -> Unit,
+    /**
+     * Flip the window's language, through `健康の設定 -- [727][01]`. Returns the reason it could not,
+     * or null on success — by which time this screen has already been recomposed in the other
+     * language, so the caller has nothing left to do.
+     */
+    onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
     val state by model.state.collectAsState()
     val progress by model.progress.collectAsState()
@@ -103,7 +112,7 @@ fun BandDashboardScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(style.cardGap),
     ) {
-        item("sync") { SyncHeader(state, progress, onSync = model::sync) }
+        item("sync") { SyncHeader(state, progress, onSync = model::sync, onSwitchLanguage = onSwitchLanguage) }
 
         state.index?.let { index ->
             item("index") { HealthIndexCard(index) { onOpenMetric(MetricSpecs.KEY_INDEX) } }
@@ -183,13 +192,15 @@ fun BandDashboardScreen(
  * `BandSyncState`, which is armed on the main thread before any coroutine is dispatched.
  */
 @Composable
-private fun SyncHeader(
+internal fun SyncHeader(
     state: DashboardState,
     progress: com.opentasker.core.band.BandSyncProgress,
     onSync: () -> Unit,
+    onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
     val lang = LocalBandLanguage.current
     val axisInk = LocalChartStyle.current.axisText
+    val switch = rememberLanguageSwitch()
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -202,12 +213,21 @@ private fun SyncHeader(
                         style = MaterialTheme.typography.labelMedium,
                         color = axisInk,
                     )
-                    Text(
-                        state.status?.lastSuccessAtMillis?.let(::formatMillis)
-                            ?: BandText.neverSynced[lang],
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    // The pill rides on the datetime's own line, to its right, with a little air
+                    // between them (白い熊, 2026-08-20). Centred against the text rather than sharing
+                    // its baseline: the chip's border is a box, and a box hung off a text baseline
+                    // sits visibly low.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            state.status?.lastSuccessAtMillis?.let(::formatMillis)
+                                ?: BandText.neverSynced[lang],
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        LanguagePill(switch, onSwitchLanguage)
+                    }
+                    LanguageSwitchFailure(switch)
                     state.status?.headroom?.let { h ->
                         Text(
                             BandText.headroom[lang]
