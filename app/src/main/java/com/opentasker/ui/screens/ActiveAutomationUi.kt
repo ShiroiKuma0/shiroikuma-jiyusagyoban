@@ -256,7 +256,6 @@ private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Tasks,
     OpenTaskerScreen.Setup,
     OpenTaskerScreen.RunLog,
-    OpenTaskerScreen.Setup,
 )
 
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
