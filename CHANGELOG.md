@@ -8,6 +8,52 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.87+2026-08-20.05-47.g4fc906f7+002 — 2026-08-20
+
+Built on upstream OpenTasker `0.2.87` (`4fc906f7`).
+
+**The app picker could not see the app you wanted to blacklist.**
+
+The kanji clock's top bar is suppressed in whatever apps you list, and the list is edited by
+`相撲字時計⇨隠すアプリ選択`, which opens the multi-select grid. Searching it for `photos` returned
+nothing — while `com.huawei.photos` and `com.huawei.ohos.photos` are both installed.
+
+The search was innocent: it has always matched the package id as well as the label. The grid it
+searched was the problem. `AppMultiSelectDialog` kept only *user* apps —
+
+```kotlin
+(info.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
+    (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+```
+
+— and the gallery is preinstalled and never user-updated: `flags=[ SYSTEM HAS_CODE … ]`, code path
+`/hw_product/app/Gallery2`. It never entered the list, so the query had nothing to match, and the
+failure read as a broken search rather than a filtered list.
+
+**Which of the two packages actually matters** was worth settling rather than guessing. With the
+gallery open, the resumed activity is `com.huawei.photos/com.huawei.gallery.app.GalleryMain` — the
+classic Gallery2, not the HarmonyOS `PhotosHm`.
+
+**The second package cannot be reached at all.** `com.huawei.ohos.photos` declares no MAIN/LAUNCHER
+activity and EMUI does not list it as force-queryable, so it falls outside every `<queries>` entry
+this app declares, and `QUERY_ALL_PACKAGES` is not an option. In `dumpsys package queries` our
+intent-visible set holds 447 packages: `com.huawei.photos` is among them, `com.huawei.ohos.photos`
+is not.
+
+Three escapes, all in the picker:
+
+- **⚙ → "System apps"**, persisted alongside the tile knobs, drops the user-app filter. Off by
+  default, so ordinary lists stay uncluttered.
+- **The empty-search state offers the same switch inline.** A fruitless search for a stock app is
+  exactly where the filter bites, and the switch would otherwise stay buried behind ⚙.
+- **Typing a package id offers "＋ Add"**, which puts that package in the grid, ticked. One Android
+  hides from us is still perfectly blacklistable: the foreground package arrives through
+  accessibility, which owes nothing to package visibility.
+
+An older flaw fell out of the same fix. A selected package the grid could not show was invisible —
+yet it was pre-ticked into the selection map and written back on OK, so it survived every edit while
+being impossible to see or untick. Such a package now gets a stand-in tile labelled by its id.
+
 ## 0.2.87+2026-08-20.05-47.g4fc906f7+001 — 2026-08-20
 
 Built on upstream OpenTasker `0.2.87` (`4fc906f7`). Upstream moved its own version literals for the
