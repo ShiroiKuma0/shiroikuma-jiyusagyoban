@@ -69,6 +69,7 @@ fun MarkSessionScreen(
     contentPadding: PaddingValues,
     onSubmit: (Long, Long) -> Boolean,
     onBack: () -> Unit,
+    onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
@@ -102,7 +103,13 @@ fun MarkSessionScreen(
                 bottom = contentPadding.calculateBottomPadding() + 24.dp,
             ),
     ) {
-        DetailHeader(BandText.markSessionTitle[lang], hasInfo = false, onBack = onBack, onInfo = {})
+        DetailHeader(
+            BandText.markSessionTitle[lang],
+            hasInfo = false,
+            onBack = onBack,
+            onInfo = {},
+            onSwitchLanguage = onSwitchLanguage,
+        )
 
         Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SpanChips(viewport, bounds)
