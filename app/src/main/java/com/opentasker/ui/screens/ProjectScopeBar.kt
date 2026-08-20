@@ -74,14 +74,14 @@ fun ProjectScopeBar(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
             ) {
-                Icon(Icons.Filled.Folder, contentDescription = null)
+                Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.projects_scope_label))
                 Text(
                     selectedName,
                     modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Icon(Icons.Filled.ExpandMore, contentDescription = null)
+                Icon(Icons.Filled.ExpandMore, contentDescription = stringResource(R.string.action_expand))
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 DropdownMenuItem(

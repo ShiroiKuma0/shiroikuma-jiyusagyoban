@@ -21,6 +21,7 @@ enum class ThemeMode {
 
     companion object {
         fun fromString(value: String?): ThemeMode = when (value) {
+            "system" -> System
             "dark" -> Dark
             "amoled" -> Amoled
             "light" -> Light

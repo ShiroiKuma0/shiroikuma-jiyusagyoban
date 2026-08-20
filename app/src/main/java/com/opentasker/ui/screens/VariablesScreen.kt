@@ -242,7 +242,7 @@ private fun VariableSummaryCard(
                 ) {
                     Icon(
                         Icons.Filled.VisibilityOff,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_variables),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )

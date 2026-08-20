@@ -311,7 +311,7 @@ private fun WorkspaceSummaryCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_profiles),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )
@@ -407,7 +407,7 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
             ) {
                 Icon(
                     Icons.Filled.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.nav_tasks),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(10.dp).size(24.dp),
                 )
@@ -517,7 +517,7 @@ private fun ProfileCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.a11y_profile_status, profile.name),
                         tint = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(10.dp).size(22.dp),
                     )
@@ -542,6 +542,7 @@ private fun ProfileCard(
                 )
                 ProfileActionsMenu(
                     contentDescription = stringResource(R.string.a11y_duplicate_profile, profile.name),
+                    editDescription = stringResource(R.string.a11y_edit_profile, profile.name),
                     canEditContextLogic = profile.contexts.size >= 2,
                     canUndo = canUndo,
                     canRedo = canRedo,
@@ -556,7 +557,7 @@ private fun ProfileCard(
                 )
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = null,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -776,7 +777,7 @@ private fun TaskCard(
                 )
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = null,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -815,6 +816,7 @@ private fun TaskCard(
 @Composable
 private fun ProfileActionsMenu(
     contentDescription: String,
+    editDescription: String,
     canEditContextLogic: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
@@ -830,7 +832,7 @@ private fun ProfileActionsMenu(
     ContextualActionsMenu(
         contentDescription = contentDescription,
         actions = listOf(
-            ContextualMenuAction(R.string.action_edit, onClick = onEdit),
+            ContextualMenuAction(R.string.action_edit, accessibilityLabel = editDescription, onClick = onEdit),
             ContextualMenuAction(R.string.profile_add_context, onClick = onAddContext),
             ContextualMenuAction(R.string.profile_edit_context_logic, enabled = canEditContextLogic, onClick = onEditContextLogic),
             ContextualMenuAction(R.string.action_preflight, onClick = onPreflight),
@@ -874,6 +876,7 @@ private fun TaskActionsMenu(
 private data class ContextualMenuAction(
     @StringRes val labelRes: Int,
     val enabled: Boolean = true,
+    val accessibilityLabel: String? = null,
     val onClick: () -> Unit,
 )
 
@@ -902,6 +905,9 @@ private fun ContextualActionsMenu(
                 DropdownMenuItem(
                     text = { Text(stringResource(action.labelRes)) },
                     enabled = action.enabled,
+                    modifier = Modifier.semantics {
+                        action.accessibilityLabel?.let { this.contentDescription = it }
+                    },
                     onClick = {
                         expanded = false
                         action.onClick()

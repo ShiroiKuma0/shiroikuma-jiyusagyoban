@@ -451,7 +451,7 @@ private fun RunLogSummaryCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_run_log),
                         tint = if (failures > 0 || interrupted > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )

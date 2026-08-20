@@ -409,7 +409,7 @@ private fun ContextInspectorSummaryCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_inspector),
                         tint = healthColor,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )
