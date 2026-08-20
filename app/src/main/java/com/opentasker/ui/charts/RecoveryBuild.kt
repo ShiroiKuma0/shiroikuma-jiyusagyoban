@@ -112,7 +112,7 @@ object RecoveryBuild {
         val peakDay = RecoverySource.lastCompleteDay(stepPoints, zoneOffsetMs, todayEpochDay)
         val peak30 = peakDay?.let { RecoverySource.peakCadence(it.second, 30) }
 
-        val nights = RecoverySource.nights(sessions)
+        val nights = RecoverySource.nights(sessions, minuteOfDayOf)
         val spo2Points = pointsOf(metrics, BandMetric.SPO2)
         val spo2ByNight = nights.mapNotNull { n ->
             HealthIndexSource.median(spo2Points.filter { it.tMs in n.startMs..n.endMs }.map { it.value })

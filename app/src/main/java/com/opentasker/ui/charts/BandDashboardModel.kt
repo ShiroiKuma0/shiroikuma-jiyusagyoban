@@ -250,6 +250,9 @@ class BandDashboardModel(
 
         val today = LocalDate.now(zone)
         val zoneOffsetMs = zone.rules.getOffset(java.time.Instant.now()).totalSeconds * 1000L
+        // One definition, two readers: the recovery build's own clock arithmetic, and the nap test
+        // that keeps a daytime sleep out of the recovery baseline.
+        val minuteOfDayOf: (Long) -> Double = { ms -> SleepShape.minuteOfDay(ms, zone).toDouble() }
 
         // Before anything reads a rating: the store changed what a key MEANS on 2026-08-16, and only
         // the recorded nights can say where each one moves. This is the one place that holds both, and
@@ -261,7 +264,7 @@ class BandDashboardModel(
         // rating older than that window would be left where it is and counted, not guessed at.
         RecoveryLog.migrateToMorningKeys(
             appContext,
-            RecoverySource.nights(sleep.sessions).associate {
+            RecoverySource.nights(sleep.sessions, minuteOfDayOf).associate {
                 localDateKeyOf(it.startMs, zone) to localDateKeyOf(it.endMs, zone)
             },
         ).let { unresolved ->
@@ -284,10 +287,7 @@ class BandDashboardModel(
             todayEpochDay = (System.currentTimeMillis() + zoneOffsetMs) / 86_400_000L,
             nowMs = System.currentTimeMillis(),
             offsetsByDay = offsetsByDay(sleep.sessions, zone),
-            minuteOfDayOf = { ms ->
-                val t = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalTime()
-                (t.hour * 60 + t.minute).toDouble()
-            },
+            minuteOfDayOf = minuteOfDayOf,
         )
 
         DashboardState(
@@ -595,7 +595,11 @@ class BandDashboardModel(
             SleepSegmentInput(start, row.minutes, row.stages)
         }
         val sessions = SleepShape.sessions(inputs)
-        val latest = sessions.maxByOrNull { it.endMs }
+        // The most recent NIGHT, not the most recent session: an afternoon nap ends later than last
+        // night and would otherwise take the headline, the stage table and the 健康指数 with it
+        // (白い熊, 2026-08-20). The chart still draws every session — a nap happened and the
+        // hypnogram should show it; what it must not do is answer "how did I sleep".
+        val latest = SleepShape.latestNight(sessions, zone)
         return SleepChart(
             sessions = sessions,
             latest = latest,

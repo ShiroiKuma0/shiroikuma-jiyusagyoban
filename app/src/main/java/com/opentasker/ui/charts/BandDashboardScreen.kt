@@ -129,7 +129,9 @@ fun BandDashboardScreen(
                 sleepScore = state.sleepScore,
                 peak30Cadence = state.peak30Cadence,
                 peakCadenceDay = state.peakCadenceDay,
-                awakeMinutes = state.sleep?.sessions?.maxByOrNull { it.startMs }?.awake,
+                // The night's awake minutes, from the same night everything else reads. This used to
+                // run its own "latest session" scan, which a nap won.
+                awakeMinutes = state.sleep?.latest?.awake,
                 regime = state.regime,
                 feltToday = state.feltToday,
                 feltNight = state.feltNight,
