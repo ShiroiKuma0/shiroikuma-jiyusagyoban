@@ -8,6 +8,78 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+028 — 2026-08-20
+
+Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
+
+**A night is no longer cut in two by a trip to the bathroom, and 健康 switches language from the
+report itself.**
+
+### A half-hour hole no longer ends the night
+
+The band reports sleep as segments, not nights, and it stops emitting stages while you are out of
+bed — so getting up punches a hole in the record. Segments closer together than the stitch tolerance
+are one night; anything wider starts a new one.
+
+On 2026-08-20 the band left a **29-minute** hole at 04:00. The tolerance was 20 minutes, so a 7h05m
+night was split in two and the screen announced its **1h39m tail** as the day's sleep. That fragment
+was not confined to the headline: the stage table, the 健康指数 and 回復 all read the latest session,
+so all four graded the night on its last ninety-nine minutes.
+
+The tolerance is now **90 minutes**, and the number is measured rather than picked. Across the 117
+sleep segments of 2026-08 the gap distribution is bimodal with nothing in between:
+
+- every gap that falls **inside** a night is 0–19 minutes, save the one that caused this;
+- the shortest gap that genuinely **separates** two sleeps is **197 minutes** — an evening nap on
+  08-02 ending 19:26, before a night starting 22:43.
+
+Twenty minutes sat on the edge of a cluster with no margin at all. Ninety sits in the middle of the
+empty band: three times the worst hole ever observed, less than half the shortest real separation.
+Erring towards stitching is also the safer side empirically — a fractured night has happened, a nap
+within ninety minutes of a night never has.
+
+Replayed against the whole archive, exactly **one** session of twenty-five changes: the two fragments
+become one 7h05m night. Every other night is byte-identical.
+
+### 日本語／英語, from the report itself
+
+A pill on **every page of the report** — the dashboard's sync line, 運動と回復, and each individual
+page from Sleep through 血圧, 健康指数 and 回復 — flips the window's language without leaving it.
+
+It goes the long way round on purpose. Writing the display preference directly would be one line, and
+would leave `健康の設定 -- [727][01]` still saying `en-US` while the window showed Japanese — with the
+next run of that task, which happens on every 起動完了, silently undoing the switch. Whichever of the
+two you believed, the other would be lying. So the pill does what 白い熊 would do by hand, in the same
+order: **rewrite the value in the task, save the task, run the task.** Running it is not a flourish —
+`var.set` is what publishes `%Band_Language`, and the task's closing `flash` is the confirmation.
+
+The settings task sets variables and nothing else, though: `band.charts`, the action that persists the
+preference the window reads at launch, lives in `健康 -- [727]`. So the switch writes that preference
+itself, after a successful run, with the value the task just published. Without it the pill would
+appear to work until the system recreated the window.
+
+- **Found by what it sets, not what it is called.** Any task defining `%Band_Language` is the settings
+  task; the canonical name only breaks a tie, and a genuinely ambiguous workspace is reported rather
+  than guessed at.
+- **One value changes and nothing else.** The labels in that task are the bilingual documentation of
+  every band setting, and a test asserts they come through the rewrite untouched.
+- **Yellow border, no fill** — this app's settled grammar for a live control. It follows
+  `colorScheme.primary` rather than a literal `#FFFF00`, so it survives a theme change.
+- The pill sits on the sync line beside the last-sync datetime, and in the shared report header
+  between the title and the ⓘ, where it lands in the same place on every page regardless of title
+  length.
+
+### Behind it
+
+- The 健康 window's language became reactive state rather than a value read once at launch, and a
+  switch reloads the dashboard model so the strings it bakes at build time — the sync status line,
+  the chart footers — follow too, not just the ones resolved at draw time.
+- `DetailHeader` is where the pill lives for the report pages, which made it one change rather than
+  nine; 健康指数 and 回復 get it because those screens return early only *after* the header row.
+- `SyncHeader` went from `private` to `internal` so the screenshot previews render the real header
+  rather than a copy of its layout. Four new reference renders cover both the sync line and the report
+  header, at the folded 413 dp width in both languages — the two rows this could have wrapped.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+024 — 2026-08-18
 
 Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
