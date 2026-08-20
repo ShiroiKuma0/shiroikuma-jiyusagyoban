@@ -8,6 +8,47 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.87+2026-08-20.05-47.g4fc906f7+001 — 2026-08-20
+
+Built on upstream OpenTasker `0.2.87` (`4fc906f7`). Upstream moved its own version literals for the
+first time in three syncs — `0.2.86`/`88` → `0.2.87`/`89` — so the build counter resets to `1`.
+
+**Upstream sync: 7 commits.** One of them is a whole-app UI redesign, and this fork does not take it.
+
+`feat: unify workspace visual hierarchy` reworks Profiles, Tasks, Variables, Flow, Scenes, Inspector,
+Setup, Run Log, Diagnostics and Settings onto a single compact true-black page hierarchy: promoted
+project scope and search, a standardised five-item bottom bar with the advanced workspaces folded into
+a More menu, tightened card and permission-row density, a re-cut type scale (`headlineSmall` 26 sp
+SemiBold → 30 sp Bold) and new corner radii. It lands squarely on the seven screens this fork rewrote
+or deleted, so taking it would have meant rebuilding our UI on top of theirs.
+
+The screens went back to the fork's own version — `ActiveAutomationLists`, `PermissionOnboardingScreen`,
+`RunLogScreenContent`, `VariablesScreen`, `ContextInspectorScreen`, `AutomationFlowScreen`,
+`TermuxScriptAllowlistCard` — and our deletions of `DiagnosticsScreen`, `ProjectScopeBar`,
+`SceneLibraryCards` and the 35 refreshed screenshot baselines stand.
+
+**Two of those merges did not compile, and one was worse than that.** `RunLogScreenContent` and
+`VariablesScreen` silently absorbed upstream's new summary-card header, which reads `interrupted`,
+`totalCount` and `Icons.Filled.VisibilityOff` — names our composables never had. `PermissionOnboardingScreen`
+came out with two different `when` blocks over `PermissionAction` interleaved: upstream's Shizuku
+branches spliced into the middle of our device-admin branch. And `primaryNavigationScreens` in
+`ActiveAutomationUi` ended up listing `OpenTaskerScreen.Setup` twice — upstream added it in a region
+that merged cleanly, our side added it inside a conflict hunk — which would have put two Setup entries
+in the bottom navigation.
+
+**What we did keep from upstream.** `ThemeMode.fromString` now returns `Amoled` rather than `System`
+for a first launch or an unrecognised stored value, and maps `"system"` explicitly instead of reaching
+it through the fallback. Accessibility semantics restored across the redesigned screens where they
+touch code we share. `release-truth.json` takes upstream's new tag and version pins while keeping our
+capability counts (175 registered actions, bundle schema 5, Room schema 27).
+
+Everything else in upstream's `v0.2.87` changelog — the SAF-folder `.otbackup` v2 snapshots, the speed
+context's leaked GPS listener, `screen.off` sending the non-toggling sleep key, the dormant
+AppFunctions surface — was already in this fork before the sync; `master` sat on the AppFunctions
+commit itself.
+
+Room schema stayed at 27, so no migration replay was needed.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+029 — 2026-08-20
 
 Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
