@@ -1,6 +1,8 @@
 package com.opentasker.ui.charts
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -136,6 +138,110 @@ class SleepShapeTest {
     fun `rows stack with deep at the bottom`() {
         assertEquals(0, SleepShape.rowOf('5'))   // awake, top
         assertEquals(3, SleepShape.rowOf('1'))   // deep, bottom
+    }
+
+    // ---- which session is "the night" ----------------------------------------------------------
+    //
+    // 白い熊, 2026-08-20: "so no day naps replace nights". The headline, the stage table, the 健康指数
+    // and the 回復 card all read one session, and it used to be whichever ended last -- which after a
+    // nap is the nap. The times below are 白い熊's own, from the 2026-08 archive.
+
+    /** Session running from [fromHour] for [minutes], on an arbitrary day, in UTC. */
+    private fun sessionAt(fromHour: Int, fromMinute: Int = 0, minutes: Int): SleepSession {
+        val dayStart = 1_787_184_000_000L   // 2026-08-20 00:00 UTC
+        val start = dayStart + (fromHour * 60L + fromMinute) * m
+        return SleepShape.sessions(
+            listOf(SleepSegmentInput(start, minutes, "2".repeat(minutes))),
+        ).single()
+    }
+
+    private val utc = java.time.ZoneOffset.UTC
+
+    @Test
+    fun `an afternoon nap is not a night`() {
+        // 2026-08-04 15:25 -> 17:20, and 2026-08-15 15:09 -> 16:36.
+        assertFalse(SleepShape.isNight(sessionAt(15, 25, minutes = 115), utc))
+        assertFalse(SleepShape.isNight(sessionAt(15, 9, minutes = 87), utc))
+    }
+
+    @Test
+    fun `an early-evening doze is not a night either`() {
+        // 2026-08-02 18:56 -> 19:26 is the nap that sits CLOSEST to the window; it stays outside.
+        assertFalse(SleepShape.isNight(sessionAt(18, 56, minutes = 30), utc))
+        assertFalse(SleepShape.isNight(sessionAt(17, 53, minutes = 35), utc))
+    }
+
+    @Test
+    fun `a late-morning doze is not a night`() {
+        // 2026-08-01 11:15 -> 11:48.
+        assertFalse(SleepShape.isNight(sessionAt(11, 15, minutes = 33), utc))
+    }
+
+    @Test
+    fun `an ordinary night is a night`() {
+        // 2026-08-19 22:30 -> 06:08, and the longest on record, 08-04 20:51 -> 07:30.
+        assertTrue(SleepShape.isNight(sessionAt(22, 30, minutes = 458), utc))
+        assertTrue(SleepShape.isNight(sessionAt(20, 51, minutes = 639), utc))
+    }
+
+    @Test
+    fun `a short broken night is still a night`() {
+        // 2026-08-04 03:21 -> 06:19: 178 minutes, UNDER RecoverySource.MIN_NIGHT_MINUTES. This is the
+        // case a duration test gets wrong and the reason the rule is about time of day.
+        val short = sessionAt(3, 21, minutes = 178)
+        assertTrue(short.totalMinutes < RecoverySource.MIN_NIGHT_MINUTES)
+        assertTrue(SleepShape.isNight(short, utc))
+    }
+
+    @Test
+    fun `a nap after the night does not take the headline`() {
+        // The exact shape of the complaint: last night, then a doze this afternoon. Before the fix
+        // the nap ended later and therefore won.
+        val night = sessionAt(-2, 30, minutes = 458)   // 21:30 the previous evening -> 05:08
+        val nap = sessionAt(15, 0, minutes = 90)
+        val picked = SleepShape.latestNight(listOf(night, nap), utc)
+        assertEquals(night, picked)
+        assertTrue(nap.endMs > night.endMs)            // the nap really is the later session
+    }
+
+    @Test
+    fun `the most recent night wins among nights`() {
+        val older = sessionAt(-26, 0, minutes = 400)
+        val newer = sessionAt(-2, 0, minutes = 400)
+        assertEquals(newer, SleepShape.latestNight(listOf(older, newer), utc))
+    }
+
+    @Test
+    fun `nothing but naps yields no night rather than the longest nap`() {
+        // A dash is the truthful answer; falling back to "the latest session" would reintroduce
+        // exactly the bug this prevents.
+        val naps = listOf(sessionAt(13, 0, minutes = 60), sessionAt(16, 0, minutes = 120))
+        assertNull(SleepShape.latestNight(naps, utc))
+        assertNull(SleepShape.latestNight(emptyList(), utc))
+    }
+
+    @Test
+    fun `the window is stated in minutes of the day`() {
+        assertTrue(SleepShape.isNightMidpoint(21 * 60))        // 21:00, first minute in
+        assertFalse(SleepShape.isNightMidpoint(21 * 60 - 1))   // 20:59, last minute out
+        assertTrue(SleepShape.isNightMidpoint(9 * 60 - 1))     // 08:59, last minute in
+        assertFalse(SleepShape.isNightMidpoint(9 * 60))        // 09:00, first minute out
+        assertTrue(SleepShape.isNightMidpoint(0))              // midnight
+    }
+
+    @Test
+    fun `every session in the 2026-08 archive is classified correctly`() {
+        // Every midpoint in the archive, in minutes of the day: 19 nights spanning 01:27 to 04:50,
+        // and 5 naps from 11:32 to 19:11. Nothing at all lies between 04:50 and 11:32 — that empty
+        // stretch is the margin the rule sits in, and these are the numbers that say so.
+        val nightMidpoints = listOf(
+            87, 89, 116, 129, 131, 135, 138, 139, 159, 163, 164, 171, 178, 180, 182, 199, 210, 231, 290,
+        )
+        assertEquals(19, nightMidpoints.size)
+        nightMidpoints.forEach { assertTrue("$it should be a night", SleepShape.isNightMidpoint(it)) }
+        val napMidpoints = listOf(692, 953, 983, 1091, 1151)
+        assertEquals(5, napMidpoints.size)
+        napMidpoints.forEach { assertFalse("$it should be a nap", SleepShape.isNightMidpoint(it)) }
     }
 
     @Test
