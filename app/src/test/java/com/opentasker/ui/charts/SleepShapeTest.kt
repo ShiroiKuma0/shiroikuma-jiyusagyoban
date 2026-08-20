@@ -45,6 +45,33 @@ class SleepShapeTest {
     }
 
     @Test
+    fun `a half-hour hole in the middle of the night does not cut the night in two`() {
+        // 2026-08-20, from the archive, minute-for-minute: the band recorded 22:30:57-00:00:57,
+        // 00:04:57-02:04:57, 02:04:57-04:00:57, then stopped for TWENTY-NINE MINUTES before
+        // 04:29:57-06:08:57. At the old 20-minute tolerance that hole ended the night, so the
+        // screen announced the 1h39m tail as 白い熊's sleep for the day. One night, 425 minutes.
+        val night = listOf(
+            SleepSegmentInput(0, 90, "2".repeat(90)),               // 22:30 -> 00:00
+            SleepSegmentInput(94 * m, 120, "2".repeat(120)),        // 00:04 -> 02:04, 4m hole
+            SleepSegmentInput(214 * m, 116, "2".repeat(116)),       // 02:04 -> 04:00, abutting
+            SleepSegmentInput(359 * m, 99, "2".repeat(99)),         // 04:29 -> 06:08, 29m hole
+        )
+        val s = SleepShape.sessions(night).single()
+        assertEquals(425, s.totalMinutes)
+        assertEquals(0L, s.startMs)
+        assertEquals(458 * m, s.endMs)   // the extent spans the holes; the total does not count them
+    }
+
+    @Test
+    fun `the tolerance sits in the empty band between a hole and a separate sleep`() {
+        // Measured over 2026-08: intra-night holes reach 29 minutes, while the shortest gap that
+        // really separates two sleeps is 197. A threshold on either edge of that band is a
+        // threshold with no margin, which is how the 20-minute one failed.
+        assertTrue(SleepShape.STITCH_TOLERANCE_MS > 29 * m)
+        assertTrue(SleepShape.STITCH_TOLERANCE_MS < 197 * m)
+    }
+
+    @Test
     fun `a nap hours later is its own session, not one very long sleep`() {
         val segments = listOf(
             SleepSegmentInput(0, 60, "2".repeat(60)),

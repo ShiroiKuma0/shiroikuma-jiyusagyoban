@@ -49,8 +49,27 @@ object SleepShape {
 
     const val MINUTE_MS = 60_000L
 
-    /** Segments closer than this are the same night. */
-    const val STITCH_TOLERANCE_MS = 20 * MINUTE_MS
+    /**
+     * Segments closer than this are the same night.
+     *
+     * Ninety minutes, because the gap distribution is bimodal with nothing in between. Across the
+     * 117 segments of 2026-08, every gap that sits **inside** a night is 0–19 minutes save one, and
+     * the smallest gap that genuinely separates two sleeps is **197 minutes** (an evening nap on
+     * 08-02, ending 19:26, before a night starting 22:43). The band simply stops emitting stages
+     * while you are out of bed, so a trip to the bathroom punches a hole of exactly this kind.
+     *
+     * The old value was 20 minutes, set when 19 was the largest hole on record — which made it a
+     * threshold with no margin at all. On 2026-08-20 the band left a **29-minute** hole at 04:00,
+     * so a 7h05m night was cut in two and the screen reported its 1h39m tail as the night (白い熊).
+     * That fragment fed the headline, the stage table, the 健康指数 and recovery alike, since all of
+     * them read the latest session.
+     *
+     * 90 minutes is three times the worst hole ever observed and less than half the shortest real
+     * separation, so it sits in the middle of an empty band rather than on the edge of a cluster.
+     * Erring towards stitching is also the safer side empirically: a fractured night has happened,
+     * a nap within 90 minutes of a night never has.
+     */
+    const val STITCH_TOLERANCE_MS = 90 * MINUTE_MS
 
     /**
      * Collapse per-minute stage codes into runs.
