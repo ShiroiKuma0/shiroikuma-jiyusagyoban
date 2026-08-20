@@ -1085,7 +1085,7 @@ private fun ThemeSetupCard(
                                 onSelectMode(mode)
                             },
                             trailingIcon = if (mode == currentMode) {
-                                { Icon(Icons.Filled.CheckCircle, contentDescription = null) }
+                                { Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.label_selected)) }
                             } else {
                                 null
                             },

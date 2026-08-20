@@ -132,7 +132,7 @@ internal fun SceneOverviewCard(
                 ) {
                     Icon(
                         Icons.Filled.Info,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_scenes),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )
@@ -226,7 +226,7 @@ internal fun SceneCard(
                 )
                 Icon(
                     if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

@@ -195,7 +195,7 @@ private fun FlowOverviewCard(
                 ) {
                     Icon(
                         Icons.Filled.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.nav_flow),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(10.dp).size(24.dp),
                     )

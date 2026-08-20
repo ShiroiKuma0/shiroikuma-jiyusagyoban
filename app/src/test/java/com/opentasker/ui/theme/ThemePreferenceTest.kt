@@ -12,7 +12,7 @@ class ThemePreferenceTest {
     }
 
     @Test
-    fun unknownStorageValuesFallBackToSystem() {
+    fun unknownStorageValuesFallBackToAmoled() {
         assertEquals(ThemeMode.Amoled, ThemeMode.fromString(null))
         assertEquals(ThemeMode.Amoled, ThemeMode.fromString("unknown"))
     }
