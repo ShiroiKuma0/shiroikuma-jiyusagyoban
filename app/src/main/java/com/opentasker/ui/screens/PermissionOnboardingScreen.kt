@@ -18,6 +18,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +41,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,7 +52,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -58,6 +66,7 @@ import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotStatus
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -95,6 +104,7 @@ import com.opentasker.core.permissions.RuntimePermissionOutcome
 import com.opentasker.core.permissions.RuntimePermissionRequestHistory
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.DesignSystem
 import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -426,11 +436,10 @@ fun PermissionOnboardingScreen(
         if (!settingsOnly) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
                 shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
             ) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Box(
                             modifier = Modifier.size(72.dp),
@@ -450,11 +459,16 @@ fun PermissionOnboardingScreen(
                             )
                         }
                         Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.title_setup_checklist), style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                stringResource(R.string.setup_progress_ready_count, grantedCount, requiredItems.size),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             Text(
                                 stringResource(R.string.setup_checklist_body),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Spacer(Modifier.height(6.dp))
                             PermissionStatusPill(
@@ -477,7 +491,6 @@ fun PermissionOnboardingScreen(
         }
 
         if (settingsOnly) {
-            item { SettingsIntroCard() }
             if (UpdateCheckAvailability.isAvailable()) {
                 item {
                     UpdateCheckSetupCard(
@@ -634,8 +647,7 @@ fun PermissionOnboardingScreen(
 private fun SettingsIntroCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -664,46 +676,32 @@ private fun UpdateCheckSetupCard(
     val toggleDescription = stringResource(
         if (state.enabled) R.string.setup_update_enabled else R.string.setup_update_disabled,
     )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .toggleable(value = state.enabled, onValueChange = onEnabledChange, role = Role.Switch)
-                    .semantics(mergeDescendants = true) { stateDescription = toggleDescription },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.setup_update_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.setup_update_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stateText,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (state.newerVersion != null) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.tertiary
-                        },
-                    )
-                }
-                Switch(checked = state.enabled, onCheckedChange = null)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = state.enabled, onValueChange = onEnabledChange, role = Role.Switch)
+                .semantics(mergeDescendants = true) { stateDescription = toggleDescription }
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.setup_update_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stateText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (state.newerVersion != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+                )
             }
-            if (state.newerVersion != null && state.releaseUrl != null) {
-                OutlinedButton(onClick = { onOpenRelease(state.releaseUrl) }) {
-                    Text(stringResource(R.string.setup_update_open_release))
-                }
+            Switch(checked = state.enabled, onCheckedChange = null)
+        }
+        if (state.newerVersion != null && state.releaseUrl != null) {
+            TextButton(onClick = { onOpenRelease(state.releaseUrl) }, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.setup_update_open_release))
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 
@@ -713,27 +711,43 @@ private fun GlobalFallbackTaskCard(
     tasks: List<Task>,
     onTaskChange: (Long?) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.setup_global_fallback_title), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.setup_global_fallback_body),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TaskActionFieldInput(
-                label = stringResource(R.string.setup_global_fallback_label),
-                hint = stringResource(R.string.setup_global_fallback_hint),
-                value = taskId?.toString().orEmpty(),
-                tasks = tasks,
-                onChange = { onTaskChange(it.toLongOrNull()) },
-            )
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
+    val selectedName = tasks.firstOrNull { it.id == taskId }?.name ?: stringResource(R.string.label_none)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.setup_global_fallback_title), style = MaterialTheme.typography.titleSmall)
+                Text(selectedName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.ExpandMore, contentDescription = stringResource(R.string.setup_global_fallback_label))
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.label_none)) },
+                        onClick = {
+                            menuExpanded = false
+                            onTaskChange(null)
+                        },
+                    )
+                    tasks.forEach { task ->
+                        DropdownMenuItem(
+                            text = { Text(task.name) },
+                            onClick = {
+                                menuExpanded = false
+                                onTaskChange(task.id)
+                            },
+                        )
+                    }
+                }
+            }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 
@@ -1034,41 +1048,53 @@ private fun ThemeSetupCard(
     currentMode: ThemeMode,
     onSelectMode: (ThemeMode) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(stringResource(R.string.setup_theme_label), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.setup_theme_helper_full),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
+    val offeredModes = ThemeMode.entries.filter {
+        it != ThemeMode.Dynamic || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    }
+    val modeLabels = ThemeMode.entries.associateWith { mode ->
+        when (mode) {
+            ThemeMode.System -> stringResource(R.string.theme_system)
+            ThemeMode.Dark -> stringResource(R.string.theme_dark)
+            ThemeMode.Light -> stringResource(R.string.theme_light)
+            ThemeMode.HighContrast -> stringResource(R.string.theme_high_contrast)
+            ThemeMode.Amoled -> stringResource(R.string.theme_amoled)
+            ThemeMode.Dynamic -> stringResource(R.string.theme_dynamic)
+        }
+    }
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.setup_theme_label), style = MaterialTheme.typography.titleSmall)
+                Text(modeLabels.getValue(currentMode), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                // Material You needs API 31; offering it below that would be a choice that
-                // silently does nothing.
-                val offeredModes = ThemeMode.entries.filter {
-                    it != ThemeMode.Dynamic || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.ExpandMore, contentDescription = stringResource(R.string.setup_theme_label))
                 }
-                offeredModes.chunked(2).forEach { rowModes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        rowModes.forEach { mode ->
-                            ThemeChoice(
-                                mode = mode,
-                                selected = mode == currentMode,
-                                onSelect = onSelectMode,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    offeredModes.forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(modeLabels.getValue(mode)) },
+                            onClick = {
+                                menuExpanded = false
+                                onSelectMode(mode)
+                            },
+                            trailingIcon = if (mode == currentMode) {
+                                { Icon(Icons.Filled.CheckCircle, contentDescription = null) }
+                            } else {
+                                null
+                            },
+                        )
                     }
                 }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 
@@ -1081,47 +1107,23 @@ private fun DirectBootSetupCard(
         if (enabled) R.string.setup_direct_boot_enabled else R.string.setup_direct_boot_disabled,
     )
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // Toggle the whole row, the pattern every other switch in the app uses. A bare
-                // Switch is its own focus target with no name, so a screen reader announced only
-                // "on/off" and never said which setting it belonged to.
-                .toggleable(
-                    value = enabled,
-                    onValueChange = onEnabledChange,
-                    role = Role.Switch,
-                )
+                .toggleable(value = enabled, onValueChange = onEnabledChange, role = Role.Switch)
                 .semantics(mergeDescendants = true) { this.stateDescription = stateDescription }
-                .padding(16.dp),
+                .padding(horizontal = 8.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(stringResource(R.string.setup_direct_boot_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.setup_direct_boot_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stateDescription,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.setup_direct_boot_title), style = MaterialTheme.typography.titleSmall)
+                Text(stateDescription, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
             }
-            // The row owns the toggle semantics now, so the switch itself is decorative.
             Switch(checked = enabled, onCheckedChange = null)
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 
@@ -1200,23 +1202,40 @@ private fun BackupSetupCard(
     onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
     onSnapshotDestinationSelected: (Uri, CharArray, Boolean) -> Unit,
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val summary = when {
+        state.pendingRestore -> stringResource(R.string.setup_backup_restore_staged)
+        state.latestBackupName != null -> stringResource(R.string.setup_backup_available)
+        else -> stringResource(R.string.setup_backup_none)
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.setup_backup_label), style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.setup_backup_label), style = MaterialTheme.typography.titleSmall)
+                    Text(summary, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = summary,
+                )
+            }
+            if (expanded) {
                 Text(
                     stringResource(R.string.setup_backup_helper_full),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            BackupStateBanner(state)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                BackupStateBanner(state)
                 Button(
                     onClick = onCreateBackup,
                     enabled = !state.busy,
@@ -1336,77 +1355,61 @@ private fun PermissionSetupCard(
         item.granted -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.error
     }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (item.granted || item.optional) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
-            } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.18f)
-            },
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (item.granted || item.optional) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f) else MaterialTheme.colorScheme.error.copy(alpha = 0.26f),
-        ),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    color = stateColor.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(
-                        1.dp,
-                        stateColor.copy(alpha = 0.28f),
-                    ),
-                ) {
-                    Box(modifier = Modifier.padding(9.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            when {
-                                item.granted -> Icons.Filled.CheckCircle
-                                item.optional -> Icons.Filled.Info
-                                else -> Icons.Filled.Error
-                            },
-                            contentDescription = when {
-                                item.granted -> stringResource(R.string.status_granted)
-                                item.optional -> stringResource(R.string.status_optional)
-                                else -> stringResource(R.string.status_required)
-                            },
-                            tint = stateColor,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        stateLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = stateColor,
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                color = stateColor.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+            ) {
+                Box(modifier = Modifier.padding(10.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        when {
+                            item.granted -> Icons.Filled.CheckCircle
+                            item.optional -> Icons.Filled.Info
+                            else -> Icons.Filled.Error
+                        },
+                        contentDescription = when {
+                            item.granted -> stringResource(R.string.status_granted)
+                            item.optional -> stringResource(R.string.status_optional)
+                            else -> stringResource(R.string.status_required)
+                        },
+                        tint = stateColor,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
-            Text(item.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            PermissionRequirement(label = if (item.optional) stringResource(R.string.setup_optional_requirement, item.requiredFor) else item.requiredFor)
-            if (!item.granted && item.action == PermissionAction.None) {
-                // Nothing to run: rendering a button here promised an action that only produced a
-                // toast saying the item was already ready.
-                Text(
-                    stringResource(R.string.setup_no_action_available),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else if (!item.granted) {
-                Button(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Text(item.actionLabel)
+            Column(Modifier.weight(1f)) {
+                Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stateLabel, style = MaterialTheme.typography.labelMedium, color = stateColor)
+            }
+            when {
+                !item.granted && item.action != PermissionAction.None -> {
+                    OutlinedButton(
+                        onClick = onRunAction,
+                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                    ) {
+                        Text(item.actionLabel, maxLines = 1)
+                    }
                 }
-            } else if (item.allowActionWhenGranted) {
-                OutlinedButton(onClick = onRunAction, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Text(stringResource(R.string.setup_review_settings))
+                item.granted && item.allowActionWhenGranted -> {
+                    IconButton(onClick = onRunAction) {
+                        Icon(Icons.Filled.ChevronRight, contentDescription = stringResource(R.string.setup_review_settings))
+                    }
+                }
+                else -> {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = stateLabel,
+                        tint = stateColor,
+                    )
                 }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 
@@ -1425,15 +1428,6 @@ private fun PermissionStatusPill(label: String, color: Color) {
         )
         Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }
-}
-
-@Composable
-private fun PermissionRequirement(label: String) {
-    Text(
-        label,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 private fun buildPermissionItems(

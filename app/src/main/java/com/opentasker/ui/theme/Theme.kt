@@ -204,9 +204,9 @@ private val HighContrast = darkColorScheme(
 
 private val OpenTaskerTypography = Typography(
     headlineSmall = TextStyle(
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
-        lineHeight = 31.sp,
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
+        lineHeight = 36.sp,
     ),
     titleLarge = TextStyle(
         fontWeight = FontWeight.SemiBold,
@@ -251,9 +251,11 @@ private val OpenTaskerTypography = Typography(
 )
 
 private val OpenTaskerShapes = Shapes(
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
     small = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
     medium = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+    extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
 )
 
 /**

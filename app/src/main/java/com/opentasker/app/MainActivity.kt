@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
+            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.Amoled)
             OpenTaskerTheme(themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

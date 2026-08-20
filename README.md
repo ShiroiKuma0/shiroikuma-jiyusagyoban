@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.86-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.87-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
@@ -13,32 +13,32 @@
 
 ### Automation engine
 
-- **Encrypted automation database** — SQLCipher encrypts the complete Room file at rest with a random key wrapped by Android Keystore; existing plaintext databases migrate once before Room opens, and wrong-key opens fail closed
+- **Encrypted automation database**. SQLCipher encrypts the complete Room file at rest with a random key wrapped by Android Keystore; existing plaintext databases migrate once before Room opens, and wrong-key opens fail closed
 
-- **Profiles, contexts, tasks, actions** — a complete Room-backed automation pipeline with a Compose UI
-- **Companion presence triggers** — user-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
-- **7 context families** — Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
+- **Profiles, contexts, tasks, actions**. a complete Room-backed automation pipeline with a Compose UI
+- **Companion presence triggers**. user-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
+- **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
 - **74 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`)
-- **USB device contexts** — attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
-- **Template expressions** — bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
-- **Side-effect-free preflight reviews** — preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
-- **Trigger simulation** — from a profile editor or Context Inspector, pin family-specific synthetic events and see each predicate, context expression, cooldown, and admission result without writing a production run-log row or running the task
-- **Automation lint** — profile saves, imports, the flow graph, and Context Inspector surface missing reversals, repeated state triggers, conflicting writers, and inter-profile loops with concrete fixes
-- **Profile lifecycle policy** — assign deterministic priority, symmetric activation grace, and never/date/once lifetimes; the Inspector explains expiry and priority suppression, while bundles and Tasker mappings preserve safe defaults
-- **Profile execution admission** — optionally bound active and burst starts per profile, choose replayable logged holds or silent skips on overflow, and inspect rejection counts and circuit-breaker state in Diagnostics
-- **Failure recovery** — route unhandled failures to an optional per-profile or global fallback task; the fallback receives bounded structured error variables and cannot recurse into another fallback
-- **First-class secret variables** — AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
-- **One redaction boundary for stored arguments** — credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
-- **Coherent execution controls** — per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
-- **Action-level flow controls** — atomic action reordering plus optional conditions and continue-after-failure behavior, with those semantics preserved through storage and bundle round trips
-- **Durable edit history** — task, profile, and scene cards expose five-step undo/redo; scene snapshots include names, dimensions, and elements, and a new edit after undo safely starts a branch
-- **Profile groups** — organize profiles into named groups with filter chips
-- **Nested context logic** — author backward-compatible ALL/ANY/NOT groups over profile contexts; the Inspector explains the evaluated tree
-- **Local projects** — scope tasks, profiles, scenes, and variables behind a shared project boundary with explicit reassignment on deletion
+- **USB device contexts**. attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
+- **Template expressions**. bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
+- **Side-effect-free preflight reviews**. preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
+- **Trigger simulation**. from a profile editor or Context Inspector, pin family-specific synthetic events and see each predicate, context expression, cooldown, and admission result without writing a production run-log row or running the task
+- **Automation lint**. profile saves, imports, the flow graph, and Context Inspector surface missing reversals, repeated state triggers, conflicting writers, and inter-profile loops with concrete fixes
+- **Profile lifecycle policy**. assign deterministic priority, symmetric activation grace, and never/date/once lifetimes; the Inspector explains expiry and priority suppression, while bundles and Tasker mappings preserve safe defaults
+- **Profile execution admission**. optionally bound active and burst starts per profile, choose replayable logged holds or silent skips on overflow, and inspect rejection counts and circuit-breaker state in Diagnostics
+- **Failure recovery**. route unhandled failures to an optional per-profile or global fallback task; the fallback receives bounded structured error variables and cannot recurse into another fallback
+- **First-class secret variables**. AES-256-GCM Android Keystore storage, deliberate reveal/re-entry UX, and provenance-based redaction for derived action arguments, logs, traces, and failures
+- **One redaction boundary for stored arguments**. credential-bearing action arguments (HTTP authorization/headers/query/body, request payloads, script stdin, SMS text) are masked wherever they are displayed, including the task list, flow graph, and previews, so they cannot leak through a screenshot or accessibility semantics; unregistered actions and unknown keys fail closed
+- **Coherent execution controls**. per-profile single/restart/queued/parallel re-trigger behavior, followed by a global per-task abort-new/abort-existing/run-both/wait collision policy across profile, manual, nested, widget, notification, and external runs
+- **Action-level flow controls**. atomic action reordering plus optional conditions and continue-after-failure behavior, with those semantics preserved through storage and bundle round trips
+- **Durable edit history**. task, profile, and scene cards expose five-step undo/redo; scene snapshots include names, dimensions, and elements, and a new edit after undo safely starts a branch
+- **Profile groups**. organize profiles into named groups with filter chips
+- **Nested context logic**. author backward-compatible ALL/ANY/NOT groups over profile contexts; the Inspector explains the evaluated tree
+- **Local projects**. scope tasks, profiles, scenes, and variables behind a shared project boundary with explicit reassignment on deletion
 
 ### Triggers (contexts)
 
-- **Offline bundle import** - paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
+- **Offline bundle import**. paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
 
 - Time/day schedules with presets, aliases, and ranges
 - Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, and phone-call state); sensor/GPS/phone callbacks are demand-gated per profile
@@ -50,14 +50,14 @@
 - Sunrise/sunset filters with coordinate, offset, and window support
 - Shake, Bluetooth connect/disconnect and Android 16 bond-loss/encryption security events, Android 16 Advanced Protection transitions, sanitized SMS/MMS receipt on standard/F-Droid builds, package install/remove/replace
 - Bluetooth all-devices-disconnected transition with an editor preset and multi-device tracking
-- Android 15+ screen-recording visibility trigger - `event=screen_recording` reacts to whether this app is visible in a recording without capturing screen contents
-- SMS/MMS-received trigger - `event=sms_received` exposes sanitized sender/body metadata on standard/F-Droid builds; Android 17 may delay standard OTP SMS delivery for up to three hours outside exempt apps
+- Android 15+ screen-recording visibility trigger. `event=screen_recording` reacts to whether this app is visible in a recording without capturing screen contents
+- SMS/MMS-received trigger. `event=sms_received` exposes sanitized sender/body metadata on standard/F-Droid builds; Android 17 may delay standard OTP SMS delivery for up to three hours outside exempt apps
 - Quick Settings tile tap, home-screen widget/shortcut, boot
 - Authenticated `event=push` bridge for a de-googled UnifiedPush distributor; delivery IDs are deduplicated, payloads are bounded, and message content is redacted before matching/logging
 - Received Share (`ACTION_SEND`/`SEND_MULTIPLE`) trigger for bounded text, URLs, single files, and multiple files, with MIME/text/URI filters and `share_*` task variables
-- FOSS platform location/geofence — GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
-- Locale/Tasker condition plugins — polled as first-class context predicates with last-known-state caching
-- Home Assistant bridge proof of concept — bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
+- FOSS platform location/geofence. GPS/network fixes, balanced provider cadence, radius/accuracy/dwell evaluation, persisted dwell state, and API 36 background delivery evidence
+- Locale/Tasker condition plugins. polled as first-class context predicates with last-known-state caching
+- Home Assistant bridge proof of concept. bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
 ### Actions (74 registered + 10 engine-handled)
 
@@ -107,26 +107,29 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - Context inspector with live source health, latest values, per-profile match explanations, and
   Loading/Ready/Stale/Error observation status with age-aware reporting
 - Keyset-paged run logs with SQL-backed task/status/date/search filters, complete expandable action traces, redacted JSON/CSV export, per-step diagnostics and variable writes, reviewed retention reductions, held admission rows with safe manual replay, and user-pinned history
-- Live view of in-flight automations — task, origin, current step, and elapsed time — with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
+- Live view of in-flight automations. task, origin, current step, and elapsed time. with per-run cancellation that unwinds nested sub-tasks and records a terminal `Cancelled` outcome
 - In-app diagnostics for service/foreground-type/standby/exact-alarm/matcher/watchdog health, execution admission limits and circuit trips, a bounded process log, and captured crash previews; shared reports include the same evidence with credential redaction
 - Scheduling diagnostics include API 36 pending-job reason history, API 37 aggregate pending durations, expanded WorkManager stop reasons, and plain-language standby delivery consequences with honest unsupported states
 - Crash log capture and local diagnostic export
 
 ### Interoperability
 
-- **Locale/Tasker plugin host** — setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
-- **Locale/Tasker condition plugin target** — third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions; the exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
-- **Locale/Tasker condition context** — condition plugins as first-class profile predicates polled every 30 seconds
-- **External automation target** — signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`; see [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
-- **Home Assistant / ntfy interoperability** — the Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names; an ntfy `broadcast` action can target `com.opentasker.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
-- **OpenTasker JSON bundles** — schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
-- **Tasker XML import/export** — preview with migration/capability warnings, deterministic mapped/unsupported/lossy reporting, and safe batches for notification, variable, media, settings, and flow actions
-- **Profile sharing** — offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text; unverified shares stay blocked until the existing import review passes
+- **Locale/Tasker plugin host**. setting dispatch, condition queries, configuration parsing, request-query events, bundle validation, and last-known-state fallback
+- **Locale/Tasker condition plugin target**. third-party hosts can configure OpenTasker profile-active, context-satisfied, and non-secret variable-comparison conditions; the exported ordered query receiver returns satisfied, unsatisfied, or unknown with bounded, typed bundles
+- **Locale/Tasker condition context**. condition plugins as first-class profile predicates polled every 30 seconds
+- **External automation target**. signature-scoped intents to run tasks, toggle profiles, query status, and pass variables. Task runs are asynchronous (protocol v2): the receiver validates and enqueues, then returns an execution ID that callers poll with `QUERY_EXECUTION`, because a broadcast cannot stay open for a task that may wait minutes. Callers must send `PROTOCOL_VERSION=2`; see [docs/EXTERNAL_INTENTS.md](docs/EXTERNAL_INTENTS.md)
+- **Home Assistant / ntfy interoperability**. the Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names; an ntfy `broadcast` action can target `com.opentasker.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
+- **OpenTasker JSON bundles**. schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
+- **Tasker XML import/export**. preview with migration/capability warnings, deterministic mapped/unsupported/lossy reporting, and safe batches for notification, variable, media, settings, and flow actions
+- **Profile sharing**. offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text; unverified shares stay blocked until the existing import review passes
 
 Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64; Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Both formats share decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
 
 ### UI and theming
 
+- True-black workspace surfaces now use a compact, information-first layout across Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run Log, Diagnostics, and Settings
+- Five primary destinations stay visible in the bottom navigation, while advanced workspaces remain one tap away in More
+- Project scope, readiness, search, and primary creation actions have a consistent hierarchy on every main page
 - AMOLED-first Catppuccin Mocha (dark) and Latte (light) palettes, high contrast mode
 - Refined mobile shell with clearer primary navigation, bottom-bar contrast, and edge-to-edge system bar theming
 - Accessible Setup theme selector with explicit selected state plus denser, confidence-building backup controls
@@ -178,7 +181,7 @@ ActionRegistry (built-ins + capability gates + Locale plugin dispatch)
 Room DB (persistent storage + StateFlow live queries)
 ```
 
-No Hilt — manual dependency wiring via `OpenTaskerApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
+No Hilt. manual dependency wiring via `OpenTaskerApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
 
 ---
 
@@ -276,18 +279,18 @@ These are settled, and each one is a deliberate trade rather than a gap:
 - **No accessibility-service automation.** No UI scraping and no synthetic taps. Triggers keep working when an accessibility service is disabled by policy, by Advanced Protection, or by an OEM, and every action can honestly declare what it will do.
 - **No cloud sync, account, or remote execution.** Automations are local. This is what makes "no account anywhere" a fact rather than a slogan.
 - **No URL or network import for shared profiles.** An imported bundle is untrusted input that can request capabilities; the local review step is the control.
-- **No Google Play Services dependency**, including for geofencing — geofences are evaluated in-app from platform location fixes.
+- **No Google Play Services dependency**, including for geofencing. geofences are evaluated in-app from platform location fixes.
 - **No crash reporting or analytics**, self-hosted or otherwise. The redacted diagnostic export you choose to share is the only way anything leaves the device.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. see [LICENSE](LICENSE).
 
 ## Contributing
 
-Issues and pull requests welcome. Open an issue to discuss a feature before building it — the Non-goals above are settled, and everything else is fair game.
+Issues and pull requests welcome. Open an issue to discuss a feature before building it. the Non-goals above are settled, and everything else is fair game.
 
 ### Translations
 
@@ -295,7 +298,7 @@ OpenTasker supports localization. The current release ships English only; Englis
 
 1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
 2. Translate only the string values (not the `name` attributes)
-3. Omit strings that are identical to English — Android falls back automatically, but the locale must still reach the 80% translated-value threshold
+3. Omit strings that are identical to English. Android falls back automatically, but the locale must still reach the 80% translated-value threshold
 4. Run `./gradlew :app:verifyLocaleResources` and submit the locale directory only when it passes
 
 No incomplete locale directories are kept as release placeholders. The gate reports the exact translated-string count when a locale falls below the threshold.

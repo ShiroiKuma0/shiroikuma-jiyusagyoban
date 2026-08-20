@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -36,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.Project
+import com.opentasker.ui.theme.DesignSystem
 
 @Composable
 fun ProjectScopeBar(
@@ -54,15 +58,30 @@ fun ProjectScopeBar(
         ?: stringResource(R.string.projects_all)
 
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.projects_scope_label))
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.projects_scope_label), style = MaterialTheme.typography.labelMedium)
-            OutlinedButton(onClick = { menuExpanded = true }) {
-                Text(selectedName)
+            Text(
+                stringResource(R.string.projects_scope_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+            OutlinedButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+            ) {
+                Icon(Icons.Filled.Folder, contentDescription = null)
+                Text(
+                    selectedName,
+                    modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(Icons.Filled.ExpandMore, contentDescription = null)
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 DropdownMenuItem(
@@ -83,8 +102,8 @@ fun ProjectScopeBar(
                 }
             }
         }
-        TextButton(onClick = { managerVisible = true }) {
-            Text(stringResource(R.string.projects_manage))
+        IconButton(onClick = { managerVisible = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.projects_manage))
         }
     }
 

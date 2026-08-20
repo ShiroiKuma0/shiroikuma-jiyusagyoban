@@ -98,7 +98,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -211,9 +210,8 @@ internal enum class OpenTaskerScreen(@StringRes val labelRes: Int) {
 private val primaryNavigationScreens = listOf(
     OpenTaskerScreen.Profiles,
     OpenTaskerScreen.Tasks,
-    OpenTaskerScreen.Setup,
-    OpenTaskerScreen.Settings,
     OpenTaskerScreen.RunLog,
+    OpenTaskerScreen.Setup,
 )
 
 private val secondaryNavigationScreens = OpenTaskerScreen.entries.filterNot { it in primaryNavigationScreens }
@@ -613,6 +611,7 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Profiles -> {
                     val createLabel = stringResource(if (projectTasks.isEmpty()) R.string.task_new else R.string.profile_new)
                     ExtendedFloatingActionButton(
+                        modifier = Modifier.fillMaxWidth(0.92f),
                         onClick = {
                             if (projectTasks.isEmpty()) {
                                 showCreateTaskDialog = true
@@ -634,6 +633,7 @@ fun ActiveAutomationUi(
                 }
 
                 OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
+                    modifier = Modifier.fillMaxWidth(0.92f),
                     onClick = { showCreateTaskDialog = true },
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -1317,7 +1317,6 @@ private fun OpenTaskerHeader(
     detail: String,
     onOpenSearch: () -> Unit,
 ) {
-    val appName = stringResource(R.string.app_name)
     Surface(
         color = MaterialTheme.colorScheme.background,
         tonalElevation = 0.dp,
@@ -1330,29 +1329,46 @@ private fun OpenTaskerHeader(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = DesignSystem.Screen.horizontalPadding, vertical = 8.dp),
+                    .padding(
+                        start = DesignSystem.Screen.horizontalPadding,
+                        end = DesignSystem.Screen.horizontalPadding,
+                        top = 14.dp,
+                        bottom = 12.dp,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_opentasker_mark),
-                    contentDescription = appName,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(24.dp),
-                )
                 Column(Modifier.weight(1f)) {
                     Text(
-                        appName,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                    Text(
                         stringResource(screen.labelRes),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(7.dp)
+                                .background(
+                                    color = when (screen) {
+                                        OpenTaskerScreen.Diagnostics -> MaterialTheme.colorScheme.tertiary
+                                        OpenTaskerScreen.RunLog, OpenTaskerScreen.Inspector -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.primary
+                                    },
+                                    shape = RoundedCornerShape(DesignSystem.Radii.xs),
+                                ),
+                        )
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 IconButton(onClick = onOpenSearch) {
                     Icon(
@@ -1360,16 +1376,20 @@ private fun OpenTaskerHeader(
                         contentDescription = stringResource(R.string.global_search_content_description),
                     )
                 }
-                Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
                     Icon(
                         imageVector = screen.icon(),
                         contentDescription = stringResource(screen.labelRes),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .size(20.dp),
                     )
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
     }
 }
@@ -1399,7 +1419,7 @@ private fun OpenTaskerNavigationItem(
     ) {
         Box(
             modifier = Modifier
-                .size(width = 44.dp, height = 28.dp)
+                .size(width = 48.dp, height = 30.dp)
                 .then(
                     if (selected) Modifier.background(
                         color = selectedContainerColor(),

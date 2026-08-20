@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,17 +121,30 @@ internal fun SceneOverviewCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_scene_library), style = MaterialTheme.typography.titleLarge)
                     Text(
                         stringResource(R.string.scenes_overview_summary, scenes.sumOf { it.elements.size }, scenes.size),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(R.string.title_scene_library),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -178,15 +192,19 @@ internal fun SceneCard(
     val elementIds = scene.elements.map { it.id }
     var selectedIndices by remember(scene.id, elementIds) { mutableStateOf(emptySet<Int>()) }
     val overlayReady = sceneOverlayReady()
+    var expanded by remember(scene.id) { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+            Row(
+                modifier = Modifier.clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
@@ -206,9 +224,14 @@ internal fun SceneCard(
                     contentDescription = stringResource(R.string.a11y_duplicate_scene, scene.name),
                     onDuplicate = onDuplicate,
                 )
+                Icon(
+                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
-            ScenePreviewBox(
+            if (expanded) ScenePreviewBox(
                 scene = scene,
                 onMoveElement = { index, xDp, yDp ->
                     scene.elements.getOrNull(index)?.let { element ->
@@ -242,7 +265,7 @@ internal fun SceneCard(
                 },
             )
 
-            OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
+            if (expanded) OutlinedButton(onClick = onAddElement, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_add_element_content_description))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.action_add_element))
@@ -250,7 +273,7 @@ internal fun SceneCard(
 
             val nothingToUndo = stringResource(R.string.history_nothing_to_undo)
             val nothingToRedo = stringResource(R.string.history_nothing_to_redo)
-            Row(
+            if (expanded) Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
@@ -274,7 +297,7 @@ internal fun SceneCard(
                 }
             }
 
-            if (scene.elements.isNotEmpty()) {
+            if (expanded && scene.elements.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                     scene.elements.forEachIndexed { index, element ->
                         SceneElementRow(
@@ -298,7 +321,7 @@ internal fun SceneCard(
                 }
             }
 
-            if (issues.isNotEmpty()) {
+            if (expanded && issues.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     issues.take(4).forEach { issue ->

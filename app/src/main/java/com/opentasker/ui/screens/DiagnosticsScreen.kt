@@ -129,15 +129,14 @@ private fun DiagnosticSummaryCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (healthy) {
-                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
             } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
             },
         ),
-        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.40f)),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(
                     if (healthy) Icons.Filled.CheckCircle else Icons.Filled.Error,
@@ -145,16 +144,11 @@ private fun DiagnosticSummaryCard(
                     tint = statusColor,
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.diagnostics_title), style = MaterialTheme.typography.headlineSmall)
+                    Text(statusLabel, style = MaterialTheme.typography.titleMedium, color = statusColor)
                     Text(
                         stringResource(R.string.diagnostics_summary_body),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        statusLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = statusColor,
                     )
                     reason?.let {
                         Text(
@@ -180,8 +174,7 @@ private fun DiagnosticSummaryCard(
 private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateFormat) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

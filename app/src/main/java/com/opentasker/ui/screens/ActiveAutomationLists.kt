@@ -1,6 +1,8 @@
 package com.opentasker.ui.screens
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,28 +18,34 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -189,9 +197,6 @@ internal fun ProfilesScreen(
                 taskerImportBusy = taskerImportBusy,
             )
         }
-        item {
-            TemplatePromptCard(onBrowseTemplates)
-        }
         if (storageDecodeIssues.isNotEmpty()) {
             item {
                 StorageDecodeWarningCard(storageDecodeIssues)
@@ -281,30 +286,79 @@ private fun WorkspaceSummaryCard(
     val enabledProfiles = profiles.count { it.enabled }
     val configuredContexts = profiles.sumOf { it.contexts.size }
     val totalActions = tasks.sumOf { it.actions.size }
+    val readiness = if (profiles.isEmpty()) 0f else enabledProfiles.toFloat() / profiles.size
+    val readinessPercent = (readiness * 100).toInt()
     val recentFailure = runLogs.firstOrNull { !it.success }
     val reviewDetails = stringResource(R.string.workspace_review_run_log_details)
+    var actionsExpanded by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.68f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_automation_workspace), style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        stringResource(R.string.workspace_review_readiness_templates),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
                     )
                 }
-                StatusPill(
-                    label = if (enabledProfiles > 0) stringResource(R.string.label_live_count, enabledProfiles) else stringResource(R.string.label_paused),
-                    color = if (enabledProfiles > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.header_profiles_detail, enabledProfiles, profiles.size),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(R.string.workspace_review_readiness_templates),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box {
+                    IconButton(onClick = { actionsExpanded = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_more))
+                    }
+                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+                        WorkspaceActionMenuItem(R.string.workspace_templates) { actionsExpanded = false; onBrowseTemplates() }
+                        WorkspaceActionMenuItem(R.string.import_tasker) { actionsExpanded = false; onImportTaskerXml() }
+                        WorkspaceActionMenuItem(R.string.import_export_json) { actionsExpanded = false; onExportOpenTaskerBundle() }
+                        WorkspaceActionMenuItem(R.string.import_import_json) { actionsExpanded = false; onImportOpenTaskerBundle() }
+                        WorkspaceActionMenuItem(R.string.import_export_tasker_xml) { actionsExpanded = false; onExportTaskerXml() }
+                        WorkspaceActionMenuItem(R.string.import_paste_json_action) { actionsExpanded = false; onImportOpenTaskerBundleText() }
+                        WorkspaceActionMenuItem(R.string.profile_share_preview_action) { actionsExpanded = false; onPreviewProfileShare() }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                LinearProgressIndicator(
+                    progress = { readiness },
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+                Text(
+                    text = "$readinessPercent%",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
@@ -323,69 +377,13 @@ private fun WorkspaceSummaryCard(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(onClick = onBrowseTemplates, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.workspace_templates))
-                }
-                OutlinedButton(
-                    onClick = onImportTaskerXml,
-                    enabled = !taskerImportBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (taskerImportBusy) stringResource(R.string.import_reading_xml) else stringResource(R.string.import_tasker))
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onExportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) stringResource(R.string.action_working) else stringResource(R.string.import_export_json))
-                }
-                OutlinedButton(
-                    onClick = onImportOpenTaskerBundle,
-                    enabled = !openTaskerBundleBusy,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(if (openTaskerBundleBusy) stringResource(R.string.import_reading_json) else stringResource(R.string.import_import_json))
-                }
-            }
-            OutlinedButton(
-                onClick = onExportTaskerXml,
-                enabled = !taskerImportBusy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    if (taskerImportBusy) {
-                        stringResource(R.string.action_working)
-                    } else {
-                        stringResource(R.string.import_export_tasker_xml)
-                    },
-                )
-            }
-            OutlinedButton(
-                onClick = onImportOpenTaskerBundleText,
-                enabled = !openTaskerBundleBusy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.import_paste_json_action))
-            }
-            OutlinedButton(
-                onClick = onPreviewProfileShare,
-                enabled = !openTaskerBundleBusy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    if (openTaskerBundleBusy) {
-                        stringResource(R.string.profile_share_preparing)
-                    } else {
-                        stringResource(R.string.profile_share_preview_action)
-                    },
-                )
-            }
         }
     }
+}
+
+@Composable
+private fun WorkspaceActionMenuItem(@androidx.annotation.StringRes labelRes: Int, onClick: () -> Unit) {
+    DropdownMenuItem(text = { Text(stringResource(labelRes)) }, onClick = onClick)
 }
 
 @Composable
@@ -395,29 +393,40 @@ private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) 
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_task_library), style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        stringResource(R.string.workspace_task_library_ready_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Button(onClick = onCreateTask) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.task_new))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.action_task))
-                }
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                shape = RoundedCornerShape(DesignSystem.Radii.md),
+            ) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(10.dp).size(24.dp),
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${tasks.size}", stringResource(R.string.label_tasks), Modifier.weight(1f))
-                SummaryMetric("$totalActions", stringResource(R.string.label_actions), Modifier.weight(1f))
-                SummaryMetric("$emptyTasks", stringResource(R.string.label_need_actions), Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.header_tasks_detail, totalActions, tasks.size),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    stringResource(R.string.workspace_task_library_ready_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (emptyTasks > 0) {
+                StatusPill("$emptyTasks", MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -482,30 +491,46 @@ private fun ProfileCard(
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
 ) {
+    var expanded by rememberSaveable(profile.id) { mutableStateOf(false) }
     val profileState = when {
         profile.requiresRiskAcknowledgement -> stringResource(R.string.imported_profile_review_required)
         profile.enabled -> stringResource(R.string.label_enabled)
         else -> stringResource(R.string.label_paused)
     }
     val toggleDescription = stringResource(R.string.a11y_profile_status, profile.name)
-    val editDescription = stringResource(R.string.a11y_edit_profile, profile.name)
-    val addContextDescription = stringResource(R.string.a11y_add_context_to_profile, profile.name)
-    val editContextLogicDescription = stringResource(R.string.profile_edit_context_logic)
-    val deleteDescription = stringResource(R.string.a11y_delete_profile, profile.name)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (profile.enabled) 0.72f else 0.46f),
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+            Row(
+                modifier = Modifier.clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.66f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = if (profile.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(10.dp).size(22.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(stringResource(R.string.workspace_runs_task, enterTaskName), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(profile.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        stringResource(R.string.workspace_runs_task, enterTaskName),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 Switch(
                     checked = profile.enabled,
@@ -515,58 +540,44 @@ private fun ProfileCard(
                         stateDescription = profileState
                     },
                 )
-                DuplicateMenu(
+                ProfileActionsMenu(
                     contentDescription = stringResource(R.string.a11y_duplicate_profile, profile.name),
+                    canEditContextLogic = profile.contexts.size >= 2,
+                    canUndo = canUndo,
+                    canRedo = canRedo,
+                    onEdit = onEdit,
+                    onAddContext = onAddContext,
+                    onEditContextLogic = onEditContextLogic,
+                    onPreflight = onPreflight,
                     onDuplicate = onDuplicate,
+                    onUndo = onUndo,
+                    onRedo = onRedo,
+                    onDelete = onDelete,
+                )
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
-                    StatusPill(
-                        label = profileState,
-                        color = when {
-                            profile.requiresRiskAcknowledgement -> MaterialTheme.colorScheme.error
-                            profile.enabled -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                }
-                item { StatusPill(stringResource(R.string.label_context_count, profile.contexts.size), MaterialTheme.colorScheme.primary) }
-                item { StatusPill(stringResource(R.string.label_cooldown_seconds, profile.cooldownSec), MaterialTheme.colorScheme.secondary) }
-                item { StatusPill(stringResource(R.string.label_profile_priority, profile.priority), MaterialTheme.colorScheme.primary) }
-                if (profile.gracePeriodSec > 0) {
-                    item { StatusPill(stringResource(R.string.label_profile_grace_seconds, profile.gracePeriodSec), MaterialTheme.colorScheme.secondary) }
-                }
-                profile.maxActiveExecutions?.let { maxActive ->
-                    item { StatusPill(stringResource(R.string.label_profile_active_limit, maxActive), MaterialTheme.colorScheme.primary) }
-                }
-                profile.burstLimit?.let { burstLimit ->
-                    item { StatusPill(stringResource(R.string.label_profile_burst_limit, burstLimit), MaterialTheme.colorScheme.secondary) }
-                }
-                if (profile.overflowPolicy == com.opentasker.core.model.ProfileOverflowPolicy.SILENT) {
-                    item { StatusPill(stringResource(R.string.label_profile_overflow_silent), MaterialTheme.colorScheme.error) }
-                }
-                item { StatusPill(profileLifetimeTitle(profile.lifetime), MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (profile.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && profile.expiresAtMs != null) {
-                    item {
-                        StatusPill(
-                            stringResource(R.string.label_profile_expiry_date, formatProfileExpiryDate(profile.expiresAtMs)),
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                item { StatusPill(stringResource(automationModeTitleRes(profile.automationMode)), MaterialTheme.colorScheme.onSurfaceVariant) }
-                profile.group?.let { group ->
-                    item { StatusPill(group, MaterialTheme.colorScheme.inversePrimary) }
-                }
-            }
-            if (profile.contexts.isEmpty()) {
+            Text(
+                text = listOf(
+                    profileState,
+                    stringResource(R.string.label_context_count, profile.contexts.size),
+                    stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
+                ).joinToString(" • "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (expanded && profile.contexts.isEmpty()) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_profile_cannot_match),
                     body = stringResource(R.string.workspace_profile_cannot_match_body),
                     color = MaterialTheme.colorScheme.error,
                 )
-            } else {
+            } else if (expanded) {
                 profile.contexts.forEachIndexed { index, context ->
                     ContextRow(
                         index = index,
@@ -576,63 +587,6 @@ private fun ProfileCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = editDescription },
-                ) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = editDescription,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.action_edit))
-                }
-                OutlinedButton(
-                    onClick = onAddContext,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = addContextDescription },
-                ) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = addContextDescription,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.profile_add_context))
-                }
-                OutlinedButton(
-                    onClick = onEditContextLogic,
-                    enabled = profile.contexts.size >= 2,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = editContextLogicDescription },
-                ) {
-                    Text(stringResource(R.string.profile_edit_context_logic))
-                }
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = onPreflight) {
-                    Text(stringResource(R.string.action_preflight))
-                }
-                TextButton(
-                    onClick = onDelete,
-                    modifier = Modifier.semantics { contentDescription = deleteDescription },
-                ) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = deleteDescription,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.profile_delete))
-                }
-            }
-            HistoryButtons(onUndo = onUndo, onRedo = onRedo, canUndo = canUndo, canRedo = canRedo)
         }
     }
 }
@@ -719,6 +673,7 @@ internal fun TasksScreen(
         items(filteredTasks, key = { it.id }) { task ->
             TaskCard(
                 task = task,
+                initiallyExpanded = filteredTasks.firstOrNull()?.id == task.id,
                 onEdit = { onEditTask(task) },
                 onUndo = { onUndoTaskEdit(task) },
                 onRedo = { onRedoTaskEdit(task) },
@@ -741,6 +696,7 @@ internal fun TasksScreen(
 @Composable
 private fun TaskCard(
     task: Task,
+    initiallyExpanded: Boolean,
     onEdit: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
@@ -756,20 +712,18 @@ private fun TaskCard(
     onDeleteAction: (Int) -> Unit,
     onMoveAction: (Int, Int) -> Unit,
 ) {
-    val editDescription = stringResource(R.string.a11y_edit_task, task.name)
-    val addActionDescription = stringResource(R.string.a11y_add_action_to_task, task.name)
+    var expanded by rememberSaveable(task.id) { mutableStateOf(initiallyExpanded) }
     val runDescription = stringResource(R.string.a11y_run_task, task.name)
-    val pinDescription = stringResource(R.string.a11y_pin_task, task.name)
-    val deleteDescription = stringResource(R.string.a11y_delete_task, task.name)
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
+                modifier = Modifier.clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
@@ -788,10 +742,10 @@ private fun TaskCard(
                     )
                 }
                 Column(Modifier.weight(1f)) {
-                    Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(task.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        stringResource(R.string.workspace_task_priority, task.priority, collisionModeTitle(task.collisionMode)),
-                        style = MaterialTheme.typography.bodyMedium,
+                        stringResource(R.string.label_action_count, task.actions.size),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -807,23 +761,40 @@ private fun TaskCard(
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.action_run))
                 }
-                DuplicateMenu(
+                TaskActionsMenu(
                     contentDescription = stringResource(R.string.a11y_duplicate_task, task.name),
+                    canUndo = canUndo,
+                    canRedo = canRedo,
+                    onEdit = onEdit,
+                    onAddAction = onAddAction,
+                    onPreflight = onPreflight,
+                    onPin = onPin,
                     onDuplicate = onDuplicate,
+                    onUndo = onUndo,
+                    onRedo = onRedo,
+                    onDelete = onDelete,
+                )
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill(stringResource(R.string.label_action_count, task.actions.size), MaterialTheme.colorScheme.primary) }
-                item { StatusPill(stringResource(R.string.label_priority_short, task.priority), MaterialTheme.colorScheme.secondary) }
-                item { StatusPill(collisionModeTitle(task.collisionMode), MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            if (task.actions.isEmpty()) {
+            Text(
+                text = listOf(
+                    stringResource(R.string.label_priority_short, task.priority),
+                    collisionModeTitle(task.collisionMode),
+                ).joinToString(" • "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (expanded && task.actions.isEmpty()) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_task_has_no_actions),
                     body = stringResource(R.string.workspace_task_has_no_actions_body),
                     color = MaterialTheme.colorScheme.error,
                 )
-            } else {
+            } else if (expanded) {
                 task.actions.forEachIndexed { index, action ->
                     ActionRow(
                         index = index,
@@ -837,72 +808,106 @@ private fun TaskCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = editDescription },
-                ) {
-                    Icon(
-                        Icons.Filled.Edit,
-                        contentDescription = editDescription,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.action_edit))
-                }
-                OutlinedButton(
-                    onClick = onAddAction,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { contentDescription = addActionDescription },
-                ) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = addActionDescription,
-                        modifier = Modifier.clearAndSetSemantics { },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.task_add_action))
-                }
+        }
+    }
+}
+
+@Composable
+private fun ProfileActionsMenu(
+    contentDescription: String,
+    canEditContextLogic: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onEdit: () -> Unit,
+    onAddContext: () -> Unit,
+    onEditContextLogic: () -> Unit,
+    onPreflight: () -> Unit,
+    onDuplicate: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ContextualActionsMenu(
+        contentDescription = contentDescription,
+        actions = listOf(
+            ContextualMenuAction(R.string.action_edit, onClick = onEdit),
+            ContextualMenuAction(R.string.profile_add_context, onClick = onAddContext),
+            ContextualMenuAction(R.string.profile_edit_context_logic, enabled = canEditContextLogic, onClick = onEditContextLogic),
+            ContextualMenuAction(R.string.action_preflight, onClick = onPreflight),
+            ContextualMenuAction(R.string.action_duplicate, onClick = onDuplicate),
+            ContextualMenuAction(R.string.action_undo, enabled = canUndo, onClick = onUndo),
+            ContextualMenuAction(R.string.action_redo, enabled = canRedo, onClick = onRedo),
+            ContextualMenuAction(R.string.profile_delete, onClick = onDelete),
+        ),
+    )
+}
+
+@Composable
+private fun TaskActionsMenu(
+    contentDescription: String,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onEdit: () -> Unit,
+    onAddAction: () -> Unit,
+    onPreflight: () -> Unit,
+    onPin: () -> Unit,
+    onDuplicate: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ContextualActionsMenu(
+        contentDescription = contentDescription,
+        actions = listOf(
+            ContextualMenuAction(R.string.action_edit, onClick = onEdit),
+            ContextualMenuAction(R.string.task_add_action, onClick = onAddAction),
+            ContextualMenuAction(R.string.action_preflight, onClick = onPreflight),
+            ContextualMenuAction(R.string.action_pin, onClick = onPin),
+            ContextualMenuAction(R.string.action_duplicate, onClick = onDuplicate),
+            ContextualMenuAction(R.string.action_undo, enabled = canUndo, onClick = onUndo),
+            ContextualMenuAction(R.string.action_redo, enabled = canRedo, onClick = onRedo),
+            ContextualMenuAction(R.string.task_delete, onClick = onDelete),
+        ),
+    )
+}
+
+private data class ContextualMenuAction(
+    @StringRes val labelRes: Int,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun ContextualActionsMenu(
+    contentDescription: String,
+    actions: List<ContextualMenuAction>,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { this.contentDescription = contentDescription },
+        ) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = contentDescription,
+                modifier = Modifier.clearAndSetSemantics { },
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            actions.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(action.labelRes)) },
+                    enabled = action.enabled,
+                    onClick = {
+                        expanded = false
+                        action.onClick()
+                    },
+                )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
-                    OutlinedButton(onClick = onPreflight) {
-                        Text(stringResource(R.string.action_preflight))
-                    }
-                }
-                item {
-                    OutlinedButton(
-                        onClick = onPin,
-                        modifier = Modifier.semantics { contentDescription = pinDescription },
-                    ) {
-                        Icon(
-                            Icons.Filled.PushPin,
-                            contentDescription = pinDescription,
-                            modifier = Modifier.clearAndSetSemantics { },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.action_pin))
-                    }
-                }
-                item {
-                    TextButton(
-                        onClick = onDelete,
-                        modifier = Modifier.semantics { contentDescription = deleteDescription },
-                    ) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = deleteDescription,
-                            modifier = Modifier.clearAndSetSemantics { },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.task_delete))
-                    }
-                }
-            }
-            HistoryButtons(onUndo = onUndo, onRedo = onRedo, canUndo = canUndo, canRedo = canRedo)
         }
     }
 }
@@ -940,42 +945,6 @@ internal fun DuplicateMenu(
 }
 
 @Composable
-private fun HistoryButtons(
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    canUndo: Boolean,
-    canRedo: Boolean,
-) {
-    // Disabled rather than always-live: pressing these with no history only produced a snackbar,
-    // and a screen reader had no way to know the action was unavailable before trying it.
-    val nothingToUndo = stringResource(R.string.history_nothing_to_undo)
-    val nothingToRedo = stringResource(R.string.history_nothing_to_redo)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-    ) {
-        OutlinedButton(
-            onClick = onUndo,
-            enabled = canUndo,
-            modifier = Modifier
-                .weight(1f)
-                .semantics { if (!canUndo) stateDescription = nothingToUndo },
-        ) {
-            Text(stringResource(R.string.action_undo))
-        }
-        OutlinedButton(
-            onClick = onRedo,
-            enabled = canRedo,
-            modifier = Modifier
-                .weight(1f)
-                .semantics { if (!canRedo) stateDescription = nothingToRedo },
-        ) {
-            Text(stringResource(R.string.action_redo))
-        }
-    }
-}
-
-@Composable
 private fun ActionRow(
     index: Int,
     action: ActionSpec,
@@ -986,6 +955,7 @@ private fun ActionRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val resources = LocalContext.current.resources
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
@@ -996,17 +966,25 @@ private fun ActionRow(
     val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
     val moveUpDescription = stringResource(R.string.a11y_move_action_up, index + 1, actionLabel)
     val moveDownDescription = stringResource(R.string.a11y_move_action_down, index + 1, actionLabel)
-    Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
         ) {
-            StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "${index + 1}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+            }
             Column(Modifier.weight(1f)) {
                 Text(actionLabel, style = MaterialTheme.typography.titleSmall)
                 Text(
@@ -1042,49 +1020,39 @@ private fun ActionRow(
                 }
             }
             IconButton(
-                onClick = onMoveUp,
-                enabled = canMoveUp,
-                modifier = Modifier.semantics { contentDescription = moveUpDescription },
-            ) {
-                Icon(
-                    Icons.Filled.ArrowUpward,
-                    contentDescription = moveUpDescription,
-                    modifier = Modifier.clearAndSetSemantics { },
-                )
-            }
-            IconButton(
-                onClick = onMoveDown,
-                enabled = canMoveDown,
-                modifier = Modifier.semantics { contentDescription = moveDownDescription },
-            ) {
-                Icon(
-                    Icons.Filled.ArrowDownward,
-                    contentDescription = moveDownDescription,
-                    modifier = Modifier.clearAndSetSemantics { },
-                )
-            }
-            IconButton(
                 onClick = onEdit,
                 modifier = Modifier.semantics { contentDescription = editDescription },
             ) {
                 Icon(
-                    Icons.Filled.Edit,
+                    Icons.Filled.ChevronRight,
                     contentDescription = editDescription,
                     modifier = Modifier.clearAndSetSemantics { },
                 )
             }
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.semantics { contentDescription = deleteDescription },
-            ) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = deleteDescription,
-                    modifier = Modifier.clearAndSetSemantics { },
-                    tint = MaterialTheme.colorScheme.error,
-                )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_more))
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.projects_move_up)) },
+                        onClick = { menuExpanded = false; onMoveUp() },
+                        enabled = canMoveUp,
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.projects_move_down)) },
+                        onClick = { menuExpanded = false; onMoveDown() },
+                        enabled = canMoveDown,
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_delete)) },
+                        onClick = { menuExpanded = false; onDelete() },
+                        leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = deleteDescription, tint = MaterialTheme.colorScheme.error) },
+                    )
+                }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
 }
 

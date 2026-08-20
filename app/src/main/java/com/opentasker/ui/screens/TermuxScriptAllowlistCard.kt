@@ -1,16 +1,21 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,12 +28,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.app.R
 import com.opentasker.core.scripting.TermuxAllowlistSaveResult
 import com.opentasker.core.scripting.TermuxScriptAllowlistStore
@@ -44,6 +51,7 @@ internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
     val store = remember(context) { TermuxScriptAllowlistStore(context) }
     var executable by rememberSaveable { mutableStateOf("") }
     var sha256 by rememberSaveable { mutableStateOf("") }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     var revision by remember { mutableIntStateOf(0) }
     // SharedPreferences first-load is disk work; keep it off the composition thread.
     val entries by produceState(initialValue = emptyList<ApprovedTermuxScript>(), store, revision) {
@@ -61,17 +69,33 @@ internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.setup_termux_allowlist_title), style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.setup_termux_allowlist_title), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.label_action_count, entries.size),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = stringResource(R.string.setup_termux_allowlist_title),
+                )
+            }
+            if (expanded) {
                 Text(
                     stringResource(R.string.setup_termux_allowlist_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
             OutlinedTextField(
                 value = executable,
                 onValueChange = { executable = it },
@@ -162,6 +186,7 @@ internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
                         }
                     }
                 }
+            }
             }
         }
     }
