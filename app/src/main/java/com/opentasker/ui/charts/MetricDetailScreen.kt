@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
@@ -51,6 +52,7 @@ fun MetricDetailScreen(
     metricKey: String,
     contentPadding: PaddingValues,
     onBack: () -> Unit,
+    onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
@@ -99,7 +101,13 @@ fun MetricDetailScreen(
                 bottom = contentPadding.calculateBottomPadding() + 24.dp,
             ),
     ) {
-        DetailHeader(title, hasInfo = info != null, onBack = onBack, onInfo = { showInfo = !showInfo })
+        DetailHeader(
+            title,
+            hasInfo = info != null,
+            onBack = onBack,
+            onInfo = { showInfo = !showInfo },
+            onSwitchLanguage = onSwitchLanguage,
+        )
 
         if (metricKey == MetricSpecs.KEY_INDEX) {
             state.index?.let { HealthIndexDetail(it) }
@@ -217,21 +225,47 @@ fun MetricDetailScreen(
     }
 }
 
+/**
+ * The bar every report page opens with: back, the title, the language pill, and the ⓘ.
+ *
+ * 白い熊 asked for the pill here as well as on the dashboard (2026-08-20) — on 運動と回復 and on each
+ * individual page, Sleep and the rest. Putting it in the shared header rather than in each screen is
+ * what makes that one change instead of nine, and it is why 健康指数 and 回復 get it too: their
+ * screens return early, but only *after* this row.
+ *
+ * The title keeps the flexible width, so the pill sits at the right against the ⓘ rather than
+ * floating at whatever x-position the title happens to end at. Nine pages whose pill moves with the
+ * length of the word above it would read as nine different controls.
+ */
 @Composable
-fun DetailHeader(title: String, hasInfo: Boolean, onBack: () -> Unit, onInfo: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircleButton("←", onBack)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        if (hasInfo) InfoCircle(onClick = onInfo)
+fun DetailHeader(
+    title: String,
+    hasInfo: Boolean,
+    onBack: () -> Unit,
+    onInfo: () -> Unit,
+    onSwitchLanguage: suspend () -> Loc? = { null },
+) {
+    val switch = rememberLanguageSwitch()
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircleButton("←", onBack)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            LanguagePill(switch, onSwitchLanguage)
+            if (hasInfo) {
+                Spacer(Modifier.width(8.dp))
+                InfoCircle(onClick = onInfo)
+            }
+        }
+        LanguageSwitchFailure(switch, Modifier.padding(top = 6.dp))
     }
 }
 

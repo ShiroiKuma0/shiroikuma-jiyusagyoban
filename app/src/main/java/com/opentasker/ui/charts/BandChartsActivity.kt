@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.band.BandSettings
@@ -58,11 +59,20 @@ class BandChartsActivity : ComponentActivity() {
         renderFrom(intent)
     }
 
+    /**
+     * The language the window is displaying in.
+     *
+     * State rather than a `val` read at launch, because the 日本語／英語 pill switches it while the
+     * window is open and every string on screen has to follow. It is still SEEDED from the stored
+     * preference on each launch — `健康の設定 -- [727][01]` writes that through the band.charts
+     * action, so it is already settled by the time this window is created — and the pill keeps the
+     * two in step by going through that same task.
+     */
+    private val language: MutableState<BandLanguage> = mutableStateOf(BandLanguage.DEFAULT)
+
     private fun renderFrom(intent: Intent?) {
         val deepLink = intent?.getStringExtra(EXTRA_METRIC)?.takeIf { it.isNotBlank() }
-        // Read once per launch rather than per frame: `健康の設定 -- [727][01]` writes it through the
-        // band.charts action, so it is already settled by the time this window is created.
-        val language = BandLanguage.parse(BandSettings.language(applicationContext))
+        language.value = BandLanguage.parse(BandSettings.language(applicationContext))
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             // The chart style is derived from the same prefs the rest of the theme reads, so a slider
@@ -71,7 +81,7 @@ class BandChartsActivity : ComponentActivity() {
             val chartStyle = remember(themePrefs) { ChartStyle.from(themePrefs) }
             OpenTaskerTheme(prefs = themePrefs) {
                 CompositionLocalProvider(
-                    LocalBandLanguage provides language,
+                    LocalBandLanguage provides language.value,
                     LocalChartStyle provides chartStyle,
                 ) {
                     Surface(
@@ -97,6 +107,7 @@ class BandChartsActivity : ComponentActivity() {
                                 model = model,
                                 contentPadding = insets,
                                 onOpenMetric = { selected = it },
+                                onSwitchLanguage = { switchLanguage(model) },
                             )
                         } else if (selected == MetricSpecs.KEY_REGISTER) {
                             SessionRegisterScreen(
@@ -104,6 +115,7 @@ class BandChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onRate = model::setFelt,
                                 onBack = { selected = null },
+                                onSwitchLanguage = { switchLanguage(model) },
                             )
                         } else if (selected == MetricSpecs.KEY_MARK_SESSION) {
                             MarkSessionScreen(
@@ -111,6 +123,7 @@ class BandChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onSubmit = { start, end -> model.markSession(start, end) },
                                 onBack = { selected = null },
+                                onSwitchLanguage = { switchLanguage(model) },
                             )
                         } else {
                             MetricDetailScreen(
@@ -118,6 +131,7 @@ class BandChartsActivity : ComponentActivity() {
                                 metricKey = selected!!,
                                 contentPadding = insets,
                                 onBack = { selected = null },
+                                onSwitchLanguage = { switchLanguage(model) },
                             )
                         }
                     }
@@ -125,6 +139,29 @@ class BandChartsActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * Flip to the other language and reload.
+     *
+     * [BandLanguageSwitch] rewrites, saves and runs the settings task; this only has to believe the
+     * result. The reload is not cosmetic — most of the page resolves its [Loc]s at draw time and
+     * would follow from the composition local alone, but the model bakes a few strings (the sync
+     * status line, the chart footers) when it builds its state, and those would keep their old
+     * language until something else happened to rebuild them.
+     */
+    private suspend fun switchLanguage(model: BandDashboardModel): Loc? =
+        when (val outcome = BandLanguageSwitch.switchTo(
+            appContext = applicationContext,
+            db = OpenTaskerApp_NoHilt.db,
+            to = BandLanguageSwitch.other(language.value),
+        )) {
+            is BandLanguageSwitch.Outcome.Switched -> {
+                language.value = outcome.language
+                model.refresh()
+                null
+            }
+            is BandLanguageSwitch.Outcome.Failed -> outcome.reason
+        }
 
     companion object {
         /** Optional: open straight onto one metric instead of the dashboard. */
