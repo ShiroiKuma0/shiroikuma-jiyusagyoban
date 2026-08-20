@@ -8,6 +8,58 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.86+2026-08-12.15-45.ga1fe8154+029 — 2026-08-20
+
+Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
+
+**An afternoon nap no longer stands in for the night.**
+
+Four things on the 健康 screens read one sleep session — the Sleep headline, the stage table, the
+**健康指数**, and the **回復** card's awake minutes — and the one they read was whichever session
+**ended last**. A nap ends later than last night, so a doze on the sofa took all four with it.
+
+A night is defined by **when** it happened, not by how long it lasted. A half-hour doze at 03:00 is
+part of the night; three hours at 16:00 is not. So the test is the session's **midpoint** against a
+21:00–09:00 window — and on 白い熊's own month the two populations are nowhere near each other:
+
+| | midpoints |
+| --- | --- |
+| the 19 nights | 01:27 – 04:50 |
+| the 5 naps | 11:32, 15:53, 16:23, 18:11, 19:11 |
+
+Nothing at all falls between 04:50 and 11:32. The nearest nap sits 1 h 49 m outside the window; the
+nearest night, 4 h 10 m inside it.
+
+**A length test was the obvious alternative, and it is wrong.** `RecoverySource.MIN_NIGHT_MINUTES` is
+four hours, and on 2026-08-04 白い熊 slept **03:21–06:19** — 178 minutes, a short broken night that a
+duration floor files as a nap. Time of day gets it right; length does not.
+
+Replayed across the archive, all 24 sessions classify correctly and every one of the five nap days
+now reports its night instead:
+
+```
+nap 08-01 11:15->11:48 0h33m   ->  night 07-31 21:21->07:09  9h33m
+nap 08-02 18:56->19:26 0h30m   ->  night 08-01 23:28->05:50  6h22m
+nap 08-04 15:25->17:20 1h55m   ->  night 08-04 03:21->06:19  2h58m
+nap 08-11 17:53->18:28 0h35m   ->  night 08-10 23:10->06:54  6h56m
+nap 08-15 15:09->16:36 1h23m   ->  night 08-15 00:21->05:34  5h03m
+```
+
+The 19 night-only days are untouched.
+
+Two further decisions:
+
+- **The chart still draws every session.** A nap happened and the hypnogram should show it; what it
+  must not do is answer "how did I sleep".
+- **With no night on record the headline is a dash**, not the most recent session. Falling back would
+  reintroduce precisely the bug this prevents, and a dash above a day table full of dated rows is the
+  truthful answer.
+- **The recovery baseline gets the same guard**, where a four-hour Sunday afternoon would clear the
+  length floor and enter as a night. It changes nothing on the data to hand — the longest nap on
+  record is 178 minutes, already below the floor — so it is defence rather than repair. The four-hour
+  floor stays where it is for its own separate reason: the nocturnal-HR estimator needs onset + 30 min
+  and then four hours, which 178 minutes cannot fill.
+
 ## 0.2.86+2026-08-12.15-45.ga1fe8154+028 — 2026-08-20
 
 Built on upstream OpenTasker `0.2.86` (`a1fe8154`).
