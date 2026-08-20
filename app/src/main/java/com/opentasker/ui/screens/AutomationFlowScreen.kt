@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
@@ -84,14 +85,6 @@ fun AutomationFlowScreen(
 ) {
     val resources = LocalContext.current.resources
     val lintStrings = AutomationLintStrings.from(resources)
-    val lintReport = remember(profiles, tasks, invariants, resources) {
-        AutomationLint.analyze(
-            profiles = profiles,
-            tasks = tasks,
-            strings = lintStrings,
-            invariants = invariants,
-        )
-    }
     val graphs = remember(profiles, tasks, resources, changedNodeKeys, invariants) {
         val tasksById = tasks.associateBy { it.id }
         val strings = com.opentasker.core.flow.AutomationFlowStrings.from(resources)
@@ -124,13 +117,6 @@ fun AutomationFlowScreen(
                 profiles = profiles,
                 tasks = tasks,
                 graphs = graphs,
-            )
-        }
-        item {
-            AutomationInvariantPanel(
-                invariants = invariants,
-                report = lintReport,
-                onUpdate = onUpdateInvariants,
             )
         }
         items(graphs, key = { it.profileId }) { graph ->
@@ -198,18 +184,33 @@ private fun FlowOverviewCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.flow_overview_title), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.header_flow_detail, profiles.size, tasks.size),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Text(
                         stringResource(R.string.flow_overview_body),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 FlowStatusPill(
@@ -241,7 +242,6 @@ private fun FlowGraphCard(
             .fillMaxWidth()
             .semantics { contentDescription = graph.accessibilitySummary() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -264,23 +264,14 @@ private fun FlowGraphCard(
                 )
             }
 
-            FlowCanvasOverview(
-                graph = graph,
-                profileNode = profileNode,
-                onNodeTargetSelected = onNodeTargetSelected,
-            )
-
             if (graph.contextNodes.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    items(graph.contextNodes, key = { it.id }) { node ->
-                        FlowNodeView(
-                            node = node,
-                            onNodeTargetSelected = onNodeTargetSelected,
-                            modifier = Modifier.widthIn(min = 220.dp, max = 280.dp),
-                        )
-                    }
+                graph.contextNodes.forEach { node ->
+                    FlowNodeView(
+                        node = node,
+                        onNodeTargetSelected = onNodeTargetSelected,
+                    )
+                    FlowEdgeLabel(stringResource(R.string.flow_all_context_rules))
                 }
-                FlowEdgeLabel(stringResource(R.string.flow_all_context_rules))
             }
             FlowInlineCommand(label = stringResource(R.string.profile_add_context), onClick = { onAddContext(graph.profileId) })
 

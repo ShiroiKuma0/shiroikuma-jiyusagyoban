@@ -26,7 +26,7 @@ enum class ThemeMode {
             "light" -> Light
             "high_contrast" -> HighContrast
             "dynamic" -> Dynamic
-            else -> System
+            else -> Amoled
         }
     }
 

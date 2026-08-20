@@ -440,18 +440,33 @@ private fun RunLogSummaryCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = if (failures > 0 || interrupted > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_execution_history), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.header_run_log_detail, totalCount),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Text(
                         stringResource(R.string.run_log_history_body),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 StatusPill(
@@ -472,8 +487,6 @@ private fun RunLogSummaryCard(
                 )
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { SummaryMetric("$totalCount", stringResource(R.string.label_entries), Modifier.width(104.dp)) }
-                item { SummaryMetric("${logs.size}", stringResource(R.string.run_log_loaded), Modifier.width(104.dp)) }
                 item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
                 item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
                 item { SummaryMetric("$interrupted", stringResource(R.string.status_interrupted), Modifier.width(104.dp)) }
@@ -487,27 +500,19 @@ private fun RunLogSummaryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                OutlinedButton(onClick = onShareDiagnostic, modifier = Modifier.weight(1f)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                item { OutlinedButton(onClick = onShareDiagnostic) {
                     Text(stringResource(R.string.run_log_share_diagnostic), maxLines = 1)
-                }
-                OutlinedButton(onClick = onRefresh, modifier = Modifier.weight(1f)) {
+                } }
+                item { OutlinedButton(onClick = onRefresh) {
                     Text(stringResource(R.string.run_log_refresh), maxLines = 1)
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                OutlinedButton(onClick = onExportJson, modifier = Modifier.weight(1f)) {
+                } }
+                item { OutlinedButton(onClick = onExportJson) {
                     Text(stringResource(R.string.run_log_export_json))
-                }
-                OutlinedButton(onClick = onExportCsv, modifier = Modifier.weight(1f)) {
+                } }
+                item { OutlinedButton(onClick = onExportCsv) {
                     Text(stringResource(R.string.run_log_export_csv))
-                }
+                } }
             }
         }
     }
@@ -550,18 +555,7 @@ private fun RunLogCard(
                 RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
             }
         ),
-        border = BorderStroke(
-            1.dp,
-            when (outcome) {
-                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)
-                RunLogOutcome.Failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.30f)
-                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.34f)
-                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.42f)
-                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
-                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error.copy(alpha = 0.42f)
-            },
-        ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

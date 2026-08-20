@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## v0.2.87
+
+OpenTasker's ten main workspaces now share a compact, true-black visual system designed for faster scanning and fewer competing controls.
+
+### Changed
+
+- Reworked Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run Log, Diagnostics, and Settings around a consistent page hierarchy.
+- Promoted project scope, readiness, search, and the primary page action while moving secondary commands into contextual menus.
+- Standardized the five-item bottom navigation and kept advanced workspaces in a concise More menu.
+- Tightened cards, permission rows, action sequences, backup controls, fallback settings, and Termux configuration to match the new density.
+- Made AMOLED black the safe default for first launch and unknown stored theme values.
+
+### Design
+
+- Added a complete page-by-page visual reference set and side-by-side emulator comparisons.
+- Verified every destination on a Pixel 7 API 35 emulator and recorded the remaining minor parity notes in `design-qa.md`.
+
 ### Added
 
 - Scheduled configuration snapshots can now be written as encrypted `.otbackup` v2 archives to a user-selected Storage Access Framework folder. OpenTasker retains the folder grant, applies count-and-age retention only to its own archives, and reports lost access in Setup; the user-held passphrase remains required after reinstall or on another device.

@@ -231,18 +231,33 @@ private fun VariableSummaryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DesignSystem.Opacity.elevatedSurface)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = DesignSystem.Opacity.subtleBorder)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(DesignSystem.Screen.heroCardPadding), verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.sectionGap)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.sectionGap)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_variable_vault), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        stringResource(R.string.header_variables_detail, totalCount),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Text(
                         stringResource(R.string.empty_variables_body),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 VariablePill(
@@ -304,8 +319,7 @@ private fun VariableRow(
     Card(
         onClick = onEdit,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DesignSystem.Opacity.restingSurface)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = DesignSystem.Opacity.subtleBorder)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)),
         shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Row(

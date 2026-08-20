@@ -145,6 +145,7 @@
     <string name="setup_section_optional">Optional integrations</string>
     <string name="setup_section_reliability">Reliability</string>
     <string name="setup_progress_percent">%1$d%%</string>
+    <string name="setup_progress_ready_count">%1$d of %2$d ready</string>
     <string name="title_execution_history">Execution history</string>
     <string name="title_starter_templates">Starter templates</string>
 

@@ -398,18 +398,37 @@ private fun ContextInspectorSummaryCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
         shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
     ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = healthColor,
+                        modifier = Modifier.padding(10.dp).size(24.dp),
+                    )
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.title_context_inspector), style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        if (attentionSources == 0) {
+                            stringResource(R.string.inspector_ready)
+                        } else {
+                            stringResource(R.string.inspector_attention, attentionSources)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Text(
                         stringResource(R.string.inspector_body),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 InspectorStatusPill(
@@ -447,11 +466,10 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                 ContextSourceStatus.NeedsSetup,
                 ContextSourceStatus.Missing,
                 ContextSourceStatus.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.20f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)
             },
         ),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
@@ -512,8 +530,7 @@ private fun ProfileInspectorCard(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             },
         ),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {

@@ -1,0 +1,3 @@
+Reworked Profiles, Tasks, Variables, Flow, Scenes, Inspector, Setup, Run Log, Diagnostics, and Settings around a consistent page hierarchy.
+Promoted project scope, readiness, search, and the primary page action while moving secondary commands into contextual menus.
+Standardized the five-item bottom navigation and kept advanced workspaces in a concise More menu.
