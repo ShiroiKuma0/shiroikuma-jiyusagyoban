@@ -28,6 +28,7 @@
 
 ### Changed
 
+- Macrobenchmark and the baseline-profile plugin move from `1.5.0-alpha07` to `1.5.0-rc01`, and the Compose screenshot plugin from `0.0.1-alpha15` to `0.0.1-alpha16`. Neither reaches the release runtime classpath; they are the build tooling the earlier dependency pass deliberately left alone.
 - Losing the Android Keystore master key now fails with a named `DatabaseKeyUnavailableException` instead of a bare error. It is still terminal, and deliberately so: the SQLCipher key exists only inside that wrapped blob, so a Keystore reset or a restore onto another device leaves the encrypted database unreadable. Naming the failure is what lets a caller tell it apart from something worth retrying.
 
 - The `core` modules own their sources. They used to point their source sets at files under `app/`, so the app and each module compiled the same classes and the module dependencies had to be `compileOnly` to stop R8 rejecting the duplicates. Model, logging, storage and the engine primitives now live in their own directories and the app depends on them for real. The release APK holds exactly the same classes it did before the move.

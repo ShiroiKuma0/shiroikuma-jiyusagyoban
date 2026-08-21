@@ -272,7 +272,7 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | AGP | 9.3.1 |
 | KSP | 2.3.11 |
 | Build Tools | 36.0.0 |
-| Macrobenchmark | 1.5.0-alpha07 |
+| Macrobenchmark | 1.5.0-rc01 |
 | JDK | 17 or 21 |
 | Min SDK | 26 (Android 8.0) |
 | Compile SDK | 37 |
