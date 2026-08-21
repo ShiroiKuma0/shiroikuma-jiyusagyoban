@@ -18,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
@@ -509,7 +510,11 @@ private fun TaskerImportListSection(
 ) {
     InlineNotice(
         title = title,
-        body = values.take(5).joinToString("\n") + if (values.size > 5) "\n${values.size - 5} more" else "",
+        body = values.take(5).joinToString("\n") + if (values.size > 5) {
+            "\n" + pluralStringResource(R.plurals.import_review_more, values.size - 5, values.size - 5)
+        } else {
+            ""
+        },
         color = color,
     )
 }

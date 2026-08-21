@@ -21,6 +21,8 @@ class SecretVariableUiSourceTest {
             "variable.isSecret",
             "PasswordVisualTransformation()",
             "var value by remember(stateKey)",
+            "var nonSecretDraft by rememberSaveable(stateKey)",
+            "nonSecretDraft = if (it) null else value",
             "R.string.variables_reveal_secret",
             "R.string.variables_hide_secret",
             "!variable.secretAvailable",
