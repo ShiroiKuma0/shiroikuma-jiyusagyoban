@@ -215,6 +215,25 @@ object ContextMatchEvaluator {
     }
 
     /**
+     * Stamps a stable pulse identity on a sun-window match so [PulseEventContinuity] can
+     * collapse the once-per-minute `sun_tick` stream into one occurrence per window.
+     *
+     * Exact-minute contexts (window of 1) still get a unique id per matching minute, so they
+     * continue to fire on that minute. Calendar and share events already carry `eventId` /
+     * `observedAtEpochMs` and are left unchanged.
+     */
+    fun withStablePulseIdentity(spec: ContextSpec, event: ContextEvent): ContextEvent {
+        if (event.metadata["eventId"] != null || event.metadata["observedAtEpochMs"] != null) {
+            return event
+        }
+        val expectedEvent = spec.config["event"]?.trim().orEmpty()
+        if (!expectedEvent.isSunEvent()) return event
+        val window = sunWindow(spec, event, expectedEvent) ?: return event
+        val occurrenceId = "sun:${window.event}:${window.date}:${window.start}:${window.end}"
+        return event.copy(metadata = event.metadata + ("eventId" to occurrenceId))
+    }
+
+    /**
      * True when a multiplexed plugin poll result belongs to this spec's subscription.
      * Results for other plugin/bundle subscriptions must be ignored (state held), not
      * evaluated to false, or every extra subscription flaps this level context.
@@ -240,22 +259,41 @@ object ContextMatchEvaluator {
         return event.metadata["state"].equals("satisfied", ignoreCase = true)
     }
 
-    private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean {
-        if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
-        val latitude = firstConfig(spec, "latitude", "lat").toDoubleOrNull() ?: return false
-        val longitude = firstConfig(spec, "longitude", "lon", "lng").toDoubleOrNull() ?: return false
+    private fun matchesSunEvent(spec: ContextSpec, event: ContextEvent, expectedEvent: String): Boolean =
+        sunWindow(spec, event, expectedEvent) != null
+
+    private fun sunWindow(spec: ContextSpec, event: ContextEvent, expectedEvent: String): SunWindow? {
+        if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return null
+        val latitude = firstConfig(spec, "latitude", "lat").toDoubleOrNull() ?: return null
+        val longitude = firstConfig(spec, "longitude", "lon", "lng").toDoubleOrNull() ?: return null
         val date = event.metadata["date"]?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
             ?: LocalDate.now()
         val zone = event.metadata["zone"]?.let { runCatching { ZoneId.of(it) }.getOrNull() }
             ?: ZoneId.systemDefault()
         val currentMinute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
-        val baseMinute = SunEventCalculator.eventMinuteOfDay(date, latitude, longitude, expectedEvent, zone) ?: return false
+        val baseMinute = SunEventCalculator.eventMinuteOfDay(date, latitude, longitude, expectedEvent, zone) ?: return null
         val offset = firstConfig(spec, "offsetMinutes", "offset").toIntOrNull() ?: 0
-        val window = (firstConfig(spec, "windowMinutes", "window").toIntOrNull() ?: 1).coerceIn(1, 180)
+        val windowMinutes = (firstConfig(spec, "windowMinutes", "window").toIntOrNull() ?: 1).coerceIn(1, 180)
         val start = Math.floorMod(baseMinute + offset, MINUTES_PER_DAY)
-        val end = Math.floorMod(start + window - 1, MINUTES_PER_DAY)
-        return minuteInWindow(currentMinute, start, end)
+        val end = Math.floorMod(start + windowMinutes - 1, MINUTES_PER_DAY)
+        if (!minuteInWindow(currentMinute, start, end)) return null
+        // A window that wraps midnight still belongs to the evening's occurrence. Ticks after
+        // 00:00 carry the next calendar date, so identity uses the date of the window start.
+        val occurrenceDate = if (start > end && currentMinute <= end) date.minusDays(1) else date
+        return SunWindow(
+            event = expectedEvent.lowercase(Locale.US),
+            date = occurrenceDate.toString(),
+            start = start,
+            end = end,
+        )
     }
+
+    private data class SunWindow(
+        val event: String,
+        val date: String,
+        val start: Int,
+        val end: Int,
+    )
 
     private fun firstConfig(spec: ContextSpec, vararg keys: String): String =
         keys.firstNotNullOfOrNull { spec.config[it]?.trim()?.takeIf(String::isNotBlank) }.orEmpty()
