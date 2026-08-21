@@ -79,6 +79,10 @@ import java.util.Locale
 
 internal const val RUN_LOG_LIST_TAG = "run_log_list"
 
+// The export/refresh controls sit in a LazyRow, so the ones past the right edge are never
+// composed on a narrow device and cannot be reached without scrolling the row itself.
+internal const val RUN_LOG_ACTIONS_TAG = "run_log_actions"
+
 @Composable
 internal fun RunLogScreenContent(
     logs: List<RunLogEntry>,
@@ -500,7 +504,10 @@ private fun RunLogSummaryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                modifier = Modifier.fillMaxWidth().testTag(RUN_LOG_ACTIONS_TAG),
+            ) {
                 item { OutlinedButton(onClick = onShareDiagnostic) {
                     Text(stringResource(R.string.run_log_share_diagnostic), maxLines = 1)
                 } }
