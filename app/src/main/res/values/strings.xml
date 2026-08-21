@@ -678,11 +678,11 @@
     <string name="import_export_json">Export JSON</string>
     <string name="import_export_tasker_xml">Export Tasker XML</string>
     <string name="import_import_json">Import JSON</string>
-    <string name="import_paste_json_action">Paste / scan JSON</string>
-    <string name="import_paste_json_title">Paste or scan an OpenTasker bundle</string>
-    <string name="import_paste_json_body">Paste exported JSON here, or use a QR scanner that types the decoded text. Nothing is written until the existing import review is confirmed.</string>
-    <string name="import_paste_json_hint">OpenTasker bundle JSON</string>
-    <string name="import_paste_json_review">Review bundle</string>
+    <string name="import_paste_json_action">Paste / scan</string>
+    <string name="import_paste_json_title">Paste or scan an import</string>
+    <string name="import_paste_json_body">Paste an OpenTasker bundle or a Tasker XML task or profile here, or use a QR scanner that types the decoded text. Whichever it is opens the same review, and nothing is written until you confirm it.</string>
+    <string name="import_paste_json_hint">OpenTasker JSON or Tasker XML</string>
+    <string name="import_paste_json_review">Review import</string>
     <string name="import_opentasker_bundle">OpenTasker bundle</string>
     <string name="import_count_tasks">Tasks</string>
     <string name="import_count_profiles">Profiles</string>

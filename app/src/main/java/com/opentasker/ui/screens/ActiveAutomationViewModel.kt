@@ -105,6 +105,8 @@ import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.OpenTaskerBundleTextImport
+import com.opentasker.core.transfer.PastedImportKind
+import com.opentasker.core.transfer.PastedImportSource
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerXmlExporter
 import com.opentasker.core.transfer.TaskerImportPreview
@@ -1241,9 +1243,40 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * One paste box, two formats. Tasker XML opens the same review the document picker does, so a
+     * copied Tasker task and a Tasker file end up in the same place.
+     */
+    fun previewPastedImport(rawText: String, appVersion: String) {
+        when (PastedImportSource.classify(rawText)) {
+            PastedImportKind.TASKER_XML -> previewTaskerXmlText(rawText, appVersion)
+            PastedImportKind.OPEN_TASKER_JSON -> previewOpenTaskerBundleText(rawText)
+        }
+    }
+
     fun previewOpenTaskerBundleText(rawText: String) {
         previewOpenTaskerBundleSource {
             OpenTaskerBundleTextImport.decode(rawText)
+        }
+    }
+
+    private fun previewTaskerXmlText(rawText: String, appVersion: String) {
+        viewModelScope.launch {
+            if (_taskerImportBusy.value) return@launch
+            _taskerImportBusy.value = true
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val rawXml = PastedImportSource.requireTaskerXmlWithinBudget(rawText)
+                    val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
+                    TaskerImportReviewState(report = report, preview = TaskerImportPlanner.preview(report))
+                }
+            }
+                .onSuccess {
+                    _taskerImportReview.value = it
+                    events.send(message(R.string.ui_message_tasker_xml_ready))
+                }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_preview)) }
+            _taskerImportBusy.value = false
         }
     }
 
