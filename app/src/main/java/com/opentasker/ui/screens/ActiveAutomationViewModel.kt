@@ -3,7 +3,6 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import android.annotation.SuppressLint
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -11,7 +10,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.app.R
-import com.opentasker.core.capabilities.WriteSettingsAdmission
 import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintReport
@@ -60,9 +58,7 @@ import com.opentasker.core.logging.AppLogger
 import kotlinx.serialization.SerializationException
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.plugins.locale.LocaleGrantStore
-import com.opentasker.core.diff.AutomationSemanticDiff
 import com.opentasker.core.diff.SemanticDiffDocument
-import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.references.AutomationDuplicator
 import com.opentasker.core.references.AutomationDuplicateStrings
@@ -86,7 +82,6 @@ import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
-import com.opentasker.core.storage.EditHistorySnapshotDecoder
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.RunLogQuery

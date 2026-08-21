@@ -192,9 +192,9 @@ There is no F-Droid or IzzyOnDroid listing yet, so releases come from this repos
 
 **With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/OpenTasker` as a GitHub source. Default settings are correct, nothing needs configuring.
 
-**By hand:** download the APK from the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Release assets are named `OpenTasker-v<version>.apk`.
+**By hand:** download the APK attached to the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. From the next release on, that file is named `OpenTasker-v<version>.apk`; `v0.2.87` and earlier predate the naming gate, and `v0.2.87` ships its APK as `app-release.apk`.
 
-Releases tagged `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. They predate the current signing key, carry versionCode 1, and cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. Only tags in the `v0.2.x` line are real.
+Releases tagged `v0.1.0`, `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. All four carry versionCode 1 and were signed with a key that no longer exists, so they cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. The live line is `v0.2.x`, and its newest tag is the one to take.
 
 ---
 
