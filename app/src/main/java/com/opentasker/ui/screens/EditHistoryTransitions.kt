@@ -8,16 +8,19 @@ import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.plugins.locale.LocaleGrantStore
+import com.opentasker.core.references.AutomationReferenceRewriter
 import com.opentasker.core.references.AutomationReferenceIndex
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistorySnapshotDecoder
 import com.opentasker.core.storage.FallbackTaskSettings
+import com.opentasker.core.storage.ProjectDeletionSnapshot
 import com.opentasker.core.storage.StorageJson
+import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
 
 /**
- * Undo/redo restore for profiles, tasks and scenes.
+ * Undo/redo restore for profiles, tasks, scenes, variables, and projects.
  *
  * Lives outside [ActiveAutomationViewModel] so the history transaction, which is the largest
  * single responsibility the view model had, stops crowding the file against its line ceiling.
@@ -28,8 +31,24 @@ internal class EditHistoryTransitions(
     private val fallbackTaskSettings: FallbackTaskSettings,
     private val locationDwellStateStore: LocationDwellStateStore,
     private val writeSettingsGuard: WriteSettingsGuard,
+    private val variableRepository: VariableRepository,
 ) {
-    suspend fun transition(entityType: String, entityId: Long, redo: Boolean): SemanticDiffDocument? = db.withTransaction {
+    suspend fun transition(entityType: String, entityId: Long, redo: Boolean): SemanticDiffDocument? =
+        if (entityType == EditHistoryDao.TYPE_VARIABLE || entityType == EditHistoryDao.TYPE_PROJECT) {
+            variableRepository.withMutationLock {
+                db.withTransaction {
+                    transitionStorageDeletion(entityType, entityId, redo, this@withMutationLock)
+                }
+            }
+        } else {
+            transitionAutomation(entityType, entityId, redo)
+        }
+
+    private suspend fun transitionAutomation(
+        entityType: String,
+        entityId: Long,
+        redo: Boolean,
+    ): SemanticDiffDocument? = db.withTransaction {
         val history = db.editHistoryDao()
         val snapshot = if (redo) {
             history.getRedoCandidate(entityType, entityId)
@@ -268,6 +287,172 @@ internal class EditHistoryTransitions(
             else -> return@withTransaction null
         }
     }
+
+    private suspend fun transitionStorageDeletion(
+        entityType: String,
+        entityId: Long,
+        redo: Boolean,
+        variables: VariableRepository.LockedMutations,
+    ): SemanticDiffDocument? {
+        val history = db.editHistoryDao()
+        val historyEntry = if (redo) {
+            history.getRedoCandidate(entityType, entityId)
+        } else {
+            history.getUndoCandidate(entityType, entityId)
+        } ?: return null
+        if (historyEntry.previousJson.isBlank() || historyEntry.nextJson.isNotBlank()) return null
+
+        val changed = when (entityType) {
+            EditHistoryDao.TYPE_VARIABLE -> transitionVariableDeletion(
+                historyEntry.previousJson,
+                entityId,
+                redo,
+                variables,
+            )
+            EditHistoryDao.TYPE_PROJECT -> transitionProjectDeletion(
+                historyEntry.previousJson,
+                entityId,
+                redo,
+                variables,
+            )
+            else -> false
+        }
+        if (!changed) return null
+        if (redo) history.markRedone(historyEntry.id) else history.markUndone(historyEntry.id, "")
+        return SemanticDiffDocument()
+    }
+
+    private suspend fun transitionVariableDeletion(
+        json: String,
+        entityId: Long,
+        redo: Boolean,
+        variables: VariableRepository.LockedMutations,
+    ): Boolean {
+        val snapshot = EditHistorySnapshotDecoder.variable(json, entityId)
+        val current = variables.getStored(snapshot.name, snapshot.projectId)
+        if (!redo) {
+            if (current != null) return false
+            variables.restoreStored(snapshot)
+            return true
+        }
+        if (current != snapshot) return false
+        val variable = variables.get(snapshot.name, snapshot.projectId) ?: return false
+        if (!variableCanBeDeleted(variable)) return false
+        variables.delete(snapshot.name, snapshot.projectId)
+        LocaleConditionGrantStore(appContext).revokeAllForBinding(
+            LocaleConditionGrantStore.variableKey(snapshot.projectId, snapshot.name),
+        )
+        return true
+    }
+
+    private suspend fun variableCanBeDeleted(variable: com.opentasker.core.model.Variable): Boolean {
+        fun <T> requireDecoded(result: com.opentasker.core.storage.StorageDecodeResult<T>): T {
+            result.issue?.let { throw CorruptRecordOverwriteException(it) }
+            return result.value
+        }
+        val profiles = db.profileDao().getAll().map { requireDecoded(it.toDomainDecodeResult()) }
+        val tasks = db.taskDao().getAll().map { requireDecoded(it.toDomainDecodeResult()) }
+        val scenes = db.sceneDao().getAll().map { requireDecoded(it.toDomainDecodeResult()) }
+        return AutomationReferenceRewriter.guardVariableDeletion(variable, profiles, tasks, scenes).canCommit
+    }
+
+    private suspend fun transitionProjectDeletion(
+        json: String,
+        entityId: Long,
+        redo: Boolean,
+        variables: VariableRepository.LockedMutations,
+    ): Boolean {
+        val snapshot = EditHistorySnapshotDecoder.projectDeletion(json, entityId)
+        return if (redo) {
+            redoProjectDeletion(snapshot, variables)
+        } else {
+            restoreProjectDeletion(snapshot, variables)
+        }
+    }
+
+    private suspend fun restoreProjectDeletion(
+        snapshot: ProjectDeletionSnapshot,
+        variables: VariableRepository.LockedMutations,
+    ): Boolean {
+        if (db.projectDao().getById(snapshot.project.id) != null) return false
+        if (db.projectDao().getById(snapshot.targetProjectId) == null) return false
+        if (db.projectDao().getAll().any { it.name.equals(snapshot.project.name, ignoreCase = true) }) return false
+        if (!projectMembership(snapshot.project.id).isEmpty()) return false
+        if (!projectMembership(snapshot.targetProjectId).contains(snapshot.membership())) return false
+
+        db.projectDao().insert(snapshot.project.toEntity())
+        moveProjectMembership(snapshot, snapshot.targetProjectId, snapshot.project.id, variables)
+        return true
+    }
+
+    private suspend fun redoProjectDeletion(
+        snapshot: ProjectDeletionSnapshot,
+        variables: VariableRepository.LockedMutations,
+    ): Boolean {
+        val currentProject = db.projectDao().getById(snapshot.project.id) ?: return false
+        if (currentProject.toDomain() != snapshot.project) return false
+        if (db.projectDao().getById(snapshot.targetProjectId) == null) return false
+        if (projectMembership(snapshot.project.id) != snapshot.membership()) return false
+
+        moveProjectMembership(snapshot, snapshot.project.id, snapshot.targetProjectId, variables)
+        check(db.projectDao().deleteIfNotDefault(snapshot.project.id) == 1) {
+            "Project no longer exists."
+        }
+        return true
+    }
+
+    private suspend fun moveProjectMembership(
+        snapshot: ProjectDeletionSnapshot,
+        fromProjectId: Long,
+        toProjectId: Long,
+        variables: VariableRepository.LockedMutations,
+    ) {
+        snapshot.taskIds.forEach { id ->
+            val entity = checkNotNull(db.taskDao().getById(id)) { "Project task #$id is missing." }
+            check(entity.projectId == fromProjectId) { "Project task #$id moved elsewhere." }
+            db.taskDao().update(entity.copy(projectId = toProjectId))
+        }
+        snapshot.profileIds.forEach { id ->
+            val entity = checkNotNull(db.profileDao().getById(id)) { "Project profile #$id is missing." }
+            check(entity.projectId == fromProjectId) { "Project profile #$id moved elsewhere." }
+            db.profileDao().update(entity.copy(projectId = toProjectId))
+        }
+        snapshot.sceneIds.forEach { id ->
+            val entity = checkNotNull(db.sceneDao().getById(id)) { "Project scene #$id is missing." }
+            check(entity.projectId == fromProjectId) { "Project scene #$id moved elsewhere." }
+            db.sceneDao().update(entity.copy(projectId = toProjectId))
+        }
+        variables.reassignProject(snapshot.variableNames.toSet(), fromProjectId, toProjectId)
+    }
+
+    private suspend fun projectMembership(projectId: Long): ProjectMembership = ProjectMembership(
+        taskIds = db.taskDao().getAll().filter { it.projectId == projectId }.mapTo(sortedSetOf()) { it.id },
+        profileIds = db.profileDao().getAll().filter { it.projectId == projectId }.mapTo(sortedSetOf()) { it.id },
+        sceneIds = db.sceneDao().getAll().filter { it.projectId == projectId }.mapTo(sortedSetOf()) { it.id },
+        variableNames = db.variableDao().getAllInProject(projectId).mapTo(sortedSetOf()) { it.name },
+    )
 }
 
 private fun documentOf(entry: SemanticDiffEntry): SemanticDiffDocument = SemanticDiffDocument(listOf(entry))
+
+private data class ProjectMembership(
+    val taskIds: Set<Long>,
+    val profileIds: Set<Long>,
+    val sceneIds: Set<Long>,
+    val variableNames: Set<String>,
+) {
+    fun isEmpty(): Boolean = taskIds.isEmpty() && profileIds.isEmpty() && sceneIds.isEmpty() && variableNames.isEmpty()
+
+    fun contains(other: ProjectMembership): Boolean =
+        taskIds.containsAll(other.taskIds) &&
+            profileIds.containsAll(other.profileIds) &&
+            sceneIds.containsAll(other.sceneIds) &&
+            variableNames.containsAll(other.variableNames)
+}
+
+private fun ProjectDeletionSnapshot.membership(): ProjectMembership = ProjectMembership(
+    taskIds = taskIds.toSet(),
+    profileIds = profileIds.toSet(),
+    sceneIds = sceneIds.toSet(),
+    variableNames = variableNames.toSet(),
+)

@@ -79,6 +79,7 @@ import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.StorageDecodeResult
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
+import com.opentasker.core.storage.ProjectDeletionSnapshot
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
@@ -90,6 +91,7 @@ import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.VariableRepository
+import com.opentasker.core.storage.VariableEditHistoryIdentity
 import com.opentasker.core.storage.ProjectEntity
 import com.opentasker.core.storage.minimumTimestamp
 import com.opentasker.core.storage.loadPage
@@ -293,8 +295,14 @@ class ActiveAutomationViewModel(
     private val fallbackTaskSettings = FallbackTaskSettings(appContext)
     private val databaseBackupManager = DatabaseBackupManager(appContext, db)
     private val writeSettingsGuard = WriteSettingsGuard(db, appContext)
-    private val editHistoryTransitions =
-        EditHistoryTransitions(db, appContext, fallbackTaskSettings, locationDwellStateStore, writeSettingsGuard)
+    private val editHistoryTransitions = EditHistoryTransitions(
+        db,
+        appContext,
+        fallbackTaskSettings,
+        locationDwellStateStore,
+        writeSettingsGuard,
+        variableRepository,
+    )
 
     private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
         UiMessage(resId, args.toList())
@@ -998,25 +1006,54 @@ class ActiveAutomationViewModel(
         db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
     }
 
-    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage(R.string.ui_message_project_deleted) {
+    fun deleteProject(project: Project, targetProject: Project) = launchWithMessage(
+        successMessageRes = R.string.ui_message_project_deleted,
+        successAction = UiMessageAction.Undo(EditHistoryDao.TYPE_PROJECT, project.id),
+    ) {
         require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be deleted." }
         require(project.id != targetProject.id) { "Choose a different destination project." }
         // Mutation lock first, then the transaction: the reverse order deadlocks against the
         // engine's variable commit path.
         variableRepository.withMutationLock {
             db.withTransaction {
-                val sourceVariables = db.variableDao().getAllInProject(project.id)
-                val targetNames = db.variableDao().getAllInProject(targetProject.id).map { it.name }.toSet()
+                val currentProject = db.projectDao().getById(project.id)
+                    ?: throw IllegalStateException("Project no longer exists.")
+                val currentTarget = db.projectDao().getById(targetProject.id)
+                    ?: throw IllegalStateException("Destination project no longer exists.")
+                val sourceVariables = getAllStoredInProject(currentProject.id)
+                val targetNames = db.variableDao().getAllInProject(currentTarget.id).map { it.name }.toSet()
                 val collisions = sourceVariables.map { it.name }.filter { it in targetNames }
                 require(collisions.isEmpty()) {
                     "Reassignment would overwrite variables: ${collisions.joinToString()}. Rename or remove them first."
                 }
-                db.taskDao().reassignProject(project.id, targetProject.id)
-                db.profileDao().reassignProject(project.id, targetProject.id)
-                db.sceneDao().reassignProject(project.id, targetProject.id)
+                val snapshot = ProjectDeletionSnapshot(
+                    project = currentProject.toDomain(),
+                    targetProjectId = currentTarget.id,
+                    taskIds = db.taskDao().getAll()
+                        .filter { it.projectId == currentProject.id }
+                        .map { it.id }
+                        .sorted(),
+                    profileIds = db.profileDao().getAll()
+                        .filter { it.projectId == currentProject.id }
+                        .map { it.id }
+                        .sorted(),
+                    sceneIds = db.sceneDao().getAll()
+                        .filter { it.projectId == currentProject.id }
+                        .map { it.id }
+                        .sorted(),
+                    variableNames = sourceVariables.map { it.name }.sorted(),
+                )
+                recordDeletion(
+                    EditHistoryDao.TYPE_PROJECT,
+                    currentProject.id,
+                    StorageJson.encodeToString(snapshot),
+                )
+                db.taskDao().reassignProject(currentProject.id, currentTarget.id)
+                db.profileDao().reassignProject(currentProject.id, currentTarget.id)
+                db.sceneDao().reassignProject(currentProject.id, currentTarget.id)
                 // Secrets must be re-encrypted, not row-copied: their envelope binds the project id.
-                reassignProject(project.id, targetProject.id)
-                check(db.projectDao().deleteIfNotDefault(project.id) == 1) { "Project no longer exists." }
+                reassignProject(currentProject.id, currentTarget.id)
+                check(db.projectDao().deleteIfNotDefault(currentProject.id) == 1) { "Project no longer exists." }
             }
         }
     }
@@ -1954,6 +1991,10 @@ class ActiveAutomationViewModel(
     fun redoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = true)
     fun undoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = false)
     fun redoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = true)
+    fun undoLastVariableDelete(historyId: Long) = transitionEditAsync(EditHistoryDao.TYPE_VARIABLE, historyId, redo = false)
+    fun redoLastVariableDelete(historyId: Long) = transitionEditAsync(EditHistoryDao.TYPE_VARIABLE, historyId, redo = true)
+    fun undoLastProjectDelete(projectId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROJECT, projectId, redo = false)
+    fun redoLastProjectDelete(projectId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROJECT, projectId, redo = true)
 
     fun updateVariable(
         previousName: String?,
@@ -2037,12 +2078,15 @@ class ActiveAutomationViewModel(
 
     fun deleteVariable(name: String, successMessage: UiMessage, projectId: Long = DEFAULT_PROJECT_ID) {
         var deletedVariableBinding: String? = null
+        var deletedVariableHistoryId: Long? = null
         viewModelScope.launch {
             runCatching {
                 // Mutation lock first, then the transaction: the reverse order deadlocks against
                 // the engine's variable commit path.
                 variableRepository.withMutationLock {
                     db.withTransaction {
+                        val stored = getStored(name, projectId)
+                            ?: throw IllegalStateException("Variable '%$name' no longer exists.")
                         val variable = get(name, projectId)
                             ?: throw IllegalStateException("Variable '%$name' no longer exists.")
                         val (profiles, tasks, scenes) = loadDecodedAutomation()
@@ -2059,14 +2103,24 @@ class ActiveAutomationViewModel(
                                 listOf("%${variable.name}", sites),
                             )
                         }
+                        val historyId = VariableEditHistoryIdentity.entityId(stored.projectId, stored.name)
+                        recordDeletion(
+                            EditHistoryDao.TYPE_VARIABLE,
+                            historyId,
+                            StorageJson.encodeToString(stored),
+                        )
                         delete(variable.name, projectId)
+                        deletedVariableHistoryId = historyId
                         deletedVariableBinding = LocaleConditionGrantStore.variableKey(projectId, variable.name)
                     }
                 }
             }
                 .onSuccess {
                     deletedVariableBinding?.let { LocaleConditionGrantStore(appContext).revokeAllForBinding(it) }
-                    events.send(successMessage)
+                    val action = deletedVariableHistoryId?.let {
+                        UiMessageAction.Undo(EditHistoryDao.TYPE_VARIABLE, it)
+                    }
+                    events.send(successMessage.copy(action = action))
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_variable_delete)) }
         }

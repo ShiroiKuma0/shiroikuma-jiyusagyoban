@@ -240,6 +240,12 @@ class VariableRepository(
         suspend fun get(name: String, projectId: Long = DEFAULT_PROJECT_ID): Variable? =
             getLocked(name, projectId)
 
+        suspend fun getStored(name: String, projectId: Long = DEFAULT_PROJECT_ID): VariableEntity? =
+            getStoredLocked(name, projectId)
+
+        suspend fun getAllStoredInProject(projectId: Long): List<VariableEntity> =
+            getAllStoredInProjectLocked(projectId)
+
         suspend fun rename(previousName: String, variable: Variable) =
             renameLocked(previousName, variable)
 
@@ -248,8 +254,16 @@ class VariableRepository(
 
         suspend fun importVariable(variable: Variable) = importVariableLocked(variable)
 
+        suspend fun restoreStored(variable: VariableEntity) = restoreStoredLocked(variable)
+
         suspend fun reassignProject(fromProjectId: Long, toProjectId: Long) =
             reassignProjectLocked(fromProjectId, toProjectId)
+
+        suspend fun reassignProject(
+            variableNames: Set<String>,
+            fromProjectId: Long,
+            toProjectId: Long,
+        ) = reassignProjectLocked(fromProjectId, toProjectId, variableNames)
     }
 
     suspend fun get(name: String, projectId: Long = DEFAULT_PROJECT_ID): Variable? {
@@ -272,6 +286,24 @@ class VariableRepository(
         return entity?.let(::decodeForDomain)
     }
 
+    private suspend fun getStoredLocked(
+        name: String,
+        projectId: Long = DEFAULT_PROJECT_ID,
+    ): VariableEntity? {
+        migrateLegacySensitiveVariablesLocked()
+        val normalizedName = VariableNamePolicy.normalize(name) ?: return null
+        return if (projectId == DEFAULT_PROJECT_ID) {
+            dao.get(normalizedName)
+        } else {
+            dao.getInProject(normalizedName, projectId)
+        }
+    }
+
+    private suspend fun getAllStoredInProjectLocked(projectId: Long): List<VariableEntity> {
+        migrateLegacySensitiveVariablesLocked()
+        return dao.getAllInProject(projectId)
+    }
+
     /**
      * Moves every variable in [fromProjectId] to [toProjectId], re-encrypting secrets under the
      * destination project.
@@ -281,9 +313,35 @@ class VariableRepository(
      * secret becomes permanently unreadable. Failing to decrypt any secret aborts the move rather
      * than relocating an envelope that can never be opened.
      */
-    private suspend fun reassignProjectLocked(fromProjectId: Long, toProjectId: Long) {
+    private suspend fun reassignProjectLocked(
+        fromProjectId: Long,
+        toProjectId: Long,
+        selectedNames: Set<String>? = null,
+    ) {
+        require(fromProjectId != toProjectId) { "Variable source and destination projects must differ." }
         migrateLegacySensitiveVariablesLocked()
-        val moved = dao.getAllInProject(fromProjectId).map { entity ->
+        val source = if (selectedNames == null) {
+            dao.getAllInProject(fromProjectId)
+        } else {
+            val normalizedNames = selectedNames.map { name ->
+                VariableNamePolicy.normalize(name)
+                    ?: throw IllegalArgumentException("Invalid variable name '$name'.")
+            }.toSet()
+            require(normalizedNames.size == selectedNames.size) {
+                "Variable reassignment contains duplicate normalized names."
+            }
+            normalizedNames.sorted().map { name ->
+                dao.getInProject(name, fromProjectId)
+                    ?: throw IllegalStateException("Variable '%$name' is missing from the source project.")
+            }
+        }
+        val collisions = source.mapNotNull { entity ->
+            dao.getInProject(entity.name, toProjectId)?.let { entity.name }
+        }
+        require(collisions.isEmpty()) {
+            "Reassignment would overwrite variables: ${collisions.distinct().sorted().joinToString()}."
+        }
+        val moved = source.map { entity ->
             if (!entity.isEffectivelySecret()) return@map entity.copy(projectId = toProjectId)
             val plaintext = secretCodec.decrypt(entity.projectId, entity.name, entity.value)
                 .getOrElse {
@@ -298,7 +356,31 @@ class VariableRepository(
             )
         }
         if (moved.isNotEmpty()) dao.insertAll(moved)
-        dao.deleteAllInProject(fromProjectId)
+        if (selectedNames == null) {
+            dao.deleteAllInProject(fromProjectId)
+        } else {
+            source.forEach { entity -> dao.deleteByNameInProject(entity.name, fromProjectId) }
+        }
+    }
+
+    private suspend fun restoreStoredLocked(variable: VariableEntity) {
+        migrateLegacySensitiveVariablesLocked()
+        require(variable.projectId > 0L) { "Variable project id must be positive." }
+        require(VariableNamePolicy.normalize(variable.name) == variable.name) {
+            "Variable snapshot name is invalid."
+        }
+        check(dao.getInProject(variable.name, variable.projectId) == null) {
+            "Variable '%${variable.name}' already exists."
+        }
+        if (variable.isEffectivelySecret()) {
+            secretCodec.decrypt(variable.projectId, variable.name, variable.value)
+                .getOrElse {
+                    throw IllegalStateException(
+                        "Secret variable '%${variable.name}' could not be decrypted, so it was not restored.",
+                    )
+                }
+        }
+        dao.insertStrict(variable)
     }
 
     /** Stores an edited value under a new name and removes the old row as one mutation. */
