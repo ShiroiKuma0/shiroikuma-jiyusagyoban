@@ -128,6 +128,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "airplane.toggle",
     "mobile.toggle",
     "aod.set",
+    "wifi.scan",
     "screen.timeout",
     "dnd.set",
     "ringer.set",
@@ -686,6 +687,19 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
                 ActionField("state", R.string.catalog_action_airplane_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_airplane_toggle_field_state_hint, options = toggleOptions),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "wifi.scan",
+            nameRes = R.string.catalog_action_wifi_scan_name,
+            descriptionRes = R.string.catalog_action_wifi_scan_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("var", R.string.catalog_action_wifi_scan_field_var_label, FieldType.TEXT, required = false, hintRes = R.string.catalog_action_wifi_scan_field_var_hint),
+                ActionField("limit", R.string.catalog_action_wifi_scan_field_limit_label, FieldType.NUMBER, required = false, hintRes = R.string.catalog_action_wifi_scan_field_limit_hint, numberRule = integerRule(1, WifiScanAction.MAX_RESULTS.toLong())),
             )
         )
     )
