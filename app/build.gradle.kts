@@ -961,6 +961,128 @@ abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
 }
 
 /**
+ * Extracts every regex literal declared in production source into an asset the instrumented suite
+ * compiles on-device.
+ *
+ * Android's regex engine is ICU. It rejects patterns that desktop `java.util.regex` accepts, and
+ * this project has shipped that defect three separate times. A pattern in a `companion object` is
+ * the worst case: an ICU rejection there throws from the class initializer, so the entire enclosing
+ * class becomes unusable rather than one call failing. A JVM suite structurally cannot see any of
+ * it, because it runs against the desktop engine.
+ *
+ * Patterns containing a `$` template are recorded as skipped rather than dropped, because the build
+ * cannot resolve them and silently omitting them would make the corpus look complete.
+ */
+abstract class GenerateRegexCorpusTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputFiles
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val sources: org.gradle.api.file.ConfigurableFileCollection
+
+    @get:org.gradle.api.tasks.OutputDirectory
+    abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
+
+    @org.gradle.api.tasks.TaskAction
+    fun generate() {
+        val extracted = linkedSetOf<String>()
+        var skipped = 0
+
+        sources.files.filter { it.isFile && it.extension == "kt" }.sortedBy { it.path }.forEach { file ->
+            val text = file.readText()
+            forEachConstructorCall(text) { argumentStart ->
+                when (val literal = readStringLiteral(text, argumentStart)) {
+                    // The argument is a variable, a concatenation, or an interpolated template, so
+                    // the build cannot know the pattern. Counted, never silently dropped.
+                    null -> skipped++
+                    else -> extracted += literal
+                }
+            }
+        }
+
+        val output = outputDirectory.get().asFile
+        output.mkdirs()
+        output.resolve("production-regex-patterns.txt").writeText(
+            extracted.joinToString(separator = "\n", postfix = "\n") { it.replace("\n", "\\n") },
+        )
+        logger.lifecycle(
+            "Regex corpus: ${extracted.size} literal patterns, $skipped non-literal patterns skipped.",
+        )
+    }
+
+    /** Invokes [block] with the index of the first argument character of each regex construction. */
+    private fun forEachConstructorCall(text: String, block: (Int) -> Unit) {
+        listOf("Regex(", "Pattern.compile(").forEach { token ->
+            var index = text.indexOf(token)
+            while (index >= 0) {
+                // "MyRegex(" and "SafePattern.compile(" are different symbols.
+                val previous = text.getOrNull(index - 1)
+                val ownToken = previous == null ||
+                    (!previous.isLetterOrDigit() && previous != '_' && previous != '.')
+                if (ownToken) {
+                    var cursor = index + token.length
+                    while (cursor < text.length && text[cursor].isWhitespace()) cursor++
+                    block(cursor)
+                }
+                index = text.indexOf(token, index + 1)
+            }
+        }
+    }
+
+    /**
+     * Reads the Kotlin string literal starting at [start], or null when the argument is not a
+     * literal this build can resolve. Raw strings interpolate too, so a template in either form
+     * means the pattern is assembled at runtime.
+     */
+    private fun readStringLiteral(text: String, start: Int): String? {
+        val triple = "\"\"\""
+        if (text.startsWith(triple, start)) {
+            val end = text.indexOf(triple, start + triple.length)
+            if (end < 0) return null
+            val body = text.substring(start + triple.length, end)
+            return if (body.indices.any { isTemplateStart(body, it) }) null else body
+        }
+        if (text.getOrNull(start) != '"') return null
+
+        val builder = StringBuilder()
+        var index = start + 1
+        while (index < text.length) {
+            when (val character = text[index]) {
+                '"' -> return builder.toString()
+                '\n' -> return null
+                // A bare '$' is a regex end-anchor. Only '${'$'}name' and '${'$'}{...}' are templates,
+                // and treating every '$' as one silently dropped every anchored pattern.
+                '$' -> if (isTemplateStart(text, index)) return null else { builder.append(character); index++ }
+                '\\' -> {
+                    val escape = text.getOrNull(index + 1) ?: return null
+                    when (escape) {
+                        'n' -> { builder.append('\n'); index += 2 }
+                        't' -> { builder.append('\t'); index += 2 }
+                        'r' -> { builder.append('\r'); index += 2 }
+                        'b' -> { builder.append('\b'); index += 2 }
+                        'u' -> {
+                            if (index + 6 > text.length) return null
+                            builder.append(text.substring(index + 2, index + 6).toInt(16).toChar())
+                            index += 6
+                        }
+                        // For a regex the backslash is significant, so \\ \" \' each stand for
+                        // the escaped character itself.
+                        else -> { builder.append(escape); index += 2 }
+                    }
+                }
+                else -> { builder.append(character); index++ }
+            }
+        }
+        return null
+    }
+
+    /** True when the '$' at [index] begins a Kotlin string template rather than a regex anchor. */
+    private fun isTemplateStart(text: String, index: Int): Boolean {
+        if (text[index] != '$') return false
+        val next = text.getOrNull(index + 1) ?: return false
+        return next == '{' || next.isLetter() || next == '_'
+    }
+}
+
+/**
  * Release assets are what a user actually sees on the GitHub release page, and Obtainium matches
  * them by name. AGP's default output is `app-release.apk`, which is indistinguishable from an
  * unsigned CI artifact and identical across every version, so uploading it directly leaves users
@@ -1594,6 +1716,25 @@ val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyR
     stagingDirectory.set(releaseAssetStagingDirectory)
     truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
     versionName.set(appVersionName)
+}
+
+val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
+    group = "verification"
+    description = "Extracts production regex literals for the on-device ICU compilation test."
+    sources.from(layout.projectDirectory.dir("src/main/java").asFileTree.matching { include("**/*.kt") })
+    outputDirectory.set(layout.buildDirectory.dir("generated/regexCorpus"))
+}
+
+// Registering the directory through the variant API is what carries the task dependency. Adding it
+// to the static androidTest source set instead leaves lint and packaging reading a directory they
+// never declared they consume, which Gradle rejects as an implicit dependency.
+androidComponents {
+    onVariants { variant ->
+        variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(
+            generateRegexCorpus,
+            GenerateRegexCorpusTask::outputDirectory,
+        )
+    }
 }
 
 tasks.register("localQualityGate") {
