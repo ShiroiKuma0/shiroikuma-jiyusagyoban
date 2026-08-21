@@ -1,6 +1,12 @@
 package com.opentasker.core.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /** A floating UI overlay built from elements. */
 @Serializable
@@ -16,6 +22,7 @@ data class Scene(
 @Serializable
 data class SceneElement(
     val id: Long = 0,
+    @Serializable(with = SceneElementTypeSerializer::class)
     val type: SceneElementType,
     val xDp: Int,
     val yDp: Int,
@@ -26,9 +33,33 @@ data class SceneElement(
     val longPressTaskId: Long? = null,
 )
 
+/**
+ * Only the types the overlay can actually draw.
+ *
+ * Twelve more were declared (EDIT_TEXT, CHECKBOX, TOGGLE, NUMBER_PICKER, SPINNER, MAP, WEB, MENU,
+ * VIDEO, OVAL, RECTANGLE, DOODLE) but nothing ever rendered them: the editor refused to create
+ * them and the overlay drew a grey "unsupported" label. They were removed rather than translated.
+ */
 @Serializable
 enum class SceneElementType {
-    BUTTON, TEXT, EDIT_TEXT, CHECKBOX, TOGGLE, SLIDER,
-    NUMBER_PICKER, SPINNER, IMAGE, MAP, WEB, MENU, VIDEO,
-    OVAL, RECTANGLE, DOODLE,
+    BUTTON, TEXT, SLIDER, IMAGE,
+}
+
+/**
+ * Decodes a removed element type as [SceneElementType.TEXT] instead of failing the whole scene.
+ *
+ * A scene saved by an older build can name one of the twelve removed types. The element keeps its
+ * position, size and task bindings; its leftover config keys are ignored, and saving the scene
+ * again writes the fallback, so the migration is one-way and happens on first read.
+ */
+object SceneElementTypeSerializer : KSerializer<SceneElementType> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("com.opentasker.core.model.SceneElementType", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: SceneElementType) = encoder.encodeString(value.name)
+
+    override fun deserialize(decoder: Decoder): SceneElementType {
+        val raw = decoder.decodeString()
+        return SceneElementType.entries.firstOrNull { it.name == raw } ?: SceneElementType.TEXT
+    }
 }

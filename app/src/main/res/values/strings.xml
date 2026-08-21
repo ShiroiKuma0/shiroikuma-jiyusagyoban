@@ -1150,20 +1150,8 @@
     <string name="scenes_slider_summary">%1$s: %2$s (%3$s-%4$s)</string>
     <string name="scene_element_type_button">Button</string>
     <string name="scene_element_type_text">Text</string>
-    <string name="scene_element_type_edit_text">Editable text</string>
-    <string name="scene_element_type_checkbox">Checkbox</string>
-    <string name="scene_element_type_toggle">Toggle</string>
     <string name="scene_element_type_slider">Slider</string>
-    <string name="scene_element_type_number_picker">Number picker</string>
-    <string name="scene_element_type_spinner">Spinner</string>
     <string name="scene_element_type_image">Image</string>
-    <string name="scene_element_type_map">Map</string>
-    <string name="scene_element_type_web">Web content</string>
-    <string name="scene_element_type_menu">Menu</string>
-    <string name="scene_element_type_video">Video</string>
-    <string name="scene_element_type_oval">Oval</string>
-    <string name="scene_element_type_rectangle">Rectangle</string>
-    <string name="scene_element_type_doodle">Drawing</string>
 
     <string name="diagnostics_title">Diagnostics and engine health</string>
     <string name="diagnostics_summary_body">Inspect background delivery, captured crashes, and the bounded in-app log without connecting to a server.</string>
