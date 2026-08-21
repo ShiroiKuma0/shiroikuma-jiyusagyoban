@@ -39,8 +39,8 @@ internal enum class PackageArchiveMode(val verb: String) {
     UNARCHIVE("unarchive"),
 }
 
-@Suppress("NewApi")
 internal object PackageArchiveActionSupport {
+    @Suppress("NewApi")
     suspend fun run(
         ctx: ActionContext,
         args: Map<String, String>,

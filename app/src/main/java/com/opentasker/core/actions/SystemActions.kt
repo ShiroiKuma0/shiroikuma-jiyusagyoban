@@ -49,17 +49,13 @@ class VibrateAction : DeclaredAction(ActionCatalog.require("vibrate")) {
 /**
  * Reboot device.
  *
- * Args:
- *   - "mode": "recovery", "bootloader", or blank for normal reboot
+ * The Shizuku allowlist only admits a normal reboot. Metadata exposes no mode field, and
+ * imported leftover `mode` args are ignored rather than failing a mapped Tasker reboot.
  */
 class RebootAction : DeclaredAction(ActionCatalog.require("reboot")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val mode = args["mode"]?.ifBlank { null }
-        if (mode != null && mode != "normal") {
-            return ActionResult.Failure("Only normal reboot is available through the Shizuku allowlist")
-        }
-        ctx.logger("Reboot${mode?.let { " ($it)" } ?: ""}")
+        ctx.logger("Reboot")
         return ctx.runShizukuAction("reboot", "Reboot")
     }
 }
@@ -89,14 +85,13 @@ class ScreenOffAction : DeclaredAction(ActionCatalog.require("screen.off")) {
 /**
  * Turn on screen (wake device).
  *
- * Args:
- *   - "duration_sec": how long to keep screen on
+ * Shizuku sends a directional wake keyevent. There is no keep-awake duration on that path,
+ * so leftover `duration_sec` args are ignored rather than logged as if they were honoured.
  */
 class WakeAction : DeclaredAction(ActionCatalog.require("wake")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val dur = args["duration_sec"]?.toLongOrNull() ?: 10L
-        ctx.logger("Wake (${dur}s)")
+        ctx.logger("Wake")
         return ctx.runShizukuAction("wake", "Wake")
     }
 }

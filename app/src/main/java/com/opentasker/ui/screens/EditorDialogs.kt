@@ -85,6 +85,7 @@ import com.opentasker.core.templates.ProfileTemplateCatalog
 import com.opentasker.core.templates.BlueprintSelectorKind
 import com.opentasker.core.templates.TemplateAvailability
 import com.opentasker.core.templates.validationError
+import com.opentasker.core.transfer.BLUEPRINT_SECTION_KEY_PREFIX
 import com.opentasker.core.validation.InputValidation
 import com.opentasker.feature.automation.AutomationBlueprintInputField
 import com.opentasker.feature.automation.AutomationInputKeyboard
@@ -204,7 +205,7 @@ internal fun TemplateSlotDialog(
                     }
                 }
                 sections.forEach { (section, inputs) ->
-                    item(key = "blueprint-section-$section") {
+                    item(key = "$BLUEPRINT_SECTION_KEY_PREFIX$section") {
                         TextButton(
                             onClick = { collapsedSection = if (collapsedSection == section) null else section },
                             modifier = Modifier.fillMaxWidth(),
@@ -221,7 +222,7 @@ internal fun TemplateSlotDialog(
                         }
                     }
                     if (collapsedSection != section) {
-                        items(inputs, key = { it.key }) { input ->
+                        items(inputs, key = { "blueprint-input-${it.key}" }) { input ->
                             val selectorLabel = blueprintSelectorLabel(input.selector)
                             val bounds = listOfNotNull(
                                 input.minimum?.let { "≥ ${it.blueprintNumber()}" },

@@ -485,10 +485,7 @@ object TaskerXmlImporter {
             // URI, and making it fatal broke every device import (issue #5). Doctypes are
             // stripped or rejected in text by ImportResourceGuard.sanitizeTaskerXml before
             // this parser ever sees the input.
-            setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
-            setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
-            setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            applyImportHardening()
         }
         return factory.newDocumentBuilder().parse(InputSource(StringReader(rawXml)))
     }
@@ -564,11 +561,7 @@ object TaskerXmlImporter {
         getAttribute("sr").filter(Char::isDigit).toIntOrNull() ?: Int.MAX_VALUE
 
     private fun org.w3c.dom.NodeList.asElementList(): List<Element> =
-        (0 until length).mapNotNull { index -> item(index).takeIf { it.nodeType == Node.ELEMENT_NODE } as? Element }
-
-    private fun DocumentBuilderFactory.setFeatureSafely(name: String, value: Boolean) {
-        runCatching { setFeature(name, value) }
-    }
+            (0 until length).mapNotNull { index -> item(index).takeIf { it.nodeType == Node.ELEMENT_NODE } as? Element }
 
     private data class ParsedTaskerAction(
         val action: ActionSpec,

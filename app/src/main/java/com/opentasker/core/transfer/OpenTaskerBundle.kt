@@ -55,6 +55,7 @@ private val SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMAS =
 private fun projectVariableKey(projectId: Long, name: String): String = "$projectId:$name"
 private val BLUEPRINT_ID_PATTERN = Regex("^[a-z0-9][a-z0-9._-]{0,63}$")
 private val BLUEPRINT_INPUT_KEY_PATTERN = Regex("^[a-zA-Z][a-zA-Z0-9_-]{0,63}$")
+internal const val BLUEPRINT_SECTION_KEY_PREFIX = "blueprint-section-"
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
@@ -410,6 +411,9 @@ object OpenTaskerBundleCodec {
             blueprint.inputs.forEach { input ->
                 if (!input.key.matches(BLUEPRINT_INPUT_KEY_PATTERN) || input.label.isBlank() || input.section.isBlank()) {
                     warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}' has invalid metadata)."
+                }
+                if (input.key.startsWith(BLUEPRINT_SECTION_KEY_PREFIX)) {
+                    warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}' collides with the section-header key namespace)."
                 }
                 if (input.minimum != null && input.maximum != null && input.minimum > input.maximum) {
                     warnings += "Invalid blueprint '${blueprint.id}' (input '${input.key}' has reversed bounds)."
