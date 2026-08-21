@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
+[![Obtainium](https://img.shields.io/badge/Obtainium-add%20app-1c1c1c.svg)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.opentasker.app%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSysAdminDoc%2FOpenTasker%22%2C%22author%22%3A%22SysAdminDoc%22%2C%22name%22%3A%22OpenTasker%22%7D)
 
 **OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android.
 
@@ -182,6 +183,18 @@ Room DB (persistent storage + StateFlow live queries)
 ```
 
 No Hilt. manual dependency wiring via `OpenTaskerApp_NoHilt`. MVVM with Compose, Room, coroutines, DataStore, and WorkManager.
+
+---
+
+## Install
+
+There is no F-Droid or IzzyOnDroid listing yet, so releases come from this repository.
+
+**With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/OpenTasker` as a GitHub source. Default settings are correct, nothing needs configuring.
+
+**By hand:** download the APK from the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Release assets are named `OpenTasker-v<version>.apk`.
+
+Releases tagged `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. They predate the current signing key, carry versionCode 1, and cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. Only tags in the `v0.2.x` line are real.
 
 ---
 
