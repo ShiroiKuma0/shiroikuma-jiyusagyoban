@@ -302,6 +302,8 @@ MIT. see [LICENSE](LICENSE).
 
 Issues and pull requests welcome. Open an issue to discuss a feature before building it. the Non-goals above are settled, and everything else is fair game.
 
+[CONTRIBUTING.md](CONTRIBUTING.md) has the build and test commands, a map of where things live, and the source guards that will fail your build before a reviewer sees it.
+
 ### Translations
 
 OpenTasker supports localization. The current release ships English only; English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources have genuinely translated values; incomplete or empty locale directories are rejected by the release gate. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:

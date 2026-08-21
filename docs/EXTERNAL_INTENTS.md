@@ -1,0 +1,165 @@
+# External Automation Intents
+
+OpenTasker exposes a narrow broadcast receiver so other apps can trigger user-created automation without binding to internal services.
+
+## Security boundary
+
+Receiver: `com.opentasker.core.external.AutomationTargetReceiver`  
+Required permission: `com.opentasker.permission.AUTOMATION`
+
+The receiver is exported only behind this custom permission. Callers should send explicit broadcasts to the OpenTasker package and use ordered broadcasts when they need result extras.
+
+## Home Assistant Companion command vocabulary
+
+The `integration.home_assistant.webhook` action accepts the Home Assistant Companion envelope
+directly when its `message` and `data` fields are used:
+
+```json
+{
+  "message": "command_broadcast_intent",
+  "data": {
+    "intent_package_name": "com.opentasker.app",
+    "intent_action": "com.opentasker.action.RUN_TASK",
+    "intent_extras": "com.opentasker.extra.PROTOCOL_VERSION:2:int,com.opentasker.extra.TASK_ID:1:long"
+  }
+}
+```
+
+The command value and field names follow the [Home Assistant Companion notification command
+contract](https://companion.home-assistant.io/docs/notifications/notification-commands/). The
+raw `payload` field remains available for arbitrary webhook JSON and is mutually exclusive with
+`message`/`data`; `command_*` values are checked against the documented command vocabulary.
+
+Home Assistant's `command_broadcast_intent` is a payload message, not a replacement for
+OpenTasker's namespaced Android actions. OpenTasker keeps `RUN_TASK`, `SET_PROFILE_ENABLED`,
+`QUERY_STATUS`, and `QUERY_EXECUTION` unchanged, and protocol-v2 callers must still provide
+`com.opentasker.extra.PROTOCOL_VERSION=2`.
+
+## ntfy push and broadcast compatibility
+
+UnifiedPush JSON and the token-authenticated `com.opentasker.action.PUSH_EVENT` receiver accept
+ntfy's standard names `id`, `base_url`, `topic`, `title`, `time`, `encoding`, `content_type`,
+`tags`, `tags_map`, `priority`, `muted`, `muted_str`, `attachment_name`, `attachment_type`,
+`attachment_size`, and `attachment_expires`. The existing `eventId` and namespaced extras remain
+accepted as compatibility aliases.
+
+For a no-adapter ntfy notification action, publish an action whose intent is
+`com.opentasker.action.PUSH_EVENT` and whose string extras include:
+
+```text
+com.opentasker.extra.PUSH_TOKEN=<the per-install token>
+topic=<topic>
+id=<unique event id>
+```
+
+ntfy documents this as the `broadcast` action and supports `extras.<name>=<value>` in its short
+form. OpenTasker does not register the unauthenticated `io.heckel.ntfy.MESSAGE_RECEIVED` action:
+an arbitrary installed app could otherwise inject a push trigger. The message body is accepted
+for size accounting but is deliberately omitted from event metadata and logs; this is the one
+intentional divergence from ntfy's `message` extra. Click and attachment URLs are also omitted
+because they can contain credentials or remote identifiers. Use `topic`, `id`, `title`, `tags`,
+and the other bounded metadata fields for event matching.
+
+## Actions
+
+### Run a task (asynchronous, protocol v2)
+
+Action: `com.opentasker.action.RUN_TASK`
+
+Runs are **asynchronous**. The receiver authenticates and validates the request, hands the run to
+the foreground engine service, and replies immediately with an execution ID. It never waits for the
+task: Android expects broadcast work to finish in roughly 10 seconds while an OpenTasker task can
+wait up to 30 minutes, so a reply that carried the task's terminal result was reporting an outcome
+that had not happened yet — and the system could kill the receiver mid-run with no run-log entry.
+
+Callers **must** declare the protocol version. A request without it is refused with an explicit
+error naming the required extra, rather than being silently reinterpreted.
+
+Extras:
+
+| Extra | Type | Notes |
+|---|---|---|
+| `com.opentasker.extra.PROTOCOL_VERSION` | int | **Required**, must be `2`. |
+| `com.opentasker.extra.TASK_ID` | long | Preferred stable local ID. |
+| `com.opentasker.extra.TASK_NAME` | string | Case-insensitive fallback lookup. |
+| `com.opentasker.var.<Name>` | string-compatible | Optional task variables. Names must match `[A-Za-z][A-Za-z0-9_]{0,63}`. |
+
+Ordered-broadcast result extras:
+
+| Extra | Type | Notes |
+|---|---|---|
+| `com.opentasker.extra.PROTOCOL_VERSION` | int | The version this build speaks. |
+| `com.opentasker.extra.ACCEPTED` | boolean | `true` once the run is validated and enqueued. |
+| `com.opentasker.extra.EXECUTION_ID` | string | Poll this with `QUERY_EXECUTION`. |
+| `com.opentasker.extra.EXECUTION_STATE` | string | `ACCEPTED` on a successful request. |
+| `com.opentasker.extra.EXECUTION_TERMINAL` | boolean | Always `false` here — acceptance is not completion. |
+| `com.opentasker.extra.ERROR` | string, present on failure |  |
+
+The run appears in the normal Run Log with its usual redaction, sourced as `External intent`.
+
+### Query an execution
+
+Action: `com.opentasker.action.QUERY_EXECUTION`
+
+Extras:
+
+| Extra | Type | Notes |
+|---|---|---|
+| `com.opentasker.extra.EXECUTION_ID` | string | **Required**, from the `RUN_TASK` reply. |
+
+Ordered-broadcast result extras:
+
+| Extra | Type | Notes |
+|---|---|---|
+| `com.opentasker.extra.EXECUTION_STATE` | string | `ACCEPTED`, `RUNNING`, `SUCCEEDED`, `FAILED`, or `UNKNOWN`. |
+| `com.opentasker.extra.EXECUTION_TERMINAL` | boolean | `true` only for `SUCCEEDED`/`FAILED`. |
+| `com.opentasker.extra.TASK_SUCCESS` | boolean | Meaningful only once terminal. |
+| `com.opentasker.extra.TASK_DURATION_MS` | long |  |
+| `com.opentasker.extra.ERROR` | string | Present for `FAILED` and `UNKNOWN`. |
+
+Results are retained for the 64 most recent executions and survive a process restart. An execution
+that was in flight when the engine's process died resolves to `FAILED`, so a caller never polls a
+non-terminal state forever. An id that was never issued (or has aged out) reports `UNKNOWN`.
+
+### Set profile enabled state
+
+Action: `com.opentasker.action.SET_PROFILE_ENABLED`
+
+Extras:
+
+| Extra | Type | Notes |
+|---|---|---|
+| `com.opentasker.extra.PROFILE_ID` | long | Preferred stable local ID. |
+| `com.opentasker.extra.PROFILE_NAME` | string | Case-insensitive fallback lookup. |
+| `com.opentasker.extra.ENABLED` | boolean | Desired enabled state. |
+
+### Query status
+
+Action: `com.opentasker.action.QUERY_STATUS`
+
+Optional extras:
+
+| Extra | Type |
+|---|---|
+| `com.opentasker.extra.PROFILE_ID` | long |
+| `com.opentasker.extra.PROFILE_NAME` | string |
+
+Ordered-broadcast result extras include task/profile counts, enabled profile count, and profile-specific enabled/context state when a profile is found.
+
+## adb examples
+
+```bash
+adb shell am broadcast \
+  -a com.opentasker.action.RUN_TASK \
+  -p com.opentasker.app \
+  --el com.opentasker.extra.TASK_ID 1 \
+  --es com.opentasker.var.User "demo"
+```
+
+```bash
+adb shell am broadcast \
+  -a com.opentasker.action.SET_PROFILE_ENABLED \
+  -p com.opentasker.app \
+  --el com.opentasker.extra.PROFILE_ID 1 \
+  --ez com.opentasker.extra.ENABLED true
+```

@@ -54,10 +54,15 @@ build.sh
 *.md
 !/README.md
 !/CHANGELOG.md
+!/CONTRIBUTING.md
 
 # The local documentation tree is working notes, not published material. Publishing it is a
-# separate, deliberate decision; until then nothing under docs/ is tracked.
-docs/
+# separate, deliberate decision; until then only the files README.md links to are tracked.
+# This has to exclude the directory's *contents* rather than the directory itself: git cannot
+# re-include a file whose parent directory is excluded, so `docs/` plus a negation would leave
+# EXTERNAL_INTENTS.md ignored and the README link broken on github.com.
+docs/*
+!/docs/EXTERNAL_INTENTS.md
 
 # AI config
 AGENTS.md
