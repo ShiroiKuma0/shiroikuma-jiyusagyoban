@@ -446,3 +446,53 @@ class ScreenTimeoutAction : DeclaredAction(ActionCatalog.require("screen.timeout
         private const val MAX_SCREEN_TIMEOUT_MS = 1_800_000L // 30 minutes
     }
 }
+
+/**
+ * Turn the always-on display on or off.
+ *
+ * Args:
+ *   - "state": "on", "off", or "toggle"
+ *
+ * `settings put secure doze_always_on` returns a zero exit code on builds that do not implement
+ * the key, so writing it proves nothing. The value is read before and after the write and the
+ * action fails when the device did not actually change, rather than reporting a Success the user
+ * can see is false.
+ */
+class AlwaysOnDisplayAction : DeclaredAction(ActionCatalog.require("aod.set")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val state = args["state"]?.lowercase() ?: "toggle"
+        val current = readAlwaysOnDisplay(ctx)
+            ?: return ActionResult.Failure(
+                "This device does not expose the always-on display setting ($ALWAYS_ON_DISPLAY_KEY), so it cannot be changed.",
+            )
+        val target = when (state) {
+            "on" -> 1
+            "off" -> 0
+            "toggle" -> if (current == 1) 0 else 1
+            else -> return ActionResult.Failure("invalid always-on display state: $state")
+        }
+        ctx.logger("Always-on display: $state")
+        if (target == current) return ActionResult.Success
+
+        val result = ctx.runShizukuAction("aod.set", "Always-on display", if (target == 1) 0 else 1)
+        if (result !is ActionResult.Success) return result
+
+        val applied = readAlwaysOnDisplay(ctx)
+        return if (applied == target) {
+            ActionResult.Success
+        } else {
+            ActionResult.Failure(
+                "Always-on display is still ${if (applied == 1) "on" else "off"}; this build accepted the write and ignored it.",
+            )
+        }
+    }
+
+    private fun readAlwaysOnDisplay(ctx: ActionContext): Int? = runCatching {
+        Settings.Secure.getInt(ctx.app.contentResolver, ALWAYS_ON_DISPLAY_KEY)
+    }.getOrNull()
+
+    companion object {
+        internal const val ALWAYS_ON_DISPLAY_KEY = "doze_always_on"
+    }
+}

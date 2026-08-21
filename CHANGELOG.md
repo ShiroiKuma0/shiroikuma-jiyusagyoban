@@ -37,6 +37,7 @@
 
 ### Added
 
+- An always-on display action, so "turn AOD on while a notification is showing" can be automated. It writes the secure setting through the existing Shizuku transport with a pinned argv, and then reads the value back: plenty of OEM builds accept the write and ignore it, and this reports that as a failure instead of a green run-log row. A device that has no such setting at all says so rather than pretending.
 - The paste box accepts Tasker XML, not only OpenTasker JSON. Copy a task or profile out of Tasker, paste it in, and it opens the same review the document picker does: disabled by default, with the mapped, unsupported and lossy report. JSON paste is unchanged, and an oversize or DOCTYPE-carrying paste is still refused before anything reaches the database.
 - Diagnostics lists every scheduled worker with how its last run ended and when. Android 16 ties WorkManager quotas to the app standby bucket, so a user who rarely opens OpenTasker can drop into `rare` or `restricted` and have automations stop with nothing to look at. Each worker now records its own outcome, and a stop the platform decided ("out of run quota for the standby bucket", "app standby bucket") reads differently from a normal finish and from a failure. The same rows go into the diagnostic export.
 - An Install section in the README, with an Obtainium badge that adds this repository as a source in one tap. It also says plainly that the `v0.3.0`, `v0.4.1` and `v0.4.2` releases are dead: they predate the current signing key, carry versionCode 1, and cannot be upgraded in place.
