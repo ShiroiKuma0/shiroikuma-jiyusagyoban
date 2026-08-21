@@ -54,6 +54,10 @@ class LocalizationSourceTest {
             "placeholder text literal" to Regex("""placeholder\s*=\s*\{\s*Text\s*\(\s*""" + "\""),
             "body argument literal" to Regex("""\bbody\s*=\s*""" + "\""),
             "values argument literal" to Regex("""\bvalues\s*=\s*""" + "\""),
+            // Helpers like InspectorStatusPill(label = "...") never matched Text("...").
+            "label assignment literal" to Regex("""\blabel\s*=\s*""" + "\""),
+            "share-sheet subject literal" to Regex("""EXTRA_SUBJECT\s*,\s*""" + "\""),
+            "share-sheet chooser literal" to Regex("""createChooser\s*\([^)]*,\s*""" + "\""),
         )
 
         // Every presentation file under ui/screens is scanned, not just a hand-written list:

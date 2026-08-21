@@ -547,7 +547,7 @@ private fun RunLogCard(
         RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
     val sourceText = entry.source?.let { key ->
-        val name = RunLogSource.displayName(key)
+        val name = runLogSourceName(key)
         entry.sourceLabel?.let { "$name: $it" } ?: name
     } ?: diagnostics.source
     Card(
@@ -1056,6 +1056,25 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
         .map { (taskId, entries) -> taskId to (taskNames[taskId] ?: entries.first().taskName) }
         .sortedWith(compareBy<Pair<Long, String>> { it.second.lowercase() }.thenBy { it.first })
 }
+
+@Composable
+private fun runLogSourceName(key: String): String = stringResource(
+    when (key) {
+        RunLogSource.PROFILE -> R.string.run_log_source_profile
+        RunLogSource.EXTERNAL_INTENT -> R.string.run_log_source_external_intent
+        RunLogSource.QUICK_SETTINGS_TILE -> R.string.run_log_source_quick_settings_tile
+        RunLogSource.MANUAL_RUN -> R.string.run_log_source_manual_run
+        RunLogSource.NOTIFICATION_ACTION -> R.string.run_log_source_notification_action
+        RunLogSource.WIDGET -> R.string.run_log_source_widget
+        RunLogSource.SHORTCUT -> R.string.run_log_source_shortcut
+        RunLogSource.LOCALE_PLUGIN -> R.string.run_log_source_locale_plugin
+        RunLogSource.SCENE_OVERLAY -> R.string.run_log_source_scene_overlay
+        RunLogSource.APP_FUNCTION -> R.string.run_log_source_app_function
+        RunLogSource.SCHEDULER -> R.string.run_log_source_scheduler
+        RunLogSource.OTHER -> R.string.run_log_source_other
+        else -> R.string.run_log_source_unknown
+    },
+)
 
 @Composable
 private fun RunLogOutcome.localizedLabel(): String = stringResource(

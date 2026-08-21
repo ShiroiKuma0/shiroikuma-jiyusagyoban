@@ -4,28 +4,37 @@
 
 ### Fixed
 
+- Sunrise and sunset windows fire once per occurrence instead of once a minute. The matcher now stamps a stable `eventId` on the matched window so later ticks in the same window are treated as the same pulse. An exact-minute sun context still fires on its minute.
+- Locale plugin setting broadcasts fail closed when the plugin's receiver requires a permission OpenTasker does not hold. Android drops those broadcasts with no exception, and the action used to log Success anyway. Condition queries use the same delivery check. The send path still uses the one-argument `sendBroadcast(intent)` after that check; the two-argument overload would have required the plugin to hold OpenTasker's permission instead of the other way around.
+- A sunrise or sunset window that wraps midnight still counts as one occurrence. Identity uses the date of the window start, so ticks after 00:00 do not start a second pulse.
+- Enabling or running a profile that uses `brightness.set` or `screen.timeout` now stops at Setup when Modify system settings is missing, instead of logging a Failure row that looked like an engine bug.
+- Wake and reboot no longer read arguments their editors cannot offer. Leftover `duration_sec` and `mode` values were logged or rejected as if the UI supported them.
+- Imported blueprint input keys that collide with the template dialog's section-header keys are rejected, and the dialog namespaces its own row keys so Compose cannot crash on a duplicate.
+- The Context Inspector empty-state pill, diagnostic share sheet, document-open errors, Run Log source labels, and import-review "N more" line resolve through string resources. `LocalizationSourceTest` now flags `label = "..."`, share-sheet subjects, and chooser titles.
+- The Setup theme menu exposes radio-button semantics for the selected mode.
+- The Variables summary no longer shows empty-state copy when variables already exist. A non-secret value typed in the editor survives rotation without putting secrets into saved instance state.
 - Locale plugin actions no longer report Success for outcomes they never observed. A condition query whose plugin timed out or answered `RESULT_CONDITION_UNKNOWN` used to produce a green run-log row, because the unknown state fell through the same branch as a genuine "no". Unknown now fails the action, and the run-log trace distinguishes it from an unsatisfied condition. The reported state is still written to the result variable first, so an automation using continue-on-error can branch on it.
 - A `timeoutMs` that isn't a whole number of milliseconds now fails a Locale plugin action instead of silently reverting to the five second default.
 - A dispatched Locale setting says in the run log that delivery is unconfirmed. The Locale protocol has no acknowledgement for `FIRE_SETTING`, so nothing about the plugin acting on it was ever observed.
-
 - Reordering an action from its overflow menu now announces which action moves. The menu items had been left with only "Move up" and "Move down" after the workspace redesign, so a screen reader gave no way to tell one row's controls from another's.
 - The Run Log export buttons are reachable on narrow devices. They sit in a lazily composed row, so on a phone the ones past the right edge were never composed.
 - Migrating a pre-v9 database no longer leaves a residual column default on the profiles table, which Room's schema identity check rejected.
 
 ### Security
 
+- Tasker XML import, the XML budget preflight, and `data.read` XML parsing share one best-effort factory hardener, so a later copy cannot quietly go fatal on Android's Expat factory again.
 - `org.bouncycastle` moves from 1.79 to 1.85, clearing CVE-2025-14813 (Critical), CVE-2026-5588 and CVE-2026-0636. It is a test-only dependency, so nothing reached the APK, but the advisory was live against the repository.
 - SQLCipher moves from 4.15.0 to 4.17.0, picking up SQLite 3.53.3 and a fix for mlock warning-log spam on Android.
 
 ### Changed
 
+- Package-archive API 35 calls keep a method-scoped NewApi suppress instead of silencing the whole helper object.
 - The UnifiedPush connector moves off the `3.3.4-rc1` release candidate to `3.3.4` stable, which shipped since the pin was made. No pre-release artifact remains on the release runtime classpath.
 - `androidx.tracing` 1.2.0 to 1.3.0 and `androidx.core` 1.18.0 to 1.19.0.
 
 ### Added
 
 - An instrumented test compiles every regex literal declared in production source against Android's ICU engine. `:app:generateRegexCorpus` extracts the patterns into an androidTest asset, and the test fails on any the device rejects. Three shipped defects came from patterns that compile on a desktop JVM and do not on Android, and a JVM suite structurally cannot see them.
-
 - `CONTRIBUTING.md`, with the build and test commands, a map of the package layout, and the source guards that fail a build before review.
 - `docs/EXTERNAL_INTENTS.md` is now tracked, so the README's only documentation link resolves on github.com instead of 404ing. `:app:verifyDocumentationTruth` fails when the README links to a path that is missing or untracked.
 - Store listing icon and feature graphic at the Fastlane paths IzzyOnDroid reads, rendered from the shipped adaptive icon by `tools/render-store-assets.py`. `:app:verifyFdroidMetadata` now fails when either is missing or the wrong size.

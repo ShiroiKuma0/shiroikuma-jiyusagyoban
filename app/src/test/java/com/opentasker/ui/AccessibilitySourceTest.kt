@@ -135,6 +135,7 @@ class AccessibilitySourceTest {
         val requiredMarkersByFile = mapOf(
             "screens/PermissionOnboardingScreen.kt" to listOf(
                 "role = Role.RadioButton",
+                "selected = mode == currentMode",
                 "stateDescription = selectionDescription",
                 "R.string.a11y_option_selected",
                 "R.string.status_granted",
@@ -147,6 +148,7 @@ class AccessibilitySourceTest {
                 "enabled = canSave",
                 "R.string.ui_info_content_description",
                 "R.string.delete_undo_helper",
+                "blueprint-input-",
             ),
             "screens/ImportedProfileRiskDialog.kt" to listOf(
                 "Checkbox(checked = acknowledged",

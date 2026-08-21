@@ -854,7 +854,7 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 InspectorStatusPill(
-                    label = "Waiting for sources",
+                    label = stringResource(R.string.inspector_waiting_for_sources),
                     color = MaterialTheme.colorScheme.primary,
                 )
             }

@@ -253,7 +253,11 @@ private fun VariableSummaryCard(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        stringResource(R.string.empty_variables_body),
+                        if (totalCount == 0) {
+                            stringResource(R.string.empty_variables_body)
+                        } else {
+                            stringResource(R.string.variables_summary_body)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -392,8 +396,15 @@ private fun VariableEditorDialog(
     var name by rememberSaveable(stateKey) { mutableStateOf(variable?.name.orEmpty()) }
     // Never place plaintext secrets in Android saved-instance state.
     var value by remember(stateKey) { mutableStateOf(variable?.value.orEmpty()) }
+    var nonSecretDraft by rememberSaveable(stateKey) { mutableStateOf<String?>(null) }
     var isSecret by rememberSaveable(stateKey) { mutableStateOf(variable?.isSecret == true) }
     var revealed by remember(stateKey) { mutableStateOf(false) }
+    LaunchedEffect(stateKey, isSecret) {
+        val draft = nonSecretDraft
+        if (!isSecret && draft != null) {
+            value = draft
+        }
+    }
     val normalizedName = VariableNamePolicy.promoteToGlobal(name)
     val duplicateName = normalizedName != null &&
         normalizedName != variable?.name &&
@@ -440,7 +451,10 @@ private fun VariableEditorDialog(
                 }
                 OutlinedTextField(
                     value = value,
-                    onValueChange = { value = it.take(AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES) },
+                    onValueChange = {
+                        value = it.take(AesGcmVariableSecretCodec.MAX_SECRET_PLAINTEXT_BYTES)
+                        if (!isSecret) nonSecretDraft = value
+                    },
                     label = {
                         Text(
                             stringResource(
@@ -485,6 +499,7 @@ private fun VariableEditorDialog(
                         onCheckedChange = {
                             isSecret = it
                             revealed = false
+                            nonSecretDraft = if (it) null else value
                         },
                     )
                 }
