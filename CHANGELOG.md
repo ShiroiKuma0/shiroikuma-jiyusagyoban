@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- Locale plugin actions no longer report Success for outcomes they never observed. A condition query whose plugin timed out or answered `RESULT_CONDITION_UNKNOWN` used to produce a green run-log row, because the unknown state fell through the same branch as a genuine "no". Unknown now fails the action, and the run-log trace distinguishes it from an unsatisfied condition. The reported state is still written to the result variable first, so an automation using continue-on-error can branch on it.
+- A `timeoutMs` that isn't a whole number of milliseconds now fails a Locale plugin action instead of silently reverting to the five second default.
+- A dispatched Locale setting says in the run log that delivery is unconfirmed. The Locale protocol has no acknowledgement for `FIRE_SETTING`, so nothing about the plugin acting on it was ever observed.
+
 - Reordering an action from its overflow menu now announces which action moves. The menu items had been left with only "Move up" and "Move down" after the workspace redesign, so a screen reader gave no way to tell one row's controls from another's.
 - The Run Log export buttons are reachable on narrow devices. They sit in a lazily composed row, so on a phone the ones past the right edge were never composed.
 - Migrating a pre-v9 database no longer leaves a residual column default on the profiles table, which Room's schema identity check rejected.
