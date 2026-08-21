@@ -1445,6 +1445,26 @@ tasks.register("verifyFdroidMetadata") {
             "F-Droid changelog $appVersionCode.txt exceeds $FDROID_CHANGELOG_MAX_CHARS characters"
         }
 
+        // IzzyOnDroid reads the Fastlane tree directly and will not list an app whose icon or
+        // feature graphic is absent, so the listing assets are part of the release contract rather
+        // than something to discover at submission time. Dimensions are checked because a wrongly
+        // sized graphic is rejected just as hard as a missing one.
+        listOf(
+            Triple("images/icon.png", 512, 512),
+            Triple("images/featureGraphic.png", 1024, 500),
+        ).forEach { (path, expectedWidth, expectedHeight) ->
+            val image = listing.resolve(path)
+            check(image.isFile) {
+                "F-Droid store listing is missing $path; IzzyOnDroid requires it to list the app"
+            }
+            val decoded = javax.imageio.ImageIO.read(image)
+            checkNotNull(decoded) { "F-Droid store listing asset $path is not a readable image" }
+            check(decoded.width == expectedWidth && decoded.height == expectedHeight) {
+                "F-Droid store listing asset $path is ${decoded.width}x${decoded.height}; expected " +
+                    "${expectedWidth}x$expectedHeight"
+            }
+        }
+
         // Screenshots are captured per release. Pinning the capture to a version code is what makes
         // a stale listing fail the build instead of quietly showing an old UI on the store page.
         val screenshotDir = listing.resolve("images/phoneScreenshots")
