@@ -92,6 +92,22 @@ data class LocalePluginDescriptor(
     val conditionReceiverPermissions: List<String> = emptyList(),
 )
 
+/**
+ * Whether a Locale `FIRE_SETTING` / `QUERY_CONDITION` broadcast can actually be delivered.
+ *
+ * A receiver `android:permission` is a sender requirement. After confirming the sender holds
+ * that permission, the host must call `sendBroadcast(intent)` with no receiver-permission
+ * argument: the two-arg overload requires *receivers* to hold the permission, which would
+ * drop a deliverable Locale fire and still look like Success.
+ */
+internal object LocaleSettingDispatch {
+    fun allowed(requiredPermission: String?, senderHoldsPermission: Boolean): Boolean =
+        requiredPermission.isNullOrBlank() || senderHoldsPermission
+
+    fun missingPermissionMessage(permission: String): String =
+        "Locale plugin setting requires $permission, which OpenTasker does not hold."
+}
+
 /** Package/component queries used by the host and discovery surfaces. */
 interface LocalePluginComponentResolver {
     fun editActivities(packageName: String, action: String): List<ComponentName>
@@ -126,10 +142,14 @@ private class AndroidLocalePluginTransport(
     private val dispatcher: CoroutineDispatcher,
 ) : LocalePluginTransport {
     override suspend fun sendSetting(intent: Intent) {
-        withContext(dispatcher) { appContext.sendBroadcast(intent) }
+        withContext(dispatcher) {
+            requireDeliverable(intent)
+            appContext.sendBroadcast(intent)
+        }
     }
 
     override suspend fun queryCondition(intent: Intent): Int = withContext(dispatcher) {
+        requireDeliverable(intent)
         suspendCancellableCoroutine { continuation ->
             val resultReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context, intent: Intent?) {
@@ -145,6 +165,23 @@ private class AndroidLocalePluginTransport(
                 null,
                 null,
             )
+        }
+    }
+
+    private fun requireDeliverable(intent: Intent) {
+        val component = intent.component
+            ?: throw IllegalStateException("Locale plugin broadcast has no target component.")
+        val permission = runCatching {
+            appContext.packageManager.getReceiverInfo(component, 0).permission
+        }.getOrElse { error ->
+            throw SecurityException(
+                "Locale plugin receiver ${component.flattenToShortString()} could not be inspected: ${error.message}",
+            )
+        }?.takeIf { it.isNotBlank() }
+        val holds = permission == null ||
+            appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        if (!LocaleSettingDispatch.allowed(permission, holds)) {
+            throw SecurityException(LocaleSettingDispatch.missingPermissionMessage(permission.orEmpty()))
         }
     }
 }
@@ -372,8 +409,12 @@ class LocalePluginHost private constructor(
         )
 
         return withTimeout(request.timeoutMs) {
-            transport.sendSetting(intent)
-            LocalePluginResult(true, "Locale plugin setting dispatched to ${component.flattenToShortString()}.")
+            try {
+                transport.sendSetting(intent)
+                LocalePluginResult(true, "Locale plugin setting dispatched to ${component.flattenToShortString()}.")
+            } catch (error: SecurityException) {
+                LocalePluginResult(false, error.message ?: "Locale plugin setting was not deliverable.")
+            }
         }
     }
 
