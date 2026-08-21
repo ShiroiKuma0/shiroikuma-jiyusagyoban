@@ -83,7 +83,7 @@
          <trusted-key id="54A26BFDC7ECDD39BA4C123AC3BAB45F4AF71FAB" group="io.opencensus" name="opencensus-proto" version="0.2.0" />
          <trusted-key id="5897253BEA3046AEEA95A067E93671C7272B7B3F" group="org.jdom" name="jdom2" version="2.0.6" />
          <trusted-key id="600EA202B1EC682F4A788E5AAC7A514BC9F9BB70" group="io.opencensus" name="opencensus-api" version="0.31.0" />
-         <trusted-key id="61DEBD732F3F07771269972E2F87304808D40CEC" group="net.zetetic" name="sqlcipher-android" version="4.15.0" />
+         <trusted-key id="61DEBD732F3F07771269972E2F87304808D40CEC" group="net.zetetic" name="sqlcipher-android" version="4.17.0" />
          <trusted-key id="694621A7227D8D5289699830ABE9F3126BB741C1" group="^com[.]google($|([.].*))" regex="true" />
          <trusted-key id="696B6199A2A9D8C29CE78CC0D041CAD2E452550F" group="com.google.protobuf" />
          <trusted-key id="6DD3B8C64EF75253BEB2C53AD908A43FB7EC07AC" group="jakarta.activation" />
@@ -99,6 +99,7 @@
          <trusted-key id="7F0C6700F82B97092092AFF84DA93C0B57A98B11" group="org.unifiedpush.android" />
          <trusted-key id="7F36E793AE3252E5D9E9B98FEE9E7DC9D92FC896" group="com.google.errorprone" />
          <trusted-key id="8461EFA0E74ABAE010DE66994EB27DB2A3B88B8B">
+            <trusting group="androidx.annotation" name="annotation-jvm" version="1.7.0" />
             <trusting group="androidx.emoji2" />
             <trusting group="androidx.lifecycle" />
             <trusting group="androidx.tracing" />
@@ -223,6 +224,11 @@
          </artifact>
          <artifact name="annotation-jvm-1.10.0.module">
             <sha256 value="42afca374194273e4067b937cfc447bd3c8c4fd441f41d44f954050dfd6106dd" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.annotation" name="annotation-jvm" version="1.7.0">
+         <artifact name="annotation-jvm-1.7.0.module">
+            <sha256 value="07ce60c377ab94e47c8c902589b9776030064fd1a7e4d5a01a38d700e35e5db4" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.annotation" name="annotation-jvm" version="1.8.1">
@@ -1726,12 +1732,12 @@
             <sha256 value="a67c52c9ddfaff2ffb2fd4b97cd94fa382e837ea8a5874d029e0a04fa63e5caf" origin="OpenTasker: Google Maven direct artifact SHA-256 (no upstream .sha256/.asc)" />
          </artifact>
       </component>
-      <component group="androidx.core" name="core" version="1.18.0">
-         <artifact name="core-1.18.0.aar">
-            <sha256 value="311d83ac67d394076ec21d12ed2d10a44b59cb2929b7dce00e5a90a93842e37d" origin="OpenTasker: Google Maven published .sha256" />
+      <component group="androidx.core" name="core" version="1.19.0">
+         <artifact name="core-1.19.0.aar">
+            <sha256 value="55445ad0ff025963929892569a0bfc6b4c68e60d8b7c965dcffba09048c36c8e" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
-         <artifact name="core-1.18.0.module">
-            <sha256 value="b67ff7a1f9be95687dfa86d6055147fc1d8bbe3b1dc19048c432afca18abfd95" origin="OpenTasker: Google Maven published .sha256" />
+         <artifact name="core-1.19.0.module">
+            <sha256 value="54a4e456f3f7110e91a3d30196cadd98a7478691679f5d63f2c4023a48d2ec61" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.core" name="core" version="1.9.0">
@@ -1742,12 +1748,12 @@
             <sha256 value="8674ade1d12962469dd2d1e6edc03b465f20d180b0840a129bc40b351e8651d1" origin="OpenTasker: Google Maven published .sha256" reason="Artifact is not signed" />
          </artifact>
       </component>
-      <component group="androidx.core" name="core-ktx" version="1.18.0">
-         <artifact name="core-ktx-1.18.0.aar">
-            <sha256 value="c7c511e3df838fcbcb61ace36944de6bb7c10eb597be546974f001119939c85d" origin="OpenTasker: Google Maven published .sha256" />
+      <component group="androidx.core" name="core-ktx" version="1.19.0">
+         <artifact name="core-ktx-1.19.0.aar">
+            <sha256 value="db1ae24b15c36358ad46497d561b19c325642565432d56479ebe47ee3baa0d7e" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
-         <artifact name="core-ktx-1.18.0.module">
-            <sha256 value="3fa579c11de0f6f378002c0f0bb4bbe71100634f80f8b282951789ea7d0fb849" origin="OpenTasker: Google Maven published .sha256" />
+         <artifact name="core-ktx-1.19.0.module">
+            <sha256 value="b46244e8f5b84fadef9a4c7a033af640836da52cd1b6e19fbda58f28be1383f9" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.core" name="core-viewtree" version="1.0.0">
@@ -3002,12 +3008,17 @@
             <sha256 value="b1fed4309623b6f20bc817d8fbd70e4ea7085e40647694cd399ae58d2f0049e3" origin="OpenTasker: Google Maven published .sha256" reason="Artifact is not signed" />
          </artifact>
       </component>
-      <component group="androidx.tracing" name="tracing" version="1.2.0">
-         <artifact name="tracing-1.2.0.aar">
-            <sha256 value="6faa90390d1fdbf0adb9a99bf99de67b94c6c6f35aea9510593a9d17973736a2" origin="OpenTasker: Google Maven published .sha256" />
+      <component group="androidx.tracing" name="tracing" version="1.3.0">
+         <artifact name="tracing-1.3.0.module">
+            <sha256 value="c71f72783bef73e04af227e760e7fe4ded5a0f753297315450aa1acf97cca725" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
-         <artifact name="tracing-1.2.0.module">
-            <sha256 value="d0d8d486b6bd33206dbf3f1a6d167e9b43c268ea63c3321c886b1543ad05ece3" origin="OpenTasker: Google Maven published .sha256" />
+      </component>
+      <component group="androidx.tracing" name="tracing-android" version="1.3.0">
+         <artifact name="tracing-android-1.3.0.module">
+            <sha256 value="25fae2192a5a9e7dc85fdf7be1e4dec02dad641cdf63f8de4627888561a85dca" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="tracing-android-1.3.0.aar">
+            <sha256 value="f59782bbe3470a6b0c531cef262dd1fc9d9a0233490bb5e6d553e1fe6a1816b2" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.tracing" name="tracing-ktx" version="1.0.0">
@@ -5658,12 +5669,12 @@
             <sha256 value="31ce606f4e9518936299bb0d27c978fa61e185fd1de7c9874fe959a53e34a685" origin="OpenTasker: Maven Central direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
          </artifact>
       </component>
-      <component group="net.zetetic" name="sqlcipher-android" version="4.15.0">
-         <artifact name="sqlcipher-android-4.15.0.aar">
-            <sha256 value="480c9176aecbc8a3a7bd98441372bba5ad9482f57e54c5734b9a7e97a39971d8" origin="OpenTasker: Maven Central published .sha256" />
+      <component group="net.zetetic" name="sqlcipher-android" version="4.17.0">
+         <artifact name="sqlcipher-android-4.17.0.aar">
+            <sha256 value="44fc40c33d1de597c8339072a71fa0ff20e12d01ab352d6abe4ad5df668ead94" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
-         <artifact name="sqlcipher-android-4.15.0.module">
-            <sha256 value="ea493ef16dcb8807365b8ad61c3810feac4ea4b9ef2e279615a4b0a8685b3e6a" origin="OpenTasker: Maven Central published .sha256" />
+         <artifact name="sqlcipher-android-4.17.0.module">
+            <sha256 value="d6a51f3d869179fb2ab5f1968a51884a127823bcd3ccb1f070d1f0ddeae62537" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="org.apache" name="apache" version="13">
@@ -5811,28 +5822,28 @@
             <sha256 value="bad024180a1b469cbd94e5f2db12841bcac5443d9545607f673cfde677c1d872" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
-      <component group="org.bouncycastle" name="bcpkix-jdk18on" version="1.79">
-         <artifact name="bcpkix-jdk18on-1.79.jar">
-            <sha256 value="3639a24ddf9ba4b7eba0659b44770e91eba816421888e571f285aadefe532cd6" origin="OpenTasker: Maven Central published .sha256" />
+      <component group="org.bouncycastle" name="bcpkix-jdk18on" version="1.85">
+         <artifact name="bcpkix-jdk18on-1.85.jar">
+            <sha256 value="c9f82b2d4e99c4bbdfccf684e52cc06ea06a0b567bfd0d08f9c5a3f417055996" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
-         <artifact name="bcpkix-jdk18on-1.79.pom">
-            <sha256 value="35e49f4134de2ac326c3a50a25762cbb4db56f3802fa3f730cc85b653ad0987b" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-      </component>
-      <component group="org.bouncycastle" name="bcprov-jdk18on" version="1.79">
-         <artifact name="bcprov-jdk18on-1.79.jar">
-            <sha256 value="0d81ecc3124536b539bce9aa3fe9621b7f84c9cee371b635a5b31c78b79ab1da" origin="OpenTasker: Maven Central published .sha256" />
-         </artifact>
-         <artifact name="bcprov-jdk18on-1.79.pom">
-            <sha256 value="d8f1a06b149d746e9d98de54e2f7aa9b2eb613fb35ca67d8ae396ceaac661ee4" origin="OpenTasker: Maven Central published .sha256" />
+         <artifact name="bcpkix-jdk18on-1.85.pom">
+            <sha256 value="9b052b0cb85cb7d8bb0956afcc74f31c814f1c67e03498e1ca74f8fe8611d957" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
-      <component group="org.bouncycastle" name="bcutil-jdk18on" version="1.79">
-         <artifact name="bcutil-jdk18on-1.79.jar">
-            <sha256 value="c70b88ada58938cbc2f005d40329054078bcfa1149e6ffc03e9242eb6ab21836" origin="OpenTasker: Maven Central published .sha256" />
+      <component group="org.bouncycastle" name="bcprov-jdk18on" version="1.85">
+         <artifact name="bcprov-jdk18on-1.85.jar">
+            <sha256 value="20af26bf6060bb8005cc2389916812c1e0e998dc48d2ced7131b89461b54cff7" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
-         <artifact name="bcutil-jdk18on-1.79.pom">
-            <sha256 value="e24c1fb4cf1605405a6988e9e4d6e4b2e1f4393fc73a89a9452ae625ee311d02" origin="OpenTasker: Maven Central published .sha256" />
+         <artifact name="bcprov-jdk18on-1.85.pom">
+            <sha256 value="a48e978d6b24c183c4832f5c49d71c1f84156b99c6fa9a410aafb373a254be7c" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+      </component>
+      <component group="org.bouncycastle" name="bcutil-jdk18on" version="1.85">
+         <artifact name="bcutil-jdk18on-1.85.jar">
+            <sha256 value="590f55ed5d68529239898a4a5c4f730b6e37f45d1cfa3fbe51f8485abe32c42d" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+         <artifact name="bcutil-jdk18on-1.85.pom">
+            <sha256 value="9f1c79a12a7c03d78860e05750dcc44e855e20205c7af7cffbf29a69448d85ea" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="org.checkerframework" name="checker-compat-qual" version="2.5.5">
@@ -8025,12 +8036,12 @@
             <sha256 value="0fe31326e83b7622cbcd9c75d467b291f01ffe3cc6e3e76651ac05a1c1c7a360" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
          </artifact>
       </component>
-      <component group="org.unifiedpush.android" name="connector" version="3.3.4-rc1">
-         <artifact name="connector-3.3.4-rc1.aar">
-            <sha256 value="1a9b0abf477ef95d91923925a2e43ff6039b1f3a4bf5e880c917a96ba9fbfce2" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+      <component group="org.unifiedpush.android" name="connector" version="3.3.4">
+         <artifact name="connector-3.3.4.aar">
+            <sha256 value="773f357d4443b7700e76a5374e0cc0c48182ad357018d0a583349aba6a193ebe" origin="OpenTasker: Maven Central direct artifact SHA-256 (no upstream .sha256/.asc)" />
          </artifact>
-         <artifact name="connector-3.3.4-rc1.module">
-            <sha256 value="bda1b77d1d78525ddaa98b18108729b5df8752aeb5f12d7229384fb33192c1c8" origin="OpenTasker: Maven Central published .asc + artifact SHA-256" />
+         <artifact name="connector-3.3.4.module">
+            <sha256 value="5210ffdb00066a9c4b6589f01c1e39452bf393647388522e3efa4a00d112f98f" origin="OpenTasker: Maven Central direct artifact SHA-256 (no upstream .sha256/.asc)" />
          </artifact>
       </component>
       <component group="org.xerial" name="sqlite-jdbc" version="3.41.2.2">
