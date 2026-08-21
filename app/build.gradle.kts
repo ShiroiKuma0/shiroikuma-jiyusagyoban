@@ -7,12 +7,14 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.Sync
@@ -108,20 +110,7 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
             "README links to paths that are missing or untracked, so they 404 on github.com: " +
                 untrackedLinks.joinToString()
         }
-    }
 
-    private fun isTrackedByGit(root: File, path: String): Boolean {
-        if (!root.resolve(".git").exists()) return true
-        val process = ProcessBuilder("git", "ls-files", "--error-unmatch", "--", path)
-            .directory(root)
-            .redirectErrorStream(true)
-            .start()
-        process.inputStream.bufferedReader().readText()
-        return process.waitFor() == 0
-
-        // These files were declared as inputs but never read, so the task invalidated its own
-        // cache on every CHANGELOG edit while verifying nothing in it - and its description
-        // claimed to check current release claims.
         val currentFiles = currentDocumentation.files.filter { it != readmeFile.get().asFile }
         currentFiles.forEach { file ->
             val relative = file.relativeTo(repositoryRoot.get().asFile)
@@ -166,6 +155,16 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
             "Documentation truth passed: current release claims are checked; " +
                 "${staleClaims.size} historical claims reported without blocking labeled snapshots.",
         )
+    }
+
+    private fun isTrackedByGit(root: File, path: String): Boolean {
+        if (!root.resolve(".git").exists()) return true
+        val process = ProcessBuilder("git", "ls-files", "--error-unmatch", "--", path)
+            .directory(root)
+            .redirectErrorStream(true)
+            .start()
+        process.inputStream.bufferedReader().readText()
+        return process.waitFor() == 0
     }
 }
 
@@ -1204,6 +1203,98 @@ abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
     }
 }
 
+abstract class VerifyFuzzDependencyIsolationTask : DefaultTask() {
+    @get:Input
+    abstract val coordinates: ListProperty<String>
+
+    @TaskAction
+    fun verify() {
+        check(coordinates.get().none { it.startsWith("com.code-intelligence:") }) {
+            "Jazzer must not appear in the release runtime dependency graph."
+        }
+        println("Fuzz dependency isolation passed: Jazzer is absent from release runtime resolution.")
+    }
+}
+
+abstract class VerifyPerformanceEvidenceTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val profileFile: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val baselineSource: RegularFileProperty
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val macrobenchmarkSource: RegularFileProperty
+
+    @get:Input
+    abstract val versionCode: Property<Int>
+
+    @TaskAction
+    fun verify() {
+        val profile = profileFile.get().asFile.readLines().map(String::trim).filter(String::isNotEmpty)
+        check(profile.any { it == "Lcom/opentasker/app/MainActivity;" }) {
+            "Baseline profile must include the launcher activity class rule."
+        }
+        check(profile.any { it == "Lcom/opentasker/app/OpenTaskerApp_NoHilt;" }) {
+            "Baseline profile must include the application class rule."
+        }
+
+        val baselineSourceText = baselineSource.get().asFile.readText()
+        check("BaselineProfileRule" in baselineSourceText && "startActivityAndWait" in baselineSourceText) {
+            "Baseline profile generator must exercise cold start."
+        }
+        val macrobenchmarkSourceText = macrobenchmarkSource.get().asFile.readText()
+        check("StartupTimingMetric" in macrobenchmarkSourceText && "FrameTimingMetric" in macrobenchmarkSourceText) {
+            "Macrobenchmark suite must cover startup and first-navigation timing."
+        }
+
+        val capturedAt = profileFile.get().asFile.resolveSibling("baseline-prof-captured-at-version-code.txt")
+        check(capturedAt.isFile) {
+            "Missing ${capturedAt.name}; regenerate the baseline profile " +
+                "(:app:generateBaselineProfile on an API 35+ device) and record the version code."
+        }
+        val recorded = capturedAt.readText().trim()
+        check(recorded == versionCode.get().toString()) {
+            "The baseline profile was captured at version code $recorded but this release is " +
+                "${versionCode.get()}. Regenerate it so the shipped profile matches the shipped code."
+        }
+        println(
+            "Performance evidence harness passed: ${profile.size} profile rules; " +
+                "API 35+ device evidence is collected explicitly with :app:generateBaselineProfile " +
+                "and :baselineprofile:connectedBenchmarkReleaseAndroidTest.",
+        )
+    }
+}
+
+abstract class StageReleaseAssetTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourceApk: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val stagingDirectory: DirectoryProperty
+
+    @get:Input
+    abstract val versionName: Property<String>
+
+    @TaskAction
+    fun stage() {
+        val source = sourceApk.get().asFile
+        check(source.isFile) { "Release APK is missing: ${source.absolutePath}" }
+        val destinationDirectory = stagingDirectory.get().asFile
+        check(!destinationDirectory.exists() || destinationDirectory.deleteRecursively()) {
+            "Could not clear stale release assets from ${destinationDirectory.absolutePath}"
+        }
+        check(destinationDirectory.mkdirs()) {
+            "Could not create release asset directory ${destinationDirectory.absolutePath}"
+        }
+        source.copyTo(destinationDirectory.resolve("OpenTasker-v${versionName.get()}.apk"), overwrite = true)
+    }
+}
+
 val releaseRuntimeCoordinates = providers.provider {
     val configuration = configurations.single { candidate ->
         candidate.isCanBeResolved && candidate.name.equals("releaseRuntimeClasspath", ignoreCase = true)
@@ -1214,15 +1305,10 @@ val releaseRuntimeCoordinates = providers.provider {
     }
 }
 
-tasks.register("verifyFuzzDependencyIsolation") {
+tasks.register<VerifyFuzzDependencyIsolationTask>("verifyFuzzDependencyIsolation") {
     group = "verification"
     description = "Checks that the opt-in fuzzing dependency stays out of release runtime resolution."
-    doLast {
-        check(releaseRuntimeCoordinates.get().none { it.startsWith("com.code-intelligence:") }) {
-            "Jazzer must not appear in the release runtime dependency graph."
-        }
-        println("Fuzz dependency isolation passed: Jazzer is absent from release runtime resolution.")
-    }
+    coordinates.set(releaseRuntimeCoordinates)
 }
 
 val verifyResolvedDependencyPolicy = tasks.register<VerifyResolvedDependencyPolicyTask>("verifyResolvedDependencyPolicy") {
@@ -1327,61 +1413,22 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     ))
 }
 
-val verifyPerformanceEvidence = tasks.register("verifyPerformanceEvidence") {
+val verifyPerformanceEvidence = tasks.register<VerifyPerformanceEvidenceTask>("verifyPerformanceEvidence") {
     group = "verification"
     description = "Checks the baseline-profile artifact and macrobenchmark evidence harness."
     dependsOn("compileReleaseArtProfile", ":baselineprofile:compileBenchmarkReleaseKotlin")
 
-    val profileFile = layout.projectDirectory.file("src/main/baseline-prof.txt")
-    val baselineSource = rootProject.layout.projectDirectory.file(
+    profileFile.set(layout.projectDirectory.file("src/main/baseline-prof.txt"))
+    baselineSource.set(rootProject.layout.projectDirectory.file(
         "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerBaselineProfile.kt",
-    )
-    val macrobenchmarkSource = rootProject.layout.projectDirectory.file(
+    ))
+    macrobenchmarkSource.set(rootProject.layout.projectDirectory.file(
         "baselineprofile/src/main/java/com/opentasker/baselineprofile/OpenTaskerMacrobenchmark.kt",
-    )
-    inputs.files(profileFile, baselineSource, macrobenchmarkSource)
+    ))
+    versionCode.set(appVersionCode)
 
     if (providers.gradleProperty("openTaskerRequirePerformanceRun").orNull?.toBoolean() == true) {
         dependsOn("generateBaselineProfile")
-    }
-
-    doLast {
-        val profile = profileFile.asFile.readLines().map(String::trim).filter(String::isNotEmpty)
-        check(profile.any { it == "Lcom/opentasker/app/MainActivity;" }) {
-            "Baseline profile must include the launcher activity class rule."
-        }
-        check(profile.any { it == "Lcom/opentasker/app/OpenTaskerApp_NoHilt;" }) {
-            "Baseline profile must include the application class rule."
-        }
-
-        val baselineSourceText = baselineSource.asFile.readText()
-        check("BaselineProfileRule" in baselineSourceText && "startActivityAndWait" in baselineSourceText) {
-            "Baseline profile generator must exercise cold start."
-        }
-        val macrobenchmarkSourceText = macrobenchmarkSource.asFile.readText()
-        check("StartupTimingMetric" in macrobenchmarkSourceText && "FrameTimingMetric" in macrobenchmarkSourceText) {
-            "Macrobenchmark suite must cover startup and first-navigation timing."
-        }
-
-        // Freshness, on the same principle as the store screenshots: the checks above are
-        // substring greps over sources in the same trust domain as the thing they certify, so a
-        // profile captured many releases ago passed forever. The recorded version code is what
-        // makes "this profile describes this build" falsifiable.
-        val capturedAt = profileFile.asFile.resolveSibling("baseline-prof-captured-at-version-code.txt")
-        check(capturedAt.isFile) {
-            "Missing ${capturedAt.name}; regenerate the baseline profile " +
-                "(:app:generateBaselineProfile on an API 35+ device) and record the version code."
-        }
-        val recorded = capturedAt.readText().trim()
-        check(recorded == appVersionCode.toString()) {
-            "The baseline profile was captured at version code $recorded but this release is " +
-                "$appVersionCode. Regenerate it so the shipped profile matches the shipped code."
-        }
-        println(
-            "Performance evidence harness passed: ${profile.size} profile rules; " +
-                "API 35+ device evidence is collected explicitly with :app:generateBaselineProfile " +
-                "and :baselineprofile:connectedBenchmarkReleaseAndroidTest.",
-        )
     }
 }
 
@@ -1662,17 +1709,13 @@ val verifyPackagedTypeCompleteness = tasks.register<VerifyPackagedTypeCompletene
  */
 val releaseAssetStagingDirectory = layout.buildDirectory.dir("outputs/release-assets")
 
-val stageReleaseAsset = tasks.register<Copy>("stageReleaseAsset") {
+val stageReleaseAsset = tasks.register<StageReleaseAssetTask>("stageReleaseAsset") {
     group = "release"
     description = "Copies the release APK to outputs/release-assets under the published asset name."
     dependsOn("packageRelease")
-    from(rootProject.layout.projectDirectory.file(expectedReleaseApkPath)) {
-        rename { "OpenTasker-v$appVersionName.apk" }
-    }
-    into(releaseAssetStagingDirectory)
-    // Without this a rename after a version bump leaves both names staged, and whichever sorts
-    // first is what an update client picks up.
-    doFirst { delete(releaseAssetStagingDirectory) }
+    sourceApk.set(rootProject.layout.projectDirectory.file(expectedReleaseApkPath))
+    stagingDirectory.set(releaseAssetStagingDirectory)
+    versionName.set(appVersionName)
 }
 
 val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyReleaseAssetName") {
