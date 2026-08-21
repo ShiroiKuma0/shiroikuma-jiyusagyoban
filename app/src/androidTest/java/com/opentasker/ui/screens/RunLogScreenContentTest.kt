@@ -7,7 +7,6 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -140,8 +139,12 @@ class RunLogScreenContentTest {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Export JSON").performScrollTo().performClick()
-        composeTestRule.onNodeWithText("Export CSV").performScrollTo().performClick()
+        // The action row is lazy: on a narrower device the export buttons are not composed until
+        // the row scrolls, so performScrollTo alone cannot find them.
+        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("Export JSON"))
+        composeTestRule.onNodeWithText("Export JSON").performClick()
+        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("Export CSV"))
+        composeTestRule.onNodeWithText("Export CSV").performClick()
         composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Load more"))
         composeTestRule.onNodeWithText("Load more").performClick()
 

@@ -5,6 +5,7 @@
 ### Fixed
 
 - Reordering an action from its overflow menu now announces which action moves. The menu items had been left with only "Move up" and "Move down" after the workspace redesign, so a screen reader gave no way to tell one row's controls from another's.
+- The Run Log export buttons are reachable on narrow devices. They sit in a lazily composed row, so on a phone the ones past the right edge were never composed.
 - Migrating a pre-v9 database no longer leaves a residual column default on the profiles table, which Room's schema identity check rejected.
 
 ### Added
