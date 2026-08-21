@@ -45,7 +45,6 @@ object SceneElementDrafts {
             "content_description" to "",
             "decorative" to "true",
         )
-        else -> emptyMap()
     }
 
     private fun defaultSize(type: SceneElementType): Pair<Int, Int> = when (type) {
@@ -53,7 +52,6 @@ object SceneElementDrafts {
         SceneElementType.BUTTON -> 160 to 48
         SceneElementType.SLIDER -> 220 to 56
         SceneElementType.IMAGE -> 180 to 120
-        else -> 160 to 48
     }
 
     private fun boundedSize(preferred: Int, sceneSize: Int): Int {

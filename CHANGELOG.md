@@ -28,6 +28,7 @@
 
 ### Changed
 
+- Scenes declare only the four element types that actually draw: button, text, slider and image. The other twelve (edit text, checkbox, toggle, number picker, spinner, map, web, menu, video, oval, rectangle, doodle) were pickable in name only. The editor never offered them and the overlay drew a grey "unsupported" label, so they were removed rather than handed to translators. A scene saved with one of them still loads: the element becomes a text element, keeps its position, size and task bindings, and writes the fallback the next time the scene is saved.
 - The workspace view model and app shell were split below their line ceilings. Undo/redo restore, the Modify-system-settings admission check, and the navigation chrome each moved into their own file, and the source gates that used to require a symbol to live in a named file now scan the screens package instead. Behaviour is unchanged; the point is that the next feature no longer has to start with an unrelated extraction.
 - Package-archive API 35 calls keep a method-scoped NewApi suppress instead of silencing the whole helper object.
 - The UnifiedPush connector moves off the `3.3.4-rc1` release candidate to `3.3.4` stable, which shipped since the pin was made. No pre-release artifact remains on the release runtime classpath.

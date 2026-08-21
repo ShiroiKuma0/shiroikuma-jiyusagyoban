@@ -282,8 +282,6 @@ class SceneOverlayService : Service() {
                     unsupportedElementView(element)
                 }
             }
-
-            else -> unsupportedElementView(element)
         }
     }
 
