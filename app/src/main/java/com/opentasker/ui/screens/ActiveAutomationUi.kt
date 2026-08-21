@@ -1000,7 +1000,7 @@ fun ActiveAutomationUi(
             onDismiss = { if (!openTaskerBundleBusy) showBundleTextImportDialog = false },
             onConfirm = {
                 showBundleTextImportDialog = false
-                viewModel.previewOpenTaskerBundleText(bundleTextImportDraft)
+                viewModel.previewPastedImport(bundleTextImportDraft, BuildConfig.VERSION_NAME)
             },
         )
     }
