@@ -10,8 +10,49 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Thrown when the wrapped database key cannot be recovered.
+ *
+ * This is terminal by design. The SQLCipher key exists only inside the Keystore-wrapped blob, so
+ * losing the master key (a Keystore reset, a restore onto another device, a corrupted blob) means
+ * the encrypted database is unreadable and no amount of retrying will change that. Failing with a
+ * named type rather than a bare IllegalStateException is what lets a caller tell this apart from a
+ * transient error and offer the only real remedy: restore a backup, or start over.
+ */
+class DatabaseKeyUnavailableException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
+
+/**
+ * The parts of unwrapping that do not need the Keystore, split out so the failure path is testable.
+ *
+ * Nothing here recovers from a bad payload. It decides whether the stored blob is even shaped like
+ * one this app wrote, and says so with the terminal type.
+ */
+// Public because the device lane asserts the Keystore-loss decision; core:storage is a module.
+object DatabaseKeyPayload {
+    const val NONCE_BYTES = 12
+    const val DATABASE_KEY_BYTES = 32
+
+    fun requireWellFormed(payload: ByteArray): ByteArray {
+        if (payload.size <= NONCE_BYTES) {
+            throw DatabaseKeyUnavailableException("Stored database key is truncated")
+        }
+        return payload
+    }
+
+    fun requireKeyLength(key: ByteArray): ByteArray {
+        if (key.size != DATABASE_KEY_BYTES) {
+            throw DatabaseKeyUnavailableException("Stored database key has an invalid length")
+        }
+        return key
+    }
+
+    fun nonceOf(payload: ByteArray): ByteArray = payload.copyOfRange(0, NONCE_BYTES)
+}
+
 /** Stores a random SQLCipher key wrapped by an app-private Android Keystore key. */
-internal object DatabaseKeyStore {
+// Public for the same reason; wrap() and masterKey() stay private.
+object DatabaseKeyStore {
     private const val PREFERENCES = "database_security"
     private const val WRAPPED_KEY = "wrapped_sqlcipher_key"
     private const val KEYSTORE = "AndroidKeyStore"
@@ -63,25 +104,24 @@ internal object DatabaseKeyStore {
         return Base64.encodeToString(payload, Base64.NO_WRAP)
     }
 
-    private fun unwrap(encoded: String): ByteArray {
-        val payload = runCatching { Base64.decode(encoded, Base64.NO_WRAP) }
-            .getOrElse { error -> throw IllegalStateException("Stored database key is malformed", error) }
-        if (payload.size <= NONCE_BYTES) {
-            throw IllegalStateException("Stored database key is truncated")
-        }
+    fun unwrap(encoded: String): ByteArray {
+        val decoded = runCatching { Base64.decode(encoded, Base64.NO_WRAP) }
+            .getOrElse { error -> throw DatabaseKeyUnavailableException("Stored database key is malformed", error) }
+        val payload = DatabaseKeyPayload.requireWellFormed(decoded)
 
-        return runCatching {
+        val key = runCatching {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
                 Cipher.DECRYPT_MODE,
                 masterKey(),
-                GCMParameterSpec(GCM_TAG_BITS, payload.copyOfRange(0, NONCE_BYTES)),
+                GCMParameterSpec(GCM_TAG_BITS, DatabaseKeyPayload.nonceOf(payload)),
             )
             cipher.doFinal(payload, NONCE_BYTES, payload.size - NONCE_BYTES)
         }.getOrElse { error ->
-            throw IllegalStateException("Could not unwrap the encrypted database key", error)
-        }.also { key ->
-            check(key.size == DATABASE_KEY_BYTES) { "Stored database key has an invalid length" }
+            // The master key is gone or the blob no longer authenticates. Terminal on purpose:
+            // there is no second copy of the SQLCipher key anywhere.
+            throw DatabaseKeyUnavailableException("Could not unwrap the encrypted database key", error)
         }
+        return DatabaseKeyPayload.requireKeyLength(key)
     }
 }

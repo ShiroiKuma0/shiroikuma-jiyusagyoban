@@ -38,9 +38,7 @@ class UnifiedPushEndpointStore(context: Context) {
             instance = preferences.getString(KEY_INSTANCE, UnifiedPushConnector.DEFAULT_INSTANCE)
                 .orEmpty()
                 .ifBlank { UnifiedPushConnector.DEFAULT_INSTANCE },
-            status = preferences.getString(KEY_STATUS, null)
-                ?.let { value -> runCatching { UnifiedPushRegistrationStatus.valueOf(value) }.getOrNull() }
-                ?: UnifiedPushRegistrationStatus.IDLE,
+            status = UnifiedPushRegistrationTransitions.decodeStatus(preferences.getString(KEY_STATUS, null)),
             endpoint = preferences.getString(KEY_ENDPOINT, null)?.takeIf(String::isNotBlank),
             publicKey = preferences.getString(KEY_PUBLIC_KEY, null)?.takeIf(String::isNotBlank),
             auth = preferences.getString(KEY_AUTH, null)?.takeIf(String::isNotBlank),
@@ -51,70 +49,33 @@ class UnifiedPushEndpointStore(context: Context) {
     }
 
     fun markRegistering(instance: String = UnifiedPushConnector.DEFAULT_INSTANCE) {
-        update(
-            state().copy(
-                instance = instance,
-                status = UnifiedPushRegistrationStatus.REGISTERING,
-                endpoint = null,
-                publicKey = null,
-                auth = null,
-                temporaryEndpoint = false,
-                failureReason = null,
-            ),
-        )
+        update(UnifiedPushRegistrationTransitions.registering(state(), instance))
     }
 
     fun saveEndpoint(instance: String, endpoint: PushEndpoint) {
         val keySet = endpoint.pubKeySet
         update(
-            state().copy(
+            UnifiedPushRegistrationTransitions.registered(
+                current = state(),
                 instance = instance,
-                status = UnifiedPushRegistrationStatus.REGISTERED,
-                endpoint = endpoint.url.take(MAX_ENDPOINT_CHARS),
-                publicKey = keySet?.pubKey?.take(MAX_KEY_CHARS),
-                auth = keySet?.auth?.take(MAX_KEY_CHARS),
-                temporaryEndpoint = endpoint.temporary,
-                failureReason = null,
+                endpoint = endpoint.url,
+                publicKey = keySet?.pubKey,
+                auth = keySet?.auth,
+                temporary = endpoint.temporary,
             ),
         )
     }
 
     fun markFailure(instance: String, reason: String) {
-        update(
-            state().copy(
-                instance = instance,
-                status = UnifiedPushRegistrationStatus.REGISTRATION_FAILED,
-                endpoint = null,
-                publicKey = null,
-                auth = null,
-                temporaryEndpoint = false,
-                failureReason = reason.take(MAX_FAILURE_CHARS),
-            ),
-        )
+        update(UnifiedPushRegistrationTransitions.failed(state(), instance, reason))
     }
 
     fun markTemporarilyUnavailable(instance: String) {
-        update(
-            state().copy(
-                instance = instance,
-                status = UnifiedPushRegistrationStatus.TEMPORARILY_UNAVAILABLE,
-                failureReason = null,
-            ),
-        )
+        update(UnifiedPushRegistrationTransitions.temporarilyUnavailable(state(), instance))
     }
 
     fun markUnregistered(instance: String) {
-        update(
-            state().copy(
-                instance = instance,
-                status = UnifiedPushRegistrationStatus.UNREGISTERED,
-                endpoint = null,
-                publicKey = null,
-                auth = null,
-                temporaryEndpoint = false,
-                failureReason = null,
-            ),
-        )
+        update(UnifiedPushRegistrationTransitions.unregistered(state(), instance))
     }
 
     fun setDistributor(distributor: String?) {
@@ -149,8 +110,5 @@ class UnifiedPushEndpointStore(context: Context) {
         const val KEY_TEMPORARY = "temporary"
         const val KEY_FAILURE_REASON = "failure_reason"
         const val KEY_DISTRIBUTOR = "distributor"
-        const val MAX_ENDPOINT_CHARS = 1_000
-        const val MAX_KEY_CHARS = 256
-        const val MAX_FAILURE_CHARS = 64
     }
 }

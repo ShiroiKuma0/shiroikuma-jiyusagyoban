@@ -67,7 +67,8 @@ object DatabaseSecurity {
         )
     }
 
-    internal fun isPlaintext(file: File): Boolean {
+    // Public because the device lane asserts a migrated database is no longer plaintext.
+    fun isPlaintext(file: File): Boolean {
         if (!file.isFile || file.length() < SQLITE_HEADER.size) return false
         return FileInputStream(file).use { input ->
             val header = ByteArray(SQLITE_HEADER.size)
