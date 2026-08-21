@@ -12,6 +12,16 @@
 - The Run Log export buttons are reachable on narrow devices. They sit in a lazily composed row, so on a phone the ones past the right edge were never composed.
 - Migrating a pre-v9 database no longer leaves a residual column default on the profiles table, which Room's schema identity check rejected.
 
+### Security
+
+- `org.bouncycastle` moves from 1.79 to 1.85, clearing CVE-2025-14813 (Critical), CVE-2026-5588 and CVE-2026-0636. It is a test-only dependency, so nothing reached the APK, but the advisory was live against the repository.
+- SQLCipher moves from 4.15.0 to 4.17.0, picking up SQLite 3.53.3 and a fix for mlock warning-log spam on Android.
+
+### Changed
+
+- The UnifiedPush connector moves off the `3.3.4-rc1` release candidate to `3.3.4` stable, which shipped since the pin was made. No pre-release artifact remains on the release runtime classpath.
+- `androidx.tracing` 1.2.0 to 1.3.0 and `androidx.core` 1.18.0 to 1.19.0.
+
 ### Added
 
 - An instrumented test compiles every regex literal declared in production source against Android's ICU engine. `:app:generateRegexCorpus` extracts the patterns into an androidTest asset, and the test fails on any the device rejects. Three shipped defects came from patterns that compile on a desktop JVM and do not on Android, and a JVM suite structurally cannot see them.
