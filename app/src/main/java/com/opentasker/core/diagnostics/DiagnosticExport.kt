@@ -6,6 +6,8 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.ScheduledWorkOutcomeKind
+import com.opentasker.core.storage.ScheduledWorkerId
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,6 +53,17 @@ object DiagnosticExport {
             sb.appendLine("Heartbeat gap: ${health.processExitCorrelation.gapMillis?.let(EngineHealthReader::ageLabel) ?: "none"}")
             sb.appendLine("Last matcher error: ${health.lastMatcherError?.let(::redactSensitive) ?: "none"}")
             sb.appendLine("Last worker stop reason: ${health.lastWorkerStopReason?.let(::redactSensitive) ?: "none"}")
+            ScheduledWorkerId.entries.forEach { worker ->
+                val outcome = health.scheduledWorkOutcomes.firstOrNull { it.worker == worker }
+                val summary = when {
+                    outcome == null -> "no run recorded"
+                    outcome.kind == ScheduledWorkOutcomeKind.STOPPED ->
+                        "stopped (${EngineHealthReader.workerStopReasonLabel(outcome.stopReason)}) at " +
+                            formatTimestamp(outcome.timestampMillis, dateFormat)
+                    else -> "${outcome.kind.name.lowercase()} at ${formatTimestamp(outcome.timestampMillis, dateFormat)}"
+                }
+                sb.appendLine("Scheduled work ${worker.key}: $summary")
+            }
             sb.appendLine("Pending job reasons: ${health.pendingScheduledJobs.currentReasons ?: if (health.pendingScheduledJobs.currentAvailable) "none" else "unavailable"}")
             sb.appendLine("Pending job reason history: ${health.pendingScheduledJobs.history ?: if (health.pendingScheduledJobs.historyAvailable) "none" else "unavailable"}")
             sb.appendLine("Pending job duration stats: ${health.pendingScheduledJobs.aggregateStats ?: if (health.pendingScheduledJobs.aggregateStatsAvailable) "none" else "unavailable"}")

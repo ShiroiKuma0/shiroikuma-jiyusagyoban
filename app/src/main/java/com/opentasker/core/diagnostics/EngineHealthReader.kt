@@ -21,6 +21,8 @@ import com.opentasker.core.engine.correlateProcessExit
 import com.opentasker.core.engine.needsRecovery
 import com.opentasker.core.external.ExternalExecutions
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
+import com.opentasker.core.storage.ScheduledWorkOutcome
+import com.opentasker.core.storage.ScheduledWorkOutcomeStore
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import java.time.Duration
 import kotlinx.coroutines.flow.first
@@ -62,6 +64,8 @@ data class EngineHealthStatus(
     val lastWorkerStopReason: String?,
     val processExitCorrelation: EngineExitCorrelation = EngineExitCorrelation(EngineExitCorrelationState.UNAVAILABLE),
     val pendingScheduledJobs: ScheduledJobDiagnostics = ScheduledJobDiagnostics.unavailable(),
+    /** Last recorded outcome per scheduled worker, newest write wins. Empty until one runs. */
+    val scheduledWorkOutcomes: List<ScheduledWorkOutcome> = emptyList(),
     val activeExecutionCount: Int = 0,
     val pendingExecutionCount: Int = 0,
     val signals: List<HealthSignal> = emptyList(),
@@ -140,6 +144,7 @@ object EngineHealthReader {
                 ?.stopReason
         }.getOrNull()
         val pendingJobs = scheduledJobSource.read(context, nowMillis)
+        val scheduledWorkOutcomes = ScheduledWorkOutcomeStore(context).read()
         val activeExecutionCount = ActiveExecutionRegistry.active.value.size
         val pendingExecutionCount = ExternalExecutions.snapshot(context)
             .count { !it.state.isTerminal }
@@ -256,6 +261,7 @@ object EngineHealthReader {
             lastWorkerStopReason = workerStopReason?.let(::workerStopReasonLabel),
             processExitCorrelation = processExitCorrelation,
             pendingScheduledJobs = pendingJobs,
+            scheduledWorkOutcomes = scheduledWorkOutcomes,
             activeExecutionCount = activeExecutionCount,
             pendingExecutionCount = pendingExecutionCount,
             signals = signals,
