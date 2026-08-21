@@ -14,10 +14,10 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 $Gradle = Get-Content -LiteralPath (Join-Path $Root "app\build.gradle.kts") -Raw
 $ActionCatalog = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\actions\ActionCatalog.kt") -Raw
-$ContextSpec = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\model\ContextSpec.kt") -Raw
+$ContextSpec = Get-Content -LiteralPath (Join-Path $Root "core\model\src\main\kotlin\com\opentasker\core\model\ContextSpec.kt") -Raw
 $FlowStructure = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\engine\FlowStructure.kt") -Raw
 $TaskRunner = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\engine\TaskRunner.kt") -Raw
-$AppDatabase = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\storage\AppDatabase.kt") -Raw
+$AppDatabase = Get-Content -LiteralPath (Join-Path $Root "core\storage\src\main\kotlin\com\opentasker\core\storage\AppDatabase.kt") -Raw
 $Bundle = Get-Content -LiteralPath (Join-Path $Root "app\src\main\java\com\opentasker\core\transfer\OpenTaskerBundle.kt") -Raw
 $Wrapper = Get-Content -LiteralPath (Join-Path $Root "gradle\wrapper\gradle-wrapper.properties") -Raw
 $Versions = Get-Content -LiteralPath (Join-Path $Root "gradle\libs.versions.toml") -Raw
