@@ -5,6 +5,7 @@ import java.nio.file.Path
 import kotlin.io.path.readText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -28,34 +29,51 @@ class ActiveAutomationModuleSplitTest {
                 .associate { it.fileName.toString() to it.readText() }
         }
 
-    private fun declarationRegex(functionName: String) =
-        Regex("""(?:private|internal|public)?\s*fun $functionName\b""")
+    private fun declarationRegex(visibility: String, functionName: String) =
+        Regex("""$visibility fun $functionName\b""")
+
+    /** The one file that declares [functionName]; fails when zero or several files do. */
+    private fun ownerOf(visibility: String, functionName: String): String {
+        val owners = screenSources()
+            .filterValues { declarationRegex(visibility, functionName).containsMatchIn(it) }
+            .keys
+        assertEquals(
+            "Expected exactly one screens file to declare `$visibility fun $functionName`, found $owners",
+            1,
+            owners.size,
+        )
+        return owners.single()
+    }
+
+    /** Fails when the token is absent from the package, and when two files both claim it. */
+    private fun soleOwnerOf(token: String): String {
+        val owners = screenSources().filterValues { it.contains(token) }.keys
+        assertEquals("Expected exactly one screens file to contain `$token`, found $owners", 1, owners.size)
+        return owners.single()
+    }
 
     @Test
     fun activeAutomationShellDelegatesRunLogAndImportReviewWorkflows() {
-        val sources = screenSources()
-        val shellSource = sources.getValue(shellFileName)
+        val shellSource = screenSources().getValue(shellFileName)
 
         listOf(
-            "RunLogScreenContent",
-            "RunLogRetentionCard",
-            "RunLogFilterCard",
-            "RunLogCard",
-            "RunLogTraceRow",
-            "OpenTaskerBundleReviewDialog",
-            "TaskerImportReviewDialog",
-            "TaskerImportListSection",
-        ).forEach { functionName ->
-            val pattern = declarationRegex(functionName)
+            "internal" to "RunLogScreenContent",
+            "private" to "RunLogRetentionCard",
+            "private" to "RunLogFilterCard",
+            "private" to "RunLogCard",
+            "private" to "RunLogTraceRow",
+            "internal" to "OpenTaskerBundleReviewDialog",
+            "internal" to "TaskerImportReviewDialog",
+            "private" to "TaskerImportListSection",
+        ).forEach { (visibility, functionName) ->
             assertFalse(
                 "$shellFileName should not own $functionName",
-                pattern.containsMatchIn(shellSource),
+                declarationRegex(visibility, functionName).containsMatchIn(shellSource),
             )
-            val owners = sources.filterKeys { it != shellFileName }.filterValues { pattern.containsMatchIn(it) }.keys
-            assertEquals(
-                "Expected exactly one screens file to declare $functionName, found $owners",
-                1,
-                owners.size,
+            assertNotEquals(
+                "$shellFileName should not own $functionName",
+                shellFileName,
+                ownerOf(visibility, functionName),
             )
         }
     }
@@ -77,12 +95,17 @@ class ActiveAutomationModuleSplitTest {
 
     @Test
     fun importReviewDialogsKeepScrollableContentBounded() {
-        val boundedLists = screenSources().values.sumOf { source ->
-            Regex("""heightIn\(max\s*=\s*460\.dp\)""").findAll(source).count()
-        }
+        // Anchored on the file that declares the bundle review dialog rather than on a filename,
+        // and counted within that file: summing across the package let one dialog's bound stand in
+        // for another's.
+        val owner = ownerOf("internal", "OpenTaskerBundleReviewDialog")
+        val boundedLists = Regex("""heightIn\(max\s*=\s*460\.dp\)""")
+            .findAll(screenSources().getValue(owner))
+            .count()
 
         assertTrue(
-            "Import review dialogs must constrain long warning and action lists on small screens",
+            "Import review dialogs must constrain long warning and action lists on small screens, " +
+                "$owner bounds $boundedLists list(s)",
             boundedLists >= 2,
         )
     }
@@ -90,20 +113,13 @@ class ActiveAutomationModuleSplitTest {
     @Test
     fun appShellKeepsPremiumCreateAndOnboardingActionsDiscoverable() {
         val sources = screenSources()
-        val allSources = sources.values.joinToString(separator = System.lineSeparator())
 
         assertTrue(
             "Create actions should stay labeled, not icon-only",
-            sources.getValue(shellFileName).contains("ExtendedFloatingActionButton"),
+            sources.getValue(soleOwnerOf("fun ActiveAutomationUi(")).contains("ExtendedFloatingActionButton"),
         )
-        assertTrue(
-            "First-run onboarding should recommend guided templates first",
-            allSources.contains("R.string.action_browse_templates"),
-        )
-        assertTrue(
-            "Empty-state actions should not stretch awkwardly on large screens",
-            allSources.contains("widthIn(max = 420.dp)"),
-        )
+        soleOwnerOf("R.string.action_browse_templates")
+        soleOwnerOf("widthIn(max = 420.dp)")
     }
 
     @Test

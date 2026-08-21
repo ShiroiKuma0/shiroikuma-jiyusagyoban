@@ -44,7 +44,13 @@ class ExecutionSemanticsContractTest {
         }
         assertEquals("Expected exactly one declaration of moveTaskAction", 1, owner.size)
         val source = owner.single().readText()
-        val method = source.substringAfter("fun moveTaskAction(").substringBefore("${'\n'}    fun ")
+        // Stop at the next member declaration whatever modifiers it carries; keying on a bare
+        // `fun ` let the slice silently swallow the rest of the class.
+        val body = source.substringAfter("fun moveTaskAction(")
+        val method = Regex("""\n    (?:private |internal |public )?(?:suspend )?fun """)
+            .find(body)
+            ?.let { body.substring(0, it.range.first) }
+            ?: body
 
         assertTrue(method.contains("db.withTransaction"))
         assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))
