@@ -774,8 +774,9 @@ suspend fun replayHeldExecution(
 fun dbSubTaskResolver(db: AppDatabase): SubTaskResolver = resolver@{ ref ->
     fun TaskEntity.decodedOrNull(): Task? {
         val result = toDomainDecodeResult()
-        if (result.issue != null) {
-            AppLogger.error(TAG, "Sub-task '$ref' (id=$id) is corrupt: ${result.issue.message}")
+        val issue = result.issue
+        if (issue != null) {
+            AppLogger.error(TAG, "Sub-task '$ref' (id=$id) is corrupt: ${issue.message}")
             return null
         }
         return result.value

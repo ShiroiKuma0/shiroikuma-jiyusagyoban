@@ -5,17 +5,15 @@ import java.nio.file.Path
 import kotlin.io.path.readText
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import com.opentasker.ProductionSources
 import org.junit.Test
 
 class SecretVariableUiSourceTest {
-    private val sourceRoot: Path = listOf(
-        Path.of("src/main/java/com/opentasker"),
-        Path.of("app/src/main/java/com/opentasker"),
-    ).first(Files::exists)
+
 
     @Test
     fun variableVaultUsesExplicitSecretStateAndDeliberateReveal() {
-        val source = sourceRoot.resolve("ui/screens/VariablesScreen.kt").readText()
+        val source = ProductionSources.path("com/opentasker/ui/screens/VariablesScreen.kt").readText()
 
         listOf(
             "variable.isSecret",
@@ -36,10 +34,10 @@ class SecretVariableUiSourceTest {
 
     @Test
     fun storageExpansionAndExportsKeepSecretBoundaries() {
-        val storage = sourceRoot.resolve("core/storage/VariableSecretStorage.kt").readText()
-        val runner = sourceRoot.resolve("core/engine/TaskRunner.kt").readText()
-        val bundle = sourceRoot.resolve("core/transfer/OpenTaskerBundle.kt").readText()
-        val taskerExport = sourceRoot.resolve("core/transfer/TaskerXmlExport.kt").readText()
+        val storage = ProductionSources.path("com/opentasker/core/storage/VariableSecretStorage.kt").readText()
+        val runner = ProductionSources.path("com/opentasker/core/engine/TaskRunner.kt").readText()
+        val bundle = ProductionSources.path("com/opentasker/core/transfer/OpenTaskerBundle.kt").readText()
+        val taskerExport = ProductionSources.path("com/opentasker/core/transfer/TaskerXmlExport.kt").readText()
 
         listOf("AndroidKeyStore", "AES/GCM/NoPadding", "updateAAD", "isSecret = true").forEach { marker ->
             assertTrue("Secret storage is missing $marker", storage.contains(marker))

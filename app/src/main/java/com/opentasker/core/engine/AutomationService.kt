@@ -507,9 +507,10 @@ class AutomationService : Service() {
             return
         }
         val decoded = task.toDomainDecodeResult()
-        if (decoded.issue != null) {
-            AppLogger.error(TAG, "Enter task ${profile.enterTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
-            logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
+        val decodeIssue = decoded.issue
+        if (decodeIssue != null) {
+            AppLogger.error(TAG, "Enter task ${profile.enterTaskId} is corrupt for profile ${profile.name}: ${decodeIssue.message}")
+            logProfileSkippedRun(profile, decoded.value, "Enter task data is corrupt (${decodeIssue.fieldName}); recover it before it can run.")
             return
         }
 
@@ -568,9 +569,10 @@ class AutomationService : Service() {
             return
         }
         val decoded = task.toDomainDecodeResult()
-        if (decoded.issue != null) {
-            AppLogger.error(TAG, "Exit task ${profile.exitTaskId} is corrupt for profile ${profile.name}: ${decoded.issue.message}")
-            logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decoded.issue.fieldName}); recover it before it can run.")
+        val decodeIssue = decoded.issue
+        if (decodeIssue != null) {
+            AppLogger.error(TAG, "Exit task $exitTaskId is corrupt for profile ${profile.name}: ${decodeIssue.message}")
+            logProfileSkippedRun(profile, decoded.value, "Exit task data is corrupt (${decodeIssue.fieldName}); recover it before it can run.")
             released.forEach { onProfileActivated(it, null) }
             return
         }
@@ -581,8 +583,9 @@ class AutomationService : Service() {
     private suspend fun consumeOneShotProfile(profile: Profile): Boolean = db.withTransaction {
         val entity = db.profileDao().getById(profile.id) ?: return@withTransaction false
         val decoded = entity.toDomainDecodeResult()
-        if (decoded.issue != null) {
-            AppLogger.error(TAG, "One-shot profile ${profile.id} is corrupt: ${decoded.issue.message}")
+        val decodeIssue = decoded.issue
+        if (decodeIssue != null) {
+            AppLogger.error(TAG, "One-shot profile ${profile.id} is corrupt: ${decodeIssue.message}")
             return@withTransaction false
         }
         val current = decoded.value

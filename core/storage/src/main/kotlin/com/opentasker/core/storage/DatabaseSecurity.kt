@@ -11,7 +11,8 @@ import java.nio.charset.StandardCharsets
 import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 
 /** Loads SQLCipher and upgrades an existing plaintext Room file before Room can open it. */
-internal object DatabaseSecurity {
+// Public because the application class opens the database; core:storage is a module now.
+object DatabaseSecurity {
     private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(StandardCharsets.US_ASCII)
     private const val TEMP_SUFFIX = ".encrypted.tmp"
     private const val USER_TABLE_COUNT_SQL =

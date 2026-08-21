@@ -1,5 +1,6 @@
 package com.opentasker.core.storage
 
+import com.opentasker.ProductionSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,12 +17,8 @@ import kotlin.io.path.readText
  */
 class RestoreReviewContractTest {
 
-    private val source: String = listOf(
-        Path.of("src/main/java"),
-        Path.of("app/src/main/java"),
-    ).first(Files::exists)
-        .resolve("com/opentasker/core/storage/DatabaseBackupManager.kt")
-        .readText()
+    private val source: String =
+        ProductionSources.read("com/opentasker/core/storage/DatabaseBackupManager.kt")
 
     @Test
     fun inspectionWritesTheCandidateFileNotThePendingJournal() {
