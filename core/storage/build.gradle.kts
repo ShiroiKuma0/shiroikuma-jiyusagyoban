@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
+    // Required now that this module actually compiles the entities: without it the @Serializable
+    // classes get no generated serializer and every profile write fails at runtime.
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
 
@@ -17,9 +20,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    sourceSets {
-        getByName("main").kotlin.directories.add("$rootDir/app/src/main/java/com/opentasker/core/storage")
-    }
 }
 
 kotlin {
@@ -43,6 +43,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
+    testImplementation(libs.junit)
+    // The Compose compiler plugin runs over the unit-test source set too and refuses to compile
+    // without the runtime on the class path, even though nothing here is a composable.
+    testCompileOnly(platform(libs.androidx.compose.bom))
+    testCompileOnly(libs.androidx.compose.runtime)
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.kotlinx.serialization.json)

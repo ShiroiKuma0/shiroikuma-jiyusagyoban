@@ -82,7 +82,8 @@ class AesGcmVariableSecretCodec(
     }
 
     companion object {
-        internal const val MAX_SECRET_PLAINTEXT_BYTES = 65_536
+        // Public because the variable editor caps its input on it; core:storage is a module now.
+        const val MAX_SECRET_PLAINTEXT_BYTES = 65_536
         private const val MAX_SECRET_ENVELOPE_CHARS = 100_000
         private const val MAX_SECRET_CIPHERTEXT_BYTES = MAX_SECRET_PLAINTEXT_BYTES + 16
         private const val MIN_GCM_CIPHERTEXT_BYTES = 16
@@ -540,7 +541,8 @@ private fun RuntimeVariableSeed.stateOf(name: String): RuntimeVariableState = Ru
     unavailable = name in unavailableSecretNames,
 )
 
-internal fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
+// Public because the bundle codec decides what to omit on it; core:storage is a module now.
+fun VariableEntity.isEffectivelySecret(): Boolean = isSecret
 
 internal fun Variable.normalizedForStorage(): Variable {
     val normalizedName = VariableNamePolicy.normalizeForScope(name, isGlobal)
