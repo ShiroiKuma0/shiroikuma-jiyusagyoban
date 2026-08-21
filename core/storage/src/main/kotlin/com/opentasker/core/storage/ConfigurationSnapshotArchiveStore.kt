@@ -32,19 +32,20 @@ private fun snapshotTimestampFormat(): SimpleDateFormat =
         timeZone = TimeZone.getTimeZone("UTC")
     }
 
-internal data class ConfigurationSnapshotArchive(
+data class ConfigurationSnapshotArchive(
     val uri: Uri,
     val file: SnapshotFile,
 )
 
-internal data class ConfigurationSnapshotArchiveInventory(
+data class ConfigurationSnapshotArchiveInventory(
     val snapshotCount: Int,
     val storageBytes: Long,
     val removedCount: Int,
 )
 
 /** Storage Access Framework boundary for scheduled encrypted snapshot archives. */
-internal class ConfigurationSnapshotArchiveStore(context: Context) {
+// Public because the device lane exercises the SAF archive path; core:storage is a module now.
+class ConfigurationSnapshotArchiveStore(context: Context) {
     private val resolver = context.applicationContext.contentResolver
 
     fun requirePersistedAccess(treeUri: Uri) {
@@ -157,7 +158,8 @@ internal class ConfigurationSnapshotArchiveStore(context: Context) {
     }
 }
 
-internal class SnapshotDestinationUnavailableException(
+// Public for the same reason: the device lane asserts this is what a missing tree throws.
+class SnapshotDestinationUnavailableException(
     message: String,
     cause: Throwable? = null,
 ) : IOException(message, cause)
