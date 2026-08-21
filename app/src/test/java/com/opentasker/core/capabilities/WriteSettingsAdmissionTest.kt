@@ -26,17 +26,24 @@ class WriteSettingsAdmissionTest {
 
     @Test
     fun profileEnableAndManualRunConsultTheAdmissionGate() {
-        val viewModel = listOf(
-            Path.of("src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt"),
-            Path.of("app/src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt"),
-        ).first { Files.exists(it) }.readText()
-        assertTrue(viewModel.contains("requireWriteSettingsIfEnabled(reviewed)"))
-        assertTrue(viewModel.contains("requireWriteSettingsIfEnabled(reviewedProfile)"))
-        assertTrue(viewModel.contains("requireWriteSettingsIfEnabled(current.copy(enabled = true))"))
-        assertTrue(viewModel.contains("requireWriteSettingsIfEnabled(restored)"))
-        assertTrue(viewModel.contains("requireWriteSettingsIfEnabled(target)"))
-        assertTrue(viewModel.contains("requireWriteSettingsReady(task.actions)"))
-        assertTrue(viewModel.contains("profile.fallbackTaskId"))
-        assertTrue(viewModel.contains("WriteSettingsAdmission.blocked"))
+        // Scanned across the screens package: the contract is that every write path consults the
+        // gate, not that those paths share one file.
+        val screensRoot = listOf(
+            Path.of("src/main/java/com/opentasker/ui/screens"),
+            Path.of("app/src/main/java/com/opentasker/ui/screens"),
+        ).first { Files.exists(it) }
+        val screens = Files.list(screensRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }
+                .toList()
+                .joinToString(separator = System.lineSeparator()) { it.readText() }
+        }
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(reviewed)"))
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(reviewedProfile)"))
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(current.copy(enabled = true))"))
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(restored)"))
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(target)"))
+        assertTrue(screens.contains("requireWriteSettingsReady(task.actions)"))
+        assertTrue(screens.contains("profile.fallbackTaskId"))
+        assertTrue(screens.contains("WriteSettingsAdmission.blocked"))
     }
 }

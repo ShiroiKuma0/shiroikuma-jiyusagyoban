@@ -8,7 +8,9 @@ class SemanticDiffContractTest {
     @Test
     fun semanticDiffUsesDecodedModelsAcrossUndoImportAndFlowReview() {
         val diff = repoFile("src/main/java/com/opentasker/core/diff/AutomationSemanticDiff.kt").readText()
-        val viewModel = repoFile("src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+        // Scanned across the screens package: publishing the review and building the document are
+        // allowed to live in separate files.
+        val viewModel = screensSources()
         val importReview = repoFile("src/main/java/com/opentasker/ui/screens/ImportReviewDialogs.kt").readText()
         val diffDialogs = repoFile("src/main/java/com/opentasker/ui/screens/SemanticDiffDialogs.kt").readText()
         val flow = repoFile("src/main/java/com/opentasker/ui/screens/AutomationFlowScreen.kt").readText()
@@ -23,4 +25,14 @@ class SemanticDiffContractTest {
 
     private fun repoFile(path: String): File =
         listOf(File(path), File("app/$path")).first { it.exists() }
+
+    private fun screensSources(): String {
+        val root = listOf(
+            File("src/main/java/com/opentasker/ui/screens"),
+            File("app/src/main/java/com/opentasker/ui/screens"),
+        ).first { it.isDirectory }
+        return root.listFiles { file -> file.name.endsWith(".kt") }
+            .orEmpty()
+            .joinToString(separator = System.lineSeparator()) { it.readText() }
+    }
 }
