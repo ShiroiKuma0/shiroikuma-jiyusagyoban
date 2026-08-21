@@ -63,6 +63,9 @@ object ActionCatalog {
         define("flow.wait", ActionCategory.FLOW, ActionRetrySafety.NEVER, ::WaitAction),
         define("intent.launch", ActionCategory.APP, ActionRetrySafety.NEVER, ::LaunchIntentAction),
         define("wifi.toggle", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::WiFiToggleAction),
+        // IDEMPOTENT: it only reads. Retrying re-reads the same cache and rewrites the same
+        // variables, and the platform decides whether a fresh scan happens either way.
+        define("wifi.scan", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::WifiScanAction),
         define("bluetooth.toggle", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::BluetoothToggleAction),
         define("brightness.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::BrightnessAction),
         define("volume.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::VolumeAction),

@@ -293,6 +293,12 @@
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">Stream</string>
     <string name="catalog_action_volume_set_field_stream_hint" formatted="false">music, call, alarm</string>
     <string name="catalog_action_volume_set_field_level_label" formatted="false">Level (0-100)</string>
+    <string name="catalog_action_wifi_scan_name" formatted="false">Scan Wi-Fi Networks</string>
+    <string name="catalog_action_wifi_scan_description" formatted="false">List nearby access points into variables. Android limits how often a real scan runs, so results may come from the last cached scan.</string>
+    <string name="catalog_action_wifi_scan_field_var_label" formatted="false">Variable prefix</string>
+    <string name="catalog_action_wifi_scan_field_var_hint" formatted="false">wifi</string>
+    <string name="catalog_action_wifi_scan_field_limit_label" formatted="false">Maximum results</string>
+    <string name="catalog_action_wifi_scan_field_limit_hint" formatted="false">1-64, default 20</string>
     <string name="catalog_action_aod_set_name" formatted="false">Always-On Display</string>
     <string name="catalog_action_aod_set_description" formatted="false">Turn the always-on display on or off</string>
     <string name="catalog_action_aod_set_field_state_label" formatted="false">State</string>

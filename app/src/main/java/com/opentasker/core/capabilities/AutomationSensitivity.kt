@@ -108,6 +108,7 @@ object AutomationSensitivityRegistry {
         "volume.set",
         "airplane.toggle",
         "aod.set",
+        "wifi.scan",
         "mobile.toggle",
         "screen.timeout",
         "dnd.set",
