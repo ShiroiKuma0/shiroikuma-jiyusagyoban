@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- Reordering an action from its overflow menu now announces which action moves. The menu items had been left with only "Move up" and "Move down" after the workspace redesign, so a screen reader gave no way to tell one row's controls from another's.
+- Migrating a pre-v9 database no longer leaves a residual column default on the profiles table, which Room's schema identity check rejected.
+
+### Added
+
+- `:app:verifyReleaseAssetName` stages the signed APK under its published name, `OpenTasker-v<versionName>.apk`, and fails if the staged file is still AGP's default `app-release.apk` or disagrees with the recorded release version.
+
 ## v0.2.87
 
 OpenTasker's ten main workspaces now share a compact, true-black visual system designed for faster scanning and fewer competing controls.

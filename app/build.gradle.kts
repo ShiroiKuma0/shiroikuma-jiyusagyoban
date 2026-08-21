@@ -931,6 +931,65 @@ abstract class VerifyPackagedTypeCompletenessTask : DefaultTask() {
     }
 }
 
+/**
+ * Release assets are what a user actually sees on the GitHub release page, and Obtainium matches
+ * them by name. AGP's default output is `app-release.apk`, which is indistinguishable from an
+ * unsigned CI artifact and identical across every version, so uploading it directly leaves users
+ * and update clients with nothing to sort or filter on. The staging directory below is the only
+ * thing a release is uploaded from, and this task is what decides the name is right.
+ */
+abstract class VerifyReleaseAssetNameTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputDirectory
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val stagingDirectory: org.gradle.api.file.DirectoryProperty
+
+    @get:org.gradle.api.tasks.InputFile
+    @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract val truthFile: org.gradle.api.file.RegularFileProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val versionName: org.gradle.api.provider.Property<String>
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val truth = truthFile.get().asFile
+        check(truth.isFile) { "Missing release truth at ${truth.absolutePath}" }
+        val recordedVersion = Regex("\"versionName\"\\s*:\\s*\"([^\"]+)\"")
+            .find(truth.readText())
+            ?.groupValues
+            ?.get(1)
+        check(recordedVersion == versionName.get()) {
+            "tools/release-truth.json records versionName '$recordedVersion' but the build declares " +
+                "'${versionName.get()}'. The release asset name is derived from the version, so " +
+                "these must agree before anything is published."
+        }
+
+        val expectedName = "OpenTasker-v${versionName.get()}.apk"
+        val staged = stagingDirectory.get().asFile.listFiles().orEmpty()
+            .filter { it.isFile }
+            .sortedBy { it.name }
+        check(staged.isNotEmpty()) {
+            "No staged release asset found in ${stagingDirectory.get().asFile.absolutePath}. " +
+                "Run :app:stageReleaseAsset first."
+        }
+        // A leftover from a previous version would otherwise be uploaded alongside the current
+        // one, which is exactly the sort-order hazard this check exists to prevent.
+        check(staged.size == 1) {
+            "Expected exactly one staged release asset, found ${staged.size}: " +
+                staged.joinToString { it.name }
+        }
+        val actualName = staged.single().name
+        check(actualName != "app-release.apk" && actualName != "app-release-unsigned.apk") {
+            "Staged release asset is still AGP's default output name '$actualName'. Publish it as " +
+                "$expectedName so update clients and humans can tell releases apart."
+        }
+        check(actualName == expectedName) {
+            "Staged release asset is named '$actualName' but the documented pattern is '$expectedName'."
+        }
+        println("Release asset name check passed: $actualName")
+    }
+}
+
 abstract class VerifyNativePageAlignmentTask : org.gradle.api.DefaultTask() {
     @get:org.gradle.api.tasks.InputFile
     @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
@@ -1459,10 +1518,40 @@ val verifyPackagedTypeCompleteness = tasks.register<VerifyPackagedTypeCompletene
     )
 }
 
+/**
+ * The single directory a GitHub release is uploaded from. Staging is a copy rather than an AGP
+ * output rename because the F-Droid recipe, the reproducibility harness, and
+ * verifyPackagedTypeCompleteness all name the AGP path directly.
+ */
+val releaseAssetStagingDirectory = layout.buildDirectory.dir("outputs/release-assets")
+
+val stageReleaseAsset = tasks.register<Copy>("stageReleaseAsset") {
+    group = "release"
+    description = "Copies the release APK to outputs/release-assets under the published asset name."
+    dependsOn("packageRelease")
+    from(rootProject.layout.projectDirectory.file(expectedReleaseApkPath)) {
+        rename { "OpenTasker-v$appVersionName.apk" }
+    }
+    into(releaseAssetStagingDirectory)
+    // Without this a rename after a version bump leaves both names staged, and whichever sorts
+    // first is what an update client picks up.
+    doFirst { delete(releaseAssetStagingDirectory) }
+}
+
+val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyReleaseAssetName") {
+    group = "verification"
+    description = "Checks the staged release asset matches OpenTasker-v<versionName>.apk."
+    dependsOn(stageReleaseAsset)
+    stagingDirectory.set(releaseAssetStagingDirectory)
+    truthFile.set(rootProject.layout.projectDirectory.file("tools/release-truth.json"))
+    versionName.set(appVersionName)
+}
+
 tasks.register("localQualityGate") {
     group = "verification"
     description = "Runs the deterministic local debug-quality and dependency-report gate."
     dependsOn(
+        verifyReleaseAssetName,
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "connectedDebugAndroidTest",
