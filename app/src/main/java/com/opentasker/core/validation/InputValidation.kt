@@ -36,7 +36,8 @@ object InputValidation {
         if (profile.enterTaskId <= 0) {
             errors.add(ValidationError("enterTaskId", "Enter task must be set"))
         }
-        if (profile.fallbackTaskId != null && profile.fallbackTaskId <= 0L) {
+        val fallbackTaskId = profile.fallbackTaskId
+        if (fallbackTaskId != null && fallbackTaskId <= 0L) {
             errors.add(ValidationError("fallbackTaskId", "Fallback task id must be positive"))
         }
         if (profile.cooldownSec < 0 || profile.cooldownSec > MAX_COOLDOWN_SEC) {
@@ -78,8 +79,9 @@ object InputValidation {
                 ),
             )
         }
+        val expiresAtMs = profile.expiresAtMs
         when (profile.lifetime) {
-            ProfileLifetime.UNTIL_DATE -> if (profile.expiresAtMs == null || profile.expiresAtMs <= 0L) {
+            ProfileLifetime.UNTIL_DATE -> if (expiresAtMs == null || expiresAtMs <= 0L) {
                 errors.add(ValidationError("expiresAtMs", "An expiry date is required for date-limited profiles"))
             }
             ProfileLifetime.NEVER, ProfileLifetime.ONCE -> Unit
@@ -116,7 +118,8 @@ object InputValidation {
         if (action.type.isBlank()) {
             errors.add(ValidationError("type", "Action type cannot be empty"))
         }
-        if (action.label != null && action.label.length > MAX_NAME_LENGTH) {
+        val label = action.label
+        if (label != null && label.length > MAX_NAME_LENGTH) {
             errors.add(ValidationError("label", "Action label exceeds $MAX_NAME_LENGTH characters"))
         }
         

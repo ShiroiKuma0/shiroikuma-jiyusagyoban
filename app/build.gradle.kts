@@ -343,15 +343,6 @@ val MODULE_OWNED_SOURCES: List<String> = listOf(
             "com/opentasker/core/engine/ExecutionEnvelope.kt",
             "com/opentasker/core/engine/RunLogSource.kt",
             "com/opentasker/core/engine/TaskFailure.kt",
-            "com/opentasker/core/model/ContextSpec.kt",
-            "com/opentasker/core/model/Profile.kt",
-            "com/opentasker/core/model/ProfileConcurrencyPolicy.kt",
-            "com/opentasker/core/model/Project.kt",
-            "com/opentasker/core/model/RunLogEntry.kt",
-            "com/opentasker/core/model/Scene.kt",
-            "com/opentasker/core/model/Task.kt",
-            "com/opentasker/core/model/Variable.kt",
-            "com/opentasker/core/model/VariableNamePolicy.kt",
 )
 
 // NOTE ON THE STAGED MODULE SPLIT
@@ -382,7 +373,7 @@ ksp {
 
 dependencies {
     compileOnly(project(":core:common"))
-    compileOnly(project(":core:model"))
+    implementation(project(":core:model"))
     compileOnly(project(":core:storage"))
     compileOnly(project(":core:engine"))
     implementation(project(":feature:automation"))
@@ -1428,7 +1419,8 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     val repositoryRootPath = rootProject.layout.projectDirectory.asFile
     val readmeFilePath = repositoryRootPath.resolve("README.md")
     val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
-    val contextSpecFilePath = projectDir.resolve("src/main/java/com/opentasker/core/model/ContextSpec.kt")
+    val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
+        .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
     val databaseFilePath = projectDir.resolve("src/main/java/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
         readmeFilePath,
@@ -1456,7 +1448,7 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
     moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
     actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/actions/ActionCatalog.kt"))
-    contextSpecFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/model/ContextSpec.kt"))
+    contextSpecFile.set(rootProject.layout.projectDirectory.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt"))
     bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
     versionCatalogFile.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
     wrapperFile.set(rootProject.layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties"))

@@ -613,9 +613,10 @@ private fun RunLogCard(
                 item { StatusPill(stringResource(R.string.run_log_duration, entry.durationMs), accent) }
                 if (entry.starred) item { StatusPill(stringResource(R.string.run_log_kept), MaterialTheme.colorScheme.primary) }
             }
-            if (entry.heldPolicy != null) {
+            val heldPolicy = entry.heldPolicy
+            if (heldPolicy != null) {
                 Text(
-                    stringResource(R.string.run_log_held_policy, entry.heldPolicy),
+                    stringResource(R.string.run_log_held_policy, heldPolicy),
                     style = MaterialTheme.typography.bodySmall,
                     color = accent,
                 )

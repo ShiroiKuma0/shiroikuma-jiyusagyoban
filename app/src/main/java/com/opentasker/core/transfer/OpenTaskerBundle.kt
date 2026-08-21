@@ -544,8 +544,9 @@ object OpenTaskerBundleCodec {
                 .forEach { error ->
                     warnings += "Invalid profile '${profile.name}' (${error.field}): ${error.message}."
                 }
-            if (profile.contextExpression != null &&
-                !profile.contextExpression.isValidForContextCount(profile.contexts.size)
+            val contextExpression = profile.contextExpression
+            if (contextExpression != null &&
+                !contextExpression.isValidForContextCount(profile.contexts.size)
             ) {
                 warnings += "Invalid profile '${profile.name}' (contextExpression): leaf references or group structure are invalid."
             }
