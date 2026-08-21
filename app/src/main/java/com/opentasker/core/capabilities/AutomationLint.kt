@@ -267,23 +267,28 @@ object AutomationLint {
         return AutomationLintReport(findings.toList())
     }
 
-    private fun unreachableReason(profile: Profile, enterTask: Task?, nowMs: Long?): String? = when {
-        enterTask == null -> "its enter task ${profile.enterTaskId} is missing"
-        profile.contextExpression != null && !profile.contextExpression.isValidForContextCount(profile.contexts.size) ->
-            "its context expression is invalid"
-        profile.contexts.size > 1 && profile.contexts.indices.any { leftIndex ->
-            profile.contexts.drop(leftIndex + 1).any { right ->
-                !contextPairMayOverlap(profile.contexts[leftIndex], right)
-            }
-        } -> "its context entries contain contradictory conditions"
-        profile.lifetime == ProfileLifetime.ONCE && profile.lifetimeConsumed ->
-            "its one-shot lifetime has already been consumed"
-        profile.lifetime == ProfileLifetime.UNTIL_DATE && profile.expiresAtMs == null ->
-            "its lifetime has no expiry"
-        profile.lifetime == ProfileLifetime.UNTIL_DATE && nowMs != null &&
-            profile.expiresAtMs?.let { expiresAt -> expiresAt <= nowMs } == true ->
-            "its lifetime has expired"
-        else -> null
+    private fun unreachableReason(profile: Profile, enterTask: Task?, nowMs: Long?): String? {
+        // Bound locally: contextExpression is a public property of another module now, so it does
+        // not smart-cast.
+        val contextExpression = profile.contextExpression
+        return when {
+            enterTask == null -> "its enter task ${profile.enterTaskId} is missing"
+            contextExpression != null && !contextExpression.isValidForContextCount(profile.contexts.size) ->
+                "its context expression is invalid"
+            profile.contexts.size > 1 && profile.contexts.indices.any { leftIndex ->
+                profile.contexts.drop(leftIndex + 1).any { right ->
+                    !contextPairMayOverlap(profile.contexts[leftIndex], right)
+                }
+            } -> "its context entries contain contradictory conditions"
+            profile.lifetime == ProfileLifetime.ONCE && profile.lifetimeConsumed ->
+                "its one-shot lifetime has already been consumed"
+            profile.lifetime == ProfileLifetime.UNTIL_DATE && profile.expiresAtMs == null ->
+                "its lifetime has no expiry"
+            profile.lifetime == ProfileLifetime.UNTIL_DATE && nowMs != null &&
+                profile.expiresAtMs?.let { expiresAt -> expiresAt <= nowMs } == true ->
+                "its lifetime has expired"
+            else -> null
+        }
     }
 
     private fun contextsEquivalent(left: Profile, right: Profile): Boolean =

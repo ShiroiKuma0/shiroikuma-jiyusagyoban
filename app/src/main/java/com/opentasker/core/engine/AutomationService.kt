@@ -556,13 +556,14 @@ class AutomationService : Service() {
             released.forEach { onProfileActivated(it, null) }
             return
         }
-        if (profile.exitTaskId == null || profile.exitTaskId <= 0) {
+        val exitTaskId = profile.exitTaskId
+        if (exitTaskId == null || exitTaskId <= 0) {
             released.forEach { onProfileActivated(it, null) }
             return
         }
-        val task = db.taskDao().getById(profile.exitTaskId)
+        val task = db.taskDao().getById(exitTaskId)
         if (task == null) {
-            AppLogger.warn(TAG, "Exit task ${profile.exitTaskId} not found for profile ${profile.name}")
+            AppLogger.warn(TAG, "Exit task $exitTaskId not found for profile ${profile.name}")
             released.forEach { onProfileActivated(it, null) }
             return
         }

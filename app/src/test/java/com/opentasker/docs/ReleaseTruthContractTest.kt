@@ -105,7 +105,7 @@ class ReleaseTruthContractTest {
         val wrapper = read("gradle/wrapper/gradle-wrapper.properties")
         val fdroid = read("fdroid/metadata/com.opentasker.app.yml")
         val actionCatalog = read("app/src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
-        val contextSpec = read("app/src/main/java/com/opentasker/core/model/ContextSpec.kt")
+        val contextSpec = read("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
         val flowStructure = read("app/src/main/java/com/opentasker/core/engine/FlowStructure.kt")
         val taskRunner = read("app/src/main/java/com/opentasker/core/engine/TaskRunner.kt")
         val database = read("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt")

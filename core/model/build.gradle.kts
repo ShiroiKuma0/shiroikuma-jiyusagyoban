@@ -15,13 +15,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-sourceSets {
-    main {
-        java.srcDir("$rootDir/app/src/main/java/com/opentasker/core/model")
-        java.exclude("ProfileLifecyclePolicy.kt", "ProfileLifecycleStrings.kt")
-    }
-}
-
 dependencies {
     api(libs.kotlinx.serialization.json)
     compileOnly(platform(libs.androidx.compose.bom))

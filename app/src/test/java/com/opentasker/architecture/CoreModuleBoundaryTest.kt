@@ -51,11 +51,37 @@ class CoreModuleBoundaryTest {
         }
     }
 
+    /** Modules that physically own their sources. The rest still borrow app's; see A-99. */
+    private val migratedModules = listOf("core/model")
+
     @Test
-    fun appExcludesSourcesOwnedByCoreModules() {
+    fun migratedModulesOwnTheirSourcesInsteadOfBorrowingApps() {
+        migratedModules.forEach { module ->
+            val build = source("$module/build.gradle.kts")
+            assertFalse(
+                "$module/build.gradle.kts still points a source set at app/",
+                build.contains("app/src/main/java"),
+            )
+
+            val moduleSources = repoRoot.resolve("$module/src/main/kotlin")
+            assertTrue("$module has no sources of its own", Files.isDirectory(moduleSources))
+            Files.walk(moduleSources).use { paths ->
+                paths.filter { it.fileName.toString().endsWith(".kt") }.forEach { owned ->
+                    val relative = moduleSources.relativize(owned)
+                    val shadow = repoRoot.resolve("app/src/main/java").resolve(relative)
+                    assertFalse(
+                        "$relative exists in both $module and app, so :app compiles a duplicate",
+                        Files.exists(shadow),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun modulesStillBorrowingAppSourcesAreDocumented() {
         val appBuild = source("app/build.gradle.kts")
         listOf(
-            "com/opentasker/core/model/ContextSpec.kt",
             "com/opentasker/core/logging/AppLogger.kt",
             "com/opentasker/core/storage/**",
             "com/opentasker/core/engine/ActiveExecutionRegistry.kt",

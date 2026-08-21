@@ -202,20 +202,25 @@ internal fun explainContextExpression(
     expression: ContextExpressionNode,
     checks: List<ContextCheck>,
 ): String {
-    fun explain(node: ContextExpressionNode): String = when {
-        node.isLeaf() -> {
-            val check = node.contextIndex?.let(checks::getOrNull)
-            "Context ${(node.contextIndex ?: -1) + 1}=${if (check?.effectiveMatched == true) "match" else "no match"}"
-        }
-        node.operator != null && node.children.isNotEmpty() -> {
-            val operator = when (node.operator) {
-                ContextBooleanOperator.AND -> "ALL"
-                ContextBooleanOperator.OR -> "ANY"
+    fun explain(node: ContextExpressionNode): String {
+        // Bound locally: `operator` is a public property of another module now, so checking it for
+        // null inside the `when` subject no longer smart-casts it.
+        val nodeOperator = node.operator
+        return when {
+            node.isLeaf() -> {
+                val check = node.contextIndex?.let(checks::getOrNull)
+                "Context ${(node.contextIndex ?: -1) + 1}=${if (check?.effectiveMatched == true) "match" else "no match"}"
             }
-            val body = node.children.joinToString(", ", transform = ::explain)
-            if (node.invert) "NOT($operator($body))" else "$operator($body)"
+            nodeOperator != null && node.children.isNotEmpty() -> {
+                val operator = when (nodeOperator) {
+                    ContextBooleanOperator.AND -> "ALL"
+                    ContextBooleanOperator.OR -> "ANY"
+                }
+                val body = node.children.joinToString(", ", transform = ::explain)
+                if (node.invert) "NOT($operator($body))" else "$operator($body)"
+            }
+            else -> "Invalid context group"
         }
-        else -> "Invalid context group"
     }
     return explain(expression)
 }

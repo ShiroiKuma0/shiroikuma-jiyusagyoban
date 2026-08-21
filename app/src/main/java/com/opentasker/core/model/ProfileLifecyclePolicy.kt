@@ -16,7 +16,7 @@ object ProfileLifecyclePolicy {
         profile.lifetime == ProfileLifetime.UNTIL_DATE && profile.expiresAtMs == null ->
             strings.missingExpiry()
         profile.lifetime == ProfileLifetime.UNTIL_DATE && nowMs >= requireNotNull(profile.expiresAtMs) ->
-            strings.expired(formatExpiry(profile.expiresAtMs))
+            strings.expired(formatExpiry(requireNotNull(profile.expiresAtMs)))
         else -> null
     }
 
