@@ -34,8 +34,17 @@ class ExecutionSemanticsContractTest {
 
     @Test
     fun actionReorderUsesOneTransactionAndSnapshotsThePreviousOrder() {
-        val source = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
-        val method = source.substringAfter("fun moveTaskAction(").substringBefore("fun createScene(")
+        // Scanned across the screens package: the contract is that the reorder path is one
+        // transaction, not that it stays in a particular filename.
+        val screensRoot = sourceRoot.resolve("com/opentasker/ui/screens")
+        val owner = Files.list(screensRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }
+                .filter { it.readText().contains("fun moveTaskAction(") }
+                .toList()
+        }
+        assertEquals("Expected exactly one declaration of moveTaskAction", 1, owner.size)
+        val source = owner.single().readText()
+        val method = source.substringAfter("fun moveTaskAction(").substringBefore("${'\n'}    fun ")
 
         assertTrue(method.contains("db.withTransaction"))
         assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))

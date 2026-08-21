@@ -28,6 +28,7 @@
 
 ### Changed
 
+- The workspace view model and app shell were split below their line ceilings. Undo/redo restore, the Modify-system-settings admission check, and the navigation chrome each moved into their own file, and the source gates that used to require a symbol to live in a named file now scan the screens package instead. Behaviour is unchanged; the point is that the next feature no longer has to start with an unrelated extraction.
 - Package-archive API 35 calls keep a method-scoped NewApi suppress instead of silencing the whole helper object.
 - The UnifiedPush connector moves off the `3.3.4-rc1` release candidate to `3.3.4` stable, which shipped since the pin was made. No pre-release artifact remains on the release runtime classpath.
 - `androidx.tracing` 1.2.0 to 1.3.0 and `androidx.core` 1.18.0 to 1.19.0.

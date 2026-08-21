@@ -20,7 +20,9 @@ class AutomationDuplicationContractTest {
 
     @Test
     fun viewModelUsesCreationHistoryAndFailClosedTaskUndo() {
-        val source = repoFile("src/main/java/com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
+        // Scanned across the screens package: duplication writes and the undo transaction that
+        // reverses them are allowed to live in separate files.
+        val source = screensSources()
 
         assertTrue("Duplication must record a creation snapshot", "private suspend fun recordCreation" in source)
         assertTrue("Creation undo must have an explicit snapshot marker", "snapshot.previousJson.isBlank()" in source)
@@ -32,4 +34,14 @@ class AutomationDuplicationContractTest {
 
     private fun repoFile(path: String): File =
         listOf(File(path), File("app/$path")).first { it.exists() }
+
+    private fun screensSources(): String {
+        val root = listOf(
+            File("src/main/java/com/opentasker/ui/screens"),
+            File("app/src/main/java/com/opentasker/ui/screens"),
+        ).first { it.isDirectory }
+        return root.listFiles { file -> file.name.endsWith(".kt") }
+            .orEmpty()
+            .joinToString(separator = System.lineSeparator()) { it.readText() }
+    }
 }

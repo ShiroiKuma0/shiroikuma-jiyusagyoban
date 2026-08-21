@@ -33,7 +33,14 @@ class AdaptiveNavigationTest {
             .first { Files.exists(it.resolve("README.md")) && Files.exists(it.resolve("app/build.gradle.kts")) }
             .toAbsolutePath()
             .normalize()
-        val source = repoRoot.resolve("app/src/main/java/com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
+        // Scanned across the screens package: the shell owns the saved state and the chrome owns
+        // the destination rows, and which file holds which is not the contract being asserted.
+        val screensRoot = repoRoot.resolve("app/src/main/java/com/opentasker/ui/screens")
+        val source = Files.list(screensRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }
+                .toList()
+                .joinToString(separator = System.lineSeparator()) { it.readText() }
+        }
 
         assertTrue(source.contains("LocalConfiguration.current"))
         listOf(
