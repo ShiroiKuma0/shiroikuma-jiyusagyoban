@@ -2,6 +2,7 @@ package com.opentasker.core.actions
 
 import android.Manifest
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,22 +33,38 @@ class Api37LocalNetworkInstrumentedTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val app: Context = instrumentation.targetContext.applicationContext
     private val packageName = app.packageName
+    private val permissionProbePackageName = instrumentation.context.packageName
+    private val permissionProbeContext = object : ContextWrapper(app) {
+        override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+            if (permission == Manifest.permission.ACCESS_LOCAL_NETWORK) {
+                packageManager.checkPermission(permission, permissionProbePackageName)
+            } else {
+                super.checkPermission(permission, pid, uid)
+            }
+    }
 
     @Before
     fun requireApi37Device() {
         assumeTrue("API 37+ device required", Build.VERSION.SDK_INT >= 37)
+        // Successful action paths still perform real network operations as OpenTasker. The
+        // separate androidTest package below owns the grant that the permission guard observes.
+        grantRuntimePermission(packageName, Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
 
     @After
     fun leavePermissionGrantedForEvidenceSnapshots() {
-        grantLocalNetwork()
+        if (Build.VERSION.SDK_INT < 37) return
+        grantProbeLocalNetwork()
+        grantRuntimePermission(packageName, Manifest.permission.ACCESS_LOCAL_NETWORK)
+        app.stopService(Intent(app, AutomationService::class.java))
+        SceneOverlayService.dismiss(app)
     }
 
     @Test
     fun localNetworkPermissionMatrixCoversGrantRevokeAndRegrant() = runBlocking {
         val deniedHttpUrl = "http://127.0.0.1:9/denied"
 
-        revokeLocalNetwork()
+        revokeProbeLocalNetwork()
         assertLocalNetworkDenied(HttpGetAction().run(ctx(), mapOf("url" to deniedHttpUrl, "allow_http" to "true")))
         assertLocalNetworkDenied(PingAction().run(ctx(), mapOf("host" to "127.0.0.1", "timeout_sec" to "1")))
         assertLocalNetworkDenied(
@@ -61,8 +78,8 @@ class Api37LocalNetworkInstrumentedTest {
             ),
         )
 
-        grantLocalNetwork()
-        assertLocalNetworkGranted()
+        grantProbeLocalNetwork()
+        assertProbeLocalNetworkGranted()
         assertLocalHttpSuccess()
         assertEquals(ActionResult.Success, PingAction().run(ctx(), mapOf("host" to "127.0.0.1", "timeout_sec" to "1")))
         assertEquals(
@@ -77,30 +94,26 @@ class Api37LocalNetworkInstrumentedTest {
             ),
         )
 
-        revokeLocalNetwork()
+        revokeProbeLocalNetwork()
         assertLocalNetworkDenied(PingAction().run(ctx(), mapOf("host" to "127.0.0.1", "timeout_sec" to "1")))
 
-        grantLocalNetwork()
-        assertLocalNetworkGranted()
+        grantProbeLocalNetwork()
+        assertProbeLocalNetworkGranted()
         assertEquals(ActionResult.Success, PingAction().run(ctx(), mapOf("host" to "127.0.0.1", "timeout_sec" to "1")))
     }
 
     @Test
     fun api37BackgroundServiceNotificationBluetoothOverlayAndBackSmoke() {
-        grantRuntimePermission(Manifest.permission.POST_NOTIFICATIONS)
-        grantRuntimePermission(Manifest.permission.BLUETOOTH_SCAN)
-        grantRuntimePermission(Manifest.permission.BLUETOOTH_CONNECT)
+        grantRuntimePermission(packageName, Manifest.permission.POST_NOTIFICATIONS)
+        grantRuntimePermission(packageName, Manifest.permission.BLUETOOTH_SCAN)
+        grantRuntimePermission(packageName, Manifest.permission.BLUETOOTH_CONNECT)
         shell("appops set $packageName SYSTEM_ALERT_WINDOW allow")
         shell("logcat -c")
 
         ContextCompat.startForegroundService(app, Intent(app, AutomationService::class.java))
         assertDumpContains("dumpsys activity services $packageName", "AutomationService")
 
-        val notificationDump = shell("dumpsys notification --noredact")
-        assertTrue(
-            "expected foreground-service notification evidence",
-            notificationDump.contains("OpenTasker is running") || notificationDump.contains("opentasker.engine"),
-        )
+        assertDumpContains("dumpsys notification --noredact", "opentasker.engine")
 
         val bluetoothDump = shell("dumpsys bluetooth_manager")
         assertTrue("expected Bluetooth service dump", bluetoothDump.isNotBlank())
@@ -138,7 +151,7 @@ class Api37LocalNetworkInstrumentedTest {
     }
 
     private fun ctx(variables: VariableStore = VariableStore()): ActionContext =
-        ActionContext(app, variables)
+        ActionContext(permissionProbeContext, variables)
 
     private suspend fun assertLocalHttpSuccess() {
         val variables = VariableStore()
@@ -164,24 +177,29 @@ class Api37LocalNetworkInstrumentedTest {
         )
     }
 
-    private fun assertLocalNetworkGranted() {
+    private fun assertProbeLocalNetworkGranted() {
         assertEquals(
             PackageManager.PERMISSION_GRANTED,
-            app.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK),
+            app.packageManager.checkPermission(
+                Manifest.permission.ACCESS_LOCAL_NETWORK,
+                permissionProbePackageName,
+            ),
         )
     }
 
-    private fun grantLocalNetwork() {
-        grantRuntimePermission(Manifest.permission.ACCESS_LOCAL_NETWORK)
+    private fun grantProbeLocalNetwork() {
+        grantRuntimePermission(permissionProbePackageName, Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
 
-    private fun revokeLocalNetwork() {
-        shell("pm revoke $packageName ${Manifest.permission.ACCESS_LOCAL_NETWORK}")
-        shell("pm clear-permission-flags $packageName ${Manifest.permission.ACCESS_LOCAL_NETWORK} user-set user-fixed")
+    private fun revokeProbeLocalNetwork() {
+        instrumentation.uiAutomation.revokeRuntimePermission(
+            permissionProbePackageName,
+            Manifest.permission.ACCESS_LOCAL_NETWORK,
+        )
     }
 
-    private fun grantRuntimePermission(permission: String) {
-        shell("pm grant $packageName $permission")
+    private fun grantRuntimePermission(targetPackage: String, permission: String) {
+        instrumentation.uiAutomation.grantRuntimePermission(targetPackage, permission)
     }
 
     private fun assertDumpContains(command: String, token: String, timeoutMs: Long = 5_000) {
@@ -205,19 +223,19 @@ class Api37LocalNetworkInstrumentedTest {
         ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
             val worker = thread(start = true, name = "api37-loopback-http") {
                 server.accept().use { socket ->
-                    socket.getInputStream().bufferedReader().use { reader ->
-                        while (reader.readLine()?.isNotEmpty() == true) {
-                            // Drain request headers before writing the fixed response.
-                        }
+                    val reader = socket.getInputStream().bufferedReader()
+                    while (reader.readLine()?.isNotEmpty() == true) {
+                        // Drain request headers before writing the fixed response. Closing this
+                        // reader would also close the socket before its response can be written.
                     }
                     val bytes = body.toByteArray(Charsets.UTF_8)
-                    socket.getOutputStream().use { output ->
-                        output.write("HTTP/1.1 200 OK\r\n".toByteArray(Charsets.US_ASCII))
-                        output.write("Content-Type: text/plain\r\n".toByteArray(Charsets.US_ASCII))
-                        output.write("Content-Length: ${bytes.size}\r\n".toByteArray(Charsets.US_ASCII))
-                        output.write("Connection: close\r\n\r\n".toByteArray(Charsets.US_ASCII))
-                        output.write(bytes)
-                    }
+                    val output = socket.getOutputStream()
+                    output.write("HTTP/1.1 200 OK\r\n".toByteArray(Charsets.US_ASCII))
+                    output.write("Content-Type: text/plain\r\n".toByteArray(Charsets.US_ASCII))
+                    output.write("Content-Length: ${bytes.size}\r\n".toByteArray(Charsets.US_ASCII))
+                    output.write("Connection: close\r\n\r\n".toByteArray(Charsets.US_ASCII))
+                    output.write(bytes)
+                    output.flush()
                 }
             }
             runBlocking { block("http://127.0.0.1:${server.localPort}/api37") }

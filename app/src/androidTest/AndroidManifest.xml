@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        Api37LocalNetworkInstrumentedTest changes this separate test package's real grant so
+        revocation does not kill the OpenTasker process that hosts instrumentation.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+</manifest>

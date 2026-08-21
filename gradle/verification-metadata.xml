@@ -7,6 +7,11 @@
          <ignored-key id="6A65176A0FB1CD0B" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
          <ignored-key id="E2F38302C8075E3D" reason="Key couldn't be downloaded from any key server" />
          <ignored-key id="4B1E11D5A4B91E89" reason="Key couldn't be downloaded from any key server" />
+         <ignored-key id="E16AB52D79FD224F" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
+         <ignored-key id="79752DB6C966F0B8" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
+         <ignored-key id="D9C565AA72BA2FDD" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
+         <ignored-key id="056ACA74D46000BF" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
+         <ignored-key id="571A5291E827E1C7" reason="Key couldn't be downloaded from any key server; SHA-256 checksums remain pinned" />
       </ignored-keys>
       <trusted-keys>
          <trusted-key id="04543577D6A9CC626239C50C7ECBD740FF06AEB5">

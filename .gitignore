@@ -13,6 +13,8 @@ fdroid/srclibs/
 fdroid/tmp/
 fdroid/unsigned/
 captures/
+# Local device-evidence scratch (screenshots, UI dumps, snapshots pulled off a device)
+work/
 .externalNativeBuild/
 .cxx/
 *.apk

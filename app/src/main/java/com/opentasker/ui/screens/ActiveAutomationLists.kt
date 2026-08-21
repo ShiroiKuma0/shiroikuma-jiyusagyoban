@@ -1040,15 +1040,19 @@ private fun ActionRow(
                     Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_more))
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    // The menu item text is only "Move up"/"Move down", so without an explicit
+                    // description a screen reader cannot say which action moves.
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.projects_move_up)) },
                         onClick = { menuExpanded = false; onMoveUp() },
                         enabled = canMoveUp,
+                        modifier = Modifier.semantics { contentDescription = moveUpDescription },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.projects_move_down)) },
                         onClick = { menuExpanded = false; onMoveDown() },
                         enabled = canMoveDown,
+                        modifier = Modifier.semantics { contentDescription = moveDownDescription },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_delete)) },
