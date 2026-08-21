@@ -260,6 +260,42 @@ class VariableSecretStorageTest {
     }
 
     @Test
+    fun selectedProjectMoveLeavesOtherVariablesAndKeepsSecretsReadable() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+        repository.upsert(Variable("TOKEN", "secret", isGlobal = true, isSecret = true, projectId = 5L))
+        repository.upsert(Variable("Keep", "source", isGlobal = true, projectId = 5L))
+
+        repository.withMutationLock {
+            reassignProject(setOf("TOKEN"), fromProjectId = 5L, toProjectId = 9L)
+        }
+
+        assertEquals("secret", repository.get("TOKEN", 9L)?.value)
+        assertEquals("source", repository.get("Keep", 5L)?.value)
+        assertNull(repository.get("TOKEN", 5L))
+    }
+
+    @Test
+    fun storedSecretSnapshotRestoresTheOriginalReadableCiphertext() = runBlocking {
+        val dao = FakeVariableDao()
+        val repository = VariableRepository(dao, codec(newKey()))
+        repository.upsert(Variable("TOKEN", "secret", isGlobal = true, isSecret = true, projectId = 5L))
+
+        val snapshot = repository.withMutationLock {
+            val stored = requireNotNull(getStored("TOKEN", 5L))
+            assertFalse(stored.value.contains("secret"))
+            delete("TOKEN", 5L)
+            stored
+        }
+        assertNull(repository.get("TOKEN", 5L))
+
+        repository.withMutationLock { restoreStored(snapshot) }
+
+        assertEquals("secret", repository.get("TOKEN", 5L)?.value)
+        assertEquals(snapshot, dao.getInProject("TOKEN", 5L))
+    }
+
+    @Test
     fun movingAnUndecryptableSecretAbortsInsteadOfRelocatingDeadCiphertext() = runBlocking {
         // An envelope written under a key this install no longer has (rotated/lost Keystore key).
         val orphaned = codec(newKey()).encrypt(5L, "API_TOKEN", "token-123")
@@ -304,6 +340,11 @@ class VariableSecretStorageTest {
 
         override suspend fun insert(v: VariableEntity) {
             state.value = state.value.filterNot { it.name == v.name && it.projectId == v.projectId } + v
+        }
+
+        override suspend fun insertStrict(v: VariableEntity) {
+            check(getInProject(v.name, v.projectId) == null)
+            state.value += v
         }
 
         override suspend fun insertAll(values: List<VariableEntity>) {

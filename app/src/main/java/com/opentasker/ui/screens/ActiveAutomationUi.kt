@@ -500,6 +500,8 @@ fun ActiveAutomationUi(
                         EditHistoryDao.TYPE_PROFILE -> viewModel.undoLastProfileEdit(action.entityId)
                         EditHistoryDao.TYPE_TASK -> viewModel.undoLastTaskEdit(action.entityId)
                         EditHistoryDao.TYPE_SCENE -> viewModel.undoLastSceneEdit(action.entityId)
+                        EditHistoryDao.TYPE_VARIABLE -> viewModel.undoLastVariableDelete(action.entityId)
+                        EditHistoryDao.TYPE_PROJECT -> viewModel.undoLastProjectDelete(action.entityId)
                         else -> Unit
                     }
                     null -> Unit

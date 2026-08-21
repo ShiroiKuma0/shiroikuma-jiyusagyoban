@@ -82,5 +82,7 @@ interface EditHistoryDao {
         const val TYPE_PROFILE = "profile"
         const val TYPE_TASK = "task"
         const val TYPE_SCENE = "scene"
+        const val TYPE_VARIABLE = "variable"
+        const val TYPE_PROJECT = "project"
     }
 }

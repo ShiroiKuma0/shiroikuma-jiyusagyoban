@@ -12,8 +12,10 @@ import androidx.room.Update
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
 
 @Entity("variables", primaryKeys = ["projectId", "name"], indices = [Index("name"), Index("projectId")])
+@Serializable
 data class VariableEntity(
     val name: String,
     val value: String,
@@ -37,6 +39,7 @@ fun Variable.toEntity(): VariableEntity {
 @Dao
 interface VariableDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(v: VariableEntity)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertStrict(v: VariableEntity)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(values: List<VariableEntity>)
     @Upsert suspend fun upsert(v: VariableEntity)
     @Upsert suspend fun upsertAll(values: List<VariableEntity>)
