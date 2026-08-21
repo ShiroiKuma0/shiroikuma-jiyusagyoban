@@ -188,6 +188,9 @@ class ReleaseTruthContractTest {
         )
         assertTrue("RequireReleaseTag" in generator)
         assertTrue("releaseTagCommit" in generator)
+        assertTrue("ConvertTo-Json -Depth 6).Replace(\"`r`n\", \"`n\")" in generator)
+        assertTrue("releaseTruthJson + \"`n\"" in generator)
+        assertFalse("[Environment]::NewLine" in generator)
         assertFalse("engineHandledActions = 7" in generator)
     }
 
