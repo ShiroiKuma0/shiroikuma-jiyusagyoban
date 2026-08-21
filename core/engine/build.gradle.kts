@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
+    // TaskFailure carries @Serializable types; without this the module compiles them with no
+    // generated serializer and every structured failure throws at runtime.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,54 +18,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    sourceSets {
-        getByName("main").kotlin.directories.apply {
-            clear()
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/ActiveExecutionRegistry.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/AutomationLiveConditionState.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/CausalExecutionTracker.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/CooldownReservations.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/CooldownStore.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/EngineHeartbeatStore.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/ExecutionEnvelope.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/RunLogSource.kt")
-            add("$rootDir/app/src/main/java/com/opentasker/core/engine/TaskFailure.kt")
-        }
-    }
 }
 
 kotlin {
-    sourceSets {
-        configureEach {
-            kotlin.exclude(
-                "**/Action.kt",
-                "**/AutomationService.kt",
-                "**/BootReceiver.kt",
-                "**/ContextMonitorLifecycle.kt",
-                "**/DirectBootTimeScheduler.kt",
-                "**/DirectBootTriggerStore.kt",
-                "**/EngineWatchdogWorker.kt",
-                "**/ExecutionAdmissionController.kt",
-                "**/ExecutionAdmissionStrings.kt",
-                "**/ExecutionEnvelope.kt",
-                "**/ExecutionJournal.kt",
-                "**/FlowStructure.kt",
-                "**/HeldExecution.kt",
-                "**/PreflightRunner.kt",
-                "**/ProfileMatcherImpl.kt",
-                "**/PulseEventContinuity.kt",
-                "**/RunLogDiagnostics.kt",
-                "**/RunLogPruneWorker.kt",
-                "**/SyntheticTriggerSimulation.kt",
-                "**/TaskCollisionCoordinator.kt",
-                "**/TaskDispatchPolicy.kt",
-                "**/TaskExecutionHelper.kt",
-                "**/TaskRunner.kt",
-                "**/VariableStore.kt",
-            )
-        }
-    }
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }

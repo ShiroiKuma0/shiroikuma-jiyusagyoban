@@ -51,8 +51,8 @@ class CoreModuleBoundaryTest {
         }
     }
 
-    /** Modules that physically own their sources. The rest still borrow app's; see A-99. */
-    private val migratedModules = listOf("core/model", "core/common", "core/storage")
+    /** Every module owns its sources; none of them borrow app's any more. */
+    private val migratedModules = listOf("core/model", "core/common", "core/storage", "core/engine", "feature/automation")
 
     @Test
     fun migratedModulesOwnTheirSourcesInsteadOfBorrowingApps() {
@@ -75,17 +75,6 @@ class CoreModuleBoundaryTest {
                     )
                 }
             }
-        }
-    }
-
-    @Test
-    fun modulesStillBorrowingAppSourcesAreDocumented() {
-        val appBuild = source("app/build.gradle.kts")
-        listOf(
-            "com/opentasker/core/engine/ActiveExecutionRegistry.kt",
-            "com/opentasker/core/engine/ExecutionEnvelope.kt",
-        ).forEach { sourcePath ->
-            assertTrue("App source exclusion missing: $sourcePath", appBuild.contains(sourcePath))
         }
     }
 

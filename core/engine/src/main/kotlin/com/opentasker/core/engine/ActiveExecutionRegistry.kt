@@ -92,7 +92,9 @@ object ActiveExecutionRegistry {
     }
 
     /** Test seam: drops all tracked state without touching the jobs. */
-    internal fun reset() = synchronized(jobs) {
+    // Public because the registry's tests live with the run-log helpers they assert against,
+    // which are still app-side. core:engine is a module now, so internal no longer reaches them.
+    fun reset() = synchronized(jobs) {
         jobs.clear()
         executions.value = emptyList()
     }

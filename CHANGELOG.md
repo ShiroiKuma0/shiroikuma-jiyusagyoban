@@ -28,6 +28,7 @@
 
 ### Changed
 
+- The `core` modules own their sources. They used to point their source sets at files under `app/`, so the app and each module compiled the same classes and the module dependencies had to be `compileOnly` to stop R8 rejecting the duplicates. Model, logging, storage and the engine primitives now live in their own directories and the app depends on them for real. The release APK holds exactly the same classes it did before the move.
 - Scenes declare only the four element types that actually draw: button, text, slider and image. The other twelve (edit text, checkbox, toggle, number picker, spinner, map, web, menu, video, oval, rectangle, doodle) were pickable in name only. The editor never offered them and the overlay drew a grey "unsupported" label, so they were removed rather than handed to translators. A scene saved with one of them still loads: the element becomes a text element, keeps its position, size and task bindings, and writes the fallback the next time the scene is saved.
 - The workspace view model and app shell were split below their line ceilings. Undo/redo restore, the Modify-system-settings admission check, and the navigation chrome each moved into their own file, and the source gates that used to require a symbol to live in a named file now scan the screens package instead. Behaviour is unchanged; the point is that the next feature no longer has to start with an unrelated extraction.
 - Package-archive API 35 calls keep a method-scoped NewApi suppress instead of silencing the whole helper object.
