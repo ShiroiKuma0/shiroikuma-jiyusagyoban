@@ -1,0 +1,5 @@
+Import MacroDroid .mdr backups and .macro shares through a disabled-by-default review.
+Undo variable and project deletion, including encrypted secret restoration.
+Scan nearby Wi-Fi access points and control always-on display state.
+Improve scheduling, plugin, import, storage, and diagnostics reliability.
+Refresh the workspace layout and split core modules cleanly.
