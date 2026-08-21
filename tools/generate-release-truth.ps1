@@ -105,9 +105,10 @@ $truth = [ordered]@{
 }
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $OutputPath) -Force | Out-Null
+$releaseTruthJson = ($truth | ConvertTo-Json -Depth 6).Replace("`r`n", "`n")
 [IO.File]::WriteAllText(
     $OutputPath,
-    ($truth | ConvertTo-Json -Depth 6) + [Environment]::NewLine,
+    $releaseTruthJson + "`n",
     [Text.UTF8Encoding]::new($false)
 )
 Write-Host "Release truth manifest generated at $OutputPath"
