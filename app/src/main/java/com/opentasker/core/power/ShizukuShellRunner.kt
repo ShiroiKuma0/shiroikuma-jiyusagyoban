@@ -221,6 +221,12 @@ internal object ShizukuCommandPolicy {
             listOf("svc", "data", "enable"),
             listOf("svc", "data", "disable"),
         ),
+        // Writing the key succeeds on builds that ignore it, so the action reads the value back
+        // rather than trusting a zero exit code.
+        "aod.set" to listOf(
+            listOf("settings", "put", "secure", "doze_always_on", "1"),
+            listOf("settings", "put", "secure", "doze_always_on", "0"),
+        ),
         "screenshot.take" to listOf(
             listOf("screencap", "-p"),
         ),

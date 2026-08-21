@@ -127,6 +127,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "volume.set",
     "airplane.toggle",
     "mobile.toggle",
+    "aod.set",
     "screen.timeout",
     "dnd.set",
     "ringer.set",
@@ -685,6 +686,18 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
                 ActionField("state", R.string.catalog_action_airplane_toggle_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_airplane_toggle_field_state_hint, options = toggleOptions),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "aod.set",
+            nameRes = R.string.catalog_action_aod_set_name,
+            descriptionRes = R.string.catalog_action_aod_set_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField("state", R.string.catalog_action_aod_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_aod_set_field_state_hint, options = toggleOptions),
             )
         )
     )

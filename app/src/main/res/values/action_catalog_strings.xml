@@ -293,6 +293,10 @@
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">Stream</string>
     <string name="catalog_action_volume_set_field_stream_hint" formatted="false">music, call, alarm</string>
     <string name="catalog_action_volume_set_field_level_label" formatted="false">Level (0-100)</string>
+    <string name="catalog_action_aod_set_name" formatted="false">Always-On Display</string>
+    <string name="catalog_action_aod_set_description" formatted="false">Turn the always-on display on or off</string>
+    <string name="catalog_action_aod_set_field_state_label" formatted="false">State</string>
+    <string name="catalog_action_aod_set_field_state_hint" formatted="false">on/off/toggle</string>
     <string name="catalog_action_airplane_toggle_name" formatted="false">Toggle Airplane Mode</string>
     <string name="catalog_action_airplane_toggle_description" formatted="false">Turn Airplane mode on or off</string>
     <string name="catalog_action_airplane_toggle_field_state_label" formatted="false">State</string>

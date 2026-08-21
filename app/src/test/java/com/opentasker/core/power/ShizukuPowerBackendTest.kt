@@ -80,6 +80,10 @@ class ShizukuPowerBackendTest {
                 listOf("svc", "data", "enable"),
                 listOf("svc", "data", "disable"),
             ),
+            "aod.set" to listOf(
+                listOf("settings", "put", "secure", "doze_always_on", "1"),
+                listOf("settings", "put", "secure", "doze_always_on", "0"),
+            ),
             "screenshot.take" to listOf(listOf("screencap", "-p")),
             "reboot" to listOf(listOf("svc", "power", "reboot", "false")),
             "screen.off" to listOf(listOf("input", "keyevent", "223")),
@@ -102,6 +106,10 @@ class ShizukuPowerBackendTest {
             ),
         )
         assertFalse(ShizukuCommandPolicy.isExact("airplane.toggle", listOf("settings", "put", "global", "airplane_mode_on", "1", "--user", "0")))
+        assertFalse(
+            "The always-on display write must not accept another secure key",
+            ShizukuCommandPolicy.isExact("aod.set", listOf("settings", "put", "secure", "doze_enabled", "1")),
+        )
     }
 
     @Test

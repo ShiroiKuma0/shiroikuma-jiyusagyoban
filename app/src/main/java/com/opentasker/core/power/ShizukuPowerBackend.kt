@@ -17,6 +17,7 @@ object ShizukuPowerBackend {
     val elevatedActionIds: Set<String> = setOf(
         "airplane.toggle",
         "mobile.toggle",
+        "aod.set",
         "screenshot.take",
         "reboot",
         "screen.off",

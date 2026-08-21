@@ -107,6 +107,7 @@ object AutomationSensitivityRegistry {
         "brightness.set",
         "volume.set",
         "airplane.toggle",
+        "aod.set",
         "mobile.toggle",
         "screen.timeout",
         "dnd.set",
