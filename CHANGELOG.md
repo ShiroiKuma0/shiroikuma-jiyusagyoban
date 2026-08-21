@@ -14,6 +14,8 @@
 
 ### Added
 
+- An instrumented test compiles every regex literal declared in production source against Android's ICU engine. `:app:generateRegexCorpus` extracts the patterns into an androidTest asset, and the test fails on any the device rejects. Three shipped defects came from patterns that compile on a desktop JVM and do not on Android, and a JVM suite structurally cannot see them.
+
 - `CONTRIBUTING.md`, with the build and test commands, a map of the package layout, and the source guards that fail a build before review.
 - `docs/EXTERNAL_INTENTS.md` is now tracked, so the README's only documentation link resolves on github.com instead of 404ing. `:app:verifyDocumentationTruth` fails when the README links to a path that is missing or untracked.
 - Store listing icon and feature graphic at the Fastlane paths IzzyOnDroid reads, rendered from the shipped adaptive icon by `tools/render-store-assets.py`. `:app:verifyFdroidMetadata` now fails when either is missing or the wrong size.
