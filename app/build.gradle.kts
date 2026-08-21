@@ -89,6 +89,35 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
             "README capability counts do not match the current release contract."
         }
 
+        // A relative README link only resolves on github.com if the target is tracked. Most of this
+        // repository's markdown is deliberately ignored, so a link into docs/ reads fine locally and
+        // 404s for everyone else - which is how the only documentation link in the README stayed
+        // broken.
+        val root = repositoryRoot.get().asFile
+        val untrackedLinks = Regex("""\[[^\]]*]\((?!https?://|#|mailto:)([^)#]+)[^)]*\)""")
+            .findAll(readme)
+            .map { it.groupValues[1].trim() }
+            .distinct()
+            .filter { target ->
+                val file = root.resolve(target)
+                !file.exists() || !isTrackedByGit(root, target)
+            }
+            .toList()
+        check(untrackedLinks.isEmpty()) {
+            "README links to paths that are missing or untracked, so they 404 on github.com: " +
+                untrackedLinks.joinToString()
+        }
+    }
+
+    private fun isTrackedByGit(root: File, path: String): Boolean {
+        if (!root.resolve(".git").exists()) return true
+        val process = ProcessBuilder("git", "ls-files", "--error-unmatch", "--", path)
+            .directory(root)
+            .redirectErrorStream(true)
+            .start()
+        process.inputStream.bufferedReader().readText()
+        return process.waitFor() == 0
+
         // These files were declared as inputs but never read, so the task invalidated its own
         // cache on every CHANGELOG edit while verifying nothing in it - and its description
         // claimed to check current release claims.

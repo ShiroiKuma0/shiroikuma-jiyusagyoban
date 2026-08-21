@@ -9,6 +9,8 @@
 
 ### Added
 
+- `CONTRIBUTING.md`, with the build and test commands, a map of the package layout, and the source guards that fail a build before review.
+- `docs/EXTERNAL_INTENTS.md` is now tracked, so the README's only documentation link resolves on github.com instead of 404ing. `:app:verifyDocumentationTruth` fails when the README links to a path that is missing or untracked.
 - Store listing icon and feature graphic at the Fastlane paths IzzyOnDroid reads, rendered from the shipped adaptive icon by `tools/render-store-assets.py`. `:app:verifyFdroidMetadata` now fails when either is missing or the wrong size.
 - `:app:verifyReleaseAssetName` stages the signed APK under its published name, `OpenTasker-v<versionName>.apk`, and fails if the staged file is still AGP's default `app-release.apk` or disagrees with the recorded release version.
 
