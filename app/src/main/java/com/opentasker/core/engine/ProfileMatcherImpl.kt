@@ -102,13 +102,14 @@ internal class ProfileMatcher(
                     } else {
                         event
                     }
+                    val identityEvent = ContextMatchEvaluator.withStablePulseIdentity(spec, preparedEvent)
                     val pulseObservation = if (isPulseContext) {
-                        pulseContinuity.observe(index, preparedEvent)
+                        pulseContinuity.observe(index, identityEvent)
                     } else {
                         null
                     }
                     if (pulseObservation?.duplicate == true) return@scan previous
-                    val matched = ContextMatchEvaluator.matches(spec, preparedEvent)
+                    val matched = ContextMatchEvaluator.matches(spec, identityEvent)
                     val effectiveMatched = if (spec.invert) !matched else matched
                     ContextMatchUpdate(
                         matched = effectiveMatched,
@@ -118,7 +119,7 @@ internal class ProfileMatcher(
                             observedSequence = pulseObservation?.sequence,
                             previousSequence = previous.pulseSequence,
                         ),
-                        event = if (isPulseContext && effectiveMatched) preparedEvent else null,
+                        event = if (isPulseContext && effectiveMatched) identityEvent else null,
                     )
                 }.onEach { update ->
                     AutomationLiveConditionState.updateContext(profile.id, index, update.matched)
