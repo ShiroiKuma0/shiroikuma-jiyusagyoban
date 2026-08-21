@@ -548,6 +548,26 @@ class OpenTaskerBundleCodecTest {
         assertTrue(plan.warnings.any { it.startsWith("Invalid blueprint") })
     }
 
+    @Test
+    fun blueprintInputKeysCannotCollideWithSectionHeaderKeys() {
+        val template = ProfileTemplateCatalog.get("app-usage-reminder")!!
+        val colliding = template.copy(
+            inputs = listOf(
+                template.inputs.first().copy(key = "${BLUEPRINT_SECTION_KEY_PREFIX}General"),
+            ),
+        )
+        val plan = OpenTaskerBundleCodec.validate(
+            OpenTaskerBundle(
+                appVersion = "0.2.88",
+                exportedAtEpochMs = 123L,
+                blueprints = listOf(colliding),
+            ),
+        )
+
+        assertFalse(plan.canImport)
+        assertTrue(plan.warnings.any { it.contains("collides with the section-header key namespace") })
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun codecRejectsDirectSecretSerialization() {
         OpenTaskerBundleCodec.encode(

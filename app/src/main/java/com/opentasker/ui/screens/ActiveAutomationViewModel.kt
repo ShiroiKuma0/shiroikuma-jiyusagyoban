@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.annotation.SuppressLint
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
@@ -10,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.app.R
+import com.opentasker.core.capabilities.WriteSettingsAdmission
 import com.opentasker.core.capabilities.AutomationFeedbackRiskAnalyzer
 import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintReport
@@ -136,7 +138,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
-import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -842,7 +843,9 @@ class ActiveAutomationViewModel(
             )
             requireValidProfileFieldLimits(profile)
             val lint = requireAutomationLint(profile)
-            db.profileDao().upsert(reviewFeedbackRisk(profile).toEntity())
+            val reviewed = reviewFeedbackRisk(profile)
+            requireWriteSettingsIfEnabled(reviewed)
+            db.profileDao().upsert(reviewed.toEntity())
             emitLintWarnings(profile, lint)
         }
 
@@ -892,6 +895,9 @@ class ActiveAutomationViewModel(
                     (reviewedProfile.enabled || !reviewedProfile.requiresRiskAcknowledgement)
                 ) {
                     throw IllegalStateException("Review imported automation powers before enabling this profile.")
+                }
+                if (reviewedProfile.enabled && previous?.enabled != true) {
+                    requireWriteSettingsIfEnabled(reviewedProfile)
                 }
                 if (previousEntity != null) {
                     recordEdit(
@@ -1014,6 +1020,7 @@ class ActiveAutomationViewModel(
             check(review.canAcknowledge) {
                 "Resolve unsupported actions, missing references, and blocking automation lint findings before enabling this imported profile."
             }
+            requireWriteSettingsIfEnabled(current.copy(enabled = true))
             val enabledProfile = current.copy(
                 enabled = true,
                 requiresRiskAcknowledgement = false,
@@ -1558,11 +1565,11 @@ class ActiveAutomationViewModel(
                 val report = DiagnosticExport.buildReport(appContext, db)
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, "OpenTasker Diagnostic Report")
+                    putExtra(Intent.EXTRA_SUBJECT, appContext.getString(R.string.diagnostics_share_subject))
                     putExtra(Intent.EXTRA_TEXT, report)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                appContext.startActivity(Intent.createChooser(intent, appContext.getString(R.string.diagnostics_share_chooser)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
                 events.send(errorMessage(ex, R.string.ui_error_share_diagnostics))
             }
@@ -1722,6 +1729,7 @@ class ActiveAutomationViewModel(
             if (_runActionBusy.value) return@launch
             _runActionBusy.value = true
             runCatching {
+                requireWriteSettingsReady(task.actions)
                 executeAndLogTask(
                     appContext = appContext,
                     db = db,
@@ -1918,6 +1926,7 @@ class ActiveAutomationViewModel(
                     EditHistoryDao.TYPE_PROFILE -> {
                         if (db.profileDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.profile(snapshot.previousJson, entityId)
+                        requireWriteSettingsIfEnabled(restored)
                         db.profileDao().insert(restored.toEntity())
                         history.markUndone(snapshot.id, "")
                         return@withTransaction AutomationSemanticDiff.compareProfile(null, restored)
@@ -1953,6 +1962,7 @@ class ActiveAutomationViewModel(
                     EditHistoryDao.TYPE_PROFILE -> {
                         if (db.profileDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId)
+                        requireWriteSettingsIfEnabled(restored)
                         db.profileDao().insert(restored.toEntity())
                         history.markRedone(snapshot.id)
                         return@withTransaction AutomationSemanticDiff.compareProfile(null, restored)
@@ -2049,6 +2059,7 @@ class ActiveAutomationViewModel(
                     current.contextsJson
                 }
                 val target = EditHistorySnapshotDecoder.profile(targetJson, entityId)
+                requireWriteSettingsIfEnabled(target)
                 val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
                     ?: AutomationSemanticDiff.compareProfile(currentDecoded.value, target)?.let(::documentOf)
                     ?: SemanticDiffDocument()
@@ -2299,6 +2310,22 @@ class ActiveAutomationViewModel(
         )
     }
 
+    private suspend fun profileActions(profile: Profile): List<ActionSpec> {
+        val ids = listOfNotNull(profile.enterTaskId, profile.exitTaskId, profile.fallbackTaskId).distinct()
+        return ids.flatMap { id -> db.taskDao().getById(id)?.toDomain()?.actions.orEmpty() }
+    }
+
+    private suspend fun requireWriteSettingsIfEnabled(profile: Profile) {
+        if (!profile.enabled) return
+        requireWriteSettingsReady(profileActions(profile))
+    }
+
+    private fun requireWriteSettingsReady(actions: List<ActionSpec>) {
+        if (WriteSettingsAdmission.blocked(actions, Settings.System.canWrite(appContext))) {
+            throw UiRejection(R.string.ui_error_write_settings_required)
+        }
+    }
+
     /**
      * [onSaved] runs only when [block] succeeded. Editors use it to close themselves: closing
      * unconditionally at the call site is what discarded a whole form whenever validation the
@@ -2355,44 +2382,3 @@ class ActiveAutomationViewModelFactory(
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
-
-internal fun readBoundedTaskerXml(context: Context, uri: Uri): String {
-    return readBoundedDocumentText(
-        context = context,
-        uri = uri,
-        maxBytes = TASKER_XML_IMPORT_MAX_BYTES,
-        label = "Tasker XML file",
-    )
-}
-
-internal fun readBoundedOpenTaskerBundle(context: Context, uri: Uri): String {
-    return readBoundedDocumentText(
-        context = context,
-        uri = uri,
-        maxBytes = OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES,
-        label = "OpenTasker bundle",
-    )
-}
-
-internal fun readBoundedDocumentText(context: Context, uri: Uri, maxBytes: Int, label: String): String {
-    val stream = context.contentResolver.openInputStream(uri)
-        ?: error("Unable to open selected $label")
-    ByteArrayOutputStream().use { output ->
-        stream.use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            var totalBytes = 0
-            while (true) {
-                val read = input.read(buffer)
-                if (read == -1) break
-                totalBytes += read
-                require(totalBytes <= maxBytes) {
-                    "$label is larger than ${maxBytes / (1024 * 1024)} MB"
-                }
-                output.write(buffer, 0, read)
-            }
-        }
-        return output.toString(Charsets.UTF_8.name())
-    }
-}
-
-private fun plural(count: Int): String = if (count == 1) "" else "s"

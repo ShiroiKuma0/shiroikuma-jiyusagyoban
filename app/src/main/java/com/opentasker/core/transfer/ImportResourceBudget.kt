@@ -98,10 +98,7 @@ internal object ImportResourceGuard {
             // Best-effort only: Android's Harmony/Expat factories throw SAXNotRecognizedException
             // for the Apache feature URI, and making it fatal broke every device import (issue #5).
             // The DOCTYPE guarantee is enforced by the text checks above and sanitizeTaskerXml.
-            setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
-            setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
-            setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            applyImportHardening()
         }
         val handler = XmlBudgetHandler(budget)
         try {
@@ -452,10 +449,6 @@ private class XmlBudgetHandler(private val budget: ImportResourceBudget) : Defau
 }
 
 private class BudgetSaxException(val violation: ImportBudgetExceededException) : SAXException(violation.message)
-
-private fun SAXParserFactory.setFeatureSafely(name: String, value: Boolean) {
-    runCatching { setFeature(name, value) }
-}
 
 private fun Char.isJsonTokenBoundary(): Boolean =
     isWhitespace() || this == '"' || this == '{' || this == '}' || this == '[' || this == ']' ||

@@ -10,6 +10,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.xml.sax.InputSource
 import com.opentasker.core.transfer.ImportResourceGuard
+import com.opentasker.core.transfer.applyImportHardening
 
 /**
  * Deterministic, on-device parser that turns a JSON / CSV / XML / HTML string into one or more variable
@@ -165,10 +166,7 @@ object StructuredDataReader {
             ?: return null
         val doc = runCatching {
             val factory = DocumentBuilderFactory.newInstance().apply {
-                setFeatureSafely("http://apache.org/xml/features/disallow-doctype-decl", true)
-                setFeatureSafely("http://xml.org/sax/features/external-general-entities", false)
-                setFeatureSafely("http://xml.org/sax/features/external-parameter-entities", false)
-                setFeatureSafely("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+                applyImportHardening()
                 isExpandEntityReferences = false
                 isNamespaceAware = false
             }
@@ -182,14 +180,6 @@ object StructuredDataReader {
             current = current.flatMap { el -> el.childElements().filter { it.tagName == name } }
         }
         return current.map { it.textContent.trim() }
-    }
-
-    /**
-     * Android's XML factories throw for feature URIs they do not recognise; a fatal setFeature is
-     * what made every XML read fail on device.
-     */
-    private fun DocumentBuilderFactory.setFeatureSafely(name: String, value: Boolean) {
-        runCatching { setFeature(name, value) }
     }
 
     private fun Element.childElements(): List<Element> {
