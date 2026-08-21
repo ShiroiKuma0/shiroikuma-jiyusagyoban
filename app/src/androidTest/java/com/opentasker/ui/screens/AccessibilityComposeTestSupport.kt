@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.tryPerformAccessibilityChecks
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -17,5 +18,9 @@ internal fun createAccessibilityComposeRule(): AndroidComposeTestRule<
 }
 
 internal fun AndroidComposeTestRule<*, *>.performAccessibilityChecks() {
+    waitUntil(timeoutMillis = 10_000) {
+        runCatching { onAllNodes(isRoot()).fetchSemanticsNodes().isNotEmpty() }.getOrDefault(false)
+    }
     onRoot().tryPerformAccessibilityChecks()
+    waitForIdle()
 }

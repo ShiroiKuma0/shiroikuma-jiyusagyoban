@@ -7,19 +7,24 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
 import com.opentasker.core.actions.ActionFieldOption
@@ -70,7 +75,7 @@ class CriticalFlowComposeTest {
     }
 
     @Test
-    fun setupOnboardingShowsThemeAndBackupEntryPoints() {
+    fun settingsShowsThemeBackupAndLocaleEntryPoints() {
         composeTestRule.setContent {
             TestTheme {
                 PermissionOnboardingScreen(
@@ -84,17 +89,31 @@ class CriticalFlowComposeTest {
                     onCreateBackup = {},
                     onExportBackup = {},
                     onImportBackup = {},
+                    settingsOnly = true,
                 )
             }
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithText("Setup checklist").assertIsDisplayed()
+        // settingsOnly drops the checklist summary card; the screen title itself belongs to the
+        // app shell, not to this composable.
+        composeTestRule.onNodeWithText("OpenTasker can run with missing access", substring = true)
+            .assertDoesNotExist()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Theme"))
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
+        // The card's second line is whatever mode this device has persisted, so assert the picker
+        // offers the modes instead of pinning the test to device preference state.
+        composeTestRule.onNodeWithContentDescription("Theme").performClick()
+        // Only the menu entries are clickable; the card's own subtitle repeats whichever label
+        // this device has persisted.
+        composeTestRule.onNode(hasText("System") and hasClickAction()).assertIsDisplayed()
+        composeTestRule.onNode(hasText("AMOLED black") and hasClickAction()).assertIsDisplayed()
+        Espresso.pressBack()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Backup and restore"))
         composeTestRule.onNodeWithText("Backup and restore").assertIsDisplayed()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Locale execution grants"))
         composeTestRule.onNodeWithText("Locale execution grants").assertIsDisplayed()
         composeTestRule.onNodeWithText("No Locale execution grants are issued.").assertIsDisplayed()
-        composeTestRule.onNodeWithText("System").assertIsDisplayed()
     }
 
     @Test
@@ -190,7 +209,7 @@ class CriticalFlowComposeTest {
         assertEquals(43L, savedExitTaskId)
 
         composeTestRule.onNode(hasText("Exit task") and hasClickAction()).performScrollTo().performClick()
-        composeTestRule.onNode(hasText("None") and hasClickAction()).performClick()
+        composeTestRule.onAllNodes(hasText("None") and hasClickAction()).onLast().performClick()
         composeTestRule.onNodeWithText("Save").performClick()
         assertNull(savedExitTaskId)
     }
@@ -227,9 +246,10 @@ class CriticalFlowComposeTest {
         }
         composeTestRule.performAccessibilityChecks()
 
-        composeTestRule.onNodeWithContentDescription("Move action 2, Second, up")
-            .performScrollTo()
-            .performClick()
+        // Reorder now lives behind each action row's overflow menu (one "More" button per action),
+        // so open the second action's menu before asserting the labelled control.
+        composeTestRule.onAllNodesWithContentDescription("More").onLast().performScrollTo().performClick()
+        composeTestRule.onNodeWithContentDescription("Move action 2, Second, up").performClick()
 
         assertEquals(1 to 0, moved)
     }
@@ -260,6 +280,7 @@ class CriticalFlowComposeTest {
 
         // "Show Notification" is the dialog title and appears again in the action summary.
         composeTestRule.onAllNodesWithText("Show Notification").onFirst().assertIsDisplayed()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Required"))
         composeTestRule.onNodeWithText("Required").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
         assertTrue(!actionSaved)
@@ -340,6 +361,7 @@ class CriticalFlowComposeTest {
         composeTestRule.performAccessibilityChecks()
 
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("State *"))
         composeTestRule.onNode(hasText("State *") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("On").performClick()
         composeTestRule.onNodeWithText("Save").assertIsEnabled().performClick()
@@ -375,6 +397,7 @@ class CriticalFlowComposeTest {
         }
         composeTestRule.performAccessibilityChecks()
 
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("Milliseconds *"))
         composeTestRule.onNode(hasText("Milliseconds *") and hasSetTextAction()).performTextInput("1e3")
         composeTestRule.onNodeWithText("Enter a valid number.").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save").assertIsNotEnabled()

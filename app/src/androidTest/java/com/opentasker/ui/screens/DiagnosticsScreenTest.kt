@@ -2,9 +2,12 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.diagnostics.CrashLogRecord
 import com.opentasker.core.diagnostics.EngineHealthStatus
@@ -54,7 +57,10 @@ class DiagnosticsScreenTest {
         composeTestRule.onNodeWithText("Engine healthy").assertIsDisplayed()
         composeTestRule.onNodeWithText("Share redacted report").performClick()
         assertTrue(shared.get())
-        composeTestRule.onNodeWithText("crash-test.txt", substring = true).performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("engine ready").performScrollTo().assertIsDisplayed()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("crash-test.txt", substring = true))
+        composeTestRule.onNodeWithText("crash-test.txt", substring = true).assertIsDisplayed()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText("engine ready"))
+        composeTestRule.onNodeWithText("engine ready").assertIsDisplayed()
     }
 }

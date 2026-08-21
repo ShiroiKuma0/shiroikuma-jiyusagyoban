@@ -23,7 +23,34 @@ object DatabaseMigrations {
 
     val MIGRATION_1_2 = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE profiles ADD COLUMN automationMode TEXT NOT NULL DEFAULT 'SINGLE'")
+            db.execSQL(
+                """
+                CREATE TABLE `profiles_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `enabled` INTEGER NOT NULL,
+                    `enterTaskId` INTEGER NOT NULL,
+                    `exitTaskId` INTEGER,
+                    `cooldownSec` INTEGER NOT NULL,
+                    `contextsJson` TEXT NOT NULL,
+                    `automationMode` TEXT NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT INTO `profiles_new` (
+                    `id`, `name`, `enabled`, `enterTaskId`, `exitTaskId`, `cooldownSec`,
+                    `contextsJson`, `automationMode`
+                )
+                SELECT
+                    `id`, `name`, `enabled`, `enterTaskId`, `exitTaskId`, `cooldownSec`,
+                    `contextsJson`, 'SINGLE'
+                FROM `profiles`
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE `profiles`")
+            db.execSQL("ALTER TABLE `profiles_new` RENAME TO `profiles`")
         }
     }
 
@@ -174,15 +201,15 @@ object DatabaseMigrations {
 
     val MIGRATION_12_13 = object : Migration(12, 13) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE profiles ADD COLUMN maxActiveExecutions INTEGER")
-            db.execSQL("ALTER TABLE profiles ADD COLUMN burstLimit INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN maxActiveExecutions INTEGER DEFAULT NULL")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN burstLimit INTEGER DEFAULT NULL")
             db.execSQL("ALTER TABLE profiles ADD COLUMN overflowPolicy TEXT NOT NULL DEFAULT 'LOG'")
         }
     }
 
     val MIGRATION_13_14 = object : Migration(13, 14) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE profiles ADD COLUMN fallbackTaskId INTEGER")
+            db.execSQL("ALTER TABLE profiles ADD COLUMN fallbackTaskId INTEGER DEFAULT NULL")
         }
     }
 
