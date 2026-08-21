@@ -32,4 +32,37 @@ class ScheduledJobDiagnosticsContractTest {
         assertTrue("export must show pending-job history", "Pending job reason history" in export)
         assertTrue("export must show aggregate pending time", "Pending job duration stats" in export)
     }
+
+    @Test
+    fun everyScheduledWorkerRecordsWhyItLastStopped() {
+        val workerSources = mapOf(
+            "ENGINE_WATCHDOG" to "src/main/java/com/opentasker/core/engine/EngineWatchdogWorker.kt",
+            "RUN_LOG_PRUNE" to "src/main/java/com/opentasker/core/engine/RunLogPruneWorker.kt",
+            "CONFIGURATION_SNAPSHOT" to "src/main/java/com/opentasker/core/storage/ConfigurationSnapshotWorker.kt",
+            "UPDATE_CHECK" to "src/main/java/com/opentasker/core/updates/UpdateCheckWorker.kt",
+            "TEMPORARY_STATE_REVERT" to "src/main/java/com/opentasker/core/actions/TemporaryStateAction.kt",
+        )
+
+        workerSources.forEach { (worker, path) ->
+            val source = repoRoot.resolve(path).readText()
+            assertTrue(
+                "$worker must record how its run ended",
+                "recordingOutcome(ScheduledWorkerId.$worker)" in source,
+            )
+        }
+
+        val screen = repoRoot.resolve("src/main/java/com/opentasker/ui/screens/DiagnosticsScreen.kt").readText()
+        val export = repoRoot.resolve("src/main/java/com/opentasker/core/diagnostics/DiagnosticExport.kt").readText()
+
+        assertTrue("Diagnostics must list one row per scheduled worker", "ScheduledWorkerId.entries.forEach" in screen)
+        assertTrue("Stop reasons on screen must resolve through resources", "R.string.diagnostics_stop_reason_quota" in screen)
+        assertTrue("A stopped worker must be labelled differently from one that finished", "diagnostics_work_outcome_stopped" in screen)
+        assertTrue("Rows must carry the time the outcome was recorded", "outcome.timestampMillis" in screen)
+        assertTrue("The export must carry the same per-worker outcomes", "Scheduled work \${worker.key}" in export)
+        val store = repoRoot.resolve("src/main/java/com/opentasker/core/storage/ScheduledWorkOutcomes.kt").readText()
+        assertTrue(
+            "A platform stop must be recorded with the reason the platform gave",
+            "if (isStopped) store.recordStopped(worker, platformStopReason())" in store,
+        )
+    }
 }

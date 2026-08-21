@@ -10,6 +10,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.opentasker.app.BuildConfig
 import com.opentasker.core.actions.HttpRequestAction
+import com.opentasker.core.storage.ScheduledWorkerId
+import com.opentasker.core.storage.recordingOutcome
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
@@ -29,7 +31,10 @@ class UpdateCheckWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        recordingOutcome(ScheduledWorkerId.UPDATE_CHECK) { runWork() }
+
+    private suspend fun runWork(): Result {
         if (!UpdateCheckAvailability.isAvailable()) return Result.success()
         val settings = UpdateCheckSettings(applicationContext)
         if (!settings.load().enabled) return Result.success()

@@ -12,6 +12,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.storage.ScheduledWorkerId
+import com.opentasker.core.storage.recordingOutcome
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionResult
@@ -209,7 +211,10 @@ class TemporaryStateRevertWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        recordingOutcome(ScheduledWorkerId.TEMPORARY_STATE_REVERT) { runWork() }
+
+    private suspend fun runWork(): Result {
         val targetActionId = inputData.getString(TemporaryStateScheduler.INPUT_TARGET_ACTION)
             ?: return Result.failure()
         val restoreJson = inputData.getString(TemporaryStateScheduler.INPUT_RESTORE_ARGS)

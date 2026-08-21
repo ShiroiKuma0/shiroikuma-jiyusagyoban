@@ -7,6 +7,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.storage.ScheduledWorkerId
+import com.opentasker.core.storage.recordingOutcome
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.applyRetention
@@ -18,7 +20,10 @@ class RunLogPruneWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        recordingOutcome(ScheduledWorkerId.RUN_LOG_PRUNE) { runWork() }
+
+    private suspend fun runWork(): Result {
         val db = OpenTaskerApp_NoHilt.db
         val policy = RunLogRetentionSettings(applicationContext).load()
         val now = System.currentTimeMillis()

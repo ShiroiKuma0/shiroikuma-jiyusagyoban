@@ -23,7 +23,10 @@ class ConfigurationSnapshotWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        recordingOutcome(ScheduledWorkerId.CONFIGURATION_SNAPSHOT) { runWork() }
+
+    private suspend fun runWork(): Result {
         val settings = ConfigurationSnapshotSettings(applicationContext)
         val policy = settings.load()
         if (!policy.enabled) return Result.success()

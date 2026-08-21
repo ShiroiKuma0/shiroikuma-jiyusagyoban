@@ -6,9 +6,11 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.diagnostics.EngineHealthReader
+import com.opentasker.core.storage.ScheduledWorkerId
+import com.opentasker.core.storage.recordingOutcome
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.scheduling.ExpectedTriggerLedger
@@ -22,7 +24,10 @@ class EngineWatchdogWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result =
+        recordingOutcome(ScheduledWorkerId.ENGINE_WATCHDOG) { runWork() }
+
+    private suspend fun runWork(): Result {
         val now = System.currentTimeMillis()
         val scheduler = TimeEventScheduler(applicationContext)
         val heartbeat = EngineHeartbeatStore(applicationContext).read()

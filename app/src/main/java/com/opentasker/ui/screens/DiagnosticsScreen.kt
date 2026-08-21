@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -34,16 +35,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.work.WorkInfo
 import com.opentasker.app.R
+import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.HealthSignalState
+import com.opentasker.core.storage.ScheduledWorkOutcome
+import com.opentasker.core.storage.ScheduledWorkOutcomeKind
+import com.opentasker.core.storage.ScheduledWorkerId
 import com.opentasker.core.diagnostics.assessment
 import com.opentasker.core.diagnostics.healthy
 import com.opentasker.core.engine.EngineExitCorrelation
 import com.opentasker.core.engine.EngineExitCorrelationState
 import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.engine.ExecutionCircuitState
-import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
@@ -239,6 +244,23 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 stringResource(R.string.diagnostics_worker_stop),
                 health?.lastWorkerStopReason ?: stringResource(R.string.diagnostics_none),
             )
+            SectionTitle(stringResource(R.string.diagnostics_scheduled_work_header))
+            val outcomes = health?.scheduledWorkOutcomes.orEmpty().associateBy { it.worker }
+            ScheduledWorkerId.entries.forEach { worker ->
+                val outcome = outcomes[worker]
+                HealthRow(
+                    stringResource(scheduledWorkerLabel(worker)),
+                    if (outcome == null) {
+                        stringResource(R.string.diagnostics_scheduled_work_none)
+                    } else {
+                        stringResource(
+                            R.string.diagnostics_work_outcome_at,
+                            scheduledWorkOutcomeSummary(outcome),
+                            formatter.format(Date(outcome.timestampMillis)),
+                        )
+                    },
+                )
+            }
             HealthRow(
                 stringResource(R.string.diagnostics_pending_jobs),
                 when {
@@ -422,6 +444,50 @@ private fun processExitSummary(correlation: EngineExitCorrelation, formatter: Si
         correlation.description ?: stringResource(R.string.diagnostics_none),
         correlation.timestampMillis?.let { formatter.format(Date(it)) } ?: stringResource(R.string.diagnostics_never),
         correlation.gapMillis?.let(EngineHealthReader::ageLabel) ?: stringResource(R.string.diagnostics_none),
+    )
+}
+
+@StringRes
+private fun scheduledWorkerLabel(worker: ScheduledWorkerId): Int = when (worker) {
+    ScheduledWorkerId.ENGINE_WATCHDOG -> R.string.diagnostics_worker_engine_watchdog
+    ScheduledWorkerId.RUN_LOG_PRUNE -> R.string.diagnostics_worker_run_log_prune
+    ScheduledWorkerId.CONFIGURATION_SNAPSHOT -> R.string.diagnostics_worker_configuration_snapshot
+    ScheduledWorkerId.UPDATE_CHECK -> R.string.diagnostics_worker_update_check
+    ScheduledWorkerId.TEMPORARY_STATE_REVERT -> R.string.diagnostics_worker_temporary_state_revert
+}
+
+@StringRes
+private fun stopReasonLabel(reason: Int): Int = when (reason) {
+    WorkInfo.STOP_REASON_NOT_STOPPED -> R.string.diagnostics_stop_reason_not_stopped
+    WorkInfo.STOP_REASON_CANCELLED_BY_APP -> R.string.diagnostics_stop_reason_cancelled_by_app
+    WorkInfo.STOP_REASON_PREEMPT -> R.string.diagnostics_stop_reason_preempt
+    WorkInfo.STOP_REASON_TIMEOUT -> R.string.diagnostics_stop_reason_timeout
+    EngineHealthReader.STOP_REASON_TIMEOUT_ABANDONED -> R.string.diagnostics_stop_reason_timeout_abandoned
+    WorkInfo.STOP_REASON_DEVICE_STATE -> R.string.diagnostics_stop_reason_device_state
+    WorkInfo.STOP_REASON_CONSTRAINT_BATTERY_NOT_LOW -> R.string.diagnostics_stop_reason_constraint_battery_not_low
+    WorkInfo.STOP_REASON_CONSTRAINT_CHARGING -> R.string.diagnostics_stop_reason_constraint_charging
+    WorkInfo.STOP_REASON_CONSTRAINT_CONNECTIVITY -> R.string.diagnostics_stop_reason_constraint_connectivity
+    WorkInfo.STOP_REASON_CONSTRAINT_DEVICE_IDLE -> R.string.diagnostics_stop_reason_constraint_device_idle
+    WorkInfo.STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW -> R.string.diagnostics_stop_reason_constraint_storage_not_low
+    WorkInfo.STOP_REASON_QUOTA -> R.string.diagnostics_stop_reason_quota
+    WorkInfo.STOP_REASON_BACKGROUND_RESTRICTION -> R.string.diagnostics_stop_reason_background_restriction
+    WorkInfo.STOP_REASON_APP_STANDBY -> R.string.diagnostics_stop_reason_app_standby
+    WorkInfo.STOP_REASON_USER -> R.string.diagnostics_stop_reason_user
+    WorkInfo.STOP_REASON_SYSTEM_PROCESSING -> R.string.diagnostics_stop_reason_system_processing
+    WorkInfo.STOP_REASON_ESTIMATED_APP_LAUNCH_TIME_CHANGED ->
+        R.string.diagnostics_stop_reason_estimated_app_launch_time_changed
+    WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT -> R.string.diagnostics_stop_reason_foreground_service_timeout
+    else -> R.string.diagnostics_stop_reason_unknown
+}
+
+@Composable
+private fun scheduledWorkOutcomeSummary(outcome: ScheduledWorkOutcome): String = when (outcome.kind) {
+    ScheduledWorkOutcomeKind.COMPLETED -> stringResource(R.string.diagnostics_work_outcome_completed)
+    ScheduledWorkOutcomeKind.RETRYING -> stringResource(R.string.diagnostics_work_outcome_retrying)
+    ScheduledWorkOutcomeKind.FAILED -> stringResource(R.string.diagnostics_work_outcome_failed)
+    ScheduledWorkOutcomeKind.STOPPED -> stringResource(
+        R.string.diagnostics_work_outcome_stopped,
+        stringResource(stopReasonLabel(outcome.stopReason)),
     )
 }
 

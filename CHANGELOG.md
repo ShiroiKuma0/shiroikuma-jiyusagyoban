@@ -35,6 +35,7 @@
 
 ### Added
 
+- Diagnostics lists every scheduled worker with how its last run ended and when. Android 16 ties WorkManager quotas to the app standby bucket, so a user who rarely opens OpenTasker can drop into `rare` or `restricted` and have automations stop with nothing to look at. Each worker now records its own outcome, and a stop the platform decided ("out of run quota for the standby bucket", "app standby bucket") reads differently from a normal finish and from a failure. The same rows go into the diagnostic export.
 - An Install section in the README, with an Obtainium badge that adds this repository as a source in one tap. It also says plainly that the `v0.3.0`, `v0.4.1` and `v0.4.2` releases are dead: they predate the current signing key, carry versionCode 1, and cannot be upgraded in place.
 - An instrumented test compiles every regex literal declared in production source against Android's ICU engine. `:app:generateRegexCorpus` extracts the patterns into an androidTest asset, and the test fails on any the device rejects. Three shipped defects came from patterns that compile on a desktop JVM and do not on Android, and a JVM suite structurally cannot see them.
 - `CONTRIBUTING.md`, with the build and test commands, a map of the package layout, and the source guards that fail a build before review.
