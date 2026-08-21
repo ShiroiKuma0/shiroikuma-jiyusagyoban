@@ -240,7 +240,7 @@ class ExecutionLedger(private val capacity: Int = DEFAULT_CAPACITY) {
 
     fun snapshot(): List<ExecutionLedgerRecord> = synchronized(records) { records.values.toList() }
 
-    internal fun reset() = synchronized(records) { records.clear() }
+    fun reset() = synchronized(records) { records.clear() }
 
     private fun evictOverflow() {
         while (records.size > capacity) records.remove(records.keys.firstOrNull() ?: return)
@@ -263,5 +263,6 @@ object ExecutionCommandLedger {
         reason: ExecutionTerminalReason? = null,
     ): ExecutionLedgerRecord? = ledger.transition(executionId, state, reason)
 
-    internal fun reset() = ledger.reset()
+    // Public for the same reason as ActiveExecutionRegistry.reset: its test is app-side.
+    fun reset() = ledger.reset()
 }

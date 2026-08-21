@@ -102,7 +102,8 @@ class EngineHeartbeatStore(context: Context) {
     }
 
     companion object {
-        internal const val STALE_AFTER_MS = 5 * 60_000L
+        // Public because the health reader explains staleness with it; core:engine is a module now.
+        const val STALE_AFTER_MS = 5 * 60_000L
         private const val PREFS = "engine_heartbeat"
         private const val KEY_LAST_ALIVE = "last_alive_at"
         private const val KEY_STOPPED_CLEANLY = "stopped_cleanly"
