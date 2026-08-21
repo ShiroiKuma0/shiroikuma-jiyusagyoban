@@ -178,6 +178,14 @@ class ReleaseTruthContractTest {
         assertTrue("SUB_TASK_ACTION_ID" in generator)
         assertTrue("OPEN_TASKER_DATABASE_SCHEMA_VERSION" in generator)
         assertTrue("ActionCatalog.kt" in generator)
+        assertTrue(
+            "release-truth generator must read ContextSpec from its owning module",
+            """core\model\src\main\kotlin\com\opentasker\core\model\ContextSpec.kt""" in generator,
+        )
+        assertTrue(
+            "release-truth generator must read AppDatabase from its owning module",
+            """core\storage\src\main\kotlin\com\opentasker\core\storage\AppDatabase.kt""" in generator,
+        )
         assertTrue("RequireReleaseTag" in generator)
         assertTrue("releaseTagCommit" in generator)
         assertFalse("engineHandledActions = 7" in generator)
