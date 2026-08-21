@@ -121,6 +121,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "plugin.locale.query",
     "script.termux.run",
     "tasker.unsupported",
+    "macrodroid.unsupported",
     "wifi.toggle",
     "bluetooth.toggle",
     "brightness.set",
@@ -625,6 +626,19 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("taskerCode", R.string.catalog_action_tasker_unsupported_field_taskercode_label, required = true),
                 ActionField("summary", R.string.catalog_action_tasker_unsupported_field_summary_label, FieldType.MULTILINE),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "macrodroid.unsupported",
+            nameRes = R.string.catalog_action_macrodroid_unsupported_name,
+            descriptionRes = R.string.catalog_action_macrodroid_unsupported_description,
+            categoryRes = R.string.catalog_category_import,
+            fields = listOf(
+                ActionField("classType", R.string.catalog_action_macrodroid_unsupported_field_classtype_label, required = true),
+                ActionField("summary", R.string.catalog_action_macrodroid_unsupported_field_summary_label, FieldType.MULTILINE),
             )
         )
     )

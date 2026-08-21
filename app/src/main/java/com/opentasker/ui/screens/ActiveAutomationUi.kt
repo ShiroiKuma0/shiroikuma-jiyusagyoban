@@ -291,7 +291,9 @@ fun ActiveAutomationUi(
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState(); val highlightedFlowNodeKeys by viewModel.highlightedFlowNodeKeys.collectAsState(); val simulationProfile by viewModel.simulationProfile.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
-    val taskerXmlLauncher = rememberOpenDocumentLauncher { viewModel.previewTaskerXml(it, BuildConfig.VERSION_NAME) }
+    val taskerXmlLauncher = rememberOpenDocumentLauncher {
+        viewModel.previewTaskerOrMacroDroid(it, BuildConfig.VERSION_NAME)
+    }
     val openTaskerBundleExportLauncher = rememberCreateDocumentLauncher("application/json") {
         viewModel.exportOpenTaskerBundle(it, BuildConfig.VERSION_NAME)
     }
@@ -733,7 +735,7 @@ fun ActiveAutomationUi(
                     showBundleTextImportDialog = true
                 },
                 openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_XML_MIME_TYPES) },
+                onImportTaskerXml = { taskerXmlLauncher.launch(TASKER_MACRODROID_MIME_TYPES) },
                 onExportTaskerXml = { taskerXmlExportLauncher.launch("opentasker-tasker-export.xml") },
                 taskerImportBusy = taskerImportBusy,
                 onEditProfile = { openProfileDialog(it) },
@@ -966,7 +968,7 @@ fun ActiveAutomationUi(
             state = state,
             busy = taskerImportBusy,
             onDismiss = viewModel::clearTaskerImportReview,
-            onConfirm = { viewModel.confirmTaskerImport(state.report) },
+            onConfirm = { viewModel.confirmTaskerImport(state) },
         )
     }
 

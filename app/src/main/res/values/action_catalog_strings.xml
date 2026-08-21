@@ -259,6 +259,11 @@
     <string name="catalog_category_import" formatted="false">Import</string>
     <string name="catalog_action_tasker_unsupported_field_taskercode_label" formatted="false">Tasker action code</string>
     <string name="catalog_action_tasker_unsupported_field_summary_label" formatted="false">Import note</string>
+
+    <string name="catalog_action_macrodroid_unsupported_name" formatted="false">Unsupported MacroDroid Action</string>
+    <string name="catalog_action_macrodroid_unsupported_description" formatted="false">Placeholder for a MacroDroid action that could not be safely mapped during import</string>
+    <string name="catalog_action_macrodroid_unsupported_field_classtype_label" formatted="false">MacroDroid class</string>
+    <string name="catalog_action_macrodroid_unsupported_field_summary_label" formatted="false">Import note</string>
     <string name="catalog_action_wifi_toggle_name" formatted="false">Toggle Wi-Fi</string>
     <string name="catalog_action_wifi_toggle_description" formatted="false">Turn Wi-Fi on or off</string>
     <string name="catalog_category_settings" formatted="false">Settings</string>

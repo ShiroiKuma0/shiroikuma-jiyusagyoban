@@ -366,7 +366,7 @@ internal fun TaskerImportReviewDialog(
     val migrationWarnings = (preview.warnings + preview.lossyWarnings).distinct()
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.dialog_review_tasker)) },
+        title = { Text(stringResource(state.titleRes)) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
@@ -428,24 +428,20 @@ internal fun TaskerImportReviewDialog(
                         )
                     }
                 }
-                if (state.report.unsupportedActions.isNotEmpty()) {
+                if (state.unsupportedActionRows.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
                             title = stringResource(R.string.import_unsupported_actions),
-                            values = state.report.unsupportedActions.map {
-                                "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
-                            },
+                            values = state.unsupportedActionRows,
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
-                if (state.report.mappedActions.isNotEmpty()) {
+                if (state.mappedActionRows.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
                             title = stringResource(R.string.import_mapped_actions),
-                            values = state.report.mappedActions.map {
-                                "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
-                            },
+                            values = state.mappedActionRows,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }

@@ -179,6 +179,7 @@
     <string name="capability_wake_unsupported" formatted="false">Wake requires Shizuku permission and its privileged user-service transport.</string>
     <string name="capability_termux_setup" formatted="false">Requires Termux 0.109 or newer, RUN_COMMAND permission, and an approved script hash.</string>
     <string name="capability_tasker_import_unsupported" formatted="false">The imported Tasker action could not be mapped to a supported OpenTasker action.</string>
+    <string name="capability_macrodroid_import_unsupported" formatted="false">The imported MacroDroid action could not be mapped to a supported OpenTasker action.</string>
     <string name="capability_sms_permission" formatted="false">Requires SMS permission; Play builds omit SMS actions for policy compliance.</string>
     <string name="capability_sms_distribution_unsupported" formatted="false">SMS is unavailable in this distribution because SMS and phone-state permissions are omitted for Play policy compliance.</string>
     <string name="capability_contacts_permission" formatted="false">Requires an explicit Contacts permission for unattended lookup; Android 17+ also supports a field-scoped system picker mode.</string>

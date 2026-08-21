@@ -167,6 +167,7 @@
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
     <string name="dialog_review_bundle">Review OpenTasker bundle</string>
     <string name="dialog_review_tasker">Review Tasker import</string>
+    <string name="dialog_review_macrodroid">Review MacroDroid import</string>
     <string name="dialog_profile_share_review">Review community share</string>
 
     <!-- Profile editor -->
@@ -668,12 +669,12 @@
     <string name="import_capability_item">%1$s — %2$s: %3$s</string>
     <string name="import_warnings">Import warnings</string>
     <string name="import_migration_warnings">Migration warnings</string>
-    <string name="import_unsupported_actions">Unsupported Tasker actions</string>
+    <string name="import_unsupported_actions">Unsupported source actions</string>
     <string name="import_mapped_actions">Mapped actions</string>
     <string name="import_for_review">Import for Review</string>
     <string name="import_disabled">Import Disabled</string>
-    <string name="import_tasker">Import Tasker</string>
-    <string name="import_reading_xml">Reading XML</string>
+    <string name="import_tasker">Import Tasker or MacroDroid</string>
+    <string name="import_reading_xml">Reading import</string>
     <string name="import_reading_json">Reading JSON</string>
     <string name="import_export_json">Export JSON</string>
     <string name="import_export_tasker_xml">Export Tasker XML</string>
@@ -763,7 +764,7 @@
     <string name="action_add_context_short">Add Context</string>
     <string name="action_add_action_short">Add Action</string>
     <string name="action_create_for_review">Create for Review</string>
-    <string name="action_import_tasker_xml">Import Tasker XML</string>
+    <string name="action_import_tasker_xml">Import Tasker / MacroDroid</string>
     <string name="action_create_task">Create Task</string>
     <string name="action_add_step">Add Step</string>
     <string name="action_choose_image">Choose image</string>
@@ -1363,6 +1364,8 @@
     <string name="ui_error_task_delete">Task delete failed</string>
     <string name="ui_error_tasker_xml_preview">Tasker XML import preview failed</string>
     <string name="ui_error_tasker_xml_import">Tasker XML import failed</string>
+    <string name="ui_error_automation_import_preview">Tasker or MacroDroid import preview failed</string>
+    <string name="ui_error_automation_import">Tasker or MacroDroid import failed</string>
     <string name="ui_error_bundle_export">OpenTasker bundle export failed</string>
     <string name="ui_error_bundle_preview">OpenTasker bundle preview failed</string>
     <string name="ui_error_share_preview">Unable to prepare share preview</string>
@@ -1385,6 +1388,7 @@
     <string name="diagnostics_share_subject">OpenTasker diagnostic report</string>
     <string name="diagnostics_share_chooser">Share diagnostic report</string>
     <string name="import_document_tasker_xml">Tasker XML file</string>
+    <string name="import_document_tasker_macrodroid">Tasker XML or MacroDroid file</string>
     <string name="import_document_opentasker_bundle">OpenTasker bundle</string>
     <string name="ui_error_document_unreadable">Couldn\'t open the selected %1$s.</string>
     <string name="ui_error_document_too_large">The selected %1$s is larger than %2$d MB.</string>
@@ -1450,6 +1454,7 @@
     <string name="ui_message_template_installed">Template installed as a disabled profile</string>
     <string name="ui_task_still_used">Task is still used by %1$d automation(s). Reassign or clear those references first.</string>
     <string name="ui_message_tasker_xml_ready">Tasker XML ready for review</string>
+    <string name="ui_message_automation_import_ready">Automation import ready for review</string>
     <string name="ui_message_bundle_ready">OpenTasker bundle ready for review</string>
     <string name="ui_message_edit_undone">Edit undone</string>
     <string name="ui_message_edit_redone">Edit redone</string>

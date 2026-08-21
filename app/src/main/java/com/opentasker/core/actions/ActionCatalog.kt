@@ -121,6 +121,7 @@ object ActionCatalog {
         define("log", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::LogAction),
         define("script.termux.run", ActionCategory.PLUGIN, ActionRetrySafety.NEVER, ::TermuxScriptAction),
         define("tasker.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TaskerUnsupportedAction),
+        define("macrodroid.unsupported", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::MacroDroidUnsupportedAction),
     )
 
     /** Engine-handled flow markers have metadata but no runtime Action implementation. */

@@ -177,6 +177,15 @@ class ImportResourceBudgetTest {
     }
 
     @Test
+    fun xmlPreflightReportsMalformedInputAsAnExpectedImportFailure() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            ImportResourceGuard.requireXmlPreflight("<TaskerData></TkaserData>", budget())
+        }
+
+        assertEquals("Tasker XML is malformed.", error.message)
+    }
+
+    @Test
     fun taskerXmlAcceptsExactActionLimitAndRejectsOneOverBeforeDomParsing() {
         fun xml(actionCount: Int): String = buildString {
             append("<TaskerData><Task><id>1</id><nme>Task</nme>")

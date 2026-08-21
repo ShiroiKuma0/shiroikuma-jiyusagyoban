@@ -6,12 +6,12 @@ import androidx.annotation.StringRes
 import com.opentasker.app.R
 import java.io.ByteArrayOutputStream
 
-internal fun readBoundedTaskerXml(context: Context, uri: Uri): String {
+internal fun readBoundedTaskerOrMacroDroid(context: Context, uri: Uri): String {
     return readBoundedDocumentText(
         context = context,
         uri = uri,
-        maxBytes = TASKER_XML_IMPORT_MAX_BYTES,
-        labelRes = R.string.import_document_tasker_xml,
+        maxBytes = TASKER_MACRODROID_IMPORT_MAX_BYTES,
+        labelRes = R.string.import_document_tasker_macrodroid,
     )
 }
 

@@ -143,6 +143,7 @@ object ActionCapabilityRegistry {
             R.string.capability_termux_setup,
         ),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported OpenTasker action.", R.string.capability_tasker_import_unsupported),
+        "macrodroid.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported MacroDroid action could not be mapped to a supported OpenTasker action.", R.string.capability_macrodroid_import_unsupported),
     )
 
     /**
