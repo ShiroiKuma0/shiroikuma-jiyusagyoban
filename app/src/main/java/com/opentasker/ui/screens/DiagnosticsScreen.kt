@@ -253,11 +253,22 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                     if (outcome == null) {
                         stringResource(R.string.diagnostics_scheduled_work_none)
                     } else {
-                        stringResource(
+                        val latest = stringResource(
                             R.string.diagnostics_work_outcome_at,
                             scheduledWorkOutcomeSummary(outcome),
                             formatter.format(Date(outcome.timestampMillis)),
                         )
+                        val stop = outcome.lastStop
+                        if (stop == null) {
+                            latest
+                        } else {
+                            // A later instance finishing normally must not erase the stop.
+                            latest + stringResource(
+                                R.string.diagnostics_work_outcome_also_stopped,
+                                stringResource(stopReasonLabel(stop.stopReason)),
+                                formatter.format(Date(stop.timestampMillis)),
+                            )
+                        }
                     },
                 )
             }

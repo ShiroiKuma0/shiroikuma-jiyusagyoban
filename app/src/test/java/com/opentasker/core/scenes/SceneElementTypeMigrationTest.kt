@@ -68,6 +68,30 @@ class SceneElementTypeMigrationTest {
     }
 
     @Test
+    fun aHandEditedLowercaseTypeStillDecodesToItsRealType() {
+        // The bundle codec decodes enums case-insensitively for hand-edited documents. A strict
+        // match here would silently drop "image" to the TEXT fallback and skip its validation.
+        val scene = StorageJson.decodeFromString<Scene>(sceneJson("image"))
+
+        assertEquals(SceneElementType.IMAGE, scene.elements.single().type)
+        assertTrue(
+            "An invalid image must still be reported rather than migrated away",
+            SceneElementConfigValidator.validate(scene.elements.single()).isNotEmpty(),
+        )
+    }
+
+    @Test
+    fun aMigratedElementKeepsTheCaptionItWasAuthoredWith() {
+        val overlay = com.opentasker.ProductionSources
+            .read("com/opentasker/core/scenes/SceneOverlayService.kt")
+
+        assertTrue(
+            "A migrated element must not render as an invisible empty text view",
+            "element.config[\"text\"] ?: element.config[\"label\"].orEmpty()" in overlay,
+        )
+    }
+
+    @Test
     fun anUnknownTypeFromAnyFutureBuildFallsBackTheSameWay() {
         val scene = StorageJson.decodeFromString<Scene>(sceneJson("SOMETHING_NEW"))
 

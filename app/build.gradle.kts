@@ -4,6 +4,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.Directory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
@@ -1683,10 +1684,25 @@ val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyR
     versionName.set(appVersionName)
 }
 
+// Where production Kotlin lives. Source-scanning gates that walk a tree must walk all of these:
+// a gate pointed only at app/ silently stopped covering the 44 files the core modules now own.
+val productionSourceRoots: List<Directory> = listOf(
+    layout.projectDirectory.dir("src/main/java"),
+    rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/storage/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/engine/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("feature/automation/src/main/kotlin"),
+).filter { it.asFile.isDirectory }
+
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
     group = "verification"
     description = "Extracts production regex literals for the on-device ICU compilation test."
-    sources.from(layout.projectDirectory.dir("src/main/java").asFileTree.matching { include("**/*.kt") })
+    // Every production source root, not just app's: a regex that moved into a core module is
+    // exactly as capable of failing to compile on Android's ICU engine as one that did not.
+    productionSourceRoots.forEach { root ->
+        sources.from(root.asFileTree.matching { include("**/*.kt") })
+    }
     outputDirectory.set(layout.buildDirectory.dir("generated/regexCorpus"))
 }
 
@@ -1709,6 +1725,7 @@ tasks.register("localQualityGate") {
         verifyReleaseAssetName,
         ":core:common:testDebugUnitTest",
         ":core:storage:testDebugUnitTest",
+        ":core:engine:testDebugUnitTest",
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "connectedDebugAndroidTest",

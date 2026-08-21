@@ -4,7 +4,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.opentasker.ProductionSources
 import java.io.File
+import kotlin.io.path.readText
 import javax.xml.parsers.DocumentBuilderFactory
 
 class AutomationTargetContractTest {
@@ -71,19 +73,16 @@ class AutomationTargetContractTest {
         assertTrue(service.contains("runExternalTask("))
         assertTrue(service.contains("parentExecutionId = parentExecutionId"))
 
-        val mainSourceRoot = listOf(
-            File("src/main/java"),
-            File("app/src/main/java"),
-        ).first { it.exists() }
-        val rawProducers = mainSourceRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
+        // Exact-list equality over every production root. Walking app/ alone would have let a
+        // second producer in a core module pass unnoticed.
+        val rawProducers = ProductionSources.allKotlinFiles()
             .filter { sourceFile ->
                 val text = sourceFile.readText()
                 text.contains("\"com.opentasker.action.RUN_TASK\"") ||
                     text.contains("AutomationTargetContract.ACTION_RUN_TASK")
             }
-            .map { it.relativeTo(mainSourceRoot).invariantSeparatorsPath }
-            .toList()
+            .map { path -> "com/opentasker/" + path.toUri().path.substringAfterLast("/com/opentasker/") }
+            .sorted()
 
         assertEquals(
             "The RUN_TASK action literal must exist only beside its canonical builder/receiver",
@@ -162,9 +161,5 @@ class AutomationTargetContractTest {
             )
             .documentElement
 
-    private fun loadMainSource(relativePath: String): String =
-        listOf(
-            File("src/main/java/$relativePath"),
-            File("app/src/main/java/$relativePath"),
-        ).first { it.exists() }.readText()
+    private fun loadMainSource(relativePath: String): String = ProductionSources.read(relativePath)
 }

@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import com.opentasker.ProductionSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,10 +18,6 @@ import kotlin.streams.toList
  * plaintext-credential leak that the shared formatter exists to close.
  */
 class ActionSummarySourceGuardTest {
-    private val mainSourceRoot: Path = listOf(
-        Path.of("src/main/java"),
-        Path.of("app/src/main/java"),
-    ).first(Files::exists)
 
     /** The formatter itself, plus the engine trace builder that owns its own secret-aware path. */
     private val allowlist = setOf(
@@ -28,10 +25,9 @@ class ActionSummarySourceGuardTest {
         "TaskRunner.kt",
     )
 
-    private fun kotlinFiles(): List<Path> =
-        Files.walk(mainSourceRoot).use { stream ->
-            stream.filter { it.toString().endsWith(".kt") }.toList()
-        }
+    // Every production source root: pointing this at app/ alone stopped covering the files the
+    // core modules own, and a guard that scans less still reports green.
+    private fun kotlinFiles(): List<Path> = ProductionSources.allKotlinFiles()
 
     @Test
     fun noSurfaceJoinsRawActionArgumentsForDisplay() {
@@ -43,7 +39,7 @@ class ActionSummarySourceGuardTest {
         val offenders = kotlinFiles()
             .filter { it.fileName.toString() !in allowlist }
             .filter { it.readText().contains(rawJoins) }
-            .map { mainSourceRoot.relativize(it).toString() }
+            .map { ProductionSources.repoRoot.relativize(it).toString() }
 
         assertTrue(
             "Raw action argument rendering in $offenders — use ActionArgumentSensitivity.summarize",
@@ -57,7 +53,7 @@ class ActionSummarySourceGuardTest {
         val offenders = kotlinFiles()
             .filter { it.fileName.toString() != "ActionArgumentSensitivity.kt" }
             .filter { it.readText().contains(literal) }
-            .map { mainSourceRoot.relativize(it).toString() }
+            .map { ProductionSources.repoRoot.relativize(it).toString() }
 
         assertTrue(
             "Duplicate redaction placeholder literal in $offenders — use ActionArgumentSensitivity.REDACTED",
@@ -67,9 +63,7 @@ class ActionSummarySourceGuardTest {
 
     @Test
     fun everyBuiltInActionHasAResourceBackedSummaryDeclaration() {
-        val metadata = mainSourceRoot
-            .resolve("com/opentasker/core/actions/ActionMetadata.kt")
-            .readText()
+        val metadata = ProductionSources.read("com/opentasker/core/actions/ActionMetadata.kt")
         val actionIds = Regex("""(?m)^\s*id = \"([^\"]+)\"""")
             .findAll(metadata)
             .map { it.groupValues[1] }
@@ -94,7 +88,7 @@ class ActionSummarySourceGuardTest {
             "com/opentasker/core/flow/AutomationFlowGraph.kt" to "strings.actionSummary",
         )
         val missing = requiredCalls.filter { (relativePath, call) ->
-            !mainSourceRoot.resolve(relativePath).readText().contains(call)
+            !ProductionSources.read(relativePath).contains(call)
         }.keys
 
         assertTrue("Action preview surfaces bypass the shared formatter: $missing", missing.isEmpty())

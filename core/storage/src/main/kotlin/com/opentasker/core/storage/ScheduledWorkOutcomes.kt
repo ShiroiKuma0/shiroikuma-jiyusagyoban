@@ -36,6 +36,14 @@ data class ScheduledWorkOutcome(
     /** A [WorkInfo] `STOP_REASON_*` value; [WorkInfo.STOP_REASON_NOT_STOPPED] unless [kind] is STOPPED. */
     val stopReason: Int,
     val timestampMillis: Long,
+    /**
+     * The most recent platform stop for this worker, when it is not [kind] itself.
+     *
+     * One row covers a worker class, and the temporary-state revert runs one instance per state
+     * key, so a later instance finishing normally would otherwise erase the stop that is the whole
+     * point of the row.
+     */
+    val lastStop: ScheduledWorkOutcome? = null,
 )
 
 fun encodeScheduledWorkOutcome(outcome: ScheduledWorkOutcome): String =
@@ -83,15 +91,23 @@ class ScheduledWorkOutcomeStore(context: Context) {
         // a worker that was demonstrably stopped would be a lie.
         val reason = if (stopReason == WorkInfo.STOP_REASON_NOT_STOPPED) WorkInfo.STOP_REASON_UNKNOWN else stopReason
         val outcome = ScheduledWorkOutcome(worker, ScheduledWorkOutcomeKind.STOPPED, reason, nowMillis)
-        prefs.edit().putString(worker.key, encodeScheduledWorkOutcome(outcome)).commit()
+        val encoded = encodeScheduledWorkOutcome(outcome)
+        prefs.edit()
+            .putString(worker.key, encoded)
+            .putString(stopKey(worker), encoded)
+            .commit()
     }
 
     fun read(): List<ScheduledWorkOutcome> = ScheduledWorkerId.entries.mapNotNull { worker ->
-        decodeScheduledWorkOutcome(worker, prefs.getString(worker.key, null))
+        val latest = decodeScheduledWorkOutcome(worker, prefs.getString(worker.key, null)) ?: return@mapNotNull null
+        val stop = decodeScheduledWorkOutcome(worker, prefs.getString(stopKey(worker), null))
+        if (stop == null || stop == latest) latest else latest.copy(lastStop = stop)
     }
 
     private companion object {
         const val PREFS_NAME = "scheduled_work_outcomes"
+
+        fun stopKey(worker: ScheduledWorkerId): String = worker.key + ".lastStop"
     }
 }
 
@@ -113,7 +129,14 @@ suspend fun ListenableWorker.recordingOutcome(
         if (isStopped) store.recordStopped(worker, platformStopReason())
         throw error
     } catch (error: Throwable) {
-        store.record(worker, ScheduledWorkOutcomeKind.FAILED)
+        // A platform stop can surface as something other than cancellation when teardown makes an
+        // in-flight platform call throw. Recording that as a crash is the confusion this exists to
+        // remove, so isStopped decides here too.
+        if (isStopped) {
+            store.recordStopped(worker, platformStopReason())
+        } else {
+            store.record(worker, ScheduledWorkOutcomeKind.FAILED)
+        }
         throw error
     }
     if (isStopped) {

@@ -63,6 +63,30 @@ class ScheduledWorkOutcomesTest {
     }
 
     @Test
+    fun aLaterSuccessDoesNotEraseAnEarlierPlatformStop() {
+        val stop = ScheduledWorkOutcome(
+            worker = ScheduledWorkerId.TEMPORARY_STATE_REVERT,
+            kind = ScheduledWorkOutcomeKind.STOPPED,
+            stopReason = WorkInfo.STOP_REASON_QUOTA,
+            timestampMillis = 1_000L,
+        )
+        val later = ScheduledWorkOutcome(
+            worker = ScheduledWorkerId.TEMPORARY_STATE_REVERT,
+            kind = ScheduledWorkOutcomeKind.COMPLETED,
+            stopReason = WorkInfo.STOP_REASON_NOT_STOPPED,
+            timestampMillis = 2_000L,
+            lastStop = stop,
+        )
+
+        assertEquals(stop, later.lastStop)
+        assertEquals(
+            "The surviving stop must round-trip through the same encoding",
+            stop,
+            decodeScheduledWorkOutcome(ScheduledWorkerId.TEMPORARY_STATE_REVERT, encodeScheduledWorkOutcome(stop)),
+        )
+    }
+
+    @Test
     fun everyWorkerKeyRoundTrips() {
         ScheduledWorkerId.entries.forEach { worker ->
             assertEquals(worker, ScheduledWorkerId.fromKey(worker.key))

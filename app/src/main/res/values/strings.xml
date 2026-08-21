@@ -1219,9 +1219,11 @@
     <string name="diagnostics_work_outcome_completed">Finished normally</string>
     <string name="diagnostics_work_outcome_retrying">Failed and will retry</string>
     <string name="diagnostics_work_outcome_failed">Failed and gave up</string>
-    <!-- %1$s is the reason Android gave for stopping the job, %2$s the time it happened. -->
+    <!-- %1$s is the reason Android gave for stopping the job. -->
     <string name="diagnostics_work_outcome_stopped">Stopped by Android: %1$s</string>
     <string name="diagnostics_work_outcome_at">%1$s · %2$s</string>
+    <!-- %1$s is why Android stopped an earlier run, %2$s when. Appended after the latest outcome. -->
+    <string name="diagnostics_work_outcome_also_stopped">\n Earlier run stopped by Android: %1$s · %2$s</string>
     <string name="diagnostics_stop_reason_not_stopped">not stopped</string>
     <string name="diagnostics_stop_reason_cancelled_by_app">cancelled by OpenTasker</string>
     <string name="diagnostics_stop_reason_preempt">preempted by a higher-priority job</string>

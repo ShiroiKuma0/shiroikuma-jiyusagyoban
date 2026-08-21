@@ -1,5 +1,6 @@
 package com.opentasker.core.engine
 
+import com.opentasker.ProductionSources
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
@@ -22,13 +23,12 @@ class ExecutionSemanticsContractTest {
         assertTrue(helper.contains("collisionCoordinator.execute(task)"))
         assertTrue(runner.contains("collisionCoordinator?.execute(target)"))
 
-        val directRunnerConstruction = Files.walk(sourceRoot).use { paths ->
-            paths.filter { Files.isRegularFile(it) && it.toString().endsWith(".kt") }
-                .filter { it.fileName.toString() !in setOf("TaskRunner.kt", "TaskExecutionHelper.kt") }
-                .filter { it.readText().contains("TaskRunner(") }
-                .map { sourceRoot.relativize(it).toString() }
-                .toList()
-        }
+        // Scanned across every production root: the engine primitives moved into core:engine, and
+        // a walk limited to app/ would no longer see a direct TaskRunner there.
+        val directRunnerConstruction = ProductionSources.allKotlinFiles()
+            .filter { it.fileName.toString() !in setOf("TaskRunner.kt", "TaskExecutionHelper.kt") }
+            .filter { it.readText().contains("TaskRunner(") }
+            .map { ProductionSources.repoRoot.relativize(it).toString() }
         assertEquals("Production run paths must use executeAndLogTask", emptyList<String>(), directRunnerConstruction)
     }
 
