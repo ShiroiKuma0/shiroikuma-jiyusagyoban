@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.2.88
+
+OpenTasker now imports MacroDroid backups and makes variable or project deletion reversible. This release also adds Wi-Fi scanning and always-on display control, with reliability fixes across scheduling, plugins, imports, storage, and diagnostics.
+
 ### Fixed
 
 - Sunrise and sunset windows fire once per occurrence instead of once a minute. The matcher now stamps a stable `eventId` on the matched window so later ticks in the same window are treated as the same pulse. An exact-minute sun context still fires on its minute.
@@ -88,16 +92,16 @@ OpenTasker's ten main workspaces now share a compact, true-black visual system d
 
 Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships all of them plus a critical defect the audit itself missed.
 
-### Fixed — critical
+### Fixed: critical
 
 - **Selecting any guided template crashed immediately.** The automation feature module genuinely owns its Compose input field, but `:app` declared it `compileOnly`, so the APK referenced two classes that were never packaged. The module is now a runtime dependency, both debug and minified release APKs contain the classes, and an on-device Compose test opens the template slot dialog.
-- **Tasks could not run on any real device.** `TaskRunner` compiled a regex with unescaped closing braces in a class initializer. Desktop `java.util.regex` accepts that; Android's ICU engine rejects it, so the initializer threw on first use and every task execution failed — not only ones using array references. Present since 2026-08-10 and invisible to 1255 green JVM tests. Found by the new end-to-end instrumented test.
+- **Tasks could not run on any real device.** `TaskRunner` compiled a regex with unescaped closing braces in a class initializer. Desktop `java.util.regex` accepts that; Android's ICU engine rejects it, so the initializer threw on first use and every task execution failed: not only ones using array references. Present since 2026-08-10 and invisible to 1255 green JVM tests. Found by the new end-to-end instrumented test.
 - **Deleting a project destroyed every secret variable it held.** Variables were moved by copying the stored row to the new project, but a secret's envelope authenticates its project id, so each relocated secret failed verification and decoded as empty and unavailable with no way back. Secrets are now decrypted and re-encrypted under the destination, and a secret that cannot be decrypted aborts the move rather than being relocated as dead ciphertext.
-- **The database could freeze permanently.** The variable mutation lock and Room's write transaction were acquired in both orders — bundle import, variable rename and delete took the transaction first, the engine's commit path took the lock first — so the two could interleave and hold the single write connection until the process died. Lock order is now always mutation lock, then transaction.
+- **The database could freeze permanently.** The variable mutation lock and Room's write transaction were acquired in both orders: bundle import, variable rename and delete took the transaction first, the engine's commit path took the lock first: so the two could interleave and hold the single write connection until the process died. Lock order is now always mutation lock, then transaction.
 - **Automations fired on unrelated events.** A pulse advanced whenever any event reached an EVENT context, whether or not the context was watching for it, so a profile whose expression was already true for another reason activated on unrelated traffic: `EVENT(nfc) OR STATE(wifi=Home)` ran on every notification while on that network, and two OR'd EVENT leaves turned one physical event into two runs.
 - **NFC taps stacked a new copy of the app.** Manifest NFC dispatch starts a new activity unless the target is `singleTop`, so `onNewIntent` never ran and the armed tag-write editor stayed buried while its result went to an instance the user could no longer see.
 
-### Fixed — data and execution
+### Fixed: data and execution
 
 - A scheduled download to a fixed path replaced the good file with the 404 or 503 error body before the status was checked.
 - `clipboard.get` turned Android's background-read denial into an empty string and reported success, silently feeding blank data to whatever came next.
@@ -105,16 +109,16 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 - `app.archive`/`app.unarchive` advertised themselves as supported but could never succeed: Android's confirmation response was treated as a terminal failure.
 - The `unlocked` device state latched true after the first unlock for the rest of the service's life.
 - Calendar automations ran once a minute for the whole event; a 60-minute meeting ran its task about 60 times.
-- `data.read` with `format=xml` failed on every device — the same parser-parity defect as the Tasker XML import bug, in the one parser that never got the fix.
+- `data.read` with `format=xml` failed on every device: the same parser-parity defect as the Tasker XML import bug, in the one parser that never got the fix.
 - Tasker XML export then re-import dropped every variable.
 - Widget and shortcut runs ignored the concurrency limits and circuit breakers the in-app Run button respects, and a second tap started a concurrent run.
 - Wake-on-LAN could target any public address; `ping` demanded local-network permission even for public hosts; a broker could make the MQTT client allocate up to 256 MB.
 - A persisted cooldown was deleted when a profile was merely disabled.
 
-### Fixed — interface
+### Fixed: interface
 
 - A refused save no longer discards the whole form, and now says why: automation lint, duplicate names, and reference guards state their reason instead of "Operation failed".
-- Cold start no longer blocks the main thread waiting for the database — the launch after staging a restore could freeze for up to 30 seconds.
+- Cold start no longer blocks the main thread waiting for the database: the launch after staging a restore could freeze for up to 30 seconds.
 - The Run Log keeps its entries while reloading, reports a failed load as a failure rather than "no runs match", and debounces search.
 - Task widgets refresh after a rename or delete instead of showing a stale label and a run that cannot succeed.
 - A widget task no longer leaves an invisible overlay covering the launcher for the duration of the run.
@@ -132,14 +136,14 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 ## v0.2.85
 
 - Fixed the release build, which had failed since the staged module split: the core/* modules compile sources that still live under `app/`, so every shared class was compiled twice and R8 rejected the duplicate types. `:app` holds the only copy that ships and the module jars are no longer merged into the APK.
-- The action editor now says where to satisfy a setup-gated action, not just what is missing — elevated device actions point at the Setup tab and Shizuku rather than leaving the manifest looking like the answer.
-- Added an **AMOLED black** theme that uses true `#000000` surfaces, so an OLED panel can actually switch pixels off — the existing dark scheme is `#101211` and is unchanged, now named for what it is. Body text keeps 18.6:1 and secondary text 9.3:1 on black.
+- The action editor now says where to satisfy a setup-gated action, not just what is missing: elevated device actions point at the Setup tab and Shizuku rather than leaving the manifest looking like the answer.
+- Added an **AMOLED black** theme that uses true `#000000` surfaces, so an OLED panel can actually switch pixels off: the existing dark scheme is `#101211` and is unchanged, now named for what it is. Body text keeps 18.6:1 and secondary text 9.3:1 on black.
 - Added an opt-in **Material You** theme on Android 12+, which follows the system light/dark setting and is not offered on older releases where it would do nothing.
-- Profile and task lists reserve room for the floating action button, so the last row is no longer permanently covered, and empty states scroll — at large font scale their last action could previously sit off-screen with no way to reach it.
+- Profile and task lists reserve room for the floating action button, so the last row is no longer permanently covered, and empty states scroll: at large font scale their last action could previously sit off-screen with no way to reach it.
 - Undo and Redo on profile, task, and scene cards are now disabled when there is nothing to undo or redo, and announce why to a screen reader, instead of being permanently live and answering with a snackbar. A setup item with no available action shows status text rather than a button that only reported the item was already ready.
 - Profiles, Tasks, and Scenes now show a loading state until Room delivers its first snapshot, instead of flashing the first-run "Build your first automation" screen at every cold start for users who already have data.
 - Profile execution slots now decide and store under one lock for every automation mode, not only QUEUED, so a second dispatch path reaching the same slot cannot start a SINGLE profile twice or leave a superseded RESTART job running untracked. The queue consumer takes the same lock order, and the invariant is covered by concurrency tests.
-- The exported automation broadcast target now answers status and name-lookup requests with bounded `COUNT(*)` and indexed name queries instead of loading the whole profile and task tables inside the `goAsync()` window, and reuses one supervisor scope rather than creating one per broadcast. Name matching moved into SQLite's `COLLATE NOCASE`, which folds ASCII only — two names differing solely in the case of a non-ASCII letter are now distinct.
+- The exported automation broadcast target now answers status and name-lookup requests with bounded `COUNT(*)` and indexed name queries instead of loading the whole profile and task tables inside the `goAsync()` window, and reuses one supervisor scope rather than creating one per broadcast. Name matching moved into SQLite's `COLLATE NOCASE`, which folds ASCII only: two names differing solely in the case of a non-ASCII letter are now distinct.
 - Added an opt-in, coverage-guided JVM fuzz task for bundle, Tasker XML, template-expression, and structured-data decoders, with a checked-in seed and regression corpus kept out of release dependency graphs.
 - Added headless Compose screenshot regression coverage for primary screens and shared states across system, light, dark, and high-contrast themes, 1×/2× font scales, and an RTL pseudolocale; reference validation is part of the local quality gate.
 - Automation lint now reports shadowed, unreachable, and action/revert rules, and supports bounded device-state invariants with localized diagnostics, a reusable predicate editor, and optional bundle import/export.
@@ -276,14 +280,14 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 - Declare `ACCESS_NOTIFICATION_POLICY` so OpenTasker appears on the Do Not Disturb / Modes access settings page and DND access can actually be granted; `dnd.set`, `zen.rule.set`, and `zen.rule.clear` were dead on every device without it. Adds a manifest contract test. (#4)
 - Fix Tasker XML import failing on-device with "disallow doctype decl": Android's Expat-backed parsers reject the Apache secure-parsing feature URI the importer treated as mandatory, so every import failed regardless of file content. The feature is now best-effort, benign DOCTYPE prologs in real Tasker exports are stripped in text before parsing, and doctypes with entities or external DTD references are still rejected (XXE-safe). (#5)
 - Cover the importer with instrumentation tests that run on Android's own XML parser. The JVM
-  suite cannot see this class of defect at all — desktop Xerces accepts the feature URI Android
-  rejects — so #5 shipped with every unit test green. The new tests were checked against the
+  suite cannot see this class of defect at all: desktop Xerces accepts the feature URI Android
+  rejects: so #5 shipped with every unit test green. The new tests were checked against the
   pre-fix importer: four of six fail there, including the plain no-doctype import, with the same
   message users saw.
 - Sign published APKs with a signing key kept in the repository instead of the machine-global
   Android debug keystore. That file is regenerated by the SDK tooling, and the key that signed
   v0.2.79 was lost that way. **Upgrading in place over v0.2.79 or earlier will fail with a
-  signature mismatch — uninstall the old build first.** This is a one-time break; the new key is
+  signature mismatch: uninstall the old build first.** This is a one-time break; the new key is
   checked in, so future releases upgrade normally.
 
 ## v0.2.81
@@ -411,24 +415,24 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 
 ## v0.2.79
 
-- **Backup & restore**: selecting a database to restore now opens a review instead of staging it immediately. Selection previously replaced the pending-restart journal outright, so a user could not inspect the candidate, could not tell it apart from a restore staged earlier, and had no way to back out. The review reports the source, size, schema version, compatibility, and profile/task/scene/variable/run-log counts, names the staged restore it would replace, and stages nothing until Stage is pressed. Setup gained a "Cancel staged restore" action that removes only the validated pending journal — backups, the live database, and the pre-restore snapshot are untouched — and the pending banner now describes what is actually queued (including a staged file that has since become unreadable).
+- **Backup & restore**: selecting a database to restore now opens a review instead of staging it immediately. Selection previously replaced the pending-restart journal outright, so a user could not inspect the candidate, could not tell it apart from a restore staged earlier, and had no way to back out. The review reports the source, size, schema version, compatibility, and profile/task/scene/variable/run-log counts, names the staged restore it would replace, and stages nothing until Stage is pressed. Setup gained a "Cancel staged restore" action that removes only the validated pending journal: backups, the live database, and the pre-restore snapshot are untouched: and the pending banner now describes what is actually queued (including a staged file that has since become unreadable).
 
-- **Run logs**: the Run Log now shows what the engine is running *right now* — task, origin, current step, and elapsed time — with a Cancel button for each. Previously the service tracked its jobs privately and the UI showed only completed runs, so a runaway automation (a long wait, a hung request, an accidental loop) was invisible and unstoppable short of force-stopping the app. Cancel unwinds the whole run including nested "run sub-task" steps and any bounded blocking action suspended inside it, and records a terminal **Cancelled** outcome — a distinct state from Skipped, which means the run never started.
+- **Run logs**: the Run Log now shows what the engine is running *right now*: task, origin, current step, and elapsed time: with a Cancel button for each. Previously the service tracked its jobs privately and the UI showed only completed runs, so a runaway automation (a long wait, a hung request, an accidental loop) was invisible and unstoppable short of force-stopping the app. Cancel unwinds the whole run including nested "run sub-task" steps and any bounded blocking action suspended inside it, and records a terminal **Cancelled** outcome: a distinct state from Skipped, which means the run never started.
 
-- **External intents (breaking, protocol v2)**: `RUN_TASK` is now asynchronous. It previously held the broadcast open with `goAsync()` until the whole task finished and returned its terminal success — but Android expects broadcast work to complete in roughly 10 seconds while an OpenTasker task can wait up to 30 minutes, so the reply reported an outcome that had not happened yet and the system could kill the receiver mid-run with no run-log entry. The receiver now authenticates, validates, hands the run to the foreground engine service, and replies immediately with `ACCEPTED` plus an execution ID; callers poll terminal status with the new `com.opentasker.action.QUERY_EXECUTION`. Results are retained for the 64 most recent executions and survive a process restart, and a run that was in flight when the engine died resolves to `FAILED` rather than leaving a caller polling forever. Callers must declare `com.opentasker.extra.PROTOCOL_VERSION=2`; a request without it is refused with an explicit error naming the required extra rather than being silently reinterpreted. `SET_PROFILE_ENABLED` and `QUERY_STATUS` are unchanged. See `docs/EXTERNAL_INTENTS.md`.
+- **External intents (breaking, protocol v2)**: `RUN_TASK` is now asynchronous. It previously held the broadcast open with `goAsync()` until the whole task finished and returned its terminal success: but Android expects broadcast work to complete in roughly 10 seconds while an OpenTasker task can wait up to 30 minutes, so the reply reported an outcome that had not happened yet and the system could kill the receiver mid-run with no run-log entry. The receiver now authenticates, validates, hands the run to the foreground engine service, and replies immediately with `ACCEPTED` plus an execution ID; callers poll terminal status with the new `com.opentasker.action.QUERY_EXECUTION`. Results are retained for the 64 most recent executions and survive a process restart, and a run that was in flight when the engine died resolves to `FAILED` rather than leaving a caller polling forever. Callers must declare `com.opentasker.extra.PROTOCOL_VERSION=2`; a request without it is refused with an explicit error naming the required extra rather than being silently reinterpreted. `SET_PROFILE_ENABLED` and `QUERY_STATUS` are unchanged. See `docs/EXTERNAL_INTENTS.md`.
 
 - **Run logs**: each step now records the variables it actually set. Traces previously showed only the values that went *into* an action, so a finished run never answered "what did this task write?". Every step captures its task, global, and array deltas (added vs. updated; a rewrite of the same value is not recorded), and the Run Log renders them in an expandable per-step inspector next to the existing expression debugger. Secret-derived values are redacted at the serialization boundary, so the raw value never reaches the stored log.
 
 - **Engine**: the automation-mode dispatch rules (SINGLE suppression, RESTART preemption, the QUEUED cap, exit tasks never consuming cooldown) and cooldown reservation are now pure, directly tested components that the foreground service delegates to, instead of logic reachable only through a running service. Cooldown check-and-reserve is locked against the check-then-write race where two contexts matching the same profile in the same instant both start a run.
 
-- **Actions**: the capability contract is now total and fails closed. An action that was registered but never classified used to report itself as "Ready" by default; every action now needs an explicit contract entry, and an unreviewed one is Unsupported. `app.kill` is marked Unsupported (force-stopping another app has always been impossible without privileged access, but it advertised itself as working and failed only at run time). `screen.timeout` is correctly gated on Write Settings, which the app now actually declares — `WRITE_SETTINGS` was missing from the manifest, so `Settings.System.canWrite()` could never become true and both it and Set brightness were permanently broken while claiming to be one grant away. Setup gained a "Modify system settings" row with a working deep link. Wake-on-LAN is gated on local network access on Android 17+. The README's action counts are now derived from the registry and verified (they had drifted to 58/59 against an actual 60).
+- **Actions**: the capability contract is now total and fails closed. An action that was registered but never classified used to report itself as "Ready" by default; every action now needs an explicit contract entry, and an unreviewed one is Unsupported. `app.kill` is marked Unsupported (force-stopping another app has always been impossible without privileged access, but it advertised itself as working and failed only at run time). `screen.timeout` is correctly gated on Write Settings, which the app now actually declares: `WRITE_SETTINGS` was missing from the manifest, so `Settings.System.canWrite()` could never become true and both it and Set brightness were permanently broken while claiming to be one grant away. Setup gained a "Modify system settings" row with a working deep link. Wake-on-LAN is gated on local network access on Android 17+. The README's action counts are now derived from the registry and verified (they had drifted to 58/59 against an actual 60).
 
-- **Data integrity**: deleting or renaming a task is now reference-safe. Deletion previously checked only a profile's enter/exit task columns, so a task referenced by another task's "run sub-task" step, a notification button, or a scene tap/long-press gesture could be deleted out from under them; a rename silently broke every reference that named the task. Deleting a referenced task now lists every dependent object and requires an explicit choice — reassign them all to another task, or clear the optional ones — applied in a single transaction (a profile's enter task cannot be cleared, so only reassignment is offered when one is present). A rename pins name-based references to the task's stable id first. The same rewriter also fixes OpenTasker bundle import, which never remapped task-to-task references inside imported actions: an imported "run sub-task" step pointed at whatever local task happened to own the exporter's id.
+- **Data integrity**: deleting or renaming a task is now reference-safe. Deletion previously checked only a profile's enter/exit task columns, so a task referenced by another task's "run sub-task" step, a notification button, or a scene tap/long-press gesture could be deleted out from under them; a rename silently broke every reference that named the task. Deleting a referenced task now lists every dependent object and requires an explicit choice: reassign them all to another task, or clear the optional ones: applied in a single transaction (a profile's enter task cannot be cleared, so only reassignment is offered when one is present). A rename pins name-based references to the task's stable id first. The same rewriter also fixes OpenTasker bundle import, which never remapped task-to-task references inside imported actions: an imported "run sub-task" step pointed at whatever local task happened to own the exporter's id.
 
 - **Security**: stored action arguments are now redacted everywhere they are displayed, not just in runtime traces. The task list and the flow graph previously joined raw arguments into their subtitle, so an HTTP `authorization` header, request `body`, or query string typed into an action appeared on screen, in screenshots, and in accessibility semantics. A single shared formatter (`ActionArgumentSensitivity`) now decides what is masked, driven by an explicit `sensitive` flag on the action's registered field metadata and backed by an argument-name heuristic so unregistered actions and forward-compatible keys fail closed. `var.set` masks its value when the variable it writes is itself named like a secret, and a source guard prevents any new surface from rendering raw arguments.
 
-- **Diagnostics**: the engine-health panel now shows a "Scheduled jobs blocked by" row that reports, in plain language, why the app's deferrable jobs (watchdog, log pruning) are still pending — app standby bucket, no connectivity, not charging, out of run quota, device thermal/power state, and so on — using Android 14+ `JobScheduler.getPendingJobReason`. It answers the common "why hasn't my scheduled automation fired" question; below Android 14 or when nothing is blocking, it reads "Nothing blocking".
-- **Security**: secret/taint flags on global and array variables are now monotonic — once a variable is marked sensitive it stays sensitive for the life of the run. A concurrent plain write from another parallel profile run can no longer race the flag off and leak the value into a later log or trace (the flag is set before the value is published and never cleared by a subsequent write).
+- **Diagnostics**: the engine-health panel now shows a "Scheduled jobs blocked by" row that reports, in plain language, why the app's deferrable jobs (watchdog, log pruning) are still pending: app standby bucket, no connectivity, not charging, out of run quota, device thermal/power state, and so on: using Android 14+ `JobScheduler.getPendingJobReason`. It answers the common "why hasn't my scheduled automation fired" question; below Android 14 or when nothing is blocking, it reads "Nothing blocking".
+- **Security**: secret/taint flags on global and array variables are now monotonic: once a variable is marked sensitive it stays sensitive for the life of the run. A concurrent plain write from another parallel profile run can no longer race the flag off and leak the value into a later log or trace (the flag is set before the value is published and never cleared by a subsequent write).
 - **Run logs**: an action that fails while consuming a secret-derived argument now records its real error class and location (e.g. `threw: request failed for <redacted>`) instead of the opaque blanket "details redacted" message. The raw secret value is scrubbed from the message and the throwable cause is dropped, so failures stay debuggable without leaking the secret.
 
 ## v0.2.78
@@ -439,13 +443,13 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 - **Security**: the exported external-trigger receivers (`AutomationTargetReceiver`, `LocaleSettingFireReceiver`) now declare `android:intentMatchingFlags="enforceIntentFilter"` so incoming intents must match their declared filters (blocking mismatched-action redirection), and debug builds enable StrictMode `detectUnsafeIntentLaunch()`.
 - **Networking**: the ACCESS_LOCAL_NETWORK (Android 17+) policy is now a pure, unit-tested function covering the below-37 no-op, granted, and denied/revoked paths; LAN actions continue to fail closed with a clear "grant it in Setup" message.
 - **Tasker import**: the `Wait` action now reads Tasker's five fixed time fields (ms/seconds/minutes/hours/days) by their argument index instead of a dense list, fixing imported waits that were mis-scaled by up to 1000× when zero fields were omitted from the export.
-- **Diagnostics**: detects Android 16 Advanced Protection Mode (API 36+, read defensively via reflection so it fails closed and is a no-op below 36) and surfaces its state plus a graceful-degradation note in the engine-health panel — OpenTasker's triggers keep working since it uses no Accessibility service, but privileged extensions may be limited while it is on.
+- **Diagnostics**: detects Android 16 Advanced Protection Mode (API 36+, read defensively via reflection so it fails closed and is a no-op below 36) and surfaces its state plus a graceful-degradation note in the engine-health panel: OpenTasker's triggers keep working since it uses no Accessibility service, but privileged extensions may be limited while it is on.
 
 ## v0.2.77
 
 ### Roadmap drain (correctness, security, and consolidation)
 
-- **Engine**: sub-task (`task.run`) input variables are now scoped to the child invocation, so lowercase inputs no longer leak into the parent task's later actions. QUEUED-mode retriggers arriving while a task is running now queue instead of being dropped as "cooldown active" — the cooldown is reserved only when a fresh run actually starts. Notification-button taps run inside the foreground `AutomationService` instead of the receiver's ~10 s `goAsync` window, so long tasks (e.g. `flow.wait` up to 30 min) complete and log reliably.
+- **Engine**: sub-task (`task.run`) input variables are now scoped to the child invocation, so lowercase inputs no longer leak into the parent task's later actions. QUEUED-mode retriggers arriving while a task is running now queue instead of being dropped as "cooldown active": the cooldown is reserved only when a fresh run actually starts. Notification-button taps run inside the foreground `AutomationService` instead of the receiver's ~10 s `goAsync` window, so long tasks (e.g. `flow.wait` up to 30 min) complete and log reliably.
 - **Actions**: the `download` action now delegates to the shared `HttpRequestAction` transport (same-origin redirects, atomic fsync'd writes, the 50 MB cap, cleartext-private DNS, and the LAN-permission gate) instead of a parallel OkHttp path; downloads land in the shared `user_files` sandbox so `file.*` actions can read them. `FileActions` reads/writes with no-follow (`O_NOFOLLOW`) semantics and rejects symlinked path components, closing a TOCTOU sandbox-escape window. Notification-button PendingIntents use a collision-free request-code allocator so a newer notification can no longer overwrite an older button's intent.
 - **Import/validation**: `InputValidation` field limits (name length, task priority, non-empty actions, blank action type, profile name/cooldown) are now enforced at the OpenTasker bundle import boundary and on profile save, instead of being an unenforced module.
 - **Scenes**: a scene slider bound to a task now fires it on release with the value exposed as a variable; task-firing overlay controls (button and bound slider) drop obscured touches (`filterTouchesWhenObscured`) as a tapjacking guard. The multi-selection is reconciled when the element list changes and is preserved while dragging a selected member. The resize handle and Run Log expression-debugger expand control now meet the 48 dp touch-target minimum.
@@ -456,7 +460,7 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 ### Deep audit fixes (2026-07-17)
 
 - **Engine**: exit tasks now run on their own job slot and never consume the profile cooldown, so a cooldown, SINGLE-mode in-flight enter task, or RESTART can no longer silently drop the exit task. Closed a QUEUED lost-task race where a retrigger could be enqueued into a queue whose consumer had already decided to exit.
-- **Engine**: plugin conditions no longer flap — the shared Locale plugin poll source multiplexes every subscription, so the matcher now holds state for results addressed to a different plugin/bundle instead of driving every plugin context true→false→true each 30 s cycle. The internal `sun_tick` minute pulse can no longer satisfy a generic/blank-filter EVENT context (previously firing imported event profiles every minute); blank-event/blank-filter specs fail closed.
+- **Engine**: plugin conditions no longer flap: the shared Locale plugin poll source multiplexes every subscription, so the matcher now holds state for results addressed to a different plugin/bundle instead of driving every plugin context true→false→true each 30 s cycle. The internal `sun_tick` minute pulse can no longer satisfy a generic/blank-filter EVENT context (previously firing imported event profiles every minute); blank-event/blank-filter specs fail closed.
 - **Contexts**: all-day calendar events match on the local day instead of the raw midnight-UTC bounds (they were shifted by the zone offset). The Context Inspector is now read-only and no longer resets the engine's persisted location dwell timers, and its match explanations honor OR groups like the engine. Serialized the two-thread state-source merge and synchronized camera/mic AppOps start/stop against a watcher leak.
 - **Data**: added indexes on `run_logs(timestamp)` and `edit_history(entityType, entityId)` (schema v8, migrated + instrumented).
 - **Actions**: `download` runs on OkHttp with a policy-DNS hook so the cleartext private-LAN rule and the API 37 `ACCESS_LOCAL_NETWORK` gate are enforced against the addresses actually connected to (closing a DNS-rebinding TOCTOU), fails on non-2xx instead of saving a redirect stub over a good file, and fsyncs before the atomic rename. `tile.set` fails honestly and is capability-gated Unsupported instead of reporting a no-op Success. `screen.timeout` rejects the "0 = never" value that actually turns the screen off immediately. `flow.wait` at its 30-minute maximum no longer always times out; `sound.play`/`tts.speak` get a 10-minute budget and TTS queue failures fail fast. `datetime.*` zone typos fail closed; `data.read` CSV supports RFC 4180 quoted fields. Added missing editor fields for ping, download, sound.play, and media.mute.
@@ -489,19 +493,19 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 - **Release**: added one local quality/release gate covering blocking lint, the JVM test floor, Room schema drift, Android-test compilation, resolved dependency/repository/checksum policy, a CycloneDX SBOM with OSV advisory results, configuration-cache reuse, and Play/F-Droid release assemblies. Enabling permission lint also caught and fixed the missing manifest permission for the shipped vibrate action.
 - **i18n**: moved action/context catalogs, setup and backup copy, capability diagnostics, widget plurals, and scene-overlay labels to Android resources; seeded Spanish setup translations, enabled `en-XA`/`ar-XB` debug pseudolocales, and expanded localization guards.
 - **Reliability**: Wake-on-LAN now rejects MAC addresses with mixed `:`/`-` separators (e.g. `AA:BB-CC:...`); a consistent separator is required.
-- **Actions**: added a text/regex action pack — **Match Text** (`text.match`, captures become an array), **Replace Text** (`text.replace`, `$1` group refs), **Split Text** (`text.split`, literal or regex), **Join Text** (`text.join`), and **Substring** (`text.substring`). Regex uses the linear-time RE2 engine with bounded pattern/input sizes, so patterns can't hang the runner.
-- **Actions**: added date-time actions — **Format Date/Time** (`datetime.format`), **Parse Date/Time** (`datetime.parse`), and **Add to Date/Time** (`datetime.add`). Convert between epoch milliseconds and formatted strings with optional time zones, and do calendar-aware date arithmetic (seconds through years), all deterministic and offline. Fixed units are exact zone-independent deltas; months/years honor calendar length.
-- **Actions**: added a **Read Data** action (`data.read`) that parses JSON, CSV, or XML into variables entirely on-device — ideal for turning HTTP responses and file contents into usable automation data. Supports JSON path selectors (`items[0].name`), CSV column/cell selection, and XML element paths (`root/item/name`), sets an array plus a `%var_count`, is size-bounded, hardened against XML external entities, and fails closed on malformed input or an unresolved selector.
+- **Actions**: added a text/regex action pack: **Match Text** (`text.match`, captures become an array), **Replace Text** (`text.replace`, `$1` group refs), **Split Text** (`text.split`, literal or regex), **Join Text** (`text.join`), and **Substring** (`text.substring`). Regex uses the linear-time RE2 engine with bounded pattern/input sizes, so patterns can't hang the runner.
+- **Actions**: added date-time actions: **Format Date/Time** (`datetime.format`), **Parse Date/Time** (`datetime.parse`), and **Add to Date/Time** (`datetime.add`). Convert between epoch milliseconds and formatted strings with optional time zones, and do calendar-aware date arithmetic (seconds through years), all deterministic and offline. Fixed units are exact zone-independent deltas; months/years honor calendar length.
+- **Actions**: added a **Read Data** action (`data.read`) that parses JSON, CSV, or XML into variables entirely on-device: ideal for turning HTTP responses and file contents into usable automation data. Supports JSON path selectors (`items[0].name`), CSV column/cell selection, and XML element paths (`root/item/name`), sets an array plus a `%var_count`, is size-bounded, hardened against XML external entities, and fails closed on malformed input or an unresolved selector.
 - **Security**: the external-automation broadcast target now bounds the number of supplied variable extras (64) in addition to the existing per-value length cap, name validation, and signature permission.
-- **Interoperability**: OpenTasker bundle import now tolerates hand-edited JSON — `//` comments, trailing commas, and case-insensitive enum values decode cleanly, while unknown keys and oversized bundles are still rejected. Export output is unchanged.
+- **Interoperability**: OpenTasker bundle import now tolerates hand-edited JSON: `//` comments, trailing commas, and case-insensitive enum values decode cleanly, while unknown keys and oversized bundles are still rejected. Export output is unchanged.
 - **Reliability**: task execution now runs off the main thread. Every run path (manual, profile trigger, widget/shortcut, notification action, Locale/external) executes actions on `Dispatchers.IO`, and the automation service's matching/dispatch runs on `Dispatchers.Default`. Previously blocking actions (HTTP GET/POST, download, ping, Wake-on-LAN, file I/O) launched from the main thread threw `NetworkOnMainThreadException` and failed silently. Debug builds now install StrictMode to flag any accidental main-thread disk/network I/O.
-- **Privacy**: SMS recipient numbers are now masked in run logs (e.g. `***6789`) instead of stored in full — run-log redaction does not otherwise scrub phone numbers.
-- **Reliability**: hardened smaller action/import edge cases — the Termux script action no longer passes a spurious empty argument when `arguments` is blank or double-spaced; `file.list` reports a clean "invalid file name pattern" failure instead of leaking a raw Java exception for a bad glob; and OpenTasker bundle import no longer counts updated variables as newly inserted.
-- **Reliability**: hardened the variable engine. A `var.set` targeting a huge array index (e.g. `%X[2000000000]`, reachable from an imported/shared profile) no longer tries to grow a multi-billion-entry list — out-of-range writes fail closed. Array storage now evicts the genuinely least-recently-used array at its cap instead of an arbitrary one, and is synchronized for concurrent tasks. Ternary conditions whose test contains parentheses (e.g. `(%A(+1) > 5) ? a : b`) are now parsed correctly instead of silently falling through.
+- **Privacy**: SMS recipient numbers are now masked in run logs (e.g. `***6789`) instead of stored in full: run-log redaction does not otherwise scrub phone numbers.
+- **Reliability**: hardened smaller action/import edge cases: the Termux script action no longer passes a spurious empty argument when `arguments` is blank or double-spaced; `file.list` reports a clean "invalid file name pattern" failure instead of leaking a raw Java exception for a bad glob; and OpenTasker bundle import no longer counts updated variables as newly inserted.
+- **Reliability**: hardened the variable engine. A `var.set` targeting a huge array index (e.g. `%X[2000000000]`, reachable from an imported/shared profile) no longer tries to grow a multi-billion-entry list: out-of-range writes fail closed. Array storage now evicts the genuinely least-recently-used array at its cap instead of an arbitrary one, and is synchronized for concurrent tasks. Ternary conditions whose test contains parentheses (e.g. `(%A(+1) > 5) ? a : b`) are now parsed correctly instead of silently falling through.
 - **Reliability**: event/notification text matching with `regex=true` now uses the linear-time RE2 engine (as variable regex already does) instead of the JDK backtracking engine, so a pathological user pattern can no longer hang the matcher on an incoming event.
 - **Correctness**: battery-level triggers now normalize `EXTRA_LEVEL` against `EXTRA_SCALE`. On devices that report a non-100 scale (some report 255), `battery_level` thresholds previously never/always matched.
 - **Security**: the exported Locale fire receiver now requires a revocable execution grant. Any app could previously broadcast a chosen task id to the receiver and have OpenTasker run it. Configuring the plugin now issues a high-entropy token bound to the selected task; the receiver dispatches only when the incoming bundle carries a token that is still stored and bound to that exact task, so forged, missing, mutated, revoked, and deleted-task grants are rejected without dispatch. Grants are revoked automatically when their task is deleted.
-- **Networking**: cleartext HTTP to LAN/private hosts now actually works. The network-security config previously listed private ranges as `<domain>` hostnames (Android has no CIDR support there), which silently blocked every literal LAN IP. Cleartext is now gated solely by the runtime policy — HTTPS stays the default, `allow_http` is an explicit opt-in, and any host not resolving to a loopback/link-local/site-local/IPv6-ULA address is rejected before a connection opens. IPv6 Unique Local Addresses (`fc00::/7`), previously misclassified as public, are now recognized.
+- **Networking**: cleartext HTTP to LAN/private hosts now actually works. The network-security config previously listed private ranges as `<domain>` hostnames (Android has no CIDR support there), which silently blocked every literal LAN IP. Cleartext is now gated solely by the runtime policy: HTTPS stays the default, `allow_http` is an explicit opt-in, and any host not resolving to a loopback/link-local/site-local/IPv6-ULA address is rejected before a connection opens. IPv6 Unique Local Addresses (`fc00::/7`), previously misclassified as public, are now recognized.
 - **Variables**: global (`%UPPERCASE`) variables and `var.persist` values are now genuinely durable. Every execution path (manual run, profile trigger, widget/shortcut, notification action, Locale/external intent) hydrates persisted globals before running and commits any globals changed during the run to the database before reporting success, so they survive across runs and process restarts. Local (lowercase) variables still never escape their invocation, and the Variables vault now reflects real global state.
 - **Reliability**: the running automation engine now reconciles itself from the profiles table. Creating, editing, enabling, disabling, or deleting a profile rebuilds matchers and plugin subscriptions live, without needing a service restart, while leaving any in-flight task run untouched. Purely cosmetic edits (name, group) no longer thrash the engine.
 - **Data safety**: corrupt stored automation payloads now fail closed. Task, profile, and scene rows whose JSON no longer decodes are surfaced with the exact record and field, cannot be executed (profiles skip them with a run-log note and `task.run` refuses corrupt sub-tasks), and cannot be overwritten by the normal editors (the raw bytes are preserved for undo/backup recovery). Scene edits now also snapshot to edit history, and stored payloads decode through a shared codec that tolerates unknown additive fields.
@@ -520,12 +524,12 @@ Audit-driven release: a deep multi-pass audit filed 60 findings, and this ships 
 
 Scene editor finishing pass and visual flow editor authoring.
 
-- **Feature**: scene overlay launch via `SYSTEM_ALERT_WINDOW` — each scene card shows a "Show" button (when overlay permission is granted) that displays the scene as a draggable floating window with dark-themed element views and tap-to-run-task bindings.
-- **Feature**: scene element multi-select — drag-starting an element selects it (highlighted border); when multiple elements are selected, dragging one applies the delta to all selected elements as a group.
-- **Feature**: alignment guides on scene canvas — elements snap to canvas edges, center lines, and other element edges/centers during drag. Dashed guide lines render during the gesture with a 6dp threshold.
+- **Feature**: scene overlay launch via `SYSTEM_ALERT_WINDOW`: each scene card shows a "Show" button (when overlay permission is granted) that displays the scene as a draggable floating window with dark-themed element views and tap-to-run-task bindings.
+- **Feature**: scene element multi-select: drag-starting an element selects it (highlighted border); when multiple elements are selected, dragging one applies the delta to all selected elements as a group.
+- **Feature**: alignment guides on scene canvas: elements snap to canvas edges, center lines, and other element edges/centers during drag. Dashed guide lines render during the gesture with a 6dp threshold.
 - **Feature**: flow canvas pinch-zoom (0.5x-2.5x) and pan gestures for the lane overview.
-- **Feature**: flow edge routing — vertical connectors between lanes and horizontal connectors between nodes drawn as Canvas lines with endpoint dots.
-- **Feature**: branch and subflow markers — action nodes with sub-task references show a Subflow pill; conditional actions show a Branch pill with the if-condition text.
+- **Feature**: flow edge routing: vertical connectors between lanes and horizontal connectors between nodes drawn as Canvas lines with endpoint dots.
+- **Feature**: branch and subflow markers: action nodes with sub-task references show a Subflow pill; conditional actions show a Branch pill with the if-condition text.
 
 ## v0.2.74 - 2026-06-19
 
@@ -538,7 +542,7 @@ i18n bootstrap, engine v3, dependency upgrade, encrypted backup, Shizuku/Termux 
 - **Feature**: Shizuku elevated backend with real API 13.1.5 integration. Checks Shizuku service state (ping, permission), exposes Ready/PermissionNeeded/Disabled/ManagerInstalled states. ShizukuShellRunner validates commands against a strict allowlist. Kill-switch toggle. ActionCapabilities dynamically promotes elevated actions when Shizuku is active.
 - **Feature**: Termux RUN_COMMAND dispatch with executable path, arguments, working directory, and background execution. SHA-256 script hash pinning for allowlist verification. 1-second per-script frequency cap. Output-to-variable mapping via capture prefix.
 - **Feature**: Tasker XML export for the mappable action subset (notify, wait, log, var.set). Exports Time, Day, Application, State, and Event contexts. Reports skipped actions and unmappable contexts.
-- **Feature**: Locale plugin target bridge — OpenTasker now appears as a Locale-compatible setting plugin for Tasker/MacroDroid. Edit activity shows task picker; fire receiver dispatches tasks through the existing automation pipeline.
+- **Feature**: Locale plugin target bridge: OpenTasker now appears as a Locale-compatible setting plugin for Tasker/MacroDroid. Edit activity shows task picker; fire receiver dispatches tasks through the existing automation pipeline.
 - **Feature**: scene element resize handles on the canvas preview. Drag the bottom-right handle to resize elements within scene bounds.
 - **Dependencies**: upgraded Compose BOM from 2026.04.01 to 2026.05.00 with updated dependency verification checksums.
 - **Style**: adopted DesignSystem spacing and radius tokens across 5 major UI screen files.
@@ -549,7 +553,7 @@ Hardening, test coverage, and expression engine improvements.
 
 - **Security**: applied Android 17+ `ACCESS_LOCAL_NETWORK` permission guard to Ping and Wake-on-LAN actions; all LAN socket actions now enforce the same gate.
 - **Security**: extended the Android 17+ local-network guard to HTTPS requests targeting private, loopback, or link-local hosts so URL-backed LAN actions cannot bypass Setup permission state.
-- **Reliability**: added Room schema v5 drift gate — CI now fails if any schema version file is missing; added migration tests for 2→3, 4→5, and full 1→5 path.
+- **Reliability**: added Room schema v5 drift gate: CI now fails if any schema version file is missing; added migration tests for 2→3, 4→5, and full 1→5 path.
 - **Supply chain**: enabled Gradle dependency verification with SHA-256 checksums for all resolved artifacts.
 - **Feature**: added `var.persist` action to promote local variables to global scope across task invocations.
 - **Testing**: broadened action guard coverage for file, settings, app, and notification-channel operations; expanded retention policy boundary tests.
@@ -605,7 +609,7 @@ Premium UX polish pass.
 Profile organization and diagnostic sharing.
 
 - **Profile groups**: profiles carry an optional group, set from a new editor field, shown as a pill badge on profile cards and offered as filter chips in the profile list once any group exists. Room migration v4→v5 adds the column, and the field carries through JSON export/import.
-- **Diagnostic share**: the Run Log summary card can share a redacted diagnostic bundle — app version, device info, recent run logs, and permission state — through the Android share sheet, with regression coverage for the redaction.
+- **Diagnostic share**: the Run Log summary card can share a redacted diagnostic bundle: app version, device info, recent run logs, and permission state: through the Android share sheet, with regression coverage for the redaction.
 - **Action guard coverage**: missing-argument validation tests for `ReadFile`, `WriteFile`, `PlaySound`, `LaunchApp`, `SetVariable`, and `SayAction`'s text length cap, plus the expanded `OpenUrl` scheme allowlist (`tel`, `mailto`, `geo`, `data`, `blob`).
 - **Supply chain**: pinned the then-current GitHub Actions from mutable `v4` tags to full commit SHAs.
 
@@ -640,7 +644,7 @@ Deep engineering, security, and UX audit pass.
 - **Resource leak**: added `CameraMicContextEvents.stop()` call in `AutomationService.onDestroy()` to unregister `AppOpsManager` watchers that were previously leaked.
 - **Data corruption**: fixed HTTP response `readBounded` to collect bytes into `ByteArrayOutputStream` before UTF-8 decode, preventing multi-byte character corruption when a character straddles an 8KB read boundary.
 - **Correctness**: fixed `BrightnessAction` auto mode to set `SCREEN_BRIGHTNESS_MODE` to automatic instead of writing `-1` to the brightness value. Manual brightness values now explicitly set the mode to manual first.
-- **Correctness**: fixed `ScreenTimeoutAction` to clamp the timeout value to 0–30 minutes, preventing `Long`-to-`Int` truncation on large values.
+- **Correctness**: fixed `ScreenTimeoutAction` to clamp the timeout value to 0 to 30 minutes, preventing `Long`-to-`Int` truncation on large values.
 - **Correctness**: fixed `SunEventCalculator` DST offset to use the offset at the approximate event time instead of noon, preventing sunrise/sunset times from being off by 1 hour on DST transition days.
 - **Correctness**: seeded `battery_level` and `charging` in `StateContextSourceImpl.seedInitialState()` from the sticky `ACTION_BATTERY_CHANGED` broadcast so battery-based profile conditions evaluate correctly immediately after service start.
 - **Crash fix**: `FlowGraphCard` now uses `firstOrNull()` instead of `first()` for the profile node, preventing `NoSuchElementException` if graph data is corrupted.
@@ -1159,7 +1163,7 @@ Context inspector baseline.
 - Added a reusable context-inspection model with tests for source health, missing events, all-context matching, and inverted contexts.
 - Updated roadmap, project notes, README metadata, and app version metadata for the X6 baseline.
 
-## v0.2.16 — 2026-05-04
+## v0.2.16: 2026-05-04
 
 Automation mode baseline.
 
@@ -1169,7 +1173,7 @@ Automation mode baseline.
 - Updated `AutomationService` dispatch so re-triggers can be skipped, restarted, queued, or run in parallel.
 - Added unit coverage for profile entity automation-mode round trips and legacy fallback.
 
-## v0.2.15 — 2026-05-04
+## v0.2.15: 2026-05-04
 
 External automation target baseline.
 
@@ -1179,7 +1183,7 @@ External automation target baseline.
 - Added manifest permission strings and security documentation for external callers.
 - Added unit coverage for external variable-name validation and documented variable extra names.
 
-## v0.2.14 — 2026-05-04
+## v0.2.14: 2026-05-04
 
 Locale plugin host baseline.
 
@@ -1189,7 +1193,7 @@ Locale plugin host baseline.
 - Added manifest package visibility queries for Locale-compatible plugin discovery.
 - Documented the supported plugin host surface and added parser/trust-boundary unit tests.
 
-## v0.2.13 — 2026-05-04
+## v0.2.13: 2026-05-04
 
 Open JSON bundle baseline.
 
@@ -1199,7 +1203,7 @@ Open JSON bundle baseline.
 - Added Room-backed export/import repository logic with task ID remapping, variable upsert, profile remapping, and scene element link remapping.
 - Documented the v1 JSON bundle format and added unit coverage for sorting, capability metadata, validation, and JSON round trips.
 
-## v0.2.12 — 2026-05-04
+## v0.2.12: 2026-05-04
 
 Profile template baseline.
 
@@ -1209,7 +1213,7 @@ Profile template baseline.
 - Gated planned calendar, NFC, and external-intent templates so they are visible but cannot create broken profiles yet.
 - Added unit coverage for catalog completeness, unsupported-action gating, slot expansion, and planned-template blocking.
 
-## v0.2.11 — 2026-05-04
+## v0.2.11: 2026-05-04
 
 Public documentation truthfulness pass.
 
@@ -1218,7 +1222,7 @@ Public documentation truthfulness pass.
 - Updated architecture docs to describe the current foreground-service trigger monitors and action capability gates.
 - Removed stale audit/checkpoint documents that overclaimed completion against older source snapshots.
 
-## v0.2.10 — 2026-05-04
+## v0.2.10: 2026-05-04
 
 Regression-test hardening pass.
 
@@ -1227,7 +1231,7 @@ Regression-test hardening pass.
 - Added tests for variable scope shadowing and missing-variable expansion.
 - Updated README/roadmap metadata for the expanded regression coverage.
 
-## v0.2.9 — 2026-05-04
+## v0.2.9: 2026-05-04
 
 Run log tracing baseline.
 
@@ -1236,7 +1240,7 @@ Run log tracing baseline.
 - Expanded run-log cards to show multi-line action trace summaries.
 - Added unit coverage for trace summary formatting.
 
-## v0.2.8 — 2026-05-04
+## v0.2.8: 2026-05-04
 
 Capability gating baseline.
 
@@ -1246,7 +1250,7 @@ Capability gating baseline.
 - Added warning copy in action configuration dialogs for actions that require setup.
 - Added unit coverage for capability gating defaults.
 
-## v0.2.7 — 2026-05-04
+## v0.2.7: 2026-05-04
 
 Runtime registry and stub-failure hardening pass.
 
@@ -1257,7 +1261,7 @@ Runtime registry and stub-failure hardening pass.
 - Removed unused placeholder context source files and stopped silently swallowing application-context polling errors.
 - Added unit coverage to ensure every UI action metadata ID has a runtime action implementation.
 
-## v0.2.6 — 2026-05-04
+## v0.2.6: 2026-05-04
 
 App-open trigger hardening pass.
 
@@ -1268,7 +1272,7 @@ App-open trigger hardening pass.
 - Added focused unit coverage for foreground package selection.
 - Updated README/roadmap metadata for app-open monitoring.
 
-## v0.2.5 — 2026-05-04
+## v0.2.5: 2026-05-04
 
 WiFi trigger hardening pass.
 
@@ -1278,7 +1282,7 @@ WiFi trigger hardening pass.
 - Added SSID normalization tests for quoted and unknown platform values.
 - Updated README/roadmap metadata for platform-safe WiFi monitoring.
 
-## v0.2.4 — 2026-05-04
+## v0.2.4: 2026-05-04
 
 Exact alarm hardening pass.
 
@@ -1288,7 +1292,7 @@ Exact alarm hardening pass.
 - Added focused unit coverage for minute-boundary scheduling.
 - Updated setup text and README/roadmap metadata for exact-alarm fallback behavior.
 
-## v0.2.3 — 2026-05-04
+## v0.2.3: 2026-05-04
 
 Permission onboarding pass.
 
@@ -1297,7 +1301,7 @@ Permission onboarding pass.
 - Added Bluetooth scan permission metadata for Android 12+ Bluetooth setup.
 - Updated README/version metadata for the setup checklist.
 
-## v0.2.2 — 2026-05-04
+## v0.2.2: 2026-05-04
 
 Active UI reintegration pass.
 
@@ -1308,7 +1312,7 @@ Active UI reintegration pass.
 - Registered built-in action metadata during app startup so dynamic action forms are populated.
 - Updated README/version metadata to reflect the active UI state.
 
-## v0.2.1 — 2026-05-04
+## v0.2.1: 2026-05-04
 
 Production hardening pass.
 
@@ -1322,7 +1326,7 @@ Production hardening pass.
 - Added Room schema export and focused validation unit tests.
 - Improved shared Compose component semantics and light-theme error contrast.
 
-## v0.2.0 — 2026-05-04
+## v0.2.0: 2026-05-04
 
 Full UI layer with database integration and action editor.
 
@@ -1337,7 +1341,7 @@ Full UI layer with database integration and action editor.
 - **Gradle 8.9 toolchain:** Updated from 8.7 for AGP 8.7.2 compatibility
 - **Lint baseline:** Suppressed MissingPermission and CoarseFineLocation warnings
 
-## v0.1.0 — 2026-05-03
+## v0.1.0: 2026-05-03
 
 Initial scaffold.
 
