@@ -60,6 +60,11 @@ object SceneElementTypeSerializer : KSerializer<SceneElementType> {
 
     override fun deserialize(decoder: Decoder): SceneElementType {
         val raw = decoder.decodeString()
-        return SceneElementType.entries.firstOrNull { it.name == raw } ?: SceneElementType.TEXT
+        // Case-insensitive on purpose: the bundle codec decodes enums case-insensitively for
+        // hand-edited documents, and that only applies to descriptors of ENUM kind. Matching
+        // exactly here would have quietly turned a hand-written "image" into the TEXT fallback
+        // instead of an IMAGE the validator checks.
+        return SceneElementType.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+            ?: SceneElementType.TEXT
     }
 }

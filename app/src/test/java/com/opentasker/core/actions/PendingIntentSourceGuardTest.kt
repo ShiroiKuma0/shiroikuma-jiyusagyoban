@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import com.opentasker.ProductionSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,18 +17,13 @@ import kotlin.streams.toList
  * out collision-free codes.
  */
 class PendingIntentSourceGuardTest {
-    private val mainSourceRoot: Path = listOf(
-        Path.of("src/main/java"),
-        Path.of("app/src/main/java"),
-    ).first(Files::exists)
 
     /** Files permitted to build a mutable PendingIntent, with the reason each is allowed. */
     private val mutableAllowlist = setOf("TermuxCommandBroker.kt", "PackageArchiveActions.kt")
 
-    private fun kotlinFiles(): List<Path> =
-        Files.walk(mainSourceRoot).use { stream ->
-            stream.filter { it.toString().endsWith(".kt") }.toList()
-        }
+    // Every production source root: pointing this at app/ alone stopped covering the files the
+    // core modules own, and a guard that scans less still reports green.
+    private fun kotlinFiles(): List<Path> = ProductionSources.allKotlinFiles()
 
     @Test
     fun everyPendingIntentIsImmutableExceptDocumentedMutableCallbacks() {
@@ -38,7 +34,7 @@ class PendingIntentSourceGuardTest {
                 file.fileName.toString() !in mutableAllowlist &&
                     !file.readText().contains("FLAG_IMMUTABLE")
             }
-            .map { mainSourceRoot.relativize(it).toString() }
+            .map { ProductionSources.repoRoot.relativize(it).toString() }
 
         assertTrue("PendingIntent without FLAG_IMMUTABLE in $offenders", offenders.isEmpty())
     }
@@ -48,7 +44,7 @@ class PendingIntentSourceGuardTest {
         val offenders = kotlinFiles()
             .filter { it.readText().contains("FLAG_MUTABLE") }
             .filter { it.fileName.toString() !in mutableAllowlist }
-            .map { mainSourceRoot.relativize(it).toString() }
+            .map { ProductionSources.repoRoot.relativize(it).toString() }
 
         assertTrue("Unexpected mutable PendingIntent in $offenders", offenders.isEmpty())
     }

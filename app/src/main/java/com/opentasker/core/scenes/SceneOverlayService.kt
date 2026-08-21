@@ -204,7 +204,9 @@ class SceneOverlayService : Service() {
             }
 
             SceneElementType.TEXT -> TextView(this).apply {
-                text = element.config["text"] ?: ""
+                // `label` is read as a fallback so an element migrated from a removed type keeps
+                // the caption it was authored with instead of rendering as an invisible box.
+                text = element.config["text"] ?: element.config["label"].orEmpty()
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             }
