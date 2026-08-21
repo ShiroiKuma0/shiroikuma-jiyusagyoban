@@ -19,7 +19,7 @@
 - **Profiles, contexts, tasks, actions**. a complete Room-backed automation pipeline with a Compose UI
 - **Companion presence triggers**. user-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
 - **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **76 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`)
+- **77 built-in actions** plus engine-handled flow control (`task.run`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`)
 - **USB device contexts**. attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
 - **Template expressions**. bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews**. preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
@@ -40,6 +40,7 @@
 ### Triggers (contexts)
 
 - **Offline bundle import**. paste exported JSON or decoded QR text into the existing disabled-by-default review flow with bounded input validation
+- **MacroDroid migration**. Import full `.mdr` backups or single `.macro` shares into disabled profiles, with bounded decoding and an exact mapped, unsupported, and lossy review
 
 - Time/day schedules with presets, aliases, and ranges
 - Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, and phone-call state); sensor/GPS/phone callbacks are demand-gated per profile
@@ -60,7 +61,7 @@
 - Locale/Tasker condition plugins. polled as first-class context predicates with last-known-state caching
 - Home Assistant bridge proof of concept. bounded outbound JSON webhooks with HTTPS-by-default policy, redacted webhook secrets, and transient retry/backoff
 
-### Actions (76 registered + 10 engine-handled)
+### Actions (77 registered + 10 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
@@ -75,7 +76,7 @@
 | Flow | 1+10 | wait; engine: task.run, if/else/end if, for each/end for, try/catch/end try, stop |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 1 | SHA-256-pinned Termux `RUN_COMMAND` with bounded result capture |
-| Import | 1 | unsupported Tasker action placeholder |
+| Import | 2 | unsupported Tasker and MacroDroid action placeholders |
 
 Every action carries an explicit capability contract; an action with no reviewed contract resolves to unsupported rather than defaulting to available. Privileged actions (airplane, mobile data, always-on display, screenshot, reboot, screen off, kill app) are gated to fail honestly. Always-on display reads the setting back after writing it, so a build that accepts the write and ignores it reports a failure rather than a success. Set brightness and set screen timeout require the **Modify system settings** special access granted from Setup, and Wake-on-LAN requires local network access on Android 17+. SMS is available in standard/F-Droid builds; Play builds omit SMS/phone-state permissions.
 
@@ -122,9 +123,10 @@ Variable names follow Tasker's scope rule: an all-lowercase name is local to the
 - **Home Assistant / ntfy interoperability**. the Home Assistant webhook action accepts the Companion `message`/`data` envelope, including documented `command_*` values such as `command_broadcast_intent`. The push bridge accepts ntfy's `id`, `topic`, `title`, `time`, `tags`, `priority`, and other bounded metadata names; an ntfy `broadcast` action can target `com.opentasker.action.PUSH_EVENT` directly with the per-install token and needs no relay app. Message bodies and remote URLs stay out of event metadata and logs.
 - **OpenTasker JSON bundles**. schema-versioned export/import with deterministic legacy migrations, project membership preservation, computed action-power manifests, data-to-external-chain warnings, explicit keep/rename/replace review for variable-name conflicts, disabled-by-default installation, explicit first-enable acknowledgement, and secret values omitted by design
 - **Tasker XML import/export**. preview with migration/capability warnings, deterministic mapped/unsupported/lossy reporting, and safe batches for notification, variable, media, settings, and flow actions
+- **MacroDroid JSON import**. full `.mdr` backups and single `.macro` shares use the same review gate, with safe trigger/action conversions, explicit placeholders, and disabled-by-default profiles
 - **Profile sharing**. offline share manifests with editable local preview, screenshot attachments, safety findings, import-plan review, and GitHub Discussions submission text; unverified shares stay blocked until the existing import review passes
 
-Untrusted imports are preflighted before object/DOM allocation. OpenTasker JSON is capped at 16 Mi characters, 250,000 lexical tokens, and depth 64; Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Both formats share decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
+Untrusted imports are preflighted before object/DOM allocation. OpenTasker and MacroDroid JSON are capped at 16 Mi characters, 250,000 lexical tokens, and depth 64; Tasker XML is capped at 4 Mi characters, 100,000 nodes, and depth 64. Every format shares decoded limits of 5,000 top-level entities, 20,000 actions, 10,000 contexts, 10,000 scene elements, and 8 MiB of aggregate UTF-8 string data. A named budget violation aborts before the Room transaction.
 
 ### UI and theming
 

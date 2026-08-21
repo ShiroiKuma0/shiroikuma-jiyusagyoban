@@ -51,6 +51,17 @@ internal object ImportResourceGuard {
         JsonBudgetScanner(rawJson, budget).scan()
     }
 
+    fun requireSourceCounts(
+        entities: Long,
+        actions: Long,
+        contexts: Long,
+        budget: ImportResourceBudget = ImportResourceBudget.Default,
+    ) {
+        requireWithin("entities", entities, budget.maxEntities)
+        requireWithin("actions", actions, budget.maxActions)
+        requireWithin("contexts", contexts, budget.maxContexts)
+    }
+
     /**
      * Removes a benign DOCTYPE declaration from Tasker XML before parsing. Real Tasker exports can
      * carry a plain doctype prolog, and Android's Expat-backed parsers do not recognise the Apache
@@ -105,6 +116,8 @@ internal object ImportResourceGuard {
             factory.newSAXParser().parse(InputSource(StringReader(rawXml)), handler)
         } catch (error: BudgetSaxException) {
             throw error.violation
+        } catch (error: SAXException) {
+            throw IllegalArgumentException("Tasker XML is malformed.", error)
         }
     }
 

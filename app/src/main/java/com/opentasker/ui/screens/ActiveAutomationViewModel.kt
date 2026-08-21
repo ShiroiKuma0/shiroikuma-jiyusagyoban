@@ -101,6 +101,9 @@ import com.opentasker.core.templates.BlueprintCatalogStore
 import com.opentasker.core.templates.BlueprintInstallation
 import com.opentasker.core.templates.BlueprintInstallationStore
 import com.opentasker.core.transfer.BundleImportPlan
+import com.opentasker.core.transfer.MacroDroidImportPlanner
+import com.opentasker.core.transfer.MacroDroidImportReport
+import com.opentasker.core.transfer.MacroDroidImporter
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
 import com.opentasker.core.transfer.OpenTaskerBundleRepository
@@ -139,9 +142,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-internal const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
+internal const val TASKER_MACRODROID_IMPORT_MAX_BYTES = 16 * 1024 * 1024
 internal const val OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024
-internal val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
+internal val TASKER_MACRODROID_MIME_TYPES = arrayOf(
+    "application/json",
+    "text/json",
+    "application/xml",
+    "text/xml",
+    "application/octet-stream",
+    "text/*",
+    "*/*",
+)
 internal val OPEN_TASKER_BUNDLE_MIME_TYPES = arrayOf("application/json", "text/json", "text/*", "*/*")
 internal val DATABASE_BACKUP_MIME_TYPES = arrayOf(
     "application/octet-stream",
@@ -162,9 +173,38 @@ internal fun runLogExportName(format: RunLogExportFormat): String {
 }
 
 internal data class TaskerImportReviewState(
-    val report: TaskerXmlImportReport,
+    val bundle: OpenTaskerBundle,
     val preview: TaskerImportPreview,
+    @StringRes val titleRes: Int,
+    val mappedActionRows: List<String>,
+    val unsupportedActionRows: List<String>,
 )
+
+private fun taskerImportReviewState(report: TaskerXmlImportReport): TaskerImportReviewState =
+    TaskerImportReviewState(
+        bundle = TaskerImportPlanner.confirmedBundle(report),
+        preview = TaskerImportPlanner.preview(report),
+        titleRes = R.string.dialog_review_tasker,
+        mappedActionRows = report.mappedActions.map {
+            "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
+        },
+        unsupportedActionRows = report.unsupportedActions.map {
+            "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
+        },
+    )
+
+private fun macroDroidImportReviewState(report: MacroDroidImportReport): TaskerImportReviewState =
+    TaskerImportReviewState(
+        bundle = MacroDroidImportPlanner.confirmedBundle(report),
+        preview = MacroDroidImportPlanner.preview(report),
+        titleRes = R.string.dialog_review_macrodroid,
+        mappedActionRows = report.mappedActions.map {
+            "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} -> ${it.openTaskerActionIds.joinToString(" + ")}"
+        },
+        unsupportedActionRows = report.unsupportedActions.map {
+            "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} (${it.reason})"
+        },
+    )
 
 /** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
 sealed interface UiMessageAction {
@@ -1115,22 +1155,25 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun previewTaskerXml(uri: Uri, appVersion: String) {
+    fun previewTaskerOrMacroDroid(uri: Uri, appVersion: String) {
         viewModelScope.launch {
             if (_taskerImportBusy.value) return@launch
             _taskerImportBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val rawXml = readBoundedTaskerXml(appContext, uri)
-                    val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
-                    TaskerImportReviewState(report = report, preview = TaskerImportPlanner.preview(report))
+                    val raw = readBoundedTaskerOrMacroDroid(appContext, uri)
+                    if (raw.removePrefix("\uFEFF").trimStart().startsWith("<")) {
+                        taskerImportReviewState(TaskerXmlImporter.parse(rawXml = raw, appVersion = appVersion))
+                    } else {
+                        macroDroidImportReviewState(MacroDroidImporter.parse(rawJson = raw, appVersion = appVersion))
+                    }
                 }
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send(message(R.string.ui_message_tasker_xml_ready))
+                    events.send(message(R.string.ui_message_automation_import_ready))
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_preview)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_automation_import_preview)) }
             _taskerImportBusy.value = false
         }
     }
@@ -1141,13 +1184,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun confirmTaskerImport(report: TaskerXmlImportReport) {
+    internal fun confirmTaskerImport(state: TaskerImportReviewState) {
         viewModelScope.launch {
             if (_taskerImportBusy.value) return@launch
             _taskerImportBusy.value = true
             runCatching {
                 withContext(Dispatchers.IO) {
-                    bundleRepository.importBundle(TaskerImportPlanner.confirmedBundle(report))
+                    bundleRepository.importBundle(state.bundle)
                 }
             }
                 .onSuccess { importReport ->
@@ -1160,7 +1203,7 @@ class ActiveAutomationViewModel(
                         ),
                     )
                 }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_import)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_automation_import)) }
             _taskerImportBusy.value = false
         }
     }
@@ -1268,7 +1311,7 @@ class ActiveAutomationViewModel(
                 withContext(Dispatchers.IO) {
                     val rawXml = PastedImportSource.requireTaskerXmlWithinBudget(rawText)
                     val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
-                    TaskerImportReviewState(report = report, preview = TaskerImportPlanner.preview(report))
+                    taskerImportReviewState(report)
                 }
             }
                 .onSuccess {
