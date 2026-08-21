@@ -332,7 +332,6 @@ android {
 
 // Owned and compiled by the core/* modules; see the Android source-set filter above.
 val MODULE_OWNED_SOURCES: List<String> = listOf(
-            "com/opentasker/core/logging/AppLogger.kt",
             "com/opentasker/core/storage/**",
             "com/opentasker/core/engine/ActiveExecutionRegistry.kt",
             "com/opentasker/core/engine/AutomationLiveConditionState.kt",
@@ -372,7 +371,7 @@ ksp {
 }
 
 dependencies {
-    compileOnly(project(":core:common"))
+    implementation(project(":core:common"))
     implementation(project(":core:model"))
     compileOnly(project(":core:storage"))
     compileOnly(project(":core:engine"))
@@ -1734,6 +1733,7 @@ tasks.register("localQualityGate") {
     description = "Runs the deterministic local debug-quality and dependency-report gate."
     dependsOn(
         verifyReleaseAssetName,
+        ":core:common:testDebugUnitTest",
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "connectedDebugAndroidTest",

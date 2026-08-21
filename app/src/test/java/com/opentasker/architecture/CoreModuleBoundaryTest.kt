@@ -52,7 +52,7 @@ class CoreModuleBoundaryTest {
     }
 
     /** Modules that physically own their sources. The rest still borrow app's; see A-99. */
-    private val migratedModules = listOf("core/model")
+    private val migratedModules = listOf("core/model", "core/common")
 
     @Test
     fun migratedModulesOwnTheirSourcesInsteadOfBorrowingApps() {
@@ -82,7 +82,6 @@ class CoreModuleBoundaryTest {
     fun modulesStillBorrowingAppSourcesAreDocumented() {
         val appBuild = source("app/build.gradle.kts")
         listOf(
-            "com/opentasker/core/logging/AppLogger.kt",
             "com/opentasker/core/storage/**",
             "com/opentasker/core/engine/ActiveExecutionRegistry.kt",
             "com/opentasker/core/engine/ExecutionEnvelope.kt",
