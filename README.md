@@ -208,6 +208,16 @@ Release build (signed with the repo-owned self-host key when no keystore env var
 ./gradlew :app:assembleRelease
 ```
 
+Published release assets are named `OpenTasker-v<versionName>.apk`. Stage and check the name before
+uploading anything to a GitHub release:
+```bash
+./gradlew :app:verifyReleaseAssetName
+```
+That stages the signed APK to `app/build/outputs/release-assets/` under the published name and fails
+if the staged file is still AGP's default `app-release.apk`, if more than one asset is staged, or if
+the name disagrees with the `versionName` in `tools/release-truth.json`. Upload from that directory,
+not from `app/build/outputs/apk/release/`.
+
 F-Droid profile:
 ```bash
 ./gradlew -PopenTaskerDistribution=fdroid :app:assembleRelease :app:verifyFdroidReadiness :app:verifyFdroidMetadata
