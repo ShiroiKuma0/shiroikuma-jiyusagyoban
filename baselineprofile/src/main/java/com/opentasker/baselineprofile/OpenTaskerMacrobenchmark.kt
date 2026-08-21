@@ -7,6 +7,7 @@ import androidx.benchmark.macro.StartupTimingMetric
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Until
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,12 +38,18 @@ class OpenTaskerMacrobenchmark {
         setupBlock = { pressHome() },
         measureBlock = {
             startActivityAndWait()
-            device.findObject(By.text("Tasks")).click()
+            device.wait(Until.findObject(By.text("Continue without a template")), ONBOARDING_TIMEOUT_MS)?.click()
+            val tasks = device.wait(Until.findObject(By.text("Tasks")), NAVIGATION_TIMEOUT_MS)
+            checkNotNull(tasks) {
+                "Tasks navigation did not appear after startup."
+            }.click()
             device.waitForIdle()
         },
     )
 
     private companion object {
         const val PACKAGE_NAME = "com.opentasker.app"
+        const val ONBOARDING_TIMEOUT_MS = 2_000L
+        const val NAVIGATION_TIMEOUT_MS = 10_000L
     }
 }
