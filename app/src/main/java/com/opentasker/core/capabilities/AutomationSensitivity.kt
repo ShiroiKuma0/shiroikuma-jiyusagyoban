@@ -217,6 +217,8 @@ object AutomationSensitivityRegistry {
         "huawei.sync",
         // Same radio, asking the band about itself rather than for its data.
         "huawei.probe",
+        // Drops a bond and a credential — device control in its most consequential form here.
+        "huawei.unpair",
         // Bonds a new peripheral to the phone outright, which is the strongest form of this.
         "huawei.pair",
         // Drives the same radio, listening rather than reading: it enumerates every BLE device in

@@ -233,8 +233,18 @@ Two app-level requirements that are not obvious:
 phone, with no Huawei account and no Huawei software; a stored bind survives across sessions; history
 survives a companion change; step records read back over service `0x07` count-then-index.
 
-**Not yet done:** service `0x19` (RR intervals — real HRV, the reason this band was bought), sleep
-records (`0x0C`/`0x0D`), and the file-download service. The band's ring-buffer depth is **measured,
+**Not yet done:** service `0x19` (RR intervals — real HRV, the reason this band was bought), sleep,
+and the file-download service.
+
+**`0x07/0x0C`–`0x0D` is NOT sleep** — it was labelled that on a guess and decoded on 2026-08-22 as
+**activity bouts**: `0x05` carries a 4-byte epoch start and a 2-byte duration in minutes,
+non-overlapping, confirmed against a known morning walk. Sleep lives elsewhere.
+
+**Heart rate and SpO₂ are absent because the band is not recording them**, not because they are
+unreachable: they occupy bits in the per-minute records the step service already returns, and the
+band's own SpO₂ screen says automatic measurement must be enabled first. The same may be true of
+truSleep — `SettingRelated` confirms the band *supports* truSleep/RRI/GPS, which is not the same as
+having them switched on. The band's ring-buffer depth is **measured,
 never assumed** — `huawei_syncs.oldestReturnedSeconds` records the oldest sample each sync actually
 returned, and the reported figure is a **floor** ("at least N h observed"), never a capacity.
 

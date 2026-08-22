@@ -35,21 +35,39 @@ class HuaweiProbeAction : Action {
     override val category = ActionCategory.SYSTEM
 
     /**
-     * Every command the fitness service flags, plus 0x0C.
+     * The fitness commands whose meaning is established. Always probed: both only count.
      *
-     * 0x0C is included precisely BECAUSE the census does not flag it and it answers anyway with a
-     * real sleep count — so the census is a guide, not gospel, and a sweep beats trusting it.
-     *
-     * The protocol's shape is count/record pairs (0x0A/0x0B is steps, 0x0C/0x0D is sleep), so an
-     * even command answering a count query is the signature worth looking for.
+     * 0x0C is here despite the census not flagging it — it answers anyway, which is why the census
+     * is treated as a guide rather than gospel.
      */
     private val fitnessProbes = listOf(
-        0x0A to "step count (known)",
-        0x0C to "sleep count (answers despite not being flagged)",
-        0x0E to "?", 0x11 to "?", 0x12 to "?", 0x13 to "?", 0x14 to "?",
-        0x15 to "?", 0x16 to "?", 0x17 to "?", 0x18 to "?", 0x19 to "?",
-        0x1A to "?", 0x1B to "?",
+        0x0A to "step count",
+        0x0C to "activity-bout count",
     )
+
+    /**
+     * Commands whose meaning is unknown. **Opt-in, because these are not reads.**
+     *
+     * In the captured Huawei Health session every one of these answered with a bare result tag
+     * while the queries answered with data — a setter accepting an argument, not a query declining
+     * one. 0x0E, 0x16, 0x17, 0x18 and 0x19 all returned 100000 OK to a count-shaped payload from
+     * this probe, so something was set on the band and what is unknown.
+     */
+    private val sweepProbes = listOf(
+        0x0E to "SETTER", 0x11 to "?", 0x12 to "?", 0x13 to "?", 0x14 to "?",
+        0x15 to "?", 0x16 to "SETTER", 0x17 to "SETTER", 0x18 to "SETTER",
+        0x19 to "SETTER", 0x1A to "?", 0x1B to "?",
+    )
+
+    /**
+     * Fitness commands Huawei Health uses to READ, whose meaning we do not know.
+     *
+     * Safe without the sweep flag, and that is evidence rather than optimism: in the capture these
+     * answered with data where the setters answered with a bare acknowledgement. Sleep is expected
+     * to be among them — the band displays last night's sleep so it holds it, and every query
+     * already accounted for is steps or activity bouts.
+     */
+    private val unknownQueries = listOf(0x03, 0x1E, 0x1F, 0x26)
 
     /** 100000 is success; everything else is the band saying why not. */
     private fun resultOf(tlvs: List<HuaweiProtocol.Tlv>): String {
@@ -117,8 +135,36 @@ class HuaweiProbeAction : Action {
 
             // The direct question: which count commands on the fitness service answer at all, and
             // with what. A count is the safe probe — it reads nothing and changes nothing.
+            line("=== unknown QUERIES Health reads (0x03, 0x1E, 0x1F, 0x26) ===")
+            for (cmd in unknownQueries) {
+                runCatching {
+                    val f = session.request(
+                        HuaweiCommands.SVC_FITNESS, cmd,
+                        HuaweiCommands.fitnessCount(dayAgo, now), timeoutMs = 6_000,
+                    )
+                    val tlvs = session.decrypt(f)
+                    val count = HuaweiRecords.parseCount(tlvs)
+                    line("  0x07/0x%02X  %s".format(cmd, if (count != null) "count=$count" else resultOf(tlvs)))
+                    for (t in tlvs) {
+                        line("      tag 0x%02X (%d B) %s".format(
+                            t.tag, t.value.size, HuaweiCrypto.upperHex(t.value).take(120)))
+                        if (t.tag and 0x80 != 0 && t.value.size > 2) {
+                            runCatching {
+                                for (n in HuaweiProtocol.parseTlvs(t.value)) {
+                                    line("        0x%02X (%d B) %s".format(
+                                        n.tag, n.value.size, HuaweiCrypto.upperHex(n.value).take(80)))
+                                }
+                            }
+                        }
+                    }
+                }.onFailure { line("  0x07/0x%02X  — %s".format(cmd, it.message)) }
+            }
+            line()
+
+            val sweep = args[SWEEP_ARG]?.trim().equals("true", ignoreCase = true)
             line("=== fitness service 0x07 — count probes over the last 24 h ===")
-            for ((cmd, guess) in fitnessProbes) {
+            if (!sweep) line("  (unknown-command sweep OFF — pass sweep=true to include it)")
+            for ((cmd, guess) in fitnessProbes + if (sweep) sweepProbes else emptyList()) {
                 val r = runCatching {
                     val f = session.request(
                         HuaweiCommands.SVC_FITNESS, cmd,
@@ -137,6 +183,49 @@ class HuaweiProbeAction : Action {
                 }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
                 line("  0x07/0x%02X  %-18s %s".format(cmd, guess, r))
             }
+            line()
+
+            // Sleep is reachable (0x0C counts) but its RECORD shape is unknown, and a parser
+            // cannot be written against a guess. Fetch one and print its TLV structure — the same
+            // way the step record was decoded. Read-only: a count and an indexed read.
+            // 0x0C/0x0D was labelled "sleep" on nothing but the plan's guess, and it is NOT sleep.
+            // Decoded on 2026-08-22 its events run right through the working day — 09:18, 10:23,
+            // 11:57, 12:14 — and 白い熊 confirmed the 36-minute one at 08:37 was a morning walk and
+            // the short night-time ones were trips to the bathroom. They are activity bouts:
+            //
+            //   0x83 per event: 0x04 = 01 (constant), 0x06 = 00 (constant),
+            //   0x05 = <4-byte epoch start><2-byte duration in MINUTES>, non-overlapping.
+            //
+            // Sleep is elsewhere. The band displays last night's sleep, so it holds it; which
+            // command serves it is not yet known, and guessing is what produced this mislabel.
+            line("=== activity bouts — 0x07/0x0C count, 0x0D fetch (NOT sleep) ===")
+            runCatching {
+                val cf = session.request(
+                    HuaweiCommands.SVC_FITNESS, 0x0C,
+                    HuaweiCommands.fitnessCount(dayAgo, now), timeoutMs = 8_000,
+                )
+                val n = HuaweiRecords.parseCount(session.decrypt(cf)) ?: 0
+                line("count=$n over the last 24 h")
+                // Zero-based, as the step service turned out to be.
+                for (index in 0 until minOf(n, 2)) {
+                    val rf = session.request(
+                        HuaweiCommands.SVC_FITNESS, 0x0D,
+                        HuaweiCommands.fitnessRecord(index), timeoutMs = 8_000,
+                    )
+                    line("  record $index:")
+                    fun dump(tlvs: List<HuaweiProtocol.Tlv>, indent: String) {
+                        for (t in tlvs) {
+                            val hex = HuaweiCrypto.upperHex(t.value)
+                            line("$indent tag 0x%02X (%d B) %s".format(t.tag, t.value.size, hex.take(96)))
+                            // Container tags carry nested TLVs; 0x80 marks them in this protocol.
+                            if (t.tag and 0x80 != 0 && t.value.size > 2) {
+                                runCatching { dump(HuaweiProtocol.parseTlvs(t.value), "$indent  ") }
+                            }
+                        }
+                    }
+                    dump(session.decrypt(rf), "   ")
+                }
+            }.onFailure { line("sleep fetch failed: ${it.message}") }
             line()
 
             // 0x19/0x01 already answered 100000 (success) to a count-shaped payload, so the
