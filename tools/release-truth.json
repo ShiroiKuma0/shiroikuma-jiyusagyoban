@@ -23,11 +23,11 @@
         "work": "2.11.2"
     },
     "capabilities": {
-        "registeredActions": 175,
+        "registeredActions": 177,
         "engineHandledActions": 10,
         "contextFamilies": 7,
         "bundleSchemaVersion": 5,
         "bundleSupportedSchemaVersions": "1..5",
-        "roomSchemaVersion": 27
+        "roomSchemaVersion": 28
     }
 }

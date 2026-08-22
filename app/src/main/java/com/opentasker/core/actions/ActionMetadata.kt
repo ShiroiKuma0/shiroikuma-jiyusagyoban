@@ -1082,6 +1082,40 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.pair",
+            name = "Pair Huawei Band",
+            description = "Claim the HUAWEI Band 11 Pro for this phone — the Bluetooth pairing, the HiChain bind and the full configuration set in one run, because the band gives a new companion only seconds before abandoning its flow. No Huawei account and no Huawei software. Two confirmations are needed: a plain yes/no on the band (never a six-digit code), then Android's own dialog on the phone",
+            category = "Health",
+            fields = listOf(
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address. It is a PUBLIC address and survives a factory reset, so there is nothing to scan for"),
+                ActionField("device_name", "Band name", FieldType.TEXT, hint = "e.g. HUAWEI Band 11 Pro-90F — the band expects to be told its own name during provisioning. Blank keeps whatever is stored"),
+                ActionField("timeout_sec", "Time limit (seconds)", FieldType.NUMBER, hint = "default 180, and it covers the two human confirmations — generous by design. Two more minutes are allowed on top for the pairing itself"),
+                ActionField("serve_sec", "Stay connected after, at most (seconds)", FieldType.NUMBER, hint = "default 45, and it is a CAP rather than a wait: the band is answered until it goes quiet, which is usually 20-30 s. It keeps asking questions after the configuration set — the first arrives about four seconds later — and a companion that hangs up during that exchange is treated as no companion at all, so the band drops back to its out-of-box screen even though every command succeeded"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Phase (live: pairing, connecting, handshake, device, configuring, serving), Ok, Summary, Bound, Address"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result, success or failure"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.sync",
+            name = "Sync Huawei Band",
+            description = "Pull the HUAWEI Band 11 Pro's stored history into its own tables, over Bluetooth Classic. Kept entirely separate from the Hume band's data — the two are compared side by side, never pooled. The band must be paired first; the first sync also binds it, which needs no Huawei account",
+            category = "Health",
+            fields = listOf(
+                ActionField("from", "Read from", FieldType.TEXT, hint = "blank or auto = continue from the last successful sync with the configured overlap. all = walk back as far as the cap allows, which is also how the band's buffer depth gets measured. Or an epoch-seconds instant"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the address from 健康の設定. A PUBLIC address that survives a factory reset, so unlike the Hume band there is nothing to scan for"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Phase, Pct, Records, Inserted, Ok, Summary, SyncId, LastSuccess, AgeHours, BatteryPct, BatteryAgeHours, Firmware, ObservedDepthHours, MissingCount, SyncCount"),
+                ActionField("timeout_sec", "Time limit (seconds)", FieldType.NUMBER, hint = "blank = the value from 健康の設定 (180), coerced to 10..1800. Wider than the Hume band's range because this band is fetched record by record, so a busy day is simply more round trips"),
+                ActionField("max_records", "Record cap per window", FieldType.NUMBER, hint = "default 4096 — a runaway guard, not a target"),
+                ActionField("store", "Store the summary in", FieldType.TEXT, hint = "a variable name to receive the one-line result, success or failure"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "band.charts",
             name = "Show Band Charts",
             description = "Open 健康 in its own fullscreen window — the band's heart rate, HRV, SpO2, temperature and stress as smooth charts. Put a launcher shortcut on the task that runs this and the icon opens straight onto the data",

@@ -835,6 +835,16 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // the sample article's first page and 19 on its second. This is minutes of honest work, not a
     // hung action — measured, it was 64 s into the first page when the default budget killed it.
     actionType == "ocr.article" -> ARTICLE_ACTION_TIMEOUT_MS
+    // The Huawei band's own ceilings are far above the 60 s default and are already enforced
+    // inside the actions themselves. A pairing run waits on TWO human confirmations and then has
+    // to stay connected for ninety seconds afterwards; a sync's configurable limit caps at 1800 s.
+    //
+    // A 60 s budget does not merely report a timeout here — it kills the action AFTER work has
+    // started on the band, leaving it mid-conversation with no companion, which makes it revert to
+    // its out-of-box wizard. It also cuts the run before the action can write its own Ok/Summary
+    // variables, so the failure arrives with nothing at all to say what happened.
+    actionType == "huawei.pair" -> HUAWEI_PAIR_TIMEOUT_MS
+    actionType == "huawei.sync" -> HUAWEI_SYNC_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
@@ -842,6 +852,8 @@ private const val DEFAULT_ACTION_TIMEOUT_MS = 60_000L
 private const val MEDIA_ACTION_TIMEOUT_MS = 600_000L // 10 minutes
 private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s) + 60 s margin
 private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages
+private const val HUAWEI_PAIR_TIMEOUT_MS = 600_000L // 180 s of human + handshake + 90 s serving, with margin
+private const val HUAWEI_SYNC_TIMEOUT_MS = 1_860_000L // the action's own maximum (1800 s) + 60 s margin
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a
