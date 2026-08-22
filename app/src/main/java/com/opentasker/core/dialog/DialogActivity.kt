@@ -287,16 +287,37 @@ private fun ListDialog(
         onDismissRequest = onCancel,
         title = { if (title.isNotBlank()) Text(title) },
         text = {
-            Column(Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+            // Pills, not plain rows (白い熊, 2026-08-22).
+            //
+            // A tappable choice that looks like a paragraph reads as a paragraph: the target is
+            // invisible until you touch it, and on a confirmation dialog the whole point is that the
+            // two options look like things you press. Every other control in this app that takes a
+            // choice is an outlined chip — the project filter, the 日本語／英語 switch, the band
+            // ladders — so a list dialog rendering flat text is the odd one out rather than the norm.
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 items.forEachIndexed { index, item ->
-                    Text(
-                        item,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier
+                    Box(
+                        Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(22.dp))
+                            .border(
+                                1.5.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                                RoundedCornerShape(22.dp),
+                            )
                             .clickable { onPick(index) }
-                            .padding(vertical = 12.dp),
-                    )
+                            .padding(horizontal = 18.dp, vertical = 13.dp),
+                    ) {
+                        Text(
+                            item,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
         },

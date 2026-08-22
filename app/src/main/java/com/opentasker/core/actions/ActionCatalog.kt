@@ -217,6 +217,8 @@ object ActionCatalog {
         define("huawei.charts", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiChartsAction),
         // A read-only census of what the band supports. IDEMPOTENT: it counts and reads, never writes.
         define("huawei.probe", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiProbeAction),
+        // NEVER retry-safe: it drops a credential and a Bluetooth bond.
+        define("huawei.unpair", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiUnpairAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
         define("ocr.models", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::OcrModelsAction),
         define("ocr.article", ActionCategory.FILE, ActionRetrySafety.NEVER, ::ArticleToHtmlAction),
