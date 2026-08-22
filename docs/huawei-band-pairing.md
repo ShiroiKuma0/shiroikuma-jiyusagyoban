@@ -355,6 +355,40 @@ does not, and the **tag numbers differ per command**:
 
 ---
 
+### Weather is a PUSH, not a request
+
+The band displays weather that the phone sends it. There is no fetching involved on our side and no
+HTTP proxying — captured 2026-08-22 by refreshing the band's weather screen with a decrypted snoop
+running.
+
+```
+0x18/0x07   location   {1: <epoch>, 2: <latitude>, 3: <longitude>}
+0x0f/0x01   weather    {  8: place name, plain ASCII — e.g. "Hodkovicky"
+                          9: current temperature, °C
+                         12: observation time, epoch seconds
+                         16: humidity, %
+                         17: high °C   18: low °C
+                        129, 133: containers, believed to carry condition/icon codes }
+```
+
+**The coordinates are LITTLE-endian IEEE-754 doubles**, while every integer elsewhere in this
+protocol is big-endian. Decoding them the same way as everything else yields 10⁻¹²⁹ rather than an
+obviously wrong number, so the mistake does not announce itself.
+
+The `129` and `133` containers are small integers with no anchor, and one sample cannot pin them.
+The efficient way to map them is not to wait for different weather but to **push varied values and
+watch the band's icon change** — which is available as soon as we can send this at all.
+
+Separately, the band repeatedly asks for `hw.wearable.httpProxy` over `0x37/0x02` (topic
+`2FB08EAB`) and gets no answer from Health either. It wants the phone to fetch URLs on its behalf.
+That is a real capability and a real hazard — answering it makes our app the band's HTTP client for
+arbitrary requests — and it is **not** needed for weather.
+
+Opening the weather screen also makes the band fetch its weather **app** — numeric ids over `0x27`
+with a version string, then a `0x28` file stream. That is app management, not data.
+
+---
+
 ## 12. Capturing Huawei Health
 
 Worth writing down because two non-obvious things make the difference between a readable capture and
