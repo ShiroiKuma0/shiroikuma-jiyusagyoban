@@ -61,6 +61,8 @@ object HuaweiSyncEngine {
         val samples: List<Sample>,
         /** Indices the band refused or dropped. Empty is the expected case; anything else matters. */
         val missing: List<Int>,
+        /** The index each returned record claims for ITSELF — the band's own numbering. */
+        val returnedIndices: List<Int> = emptyList(),
     )
 
     /**
@@ -88,9 +90,20 @@ object HuaweiSyncEngine {
 
         val samples = ArrayList<Sample>()
         val missing = ArrayList<Int>()
+        val returnedIndices = ArrayList<Int>()
         var fetched = 0
+        // Record indices are ZERO-BASED: a window of N records is `0 until N`.
+        //
+        // Measured, not assumed. This ran as `1..count` until 2026-08-22, which refused exactly one
+        // record on every sync — 15/16, then 3/4 — and the visible error was the harmless half of
+        // the bug: asking for index `count` failed loudly, while record 0 was skipped in silence,
+        // losing the oldest record of every window with nothing to show for it. A probe over
+        // `0..count` settled it: `refused [2] · records claim [0,1]` for a count of 2.
+        //
+        // The reference implementation never established this — it only ever pulled record #1 to
+        // look at the shape — so there was nothing to copy and no reason to think it was known.
         val total = minOf(count, maxRecords)
-        for (index in 1..total) {
+        for (index in 0 until total) {
             onProgress(index, total)
             val record = runCatching {
                 val frame = session.request(
@@ -106,9 +119,10 @@ object HuaweiSyncEngine {
                 continue
             }
             fetched++
+            returnedIndices += record.index
             samples += toSamples(record)
         }
-        return Fetch(from, to, count, fetched, samples, missing)
+        return Fetch(from, to, count, fetched, samples, missing, returnedIndices)
     }
 
     /**

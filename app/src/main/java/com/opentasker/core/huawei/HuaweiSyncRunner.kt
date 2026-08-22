@@ -174,6 +174,7 @@ object HuaweiSyncRunner {
         var written = 0
         var oldestReturned: Long? = null
         var missing = 0
+        var probe = ""
 
         suspend fun close(ok: Boolean, message: String): Outcome {
             db.huaweiSyncDao().finish(
@@ -318,6 +319,12 @@ object HuaweiSyncRunner {
                     recordCount += fetch.recordCount
                     recordsFetched += fetch.recordsFetched
                     missing += fetch.missing.size
+                    // Only when something was actually refused: silence is the expected case, and
+                    // a diagnostic that prints on every success stops being read.
+                    if (probe.isEmpty() && fetch.missing.isNotEmpty()) {
+                        probe = "of ${fetch.recordCount}: refused [${fetch.missing.joinToString(",")}]" +
+                            " · returned [${fetch.returnedIndices.joinToString(",")}]"
+                    }
                     samples += fetch.samples
                     HuaweiSyncState.counted(samples.size, written)
                 }
@@ -332,7 +339,11 @@ object HuaweiSyncRunner {
                     written += chunk.size
                     HuaweiSyncState.counted(deduped.size, written)
                 }
-                close(true, "$written samples from $recordsFetched/$recordCount records")
+                close(
+                    true,
+                    "$written samples from $recordsFetched/$recordCount records" +
+                        if (probe.isEmpty()) "" else " | $probe",
+                )
             }
             return outcome ?: close(false, "timed out after ${request.timeoutSec}s")
         } catch (e: Throwable) {
