@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.core.band.BandMetric
+import com.opentasker.ui.charts.huawei.HuaweiKeys
 import com.opentasker.ui.theme.ThemePrefs
 
 /**
@@ -72,6 +73,8 @@ data class ChartStyle(
     val spo2: Color,
     val temperature: Color,
     val steps: Color,
+    /** 安静時心拍 — Huawei only. Defaults to slot 4; see [ChartPalette.RESTING_HEART_RATE]. */
+    val restingHr: Color,
     val systolic: Color,
     val diastolic: Color,
     val sleepDeep: Color,
@@ -91,7 +94,20 @@ data class ChartStyle(
         BandMetric.SPO2 -> spo2
         BandMetric.TEMPERATURE -> temperature
         BandMetric.STEPS_MINUTE, BandMetric.STEPS_BUCKET -> steps
-        else -> ChartPalette.BAND_INDEX
+
+        // The Huawei band's keys are prefixed because its storage names collide with the Hume
+        // band's — both call heart rate "hr" and blood oxygen "spo2". Without the prefix both
+        // devices would silently resolve to the same colour, which is not cosmetic for a
+        // red-green-deficient reader comparing two bands.
+        HuaweiKeys.HEART_RATE -> heartRate
+        HuaweiKeys.SPO2 -> spo2
+        HuaweiKeys.STEPS -> steps
+        HuaweiKeys.RESTING_HR -> restingHr
+
+        // Anything else from the Huawei band reads GREY, deliberately, and this arm must stay
+        // ABOVE the general fallback. Its raw fields and undecoded feature bits are numbers whose
+        // meaning we do not know; borrowing a series colour would dress them as measurements.
+        else -> if (key.startsWith(HuaweiKeys.PREFIX)) ChartPalette.UNKNOWN else ChartPalette.BAND_INDEX
     }
 
     /** Sleep stage colour, keyed to the band's RAW codes — see [ChartPalette.sleepStage]. */
@@ -111,6 +127,21 @@ data class ChartStyle(
             "血中酸素" to spo2,
             "体温" to temperature,
             "歩数" to steps,
+        )
+
+    /**
+     * The Huawei screen's colours, in the order its cards are drawn.
+     *
+     * A separate list because the two screens are validated separately: this one is four series and
+     * its own adjacency, and 安静時心拍 sits last for the reason recorded on
+     * [ChartPalette.RESTING_HEART_RATE].
+     */
+    val huaweiSeriesColors: List<Pair<String, Color>>
+        get() = listOf(
+            "歩数" to steps,
+            "心拍" to heartRate,
+            "血中酸素" to spo2,
+            "安静時心拍" to restingHr,
         )
 
     val sleepColors: List<Pair<String, Color>>
@@ -155,6 +186,7 @@ data class ChartStyle(
             spo2 = Color(p.chartColorSpo2),
             temperature = Color(p.chartColorTemperature),
             steps = Color(p.chartColorSteps),
+            restingHr = Color(p.chartColorRestingHr),
             systolic = Color(p.chartColorSystolic),
             diastolic = Color(p.chartColorDiastolic),
             sleepDeep = Color(p.chartColorSleepDeep),
