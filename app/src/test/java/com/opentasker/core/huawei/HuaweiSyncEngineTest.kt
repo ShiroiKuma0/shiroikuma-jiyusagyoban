@@ -85,6 +85,22 @@ class HuaweiSyncEngineTest {
     }
 
     @Test
+    fun `record indices are zero-based, so a count of N means 0 until N`() {
+        // Measured on the band 2026-08-22. This ran as 1..count and refused exactly one record on
+        // every sync; the loud half was asking for index `count`, and the quiet half — the one that
+        // mattered — was skipping record 0 and losing the oldest record of every window in silence.
+        //
+        // Pinned as arithmetic rather than as a comment because the symptom was survivable: syncs
+        // still returned data, still reported success, and still looked correct.
+        val count = 4
+        val asked = (0 until minOf(count, 4096)).toList()
+        assertEquals(listOf(0, 1, 2, 3), asked)
+        assertEquals(count, asked.size)
+        assertTrue("index `count` is out of range and must never be requested", count !in asked)
+        assertTrue("record 0 is real data and must always be requested", 0 in asked)
+    }
+
+    @Test
     fun `dedupe keeps the last value for a repeated metric and minute`() {
         // Overlapping windows are deliberate, so duplicates are normal; REPLACE semantics mean the
         // last one must win, matching what the table will do.
