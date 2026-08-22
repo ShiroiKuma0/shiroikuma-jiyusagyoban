@@ -27,6 +27,7 @@ object HuaweiSettings {
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
+    private const val KEY_LANGUAGE = "language"
 
     /**
      * 白い熊's Band 11 Pro. A **public** address, unlike the Hume band's random one — so it survives
@@ -102,6 +103,20 @@ object HuaweiSettings {
         remove(KEY_AUTH_TOKEN)
         remove(KEY_BOUND_AT)
     }
+
+    /**
+     * The 健康（Huawei） window's display language, held SEPARATELY from the Hume band's.
+     *
+     * Two windows, two settings tasks, two of everything else — one shared key would mean flipping
+     * the language in one window silently flipping the other. It is a stored preference rather than
+     * an argument passed at launch because the system can resume the window long after the task that
+     * opened it has finished, and it has to come back up in the language it was left in.
+     */
+    fun language(context: Context): String =
+        prefs(context).getString(KEY_LANGUAGE, null)?.ifEmpty { null } ?: "en-US"
+
+    fun setLanguage(context: Context, value: String) =
+        prefs(context).edit { putString(KEY_LANGUAGE, value) }
 
     fun overlapMinutes(context: Context): Int =
         prefs(context).getInt(KEY_OVERLAP_MIN, DEFAULT_OVERLAP_MINUTES)

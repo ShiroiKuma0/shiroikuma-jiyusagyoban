@@ -117,6 +117,17 @@ data class MetricSpec(
      * Only heart rate does. See [MetricSpecs.HEART_RATE].
      */
     val splitPopulations: Boolean = false,
+    /**
+     * Every tuned gate on this row is a placeholder, not a measurement.
+     *
+     * The Hume rows were all measured on 白い熊's own wrist over days of wear. A second device has
+     * none of that yet, and a Hampel filter or a slew limit pointed at an uncharacterised signal
+     * does not fail safe — it manufactures rejections, and the ✕ marks it draws are indistinguishable
+     * from real ones. So a provisional row ships with every filter OFF and says so on its card.
+     *
+     * `HuaweiMetricSpecsTest` enforces the implication: provisional means the gates really are off.
+     */
+    val provisional: Boolean = false,
 ) {
     fun format(value: Double): String = when (decimals) {
         0 -> value.toInt().toString()

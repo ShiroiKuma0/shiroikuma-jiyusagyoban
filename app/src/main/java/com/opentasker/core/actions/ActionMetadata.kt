@@ -1082,6 +1082,34 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.probe",
+            name = "Probe Huawei Band",
+            description = "Ask the band what it actually supports and write the answer to a file — its service census, its command census, and which fitness count commands respond. Diagnostic: it reads and counts, and changes nothing on the band. Run it again after a firmware update",
+            category = "Health",
+            fields = listOf(
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("out", "Write the report to", FieldType.TEXT, hint = "blank = /sdcard/tmp/huawei-probe_<millis>.txt. The path is also left in %HUAWEI_ProbeFile"),
+                ActionField("store", "Store the path in", FieldType.TEXT, hint = "a variable name to receive the report's path, or the reason it failed"),
+                ActionField("sweep", "Also probe unknown commands", FieldType.CHECKBOX, hint = "default off. Sends a count-shaped payload to fitness commands whose meaning is unknown — five of them ACCEPT it and return nothing, so this may set something on the band. Only turn it on deliberately"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.charts",
+            name = "Show Huawei Band Charts",
+            description = "Open 健康（Huawei） in its own fullscreen window — the HUAWEI Band 11 Pro's steps, heart rate, blood oxygen and resting heart rate, plus the coverage card that measures how much it actually recorded. Separate from the Hume band's 健康 window; the two data sets are never pooled",
+            category = "Health",
+            fields = listOf(
+                ActionField("metric", "Only this metric", FieldType.TEXT, hint = "blank = the dashboard. One of: steps, hr, spo2, resting_hr"),
+                ActionField("lang", "Display language", FieldType.TEXT, hint = "en-US or ja-JP. Held separately from the Hume window's setting, so switching one does not switch the other. Blank keeps whatever was set last"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.pair",
             name = "Pair Huawei Band",
             description = "Claim the HUAWEI Band 11 Pro for this phone — the Bluetooth pairing, the HiChain bind and the full configuration set in one run, because the band gives a new companion only seconds before abandoning its flow. No Huawei account and no Huawei software. Two confirmations are needed: a plain yes/no on the band (never a six-digit code), then Android's own dialog on the phone",

@@ -149,6 +149,7 @@ data class ThemePrefs(
     val chartColorSpo2: Int = 0xFF199E70.toInt(),           // 血中酸素
     val chartColorTemperature: Int = 0xFFC98500.toInt(),    // 体温
     val chartColorSteps: Int = 0xFFD55181.toInt(),          // 歩数
+    val chartColorRestingHr: Int = 0xFFC98500.toInt(),      // 安静時心拍 (Huawei) — slot 4
     val chartColorSystolic: Int = 0xFF3987E5.toInt(),       // 収縮期
     val chartColorDiastolic: Int = 0xFFD95926.toInt(),      // 拡張期
     val chartColorSleepDeep: Int = 0xFF199E70.toInt(),      // 深い
@@ -281,6 +282,7 @@ object ThemeStore {
     private const val K_CHART_C_SPO2 = "chart_c_spo2"
     private const val K_CHART_C_TEMP = "chart_c_temp"
     private const val K_CHART_C_STEPS = "chart_c_steps"
+    private const val K_CHART_C_RHR = "chart_c_rhr"
     private const val K_CHART_C_SYS = "chart_c_sys"
     private const val K_CHART_C_DIA = "chart_c_dia"
     private const val K_CHART_C_DEEP = "chart_c_deep"
@@ -438,6 +440,7 @@ object ThemeStore {
         chartColorBandState = d.chartColorBandState,
         chartColorSpo2 = d.chartColorSpo2,
         chartColorTemperature = d.chartColorTemperature,
+        chartColorRestingHr = d.chartColorRestingHr,
         chartColorSteps = d.chartColorSteps,
         chartColorSystolic = d.chartColorSystolic,
         chartColorDiastolic = d.chartColorDiastolic,
@@ -600,6 +603,7 @@ object ThemeStore {
             chartColorBandState = prefs.getInt(K_CHART_C_STATE, d.chartColorBandState),
             chartColorSpo2 = prefs.getInt(K_CHART_C_SPO2, d.chartColorSpo2),
             chartColorTemperature = prefs.getInt(K_CHART_C_TEMP, d.chartColorTemperature),
+            chartColorRestingHr = prefs.getInt(K_CHART_C_RHR, d.chartColorRestingHr),
             chartColorSteps = prefs.getInt(K_CHART_C_STEPS, d.chartColorSteps),
             chartColorSystolic = prefs.getInt(K_CHART_C_SYS, d.chartColorSystolic),
             chartColorDiastolic = prefs.getInt(K_CHART_C_DIA, d.chartColorDiastolic),
@@ -714,6 +718,7 @@ object ThemeStore {
             putInt(K_CHART_C_STATE, p.chartColorBandState)
             putInt(K_CHART_C_SPO2, p.chartColorSpo2)
             putInt(K_CHART_C_TEMP, p.chartColorTemperature)
+            putInt(K_CHART_C_RHR, p.chartColorRestingHr)
             putInt(K_CHART_C_STEPS, p.chartColorSteps)
             putInt(K_CHART_C_SYS, p.chartColorSystolic)
             putInt(K_CHART_C_DIA, p.chartColorDiastolic)
