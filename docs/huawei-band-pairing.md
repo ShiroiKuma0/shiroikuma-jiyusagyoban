@@ -227,14 +227,178 @@ Two app-level requirements that are not obvious:
 
 ---
 
+## 10. The settings, and how to set them ourselves
+
+Captured from Huawei Health on 2026-08-22 by toggling each switch with a decrypted btsnoop running
+(method in §12). Every one of these is a plain write on the fitness service — no account, no cloud,
+no Health involvement once the payload is known.
+
+**Heart rate and blood oxygen are absent from a fresh band because these are OFF, not because they
+are unreachable.** The band's own SpO₂ screen says so in as many words. Continuous heart rate began
+recording the minute Health set `0x07/0x17`, at roughly one reading every five minutes.
+
+| Command | Setting | On | Off |
+|---|---|---|---|
+| `0x07/0x16` | **truSleep** | `{1:'01'}` | `{1:'00'}` |
+| `0x07/0x17` | **continuous heart rate** | `{1:'01'}` | `{1:'00'}` |
+| `0x07/0x24` | **automatic SpO₂** | `{1:'01'}` | `{1:'00'}` |
+| `0x07/0x1d` | high heart-rate alert | `{1:'01', 2:'78'}` — `0x78` = 120 bpm | `{1:'00'}` |
+| `0x07/0x22` | low heart-rate alert | `{1:'01', 2:'28'}` — `0x28` = 40 bpm | `{1:'00'}` |
+| `0x07/0x25` | low SpO₂ alert | `{1:'01', 2:'5A'}` — `0x5A` = 90 % | `{1:'00'}` |
+
+The pattern is consistent: an **enable** command plus a companion **alert** command carrying its
+threshold as a single byte. The off form of an alert drops the threshold byte entirely. SpO₂ writes
+`0x24` then `0x25` when enabling and the reverse when disabling; the threshold commands are
+independent of the enable and can be set on their own.
+
+### Module features go through DataSync, not through a setting
+
+Some features are not a byte on `0x07` but a configuration written to a JS module on the band over
+`0x37/0x01`, addressed by package name:
+
+| Feature | Module (phone ↔ band) | Config ids |
+|---|---|---|
+| **Emotions / stress** | `hw.health.emotion` ↔ `hw.watch.health.emotion` | `0x35AC8A3C` |
+| Sleep breathing awareness (apnea) | `hw.health.apneajsmodule` ↔ `hw.watch.health.osa` | `0x35A97CE7`, `0x35A97CE8` |
+| Pulse-wave arrhythmia analysis | `hw.health.ppgjsmodule` ↔ `hw.watch.health.ppg…` | `0x35A97CE2`, `0x35A97CE4`, `0x35A97CE9` |
+
+Stress matters more than it looks: it is the one metric the Hume band provides that this band would
+otherwise have lost in the migration. It is also not a like-for-like replacement but an upgrade —
+Hume's "stress" is a lookup on its device-state byte and carries no independent information, whereas
+this is derived from real HRV.
+
+The payload is the DataSync container, and comparing an on against an off makes the whole thing
+decodable rather than a blob to replay:
+
+```
+0x84 { 0x05 = configId (4 bytes)
+       0x06 = action        1 = phone->band, 2 = band->phone
+       0x07 = 01 01 <flag>  the last byte is on/off }
+
+84 0E 05 04 35 A9 7C E8 06 01 01 07 03 01 01 01     apnea ON
+84 0E 05 04 35 A9 7C E9 06 01 01 07 03 01 01 00     arrhythmia, flag 0
+```
+
+So there is **one primitive, not a recipe per feature**: write a config id with a flag, addressed to
+the right module. The ids are NOT one tight block — apnea and arrhythmia sit in `0x35A97CE…` but
+emotions is `0x35AC8A3C` — so a feature's id has to be captured rather than guessed from its
+neighbours. The primitive is general; the ids are not derivable.
+
+Arrhythmia analysis is **on-demand** — after activation the band shows a "Measure" button — so it
+produces an event when pressed rather than a series. Recorded for completeness, not a data source.
+
+---
+
+## 11. Where the health data actually lives
+
+Three separate answers, and only one of them is the record service we started with.
+
+### Per-minute records — `0x07/0x0A` count, `0x0B` fetch
+
+Steps, calories and distance, plus **heart rate and SpO₂ once their toggles are on**. Our decoder
+always had bits for those fields; they were simply never populated.
+
+### Activity bouts — `0x07/0x0C` count, `0x0D` fetch
+
+**Not sleep**, despite being labelled that way here for weeks on nothing but a guess. Each `0x83`
+entry is `0x04 = 01` (constant), `0x06 = 00` (constant), `0x05 = <4-byte epoch start><2-byte
+duration in MINUTES>`, non-overlapping — verified against a known 36-minute morning walk and a
+scatter of one-to-three-minute night-time trips.
+
+### Daily totals — `0x07/0x03`
+
+Per-activity-type totals with **real units**: `0x05` steps, `0x06` kcal, `0x07` metres. Confirmed
+against the band's own display (4290 steps / 134 kcal / 2797 m). This is what calibrates the raw
+`calories` and `distance` fields carried in the per-minute records.
+
+### Sleep and real HRV — named FILES over service `0x2c`
+
+Neither is a record and neither answers a count, which is why every probe for them came back empty.
+They are **bulk files**, pulled by name over a chunked transfer:
+
+| File | Id | Holds |
+|---|---|---|
+| `sequence_data` | `0x16` | the continuous series — sleep staging and HRV. ~700 KB observed |
+| `rrisqi_data.bin` | `0x10` | raw RR intervals with signal-quality index |
+
+```
+0x2c/0x01  {1:<filename>, 2:<id>, 5:<from epoch>, 6:<to epoch>, 12:<total size>}   request
+0x2c/0x03  negotiate (block sizes 0x03D0, 0x1E80 observed)
+0x2c/0x04  {1:<id>, 2:<offset>, 3:<length>, 4:<total>}                             request chunk
+0x2c/0x05  data
+0x2c/0x06  {1:<id>, 2:'01'}                                                        done
+```
+
+Health requests `sequence_data` **from one second after the last sleep session's wake time**, so the
+`from` field is a cursor into a continuous store rather than a query window. It caches what it has
+already pulled and asks only for the remainder; a request for data it already holds is answered
+`0x00023281` rather than with bytes.
+
+**Service `0x19` is an enable, not a query.** It answers `100000` to a payload carrying tag 1 and
+returns no data at all — the RR intervals land in `rrisqi_data.bin`, not in a response.
+
+### Health's own request shapes, which are not what we guessed
+
+Read straight out of the decrypted capture. Our `fitnessCount` nests the range inside `0x81`; Health
+does not, and the **tag numbers differ per command**:
+
+```
+0x07/0x0a  {129:'',  3:<from>, 4:<to>}      step count
+0x07/0x0b  {129:'02 02 00 00'}              record index 0 — ZERO-BASED, confirmed independently
+0x07/0x0c  {129:'',  3:<from>, 4:<to>}      activity-bout count
+0x07/0x1e  {1:<from>, 2:<to>, 13:'00'}
+0x07/0x1f  {2:<from>, 3:<to>, 4:'00'}
+0x07/0x26  {1:<from>, 2:<to>}
+```
+
+`0x1e`, `0x1f` and `0x26` returned empty for Health too, so they are not a data path we are missing.
+
+---
+
+## 12. Capturing Huawei Health
+
+Worth writing down because two non-obvious things make the difference between a readable capture and
+a useless one.
+
+**The phone must actually support snooping.** `dumpsys bluetooth_manager | grep -i snoop` must report
+`FULL`. On 白い熊's EMUI phone the Developer-options toggle is cosmetic and the property is
+SELinux-locked; a rooted Samsung works and writes to `/data/log/bt/btsnoop_hci.log`.
+
+**The capture must include the pairing.** Keys are recovered by replaying Health's own derivation —
+the PIN is encrypted under the universal digest secret, and the HiChain steps are plaintext JSON —
+so a capture that starts after Health has paired yields nothing but ciphertext.
+
+**Per-toggle attribution is by snapshot, not by rotating the log.** The log is append-only: pull a
+copy before the toggle and another after, and diff the decoded frame lists. Rotating it mid-session
+risks losing the handshake and with it every payload.
+
+### Two bugs that made the earlier capture look like a failure
+
+The 24 MB capture from 2026-08-21 decrypted **0 of 94** frames and was written off as unusable. Both
+causes were in the tooling:
+
+1. **The two HiChain passes interleave.** Health runs bind and auth with different request ids and
+   their frames alternate in the log. A single-slot state machine has the auth pass overwrite the
+   bind pass before it has yielded the authToken the auth pass needs — so the operational key is
+   never derived and every phone→band payload stays opaque. Key the state by **request id** and defer
+   derivation until all frames are in, bind first.
+2. **The authToken's AAD is a random challenge.** It cannot be recovered from ciphertext alone — but
+   it travels in the host's `encData`, sealed under the pass-1 session key, which *is* derivable.
+   Decrypt that, use it as the AAD, and the token falls out.
+
+With both fixed, 1870 of 1993 frames decrypt.
+
+---
+
 ## 9. What is proven, and what is not
 
 **Proven:** a factory-reset band reaches a working watch face in ~15 s from the PC and ~30 s from the
 phone, with no Huawei account and no Huawei software; a stored bind survives across sessions; history
 survives a companion change; step records read back over service `0x07` count-then-index.
 
-**Not yet done:** service `0x19` (RR intervals — real HRV, the reason this band was bought), sleep,
-and the file-download service.
+**Not yet done:** the `0x2c` file-transfer client, which is what stands between us and both sleep and
+real HRV — see §11. Once it exists, `sequence_data` and `rrisqi_data.bin` are the last two data
+sources on this band we know of and do not read.
 
 **`0x07/0x0C`–`0x0D` is NOT sleep** — it was labelled that on a guess and decoded on 2026-08-22 as
 **activity bouts**: `0x05` carries a 4-byte epoch start and a 2-byte duration in minutes,
