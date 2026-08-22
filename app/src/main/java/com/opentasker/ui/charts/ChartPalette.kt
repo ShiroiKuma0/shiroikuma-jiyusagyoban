@@ -39,6 +39,39 @@ object ChartPalette {
     val SPO2 = Color(0xFF199E70)         // slot 3 aqua
     val TEMPERATURE = Color(0xFFC98500)  // slot 4 yellow
     val STEPS = Color(0xFFD55181)        // slot 5 magenta
+
+    /**
+     * 安静時心拍 — the Huawei band's resting heart rate, and the first series this app added that
+     * the Hume band never had.
+     *
+     * **It deliberately reuses slot 4 rather than introducing an eighth hue, because there is no
+     * eighth hue to introduce.** Hume already occupies all seven documented slots, and a search of
+     * OKLCh space at this app's own surface found nothing that is both CVD-separable from all seven
+     * and bright enough to sit in family: every candidate above 4.5:1 contrast lands on top of the
+     * existing orange or yellow (ΔE 0.9–2.4), and the ones that do separate are dim (~3.5:1).
+     *
+     * So the placement is the decision. On the Huawei screen the cards run
+     * 歩数 → 心拍 → 血中酸素 → 安静時心拍, and measured across **all four** — not merely neighbours —
+     * this yellow floors at **CVD ΔE 8.4 / normal ΔE 19.3, contrast 6.33:1**. That 8.4 is not a new
+     * tolerance; it is exactly the worst-adjacent figure already shipping in both the series set
+     * above and the sleep set below.
+     *
+     * ## What was rejected, so nobody re-proposes it
+     *
+     * - **Violet, slot 7** — the obvious pick, and a disaster: **ΔE 1.9 under protanopia and 9.8
+     *   with ordinary colour vision against slot 1 blue**, failing even the gate that cannot be
+     *   waived. Worse, 心拍 and 安静時心拍 are the same quantity, so they are the two cards a reader
+     *   most wants to compare. Adjacency alone passes it — violet's neighbour would be aqua — which
+     *   is precisely why the check that matters here is all-pairs across the screen.
+     * - **Orange, slot 2** — normal ΔE 11.6 against 歩数 magenta, below the 15.0 floor.
+     * - **Red, slot 8** — ΔE 6.5 against aqua and 7.5 against magenta. Fails outright.
+     *
+     * The cost, stated rather than hidden: yellow already means 体温 on the Hume screen. It is a
+     * different window, the cards are labelled, and the Huawei band has no temperature metric, so
+     * the two never appear together.
+     */
+    val RESTING_HEART_RATE = Color(0xFFC98500) // slot 4 yellow, shared with TEMPERATURE by design
+
     val BAND_INDEX = Color(0xFF9085E9)   // slot 7 violet
     val BLOOD_PRESSURE = Color(0xFFE66767) // slot 8 red — the card accent
 

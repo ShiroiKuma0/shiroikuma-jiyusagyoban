@@ -214,6 +214,9 @@ object ActionCatalog {
         // Pairing plus the HiChain bind plus the configuration set, as ONE run — the band
         // gives a new companion only seconds, so these cannot be separate steps.
         define("huawei.pair", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiPairAction),
+        define("huawei.charts", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiChartsAction),
+        // A read-only census of what the band supports. IDEMPOTENT: it counts and reads, never writes.
+        define("huawei.probe", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiProbeAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
         define("ocr.models", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::OcrModelsAction),
         define("ocr.article", ActionCategory.FILE, ActionRetrySafety.NEVER, ::ArticleToHtmlAction),

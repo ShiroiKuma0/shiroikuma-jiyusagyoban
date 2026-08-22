@@ -168,6 +168,8 @@ object AutomationSensitivityRegistry {
         // The same, from the second band. A separate declaration because it is a separate body of
         // personal history in separate tables, not a variant of the entry above.
         "huawei.sync",
+        // Puts that history on screen. It transmits nothing and displays a body's worth of it.
+        "huawei.charts",
         // Puts that same health history on screen. It transmits nothing, but it displays a body's
         // worth of it, which is the thing worth declaring.
         "band.charts",
@@ -213,6 +215,8 @@ object AutomationSensitivityRegistry {
         "band.sync",
         // Drives the same radio over Bluetooth Classic instead, to a band that IS paired.
         "huawei.sync",
+        // Same radio, asking the band about itself rather than for its data.
+        "huawei.probe",
         // Bonds a new peripheral to the phone outright, which is the strongest form of this.
         "huawei.pair",
         // Drives the same radio, listening rather than reading: it enumerates every BLE device in

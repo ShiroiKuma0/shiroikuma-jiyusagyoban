@@ -1897,6 +1897,7 @@ private enum class ChartColorTarget(
     Spo2("血中酸素 — blood oxygen", { it.chartColorSpo2 }, { p, v -> p.copy(chartColorSpo2 = v) }),
     Temperature("体温 — temperature", { it.chartColorTemperature }, { p, v -> p.copy(chartColorTemperature = v) }),
     Steps("歩数 — steps", { it.chartColorSteps }, { p, v -> p.copy(chartColorSteps = v) }),
+    RestingHr("安静時心拍 — resting heart rate (Huawei)", { it.chartColorRestingHr }, { p, v -> p.copy(chartColorRestingHr = v) }),
     Systolic("収縮期 — systolic", { it.chartColorSystolic }, { p, v -> p.copy(chartColorSystolic = v) }),
     Diastolic("拡張期 — diastolic", { it.chartColorDiastolic }, { p, v -> p.copy(chartColorDiastolic = v) }),
     SleepDeep("睡眠 深い — deep", { it.chartColorSleepDeep }, { p, v -> p.copy(chartColorSleepDeep = v) }),
