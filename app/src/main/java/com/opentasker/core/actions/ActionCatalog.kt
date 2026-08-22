@@ -207,6 +207,13 @@ object ActionCatalog {
         define("band.scan", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandScanAction),
         define("band.session", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandSessionAction),
         define("band.charts", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandChartsAction),
+        // The HUAWEI Band 11 Pro, running in parallel with the Hume band. NEVER retry-safe
+        // for the same reason band.sync is not: it moves records off a device that will
+        // overwrite them, and a retry can re-drive a radio that is mid-handshake.
+        define("huawei.sync", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiSyncAction),
+        // Pairing plus the HiChain bind plus the configuration set, as ONE run — the band
+        // gives a new companion only seconds, so these cannot be separate steps.
+        define("huawei.pair", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiPairAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
         define("ocr.models", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::OcrModelsAction),
         define("ocr.article", ActionCategory.FILE, ActionRetrySafety.NEVER, ::ArticleToHtmlAction),

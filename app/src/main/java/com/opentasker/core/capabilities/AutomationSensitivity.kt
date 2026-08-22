@@ -165,6 +165,9 @@ object AutomationSensitivityRegistry {
     private val dataAccessActionIds = setOf(
         // Reads personal health history off the band — heart rate, sleep, blood pressure.
         "band.sync",
+        // The same, from the second band. A separate declaration because it is a separate body of
+        // personal history in separate tables, not a variant of the entry above.
+        "huawei.sync",
         // Puts that same health history on screen. It transmits nothing, but it displays a body's
         // worth of it, which is the thing worth declaring.
         "band.charts",
@@ -208,6 +211,10 @@ object AutomationSensitivityRegistry {
     private val deviceControlActionIds = setOf(
         // Drives the Bluetooth radio and connects to a paired-free peripheral.
         "band.sync",
+        // Drives the same radio over Bluetooth Classic instead, to a band that IS paired.
+        "huawei.sync",
+        // Bonds a new peripheral to the phone outright, which is the strongest form of this.
+        "huawei.pair",
         // Drives the same radio, listening rather than reading: it enumerates every BLE device in
         // range and may connect to a few to identify them. Device control, not data access — it
         // reads no health history, and the addresses it learns are broadcast to the whole room.

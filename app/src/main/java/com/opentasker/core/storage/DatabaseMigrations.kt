@@ -379,6 +379,52 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * Adds the Huawei band's own tables. **Purely additive** — no existing table is altered, so no
+     * Hume row is rewritten and nothing can lose its device association. The two bands stay
+     * separate until 白い熊 is confident the Huawei data is complete.
+     */
+    val MIGRATION_27_28 = object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_samples` (
+                    `metric` TEXT NOT NULL,
+                    `epochSeconds` INTEGER NOT NULL,
+                    `value` REAL NOT NULL,
+                    `syncId` INTEGER NOT NULL,
+                    PRIMARY KEY(`metric`, `epochSeconds`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_huawei_samples_epochSeconds` " +
+                    "ON `huawei_samples` (`epochSeconds`)",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_syncs` (
+                    `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    `startedAt` INTEGER NOT NULL,
+                    `finishedAt` INTEGER NOT NULL,
+                    `ok` INTEGER NOT NULL,
+                    `address` TEXT NOT NULL,
+                    `firmware` TEXT,
+                    `battery` INTEGER,
+                    `requestedFrom` INTEGER NOT NULL,
+                    `requestedTo` INTEGER NOT NULL,
+                    `recordCount` INTEGER NOT NULL,
+                    `recordsFetched` INTEGER NOT NULL,
+                    `oldestReturnedSeconds` INTEGER,
+                    `samplesWritten` INTEGER NOT NULL,
+                    `source` TEXT NOT NULL,
+                    `message` TEXT NOT NULL
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -407,6 +453,7 @@ object DatabaseMigrations {
             MIGRATION_24_25,
             MIGRATION_25_26,
             MIGRATION_26_27,
+            MIGRATION_27_28,
         )
     }
 }
