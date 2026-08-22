@@ -1082,6 +1082,20 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.unpair",
+            name = "Unpair Huawei Band",
+            description = "Forget the band on this phone — clears the HiChain bind and the Bluetooth pairing, so the next pairing is a clean first bind. RELEASE THE BAND ON THE BAND FIRST (its Settings → Disconnect): doing this while the band still thinks this phone is its companion deadlocks it, and the only way out is a factory reset, which wipes the band's own stored history. The band's address is kept — it is public and survives even a reset",
+            category = "Health",
+            fields = listOf(
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Bound and <prefix>Summary"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.probe",
             name = "Probe Huawei Band",
             description = "Ask the band what it actually supports and write the answer to a file — its service census, its command census, and which fitness count commands respond. Diagnostic: it reads and counts, and changes nothing on the band. Run it again after a firmware update",
