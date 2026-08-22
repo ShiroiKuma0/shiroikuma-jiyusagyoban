@@ -10,10 +10,12 @@ import java.util.concurrent.CountDownLatch
 // purpose: the fork introduced projects in its own chain long before upstream did. Upstream's
 // v11..v15 (held run-log rows, profile priority/lifetime, admission limits, fallback task, the
 // execution journal) are likewise renumbered 23..27.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 27
+// v28 adds the Huawei band's OWN tables. Additive only: the Hume band's tables are not
+// touched, because both devices run in parallel until their data has been compared.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 28
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
@@ -32,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun bandDailyDao(): BandDailyDao
     abstract fun bandSleepDao(): BandSleepDao
     abstract fun bandSyncDao(): BandSyncDao
+    abstract fun huaweiSampleDao(): HuaweiSampleDao
+    abstract fun huaweiSyncDao(): HuaweiSyncDao
 }
 
 /** Process-local handoff from the application bootstrap to workers in the storage module. */
