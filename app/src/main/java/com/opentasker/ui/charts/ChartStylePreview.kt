@@ -121,6 +121,10 @@ fun ChartPaletteVerdict(prefs: ThemePrefs, modifier: Modifier = Modifier) {
     val reports = remember(prefs) {
         listOf(
             "Metric series" to PaletteCheck.validate(seriesEntries(prefs)),
+            // Its own report, not extra rows on the one above: the two screens are separate, and
+            // PaletteCheck gates ADJACENT pairs, so appending Huawei's colours to the Hume list
+            // would invent adjacencies that never appear on either screen and miss the ones that do.
+            "Metric series (Huawei)" to PaletteCheck.validate(huaweiEntries(prefs)),
             "Sleep stages" to PaletteCheck.validate(sleepEntries(prefs)),
             "Blood pressure" to PaletteCheck.validate(bpEntries(prefs)),
         )
@@ -161,6 +165,14 @@ private fun seriesEntries(p: ThemePrefs) = listOf(
     "血中酸素" to p.chartColorSpo2,
     "体温" to p.chartColorTemperature,
     "歩数" to p.chartColorSteps,
+)
+
+/** The Huawei screen's cards, in the order they are drawn — see ChartPalette.RESTING_HEART_RATE. */
+private fun huaweiEntries(p: ThemePrefs) = listOf(
+    "歩数" to p.chartColorSteps,
+    "心拍" to p.chartColorHeartRate,
+    "血中酸素" to p.chartColorSpo2,
+    "安静時心拍" to p.chartColorRestingHr,
 )
 
 private fun sleepEntries(p: ThemePrefs) = listOf(

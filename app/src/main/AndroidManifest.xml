@@ -208,6 +208,18 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The second band's report, in its OWN window with its own taskAffinity: a launcher
+             shortcut to one band never resumes the other's, and retiring one later is a deletion
+             rather than surgery on a live window. -->
+        <activity
+            android:name="com.opentasker.ui.charts.huawei.HuaweiChartsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".huawei"
+            android:label="健康（Huawei）"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <!-- The appearance settings as their own window, so 「文字認識」 can send 白い熊 to its knobs
              and the system back stack brings them back to the screenshot. Not exported. -->
         <activity

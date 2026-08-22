@@ -71,6 +71,41 @@ object HuaweiSyncRunner {
     private fun mintAuthId(): String =
         (1..16).map { "0123456789abcdef"[Random.nextInt(16)] }.joinToString("")
 
+    /**
+     * Open a session, hand it to [block], and always close it.
+     *
+     * For diagnostics that need to ask the band things no ordinary sync asks. It takes the same
+     * process-wide lock as a sync — the band is single-connection, and a probe racing a scheduled
+     * sync would produce garbage in both.
+     */
+    suspend fun <T> withSession(
+        context: Context,
+        address: String,
+        block: suspend (HuaweiSession, HuaweiClient) -> T,
+    ): Result<T> {
+        if (!running.tryLock()) return Result.failure(IllegalStateException("a sync is already running"))
+        val client = HuaweiRfcommClient(context)
+        return try {
+            client.open(address)?.let { return Result.failure(IllegalStateException(it)) }
+            val session = HuaweiSession(client)
+            val api = HuaweiClient(session)
+            val link = api.linkParams()
+            api.deviceStatus()
+            val authId = HuaweiSettings.authIdSelf(context)
+                ?: return Result.failure(IllegalStateException("not bound — pair the band first"))
+            api.securityNegotiation(link.deviceSupportType, authId, android.os.Build.MODEL)
+            val token = HuaweiSettings.authToken(context)
+                ?: return Result.failure(IllegalStateException("no stored token — pair the band first"))
+            api.authenticate(authId, token, Random.nextLong(1L, Long.MAX_VALUE))
+            Result.success(block(session, api))
+        } catch (e: Throwable) {
+            Result.failure(e)
+        } finally {
+            runCatching { client.close() }
+            running.unlock()
+        }
+    }
+
     suspend fun status(db: AppDatabase): HuaweiStatus {
         val rows = db.huaweiSyncDao().recent(200).map {
             HuaweiStatus.Companion.Row(
