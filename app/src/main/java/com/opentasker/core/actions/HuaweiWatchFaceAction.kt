@@ -34,8 +34,17 @@ class HuaweiWatchFaceAction : Action {
         val prefix = args["prefix"]?.trim()?.ifEmpty { null } ?: "HUAWEI_"
         val store = args["store"]?.trim()?.ifEmpty { null }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
+        // A directory instead of a file opens the library rather than installing anything. Kept on
+        // this action rather than given its own id because it is the same job seen from the other
+        // end — 白い熊 picking the face instead of a task naming it.
+        args["browse"]?.trim()?.ifEmpty { null }?.let { dir ->
+            com.opentasker.ui.charts.huawei.HuaweiFacesActivity.open(ctx.app, dir)
+            ctx.variables.set("${prefix}Summary", "opened the watch-face library")
+            return ActionResult.Success
+        }
+
         val path = args["file"]?.trim()?.ifEmpty { null }
-            ?: return fail(ctx, prefix, store, "no file given — pass the path to a captured face")
+            ?: return fail(ctx, prefix, store, "no file given — pass the path to a captured face, or browse= a directory")
 
         val file = File(path)
         if (!file.isFile) return fail(ctx, prefix, store, "no such file: $path")
