@@ -168,6 +168,16 @@ class HuaweiFileClient(private val session: HuaweiSession) {
         /** Per-beat RR intervals. Takes no id. */
         const val RRI_DATA = "rrisqi_data.bin"
         const val RRI_TYPE = 0x10
+
+        /**
+         * A workout's GPS track. Asked for by NAME with both timestamps zero — unlike sleep and the
+         * RR intervals, a track is not addressed by a time range; the workout number in the name is
+         * the whole address.
+         */
+        const val GPS_TYPE = 0x11
+
+        /** The dead-reckoning track, for a workout the satellites never reached. */
+        const val PDR_TYPE = 0x12
     }
 }
 

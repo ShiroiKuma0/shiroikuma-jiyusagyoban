@@ -23,6 +23,7 @@ object HuaweiCommands {
     const val SVC_ACCOUNT = 0x1A
     const val SVC_RRI = 0x19            // per-beat RR intervals — the reason this band exists
     const val SVC_FILE_UPLOAD = 0x28
+    const val SVC_WORKOUT = 0x17        // recorded exercises, and the pointer to their GPS tracks
     const val SVC_FILE_TRANSFER = 0x2C  // band -> phone: sleep and RR intervals, by name
     const val SVC_DATA_SYNC = 0x37
 
@@ -452,6 +453,42 @@ object HuaweiCommands {
 
     /** Ask which faces are on the band. The reply carries free space and one record per face. */
     fun watchFaceList(): ByteArray = tlv(1) + tlv(6, byteArrayOf(3))
+
+    // --- workouts ----------------------------------------------------------------------------
+    //
+    // A recorded exercise is NOT one of the per-minute records the history fetch walks: it has its
+    // own service, its own numbering, and — for an outdoor one — a GPS track that is not a record
+    // at all but a FILE, pulled over the same 0x2C channel as sleep and the RR intervals.
+    //
+    // Everything here is unproven against 白い熊's band, because the band has never recorded a
+    // workout: its own log says `"GPSTrack":{"Count":0}` and Huawei Health's every request for the
+    // workout list came back empty. Written from published protocol descriptions, to be confirmed
+    // the first time a walk exists.
+
+    const val WORKOUT_LIST = 0x07       // which workouts exist in a time range
+    const val WORKOUT_TOTALS = 0x08     // one workout's summary
+    const val WORKOUT_SAMPLES = 0x0A    // its per-sample stream (heart rate, speed, altitude)
+    const val WORKOUT_PACE = 0x0C       // its per-lap pace blocks
+
+    /** The workouts recorded between two instants. Both are epoch SECONDS, big-endian like all TLV. */
+    fun workoutList(fromSeconds: Long, toSeconds: Long): ByteArray =
+        tlv(0x81, tlv(3, HuaweiProtocol.intBytes(fromSeconds.toInt(), 4)) +
+            tlv(4, HuaweiProtocol.intBytes(toSeconds.toInt(), 4)))
+
+    /** One workout's summary, by the number the list gave it. */
+    fun workoutTotals(number: Int): ByteArray =
+        tlv(0x81, tlv(2, HuaweiProtocol.intBytes(number, 2)))
+
+    /**
+     * A workout's GPS track, as a file name.
+     *
+     * The number is rendered in plain decimal — workout 12 is `12_gps.bin`. `_pdr.bin` is the
+     * dead-reckoning track a band records when it never saw a satellite; it is a relative x/y
+     * path, not coordinates, which is why it gets its own name and its own decoder or none at all.
+     */
+    fun gpsTrackName(number: Int): String = "${number}_gps.bin"
+
+    fun pdrTrackName(number: Int): String = "${number}_pdr.bin"
 
     /** The band reports install progress unprompted and expects each report acknowledged. */
     fun watchFaceProgressAck(assetId: String, version: String): ByteArray =
