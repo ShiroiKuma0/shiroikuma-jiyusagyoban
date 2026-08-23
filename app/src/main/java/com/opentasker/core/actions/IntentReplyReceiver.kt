@@ -17,14 +17,24 @@ import java.util.concurrent.ConcurrentHashMap
  * target must echo), which no other app can guess.
  */
 object IntentReplyBridge {
-    private val waiters = ConcurrentHashMap<String, (String) -> Unit>()
+    /**
+     * A target's answer: its status line, and every other string extra it sent.
+     *
+     * The extras used to be dropped on the floor — only [EXTRA_RESULT] survived. That was fine while
+     * the only round-trip was a sister app reporting "OK:" or "ERROR:", and wrong the moment one
+     * answered with actual VALUES: 天気 returns a temperature, a high, a low and a humidity as named
+     * extras beside the status line, and every one of them would have been discarded silently.
+     */
+    data class Reply(val result: String, val extras: Map<String, String> = emptyMap())
+
+    private val waiters = ConcurrentHashMap<String, (Reply) -> Unit>()
 
     /** Last sign of life per pending request, and last time what it reported actually CHANGED. */
     private val lastSeen = ConcurrentHashMap<String, Long>()
     private val lastChange = ConcurrentHashMap<String, Long>()
     private val lastReport = ConcurrentHashMap<String, String>()
 
-    fun register(id: String, onResult: (String) -> Unit) {
+    fun register(id: String, onResult: (Reply) -> Unit) {
         waiters[id] = onResult
         val now = android.os.SystemClock.elapsedRealtime()
         lastSeen[id] = now
@@ -32,7 +42,10 @@ object IntentReplyBridge {
     }
 
     fun cancel(id: String) = forget(id).also { waiters.remove(id) }
-    fun deliver(id: String, result: String) { forget(id); waiters.remove(id)?.invoke(result) }
+    fun deliver(id: String, reply: Reply) { forget(id); waiters.remove(id)?.invoke(reply) }
+
+    /** The keys that are protocol rather than payload, and so are never surfaced as variables. */
+    val PLUMBING = setOf(EXTRA_REPLY_ACTION, EXTRA_REPLY_PACKAGE, EXTRA_REPLY_ID, EXTRA_RESULT)
 
     private fun forget(id: String) {
         lastSeen.remove(id); lastChange.remove(id); lastReport.remove(id)
@@ -74,6 +87,21 @@ class IntentReplyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != IntentReplyBridge.ACTION_INTENT_REPLY) return
         val id = intent.getStringExtra(IntentReplyBridge.EXTRA_REPLY_ID) ?: return
-        IntentReplyBridge.deliver(id, intent.getStringExtra(IntentReplyBridge.EXTRA_RESULT).orEmpty())
+        // Every string extra the target sent, minus the plumbing. Only strings: this channel exists
+        // because EMUI will not carry anything richer between two third-party apps, and a value that
+        // arrived as some other type would be a sign the contract was not followed, not a bonus.
+        val extras = buildMap {
+            intent.extras?.keySet()?.forEach { key ->
+                if (key in IntentReplyBridge.PLUMBING) return@forEach
+                (intent.getStringExtra(key))?.let { put(key, it) }
+            }
+        }
+        IntentReplyBridge.deliver(
+            id,
+            IntentReplyBridge.Reply(
+                intent.getStringExtra(IntentReplyBridge.EXTRA_RESULT).orEmpty(),
+                extras,
+            ),
+        )
     }
 }

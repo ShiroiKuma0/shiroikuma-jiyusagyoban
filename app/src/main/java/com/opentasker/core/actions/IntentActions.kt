@@ -148,7 +148,7 @@ class SendIntentAction : Action {
                         val reply = try {
                             withTimeoutOrNull(timeoutSec * 1000L) {
                                 coroutineScope {
-                                    val answer = CompletableDeferred<String?>()
+                                    val answer = CompletableDeferred<IntentReplyBridge.Reply?>()
                                     IntentReplyBridge.register(replyId) { answer.complete(it) }
                                     unhookCancel = ProgressPanel.onCancel { answer.complete(null) }
                                     intent.putExtra(IntentReplyBridge.EXTRA_REPLY_ACTION, IntentReplyBridge.ACTION_INTENT_REPLY)
@@ -168,7 +168,10 @@ class SendIntentAction : Action {
                                                 // Synthesised as an ERROR: reply so the caller reports a
                                                 // real reason instead of a bare timeout.
                                                 answer.complete(
-                                                    if (everSpoke) "ERROR:target-app-stalled" else "ERROR:target-app-silent",
+                                                    IntentReplyBridge.Reply(
+                                                        if (everSpoke) "ERROR:target-app-stalled"
+                                                        else "ERROR:target-app-silent",
+                                                    ),
                                                 )
                                                 break
                                             }
@@ -181,9 +184,17 @@ class SendIntentAction : Action {
                             unhookCancel?.invoke()
                             IntentReplyBridge.cancel(replyId)
                         }
-                        ctx.variables.set(resultVar, reply ?: "")
+                        ctx.variables.set(resultVar, reply?.result ?: "")
+                        // Named values land beside the status line as %<result_var>_<key>. Prefixed
+                        // rather than bare so a sister app can never collide with a task's own
+                        // variables, and so one glance at a variable list says where a value came from.
+                        reply?.extras?.forEach { (key, value) ->
+                            ctx.variables.set("${resultVar}_$key", value)
+                        }
                         val why = if (reply == null && ProgressPanel.isCancelled()) " (cancelled)" else ""
-                        ctx.logger("Send intent (reply): ${action ?: cls ?: pkg} → %$resultVar = ${(reply ?: "").take(80)}$why")
+                        val extraNote = reply?.extras?.takeIf { it.isNotEmpty() }
+                            ?.let { " + ${it.size} value(s)" } ?: ""
+                        ctx.logger("Send intent (reply): ${action ?: cls ?: pkg} → %$resultVar = ${(reply?.result ?: "").take(80)}$why$extraNote")
                         return ActionResult.Success
                     }
                     if (resultVar != null) {
