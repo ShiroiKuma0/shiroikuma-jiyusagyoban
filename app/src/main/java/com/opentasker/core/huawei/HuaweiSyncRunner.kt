@@ -3,11 +3,15 @@ package com.opentasker.core.huawei
 import android.content.Context
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.HuaweiSampleEntity
+import com.opentasker.core.storage.HuaweiSleepEntity
 import com.opentasker.core.storage.HuaweiSyncEntity
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.TimeZone
 import kotlin.random.Random
@@ -58,6 +62,14 @@ object HuaweiSyncRunner {
      * ten seconds after the configuration set finished, so leaving earlier risks cutting the setup
      * short even if the band happens to pause.
      */
+    /**
+     * How far back to ask for sleep, regardless of how little the sample sync is fetching.
+     *
+     * Three days rather than one so a couple of missed syncs still recover the nights in between,
+     * and it is cheap: the band answers with one file per night, not per minute.
+     */
+    private const val SLEEP_LOOKBACK_SEC = 3L * 86_400
+
     private const val SERVE_MIN_MS = 20_000L
 
     /**
@@ -81,28 +93,278 @@ object HuaweiSyncRunner {
     suspend fun <T> withSession(
         context: Context,
         address: String,
+        timeoutMs: Long = SESSION_TIMEOUT_MS,
         block: suspend (HuaweiSession, HuaweiClient) -> T,
     ): Result<T> {
-        if (!running.tryLock()) return Result.failure(IllegalStateException("a sync is already running"))
         val client = HuaweiRfcommClient(context)
-        return try {
-            client.open(address)?.let { return Result.failure(IllegalStateException(it)) }
+        // The lock, the watchdog, the close and the unlock all live in HuaweiSessionGuard — pure
+        // Kotlin, so the promises they make can actually be tested against a transport that
+        // misbehaves. They were made here, untested, and two of them did not hold.
+        return HuaweiSessionGuard.guard(running, client, timeoutMs, scope) {
+            // INSIDE the guard, which it used to not be. `connect()` blocks uninterruptibly, so a
+            // band that is switched off or already speaking to somebody else parked the session
+            // before any watchdog covering the session had been armed.
+            client.open(address)?.let { throw IllegalStateException(it) }
             val session = HuaweiSession(client)
             val api = HuaweiClient(session)
             val link = api.linkParams()
             api.deviceStatus()
             val authId = HuaweiSettings.authIdSelf(context)
-                ?: return Result.failure(IllegalStateException("not bound — pair the band first"))
+                ?: throw IllegalStateException("not bound — pair the band first")
             api.securityNegotiation(link.deviceSupportType, authId, android.os.Build.MODEL)
             val token = HuaweiSettings.authToken(context)
-                ?: return Result.failure(IllegalStateException("no stored token — pair the band first"))
+                ?: throw IllegalStateException("no stored token — pair the band first")
             api.authenticate(authId, token, Random.nextLong(1L, Long.MAX_VALUE))
-            Result.success(block(session, api))
-        } catch (e: Throwable) {
-            Result.failure(e)
-        } finally {
-            runCatching { client.close() }
-            running.unlock()
+            block(session, api)
+        }
+    }
+
+    /**
+     * How long any single session may run before the socket is closed under it.
+     *
+     * Generous, because a watch face is a megabyte over Bluetooth — but finite, because the failure
+     * it guards against is a permanently held lock, which looks like a broken band.
+     */
+    private const val SESSION_TIMEOUT_MS = 420_000L
+
+    /**
+     * Set the language shown ON THE BAND.
+     *
+     * The band has no language menu of its own — the companion owns the setting — so this command
+     * is the only way to change it short of a factory reset, and even that only holds until some
+     * companion pushes a locale over it.
+     *
+     * Stored on success so every later pair re-asserts it. Stored ONLY on success: recording a
+     * language the band refused would make the app claim a state the wrist disagrees with, and
+     * would keep re-asserting the refusal forever.
+     */
+    suspend fun setBandLocale(
+        context: Context,
+        address: String,
+        locale: String,
+        imperial: Boolean,
+    ): Result<Boolean> = withSession(context, address) { _, api ->
+        api.setLocale(locale, imperial).also { if (it) HuaweiSettings.setBandLocale(context, locale) }
+    }
+
+    /**
+     * Fetch the RR-interval file and store its windows.
+     *
+     * **Everything the band recorded is stored, including windows Huawei Health would not display.**
+     * Discarding at ingest is irreversible, and the count that decides publishability is stored
+     * alongside — so the presentation layer can apply Health's threshold while the evidence for
+     * revisiting it survives. Doing it the other way round would mean re-wearing the band to change
+     * our minds.
+     *
+     * @return how many windows were written.
+     */
+    private suspend fun storeRri(
+        db: AppDatabase,
+        session: HuaweiSession,
+        syncId: Long,
+        fromSeconds: Long,
+        toSeconds: Long,
+    ): Int {
+        val file = HuaweiFileClient(session).fetch(
+            HuaweiFileClient.RRI_DATA, HuaweiFileClient.RRI_TYPE, fromSeconds, toSeconds,
+        )
+        if (file !is HuaweiFileClient.Result.Data) return 0
+        val windows = HuaweiRri.parse(file.bytes)
+        if (windows.isEmpty()) return 0
+        val rows = windows.flatMap { w ->
+            w.raw.map { (field, value) ->
+                HuaweiSampleEntity(HuaweiRriKeys.metricFor(field), w.startSeconds, value, syncId)
+            }
+        }
+        rows.chunked(500).forEach { db.huaweiSampleDao().upsert(it) }
+        return windows.size
+    }
+
+    /**
+     * Fetch the night file and store its segments.
+     *
+     * Stored per SEGMENT, keyed by start time, so re-reading a night the band still holds overwrites
+     * it rather than doubling it — which matters because every sync asks for an overlapping window
+     * on purpose.
+     *
+     * @return how many segments were written; 0 when the band held no night for the window.
+     */
+    private suspend fun storeSleep(
+        db: AppDatabase,
+        session: HuaweiSession,
+        syncId: Long,
+        fromSeconds: Long,
+        toSeconds: Long,
+    ): Int {
+        val file = HuaweiFileClient(session).fetch(
+            HuaweiFileClient.SEQUENCE_DATA, HuaweiFileClient.SEQUENCE_TYPE,
+            fromSeconds, toSeconds, id = HuaweiFileClient.SLEEP_STREAM_ID,
+        )
+        if (file !is HuaweiFileClient.Result.Data) return 0
+        val night = HuaweiSleep.parse(file.bytes) ?: return 0
+        db.huaweiSleepDao().upsert(
+            night.segments.map {
+                HuaweiSleepEntity(
+                    startSeconds = it.startSeconds,
+                    durationSeconds = it.durationSeconds,
+                    stage = it.stage.code,
+                    sessionStart = night.startSeconds,
+                    sessionEnd = night.endSeconds,
+                    syncId = syncId,
+                )
+            },
+        )
+        return night.segments.size
+    }
+
+    /**
+     * Install a watch face.
+     *
+     * The name is what the band files it under and Health always uses `<assetId>_<version>`, so the
+     * two identifiers are derived from the filename rather than asked for separately — a face called
+     * `7185695173_2.1.1.bin` carries everything the band needs.
+     */
+    suspend fun uploadWatchFace(
+        context: Context,
+        address: String,
+        file: java.io.File,
+        onProgress: (Int) -> Unit = {},
+    ): Result<HuaweiUploadClient.Outcome> = withSession(context, address) { session, _ ->
+        val name = file.name.removeSuffix(".bin")
+        val assetId = name.substringBefore('_')
+        val version = name.substringAfter('_', "")
+        require(version.isNotEmpty()) { "$name is not <assetId>_<version>" }
+        // The metadata sidecar is not optional: the band needs the face's signed store record
+        // before it will take, or keep, the bytes.
+        val meta = java.io.File(file.parentFile, "$name.json")
+        require(meta.isFile) { "missing ${meta.name} beside the face — capture it with the file" }
+        HuaweiUploadClient(session).installWatchFace(
+            assetId = assetId,
+            version = version,
+            bytes = file.readBytes(),
+            metaJson = meta.readText(),
+            onProgress = onProgress,
+        )
+    }
+
+    /**
+     * Push weather (and optionally a position) to the band.
+     *
+     * Both are sends rather than requests: the band displays what it was last told and answers
+     * neither reliably, so this reports what it managed to send rather than pretending to a
+     * confirmation the protocol does not offer.
+     */
+    suspend fun pushWeather(
+        context: Context,
+        address: String,
+        place: String,
+        temperatureC: Int,
+        humidity: Int?,
+        highC: Int?,
+        lowC: Int?,
+        latitude: Double?,
+        longitude: Double?,
+    ): Result<String> = withSession(context, address) { session, _ ->
+        val now = System.currentTimeMillis() / 1000
+        if (latitude != null && longitude != null) {
+            runCatching {
+                session.send(
+                    HuaweiCommands.SVC_LOCATION, HuaweiCommands.LOCATION_PUSH,
+                    HuaweiCommands.location(now, latitude, longitude),
+                )
+            }
+        }
+        session.send(
+            HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH,
+            HuaweiCommands.weather(place, temperatureC, now, humidity, highC, lowC),
+        )
+        // Give the band a moment to answer if it means to; its silence is normal here.
+        session.poll(2_000)
+        buildString {
+            append("$place ${temperatureC}°C")
+            humidity?.let { append(" · ${it}%") }
+            if (highC != null && lowC != null) append(" · $lowC–$highC°C")
+            if (latitude != null && longitude != null) append(" · position sent")
+        }
+    }
+
+    /** One setting the band was asked to change, and what it said. */
+    data class SettingOutcome(val name: String, val ok: Boolean, val detail: String)
+
+    /**
+     * Apply recording switches to the band.
+     *
+     * Each is sent and answered independently: a band that refuses one setting should still take the
+     * others, and a caller needs to know WHICH failed rather than that "settings failed". These
+     * decide whether the band records anything at all — a fresh band has continuous heart rate and
+     * automatic SpO₂ switched off, which looks exactly like a band that cannot measure them.
+     */
+    suspend fun applySettings(
+        context: Context,
+        address: String,
+        toggles: List<Triple<String, Int, ByteArray>>,
+    ): Result<List<SettingOutcome>> = withSession(context, address) { session, _ ->
+        toggles.map { (name, command, payload) ->
+            runCatching {
+                session.requireOk(HuaweiCommands.SVC_FITNESS, command, payload)
+                SettingOutcome(name, true, "set")
+            }.getOrElse { e ->
+                SettingOutcome(name, false, e.message ?: e::class.java.simpleName)
+            }
+        }
+    }
+
+    /** One file pulled off the band, or the reason there was none. */
+    data class FileOutcome(
+        val name: String,
+        val id: Int?,
+        val bytes: Int,
+        val path: String?,
+        val note: String,
+    )
+
+    /**
+     * Pull files off the band and write them down, without interpreting them.
+     *
+     * Deliberately a DUMP rather than a decoder. `sequence_data` is a container and we do not yet
+     * know which of its stream ids holds sleep — Huawei Health was seen asking for three — and
+     * `rrisqi_data.bin` has never once returned data to us, because the band had only just been
+     * told to record RR intervals. Guessing a layout from that would produce a decoder that cannot
+     * be checked against anything. Bytes on disk can be.
+     *
+     * Each id is tried in turn and the ones holding nothing are reported as such, which is the
+     * actual question being asked here: which id is sleep?
+     */
+    suspend fun fetchFiles(
+        context: Context,
+        address: String,
+        requests: List<Triple<String, Int, Int?>>,
+        fromSeconds: Long,
+        toSeconds: Long,
+        outDir: String,
+        stamp: String,
+    ): Result<List<FileOutcome>> = withSession(context, address) { session, _ ->
+        val files = HuaweiFileClient(session)
+        requests.map { (name, type, id) ->
+            val label = if (id == null) name else "$name-$id"
+            runCatching {
+                files.fetch(name, type, fromSeconds, toSeconds, id)
+            }.fold(
+                onSuccess = { r ->
+                    when (r) {
+                        is HuaweiFileClient.Result.Empty ->
+                            FileOutcome(name, id, 0, null, "nothing (${r.resultCode})")
+                        is HuaweiFileClient.Result.Data -> {
+                            val f = java.io.File(outDir, "huawei-${label}_$stamp.bin")
+                            runCatching { f.parentFile?.mkdirs(); f.writeBytes(r.bytes) }
+                            FileOutcome(name, id, r.bytes.size, f.absolutePath, "ok")
+                        }
+                    }
+                },
+                // One id failing must not cost the others: the whole point is to learn which ones
+                // answer, and an exception is itself an answer about that id.
+                onFailure = { FileOutcome(name, id, 0, null, it.message ?: it::class.java.simpleName) },
+            )
         }
     }
 
@@ -210,6 +472,7 @@ object HuaweiSyncRunner {
         var oldestReturned: Long? = null
         var missing = 0
         var probe = ""
+        var sleepNote = ""
 
         suspend fun close(ok: Boolean, message: String): Outcome {
             db.huaweiSyncDao().finish(
@@ -268,19 +531,35 @@ object HuaweiSyncRunner {
                 val requestId = Random.nextLong(1L, Long.MAX_VALUE)
                 val storedToken = HuaweiSettings.authToken(context)
                 if (HuaweiSettings.isBound(context) && storedToken != null) {
-                    // A stored token the band no longer honours means it was factory-reset or handed
-                    // to another companion. The bind is NOT cleared here: dropping a credential is a
-                    // state change 白い熊 has not asked for, and re-binding silently would mint a new
-                    // token behind their back. Say what happened instead, and let the pair card offer
-                    // the re-bind — otherwise this reads as a generic handshake failure forever.
-                    runCatching { api.authenticate(authId, storedToken, requestId) }
-                        .onFailure {
+                    // A stored token the band no longer honours means it was factory-reset or
+                    // handed to another companion.
+                    //
+                    // The BOND can survive that while the BIND does not — which is exactly what a
+                    // trip to another phone leaves behind: RFCOMM still opens, and only the HiChain
+                    // identity is dead. So "not bonded" is the wrong test for a stale credential and
+                    // the earlier check on it was insufficient.
+                    //
+                    // On a SYNC this is reported and nothing is touched: dropping a credential is a
+                    // state change nobody asked for. On a PAIR run it is re-bound, because being
+                    // asked to pair IS the authorisation to replace it — and refusing would leave
+                    // the pair task unable to fix the one thing it exists to fix.
+                    val reAuth = runCatching { api.authenticate(authId, storedToken, requestId) }
+                    if (reAuth.isFailure) {
+                        if (!bond) {
                             return@withTimeoutOrNull close(
                                 false,
                                 "the band no longer recognises this pairing — it was reset or " +
-                                    "connected to something else. Pair it again to re-bind.",
+                                    "connected to something else. Run バンド接続（Huawei） to re-bind.",
                             )
                         }
+                        phase("handshake", "re-binding — the band forgot this phone")
+                        HuaweiSettings.clearBind(context)
+                        val fresh = api.bind(authId, api.fetchPin(link.authVersion), requestId)
+                        HuaweiSettings.saveBind(
+                            context, authId, fresh, link.authVersion, link.deviceSupportType,
+                            System.currentTimeMillis(),
+                        )
+                    }
                 } else {
                     val token = api.bind(authId, api.fetchPin(link.authVersion), requestId)
                     HuaweiSettings.saveBind(
@@ -305,6 +584,7 @@ object HuaweiSyncRunner {
                     api.configure(
                         HuaweiSettings.deviceName(context) ?: "HUAWEI Band",
                         System.currentTimeMillis() / 1000, zoneByte, 0,
+                        HuaweiSettings.bandLocale(context),
                     )
 
                     // The band is NOT finished when the configuration set is. It carries on asking
@@ -374,9 +654,40 @@ object HuaweiSyncRunner {
                     written += chunk.size
                     HuaweiSyncState.counted(deduped.size, written)
                 }
+                // Sleep, while the link is still open. Its own phase because it is a different
+                // mechanism entirely — a file fetched by name, not indexed records — and because a
+                // reader watching progress should be able to tell which part is slow.
+                //
+                // Deliberately tolerant: a night that will not parse must not cost the samples that
+                // were already fetched and written. It reports, and the sync still succeeds.
+                phase("sleep")
+                val beats = runCatching {
+                    val to = request.windows.first().last
+                    storeRri(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
+                }.getOrElse { 0 }
+                val nights = runCatching {
+                    // Its OWN window, not the sample window.
+                    //
+                    // A routine sync asks for the little that has happened since the last one — an
+                    // hour, often less — and last night falls entirely outside that, so following
+                    // the sample window means a sync that "succeeds" and never once brings a night.
+                    // Sleep is one record per night, so asking for several days costs nothing.
+                    val to = request.windows.first().last
+                    storeSleep(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
+                }.getOrElse { sleepNote = it.message ?: it::class.java.simpleName; 0 }
+
                 close(
                     true,
                     "$written samples from $recordsFetched/$recordCount records" +
+                        // Always says something about sleep, including when there was none.
+                        // Silence here is what hid the first attempt storing nothing at all: the
+                        // sync reported success, the count was zero, and nothing said so.
+                        (
+                            if (sleepNote.isNotEmpty()) " · sleep: $sleepNote"
+                            else if (nights > 0) " · $nights sleep segments"
+                            else " · no night in the last ${SLEEP_LOOKBACK_SEC / 86_400} days"
+                            ) +
+                        (if (beats > 0) " · $beats RR windows" else "") +
                         if (probe.isEmpty()) "" else " | $probe",
                 )
             }
@@ -384,8 +695,11 @@ object HuaweiSyncRunner {
         } catch (e: Throwable) {
             return close(false, e.message ?: e::class.java.simpleName)
         } finally {
-            // Always, on every path. Holding the link costs battery and locks out everything else.
-            runCatching { client.close() }
+            // Always, on every path — including a cancelled one, which is what NonCancellable buys.
+            // Holding the link costs battery and locks out everything else; see the note on
+            // HuaweiRfcommClient.close for why a bare `runCatching { close() }` here silently did
+            // nothing exactly when the caller had given up.
+            withContext(NonCancellable) { runCatching { client.close() } }
             running.unlock()
         }
     }

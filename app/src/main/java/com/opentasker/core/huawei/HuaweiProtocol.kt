@@ -113,6 +113,57 @@ object HuaweiProtocol {
         return head + intBytes(crc16(head), 2)
     }
 
+    /**
+     * Split one logical frame across several wire frames.
+     *
+     * The byte after the length is a **slice flag**, and everything we send until now has used 0 —
+     * "not fragmented" — which works because every command is small. The watch-face announcement is
+     * not: its metadata JSON pushes the frame past 1.2 KB, and the band's own LinkParams caps a
+     * frame at 1022 bytes.
+     *
+     * `1` starts a fragmented frame and carries the service and command; `2` continues; `3` ends.
+     * A fragment index follows the flag. Only the FIRST fragment carries service/command, which is
+     * also why a decoder that ignores fragmentation sees the continuation as a frame on some absurd
+     * service — that is how this went unnoticed until a face silently failed to install.
+     */
+    fun fragments(
+        serviceId: Int,
+        commandId: Int,
+        payload: ByteArray,
+        maxFrame: Int = MAX_FRAME,
+    ): List<ByteArray> {
+        // A frame is magic(1) + length(2) + body + crc(2), so the body budget is maxFrame - 5. The
+        // body is flag + index + payload, and the FIRST fragment also carries service and command.
+        val bodyBudget = maxFrame - 5
+        if (payload.size + 3 <= bodyBudget) return listOf(frame(serviceId, commandId, payload))
+
+        val out = ArrayList<ByteArray>()
+        var pos = 0
+        var index = 0
+        while (pos < payload.size) {
+            val first = pos == 0
+            val room = bodyBudget - 2 - if (first) 2 else 0
+            val n = minOf(room, payload.size - pos)
+            val last = pos + n >= payload.size
+            val body = byteArrayOf((if (first) 1 else if (last) 3 else 2).toByte(), index.toByte()) +
+                (if (first) byteArrayOf(serviceId.toByte(), commandId.toByte()) else ByteArray(0)) +
+                payload.copyOfRange(pos, pos + n)
+            val head = byteArrayOf(MAGIC) + intBytes(body.size, 2) + body
+            out += head + intBytes(crc16(head), 2)
+            pos += n
+            index++
+        }
+        return out
+    }
+
+    /**
+     * The largest frame the band will take, straight from its own LinkParams (`0x03FE`).
+     *
+     * Not a guess and not a round number: a 960-byte limit split the watch-face announcement into
+     * fragments the band did not answer, because it expects the split Health makes.
+     */
+    const val MAX_FRAME = 1022
+
     /** A frame taken off the wire. */
     data class Frame(
         val serviceId: Int,

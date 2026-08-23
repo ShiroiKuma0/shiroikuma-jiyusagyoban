@@ -6,10 +6,13 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
@@ -36,6 +39,30 @@ import java.util.UUID
 class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
 
     companion object {
+        /** How long to let a blocking RFCOMM connect run before aborting it by closing the socket. */
+        private const val CONNECT_TIMEOUT_MS = 20_000L
+
+        /**
+         * How long a single write may sit in the kernel before the link is declared gone.
+         *
+         * A frame is at most a kilobyte and RFCOMM moves it in milliseconds; twenty seconds is not a
+         * tuning value, it is "the far end has stopped draining and is not coming back".
+         */
+        private const val WRITE_TIMEOUT_MS = 20_000L
+
+        /**
+         * Where every watchdog in this class runs — deliberately NOT the scope of the call it guards.
+         *
+         * A watchdog launched as a child of its own caller is cancelled by the very cancellation it
+         * exists to clean up after. Cancel a task while it is parked in a blocking `connect()` or
+         * `write()` and the child watchdog dies first, leaving nothing able to close the socket:
+         * `withContext` cannot return until its children AND its blocking body finish, so the
+         * coroutine hangs uninterruptibly with the process-wide sync lock held. Killing the app is
+         * then the only way out — and since the band serves one connection, everything else that
+         * wants the band is stuck behind it.
+         */
+        private val watchdogs = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
         /** SDP "Private COM" — the Huawei protocol endpoint. */
         val SERVICE_UUID: UUID = UUID.fromString("82ff3820-8411-400c-b85a-55bdb32cf060")
 
@@ -148,11 +175,27 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
             return@withContext "band is not paired — pair it first, accepting the request on the band"
         }
+        // Drop anything this client is still holding before asking for a second link. The band
+        // serves ONE connection, so a socket stranded by an earlier run does not merely leak — it
+        // locks the band out from under its own owner, and every attempt after it fails identically.
+        closeQuietly()
         runCatching {
             a.cancelDiscovery()
             val s = device.createRfcommSocketToServiceRecord(SERVICE_UUID)
-            s.connect()
+            // PUBLISHED BEFORE THE CONNECT, deliberately.
+            //
+            // `connect()` blocks with no timeout of its own and cannot be cancelled either; closing
+            // the socket is the documented way to abort it, and is safe here in a way it is not for
+            // [read]: a connect that has not completed has no session to lose. Assigning the field
+            // only afterwards left a pending connect invisible to [close], so the session watchdog
+            // one layer up had nothing to close and its "the socket close is what breaks a blocked
+            // call" contract quietly did not hold during connect — the one place it is needed most.
             socket = s
+            val watchdog = watchdogs.launch {
+                delay(CONNECT_TIMEOUT_MS)
+                runCatching { s.close() }
+            }
+            try { s.connect() } finally { watchdog.cancel() }
             input = s.inputStream
             output = s.outputStream
         }.exceptionOrNull()?.let { e ->
@@ -162,26 +205,87 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         null
     }
 
+    /** False once the link is gone, so a pump loop can tell a quiet band from a dead one. */
+    override val isOpen: Boolean get() = socket != null
+
+    /**
+     * Write, with the socket closed under us if the write cannot get out.
+     *
+     * The third of this class's blocking calls, and the last to be guarded. `out.write()` blocks
+     * with no timeout and is not interruptible: a coroutine parked in one never reaches a suspension
+     * point, so a `withTimeout` around it waits for exactly the thing it is meant to interrupt —
+     * the same defect the old blocking [read] had. It bites during a watch-face upload, where a
+     * megabyte goes out in roughly a thousand frames and a band that stops draining its receive
+     * buffer parks the sender indefinitely.
+     *
+     * One watchdog per frame is not free, but it is a coroutine `launch` and a `cancel` against a
+     * kilobyte of Bluetooth: the radio costs orders of magnitude more.
+     */
     override suspend fun write(data: ByteArray) = withContext(Dispatchers.IO) {
+        val s = socket
         val out = output ?: throw IllegalStateException("not connected")
-        out.write(data)
-        out.flush()
+        val watchdog = watchdogs.launch {
+            delay(WRITE_TIMEOUT_MS)
+            runCatching { s?.close() }
+        }
+        try {
+            out.write(data)
+            out.flush()
+        } finally {
+            watchdog.cancel()
+        }
     }
 
     /**
      * Read whatever has arrived. Returns null on timeout rather than throwing, because a quiet
      * band is normal — it only speaks when it has something to say.
      */
-    override suspend fun read(timeoutMs: Long): ByteArray? = withTimeoutOrNull(timeoutMs) {
-        withContext(Dispatchers.IO) {
-            val ins = input ?: return@withContext null
-            val buf = ByteArray(4096)
-            val n = runCatching { ins.read(buf) }.getOrDefault(-1)
-            if (n <= 0) null else buf.copyOf(n)
+    /**
+     * Read whatever is waiting, or give up at [timeoutMs].
+     *
+     * **Polls `available()` rather than blocking in `read()`.** The obvious version —
+     * `withTimeoutOrNull { withContext(IO) { ins.read(buf) } }` — does not work, and fails in the
+     * worst way: `withTimeoutOrNull` can only cancel at a suspension point, and a blocking JVM read
+     * is not one. When the band goes quiet the read never returns, the timeout never fires, and the
+     * coroutine hangs FOREVER still holding the process-wide sync mutex. Every later Huawei task
+     * then reports "a sync is already running" and only restarting the app clears it. That is
+     * exactly what happened on 2026-08-22, and it looked like a band fault rather than ours.
+     *
+     * `delay` IS a suspension point, so this version cancels properly — and it never closes the
+     * socket to escape, which matters because a timeout here is the NORMAL case while serving the
+     * band: we poll with short timeouts and usually expect nothing.
+     */
+    override suspend fun read(timeoutMs: Long): ByteArray? = withContext(Dispatchers.IO) {
+        val ins = input ?: return@withContext null
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (true) {
+            val ready = runCatching { ins.available() }.getOrDefault(-1)
+            if (ready < 0) return@withContext null            // stream closed under us
+            if (ready > 0) {
+                val buf = ByteArray(4096)
+                val n = runCatching { ins.read(buf) }.getOrDefault(-1)
+                return@withContext if (n <= 0) null else buf.copyOf(n)
+            }
+            if (System.currentTimeMillis() >= deadline) return@withContext null
+            kotlinx.coroutines.delay(20)
         }
+        @Suppress("UNREACHABLE_CODE") null
     }
 
-    override suspend fun close() = withContext(Dispatchers.IO) { closeQuietly() }
+    /**
+     * Hang up. **Must work in a coroutine that has already been cancelled**, which is why the
+     * context is [NonCancellable].
+     *
+     * `withContext` calls `ensureActive()` before it runs anything, so a plain
+     * `withContext(Dispatchers.IO) { … }` here throws instead of closing the moment the caller has
+     * been cancelled — and every caller wraps this in `runCatching`, as cleanup normally is, so the
+     * failure is silent. The socket then stays open for the life of the process. The band serves ONE
+     * connection, so it is not a leak that costs a little memory: it is the band becoming
+     * unreachable, identically, on every later attempt, until the app is force-stopped. Closing is
+     * also what breaks a blocked read or write, so a close that quietly did nothing removed the only
+     * escape from a hung transfer at the same time.
+     */
+    override suspend fun close() = withContext(NonCancellable + Dispatchers.IO) { closeQuietly() }
 
     private fun closeQuietly() {
         runCatching { input?.close() }

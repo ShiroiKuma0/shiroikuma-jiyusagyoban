@@ -219,6 +219,17 @@ object ActionCatalog {
         define("huawei.probe", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiProbeAction),
         // NEVER retry-safe: it drops a credential and a Bluetooth bond.
         define("huawei.unpair", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiUnpairAction),
+        // IDEMPOTENT: setting the same locale twice is the same one frame with the same answer.
+        define("huawei.language", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiLanguageAction),
+        // IDEMPOTENT: it reads files and writes them to disk; the band is unchanged.
+        define("huawei.files", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiFilesAction),
+        // NEVER retry-safe: a half-sent face is refused by the band, but re-running blind while one
+        // transfer is still live would fight it for the link.
+        define("huawei.watchface", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiWatchFaceAction),
+        // Both write to the band, and both are safe to repeat: setting the same switch or pushing
+        // the same weather twice leaves it exactly where it was.
+        define("huawei.settings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiSettingsAction),
+        define("huawei.weather", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWeatherAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
         define("ocr.models", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::OcrModelsAction),
         define("ocr.article", ActionCategory.FILE, ActionRetrySafety.NEVER, ::ArticleToHtmlAction),

@@ -26,6 +26,35 @@ object HuaweiText {
     val back = Loc("Back", "戻る")
 
     // --- the about card ------------------------------------------------------------------------
+    val sleepTitle = Loc("Last night", "昨夜の睡眠")
+    val sleepNone = Loc(
+        "No night stored yet — sleep arrives with the next sync.",
+        "まだ夜の記録がありません。次の同期で入ります。",
+    )
+    val sleepWhy = Loc(
+        "Read from the band's own sleep file, not from per-minute samples. The band stores the " +
+            "stage blocks and no totals at all, so these figures are added up here the same way " +
+            "Huawei's own app adds them up.",
+        "バンドの睡眠ファイルから読んでいる（分ごとの記録ではない）。バンドは区間だけを持っていて" +
+            "合計は一切持たない。だからこの合計は Huawei 純正アプリと同じくこちらで足している。",
+    )
+    val sleepDeep = Loc("Deep", "深い")
+    val sleepLight = Loc("Light", "浅い")
+    val sleepRem = Loc("REM", "レム")
+    val sleepAwake = Loc("Awake", "覚醒")
+    val sleepAsleep = Loc("Asleep", "睡眠")
+    val sleepBed = Loc("Bed time", "就寝")
+    val sleepWoke = Loc("Woke", "起床")
+    val sleepOutside = Loc(
+        "Awake outside the band's own span is drawn, not counted.",
+        "区間の外側の覚醒は描くだけで数えない。",
+    )
+    val sleepMisaligned = Loc(
+        "This night's blocks do not line up with the band's own bed and wake times — read the " +
+            "shape with care.",
+        "この夜は区間がバンドの就寝・起床時刻と合わない。形は慎重に読むこと。",
+    )
+
     val aboutTitle = Loc("About this report", "この画面について")
     val aboutBody = Loc(
         "This is the HUAWEI Band 11 Pro, running alongside the Hume band so the two can be "

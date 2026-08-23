@@ -107,6 +107,22 @@ class HuaweiCommandsTest {
     }
 
     @Test
+    fun `SetLocale carries the tag as ASCII and the unit system as one byte`() {
+        // Byte-for-byte what Huawei Health sent 白い熊's band during pairing:
+        //   0x0C/0x01 {1: "en-US", 2: 00}
+        // answered with the band's success code. Pinned because it is the ONLY route to the band's
+        // language — it has no menu of its own — and because a wrong tag 2 silently switches the
+        // whole band to imperial units.
+        val tlvs = HuaweiProtocol.parseTlvs(HuaweiCommands.setLocale("en-US", imperial = false))
+        assertEquals("en-US", String(tlvs.first { it.tag == 1 }.value, Charsets.US_ASCII))
+        assertArrayEquals(byteArrayOf(0), tlvs.first { it.tag == 2 }.value)
+
+        val jp = HuaweiProtocol.parseTlvs(HuaweiCommands.setLocale("ja-JP", imperial = true))
+        assertEquals("ja-JP", String(jp.first { it.tag == 1 }.value, Charsets.US_ASCII))
+        assertArrayEquals(byteArrayOf(1), jp.first { it.tag == 2 }.value)
+    }
+
+    @Test
     fun `SetTime encodes a negative zone offset as 128 plus hours`() {
         // The band's own encoding: west-of-UTC offsets are sent offset-by-128, not two's complement.
         val tlvs = HuaweiProtocol.parseTlvs(HuaweiCommands.setTime(1_787_346_631L, 128 + 5, 0))
