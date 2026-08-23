@@ -109,27 +109,65 @@ object HuaweiSleep {
      * not recognise has to stop here, where the evidence still exists, rather than three layers
      * later in a chart.
      */
-    fun parse(bytes: ByteArray): Session? {
-        if (bytes.size < CONTAINER + 3) return null
+    fun parse(bytes: ByteArray): Session? = parseAll(bytes).firstOrNull()
 
-        val start = be32(bytes, RECORD)
-        val end = be32(bytes, RECORD + 4)
+    /**
+     * Every night in the file, oldest first.
+     *
+     * The file is APPEND-ONLY: one block per night, each beginning with its own eight-byte
+     * start/end header and its own configuration container. Parsing only the first block — which is
+     * what this did until 2026-08-23 — pins the app to the OLDEST night in the file forever. The
+     * band went on appending, the file grew from 643 to 1525 bytes, every sync reported "18 sleep
+     * segments", and the card showed a two-day-old night with nothing to say it was stale.
+     *
+     * Blocks are found rather than assumed: a base is an offset whose next eight bytes are a
+     * plausible start/end pair no more than a day apart, with the container marker `0x81` thirty-two
+     * bytes on. Walking a declared block length instead would put one wrong byte between us and
+     * every later night.
+     */
+    fun parseAll(bytes: ByteArray): List<Session> {
+        val bases = ArrayList<Int>()
+        var i = 0
+        while (i + CONTAINER - RECORD + 1 < bytes.size) {
+            val start = be32(bytes, i)
+            val end = be32(bytes, i + 4)
+            val marker = bytes.getOrNull(i + (CONTAINER - RECORD))?.toInt()?.and(0xFF)
+            if (start in PLAUSIBLE && end in PLAUSIBLE && end > start &&
+                end - start <= MAX_SEGMENT && marker == 0x81
+            ) {
+                bases += i
+                i += CONTAINER - RECORD
+            } else {
+                i++
+            }
+        }
+        return bases.mapIndexedNotNull { n, base ->
+            parseBlock(bytes, base, bases.getOrElse(n + 1) { bytes.size })
+        }
+    }
+
+    private fun parseBlock(bytes: ByteArray, base: Int, limit: Int): Session? {
+        if (base + (CONTAINER - RECORD) + 3 > bytes.size) return null
+
+        val start = be32(bytes, base)
+        val end = be32(bytes, base + 4)
         if (start !in PLAUSIBLE || end !in PLAUSIBLE || end <= start) return null
 
         // Skip the configuration container whole. Its blocks carry 0x29B9xxxx ids of the same kind
         // the module-feature commands use, and none of them is sleep.
-        if ((bytes[CONTAINER].toInt() and 0xFF) != 0x81) return null
-        val (length, after) = varInt(bytes, CONTAINER + 1) ?: return null
+        val container = base + (CONTAINER - RECORD)
+        if ((bytes[container].toInt() and 0xFF) != 0x81) return null
+        val (length, after) = varInt(bytes, container + 1) ?: return null
         var i = after + length
-        if (i > bytes.size) return null
+        if (i > limit) return null
 
         val raw = ArrayList<Pair<Int, Int>>()
-        while (i + 4 <= bytes.size) {
+        while (i + 4 <= limit) {
             val duration = le32(bytes, i)
             // The stage field may be cut short by a byte: the first night was captured before the
             // client stopped trusting the declared size, and its final pair is seven bytes rather
             // than eight. Reading what is there beats discarding a real segment.
-            val stageBytes = minOf(4, bytes.size - (i + 4))
+            val stageBytes = minOf(4, limit - (i + 4))
             if (stageBytes <= 0) break
             val stage = le(bytes, i + 4, stageBytes)
             if (duration <= 0 || duration > MAX_SEGMENT) break

@@ -1241,6 +1241,7 @@ fun registerActionMetadata() {
                 ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Phase, Pct, Records, Inserted, Ok, Summary, SyncId, LastSuccess, AgeHours, BatteryPct, BatteryAgeHours, Firmware, ObservedDepthHours, MissingCount, SyncCount"),
                 ActionField("timeout_sec", "Time limit (seconds)", FieldType.NUMBER, hint = "blank = the value from 健康の設定 (180), coerced to 10..1800. Wider than the Hume band's range because this band is fetched record by record, so a busy day is simply more round trips"),
                 ActionField("max_records", "Record cap per window", FieldType.NUMBER, hint = "default 4096 — a runaway guard, not a target"),
+                ActionField("lookback_hours", "Always look back (hours)", FieldType.NUMBER, hint = "default 26 — the floor every sync covers regardless of when the last one finished. Without it a record the band closes late falls outside every later window and the gap never heals"),
                 ActionField("store", "Store the summary in", FieldType.TEXT, hint = "a variable name to receive the one-line result, success or failure"),
             ),
         ),

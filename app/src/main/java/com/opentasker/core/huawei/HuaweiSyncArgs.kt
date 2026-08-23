@@ -40,6 +40,22 @@ object HuaweiSyncArgs {
     const val DEFAULT_MAX_WINDOWS = 14
 
     /**
+     * How far back EVERY sync looks, no matter how recently the last one finished.
+     *
+     * Chasing the last-success pointer with a half-hour overlap looked frugal and lost data all day.
+     * A routine sync asked for the sliver since the previous one — "51 samples from 2/2 records" was
+     * typical — and any record the band closed late fell outside that window and outside every window
+     * after it, because the pointer had already moved past. Forty-four syncs in a morning therefore
+     * produced a chart full of holes while the band still held a complete day: a single backfill
+     * fetched 1440 samples from 85/85 records with nothing refused (2026-08-23).
+     *
+     * 26 hours rather than 24 so that a sync at any hour still covers the whole of the previous
+     * night. The cost is bounded and small — 85 records took nine seconds — and re-fetching is free
+     * by construction, because samples are keyed by (metric, second) and upserted.
+     */
+    const val DEFAULT_LOOKBACK_HOURS = 26
+
+    /**
      * Cut `[start, now]` into windows, newest first.
      *
      * Newest-first is deliberate: if a run is cut short — a timeout, a walk out of range, a flat
@@ -56,6 +72,7 @@ object HuaweiSyncArgs {
         nowSeconds: Long,
         maxWindowHours: Int = DEFAULT_WINDOW_HOURS,
         maxWindows: Int = DEFAULT_MAX_WINDOWS,
+        lookbackHours: Int = DEFAULT_LOOKBACK_HOURS,
     ): List<LongRange> {
         val windowSec = maxWindowHours.coerceAtLeast(1) * 3_600L
         val windows = maxWindows.coerceAtLeast(1)
@@ -63,14 +80,19 @@ object HuaweiSyncArgs {
         val start = when (from) {
             is HuaweiFrom.Since -> from.epochSeconds
             HuaweiFrom.All -> nowSeconds - windowSec * windows
-            HuaweiFrom.Auto ->
+            HuaweiFrom.Auto -> {
+                // The floor is what makes gaps self-healing. Without it the start is wherever the
+                // last sync happened to finish, and a record the band closes late is never asked for
+                // again by any later sync — see DEFAULT_LOOKBACK_HOURS.
+                val floor = nowSeconds - lookbackHours.coerceAtLeast(1) * 3_600L
                 if (lastSuccessAtSeconds == null) {
-                    nowSeconds - windowSec
+                    minOf(nowSeconds - windowSec, floor)
                 } else {
                     // Overlap is applied ONCE, at the oldest edge. It is free — the (metric, minute)
                     // dedupe key discards it — whereas asking for too little loses records for good.
-                    lastSuccessAtSeconds - overlapMinutes.coerceAtLeast(0) * 60L
+                    minOf(lastSuccessAtSeconds - overlapMinutes.coerceAtLeast(0) * 60L, floor)
                 }
+            }
         }
 
         // A clock that has stepped backwards, or a Since in the future, must not produce a negative

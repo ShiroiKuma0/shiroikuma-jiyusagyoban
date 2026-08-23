@@ -86,6 +86,79 @@ class HuaweiProbeAction : Action {
         val now = System.currentTimeMillis() / 1000
         val dayAgo = now - 24 * 3600
 
+        // A census of what is actually STORED, before any radio is touched. Written first and
+        // unconditionally: when a chart and a coverage card disagree, the rows are the arbiter, and
+        // asking the band about it answers a different question entirely.
+        run {
+            val db = com.opentasker.app.OpenTaskerApp_NoHilt.db
+            val dao = db.huaweiSampleDao()
+            line("=== stored samples, last 24 h (hour buckets, local time) ===")
+            val metrics = runCatching { dao.metrics() }.getOrDefault(emptyList())
+            for (metric in metrics) {
+                val times = runCatching { dao.timesFor(metric, dayAgo, now) }.getOrDefault(emptyList())
+                val buckets = IntArray(25)
+                times.forEach { t ->
+                    val h = ((t - dayAgo) / 3600).toInt().coerceIn(0, 24)
+                    buckets[h]++
+                }
+                val strip = buckets.joinToString("") {
+                    when {
+                        it == 0 -> "."
+                        it < 10 -> it.toString()
+                        else -> "#"
+                    }
+                }
+                val first = times.firstOrNull()?.let { java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000) }
+                val last = times.lastOrNull()?.let { java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000) }
+                // Values, not only counts: a metric can be present in every minute and still draw
+                // nothing, because its readings are zeros the chart is told to treat as absent.
+                val vals = runCatching { dao.range(metric, dayAgo, now).map { it.value } }
+                    .getOrDefault(emptyList())
+                val zeros = vals.count { it == 0.0 }
+                val stat = if (vals.isEmpty()) "" else
+                    " min=%.0f max=%.0f zero=%d".format(vals.min(), vals.max(), zeros)
+                line("%-14s %5d  %s  %s .. %s%s".format(
+                    metric, times.size, strip, first ?: "-", last ?: "-", stat,
+                ))
+            }
+            line("legend: one character per hour, oldest first — . none, 1-9 that many, # ten or more")
+            line()
+
+            line("=== stored sleep ===")
+            val sleepDao = db.huaweiSleepDao()
+            line("segments ${runCatching { sleepDao.count() }.getOrDefault(-1)}")
+            val newest = runCatching { sleepDao.newestSession() }.getOrNull()
+            line("newest session start " + (newest?.let {
+                java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000)
+            } ?: "none"))
+            newest?.let { st ->
+                runCatching { sleepDao.session(st) }.getOrNull()?.forEach {
+                    line("  %s  %s .. %s".format(
+                        it.stage,
+                        java.text.SimpleDateFormat("HH:mm").format(it.startSeconds * 1000),
+                        java.text.SimpleDateFormat("HH:mm").format((it.startSeconds + it.durationSeconds) * 1000),
+                    ))
+                }
+            }
+            line()
+
+            line("=== recent syncs ===")
+            runCatching { db.huaweiSyncDao().recent(8) }.getOrDefault(emptyList()).forEach {
+                line("  %s ok=%s %s".format(
+                    java.text.SimpleDateFormat("MM-dd HH:mm").format(it.startedAt),
+                    it.ok, (it.message ?: "").take(90),
+                ))
+            }
+            line()
+        }
+
+        if (args["census_only"]?.trim().equals("true", ignoreCase = true)) {
+            runCatching { File(out).writeText(report.toString()) }
+            ctx.variables.set("HUAWEI_ProbeFile", out)
+            args["store"]?.trim()?.ifEmpty { null }?.let { ctx.variables.set(it, out) }
+            return ActionResult.Success
+        }
+
         val result = HuaweiSyncRunner.withSession(ctx.app, address) { session, api ->
             line("=== identity ===")
             runCatching { api.identity() }.onSuccess {
