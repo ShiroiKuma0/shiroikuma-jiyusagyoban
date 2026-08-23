@@ -68,6 +68,9 @@ object HuaweiMetricSpecs {
         color = ChartPalette.STEPS,
         render = RenderKind.BARS,
         cadenceSec = 60,
+        // The band sends nothing for a minute in which nothing was walked, so silence here is a
+        // measured zero. Without this the ten hours 白い熊 spent asleep were tinted as missing data.
+        absentIsZero = true,
         validMin = 0.0,
         // A physical bound, not a tuning: nobody takes four hundred steps inside one minute. This is
         // the one gate on the table that is ON, because it needed no measuring.
@@ -272,6 +275,8 @@ object HuaweiMetricSpecs {
         color = ChartPalette.UNKNOWN,
         render = RenderKind.LINE,
         cadenceSec = 60,
+        // Calories and distance are counters like steps, and the band omits them the same way.
+        absentIsZero = true,
         validMin = -Double.MAX_VALUE,
         validMax = Double.MAX_VALUE,
         zeroIsNoReading = false,

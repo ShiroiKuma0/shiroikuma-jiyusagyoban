@@ -66,6 +66,17 @@ data class MetricSpec(
     val render: RenderKind,
     /** Nominal sampling interval. Drives the gap threshold and the slew gate's per-step limit. */
     val cadenceSec: Int,
+
+    /**
+     * Whether a missing reading means ZERO rather than "not measured".
+     *
+     * True only for extensive counters — steps, calories, distance — and only on a device that omits
+     * a field it has nothing to report. The Huawei band does exactly that, so its silence overnight
+     * is a statement about 白い熊 being asleep, not about the sync. Defaulted false: an intensive
+     * quantity like a heart rate has no zero to fall back on, and inventing one would draw a flat
+     * line through hours nobody measured.
+     */
+    val absentIsZero: Boolean = false,
     val validMin: Double,
     val validMax: Double,
     /** When true a stored 0 means "no reading", not a measurement of zero. */

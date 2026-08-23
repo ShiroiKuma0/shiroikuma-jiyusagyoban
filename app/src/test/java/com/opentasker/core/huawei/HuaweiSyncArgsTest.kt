@@ -38,11 +38,11 @@ class HuaweiSyncArgsTest {
     }
 
     @Test
-    fun `a first sync asks for exactly one window`() {
+    fun `a first sync covers the whole lookback, not one window`() {
         val w = resolve(HuaweiFrom.Auto, last = null)
-        assertEquals(1, w.size)
-        assertEquals(day, w[0].last - w[0].first)
         assertWellFormed(w)
+        assertTrue("must reach the lookback floor", w.last().first <= now - 26 * hour)
+        assertEquals("the newest window ends now", now, w[0].last)
     }
 
     @Test
@@ -65,18 +65,24 @@ class HuaweiSyncArgsTest {
     }
 
     @Test
-    fun `a backwards clock step yields one ordinary window, never a negative range`() {
-        // A band whose clock we set, against a phone whose clock moved: this must not explode.
+    fun `a backwards clock step yields ordinary windows, never a negative range`() {
+        // A band whose clock we set, against a phone whose clock moved: this must not explode. With
+        // a lookback floor the future last-success is simply ignored, which is also the safer answer
+        // — the last day gets fetched instead of a single window chosen by a broken clock.
         val w = resolve(HuaweiFrom.Auto, last = now + 10 * day)
-        assertEquals(1, w.size)
         assertWellFormed(w)
+        assertTrue("no window may be inverted", w.all { it.first <= it.last })
     }
 
     @Test
-    fun `a last success in the immediate past still produces a window`() {
+    fun `a sync moments after the last one still looks the whole way back`() {
+        // The regression this pins. Chasing the pointer meant a routine sync asked for the sliver
+        // since the previous one — "51 samples from 2 records" — so any record the band closed late
+        // fell outside that window and outside every window after it. Forty-four syncs in a morning
+        // left a chart full of holes while the band still held a complete day.
         val w = resolve(HuaweiFrom.Auto, last = now, overlap = 0)
-        assertEquals(1, w.size)
         assertWellFormed(w)
+        assertTrue("a hole must still be reachable", w.last().first <= now - 26 * hour)
     }
 
     @Test
