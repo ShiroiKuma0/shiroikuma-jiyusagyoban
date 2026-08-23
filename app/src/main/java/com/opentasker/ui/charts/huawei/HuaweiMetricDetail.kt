@@ -21,6 +21,7 @@ import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.LocalChartStyle
 import com.opentasker.ui.charts.MetricChart
 import com.opentasker.ui.charts.MetricPlot
+import com.opentasker.ui.charts.rememberChartGestureModifier
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
@@ -41,6 +42,11 @@ fun HuaweiMetricDetailScreen(
     chart: MetricChart,
     contentPadding: PaddingValues,
     onBack: () -> Unit,
+    /**
+     * How far back the chart may be scrolled — the whole history, including the era before this band
+     * existed. Without it the viewport clamps to whatever the visible window happened to start at.
+     */
+    bounds: LongRange = 0L..0L,
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
@@ -52,6 +58,15 @@ fun HuaweiMetricDetailScreen(
         ChartViewport(initialEndMs = end, initialSpanMs = style.defaultSpanMs)
     }
     val crosshair = rememberCrosshairState()
+
+    // Pinch to zoom, drag sideways to travel. This screen had neither, which is why the history was
+    // invisible: the readings were on the chart the whole time, just off the left of a window that
+    // could not be moved.
+    val span = if (bounds.last > bounds.first) bounds else viewport.startMs..viewport.endMs
+    val gestures = rememberChartGestureModifier(
+        onZoom = { viewport.zoomAround(viewport.plotWidthPx / 2f, it, span) },
+        onPan = { viewport.panBy(it.x, span) },
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -72,7 +87,7 @@ fun HuaweiMetricDetailScreen(
                 MetricPlot(
                     chart = chart,
                     viewport = viewport,
-                    modifier = Modifier.fillMaxWidth().height(style.detailHeight),
+                    modifier = Modifier.fillMaxWidth().height(style.detailHeight).then(gestures),
                     crosshair = crosshair,
                 )
             }
