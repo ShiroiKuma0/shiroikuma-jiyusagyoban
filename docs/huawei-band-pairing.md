@@ -423,26 +423,44 @@ far more time than recording an offset.
 ### Weather is a PUSH, not a request
 
 The band displays weather that the phone sends it. There is no fetching involved on our side and no
-HTTP proxying — captured 2026-08-22 by refreshing the band's weather screen with a decrypted snoop
-running.
+HTTP proxying. Captured 2026-08-22 and re-captured properly 2026-08-23 by toggling each setting with
+a decrypted snoop running.
 
 ```
-0x18/0x07   location   {1: <epoch>, 2: <latitude>, 3: <longitude>}
-0x0f/0x01   weather    {  8: place name, plain ASCII — e.g. "Hodkovicky"
-                          9: current temperature, °C
-                         12: observation time, epoch seconds
-                         16: humidity, %
-                         17: high °C   18: low °C
-                        129, 133: containers, believed to carry condition/icon codes }
+0x18/0x07   position   {1: epoch, 2: latitude, 3: longitude}
+0x0F/0x01   weather    {  8: place name, plain ASCII — "Hodkovicky"
+                          9: current °C            —  0x10 = 16
+                         12: observation epoch     —  07:00 that morning
+                         16: humidity %            —  0x4D = 77
+                         17: LOW °C  18: HIGH °C   —  12 and 18, around a current 16
+                         10, 15, and containers 129 / 133: condition and icon, unmapped }
+0x0F/0x05   unit       {1: 01} Fahrenheit · {1: 00} Celsius
+0x0F/0x0C   disable    {129: 02 01 02}   — the "Weather reports" switch, OFF only
 ```
+
+**Three corrections to what this file used to say.**
+
+*The temperature unit is on the WEATHER service, not the locale one.* `0x0C/0x05` was a reasonable
+guess from the locale command's own unit-system byte, and it is wrong: the switch is `0x0F/0x05`.
+
+*Tag 17 is the LOW and 18 the HIGH*, not the other way round — 12 and 18 around a current 16 °C.
+Written the wrong way round the band shows the day's range inverted, which reads as plausible weather
+rather than as a bug, so nothing would ever have reported it.
+
+*There is no "weather reports on" command.* Switching it off sends `0x0F/0x0C`; switching it back on
+sends the band **nothing at all**. Health simply resumes pushing, and the band displays whatever it
+is next given. So re-enabling weather means pushing some.
 
 **The coordinates are LITTLE-endian IEEE-754 doubles**, while every integer elsewhere in this
 protocol is big-endian. Decoding them the same way as everything else yields 10⁻¹²⁹ rather than an
-obviously wrong number, so the mistake does not announce itself.
+obviously wrong number, so the mistake does not announce itself. Confirmed against a known
+fix, which decoded correctly; the values themselves are redacted — they are a home address.
 
-The `129` and `133` containers are small integers with no anchor, and one sample cannot pin them.
-The efficient way to map them is not to wait for different weather but to **push varied values and
-watch the band's icon change** — which is available as soon as we can send this at all.
+**Huawei Health commits a setting when you LEAVE its screen, not when you tap it.** Worth knowing
+before capturing any other toggle: a capture bounded by the tap contains nothing, and the change then
+lands in whatever slice happens to follow. Entering the weather screen alone costs ~15 KB of chatter
+the first time, so each change is best captured twice — once after entering, once after backing out —
+so the entry traffic can be told apart from the change.
 
 Separately, the band repeatedly asks for `hw.wearable.httpProxy` over `0x37/0x02` (topic
 `2FB08EAB`) and gets no answer from Health either. It wants the phone to fetch URLs on its behalf.
