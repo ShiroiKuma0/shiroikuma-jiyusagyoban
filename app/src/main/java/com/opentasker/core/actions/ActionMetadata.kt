@@ -1186,6 +1186,22 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.workouts",
+            name = "Huawei Band walks",
+            description = "Read the walks the band recorded and download their GPS tracks. A workout is not part of the ordinary sync — it is an object the band numbered, with its own summary and, if it saw satellites, a track stored as a file. Two things about that file's decoding are unproven, so the raw bytes are always kept beside the GPX",
+            category = "Health",
+            fields = listOf(
+                ActionField("days", "How far back (days)", FieldType.NUMBER, hint = "default 7, coerced to 1..30. The band discards older tracks, so a long window mostly costs round trips"),
+                ActionField("out", "Write tracks to", FieldType.TEXT, hint = "default /sdcard/tmp — receives a .gpx per walk and the raw .bin beside it. The raw file is kept because the earth radius and the datum the track uses are both unconfirmed, and only the file can settle them"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Workouts, <prefix>Tracks, <prefix>Gpx (the newest track's path) and <prefix>Summary"),
+                ActionField("store", "Store the summary in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.probe",
             name = "Probe Huawei Band",
             description = "Ask the band what it actually supports and write the answer to a file — its service census, its command census, and which fitness count commands respond. Diagnostic: it reads and counts, and changes nothing on the band. Run it again after a firmware update",
@@ -1682,7 +1698,7 @@ fun registerActionMetadata() {
                 ActionField("extra6_value", "Extra 6 value"),
                 ActionField("extra6_type", "Extra 6 type", FieldType.DROPDOWN, hint = "blank = String", options = listOf("", "int", "long", "float", "bool")),
                 ActionField("flags", "Intent flags", hint = "optional; decimal or 0x-hex, OR'd in"),
-                ActionField("result_var", "Result variable (broadcast)", hint = "stores the receiver's reply"),
+                ActionField("result_var", "Result variable (broadcast)", hint = "stores the receiver's reply. In 'receiver' mode any other string extras the target sends arrive beside it as %<result_var>_<key> — that is how a sister app returns actual values rather than just OK/ERROR"),
                 ActionField("reply_via", "Reply channel", FieldType.DROPDOWN, options = listOf("", "receiver"),
                     hint = "blank = ordered-broadcast result; 'receiver' = a private ResultReceiver callback (EMUI-proof, the target reads the \"reply_to\" extra and calls back)"),
                 ActionField("result_timeout", "Result timeout (s)", FieldType.NUMBER, hint = "default 5, max 60 (receiver: default 30, max 600)"),

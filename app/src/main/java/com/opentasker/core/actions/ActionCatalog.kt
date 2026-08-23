@@ -236,6 +236,7 @@ object ActionCatalog {
         // the same weather twice leaves it exactly where it was.
         define("huawei.settings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiSettingsAction),
         define("huawei.weather", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWeatherAction),
+        define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),
         define("ocr.models", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::OcrModelsAction),
         define("ocr.article", ActionCategory.FILE, ActionRetrySafety.NEVER, ::ArticleToHtmlAction),
