@@ -59,6 +59,8 @@ object HuaweiCommands {
     // this and are deliberately unanswered — that would make us its general-purpose web client.
     const val SVC_WEATHER = 0x0F
     const val WEATHER_PUSH = 0x01
+    const val WEATHER_UNIT = 0x05       // 01 Fahrenheit, 00 Celsius
+    const val WEATHER_DISABLE = 0x0C    // the "Weather reports" switch, OFF direction only
     const val SVC_LOCATION = 0x18
     const val LOCATION_PUSH = 0x07
 
@@ -354,8 +356,31 @@ object HuaweiCommands {
             tlv(9, byteArrayOf(temperatureC.toByte())) +
             tlv(12, HuaweiProtocol.intBytes(observedAtSeconds.toInt(), 4)) +
             (humidityPercent?.let { tlv(16, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
-            (highC?.let { tlv(17, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
-            (lowC?.let { tlv(18, byteArrayOf(it.toByte())) } ?: ByteArray(0))
+            // 17 is the LOW and 18 the HIGH — the reverse of what this file said until a capture
+            // on 2026-08-23 showed 16 °C now with 12 and 18 either side of it. Written the old way
+            // round the band would have shown the day's range inverted, which reads as plausible
+            // weather rather than as a bug.
+            (lowC?.let { tlv(17, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
+            (highC?.let { tlv(18, byteArrayOf(it.toByte())) } ?: ByteArray(0))
+
+    /**
+     * The temperature unit the band displays.
+     *
+     * On the WEATHER service, not the locale one — `0x0C/0x05` was a reasonable guess from the
+     * locale command's unit-system byte and it is wrong. Captured 2026-08-23 by switching it both
+     * ways with a decrypted snoop running.
+     */
+    fun weatherUnit(fahrenheit: Boolean): ByteArray =
+        tlv(1, byteArrayOf(if (fahrenheit) 1 else 0))
+
+    /**
+     * Turn the band's weather display OFF.
+     *
+     * **There is no matching "on".** Switching the setting back on sent the band nothing at all —
+     * Health simply resumes pushing weather, and the band shows whatever it is next given. So the
+     * way to re-enable weather is to push some: see [weather].
+     */
+    fun weatherDisable(): ByteArray = tlv(129, byteArrayOf(2, 1, 2))
 
     private fun leDouble(v: Double): ByteArray {
         val bits = java.lang.Double.doubleToRawLongBits(v)

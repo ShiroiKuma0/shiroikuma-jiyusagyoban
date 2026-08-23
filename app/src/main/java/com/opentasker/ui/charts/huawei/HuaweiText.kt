@@ -26,6 +26,19 @@ object HuaweiText {
     val back = Loc("Back", "戻る")
 
     // --- the about card ------------------------------------------------------------------------
+    val facesTitle = Loc("Watch faces", "文字盤")
+    val facesInstall = Loc("Install", "入れる")
+    val facesNoPreview = Loc("no picture", "画像なし")
+    val facesEmpty = Loc(
+        "No faces in this directory yet. Faces are captured from Huawei Health — they cannot be " +
+            "made here.",
+        "この場所にはまだ文字盤が無い。文字盤は Huawei Health から捕獲するもので、ここでは作れない。",
+    )
+    val facesBusy = Loc(
+        "The band takes one at a time.",
+        "バンドは一度に一つしか受け取らない。",
+    )
+
     val sleepTitle = Loc("Last night", "昨夜の睡眠")
     val sleepNone = Loc(
         "No night stored yet — sleep arrives with the next sync.",

@@ -220,6 +220,18 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The watch-face library as its own window: its Install buttons run for tens of
+             seconds over Bluetooth and the picker has to still be there afterwards, which a
+             dialog's launch-settle-finish contract cannot offer. -->
+        <activity
+            android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".watchfaces"
+            android:label="文字盤（Huawei）"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <!-- The appearance settings as their own window, so 「文字認識」 can send 白い熊 to its knobs
              and the system back stack brings them back to the screenshot. Not exported. -->
         <activity
