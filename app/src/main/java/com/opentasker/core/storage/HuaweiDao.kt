@@ -153,6 +153,20 @@ interface HuaweiSampleDao {
     @Query("SELECT MAX(epochSeconds) FROM huawei_samples WHERE metric = :metric")
     suspend fun newest(metric: String): Long?
 
+    /**
+     * Every instant the band described SOMETHING at, whatever the metric.
+     *
+     * This is what separates "you did not walk" from "we never asked". The band omits a field it has
+     * nothing to report for, so a minute carrying a heart rate but no steps is a minute with zero
+     * steps — while a minute carrying nothing at all is a hole. Only the union of all metrics can
+     * tell those apart, and drawing them the same way reported 白い熊's night as data loss.
+     */
+    @Query(
+        "SELECT DISTINCT epochSeconds FROM huawei_samples " +
+            "WHERE epochSeconds BETWEEN :from AND :to ORDER BY epochSeconds",
+    )
+    suspend fun recordedSeconds(from: Long, to: Long): List<Long>
+
     @Query("SELECT DISTINCT metric FROM huawei_samples ORDER BY metric")
     suspend fun metrics(): List<String>
 

@@ -48,6 +48,8 @@ class HuaweiSyncAction : Action {
             lastSuccessAtSeconds = status?.lastSuccessAtMillis?.let { it / 1000 },
             overlapMinutes = HuaweiSettings.overlapMinutes(ctx.app),
             nowSeconds = System.currentTimeMillis() / 1000,
+            lookbackHours = args["lookback_hours"]?.trim()?.toIntOrNull()
+                ?: HuaweiSettings.lookbackHours(ctx.app),
         )
 
         val outcome = HuaweiSyncRunner.sync(

@@ -107,8 +107,13 @@ class HuaweiDashboardModel(
         val fromMs = oldest * 1000L
         val toMs = newest * 1000L
 
-        val charts = HuaweiMetricSpecs.ALL.map { spec -> buildChart(spec, oldest, newest) }
-        val diagnostics = HuaweiMetricSpecs.DIAGNOSTIC.map { spec -> buildChart(spec, oldest, newest) }
+        // Every instant the band described anything at. A counter with no reading at one of these
+        // is a measured zero; a stretch with none of them is the only thing that deserves gap tint.
+        val recorded = samples.recordedSeconds(oldest, newest)
+
+        val charts = HuaweiMetricSpecs.ALL.map { spec -> buildChart(spec, oldest, newest, recorded) }
+        val diagnostics =
+            HuaweiMetricSpecs.DIAGNOSTIC.map { spec -> buildChart(spec, oldest, newest, recorded) }
 
         val coverage = (HuaweiMetricSpecs.ALL + HuaweiMetricSpecs.DIAGNOSTIC).map { spec ->
             HuaweiCoverage.from(
@@ -158,9 +163,29 @@ class HuaweiDashboardModel(
         )
     }
 
-    private suspend fun buildChart(spec: MetricSpec, from: Long, to: Long): MetricChart {
+    private suspend fun buildChart(
+        spec: MetricSpec,
+        from: Long,
+        to: Long,
+        recorded: List<Long> = emptyList(),
+    ): MetricChart {
         val rows = db.huaweiSampleDao().range(HuaweiKeys.storageKey(spec.key), from, to)
-        val points = rows.map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        val points = if (!spec.absentIsZero) {
+            // A zero this spec calls "no reading" is not a point. Keeping it made the qualifier
+            // reject it and tint the span as missing, so a metric the band fills with zeros between
+            // its occasional real values read as a day of lost data. Rows already stored are
+            // filtered here rather than migrated away.
+            rows.asSequence()
+                .filterNot { spec.zeroIsNoReading && it.value == 0.0 }
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+                .toList()
+        } else {
+            // Fill the band's own silence with zeros, but only where the band was demonstrably
+            // recording. A stretch it said nothing about at all stays absent, so a real sync hole
+            // still reads as a hole instead of being disguised as a quiet afternoon.
+            val have = rows.associate { it.epochSeconds to it.value }
+            recorded.map { ChartPoint(it * 1000L, have[it] ?: 0.0) }
+        }
         if (points.isEmpty()) {
             return MetricChart(
                 spec = spec, chunk = null, buckets = emptyList(), bars = emptyList(),
