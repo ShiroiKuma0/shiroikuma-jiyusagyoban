@@ -228,6 +228,7 @@ object AutomationSensitivityRegistry {
         // Writes to the band's display only.
         "huawei.weather",
         "huawei.workouts",
+        "band.compare",
         // Drops a bond and a credential — device control in its most consequential form here.
         "huawei.unpair",
         // Bonds a new peripheral to the phone outright, which is the strongest form of this.

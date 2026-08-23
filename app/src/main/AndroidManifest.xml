@@ -223,6 +223,18 @@
         <!-- The watch-face library as its own window: its Install buttons run for tens of
              seconds over Bluetooth and the picker has to still be there afterwards, which a
              dialog's launch-settle-finish contract cannot offer. -->
+        <!-- 「バンド比較」 belongs to NEITHER band, which is why it has its own window and its own
+             task affinity rather than being a tab of one of the two reports it judges. When the Hume
+             side is eventually retired, this one is untouched. -->
+        <activity
+            android:name="com.opentasker.ui.charts.compare.BandCompareActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".bandcompare"
+            android:label="バンド比較"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <activity
             android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
             android:exported="false"

@@ -1202,6 +1202,19 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "band.compare",
+            name = "Compare the two bands",
+            description = "Put the HUAWEI Band 11 Pro and the Hume band side by side — one metric per card, both on one shared time axis and one shared scale. The two are never averaged together: the only figure derived from both is a signed difference, and a minute only one band recorded is counted as such rather than hidden",
+            category = "Health",
+            fields = listOf(
+                ActionField("span_minutes", "Window (minutes)", FieldType.NUMBER, hint = "default 1440, a day. The window every card shares — one axis for all of them"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.probe",
             name = "Probe Huawei Band",
             description = "Ask the band what it actually supports and write the answer to a file — its service census, its command census, and which fitness count commands respond. Diagnostic: it reads and counts, and changes nothing on the band. Run it again after a firmware update",
