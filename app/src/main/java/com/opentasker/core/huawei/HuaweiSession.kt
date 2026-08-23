@@ -11,6 +11,16 @@ interface HuaweiTransport {
     /** Read whatever has arrived, or null on timeout. */
     suspend fun read(timeoutMs: Long): ByteArray?
 
+    /**
+     * Whether the pipe is still usable.
+     *
+     * A pump loop cannot otherwise tell a quiet band from a dead link: both look like a read that
+     * returned nothing, and the watch-face pump spent the remainder of its four-minute budget
+     * politely polling a closed socket before reporting a plain "timed out". Defaulted so the fakes
+     * that only model a conversation need not care.
+     */
+    val isOpen: Boolean get() = true
+
     suspend fun close()
 }
 
@@ -131,6 +141,48 @@ class HuaweiSession(private val transport: HuaweiTransport) {
         return f
     }
 
+    /**
+     * Send a payload too large for one frame, split across fragments.
+     *
+     * Everything else in this protocol fits in a single frame; the watch-face announcement does not,
+     * because it carries the face's store metadata as JSON.
+     */
+    suspend fun sendLarge(service: Int, command: Int, payload: ByteArray, encrypted: Boolean = true) {
+        val body = if (encrypted) encrypt(payload) else payload
+        HuaweiProtocol.fragments(service, command, body).forEach { transport.write(it) }
+    }
+
+    /**
+     * The decrypted payload as RAW BYTES, before any TLV parsing.
+     *
+     * Nearly every command carries TLV and [decrypt] is right for it. The file-transfer data frames
+     * are the exception: `0x2C/0x05` carries a small header followed by a slice of the file, and
+     * TLV-parsing that does not fail — it produces plausible nonsense (a tag 0 holding 450 bytes, a
+     * tag 198 holding two) because arbitrary binary happens to parse as tag/length pairs. A decoder
+     * that silently succeeds on garbage is worse than one that throws, so anything reading file
+     * bytes must come through here instead.
+     *
+     * Null when the frame carries no crypto envelope AND no key is set, which for a data frame
+     * means something is wrong rather than that the payload is plaintext.
+     */
+    fun decryptBytes(frame: HuaweiProtocol.Frame): ByteArray? {
+        val key = sessionKey ?: return frame.payload
+        val ct = frame.tag(HuaweiProtocol.TAG_CIPHERTEXT) ?: return frame.payload
+        val iv = frame.tag(HuaweiProtocol.TAG_IV) ?: return null
+        return runCatching {
+            if (useGcm) HuaweiCrypto.decryptGcm(ct, key, iv) else HuaweiCrypto.decryptCbc(ct, key, iv)
+        }.getOrNull()
+    }
+
+    /**
+     * Wait for one frame the band sends unprompted.
+     *
+     * [request] pairs a send with its reply; a file transfer instead pushes many data frames after
+     * a single request, so the reader needs to wait for them without sending anything.
+     */
+    suspend fun awaitFrame(service: Int, command: Int, timeoutMs: Long): HuaweiProtocol.Frame? =
+        await(service, command, timeoutMs)
+
     private suspend fun await(service: Int, command: Int, timeoutMs: Long): HuaweiProtocol.Frame? {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (true) {
@@ -162,6 +214,9 @@ class HuaweiSession(private val transport: HuaweiTransport) {
         transport.read(timeoutMs)?.let { out.addAll(rx.feed(it)) }
         return out
     }
+
+    /** See [HuaweiTransport.isOpen] — a pump that keeps polling a dead link reports the wrong fault. */
+    val isOpen: Boolean get() = transport.isOpen
 
     suspend fun close() = transport.close()
 }

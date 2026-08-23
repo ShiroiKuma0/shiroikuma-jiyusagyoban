@@ -787,6 +787,16 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // variables, so the failure arrives with nothing at all to say what happened.
     actionType == "huawei.pair" -> HUAWEI_PAIR_TIMEOUT_MS
     actionType == "huawei.sync" -> HUAWEI_SYNC_TIMEOUT_MS
+    // Announce, wait for the band to ask, send ~1 MB, then wait while it unpacks.
+    actionType == "huawei.watchface" -> HUAWEI_WATCHFACE_TIMEOUT_MS
+    actionType == "huawei.files" -> HUAWEI_PAIR_TIMEOUT_MS
+    // These all open a full session — connect, handshake, authenticate — before they send
+    // anything, which alone outlives the 60 s default on a band that is asleep. Probe and language
+    // were left on the default by oversight: killing one at 60 s does not merely fail the action,
+    // it walks away mid-conversation, and each of them has its own ceiling (the session watchdog)
+    // that reports what actually went wrong if it is allowed to fire first.
+    actionType == "huawei.settings" || actionType == "huawei.weather" ||
+        actionType == "huawei.probe" || actionType == "huawei.language" -> HUAWEI_PAIR_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
@@ -796,6 +806,18 @@ private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s
 private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages
 private const val HUAWEI_PAIR_TIMEOUT_MS = 600_000L // 180 s of human + handshake + 90 s serving, with margin
 private const val HUAWEI_SYNC_TIMEOUT_MS = 1_860_000L // the action's own maximum (1800 s) + 60 s margin
+
+/**
+ * A watch-face install is bounded by HuaweiSyncRunner's own session watchdog (420 s) plus the grace
+ * HuaweiSessionGuard allows the transfer to unwind in — so this only has to sit above that.
+ *
+ * It used to borrow the sync's 31-minute budget, and that is not a harmless over-estimate: a manual
+ * run holds `ActiveAutomationViewModel.runActionBusy` for its whole duration, and that one boolean
+ * greys the Run arrow on EVERY task in the list. So a wedged install did not just fail — it locked
+ * the Tasks screen for half an hour, with the only stop button on a different screen entirely.
+ * The action's own ceiling must always be the one that fires; this is the backstop, not the plan.
+ */
+private const val HUAWEI_WATCHFACE_TIMEOUT_MS = 480_000L
 
 // The engine budget must exceed WaitAction.MAX_WAIT_MS (30 min): the timeout clock starts
 // before the action parses its arguments, so an equal budget deterministically failed a

@@ -28,6 +28,7 @@ object HuaweiSettings {
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
     private const val KEY_LANGUAGE = "language"
+    private const val KEY_BAND_LOCALE = "band_locale"
 
     /**
      * 白い熊's Band 11 Pro. A **public** address, unlike the Hume band's random one — so it survives
@@ -117,6 +118,23 @@ object HuaweiSettings {
 
     fun setLanguage(context: Context, value: String) =
         prefs(context).edit { putString(KEY_LANGUAGE, value) }
+
+    /**
+     * The language shown ON THE BAND — a different thing from [language], which is the language of
+     * OUR window, and the two are set independently on purpose. 白い熊 runs the report in English
+     * and the band in Japanese.
+     *
+     * Null means "never chosen here", and that is load-bearing: the band's own first-run picker is
+     * the only other way this gets set, so asserting a locale we were never given would overwrite a
+     * choice made on the device. Once set, it is re-asserted on every pair, because any companion
+     * that touches the band can push its own locale over it — which is exactly how this band ended
+     * up in English.
+     */
+    fun bandLocale(context: Context): String? =
+        prefs(context).getString(KEY_BAND_LOCALE, null)?.ifEmpty { null }
+
+    fun setBandLocale(context: Context, value: String) =
+        prefs(context).edit { putString(KEY_BAND_LOCALE, value) }
 
     fun overlapMinutes(context: Context): Int =
         prefs(context).getInt(KEY_OVERLAP_MIN, DEFAULT_OVERLAP_MINUTES)

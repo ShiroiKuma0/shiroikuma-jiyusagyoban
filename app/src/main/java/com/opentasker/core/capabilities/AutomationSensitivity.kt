@@ -217,10 +217,22 @@ object AutomationSensitivityRegistry {
         "huawei.sync",
         // Same radio, asking the band about itself rather than for its data.
         "huawei.probe",
+        // Reads the band's stored sleep and RR-interval files — health data, not device control.
+        "huawei.files",
+        // WRITES to the band — the only Huawei action that changes what is stored on it.
+        "huawei.watchface",
+        // Changes what the band RECORDS — the most consequential of the write actions, because
+        // switching a recorder off loses data that cannot be recovered afterwards.
+        "huawei.settings",
+        // Writes to the band's display only.
+        "huawei.weather",
         // Drops a bond and a credential — device control in its most consequential form here.
         "huawei.unpair",
         // Bonds a new peripheral to the phone outright, which is the strongest form of this.
         "huawei.pair",
+        // Changes what the band displays. Device control, though the mildest kind here: it reads
+        // no data and the worst outcome is a wrist reading the wrong language.
+        "huawei.language",
         // Drives the same radio, listening rather than reading: it enumerates every BLE device in
         // range and may connect to a few to identify them. Device control, not data access — it
         // reads no health history, and the addresses it learns are broadcast to the whole room.

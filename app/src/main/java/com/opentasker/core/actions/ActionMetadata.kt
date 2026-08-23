@@ -1096,6 +1096,95 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.language",
+            name = "Huawei Band language",
+            description = "Set the language shown ON THE BAND, and its unit system. The band has no language item in its own Settings — the paired phone owns the setting and pushes it — so short of a factory reset this is the only way to change it, and a reset would wipe the band's unsynced history. An unsupported language is not an error: the band falls back to English. Re-asserted on every pairing once set, because any companion the band meets can push its own language over it",
+            category = "Health",
+            fields = listOf(
+                ActionField("locale", "Language", FieldType.TEXT, hint = "a language tag like ja-JP or en-US. Blank = the last one the band accepted"),
+                ActionField("units", "Units", FieldType.TEXT, hint = "metric (default) or imperial — the band takes both in one frame, so this is always sent"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>BandLocale and <prefix>Summary"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result, or the reason it failed"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.files",
+            name = "Pull Huawei Band files",
+            description = "Fetch the band's sequence_data and rrisqi_data.bin over the file-transfer service and write them to disk without interpreting them — this is where sleep and the per-beat RR intervals live, neither of which the ordinary sync can reach. sequence_data is a container and which stream id holds sleep is not yet known, so each id is tried in turn and the ones holding nothing are reported as such. Diagnostic: it reads, and changes nothing on the band",
+            category = "Health",
+            fields = listOf(
+                ActionField("days", "How far back", FieldType.TEXT, hint = "days of history to ask for, 1–30. Default 3"),
+                ActionField("ids", "sequence_data stream ids", FieldType.TEXT, hint = "comma-separated. Default 700004,700013,700021 — the three Huawei Health was captured asking for"),
+                ActionField("out", "Write the files to", FieldType.TEXT, hint = "a directory. Default /sdcard/tmp"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Files and <prefix>Summary"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the per-file summary"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.watchface",
+            name = "Install Huawei watch face",
+            description = "Push a captured watch face onto the band. Faces are captured from Huawei Health's own upload — Health downloads them encrypted, decrypts, uploads and deletes, so the file that goes over the air exists nowhere on disk. This installs faces you already own, letting you rotate between them without re-pairing to the other phone; it cannot obtain new ones. The band verifies a SHA-256, so a truncated file is refused rather than installed broken",
+            category = "Health",
+            fields = listOf(
+                ActionField("file", "Face file", FieldType.TEXT, hint = "path to a captured face, e.g. /sdcard/〇/faces/7185695173_2.1.1.bin"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>FaceSent while it runs and <prefix>Summary at the end"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.settings",
+            name = "Huawei Band recording settings",
+            description = "Decide what the band actually measures. A fresh band has continuous heart rate and automatic SpO₂ switched OFF, and a band that is not recording looks exactly like one that cannot — this is the only way to set them without handing the band back to Huawei Health. Each switch is sent separately, so one refusal does not hide the others. Leave a field blank to leave that setting alone; blank is NOT off",
+            category = "Health",
+            fields = listOf(
+                ActionField("trusleep", "truSleep", FieldType.TEXT, hint = "on / off / blank to leave alone"),
+                ActionField("continuous_hr", "Continuous heart rate", FieldType.TEXT, hint = "on / off / blank. OFF on a fresh band — this is why heart rate can be missing"),
+                ActionField("auto_spo2", "Automatic SpO₂", FieldType.TEXT, hint = "on / off / blank. Also off on a fresh band"),
+                ActionField("high_hr", "High heart-rate alert", FieldType.TEXT, hint = "a bpm threshold to enable (Health uses 120), or off"),
+                ActionField("low_hr", "Low heart-rate alert", FieldType.TEXT, hint = "a bpm threshold to enable (Health uses 40), or off"),
+                ActionField("low_spo2", "Low SpO₂ alert", FieldType.TEXT, hint = "a percentage to enable (Health uses 90), or off"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the per-setting result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "huawei.weather",
+            name = "Huawei Band weather",
+            description = "Put weather on the band's screen. The band never fetches anything — it displays whatever the phone last pushed, so any task that can obtain a temperature can drive this, with no Huawei account. Condition icons are deliberately not sent: one capture cannot pin their codes, and a confidently wrong icon is worse than none",
+            category = "Health",
+            fields = listOf(
+                ActionField("place", "Place name", FieldType.TEXT, hint = "shown on the band, plain ASCII"),
+                ActionField("temperature", "Temperature °C", FieldType.TEXT, hint = "required"),
+                ActionField("humidity", "Humidity %", FieldType.TEXT, hint = "optional"),
+                ActionField("high", "High °C", FieldType.TEXT, hint = "optional"),
+                ActionField("low", "Low °C", FieldType.TEXT, hint = "optional"),
+                ActionField("latitude", "Latitude", FieldType.TEXT, hint = "optional; sent with longitude as the phone's position"),
+                ActionField("longitude", "Longitude", FieldType.TEXT, hint = "optional"),
+                ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_"),
+                ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.probe",
             name = "Probe Huawei Band",
             description = "Ask the band what it actually supports and write the answer to a file — its service census, its command census, and which fitness count commands respond. Diagnostic: it reads and counts, and changes nothing on the band. Run it again after a firmware update",

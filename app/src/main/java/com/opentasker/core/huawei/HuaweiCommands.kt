@@ -19,10 +19,11 @@ object HuaweiCommands {
     // ---- services -------------------------------------------------------
     const val SVC_DEVICE_CONFIG = 0x01
     const val SVC_FITNESS = 0x07
-    const val SVC_LOCALE = 0x0C
+    const val SVC_LOCALE = 0x0C  // LocaleConfig — the band has NO language menu of its own
     const val SVC_ACCOUNT = 0x1A
     const val SVC_RRI = 0x19            // per-beat RR intervals — the reason this band exists
     const val SVC_FILE_UPLOAD = 0x28
+    const val SVC_FILE_TRANSFER = 0x2C  // band -> phone: sleep and RR intervals, by name
     const val SVC_DATA_SYNC = 0x37
 
     // ---- DeviceConfig (0x01) commands -----------------------------------
@@ -47,6 +48,68 @@ object HuaweiCommands {
     const val CMD_WEAR_STATUS = 0x3D        // device-initiated NOTIFICATION — never answer it
     const val CMD_SETUP_DEVICE_STATUS = 0x3E
     const val CMD_REVERSE_CAPABILITIES = 0x3F
+
+    // ---- LocaleConfig (0x0C) commands -----------------------------------
+    const val CMD_SET_LOCALE = 0x01
+
+    // ---- Weather (0x0F) and location (0x18) — a PUSH, never a request -------------------
+    //
+    // The band shows whatever the phone last told it. Nothing is fetched on the band's behalf, and
+    // the band's separate pleas for an HTTP proxy (`0x37/0x02`, topic 2FB08EAB) are NOT part of
+    // this and are deliberately unanswered — that would make us its general-purpose web client.
+    const val SVC_WEATHER = 0x0F
+    const val WEATHER_PUSH = 0x01
+    const val SVC_LOCATION = 0x18
+    const val LOCATION_PUSH = 0x07
+
+    // ---- Fitness settings (0x07) — the switches that decide what the band records --------
+    //
+    // Captured from Huawei Health on 2026-08-22 by toggling each switch with a decrypted btsnoop
+    // running. **Heart rate and blood oxygen are absent from a fresh band because these are OFF, not
+    // because they are unreachable** — continuous heart rate began recording the minute Health set
+    // 0x17, at roughly one reading every five minutes.
+    const val FIT_TRUSLEEP = 0x16
+    const val FIT_CONTINUOUS_HR = 0x17
+    const val FIT_AUTO_SPO2 = 0x24
+    const val FIT_HIGH_HR_ALERT = 0x1D    // threshold in bpm, one byte
+    const val FIT_LOW_HR_ALERT = 0x22
+    const val FIT_LOW_SPO2_ALERT = 0x25   // threshold in percent
+
+    // ---- WatchFace (0x27) — transferring a face is only HALF of installing one ----------
+    //
+    // The bytes go over 0x28, but the band does nothing with them until it is told to. Two more
+    // commands finish the job: install (which needs the band's own screen size) and then activate.
+    // Sending only the file leaves it stored and invisible, which is exactly how it looked when we
+    // first tried it (白い熊: "It's not there").
+    //
+    // **This service answers with result 0, not 100000.** requireOk would reject its successes.
+    const val SVC_WATCHFACE = 0x27
+    const val WF_CAPABILITY = 0x01     // band's theme version and screen size
+    const val WF_LIST = 0x02
+    const val WF_CONTROL = 0x03        // tag 3: 01 = install, 02 = make active
+    const val WF_PROGRESS = 0x05       // band-initiated; must be acknowledged
+
+    // ---- FileUpload (0x28) — how a watch face gets ONTO the band ---------
+    //
+    // The band DRIVES this one: after the request is accepted it asks for a digest, states its
+    // parameters, then repeatedly asks for a [offset, length] block which we answer with data
+    // frames. Nothing is pushed unprompted.
+    const val UPLOAD_REQUEST = 0x02
+    const val UPLOAD_HASH = 0x03       // band asks; we answer with SHA-256 of the whole file
+    const val UPLOAD_PARAMS = 0x04     // band states chunk size and block size
+    const val UPLOAD_BLOCK = 0x05      // band: "send me [offset, length]"
+    const val UPLOAD_DATA = 0x06       // us: raw, NOT TLV — see uploadFrame
+    const val UPLOAD_DONE = 0x07       // band: finished
+
+    // ---- FileTransfer (0x2C) — how sleep and RR intervals leave the band --
+    //
+    // The fitness service (0x07) hands out fixed-shape records one index at a time. Sleep and the
+    // per-beat RR intervals are not records: they are FILES, fetched by name over this service.
+    const val FILE_REQUEST = 0x01      // ask for a file by name over a time range
+    const val FILE_NEGOTIATE = 0x03    // agree the chunk size
+    const val FILE_START = 0x04        // "send it now", from an offset
+    const val FILE_DATA = 0x05         // band -> phone, RAW bytes, pushed unprompted
+    const val FILE_DONE = 0x06         // phone -> band, "I have it all"
 
     // ---- AccountRelated (0x1A) ------------------------------------------
     const val ACC_SEND_ACCOUNT = 0x01
@@ -179,6 +242,191 @@ object HuaweiCommands {
     fun sendAccount(accountId: String = ACCOUNT_ID): ByteArray = tlv(1, accountId)
 
     fun battery(): ByteArray = tlv(1)
+
+    /**
+     * The band's display language and unit system.
+     *
+     * This band has no language item in its own Settings, and that is not an omission: the
+     * COMPANION owns the setting and pushes it. Huawei Health sends this exactly once per pairing,
+     * right after announcing the phone — captured on 白い熊's band as
+     * `0x0C/0x01 {1: "en-US", 2: 00}`, answered with the band's success code.
+     *
+     * That is also why the band has been English since the diagnostic trip to another phone: that
+     * phone's Health pushed its own locale, and nothing here has ever sent this command, so the
+     * band simply kept the last word it was given.
+     *
+     * [locale] is a BCP-47 tag in `xx-YY` form. An unsupported one is not an error — outside
+     * mainland China the band falls back to English — so a wrong tag costs a language, not a band.
+     */
+    /**
+     * Ask what a file holds for a time range.
+     *
+     * [id] selects WHICH stream inside a container file and is file-specific: `sequence_data` needs
+     * one (Health was seen asking for 700004, 700013 and 700021), `rrisqi_data.bin` is fetched
+     * without it. Only some ids return anything, so this is the knob a probe turns.
+     *
+     * The band answers with the byte count in tag 4, or result 144001 when it holds nothing for
+     * that window — which is an ANSWER, not a fault.
+     */
+    fun fileRequest(name: String, type: Int, fromSeconds: Long, toSeconds: Long, id: Int?): ByteArray =
+        tlv(1, name) +
+            tlv(2, byteArrayOf(type.toByte())) +
+            tlv(5, HuaweiProtocol.intBytes(fromSeconds.toInt(), 4)) +
+            tlv(6, HuaweiProtocol.intBytes(toSeconds.toInt(), 4)) +
+            (id?.let { tlv(12, HuaweiProtocol.intBytes(it, 4)) } ?: ByteArray(0))
+
+    /** Empty tags: "tell me the chunk size", rather than proposing one. */
+    fun fileNegotiate(type: Int): ByteArray =
+        tlv(1, byteArrayOf(type.toByte())) + tlv(2) + tlv(3) + tlv(5)
+
+    fun fileStart(type: Int, offset: Int, size: Int, id: Int?): ByteArray =
+        tlv(1, byteArrayOf(type.toByte())) +
+            tlv(2, HuaweiProtocol.intBytes(offset, 4)) +
+            tlv(3, HuaweiProtocol.intBytes(size, 4)) +
+            (id?.let { tlv(4, HuaweiProtocol.intBytes(it, 4)) } ?: ByteArray(0))
+
+    /**
+     * Offer a file to the band.
+     *
+     * [fileId] is the slot the band will use to refer to it for the rest of the transfer — Huawei
+     * Health uses 1 for a watch face. [assetId] and [version] are the face's own identifiers, sent
+     * alongside the name, which is itself `<assetId>_<version>`.
+     */
+    fun uploadRequest(
+        name: String,
+        size: Int,
+        fileId: Int,
+        assetId: String?,
+        version: String?,
+    ): ByteArray =
+        tlv(1, name) +
+            tlv(2, HuaweiProtocol.intBytes(size, 4)) +
+            tlv(3, byteArrayOf(fileId.toByte())) +
+            (assetId?.let { tlv(5, it) } ?: ByteArray(0)) +
+            (version?.let { tlv(6, it) } ?: ByteArray(0))
+
+    /** The band asks for this before it will take a byte: SHA-256 of the entire file. */
+    fun uploadHash(fileId: Int, sha256: ByteArray): ByteArray =
+        tlv(1, byteArrayOf(fileId.toByte())) + tlv(3, sha256)
+
+    /**
+     * One slice of the file — **raw bytes, not TLV.**
+     *
+     * `fileId | seq | offset(4 BE) | data`. Every frame carries its own absolute offset, which is
+     * what makes the transfer restartable and a repeated block harmless. [seq] is the frame's index
+     * within the current block and wraps at 8; the band tracks it.
+     */
+    fun uploadFrame(fileId: Int, seq: Int, offset: Int, data: ByteArray): ByteArray =
+        byteArrayOf(fileId.toByte(), (seq and 0x07).toByte()) +
+            HuaweiProtocol.intBytes(offset, 4) + data
+
+    /** Acknowledge one of the band's own upload frames. */
+    /**
+     * Where the phone thinks it is.
+     *
+     * **The coordinates are LITTLE-endian IEEE-754 doubles**, while every integer elsewhere in this
+     * protocol is big-endian. Writing them big-endian does not produce an obviously wrong number —
+     * it produces something like 10⁻¹²⁹, which reads as a rounding artefact rather than a byte-order
+     * mistake, so it does not announce itself.
+     */
+    fun location(epochSeconds: Long, latitude: Double, longitude: Double): ByteArray =
+        tlv(1, HuaweiProtocol.intBytes(epochSeconds.toInt(), 4)) +
+            tlv(2, leDouble(latitude)) +
+            tlv(3, leDouble(longitude))
+
+    /**
+     * The weather to display.
+     *
+     * Tags 129 and 133 carry the condition and icon in the capture, but one sample cannot pin small
+     * integers with no anchor, so they are omitted rather than guessed. The band shows temperature
+     * and place without them; sending a wrong condition code would put a confidently wrong icon on
+     * 白い熊's wrist, which is worse than none.
+     */
+    fun weather(
+        place: String,
+        temperatureC: Int,
+        observedAtSeconds: Long,
+        humidityPercent: Int?,
+        highC: Int?,
+        lowC: Int?,
+    ): ByteArray =
+        tlv(8, place) +
+            tlv(9, byteArrayOf(temperatureC.toByte())) +
+            tlv(12, HuaweiProtocol.intBytes(observedAtSeconds.toInt(), 4)) +
+            (humidityPercent?.let { tlv(16, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
+            (highC?.let { tlv(17, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
+            (lowC?.let { tlv(18, byteArrayOf(it.toByte())) } ?: ByteArray(0))
+
+    private fun leDouble(v: Double): ByteArray {
+        val bits = java.lang.Double.doubleToRawLongBits(v)
+        return ByteArray(8) { i -> ((bits ushr (8 * i)) and 0xFF).toByte() }
+    }
+
+    /** A plain on/off switch: `{1: 01}` or `{1: 00}`. */
+    fun fitnessToggle(on: Boolean): ByteArray = tlv(1, byteArrayOf(if (on) 1 else 0))
+
+    /**
+     * An alert switch with its threshold.
+     *
+     * Turning one OFF drops the threshold byte entirely rather than sending zero — that is what
+     * Health does, and a zero threshold would be a legitimate-looking instruction to alert always.
+     */
+    fun fitnessAlert(on: Boolean, threshold: Int): ByteArray =
+        if (on) tlv(1, byteArrayOf(1)) + tlv(2, byteArrayOf(threshold.toByte()))
+        else tlv(1, byteArrayOf(0))
+
+    /** Ask the band its theme version and screen size — the install command needs the latter. */
+    fun watchFaceCapability(): ByteArray =
+        tlv(1) + tlv(2) + tlv(3) + tlv(4) + tlv(5) + tlv(20) + tlv(21)
+
+    /**
+     * Announce a face BEFORE sending it — the step without which nothing works.
+     *
+     * [metaJson] is the face's store metadata, captured alongside the file. It carries a `content`
+     * blob and a `contentSign` signature from Huawei's own servers, so it cannot be fabricated —
+     * which is exactly why a face has to be captured rather than constructed, and why this only
+     * installs faces already owned.
+     *
+     * Without this the band still accepts the file, verifies its digest, and acknowledges the
+     * transfer — and then discards it, because there is no face record to attach the bytes to. Every
+     * signal says success and nothing appears on the wrist.
+     */
+    fun watchFaceAnnounce(
+        assetId: String,
+        version: String,
+        width: Int,
+        height: Int,
+        metaJson: String,
+    ): ByteArray =
+        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(1)) +
+            tlv(5, HuaweiProtocol.intBytes(width, 2)) +
+            tlv(6, HuaweiProtocol.intBytes(height, 2)) +
+            tlv(8, metaJson)
+
+    /** Install a face already transferred. [width]/[height] come from [watchFaceCapability]. */
+    fun watchFaceInstall(assetId: String, version: String, width: Int, height: Int): ByteArray =
+        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(1)) +
+            tlv(5, HuaweiProtocol.intBytes(width, 2)) +
+            tlv(6, HuaweiProtocol.intBytes(height, 2))
+
+    /** Make an installed face the one on screen. */
+    fun watchFaceActivate(assetId: String, version: String): ByteArray =
+        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(2))
+
+    /** The band reports install progress unprompted and expects each report acknowledged. */
+    fun watchFaceProgressAck(assetId: String, version: String): ByteArray =
+        tlv(1, assetId) + tlv(2, version) +
+            tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.intBytes(HuaweiProtocol.RESULT_SUCCESS, 4))
+
+    fun uploadAck(fileId: Int): ByteArray =
+        tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.intBytes(HuaweiProtocol.RESULT_SUCCESS, 4)) +
+            tlv(1, byteArrayOf(fileId.toByte()))
+
+    fun fileDone(type: Int): ByteArray =
+        tlv(1, byteArrayOf(type.toByte())) + tlv(2, byteArrayOf(1))
+
+    fun setLocale(locale: String, imperial: Boolean): ByteArray =
+        tlv(1, locale) + tlv(2, byteArrayOf(if (imperial) 1 else 0))
 
     /** Count-then-index history: how many records exist in `[start, end]`. */
     fun fitnessCount(start: Long, end: Long): ByteArray =

@@ -50,6 +50,11 @@ class HuaweiSafetyGuardTest {
             // silently corrupt data; the orchestration that needs a Context lives in the runner
             // precisely so this file can stay testable.
             "HuaweiSyncEngine.kt",
+            // The session lifecycle — lock, watchdog, close, unlock. It lives outside the runner
+            // precisely because those promises were made inside it, untested, and two of them did
+            // not hold: a cancelled session silently skipped its own close and left the band, which
+            // serves one connection, unreachable until the app was force-stopped.
+            "HuaweiSessionGuard.kt",
             "HuaweiSyncArgs.kt", "HuaweiStatus.kt", "HuaweiHiChain.kt", "HuaweiRecords.kt",
         )
         val offenders = sources()
