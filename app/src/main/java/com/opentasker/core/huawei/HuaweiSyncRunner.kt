@@ -224,6 +224,29 @@ object HuaweiSyncRunner {
      * two identifiers are derived from the filename rather than asked for separately — a face called
      * `7185695173_2.1.1.bin` carries everything the band needs.
      */
+    /** What the band is holding, and how much room is left. One short session. */
+    suspend fun listWatchFaces(
+        context: Context,
+        address: String,
+    ): Result<HuaweiUploadClient.FaceStore?> = withSession(context, address) { session, _ ->
+        HuaweiUploadClient(session).listWatchFaces()
+    }
+
+    /**
+     * Remove one face from the band.
+     *
+     * Returns false rather than throwing when the band still lists the face afterwards — a delete
+     * that did not happen is a normal answer here, not an error, and the caller shows the list.
+     */
+    suspend fun deleteWatchFace(
+        context: Context,
+        address: String,
+        assetId: String,
+        version: String,
+    ): Result<Boolean> = withSession(context, address) { session, _ ->
+        HuaweiUploadClient(session).deleteWatchFace(assetId, version)
+    }
+
     suspend fun uploadWatchFace(
         context: Context,
         address: String,
