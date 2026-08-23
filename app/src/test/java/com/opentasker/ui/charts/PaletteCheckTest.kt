@@ -31,7 +31,21 @@ class PaletteCheckTest {
                 "steps" to defaults.chartColorSteps,
             ),
         )
-        assertEquals(report.failures.toString(), PaletteCheck.Verdict.PASS, report.verdict)
+        // ONE allowance, named, with the reason and the cost — not a relaxed threshold.
+        //
+        // 白い熊 asked for a blue steps and a red heart rate on 2026-08-23, was shown the
+        // measurements, and asked again. With steps holding the blue, no assignment of the remaining
+        // series satisfies every gate while the heart rate is red: a search over fifteen hues in
+        // every slot found exactly one clean answer, and it made the heart rate AQUA. So this is a
+        // chosen cost.
+        //
+        // The band state was moved from orange to plum to lift this pair as far as it will go. It
+        // reaches ΔE 14.9 against the red, a tenth under the threshold. Everything else here passes.
+        val allowed = setOf("hr / state")
+        val unexplained = report.findings
+            .filter { it.verdict == PaletteCheck.Verdict.FAIL }
+            .filterNot { f -> allowed.any { f.detail.startsWith(it) } }
+        assertEquals(unexplained.toString(), emptyList<Any>(), unexplained)
     }
 
     @Test

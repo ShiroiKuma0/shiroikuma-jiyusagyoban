@@ -79,12 +79,13 @@ fun HuaweiSleepCard(
     night: HuaweiSleepNight?,
     viewport: ChartViewport,
     crosshair: CrosshairState,
+    onClick: (() -> Unit)? = null,
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
 
     if (night == null) {
-        SectionCard(accent = ChartPalette.SLEEP_DEEP) {
+        SectionCard(accent = ChartPalette.SLEEP_DEEP, onClick = onClick) {
             SectionTitle(HuaweiText.sleepTitle[lang], ChartPalette.SLEEP_DEEP)
             NoteText(HuaweiText.sleepNone[lang])
         }
@@ -122,6 +123,9 @@ fun HuaweiSleepCard(
             ?: "${HuaweiText.sleepBed[lang]} ${HuaweiSleepFormat.clock(s.startSeconds)}" +
             "   ${HuaweiText.sleepWoke[lang]} ${HuaweiSleepFormat.clock(s.endSeconds)}",
         accent = atCrosshair?.let { colorOf(it.stage) } ?: ChartPalette.SLEEP_DEEP,
+        // Tappable like every other card. It was the one that was not, which made it look like a
+        // summary rather than a way in — and it is the card with the most behind it.
+        onClick = onClick,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Hypnogram(
@@ -177,7 +181,7 @@ private const val AXIS_BOTTOM = 18f
 private const val AXIS_LEFT = 46f
 
 @Composable
-private fun Hypnogram(
+internal fun Hypnogram(
     runs: List<SleepRun>,
     viewport: ChartViewport,
     crosshair: CrosshairState,

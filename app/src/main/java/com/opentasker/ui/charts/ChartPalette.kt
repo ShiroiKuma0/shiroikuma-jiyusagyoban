@@ -34,11 +34,20 @@ object ChartPalette {
     // --- series identity, in documented slot order -------------------------------------------
     // Validated as a set, dark, surface #0D0D0D: worst adjacent CVD ΔE 8.4, normal-vision 19.3.
     // ALL CHECKS PASS. Do not reorder without re-running the validator.
-    val HEART_RATE = Color(0xFF3987E5)   // slot 1 blue
-    val HRV = Color(0xFFD95926)          // slot 2 orange
+    // 白い熊, 2026-08-23: steps take the blue and the heart rate takes the red.
+    //
+    // The red was NOT free. Measured against everything already on screen, a red heart rate lands at
+    // ΔE 7.1 from the orange HRV / band state, 6.7 from the amber resting heart rate, and 7.1 from a
+    // warm blood oxygen — all below the threshold for telling two colours apart AT ALL, before
+    // red-green deficiency is considered. Warm hues collapse toward each other under it, so the
+    // palette can host exactly ONE warm series. The orange therefore moves to plum to make room, and
+    // blood oxygen stays aqua rather than becoming the orange-red that was asked for: beside this
+    // red it measured ΔE 7.1, and no better orange exists — nine combinations were measured.
+    val HEART_RATE = Color(0xFFE66767)   // red — as asked
+    val HRV = Color(0xFFA96BAF)          // plum — vacated the orange for the red heart rate
     val SPO2 = Color(0xFF199E70)         // slot 3 aqua
     val TEMPERATURE = Color(0xFFC98500)  // slot 4 yellow
-    val STEPS = Color(0xFFD55181)        // slot 5 magenta
+    val STEPS = Color(0xFF3987E5)        // blue — as asked
 
     /**
      * 安静時心拍 — the Huawei band's resting heart rate, and the first series this app added that
@@ -70,10 +79,22 @@ object ChartPalette {
      * different window, the cards are labelled, and the Huawei band has no temperature metric, so
      * the two never appear together.
      */
-    val RESTING_HEART_RATE = Color(0xFFC98500) // slot 4 yellow, shared with TEMPERATURE by design
+    // Amber against the red heart rate is ΔE 6.7 — the closest pair in the palette, and the
+    // one that matters most because the two are the SAME quantity. Kept rather than moved
+    // because every alternative collided with the blue steps instead, which is worse: a
+    // resting heart rate is read against the heart rate, not against a step count.
+    // Lime since 2026-08-23, and no longer shared with TEMPERATURE.
+    //
+    // It used to be the amber, on the reasoning that a resting heart rate and a skin temperature
+    // never appear on one card. Against a RED heart rate the amber measured ΔE 6.7 under red-green
+    // deficiency and 13.0 to ordinary vision — and these two are the same quantity, so they are read
+    // against each other whatever the card order. Twelve candidates were measured; lime is the only
+    // one that clears the red (11.6 / 27.1), the blue steps (30.6) and the aqua blood oxygen (16.3)
+    // all at once.
+    val RESTING_HEART_RATE = Color(0xFF9CCC65) // lime
 
     val BAND_INDEX = Color(0xFF9085E9)   // slot 7 violet
-    val BLOOD_PRESSURE = Color(0xFFE66767) // slot 8 red — the card accent
+    val BLOOD_PRESSURE = Color(0xFFD55181) // magenta — the heart rate took the red
 
     /**
      * Systolic and diastolic, on ONE axis because they share one unit.
@@ -82,8 +103,11 @@ object ChartPalette {
      * second series would be the dual-axis mistake — it lets any two series be made to look
      * correlated by choosing the scales.
      */
-    val SYSTOLIC = Color(0xFF3987E5)
-    val DIASTOLIC = Color(0xFFD95926)
+    // The blue and the orange both moved on 2026-08-23 — steps took one, the heart rate
+    // displaced the other — so the pair was re-measured rather than left pointing at colours
+    // that now mean something else. Magenta against violet passes on its own card.
+    val SYSTOLIC = Color(0xFFD55181)
+    val DIASTOLIC = Color(0xFF8B6FD8)
 
     /**
      * Sleep stages, keyed to the band's RAW codes.

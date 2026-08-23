@@ -45,6 +45,9 @@ import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.LocalChartStyle
 import com.opentasker.ui.charts.MetricPreviewCard
 import com.opentasker.ui.charts.NoteText
+import com.opentasker.ui.charts.DailySummaryCard
+import com.opentasker.ui.charts.HealthIndexCard
+import com.opentasker.ui.charts.RecoveryCard
 import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
 import com.opentasker.ui.charts.SubHeading
@@ -65,6 +68,9 @@ import java.time.format.DateTimeFormatter
  * that absence is stated in a card rather than shown as an empty one: an empty card implies the band
  * is failing to deliver something we ask for, when in fact we do not ask yet.
  */
+/** The key the sleep card opens under — it has no MetricSpec of its own. */
+const val SLEEP_KEY = "hw:sleep"
+
 @Composable
 fun HuaweiDashboardScreen(
     state: HuaweiDashboardState,
@@ -72,6 +78,8 @@ fun HuaweiDashboardScreen(
     contentPadding: PaddingValues,
     onSync: () -> Unit,
     onOpenMetric: (String) -> Unit,
+    onFelt: (Int) -> Unit = {},
+    onOpenRegister: () -> Unit = {},
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -90,21 +98,79 @@ fun HuaweiDashboardScreen(
         verticalArrangement = Arrangement.spacedBy(style.cardGap),
     ) {
         item("sync") { SyncHeader(state, progress, onSync) }
-        item("about") {
-            SectionCard(accent = ChartPalette.AXIS_TEXT) {
-                SectionTitle(HuaweiText.aboutTitle[lang], ChartPalette.AXIS_TEXT)
-                BodyText(HuaweiText.aboutBody[lang])
+
+        // The morning rating first, before anything the band measured. 白い熊's instruction
+        // (2026-08-23), and it is the right one: everything else on this page exists whether or not
+        // they look at it, while this exists only if they answer — and only until the day is over.
+        if (state.feltEnabled) {
+            item("morning") {
+                HuaweiMorningCard(
+                    felt = state.felt,
+                    nightLabel = state.feltMorning?.toString(),
+                    onFelt = onFelt,
+                    // Both counts from the SAME list, so the share can never exceed the whole.
+                    nights = state.nights.size,
+                    rated = state.register?.rows?.count { it.felt != null } ?: 0,
+                    humeNights = state.humeNights,
+                    onOpenRegister = onOpenRegister,
+                )
             }
         }
+
+        state.recovery?.let { rec ->
+            item("recovery") {
+                RecoveryCard(
+                    recovery = rec,
+                    load = state.load,
+                    sri = state.sri,
+                    sleepScore = state.sleepScore,
+                    peak30Cadence = null,
+                    peakCadenceDay = null,
+                    awakeMinutes = state.nights.lastOrNull()?.awake,
+                    regime = null,
+                    feltToday = state.felt,
+                    feltNight = state.feltMorning,
+                    recordedNight = null,
+                    // The rating lives in ONE place on this screen — the pill at the top. Offering
+                    // it again here would be two controls writing the same value, and a reader
+                    // would reasonably wonder whether they meant different things.
+                    feltEnabled = false,
+                    onFelt = {},
+                    registerNights = state.register?.rows?.size ?: 0,
+                    registerRated = state.register?.rows?.count { it.felt != null } ?: 0,
+                    onOpenRegister = onOpenRegister,
+                    onClick = onOpenRegister,
+                )
+            }
+        }
+
+        state.index?.let { idx -> item("index") { HealthIndexCard(idx) { onOpenMetric("index") } } }
+
         state.message?.let { msg -> item("message") { SectionCard { BodyText(msg[lang]) } } }
 
-        items(state.metrics, key = { it.spec.key }) { chart ->
+        // Then the two act-on-them cards, in 白い熊's order: steps, then sleep, then the rest.
+        // Steps and sleep first because they are the two you can do something about; the readings
+        // that merely happen to you follow. Sleep sits between steps and the heart rate rather than
+        // at the end, which is also what keeps the blue and the aqua off each other.
+        state.metrics.firstOrNull { it.spec.key == HuaweiKeys.STEPS }?.let { chart ->
+            item(chart.spec.key) {
+                MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
+            }
+        }
+        item("sleep") {
+            HuaweiSleepCard(state.sleep, viewport, crosshair) { onOpenMetric(SLEEP_KEY) }
+        }
+        items(
+            state.metrics.filter { it.spec.key != HuaweiKeys.STEPS },
+            key = { it.spec.key },
+        ) { chart ->
             MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
         }
 
-        // Above coverage: a night is the thing most worth seeing, and it is also the one card
-        // that can be present when no per-minute sample is.
-        item("sleep") { HuaweiSleepCard(state.sleep, viewport, crosshair) }
+        // The day table, back across the whole history — the Huawei era and the Hume one before it.
+        // Below the charts because it answers a different question: a chart is for seeing a shape, a
+        // day row is for reading a number off a date.
+        if (state.days.isNotEmpty()) item("days") { DailySummaryCard(state.days) }
 
         if (state.coverage.isNotEmpty()) item("coverage") { CoverageCard(state.coverage) }
         item("diagnostics") { DiagnosticsCard(state) }
