@@ -39,6 +39,65 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     /** What happened, in the band's own terms. */
     data class Outcome(val ok: Boolean, val bytesSent: Int, val blocks: Int, val message: String)
 
+    /** One face the band is holding. [builtIn] faces shipped with it and cannot be replaced. */
+    data class InstalledFace(val assetId: String, val version: String, val builtIn: Boolean)
+
+    /** What the band is holding, and how much room is left. [freeUnits] is the band's own figure. */
+    data class FaceStore(val faces: List<InstalledFace>, val freeUnits: Int)
+
+    /**
+     * Ask the band which faces it holds.
+     *
+     * The reply puts each face in a repeated nested record under tag 129: `0x82 <len>` and then
+     * tag 3 = the ten-digit asset id, tag 4 = version, tag 5 = a flag which is 04 on the faces that
+     * came with the band and 01 on the ones a companion installed. Tag 9 is free space in the band's
+     * own units — it falls by one when a face lands and rises again when one is removed, which is
+     * how "is there room?" gets answered without guessing.
+     */
+    suspend fun listWatchFaces(): FaceStore? {
+        val cfg = HuaweiCommands
+        val reply = runCatching {
+            session.decrypt(session.request(cfg.SVC_WATCHFACE, cfg.WF_LIST, cfg.watchFaceList()))
+        }.getOrNull() ?: return null
+        val free = reply.firstOrNull { it.tag == 9 }?.value?.let { HuaweiProtocol.bytesToInt(it) } ?: -1
+        val blob = reply.firstOrNull { it.tag == 129 }?.value ?: return FaceStore(emptyList(), free)
+
+        val faces = mutableListOf<InstalledFace>()
+        var i = 0
+        while (i + 2 <= blob.size && blob[i] == 0x82.toByte()) {
+            val len = blob[i + 1].toInt() and 0xFF
+            val body = blob.copyOfRange(i + 2, minOf(i + 2 + len, blob.size))
+            i += 2 + len
+            val fields = runCatching { HuaweiProtocol.parseTlvs(body) }.getOrNull() ?: break
+            fun f(t: Int) = fields.firstOrNull { it.tag == t }?.value
+            val id = f(3)?.toString(Charsets.US_ASCII) ?: continue
+            faces += InstalledFace(
+                assetId = id,
+                version = f(4)?.toString(Charsets.US_ASCII) ?: "",
+                builtIn = f(5)?.firstOrNull()?.toInt() == 4,
+            )
+        }
+        return FaceStore(faces, free)
+    }
+
+    /**
+     * Remove a face from the band.
+     *
+     * Refuses the built-in faces rather than asking the band to do something it will not do — and,
+     * more to the point, rather than letting a prune walk off the end of 白い熊's own faces into the
+     * ones that came with the watch.
+     */
+    suspend fun deleteWatchFace(assetId: String, version: String): Boolean {
+        val cfg = HuaweiCommands
+        val before = listWatchFaces()
+        if (before?.faces?.any { it.assetId == assetId && it.builtIn } == true) return false
+        session.send(cfg.SVC_WATCHFACE, cfg.WF_CONTROL, cfg.watchFaceDelete(assetId, version))
+        // Confirm against the band's own list. The delete is not acknowledged in a way worth
+        // trusting, and "it is gone" is the only claim worth making.
+        val after = listWatchFaces() ?: return false
+        return after.faces.none { it.assetId == assetId }
+    }
+
     /**
      * Install a captured watch face: announce it, send it when the band asks, then apply it.
      *
@@ -183,8 +242,10 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             }
 
             if (installed) {
-                session.send(cfg.SVC_WATCHFACE, cfg.WF_CONTROL, cfg.watchFaceActivate(assetId, version))
-                return Outcome(true, maxOf(sent, 0), blocks, "$name installed and applied · $heard")
+                // Nothing more is sent. The install IS the activation — the band puts the face on
+                // screen itself — and the command that used to follow this line (tag 3 = 02) deletes
+                // a face rather than selecting one, so it threw away the file we had just sent.
+                return Outcome(true, maxOf(sent, 0), blocks, "$name installed · $heard")
             }
 
             // The band asking for a block and then saying nothing is the case the engage timeout
