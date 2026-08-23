@@ -1135,6 +1135,7 @@ fun registerActionMetadata() {
             category = "Health",
             fields = listOf(
                 ActionField("file", "Face file", FieldType.TEXT, hint = "path to a captured face, e.g. /sdcard/〇/faces/7185695173_2.1.1.bin"),
+                ActionField("browse", "Or browse a directory", FieldType.TEXT, hint = "a directory of face ZIPs — opens the picker instead of installing. Blank = install the file above"),
                 ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
                 ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>FaceSent while it runs and <prefix>Summary at the end"),
                 ActionField("store", "Store the result in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),

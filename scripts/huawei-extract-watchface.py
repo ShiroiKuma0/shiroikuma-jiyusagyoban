@@ -16,7 +16,14 @@ Huawei's servers, so it cannot be fabricated: this only ever recovers faces alre
 Every face is verified against the SHA-256 the phone itself sent the band before transferring it, so
 a face that writes is a face that will install. One that does not verify is reported and skipped.
 
-Usage:  huawei-extract-watchface.py <btsnoop.log> [outdir]
+Usage:  huawei-extract-watchface.py <btsnoop.log> [more.log …] [outdir]
+
+Several logs may be given, and their contents are MERGED. That is not a convenience: a single
+capture routinely loses a frame or two even though the phone reports no drops and the stream parses
+at 99.9%, and one missing 935-byte frame is enough for the band to refuse the whole face. Because
+every data frame carries its own absolute offset, two captures of the SAME face fill each other's
+holes exactly — so a face that will not verify is fixed by installing it once more rather than by
+luck.
 
 The capture must include the session's HiChain handshake (the control frames are encrypted and the
 key is derived from it), so capture from before the band connects — not just around the install.
@@ -95,16 +102,8 @@ def decrypt(body, rec):
     return None
 
 
-def main():
-    if len(sys.argv) < 2:
-        raise SystemExit(__doc__)
-    path = pathlib.Path(sys.argv[1])
-    outdir = pathlib.Path(sys.argv[2] if len(sys.argv) > 2 else ".")
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    seq, rec = frames(path)
-    meta, live, done = {}, {}, []
-
+def harvest(seq, rec, meta, live, done, merged):
+    """Fold one capture into the shared buffers."""
     for d, svc, cmd, body, _ in seq:
         pt = decrypt(body, rec)
         if pt is None:
@@ -119,6 +118,8 @@ def main():
                 n = min(len(data), len(f["buf"]) - off)
                 if n > 0:
                     f["buf"][off:off + n] = data[:n]
+                    for i in range(off, off + n):
+                        f["have"][i] = 1
             continue
         try:
             tl = dict(tlv_parse(pt))
@@ -128,9 +129,6 @@ def main():
         if d and svc == SVC_WATCHFACE and cmd == 0x03 and 8 in tl:
             meta[(tl[1].decode(), tl[2].decode())] = tl[8].decode("utf-8", "replace")
         elif d and svc == SVC_UPLOAD and cmd == 0x03 and 3 in tl:
-            # Attach the digest to the file that is OPEN, not to its id: several uploads reuse
-            # file-id 1, so a dict keyed by id has the second face's digest overwrite the first's
-            # and then neither verifies.
             f = live.get(tl[1][0])
             if f:
                 f["digest"] = tl[3]
@@ -138,26 +136,51 @@ def main():
             fid = tl[3][0]
             if fid in live:
                 done.append(live.pop(fid))
-            # A 0x28/0x02 request OPENS a file. Several uploads reuse file-id 1, so without this the
-            # second face overwrites the first inside one buffer and neither verifies.
-            live[fid] = {
-                "name": tl[1].decode("ascii", "replace"),
-                "asset": tl.get(5, b"").decode("ascii", "replace"),
-                "version": tl.get(6, b"").decode("ascii", "replace"),
-                "id": fid,
-                "buf": bytearray(int.from_bytes(tl[2], "big")),
-            }
+            name = tl[1].decode("ascii", "replace")
+            size = int.from_bytes(tl[2], "big")
+            # Reuse the buffer if this face was seen in an earlier log: that IS the merge.
+            key = (tl.get(5, b"").decode("ascii", "replace"), tl.get(6, b"").decode("ascii", "replace"))
+            entry = merged.get(key)
+            if entry is None or len(entry["buf"]) != size:
+                entry = {"name": name, "asset": key[0], "version": key[1], "id": fid,
+                         "buf": bytearray(size), "have": bytearray(size)}
+                merged[key] = entry
+            entry["id"] = fid
+            live[fid] = entry
+
+
+def main():
+    if len(sys.argv) < 2:
+        raise SystemExit(__doc__)
+    args = [pathlib.Path(a) for a in sys.argv[1:]]
+    logs = [a for a in args if a.is_file()]
+    if not logs:
+        raise SystemExit("no readable log given")
+    outdir = pathlib.Path(".") if args[-1].is_file() else args[-1]
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    meta, live, done, merged = {}, {}, [], {}
+    for log in logs:
+        seq, rec = frames(log)
+        harvest(seq, rec, meta, live, done, merged)
     done += list(live.values())
 
     faces = 0
+    seen = set()
     for f in done:
-        if not f["asset"] or not f["version"]:
-            continue                            # not a watch face: a config or resource upload
+        key = (f["asset"], f["version"])
+        if not f["asset"] or not f["version"] or key in seen:
+            continue                            # not a face, or already written from the merge
+        seen.add(key)
+        missing = f["have"].count(0)
         got = hashlib.sha256(bytes(f["buf"])).digest()
         want = f.get("digest")
-        key = (f["asset"], f["version"])
+        if missing:
+            print(f"  SKIP {f['name']}: {missing:,} bytes never arrived "
+                  f"({100 * missing / max(len(f['buf']), 1):.2f}%) — install it once more and pass both logs")
+            continue
         if want and got != want:
-            print(f"  SKIP {f['name']}: digest mismatch — the capture is incomplete")
+            print(f"  SKIP {f['name']}: complete but the digest does not match — not the same file")
             continue
         if key not in meta:
             print(f"  SKIP {f['name']}: no metadata frame captured; the band would discard it")
