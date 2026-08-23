@@ -86,19 +86,48 @@ class HuaweiChartsActivity : ComponentActivity() {
                         var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
 
                         val chart = state.metrics.firstOrNull { it.spec.key == selected }
-                        if (chart == null) {
+                        val registerOpen = selected == com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
+                        val sleepOpen = selected == SLEEP_KEY
+                        if (sleepOpen) {
+                            HuaweiSleepDetailScreen(
+                                night = state.sleep,
+                                nights = state.nights,
+                                cutoverMs = state.cutoverMs,
+                                contentPadding = insets,
+                                bounds = state.bounds,
+                                onBack = { selected = null },
+                            )
+                        } else if (registerOpen) {
+                            // The Hume side's own register screen, unchanged. One record of 白い熊's
+                            // nights, reachable from either report — a second one would disagree the
+                            // first time a rating was filed from the screen the other was not
+                            // watching.
+                            com.opentasker.ui.charts.SessionRegisterScreen(
+                                register = state.register,
+                                contentPadding = insets,
+                                onRate = { night, step -> model.setFeltFor(night, step) },
+                                onBack = { selected = null },
+                            )
+                        } else if (chart == null) {
                             HuaweiDashboardScreen(
                                 state = state,
                                 progress = progress,
                                 contentPadding = insets,
                                 onSync = model::sync,
                                 onOpenMetric = { selected = it },
+                                onFelt = model::setFelt,
+                                // The register opens the Hume side's own screen: it is one record
+                                // of 白い熊's nights and ratings, not a per-band one, and two
+                                // registers would disagree the first time a rating was filed from
+                                // whichever screen the other was not watching.
+                                onOpenRegister = { selected = com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER },
                             )
                         } else {
                             HuaweiMetricDetailScreen(
                                 chart = chart,
                                 contentPadding = insets,
                                 onBack = { selected = null },
+                                bounds = state.bounds,
                             )
                         }
                     }

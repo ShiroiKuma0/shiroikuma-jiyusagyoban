@@ -54,6 +54,14 @@ object HuaweiText {
     )
 
     val sleepTitle = Loc("Last night", "昨夜の睡眠")
+    /**
+     * The PAGE, which is not one night.
+     *
+     * The card on the front page shows last night and is titled so. This screen draws every
+     * night on record, so borrowing that title labelled a month of sleep as a single night —
+     * 白い熊 caught it, 2026-08-23.
+     */
+    val sleepPageTitle = Loc("Sleep", "睡眠")
     /** Used instead of [sleepTitle] once the newest night is no longer last night. */
     val sleepOlderNight = Loc("Most recent night", "直近の睡眠")
     val sleepStale = Loc("nights ago", "夜前")
@@ -84,6 +92,37 @@ object HuaweiText {
             "shape with care.",
         "この夜は区間がバンドの就寝・起床時刻と合わない。形は慎重に読むこと。",
     )
+
+    val sleepEveryNight = Loc("Every night on record", "記録された夜すべて")
+    val sleepEveryNightNote = Loc(
+        "Newest first. Each row is one night from one band — nights before this one existed are the " +
+            "Hume band's and say so.",
+        "新しい順。各行は一台のバンドの一夜 — このバンドが無かった頃の夜は Hume のもので、そう書いてある。",
+    )
+    val sleepStages = Loc(
+        "deep %d min · light %d min · REM %d min · awake %d min",
+        "深い %d 分 ／ 浅い %d 分 ／ REM %d 分 ／ 覚醒 %d 分",
+    )
+    val sleepFromHume = Loc("— the Hume band's night", "— Hume の夜")
+
+    val registerTitle = Loc("Every night and session", "あらゆる夜と運動")
+    val registerSummary = Loc("%d nights on record · %d rated", "記録された夜 %d ／ 評価済み %d")
+    /** Both numbers must come from ONE list of nights — see the note in HuaweiMorningCard. */
+    val humeNights = Loc(
+        "%d of those %d are the Hume band's — the nights before this one existed. No night is " +
+            "built from both.",
+        "その %d 夜（全 %d 夜）は Hume のもの — このバンドがまだ無かった頃。両方から作った夜は一つも無い。",
+    )
+
+    // 「今朝の体感」 — the one thing on this screen that does not exist unless 白い熊 answers it.
+    val morningTitle = Loc("This morning", "今朝の体感")
+    val morningAsk = Loc(
+        "How do you feel this morning? Nothing on this page can be filled in later — by evening the " +
+            "question is unanswerable and the day stays blank.",
+        "今朝の調子は？ あとから埋めることはできない — 夕方には答えようがなく、その日は空のまま残る。",
+    )
+    val morningAnswered = Loc("%s — recorded as %d", "%s — %d で記録済み")
+    val morningScale = Loc("1 is best, 5 is worst.", "1 が最良、5 が最悪。")
 
     val aboutTitle = Loc("About this report", "この画面について")
     val aboutBody = Loc(

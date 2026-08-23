@@ -53,6 +53,30 @@ data class HuaweiDashboardState(
     val sleep: HuaweiSleepNight? = null,
     val bounds: LongRange = 0L..0L,
     val message: Loc? = null,
+    /**
+     * This morning's rating, and the morning it belongs to.
+     *
+     * Read from the SAME store the Hume report writes to, and deliberately so: a morning rating is a
+     * statement about 白い熊, not about a band. Two stores would mean the answer given on one screen
+     * was missing from the other, and the register would show a hole on a morning that was rated.
+     */
+    /** The index and recovery, built exactly as the Hume report builds them — see [buildDerived]. */
+    val index: com.opentasker.ui.charts.HealthIndexResult? = null,
+    val recovery: com.opentasker.ui.charts.RecoveryResult? = null,
+    val load: com.opentasker.ui.charts.RecoveryBuild.LoadReading? = null,
+    val sri: Double? = null,
+    val sleepScore: com.opentasker.ui.charts.SleepScore.Breakdown? = null,
+    val register: com.opentasker.ui.charts.SessionRegister.Register? = null,
+    val nights: List<com.opentasker.ui.charts.SleepSession> = emptyList(),
+    /** One row per day, back across the whole history — see [buildDerived]. */
+    val days: List<com.opentasker.ui.charts.DaySummary> = emptyList(),
+    /** How many of [nights] came off the OTHER wrist — stated, never implied. */
+    val humeNights: Int = 0,
+    /** Where this band's own record begins — rows before it are the other band's. */
+    val cutoverMs: Long? = null,
+    val felt: Int? = null,
+    val feltMorning: Long? = null,
+    val feltEnabled: Boolean = true,
 )
 
 /**
@@ -111,7 +135,19 @@ class HuaweiDashboardModel(
         // is a measured zero; a stretch with none of them is the only thing that deserves gap tint.
         val recorded = samples.recordedSeconds(oldest, newest)
 
-        val charts = HuaweiMetricSpecs.ALL.map { spec -> buildChart(spec, oldest, newest, recorded) }
+        // Where the Huawei band's own record begins. Before it, the charts show the Hume band's
+        // history — the era this band did not exist for — and after it, this band alone. The two
+        // never overlap: see HuaweiHistory for why that is the whole basis of it being honest.
+        val cutoverMs = HuaweiHistory.cutover(db)
+
+        // The window opens on the whole history, not just the Huawei era, so the Hume prefix is
+        // reachable by scrolling back rather than invisible.
+        val humeOldest = db.bandSampleDao().oldestEpochMs()
+        val historyFromMs = listOfNotNull(humeOldest, cutoverMs).minOrNull() ?: (oldest * 1000L)
+
+        val charts = HuaweiMetricSpecs.ALL.map { spec ->
+            buildChart(spec, oldest, newest, recorded, cutoverMs, historyFromMs)
+        }
         val diagnostics =
             HuaweiMetricSpecs.DIAGNOSTIC.map { spec -> buildChart(spec, oldest, newest, recorded) }
 
@@ -131,8 +167,27 @@ class HuaweiDashboardModel(
             HuaweiUnknownField(key, times.size, times.minOrNull(), times.maxOrNull())
         }
 
+        val zone = java.time.ZoneId.systemDefault()
+        val derived = buildDerived(charts, cutoverMs, zone)
+        val morningKey = com.opentasker.ui.charts.RecoveryBuild.ratableMorning(
+            java.time.LocalDateTime.now(zone),
+        )
+
         return HuaweiDashboardState(
             loading = false,
+            index = derived.index,
+            recovery = derived.recovery,
+            load = derived.load,
+            sri = derived.sri,
+            sleepScore = derived.sleepScore,
+            register = derived.register,
+            nights = derived.nights,
+            days = derived.days,
+            humeNights = derived.humeNights,
+            cutoverMs = cutoverMs,
+            felt = com.opentasker.core.band.RecoveryLog.rating(appContext, morningKey),
+            feltMorning = morningKey,
+            feltEnabled = com.opentasker.core.band.RecoveryLog.enabled(appContext),
             status = status,
             bound = bound,
             metrics = charts,
@@ -140,7 +195,11 @@ class HuaweiDashboardModel(
             diagnostics = diagnostics,
             unknownFields = unknown,
             sleep = sleep,
-            bounds = fromMs..toMs,
+            // The WHOLE history, not just this band's era. The Hume prefix is drawn into every
+            // chart, but ChartViewport clamps panning to these bounds — so with the Huawei-only
+            // range the older readings existed on screen and could not be reached by scrolling,
+            // which is indistinguishable from their not being there.
+            bounds = minOf(fromMs, historyFromMs)..toMs,
         )
     }
 
@@ -163,11 +222,166 @@ class HuaweiDashboardModel(
         )
     }
 
+    /**
+     * The index, the recovery and the register — built by the SAME code the Hume report uses.
+     *
+     * Not a parallel implementation. `RecoveryBuild` and `HealthIndexSource` read their inputs by
+     * metric KEY, so the only adaptation needed is to hand them charts keyed the way they expect;
+     * everything after that is the arithmetic the other report has been using for weeks, with its
+     * gates, its refusals and its published reasoning intact. A second implementation would drift,
+     * and two health indices that disagree would be worse than one.
+     *
+     * **The baseline is not all this band's.** Nights before the cutover come off the Hume wrist,
+     * because this band did not exist for them, and a baseline of two nights is not a baseline. That
+     * is 白い熊's instruction and it is sound — but it means these numbers rest partly on the other
+     * device, so [HuaweiDashboardState.humeNights] carries the count and the cards say so.
+     */
+    private suspend fun buildDerived(
+        charts: List<MetricChart>,
+        cutoverMs: Long?,
+        zone: java.time.ZoneId,
+    ): Derived {
+        // Re-key to the names RecoveryBuild and HealthIndexSource look for. The Huawei charts carry
+        // "hw:" keys precisely so the two devices' series cannot be confused elsewhere; here they
+        // must be spoken to in the shared vocabulary, and this is the ONE place that translates.
+        val rekeyed = charts.mapNotNull { chart ->
+            val humeKey = when (chart.spec.key) {
+                HuaweiKeys.STEPS -> com.opentasker.core.band.BandMetric.STEPS_MINUTE
+                HuaweiKeys.HEART_RATE -> com.opentasker.core.band.BandMetric.HEART_RATE
+                HuaweiKeys.SPO2 -> com.opentasker.core.band.BandMetric.SPO2
+                else -> null
+            } ?: return@mapNotNull null
+            chart.copy(spec = chart.spec.copy(key = humeKey))
+        }
+
+        val humeSessions = loadHumeSessions(zone)
+        val nights = HuaweiNights.all(db, cutoverMs, humeSessions)
+        val boundary = cutoverMs ?: Long.MAX_VALUE
+        val humeNights = nights.count { it.endMs < boundary }
+
+        val zoneOffsetMs = zone.rules.getOffset(java.time.Instant.now()).totalSeconds * 1000L
+        val minuteOfDayOf: (Long) -> Double =
+            { ms -> com.opentasker.ui.charts.SleepShape.minuteOfDay(ms, zone).toDouble() }
+
+        val assembled = com.opentasker.ui.charts.RecoveryBuild.build(
+            metrics = rekeyed,
+            sessions = nights,
+            ratings = com.opentasker.core.band.RecoveryLog.all(appContext),
+            sessions_ = com.opentasker.core.band.TrainingSessions.all(appContext),
+            sessionOpen = com.opentasker.core.band.TrainingSessions.openStart(appContext) != null,
+            // yyyyMMdd of an instant, the key every rating and every register row is filed under.
+            localDateOf = { ms ->
+                val d = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                d.year * 10_000L + d.monthValue * 100L + d.dayOfMonth
+            },
+            zoneOffsetMs = zoneOffsetMs,
+            todayEpochDay = (System.currentTimeMillis() + zoneOffsetMs) / 86_400_000L,
+            nowMs = System.currentTimeMillis(),
+            minuteOfDayOf = minuteOfDayOf,
+        )
+
+        // The band's own last night, if it has one — otherwise the newest on record, which will be
+        // the Hume band's. Either way it is A night that happened, never a blend of two.
+        val latest = nights.lastOrNull()
+        // One row per day, back across everything on record — the Huawei era and, before it, the
+        // Hume one. The rows are built from the SAME series the charts draw, so a day's figures and
+        // its curve can never disagree: they are the same points counted twice, not two sources.
+        //
+        // spo2Times is empty because it is a HUME record-type flag — it marks which heart-rate
+        // readings arrived alongside a blood-oxygen one, splitting that band's dual population. This
+        // band has no such split, and passing anything here would be inventing one.
+        val days = com.opentasker.ui.charts.DailySummary.build(
+            hr = rekeyed.firstOrNull { it.spec.key == com.opentasker.core.band.BandMetric.HEART_RATE }
+                ?.chunk?.segments?.flatMap { it.points }.orEmpty(),
+            spo2 = rekeyed.firstOrNull { it.spec.key == com.opentasker.core.band.BandMetric.SPO2 }
+                ?.chunk?.segments?.flatMap { it.points }.orEmpty(),
+            steps = rekeyed.firstOrNull { it.spec.key == com.opentasker.core.band.BandMetric.STEPS_MINUTE }
+                ?.bars.orEmpty(),
+            sleepSessions = nights,
+            spo2Times = emptySet(),
+            zone = zone,
+        )
+
+        return Derived(
+            index = com.opentasker.ui.charts.HealthIndexSource.compute(rekeyed, latest, emptySet()),
+            days = days,
+            recovery = assembled.recovery,
+            load = assembled.load,
+            sri = assembled.sri,
+            sleepScore = assembled.sleepScore,
+            register = assembled.register,
+            nights = nights,
+            humeNights = humeNights,
+        )
+    }
+
+    data class Derived(
+        val index: com.opentasker.ui.charts.HealthIndexResult? = null,
+        val recovery: com.opentasker.ui.charts.RecoveryResult? = null,
+        val load: com.opentasker.ui.charts.RecoveryBuild.LoadReading? = null,
+        val sri: Double? = null,
+        val sleepScore: com.opentasker.ui.charts.SleepScore.Breakdown? = null,
+        val register: com.opentasker.ui.charts.SessionRegister.Register? = null,
+        val nights: List<com.opentasker.ui.charts.SleepSession> = emptyList(),
+        val days: List<com.opentasker.ui.charts.DaySummary> = emptyList(),
+        val humeNights: Int = 0,
+    )
+
+    /** The Hume band's nights, for the era before this band existed. */
+    private suspend fun loadHumeSessions(zone: java.time.ZoneId): List<com.opentasker.ui.charts.SleepSession> {
+        val rows = runCatching { db.bandSleepDao().recent(400) }.getOrDefault(emptyList())
+        if (rows.isEmpty()) return emptyList()
+        val inputs = rows.mapNotNull { row ->
+            val start = com.opentasker.ui.charts.BandLocalTimes.toEpochMs(row.startLocalTs, zone)
+                ?: return@mapNotNull null
+            com.opentasker.ui.charts.SleepSegmentInput(start, row.minutes, row.stages)
+        }
+        return com.opentasker.ui.charts.SleepShape.sessions(inputs)
+    }
+
+    /**
+     * Record — or withdraw — this morning's rating.
+     *
+     * Tapping the value already chosen REMOVES it, exactly as on the Hume screen. A rating you can
+     * change but never withdraw is a trap: a stray tap becomes data 白い熊 did not author, and every
+     * later marker is then banded against a number nobody meant. The same gesture must not mean two
+     * different things depending on which report it was made from.
+     */
+    /**
+     * Rate — or un-rate — ONE named night, whichever night it is.
+     *
+     * What the register's editor needs: there the night is chosen by tapping a row, so its key
+     * arrives as an argument rather than being derived from what today happens to be. It writes to
+     * the same store under the same key as [setFelt], so a rating filed here is not a lesser kind.
+     */
+    fun setFeltFor(nightKey: Long, rating: Int) {
+        if (com.opentasker.core.band.RecoveryLog.rating(appContext, nightKey) == rating) {
+            com.opentasker.core.band.RecoveryLog.clear(appContext, nightKey)
+        } else {
+            com.opentasker.core.band.RecoveryLog.setRating(appContext, nightKey, rating)
+        }
+        refresh()
+    }
+
+    fun setFelt(rating: Int) {
+        val key = com.opentasker.ui.charts.RecoveryBuild.ratableMorning(
+            java.time.LocalDateTime.now(java.time.ZoneId.systemDefault()),
+        )
+        if (com.opentasker.core.band.RecoveryLog.rating(appContext, key) == rating) {
+            com.opentasker.core.band.RecoveryLog.clear(appContext, key)
+        } else {
+            com.opentasker.core.band.RecoveryLog.setRating(appContext, key, rating)
+        }
+        refresh()
+    }
+
     private suspend fun buildChart(
         spec: MetricSpec,
         from: Long,
         to: Long,
         recorded: List<Long> = emptyList(),
+        cutoverMs: Long? = null,
+        historyFromMs: Long? = null,
     ): MetricChart {
         val rows = db.huaweiSampleDao().range(HuaweiKeys.storageKey(spec.key), from, to)
         val points = if (!spec.absentIsZero) {
@@ -192,9 +406,15 @@ class HuaweiDashboardModel(
                 headline = "—", headlineBand = null, subtitle = HuaweiText.noData,
             )
         }
+        // The Hume era, prepended. It stops at the cutover, so no instant carries a reading from
+        // both wrists — the prefix is the years this band did not exist for, not a second opinion.
+        val prefix = if (historyFromMs == null) HuaweiHistory.Prefix(emptyList(), cutoverMs, 0)
+        else HuaweiHistory.prefix(db, spec.key, historyFromMs, cutoverMs, spec.cadenceSec)
+        val withHistory = prefix.points + points
+
         // mixedCadence is on for every row in this table: the real cadence is unmeasured, so the gap
         // threshold has to come from a high percentile rather than a median it cannot trust.
-        val chunk = ChartPipeline.qualifyAndSegment(points, spec, mixedCadence = spec.mixedCadence)
+        val chunk = ChartPipeline.qualifyAndSegment(withHistory, spec, mixedCadence = spec.mixedCadence)
         val retained = chunk.segments.flatMap { it.points }
         val lastDay = HealthIndexSource.lastDay(retained)
 
@@ -222,8 +442,21 @@ class HuaweiDashboardModel(
             bars = if (spec.render == RenderKind.BARS) retained else emptyList(),
             headline = headline,
             headlineBand = null,
-            // Stated on every card, because every gate on this table is a placeholder.
-            subtitle = if (spec.provisional) HuaweiText.provisional else Loc("", ""),
+            // Stated on every card, because every gate on this table is a placeholder — and, when
+            // some of what is drawn came off the other wrist, that too. A reader must never have to
+            // guess which band a stretch of chart belongs to.
+            subtitle = when {
+                prefix.humeCount > 0 -> Loc(
+                    "${prefix.humeCount} earlier readings are the Hume band's — this band did not " +
+                        "exist yet. Nothing is mixed: they stop where this one starts." +
+                        (if (spec.provisional) " · " + HuaweiText.provisional.en else ""),
+                    "古い ${prefix.humeCount} 件は Hume のもの — このバンドはまだ無かった。" +
+                        "混ぜてはいない。こちらが始まるところで終わる。" +
+                        (if (spec.provisional) " ／ " + HuaweiText.provisional.ja else ""),
+                )
+                spec.provisional -> HuaweiText.provisional
+                else -> Loc("", "")
+            },
         )
     }
 

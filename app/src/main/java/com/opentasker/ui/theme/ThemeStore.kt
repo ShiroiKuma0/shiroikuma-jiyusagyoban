@@ -144,14 +144,16 @@ data class ThemePrefs(
     val chartShowGaps: Boolean = true,                      // tint stretches with no measurement
     val chartDefaultSpanHours: Int = 24,                    // how much a chart opens on
     val chartCurveMode: String = "PCHIP",                   // PCHIP / LINEAR / STEP
-    val chartColorHeartRate: Int = 0xFF3987E5.toInt(),      // 心拍
-    val chartColorBandState: Int = 0xFFD95926.toInt(),      // バンド状態指数
+    // 白い熊, 2026-08-23: steps blue, heart rate red. The orange moved to plum to make room —
+    // see the note in ChartPalette; a red heart rate cannot share a screen with a warm series.
+    val chartColorHeartRate: Int = 0xFFE66767.toInt(),      // 心拍 — red
+    val chartColorBandState: Int = 0xFFA96BAF.toInt(),      // バンド状態指数 — plum
     val chartColorSpo2: Int = 0xFF199E70.toInt(),           // 血中酸素
     val chartColorTemperature: Int = 0xFFC98500.toInt(),    // 体温
-    val chartColorSteps: Int = 0xFFD55181.toInt(),          // 歩数
-    val chartColorRestingHr: Int = 0xFFC98500.toInt(),      // 安静時心拍 (Huawei) — slot 4
-    val chartColorSystolic: Int = 0xFF3987E5.toInt(),       // 収縮期
-    val chartColorDiastolic: Int = 0xFFD95926.toInt(),      // 拡張期
+    val chartColorSteps: Int = 0xFF3987E5.toInt(),          // 歩数 — blue
+    val chartColorRestingHr: Int = 0xFF9CCC65.toInt(),      // 安静時心拍 (Huawei) — lime
+    val chartColorSystolic: Int = 0xFFD55181.toInt(),       // 収縮期 — magenta
+    val chartColorDiastolic: Int = 0xFF8B6FD8.toInt(),      // 拡張期 — violet
     val chartColorSleepDeep: Int = 0xFF199E70.toInt(),      // 深い
     val chartColorSleepLight: Int = 0xFFC98500.toInt(),     // 浅い
     val chartColorSleepRem: Int = 0xFF3987E5.toInt(),       // REM
