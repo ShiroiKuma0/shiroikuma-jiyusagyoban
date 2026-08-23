@@ -584,7 +584,14 @@ object HuaweiSyncRunner {
                     api.configure(
                         HuaweiSettings.deviceName(context) ?: "HUAWEI Band",
                         System.currentTimeMillis() / 1000, zoneByte, 0,
-                        HuaweiSettings.bandLocale(context),
+                        // NO locale. Pairing used to re-assert the stored one, on the reasoning that
+                        // any companion which touches the band can push its own language over it.
+                        // That is true, and it is still not ours to undo: it made the band's language
+                        // a thing that changed as a side effect of connecting. 白い熊 flips it by
+                        // hand — 「バンド言語（Huawei） ⇨ 日本語 / ⇨ 英語」 — and nothing else sets it.
+                        // The cost is stated rather than hidden: after the band has been to another
+                        // phone, it stays in that phone's language until one of those tasks is run.
+                        null,
                     )
 
                     // The band is NOT finished when the configuration set is. It carries on asking

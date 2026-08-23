@@ -415,10 +415,45 @@ without re-pairing to the other phone.
    `.json`. Each face is verified against the SHA-256 the phone itself sent the band; one that does
    not verify is skipped rather than written, because the band checks the same digest and a short
    file is refused outright.
-6. Put both files where `%Huawei_Face` points and run `バンド文字盤（Huawei） -- [727]`.
+6. Put both files where `%Huawei_Face` points and run `バンド文字盤（Huawei） -- [727]`. Or drop the
+   ZIP into `%Huawei_FaceDir` and run the task with `%Huawei_Face` blank, which opens the library.
 
 Steps 2–4 exist because the alternative — capturing everything and sifting — was tried and wastes
 far more time than recording an offset.
+
+#### `0x27/0x03` tag 3: 01 installs, 02 DELETES
+
+There is **no "make this face active" command**, and believing there was one cost two days. Installing
+is what puts a face on screen; Health never sends anything afterwards to select it.
+
+What tag 3 = 02 does is remove the named face. Sending it after an install — which the fork did until
+2026-08-23 — deletes the file that was just transferred: the band shows the new face for an instant,
+drops back to the previous one, and the new face is absent from its own list. The symptom reads
+exactly like a full buffer, which is the wrong diagnosis.
+
+Settled by replaying all 33 of Health's installs out of one capture and diffing the band's face list
+across each:
+
+| after | the band's list |
+|---|---|
+| `tag3=01` | the asset **appears** — 11 faces become 12 |
+| `tag3=02` | the named asset **disappears** — back to 11 |
+
+Free space (`0x27/0x02` tag 9) falls by one on an install and rises by one on a delete, every time.
+The band held 12 faces mid-swap in every one of those 33 installs, so a two-face limit does not exist.
+What Health does after installing is delete **the previous** face, keeping the band pruned — never the
+one it just sent.
+
+```
+0x27/0x02  {1: "", 6: 03}        ask what is installed
+   <- {8: status, 9: free space, 129: repeated 0x82-prefixed records}
+      each record: {3: assetId (10 ASCII digits), 4: version, 5: 04 = factory / 01 = installed}
+0x27/0x03  {1: assetId, 2: version, 3: 01, 5: width, 6: height}   install (and show)
+0x27/0x03  {1: assetId, 2: version, 3: 02}                        DELETE
+```
+
+Tag 5 = 04 marks the faces that shipped with the band. A prune must skip them: the band refuses, and
+walking off the end of 白い熊's own faces into the factory ones is the failure worth preventing.
 
 ### Weather is a PUSH, not a request
 
