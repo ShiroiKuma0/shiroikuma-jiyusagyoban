@@ -229,6 +229,75 @@ object HuaweiSyncRunner {
      * two identifiers are derived from the filename rather than asked for separately — a face called
      * `7185695173_2.1.1.bin` carries everything the band needs.
      */
+    /** One recorded walk, with wherever its track was written. */
+    data class Walk(
+        val summary: HuaweiWorkout.Summary,
+        val trackPoints: Int,
+        val gpxPath: String?,
+        val note: String? = null,
+    )
+
+    /**
+     * List the band's recorded workouts and, for the outdoor ones, fetch and decode their tracks.
+     *
+     * One session for all of it: the band serves a single connection, and a walk is a list request,
+     * a summary request and a file transfer per workout — three round trips each that would each
+     * cost a fresh handshake if this were split up.
+     *
+     * A workout whose track will not decode still yields its summary. Losing a route is a shame;
+     * losing the fact that 白い熊 walked five kilometres because its coordinates would not parse
+     * would be worse, and it is the kind of failure that hides.
+     */
+    suspend fun fetchWorkouts(
+        context: Context,
+        address: String,
+        fromSeconds: Long,
+        toSeconds: Long,
+        outDir: java.io.File?,
+    ): Result<List<Walk>> = withSession(context, address) { session, _ ->
+        val cfg = HuaweiCommands
+        val listed = HuaweiWorkout.parseList(
+            session.decrypt(
+                session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_LIST, cfg.workoutList(fromSeconds, toSeconds)),
+            ),
+        )
+        outDir?.mkdirs()
+        listed.map { entry ->
+            val summary = runCatching {
+                HuaweiWorkout.parseSummary(
+                    session.decrypt(
+                        session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_TOTALS, cfg.workoutTotals(entry.number)),
+                    ),
+                )
+            }.getOrNull() ?: HuaweiWorkout.Summary(entry.number)
+
+            if (!entry.hasTrack) return@map Walk(summary, 0, null, "no track recorded")
+
+            val file = runCatching {
+                HuaweiFileClient(session).fetch(
+                    cfg.gpsTrackName(entry.number), HuaweiFileClient.GPS_TYPE, 0, 0,
+                )
+            }.getOrNull()
+            if (file !is HuaweiFileClient.Result.Data) {
+                return@map Walk(summary, 0, null, "the band would not send the track")
+            }
+            // Keep the raw file next to the GPX, always. Both unknowns in the decoder — the earth
+            // radius and the datum — are settled by re-decoding, and a track that was thrown away
+            // after one pass cannot be re-decoded.
+            val stem = "huawei-walk-${entry.number}-${summary.startSeconds ?: 0}"
+            outDir?.let { java.io.File(it, "$stem.bin").writeBytes(file.bytes) }
+
+            val track = HuaweiGpsTrack.decode(file.bytes)
+                ?: return@map Walk(summary, 0, null, "${file.bytes.size} B of track that did not decode")
+            val gpx = outDir?.let { dir ->
+                java.io.File(dir, "$stem.gpx").also {
+                    it.writeText(HuaweiGpsTrack.toGpx(track, "${summary.kind} ${entry.number}"))
+                }.absolutePath
+            }
+            Walk(summary, track.points.size, gpx)
+        }
+    }
+
     /** What the band is holding, and how much room is left. One short session. */
     suspend fun listWatchFaces(
         context: Context,
