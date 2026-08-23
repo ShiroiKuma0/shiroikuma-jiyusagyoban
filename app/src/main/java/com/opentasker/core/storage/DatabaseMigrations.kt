@@ -452,6 +452,35 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * v29 — the Huawei band's sleep segments. Additive: no existing table is touched.
+     *
+     * No column here carries a `defaultValue`, so nothing needs a `DEFAULT` clause spelled out — the
+     * trap that makes a hand-written migration open cleanly on a fresh install and throw on every
+     * device holding the old database.
+     */
+    val MIGRATION_28_29 = object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_sleep` (
+                    `startSeconds` INTEGER NOT NULL,
+                    `durationSeconds` INTEGER NOT NULL,
+                    `stage` INTEGER NOT NULL,
+                    `sessionStart` INTEGER NOT NULL,
+                    `sessionEnd` INTEGER NOT NULL,
+                    `syncId` INTEGER NOT NULL,
+                    PRIMARY KEY(`startSeconds`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_huawei_sleep_sessionStart` " +
+                    "ON `huawei_sleep` (`sessionStart`)",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -481,6 +510,7 @@ object DatabaseMigrations {
             MIGRATION_25_26,
             MIGRATION_26_27,
             MIGRATION_27_28,
+            MIGRATION_28_29,
         )
     }
 }

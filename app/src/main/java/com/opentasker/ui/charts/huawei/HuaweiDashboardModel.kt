@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.huawei.HuaweiFrom
 import com.opentasker.core.huawei.HuaweiSettings
+import com.opentasker.core.huawei.HuaweiSleep
 import com.opentasker.core.huawei.HuaweiStatus
 import com.opentasker.core.huawei.HuaweiSyncArgs
 import com.opentasker.core.huawei.HuaweiSyncRunner
@@ -33,6 +34,14 @@ data class HuaweiUnknownField(
     val lastSeconds: Long?,
 )
 
+/**
+ * The most recent night, rebuilt from stored segments.
+ *
+ * Reuses [HuaweiSleep.Session] rather than defining a parallel UI type, so the totals the card shows
+ * are computed by the same code the decoder's tests check against the band's own screen.
+ */
+data class HuaweiSleepNight(val session: HuaweiSleep.Session)
+
 data class HuaweiDashboardState(
     val loading: Boolean = true,
     val status: HuaweiStatus? = null,
@@ -41,6 +50,7 @@ data class HuaweiDashboardState(
     val coverage: List<HuaweiCoverage> = emptyList(),
     val diagnostics: List<MetricChart> = emptyList(),
     val unknownFields: List<HuaweiUnknownField> = emptyList(),
+    val sleep: HuaweiSleepNight? = null,
     val bounds: LongRange = 0L..0L,
     val message: Loc? = null,
 )
@@ -84,9 +94,13 @@ class HuaweiDashboardModel(
         val status = runCatching { HuaweiSyncRunner.status(db) }.getOrNull()
         val bound = HuaweiSettings.isBound(appContext)
 
+        // Loaded before the early return: a night can exist when no per-minute sample does, and
+        // showing "no data" over a stored night would be a lie about the band rather than about us.
+        val sleep = loadLatestNight()
+
         if (oldest == null || newest == null) {
             return HuaweiDashboardState(
-                loading = false, status = status, bound = bound,
+                loading = false, status = status, bound = bound, sleep = sleep,
                 message = if (bound) HuaweiText.noData else HuaweiText.notPaired,
             )
         }
@@ -120,7 +134,27 @@ class HuaweiDashboardModel(
             coverage = coverage,
             diagnostics = diagnostics,
             unknownFields = unknown,
+            sleep = sleep,
             bounds = fromMs..toMs,
+        )
+    }
+
+    /** The newest stored night, or null when none has been synced. */
+    private suspend fun loadLatestNight(): HuaweiSleepNight? {
+        val dao = db.huaweiSleepDao()
+        val start = dao.newestSession() ?: return null
+        val rows = dao.session(start)
+        if (rows.isEmpty()) return null
+        return HuaweiSleepNight(
+            HuaweiSleep.Session(
+                startSeconds = start,
+                endSeconds = rows.first().sessionEnd,
+                segments = rows.map {
+                    HuaweiSleep.Segment(
+                        it.startSeconds, it.durationSeconds, HuaweiSleep.Stage.of(it.stage),
+                    )
+                },
+            ),
         )
     }
 

@@ -102,6 +102,10 @@ fun HuaweiDashboardScreen(
             MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
         }
 
+        // Above coverage: a night is the thing most worth seeing, and it is also the one card
+        // that can be present when no per-minute sample is.
+        item("sleep") { HuaweiSleepCard(state.sleep, viewport, crosshair) }
+
         if (state.coverage.isNotEmpty()) item("coverage") { CoverageCard(state.coverage) }
         item("diagnostics") { DiagnosticsCard(state) }
     }
