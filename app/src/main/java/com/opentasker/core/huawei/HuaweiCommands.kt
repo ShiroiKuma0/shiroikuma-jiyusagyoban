@@ -88,7 +88,7 @@ object HuaweiCommands {
     const val SVC_WATCHFACE = 0x27
     const val WF_CAPABILITY = 0x01     // band's theme version and screen size
     const val WF_LIST = 0x02
-    const val WF_CONTROL = 0x03        // tag 3: 01 = install, 02 = make active
+    const val WF_CONTROL = 0x03        // tag 3: 01 = install, 02 = DELETE (not "make active")
     const val WF_PROGRESS = 0x05       // band-initiated; must be acknowledged
 
     // ---- FileUpload (0x28) — how a watch face gets ONTO the band ---------
@@ -434,9 +434,24 @@ object HuaweiCommands {
             tlv(5, HuaweiProtocol.intBytes(width, 2)) +
             tlv(6, HuaweiProtocol.intBytes(height, 2))
 
-    /** Make an installed face the one on screen. */
-    fun watchFaceActivate(assetId: String, version: String): ByteArray =
+    /**
+     * REMOVE a face from the band.
+     *
+     * This was called `watchFaceActivate` until 2026-08-23, on the reading that tag 3 = 02 made a
+     * face current. It does the opposite, and sending it right after an install deleted the face we
+     * had just spent a minute transferring: the band showed it for an instant, then fell back to the
+     * previous one, and it was absent from the band's own list.
+     *
+     * The capture settles it across all 33 of Health's installs — after `tag3=01` the asset APPEARS
+     * in the [WF_LIST] reply, and after `tag3=02` the named asset DISAPPEARS from it. Installing is
+     * also what puts the face on screen, so there is no activate step to send: Health never sends
+     * one. What Health does send is this, against the PREVIOUS face, to keep the band pruned.
+     */
+    fun watchFaceDelete(assetId: String, version: String): ByteArray =
         tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(2))
+
+    /** Ask which faces are on the band. The reply carries free space and one record per face. */
+    fun watchFaceList(): ByteArray = tlv(1) + tlv(6, byteArrayOf(3))
 
     /** The band reports install progress unprompted and expects each report acknowledged. */
     fun watchFaceProgressAck(assetId: String, version: String): ByteArray =

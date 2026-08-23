@@ -126,9 +126,12 @@ object HuaweiSettings {
      *
      * Null means "never chosen here", and that is load-bearing: the band's own first-run picker is
      * the only other way this gets set, so asserting a locale we were never given would overwrite a
-     * choice made on the device. Once set, it is re-asserted on every pair, because any companion
-     * that touches the band can push its own locale over it — which is exactly how this band ended
-     * up in English.
+     * choice made on the device.
+     *
+     * This is a RECORD of the last language sent, not an instruction. Pairing deliberately does not
+     * re-assert it (see HuaweiSyncRunner's configure call): the language changes only when a task
+     * says so. Any companion that touches the band can still push its own locale over it — that is
+     * how this band ended up in English — and the answer is to flip it back by hand.
      */
     fun bandLocale(context: Context): String? =
         prefs(context).getString(KEY_BAND_LOCALE, null)?.ifEmpty { null }
