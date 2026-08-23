@@ -39,8 +39,17 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     /** What happened, in the band's own terms. */
     data class Outcome(val ok: Boolean, val bytesSent: Int, val blocks: Int, val message: String)
 
-    /** One face the band is holding. [builtIn] faces shipped with it and cannot be replaced. */
-    data class InstalledFace(val assetId: String, val version: String, val builtIn: Boolean)
+    /**
+     * One face the band is holding. [showing] is the one on screen right now.
+     *
+     * There is deliberately no "factory" or "protected" field. Tag 5 was read as one on the strength
+     * of two records that happened to agree, and it is not: seven of 白い熊's own faces carry the
+     * same 04 as Huawei's, so the picker locked them. What tag 5 actually tracks is the current
+     * face — it becomes 05 on whichever face was last installed, and moves again when the face is
+     * changed on the band by hand. Whether a face can be removed is the band's answer to give, not
+     * ours to predict.
+     */
+    data class InstalledFace(val assetId: String, val version: String, val showing: Boolean)
 
     /** What the band is holding, and how much room is left. [freeUnits] is the band's own figure. */
     data class FaceStore(val faces: List<InstalledFace>, val freeUnits: Int)
@@ -74,7 +83,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             faces += InstalledFace(
                 assetId = id,
                 version = f(4)?.toString(Charsets.US_ASCII) ?: "",
-                builtIn = f(5)?.firstOrNull()?.toInt() == 4,
+                showing = f(5)?.firstOrNull()?.toInt() == 5,
             )
         }
         return FaceStore(faces, free)
@@ -83,14 +92,13 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     /**
      * Remove a face from the band.
      *
-     * Refuses the built-in faces rather than asking the band to do something it will not do — and,
-     * more to the point, rather than letting a prune walk off the end of 白い熊's own faces into the
-     * ones that came with the watch.
+     * Nothing is refused up front. An earlier version declined faces it believed were built in,
+     * using a flag that turned out to mark the face on screen instead — so it locked seven of
+     * 白い熊's own faces behind a rule that did not exist. The band knows what it will part with;
+     * asking it and reporting the answer is both simpler and true.
      */
     suspend fun deleteWatchFace(assetId: String, version: String): Boolean {
         val cfg = HuaweiCommands
-        val before = listWatchFaces()
-        if (before?.faces?.any { it.assetId == assetId && it.builtIn } == true) return false
         session.send(cfg.SVC_WATCHFACE, cfg.WF_CONTROL, cfg.watchFaceDelete(assetId, version))
         // Confirm against the band's own list. The delete is not acknowledged in a way worth
         // trusting, and "it is gone" is the only claim worth making.

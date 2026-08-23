@@ -29,6 +29,20 @@ object HuaweiText {
     val facesTitle = Loc("Watch faces", "文字盤")
     val facesInstall = Loc("Install", "入れる")
     val facesNoPreview = Loc("no picture", "画像なし")
+    val facesRead = Loc("Read the band", "バンドを読む")
+    val facesBandTitle = Loc("On the band", "バンドの中")
+    val facesOnBand = Loc("✓ on the band", "✓ バンドに有り")
+    val facesDelete = Loc("Remove", "外す")
+    val facesShowing = Loc("showing now", "表示中")
+    val facesUnknownOnBand = Loc("not in this library", "この庫に無い")
+    val facesCountUnit = Loc("faces", "文字盤")
+    val facesCountMine = Loc("in this library", "この庫の分")
+    val facesCountOther = Loc("from elsewhere", "他から")
+    val facesFree = Loc("free space", "空き")
+    val facesBandNever = Loc(
+        "The band has not been read yet. Reading it takes a few seconds and needs the band nearby.",
+        "まだバンドを読んでいない。読むには数秒かかり、バンドが近くに要る。",
+    )
     val facesEmpty = Loc(
         "No faces in this directory yet. Faces are captured from Huawei Health — they cannot be " +
             "made here.",
