@@ -83,8 +83,54 @@ class HuaweiFacesActivity : ComponentActivity() {
                         HuaweiFacesScreen(
                             state = state,
                             contentPadding = WindowInsets.systemBars.asPaddingValues(),
+                            onReadBand = {
+                                if (state.bandBusy) return@HuaweiFacesScreen
+                                state = state.copy(reading = true, message = null)
+                                HuaweiSyncRunner.scope.launch {
+                                    val r = HuaweiSyncRunner.listWatchFaces(
+                                        applicationContext,
+                                        HuaweiSettings.address(applicationContext),
+                                    )
+                                    scope.launch {
+                                        state = state.copy(
+                                            reading = false,
+                                            band = r.getOrNull(),
+                                            message = r.exceptionOrNull()?.message,
+                                        )
+                                    }
+                                }
+                            },
+                            onRemove = { face ->
+                                if (state.bandBusy) return@HuaweiFacesScreen
+                                state = state.copy(deleting = face.assetId, message = null)
+                                HuaweiSyncRunner.scope.launch {
+                                    val r = HuaweiSyncRunner.deleteWatchFace(
+                                        applicationContext,
+                                        HuaweiSettings.address(applicationContext),
+                                        face.assetId,
+                                        face.version,
+                                    )
+                                    // Re-read rather than editing the list we hold: the band is the
+                                    // authority on what it kept, and a removal that silently failed
+                                    // must not leave the grid claiming the face is gone.
+                                    val fresh = HuaweiSyncRunner.listWatchFaces(
+                                        applicationContext,
+                                        HuaweiSettings.address(applicationContext),
+                                    ).getOrNull()
+                                    scope.launch {
+                                        state = state.copy(
+                                            deleting = null,
+                                            band = fresh ?: state.band,
+                                            message = when {
+                                                r.getOrNull() == true -> "${face.name} — removed"
+                                                else -> "${face.name} — ${r.exceptionOrNull()?.message ?: "still on the band"}"
+                                            },
+                                        )
+                                    }
+                                }
+                            },
                         ) { face ->
-                            if (state.installing != null) return@HuaweiFacesScreen
+                            if (state.bandBusy) return@HuaweiFacesScreen
                             state = state.copy(installing = face.id, bytesSent = 0, message = null)
                             // On the runner's scope, not the composition's: the upload must survive
                             // this window being closed, exactly as a sync does.

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.huawei.HuaweiFaceLibrary
+import com.opentasker.core.huawei.HuaweiUploadClient
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.charts.LocalBandLanguage
@@ -51,7 +53,27 @@ data class HuaweiFacesState(
     val installing: String? = null,
     val bytesSent: Int = 0,
     val message: String? = null,
-)
+    /** What the band answered when last asked, or null if it has not been asked. */
+    val band: HuaweiUploadClient.FaceStore? = null,
+    val reading: Boolean = false,
+    /** The face being removed, by asset id. */
+    val deleting: String? = null,
+) {
+    /**
+     * Reading, installing and removing all open the one session the band allows, so any of them
+     * makes every button in the grid inert. Deriving it here rather than at each call site is what
+     * stops a new button being added that forgets one of the three.
+     */
+    val bandBusy: Boolean get() = installing != null || reading || deleting != null
+
+    /** Whether the band is holding this face — false whenever the band has not been read. */
+    fun onBand(assetId: String): Boolean =
+        band?.faces?.any { it.assetId == assetId } == true
+
+    /** The face the band is showing right now, if it has been read. */
+    fun isShowing(assetId: String): Boolean =
+        band?.faces?.any { it.assetId == assetId && it.showing } == true
+}
 
 /**
  * The watch-face library: pick one, install it.
@@ -74,6 +96,9 @@ fun HuaweiFacesScreen(
      * this layout gets looked at before it ships.
      */
     previewOf: (HuaweiFaceLibrary.Entry) -> ByteArray? = { HuaweiFaceLibrary.preview(it.zip) },
+    onReadBand: () -> Unit = {},
+    onRemove: (HuaweiFaceLibrary.Entry) -> Unit = {},
+    /** Last so it stays the trailing lambda — installing is what this window is for. */
     onInstall: (HuaweiFaceLibrary.Entry) -> Unit,
 ) {
     val lang = LocalBandLanguage.current
@@ -84,6 +109,9 @@ fun HuaweiFacesScreen(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            BandCard(state, onReadBand)
+        }
         if (state.message != null || state.faces.isEmpty()) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                 SectionCard(accent = ChartPalette.AXIS_TEXT) {
@@ -97,11 +125,70 @@ fun HuaweiFacesScreen(
             FaceCell(
                 face = face,
                 installing = state.installing == face.id,
-                bandBusy = state.installing != null,
+                removing = state.deleting == face.assetId,
+                onBand = state.onBand(face.assetId),
+                showing = state.isShowing(face.assetId),
+                bandBusy = state.bandBusy,
                 sent = state.bytesSent,
                 previewOf = previewOf,
                 onInstall = { onInstall(face) },
+                onRemove = { onRemove(face) },
             )
+        }
+    }
+}
+
+/**
+ * What the band is holding, and how much room is left.
+ *
+ * Reading it is a button rather than something the window does on opening. The band serves one
+ * connection: a read that fired automatically would seize it for several seconds every time this
+ * window came up, including the times 白い熊 opened it only to install something.
+ */
+@Composable
+private fun BandCard(state: HuaweiFacesState, onReadBand: () -> Unit) {
+    val lang = LocalBandLanguage.current
+    val band = state.band
+    SectionCard(accent = ChartPalette.AXIS_TEXT) {
+        SectionTitle(HuaweiText.facesBandTitle[lang], ChartPalette.AXIS_TEXT)
+        if (band == null) {
+            BodyText(HuaweiText.facesBandNever[lang])
+        } else {
+            // Split by what this library holds a copy of — a real distinction we can check — rather
+            // than by any flag in the record claiming to say where a face came from.
+            val mine = band.faces.count { f -> state.faces.any { it.assetId == f.assetId } }
+            val other = band.faces.size - mine
+            BodyText(
+                "${band.faces.size} ${HuaweiText.facesCountUnit[lang]} · " +
+                    "$mine ${HuaweiText.facesCountMine[lang]} · " +
+                    "$other ${HuaweiText.facesCountOther[lang]}",
+            )
+            // The band's own free-space figure, in the band's own units. Reported rather than
+            // converted: nothing here knows what one unit is, and inventing a megabyte would be
+            // inventing a number.
+            if (band.freeUnits >= 0) NoteText("${HuaweiText.facesFree[lang]} ${band.freeUnits}")
+            // Faces on the wrist that this library has no copy of — the factory ones, and anything
+            // installed from elsewhere. Listed because "remove one to make room" is unanswerable
+            // when the grid only shows what we happen to hold.
+            val strangers = band.faces.filter { f -> state.faces.none { it.assetId == f.assetId } }
+            if (strangers.isNotEmpty()) {
+                NoteText(
+                    HuaweiText.facesUnknownOnBand[lang] + ": " +
+                        strangers.joinToString(" · ") { it.assetId + if (it.showing) " ●" else "" },
+                )
+            }
+        }
+        Button(
+            onClick = onReadBand,
+            enabled = !state.bandBusy,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            if (state.reading) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text(HuaweiText.facesRead[lang])
+            }
         }
     }
 }
@@ -110,10 +197,14 @@ fun HuaweiFacesScreen(
 private fun FaceCell(
     face: HuaweiFaceLibrary.Entry,
     installing: Boolean,
+    removing: Boolean,
+    onBand: Boolean,
+    showing: Boolean,
     bandBusy: Boolean,
     sent: Int,
     previewOf: (HuaweiFaceLibrary.Entry) -> ByteArray?,
     onInstall: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val lang = LocalBandLanguage.current
     val accent = if (installing) ChartPalette.HEART_RATE else ChartPalette.AXIS_TEXT
@@ -165,5 +256,29 @@ private fun FaceCell(
         // Only while THIS face is going: a byte count under an idle button would read as a stale
         // result rather than as progress.
         if (installing && sent > 0) NoteText("${sent / 1024} KB")
+
+        // "On the band" is said in a word and a tick, never by colour alone. Removal appears only
+        // for a face the band actually holds and did not ship with: offering it otherwise would be
+        // offering a button that cannot work.
+        if (onBand) {
+            NoteText(
+                if (showing) "${HuaweiText.facesOnBand[lang]} · ${HuaweiText.facesShowing[lang]}"
+                else HuaweiText.facesOnBand[lang],
+            )
+            // Offered for every face the band holds. Predicting which ones it will refuse is what
+            // went wrong before; the band decides, and the result is re-read from it.
+            OutlinedButton(
+                onClick = onRemove,
+                enabled = !bandBusy,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                if (removing) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(HuaweiText.facesDelete[lang])
+                }
+            }
+        }
     }
 }

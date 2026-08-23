@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.opentasker.core.huawei.HuaweiFaceLibrary
 import com.opentasker.ui.charts.huawei.HuaweiFacesScreen
+import com.opentasker.core.huawei.HuaweiUploadClient
 import com.opentasker.ui.charts.huawei.HuaweiFacesState
 import com.opentasker.ui.theme.OpenTaskerTheme
 import java.io.ByteArrayOutputStream
@@ -105,5 +106,46 @@ fun HuaweiFacesInstallingPreview() {
 fun HuaweiFacesEmptyPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
         Frame(HuaweiFacesState(faces = emptyList(), loading = false, dir = "/sdcard/〇/…/Huawei Band 11 Pro"))
+    }
+}
+
+/**
+ * The band read: two of the library's faces are on it, alongside two this library has no copy of.
+ * One of ours is the face on screen. "On the band" is carried by a tick and a word, never by the
+ * accent colour alone, and every held face offers removal — the band decides what it will part with.
+ */
+private val BAND = HuaweiUploadClient.FaceStore(
+    faces = listOf(
+        HuaweiUploadClient.InstalledFace("2182762613", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2182762133", "2.9.8", showing = false),
+        HuaweiUploadClient.InstalledFace("7185695173", "2.1.1", showing = true),
+        HuaweiUploadClient.InstalledFace("7185922173", "2.1.1", showing = false),
+    ),
+    freeUnits = 95,
+)
+
+@PreviewTest
+@Preview(name = "Faces — band read", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiFacesBandReadPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Frame(HuaweiFacesState(faces = FACES, loading = false, band = BAND))
+    }
+}
+
+/** A removal running: every button in the grid is inert, because the band allows one session. */
+@PreviewTest
+@Preview(name = "Faces — removing 日本語", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiFacesRemovingPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        Frame(
+            HuaweiFacesState(
+                faces = FACES,
+                loading = false,
+                band = BAND,
+                deleting = "7185695173",
+            ),
+        )
     }
 }

@@ -447,13 +447,20 @@ one it just sent.
 ```
 0x27/0x02  {1: "", 6: 03}        ask what is installed
    <- {8: status, 9: free space, 129: repeated 0x82-prefixed records}
-      each record: {3: assetId (10 ASCII digits), 4: version, 5: 04 = factory / 01 = installed}
+      each record: {3: assetId (10 ASCII digits), 4: version, 5: 05 = the face on screen, else 04}
 0x27/0x03  {1: assetId, 2: version, 3: 01, 5: width, 6: height}   install (and show)
 0x27/0x03  {1: assetId, 2: version, 3: 02}                        DELETE
 ```
 
-Tag 5 = 04 marks the faces that shipped with the band. A prune must skip them: the band refuses, and
-walking off the end of 白い熊's own faces into the factory ones is the failure worth preventing.
+**Tag 5 does not say where a face came from, and there is no "protected" flag in the record.** It was
+briefly read as one on the strength of two records that happened to agree; seven of 白い熊's own faces
+carry the same `04` as Huawei's, so a picker built on that reading locked them. What tag 5 tracks is
+the CURRENT face: it becomes `05` on whichever face was last installed, and moves again when the face
+is changed on the band by hand — confirmed across all 33 installs and several band-side switches.
+
+So nothing predicts what the band will part with. Send the delete, then re-read the list and report
+what the band actually did. (One record carries `05` in tag 5 alongside `2a`/tag 7 = `02`; that pair
+is unexplained and does not track anything we drive.)
 
 ### Weather is a PUSH, not a request
 
