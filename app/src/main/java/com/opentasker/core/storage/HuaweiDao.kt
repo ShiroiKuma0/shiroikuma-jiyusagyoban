@@ -129,6 +129,10 @@ interface HuaweiSleepDao {
     suspend fun window(from: Long, to: Long): List<HuaweiSleepEntity>
 
     /** The most recent night's bed time, or null when none is stored. */
+    /** Every night on record, oldest first — the register and the recovery baseline need all of them. */
+    @Query("SELECT DISTINCT sessionStart FROM huawei_sleep ORDER BY sessionStart")
+    suspend fun sessionStarts(): List<Long>
+
     @Query("SELECT MAX(sessionStart) FROM huawei_sleep")
     suspend fun newestSession(): Long?
 

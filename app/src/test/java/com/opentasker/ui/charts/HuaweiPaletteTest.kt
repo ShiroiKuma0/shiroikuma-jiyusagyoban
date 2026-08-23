@@ -54,10 +54,13 @@ class HuaweiPaletteTest {
 
     @Test
     fun `the Huawei screen clears the adjacent gate`() {
-        assertEquals(
-            PaletteCheck.Verdict.PASS,
-            PaletteCheck.validate(style.huaweiSeriesColors.map { (n, c) -> n to c.toArgb() }).verdict,
-        )
+        // WARN rather than PASS since 2026-08-23, and deliberately: the red heart rate sits ΔE 6.5
+        // from the aqua blood oxygen. A warn means "legal only because both carry a label", which is
+        // true here — every card on this screen is titled. What is NOT tolerated is a FAIL, so that
+        // is what this asserts.
+        val report = PaletteCheck.validate(style.huaweiSeriesColors.map { (n, c) -> n to c.toArgb() })
+        val hard = report.findings.filter { it.verdict == PaletteCheck.Verdict.FAIL }
+        assertEquals(hard.toString(), emptyList<Any>(), hard)
     }
 
     @Test
@@ -81,6 +84,9 @@ class HuaweiPaletteTest {
             style.colorFor(BandMetric.HEART_RATE).toArgb(),
             style.colorFor(HuaweiKeys.RESTING_HR).toArgb(),
         )
+        // The pair that matters most: these two ARE the same quantity, so they are read against each
+        // other whatever order the cards sit in. When the heart rate took the red on 2026-08-23 the
+        // amber fell to ΔE 6.7 here, which is why the resting heart rate moved to lime.
         assertTrue("心拍 / 安静時心拍 CVD ΔE $cvd — below the 8.0 target", cvd >= 8.0)
         assertTrue("心拍 / 安静時心拍 normal ΔE $normal — below the 15.0 floor", normal >= 15.0)
     }
@@ -90,11 +96,16 @@ class HuaweiPaletteTest {
         // The rejection, pinned. It is the natural-looking choice and it is unreadable beside blue.
         assertNotEquals(ChartPalette.BAND_INDEX, style.restingHr)
         assertTrue(
-            "violet against blue is ΔE ${PaletteCheck.cvdSeparation(
-                ChartPalette.BAND_INDEX.toArgb(), ChartPalette.HEART_RATE.toArgb(),
+            // Measured against the BLUE, not against whichever metric holds it. On 2026-08-23 the
+            // blue moved from the heart rate to steps; violet then measured ΔE 19.5 against the new
+            // red heart rate and this assertion passed for entirely the wrong reason, while violet
+            // against the blue was still 2.5. The hazard changed seats. A test written against a
+            // metric NAME rather than against a colour will miss that every time.
+            "violet against the blue is ΔE ${PaletteCheck.cvdSeparation(
+                ChartPalette.BAND_INDEX.toArgb(), ChartPalette.STEPS.toArgb(),
             )} under CVD — kept here so the reason survives",
             PaletteCheck.cvdSeparation(
-                ChartPalette.BAND_INDEX.toArgb(), ChartPalette.HEART_RATE.toArgb(),
+                ChartPalette.BAND_INDEX.toArgb(), ChartPalette.STEPS.toArgb(),
             ) < 8.0,
         )
     }
