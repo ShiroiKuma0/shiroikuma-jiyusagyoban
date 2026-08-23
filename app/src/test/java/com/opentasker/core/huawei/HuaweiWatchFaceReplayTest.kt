@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.security.MessageDigest
@@ -29,7 +30,7 @@ class HuaweiWatchFaceReplayTest {
         var announced: ByteArray? = null
         var offeredName: String? = null
         var digest: ByteArray? = null
-        var activated = false
+        var deleted: String? = null   // tag 3 = 02 removes a face; nothing should send it here
         /** Set when the client tells the band to install what it transferred. */
         var installOrdered = false
         /** Every command the client sent, so a failure says what it did rather than what it did not. */
@@ -125,7 +126,8 @@ class HuaweiWatchFaceReplayTest {
                             send(svc, cmd, tlv(1, v(1)!!) + tlv(2, v(2)!!) + tlv(4, byteArrayOf(0)) +
                                 tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.intBytes(0, 4)))
                         }
-                        v(3)?.firstOrNull()?.toInt() == 2 -> activated = true
+                        v(3)?.firstOrNull()?.toInt() == 2 ->
+                            deleted = v(1)?.toString(Charsets.US_ASCII)
                     }
                 }
 
@@ -195,7 +197,11 @@ class HuaweiWatchFaceReplayTest {
             MessageDigest.getInstance("SHA-256").digest(face), band.digest,
         )
         assertTrue("the band was never told to install what it received", band.installOrdered)
-        assertTrue("the face was never activated", band.activated)
+        // The install is what puts the face on screen. The client used to follow it with
+        // tag 3 = 02, believing that selected a face; it DELETES one, so the band showed the
+        // new face for an instant and then dropped it. Asserting the frame is absent is the
+        // only way this stays fixed — the previous version of this test asserted it present.
+        assertNull("a face was deleted — tag 3 = 02 must never follow an install", band.deleted)
     }
 
     @Test
