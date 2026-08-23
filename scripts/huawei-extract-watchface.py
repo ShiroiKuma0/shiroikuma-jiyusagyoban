@@ -88,10 +88,25 @@ def frames(path):
 
 
 def decrypt(body, rec):
+    """Decrypt a frame's payload, or hand it back untouched when it is not encrypted.
+
+    The test for "is this encrypted" must be STRUCTURAL, not "does it parse". A real envelope always
+    begins with tag 124, the encryption marker; data frames are raw file bytes and begin with a file
+    id. Deciding by TLV-parsing instead loses frames twice over: the parse can throw, and — far more
+    insidiously — arbitrary file bytes occasionally parse as a TLV carrying tags 125 and 126 purely
+    by coincidence, at which point decryption is attempted, fails, and a perfectly good frame is
+    thrown away.
+
+    That cost about one frame per capture at a random offset, with the phone reporting no drops and
+    the stream fully covered, and one 935-byte hole is enough for the band to refuse an entire
+    ~900 KB face. It looked like lossy hardware for a day.
+    """
+    if not body or body[0] != 0x7C:      # not an envelope: raw payload, hand it straight back
+        return body
     try:
         tl = dict(tlv_parse(body))
     except Exception:
-        return None
+        return body
     if 126 not in tl or 125 not in tl:
         return body
     for k in rec.keys:
@@ -99,6 +114,8 @@ def decrypt(body, rec):
             return hc.decrypt_gcm(tl[126], k, tl[125])
         except Exception:
             pass
+    # Genuinely enveloped and genuinely undecryptable — a key we do not have. Say so by returning
+    # nothing, rather than passing ciphertext off as content.
     return None
 
 
