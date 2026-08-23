@@ -25,6 +25,7 @@ object HuaweiSettings {
     private const val KEY_AUTH_VERSION = "auth_version"
     private const val KEY_DEVICE_SUPPORT_TYPE = "device_support_type"
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
+    private const val KEY_LOOKBACK_HOURS = "lookback_hours"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
     private const val KEY_LANGUAGE = "language"
@@ -144,6 +145,16 @@ object HuaweiSettings {
 
     fun setOverlapMinutes(context: Context, value: Int) =
         prefs(context).edit { putInt(KEY_OVERLAP_MIN, value.coerceIn(0, 24 * 60)) }
+
+    /**
+     * How far back every routine sync looks. See [HuaweiSyncArgs.DEFAULT_LOOKBACK_HOURS] for why a
+     * floor exists at all; the short version is that without one a hole never heals.
+     */
+    fun lookbackHours(context: Context): Int =
+        prefs(context).getInt(KEY_LOOKBACK_HOURS, HuaweiSyncArgs.DEFAULT_LOOKBACK_HOURS)
+
+    fun setLookbackHours(context: Context, value: Int) =
+        prefs(context).edit { putInt(KEY_LOOKBACK_HOURS, value.coerceIn(1, 14 * 24)) }
 
     fun timeoutSec(context: Context): Int =
         prefs(context).getInt(KEY_TIMEOUT_SEC, DEFAULT_TIMEOUT_SEC)

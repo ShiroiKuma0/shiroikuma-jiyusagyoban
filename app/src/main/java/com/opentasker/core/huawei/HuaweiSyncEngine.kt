@@ -42,7 +42,11 @@ object HuaweiSyncEngine {
             m.distance?.let { out += Sample(METRIC_DISTANCE, m.epochSeconds, it.toDouble()) }
             m.heartRate?.let { out += Sample(METRIC_HEART_RATE, m.epochSeconds, it.toDouble()) }
             m.spo2?.let { out += Sample(METRIC_SPO2, m.epochSeconds, it.toDouble()) }
-            m.restingHeartRate?.let {
+            // A resting heart rate of ZERO is the band's null, not a measurement — unlike steps,
+            // where zero is a real count. It sets the field in the same minutes as the live heart
+            // rate and fills it with 0 until it has actually computed one: 426 of 431 readings on
+            // 白い熊's 2026-08-23 were zeros, which the chart then drew as a day-long absence.
+            m.restingHeartRate?.takeIf { it > 0 }?.let {
                 out += Sample(METRIC_RESTING_HR, m.epochSeconds, it.toDouble())
             }
             for ((bit, value) in m.unknown) {

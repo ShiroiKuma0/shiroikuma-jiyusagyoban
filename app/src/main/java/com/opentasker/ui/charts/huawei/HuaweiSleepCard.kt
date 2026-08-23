@@ -99,8 +99,22 @@ fun HuaweiSleepCard(
     // bargain every other card on this page makes.
     val atCrosshair = crosshair.tMs?.let { t -> s.segments.firstOrNull { it.startSeconds * 1000L <= t && t < it.endSeconds * 1000L } }
 
+    // Which night this actually is, said out loud. The card titled itself "Last night" while showing
+    // a two-day-old one for two days, because the parser could only ever reach the oldest night in
+    // the file. Nothing on screen contradicted it, and that is what made it hard to see.
+    val nightsAgo = remember(s) {
+        val today = java.util.Calendar.getInstance()
+        val night = java.util.Calendar.getInstance().apply { timeInMillis = s.endSeconds * 1000L }
+        ((today.timeInMillis / 86_400_000L) - (night.timeInMillis / 86_400_000L)).toInt()
+    }
+    val dated = remember(s) {
+        java.text.SimpleDateFormat("M/d", java.util.Locale.getDefault())
+            .format(java.util.Date(s.startSeconds * 1000L))
+    }
+
     ChartCard(
-        title = HuaweiText.sleepTitle[lang],
+        title = if (nightsAgo <= 0) HuaweiText.sleepTitle[lang]
+        else "${HuaweiText.sleepOlderNight[lang]} · $dated ($nightsAgo ${HuaweiText.sleepStale[lang]})",
         headline = atCrosshair?.let { labelOf(it.stage)[lang] } ?: HuaweiSleepFormat.hm(s.asleepSeconds),
         unit = "",
         band = null,

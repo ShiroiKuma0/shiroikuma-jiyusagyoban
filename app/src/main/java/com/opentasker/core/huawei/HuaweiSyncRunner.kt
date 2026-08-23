@@ -201,20 +201,25 @@ object HuaweiSyncRunner {
             fromSeconds, toSeconds, id = HuaweiFileClient.SLEEP_STREAM_ID,
         )
         if (file !is HuaweiFileClient.Result.Data) return 0
-        val night = HuaweiSleep.parse(file.bytes) ?: return 0
-        db.huaweiSleepDao().upsert(
-            night.segments.map {
-                HuaweiSleepEntity(
-                    startSeconds = it.startSeconds,
-                    durationSeconds = it.durationSeconds,
-                    stage = it.stage.code,
-                    sessionStart = night.startSeconds,
-                    sessionEnd = night.endSeconds,
-                    syncId = syncId,
-                )
-            },
-        )
-        return night.segments.size
+        // EVERY night in the file, not the first. The file is append-only, so taking one session
+        // pinned the app to the oldest night it had ever seen — see HuaweiSleep.parseAll.
+        val nights = HuaweiSleep.parseAll(file.bytes)
+        if (nights.isEmpty()) return 0
+        nights.forEach { night ->
+            db.huaweiSleepDao().upsert(
+                night.segments.map {
+                    HuaweiSleepEntity(
+                        startSeconds = it.startSeconds,
+                        durationSeconds = it.durationSeconds,
+                        stage = it.stage.code,
+                        sessionStart = night.startSeconds,
+                        sessionEnd = night.endSeconds,
+                        syncId = syncId,
+                    )
+                },
+            )
+        }
+        return nights.sumOf { it.segments.size }
     }
 
     /**

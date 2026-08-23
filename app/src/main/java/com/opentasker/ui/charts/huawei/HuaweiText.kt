@@ -54,6 +54,9 @@ object HuaweiText {
     )
 
     val sleepTitle = Loc("Last night", "昨夜の睡眠")
+    /** Used instead of [sleepTitle] once the newest night is no longer last night. */
+    val sleepOlderNight = Loc("Most recent night", "直近の睡眠")
+    val sleepStale = Loc("nights ago", "夜前")
     val sleepNone = Loc(
         "No night stored yet — sleep arrives with the next sync.",
         "まだ夜の記録がありません。次の同期で入ります。",
