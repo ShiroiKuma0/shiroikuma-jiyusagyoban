@@ -104,6 +104,41 @@ def cmd_grab(slot):
     save_state(s)
 
 
+# Huawei Health's face grid: 5 x 3, measured once off a 1812x2176 page shot. Fixed layout, so one
+# calibration serves every page — checked against the shot's size before use, because a different
+# screen would crop the wrong face onto the right name without complaining.
+GRID = {"size": [1812, 2176], "cols": [203, 555, 907, 1259, 1610], "rows": [507, 1147, 1788],
+        "half": [145, 247]}
+
+
+def cmd_page(tag):
+    """Shoot the 15-face grid. Names and previews both come from here."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    shot = WORK / f"page-{tag}.png"
+    raw = adb("exec-out", "screencap", "-p", binary=True)
+    # A foldable answers screencap with a "[Warning] Multiple displays were found" line BEFORE the
+    # PNG, so the bytes are a valid image with a preamble glued on. Cut to the magic rather than
+    # trusting the stream to start where it should.
+    magic = b"\x89PNG\r\n\x1a\n"
+    i = raw.find(magic)
+    if i < 0:
+        raise SystemExit(f"no PNG in screencap output: {raw[:120]!r}")
+    shot.write_bytes(raw[i:])
+    st = load_state()
+    st["page"] = str(shot)
+    save_state(st)
+    print(f"page shot: {shot}")
+
+
+def tile_box(page, row, col):
+    from PIL import Image
+    if list(Image.open(page).size) != GRID["size"]:
+        raise SystemExit(f"page shot is {Image.open(page).size}, not {GRID['size']} — recalibrate")
+    cx, cy = GRID["cols"][col], GRID["rows"][row]
+    hw, hh = GRID["half"]
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
 def cmd_pack(slot, name, box=None):
     from PIL import Image
 
@@ -116,7 +151,7 @@ def cmd_pack(slot, name, box=None):
     ARCHIVE.mkdir(parents=True, exist_ok=True)
 
     preview = stage / "preview.png"
-    img = Image.open(stage / "screen.png")
+    img = Image.open(s["page"] if box and s.get("page") else stage / "screen.png")
     crop = box or s.get("crop")
     if not crop:
         raise SystemExit("no crop box yet — set one with `crop L T R B` after checking a screenshot")
@@ -160,8 +195,17 @@ def main():
         cmd_arm()
     elif cmd == "grab":
         cmd_grab(rest[0])
+    elif cmd == "page":
+        cmd_page(rest[0] if rest else "1")
     elif cmd == "pack":
-        cmd_pack(rest[0], rest[1], [int(x) for x in rest[2:6]] or None)
+        # two extra args are a GRID POSITION (row col); four are raw pixels
+        extra = rest[2:6]
+        st = load_state()
+        if len(extra) == 2:
+            box = tile_box(st["page"], int(extra[0]), int(extra[1]))
+        else:
+            box = [int(x) for x in extra] or None
+        cmd_pack(rest[0], rest[1], box)
     elif cmd == "crop":
         s = load_state(); s["crop"] = [int(x) for x in rest[:4]]; save_state(s)
         print("crop box set:", s["crop"])
