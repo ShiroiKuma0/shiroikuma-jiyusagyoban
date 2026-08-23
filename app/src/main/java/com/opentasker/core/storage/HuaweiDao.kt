@@ -84,6 +84,58 @@ data class HuaweiSyncEntity(
     val message: String,
 )
 
+/**
+ * One stage block of one night, from `sequence_data` stream 700013.
+ *
+ * Stored as SEGMENTS rather than as a nightly summary because that is what the band actually sends:
+ * the file carries no totals at all, and Huawei Health computes its headline figures the same way we
+ * do. Keeping the segments means a later change of mind about how to summarise costs a query rather
+ * than another night's wait.
+ *
+ * [sessionStart] is the band's own bed time and groups a night. It is NOT the first segment's start:
+ * awake blocks can sit outside the session at both ends — see `HuaweiSleep`.
+ */
+@Entity(
+    tableName = "huawei_sleep",
+    primaryKeys = ["startSeconds"],
+    indices = [Index(value = ["sessionStart"])],
+)
+data class HuaweiSleepEntity(
+    /** UTC seconds this block begins. Unique, so re-reading a night overwrites rather than doubles. */
+    val startSeconds: Long,
+    val durationSeconds: Int,
+    /** 1 light, 2 REM, 3 deep, 4 awake — the band's own numbering, kept raw. */
+    val stage: Int,
+    /** The band's bed time for this night; groups the segments. */
+    val sessionStart: Long,
+    /** The band's wake time. */
+    val sessionEnd: Long,
+    val syncId: Long,
+)
+
+@Dao
+interface HuaweiSleepDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rows: List<HuaweiSleepEntity>)
+
+    @Query("SELECT COUNT(*) FROM huawei_sleep")
+    suspend fun count(): Int
+
+    /** Every segment of every night overlapping the window, oldest first. */
+    @Query(
+        "SELECT * FROM huawei_sleep WHERE sessionEnd >= :from AND sessionStart <= :to " +
+            "ORDER BY startSeconds ASC",
+    )
+    suspend fun window(from: Long, to: Long): List<HuaweiSleepEntity>
+
+    /** The most recent night's bed time, or null when none is stored. */
+    @Query("SELECT MAX(sessionStart) FROM huawei_sleep")
+    suspend fun newestSession(): Long?
+
+    @Query("SELECT * FROM huawei_sleep WHERE sessionStart = :sessionStart ORDER BY startSeconds ASC")
+    suspend fun session(sessionStart: Long): List<HuaweiSleepEntity>
+}
+
 @Dao
 interface HuaweiSampleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -289,6 +289,46 @@ produces an event when pressed rather than a series. Recorded for completeness, 
 
 ---
 
+### 10a. The band's display language — `0x0C/0x01`
+
+**The band has no language setting of its own, and that is by design.** Huawei state it plainly:
+*"The language cannot be set on your wearable device directly. Once the wearable device is connected
+to a phone, the time and language settings on the phone will automatically sync to the wearable
+device."* The Band 11 guide mentions language only in its pairing section; nothing in the on-device
+Settings tree exposes it.
+
+The companion pushes it, exactly once per pairing, right after announcing itself:
+
+```
+--> 0x0C/0x01  {1: "en-US", 2: 00}
+<-- 0x0C/0x01  {127: 00 01 86 A0}          # 100000 — the band's success code
+```
+
+| Tag | Meaning |
+|---|---|
+| 1 | BCP-47 language tag, ASCII, `xx-YY` form |
+| 2 | unit system — `00` metric, `01` imperial |
+
+`0x0C/0x05` carries the temperature unit separately.
+
+Three consequences worth keeping straight:
+
+* **This is why 白い熊's band is in English.** It went to another phone for the capture in §12, that
+  phone's Health pushed its own `en-US`, and our client had never sent this command — so the band
+  simply kept the last word it was given. The first-run picker is real, but the first companion to
+  connect overwrites it.
+* **An unsupported language is not an error.** Outside mainland China the band falls back to English
+  (inside it, to Simplified Chinese). A wrong tag therefore costs a language, not a band — which is
+  why the action sends and reports rather than validating against a list we would have to keep in
+  step with Huawei's firmware. Japanese is in Huawei's published support table.
+* **It must be re-asserted.** Any companion the band meets can push its own locale over ours, so
+  `configure()` re-sends the stored choice on every pairing — but only when one has been stored, so
+  a language picked on the band itself is never silently overwritten by us.
+
+Ours is `huawei.language` (`locale`, `units`), driven by `%Huawei_BandLocale` from
+`健康の設定 -- [727][01]` — deliberately a different setting from `%Huawei_Language`, which is the
+language of *our window*. 白い熊 runs the band in Japanese and the report in English.
+
 ## 11. Where the health data actually lives
 
 Three separate answers, and only one of them is the record service we started with.
@@ -355,6 +395,31 @@ does not, and the **tag numbers differ per command**:
 
 ---
 
+### 11c. Adding a watch face — the whole procedure
+
+Faces cannot be built, only captured. Huawei Health downloads one as an encrypted `themeV2Cipher`
+package, decrypts it, uploads the result and deletes the download, so the bytes that go over the air
+exist nowhere on disk. And the band will not keep a face it was not told about: the announcement
+carries a `contentSign` signed by Huawei's servers, which cannot be fabricated. **So this recovers
+faces 白い熊 already owns; it cannot obtain new ones.** That is the whole point — rotating them
+without re-pairing to the other phone.
+
+1. Pair the band to the rooted Samsung and let Huawei Health take it.
+2. **Record the byte offset of `/data/log/bt/btsnoop_hci.log` first**, so the capture is the install
+   and nothing else. The log must include the session's HiChain handshake — the control frames are
+   encrypted and the key is derived from it — so if the band is already connected, disconnect and
+   reconnect it before installing.
+3. Install **one** face. Two interleaved are far harder to separate.
+4. Pull the log and splice its first 16 bytes (the btsnoop header) onto everything past the offset.
+5. `python3 scripts/huawei-extract-watchface.py <log> <outdir>` → `<assetId>_<version>.bin` and
+   `.json`. Each face is verified against the SHA-256 the phone itself sent the band; one that does
+   not verify is skipped rather than written, because the band checks the same digest and a short
+   file is refused outright.
+6. Put both files where `%Huawei_Face` points and run `バンド文字盤（Huawei） -- [727]`.
+
+Steps 2–4 exist because the alternative — capturing everything and sifting — was tried and wastes
+far more time than recording an offset.
+
 ### Weather is a PUSH, not a request
 
 The band displays weather that the phone sends it. There is no fetching involved on our side and no
@@ -388,6 +453,156 @@ Opening the weather screen also makes the band fetch its weather **app** — num
 with a version string, then a `0x28` file stream. That is app management, not data.
 
 ---
+
+### 11b. Sleep, stored and drawn
+
+Schema **29** (additive) adds `huawei_sleep`: one row per stage block, keyed by its start second so
+re-reading a night the band still holds overwrites rather than doubles it — which matters because
+every sync deliberately asks for an overlapping window. `sessionStart` groups a night and is the
+band's own bed time, NOT the first segment's start.
+
+`huawei.sync` pulls the night after the record walk, in its own `sleep` phase, over **its own
+three-day window** rather than the sample window. That is not a nicety: a routine sync asks for the
+little that has happened since the last one — often under an hour — and last night falls entirely
+outside that, so following the sample window produces a sync that succeeds and never once brings a
+night. The summary now always says something about sleep, including when there was none; the first
+attempt stored nothing and said nothing, which is exactly how it went unnoticed. Tolerant by design: a
+night that will not parse reports itself and the sync still succeeds, because the samples were
+already fetched and written and losing them to a sleep problem would be the wrong trade.
+
+The card (`HuaweiSleepCard.kt`) is a lane hypnogram — deep at the bottom, awake at the top. **Stage
+is carried by vertical position; colour only reinforces it.** That is not stylistic: the tightest
+adjacent pair in the sleep palette, deep against light, measures CVD ΔE 8.4 against a target of 8.0,
+so a chart that leaned on hue alone would be asking too much of it. The four colours are the
+`ChartPalette.SLEEP_*` set that had sat unused since the Hume sleep UI was dropped, gated as a set by
+`HuaweiSleepPaletteTest` (adjacent floors: CVD 8.4, normal 19.8). Reusing them also means both bands
+will read identically in the eventual compare view.
+
+Awake blocks outside the band's span are **drawn but not counted**, and the card says so — the
+alternative is a reader silently failing to reconcile 34 minutes of awake with a 308-minute span.
+
+### 11a. The file transfer — `0x2C`, where sleep and RR intervals live
+
+The fitness service hands out fixed-shape records by index. Sleep and the per-beat RR intervals are
+not records: they are **files**, fetched by name.
+
+| File | Type | Holds | Takes an id? |
+|---|---|---|---|
+| `sequence_data` | `0x16` | sleep | **yes** — it is a container |
+| `rrisqi_data.bin` | `0x10` | per-beat RR intervals | no |
+
+```
+--> 0x2C/0x01  {1: name, 2: type, 5: from, 6: to, [12: id]}
+<-- 0x2C/0x01  {1: name, 2: type, 3: type, 4: SIZE, 127: result}
+--> 0x2C/0x03  {1: type, 2: '', 3: '', 5: ''}          # empty tags: "what chunk size?"
+<-- 0x2C/0x03  {1: type, 2: 0x15, 3: 0x03D0, 4: 0x1E80, 5: 0x02}
+--> 0x2C/0x04  {1: type, 2: offset, 3: size, [4: id]}  # "send it"
+<-- 0x2C/0x05  type(1) | offset(4 BE) | data … | 1 trailing byte    # pushed, unprompted
+--> 0x2C/0x06  {1: type, 2: 01}                        # "I have it all"
+<-- 0x2C/0x06  {127: ok, 1: type}
+```
+
+Points that cost time to establish:
+
+* **`0x2C/0x05` is NOT TLV.** It is a header plus raw file bytes. TLV-parsing it does not fail — it
+  yields plausible nonsense, a tag 0 holding 450 bytes beside a tag 198 holding two — because
+  arbitrary binary parses as tag/length pairs. `HuaweiSession.decryptBytes` exists so nothing reads
+  file bytes through the TLV path.
+* **The header is five bytes, and the band sends one byte MORE than it declares.** Corrected
+  2026-08-22: the earlier reading — a six-byte header with an unknown trailer — fits the byte counts
+  equally well and is wrong. Both transfers carry `size + 1` (643 for a declared 642; a final slice
+  ending at 7525 of a declared 7524), and the overflow byte rides in the last slice rather than
+  arriving on its own. Treating the declared size as the length cost the first captured night its
+  final segment's high byte — zero that time, so nothing looked broken. The client now treats the
+  declared size as a **minimum**: it decides when the transfer is complete, not how much is kept.
+* **The band pushes.** After `0x2C/0x04` there is no per-chunk acknowledgement; chunks arrive until
+  the file is complete.
+* **Result 144001 means "nothing for that window".** It is an answer, not a fault — an empty night
+  and a broken request must never look alike.
+* **`0x1C` is not this.** It runs concurrently during pairing and carries `HW_PGNSS_BDS` /
+  `HW_PGNSS_GLONASS` GNSS almanacs *phone → band*. It is the largest traffic in the capture and has
+  nothing to do with health data.
+
+**Answered 2026-08-22** by running `バンド書類（Huawei） -- [727]` against the real band. All four
+streams returned data, `rrisqi_data.bin` for the first time — and the 9804-byte transfer exercised
+multi-chunk reassembly on the wire, not just in tests.
+
+Every `sequence_data` stream opens with the same 33-byte header: `00`, the file size as a uint32, the
+stream id, then flags and padding. Records start at `0x21` with a **start/end epoch pair**.
+
+| id | that run | shape |
+|---|---|---|
+| `700013` | 642 B | **SLEEP** — one record, 2026-08-21 23:55 → 08-22 05:03 (5 h 08 m) |
+| `700004` | 7845 B | same record shape, single moment (14:07:03 → 14:07:03) |
+| `700021` | 9804 B | denser; a record header then a long blob of repeating 4-byte groups |
+| `rrisqi_data.bin` | 312 B | 48-byte header, then **66-byte records** |
+
+**`sequence_data` 700013 decodes fully — confirmed against the band's own Sleep screen.** The file
+stores no totals at all (290, 308, 83, 157 and 50 appear nowhere in its 642 bytes), so Health
+computes the summary from a segment list, and so do we. After the `0x81` configuration container the
+tail is an array of **little-endian uint32 pairs: duration in seconds, then stage.** Every header
+field above it is big-endian; the endianness really does flip mid-file.
+
+| code | stage | night of 2026-08-21 | band's screen |
+|---|---|---|---|
+| 1 | light | 157 min | 2 h 37 min ✓ |
+| 2 | REM | 50 min | 50 min ✓ |
+| 3 | deep | 83 min | 1 h 23 min ✓ |
+| 4 | awake | 34 min | — (12 min before bed time, 4 after waking, 18 within) |
+
+**The header brackets the SLEEP, not the segment array.** The segments run 324 min against a
+declared span of 308; the excess is exactly a 12-minute awake block before bed time and a 4-minute
+one after waking. So the array is anchored by its **first non-awake segment**, which begins at the
+declared start — and the last non-awake segment then ends exactly on the declared wake time, which
+is the file's own confirmation that the alignment is right. Anchoring at the declared start instead
+(the obvious reading) leaves every total correct and shifts the whole hypnogram twelve minutes late,
+a failure no summary figure would reveal.
+
+Light + REM + deep = 290 min = the headline **4 h 50 min**, to the minute. Note the numbering does
+NOT run deep-to-light: the plausible guess swaps deep with light and still draws a convincing
+hypnogram, which is why this was checked rather than assumed. Awake totals 34 min, and that now reconciles exactly: 12 min before bed time
+plus 4 after waking are outside the declared span, leaving the 18 min within it that
+span-minus-asleep implies.
+
+`rrisqi_data.bin` records are: start epoch, end epoch, a few flag bytes, then **ten IEEE-754 BE
+float32 fields**. Two are pinned against Huawei Health's own lists (2026-08-22):
+
+| field | offset | meaning | how it was established |
+|---|---|---|---|
+| 1 | +19 | **count of valid intervals** | Health publishes a window only when this is ≳17 — a clean 9/9 split between the three records it listed (32, 19, 20) and the six it omitted (16, 14, 12, 9, 9, 7) |
+| 6 | +39 | **mean RR interval, ms, quantised to 20 ms** | `60000/f6` reproduces Health's heart rate across 8 overlapping points at **RMSE 2.15 bpm** — and it is the ONLY fit under 6 bpm across all 66 byte positions and both endiannesses. At ~720 ms the 20 ms grid is itself worth ~2.3 bpm, so the residual IS the quantisation |
+
+Field 3 (+27) is the other 20 ms-quantised field and is always smaller than field 6, so it is very
+likely the shortest interval in the window. **Health's HRV number is NOT any stored field** — of
+three overlapping entries, one (35 ms at 15:10) appears nowhere in its record at any offset or
+encoding, so Health derives it. Two fields each matched one of the other two, which is what
+coincidence looks like; nothing here is decoded on that basis. The four captured windows are ~56 s each (14:22, 14:40, 15:04, 15:10). The field
+meanings are NOT yet established and are not guessed here — pinning them needs the values the band
+itself displays for those same windows.
+
+In `700013`/`700004` the record's timestamp pair is followed by a nested TLV container (tag `0x81`
+with a VarInt length) whose inner blocks carry ids in the `0x29B9xxxx` range. **`700021` is not
+fixed-stride** — a 35-byte guess aligns only the first record and produces nonsense timestamps after
+it, so its layout is still open.
+
+**The capture tooling, twice repaired (2026-08-22).** `btsnoop.py` originally sorted frames by byte
+offset *within* a direction, which is not time order — with 1968 phone frames against 713 band ones,
+replies appeared before their own requests. It now sorts by the btsnoop record timestamp; **do not
+infer a sequence from a dump made before that.**
+
+It also concatenated raw ACL payloads, so any LPv2 frame larger than about a kilobyte was split
+across several RFCOMM PDUs and had their headers sitting *inside* it, failing CRC and vanishing
+silently. It now reassembles L2CAP PDUs using the ACL PB flag and strips RFCOMM UIH framing. The
+difference:
+
+| direction | before | after |
+|---|---|---|
+| band → phone | 713 frames, 81.2 % of bytes | 719 frames, **92.1 %** |
+| phone → band | 1968 frames, 64.0 % | 2707 frames, **99.1 %** |
+
+`0x2C/0x05` went from 2 recovered frames (the last chunk of each transfer) to 7, and the phone→band
+upload channel `0x28/0x06` from 374 KB to 1.05 MB. The phone→band direction is the one a watch-face
+upload travels on, which is why this had to be fixed before capturing one.
 
 ## 12. Capturing Huawei Health
 
