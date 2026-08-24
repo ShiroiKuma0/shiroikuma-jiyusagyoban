@@ -12,13 +12,14 @@ import kotlin.math.cos
 /**
  * The track decoder, against files this test builds itself.
  *
- * No real `_gps.bin` exists yet — 白い熊's band has never recorded a walk — so these fixtures encode
- * the format as we understand it rather than as we have seen it. That makes them a statement of the
- * hypothesis, not proof of the band: if the first real walk decodes into the Atlantic, the fixture
- * is what gets corrected, and these tests are what make the correction visible.
+ * These fixtures were written before any real track existed, and the first real one — 白い熊's walk
+ * of 2026-08-23 — corrected them: the header is 33 bytes, not the 32 every published description
+ * gives. That error did not throw. It shifted every field by a byte and produced a start time in
+ * 2043 and a starting position in the ocean, which the decoder happened to refuse. The arithmetic is
+ * what caught it: at 32 the payload does not divide by the record size, and at 33 it divides exactly.
  *
- * What they DO prove is everything downstream of the layout: the little-endian reads, the cumulative
- * metre accumulation, the projection back to degrees, the altitude stride, and the refusals.
+ * What these tests prove is everything downstream of that layout: the little-endian reads, the
+ * cumulative metre accumulation, the projection back to degrees, the altitude stride, the refusals.
  */
 class HuaweiGpsTrackTest {
 
@@ -55,7 +56,8 @@ class HuaweiGpsTrackTest {
         lon: Double = lon0,
     ): ByteArray {
         val out = java.io.ByteArrayOutputStream()
-        out.write(ByteArray(32) { 0x7F })                    // the header nobody has described
+        // 33, not 32 — measured against 白い熊's own first walk; see HuaweiGpsTrack.
+        out.write(ByteArray(33) { 0x7F })                    // the header nobody has described
         out.write(if (withAltitude) 0x03 else 0x00)
         out.write(le32(start.toInt()))
         out.write(leDouble(lon))

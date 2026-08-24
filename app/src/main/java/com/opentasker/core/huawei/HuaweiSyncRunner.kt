@@ -281,20 +281,26 @@ object HuaweiSyncRunner {
             if (file !is HuaweiFileClient.Result.Data) {
                 return@map Walk(summary, 0, null, "the band would not send the track")
             }
-            // Keep the raw file next to the GPX, always. Both unknowns in the decoder — the earth
-            // radius and the datum — are settled by re-decoding, and a track that was thrown away
-            // after one pass cannot be re-decoded.
-            val stem = "huawei-walk-${entry.number}-${summary.startSeconds ?: 0}"
-            outDir?.let { java.io.File(it, "$stem.bin").writeBytes(file.bytes) }
-
             val track = HuaweiGpsTrack.decode(file.bytes)
                 ?: return@map Walk(summary, 0, null, "${file.bytes.size} B of track that did not decode")
-            val gpx = outDir?.let { dir ->
-                java.io.File(dir, "$stem.gpx").also {
-                    it.writeText(HuaweiGpsTrack.toGpx(track, "${summary.kind} ${entry.number}"))
-                }.absolutePath
+
+            // One directory per walk, holding the raw bytes as well as the route. Keeping the raw
+            // file is what made the header off-by-one fixable in an afternoon: a GPX regenerated
+            // from a bad decode is a walk that never happened, and only the .bin can be re-read.
+            val stored = outDir?.let { root ->
+                HuaweiWalkLibrary.write(
+                    root = root,
+                    number = entry.number,
+                    startSeconds = summary.startSeconds ?: track.startSeconds,
+                    endSeconds = summary.endSeconds,
+                    distanceMetres = summary.distanceMetres,
+                    kind = summary.kind,
+                    points = track.points.size,
+                    raw = file.bytes,
+                    gpx = HuaweiGpsTrack.toGpx(track, "${summary.kind} ${entry.number}"),
+                )
             }
-            Walk(summary, track.points.size, gpx)
+            Walk(summary, track.points.size, stored?.gpx?.absolutePath)
         }
     }
 
