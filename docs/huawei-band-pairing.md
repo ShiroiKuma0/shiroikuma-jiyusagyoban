@@ -654,27 +654,62 @@ way until there is ground truth.** Nine unique windows exist across all three ca
 Ranges, for anyone matching against a displayed number: f2 `3.3…12.6`, f3 `220…520` (×20),
 f4 `1.3…71.4`, f5 `44.6…124.1`, f7 `0.41…1.52`, f8 `43.5…1442`, f9 `38.3…7008`, f10 `22.0…74.9`.
 
-### Open defect — the file channel drops most of a stream without erroring
+### The file channel: what was fixed, and what turns out to be the band's own
 
-Asked on 2026-08-24 for the last three days, the `0x2C` transfer reported:
+The `0x2C` transfer reported "N of M bytes never arrived" and that was read as loss. Three things
+were wrong on our side and one thing is the band's.
+
+**Ours, all fixed.**
+
+1. **`FILE_NEGOTIATE`'s answer was computed and discarded.** The band offers `chunk 976, max 7808,
+   mode 2`, and those numbers explain everything below. They are now carried into the result.
+2. **`fileStart` has always taken an `offset`, and it was only ever called with `0`.** The band
+   serves a bounded run of chunks per START and stops; restarting from the lowest missing byte is
+   how the rest is fetched. This alone took a 3-day `700004` from 195201 bytes to 421632.
+3. **A short transfer threw its data away.** 390 KB was assembled and then dropped because it was
+   not whole. It now returns `Result.Partial` — a distinct type, so a caller that has not thought
+   about incompleteness will not compile — and the bytes are written as `*.partial.bin`. The summary
+   line says so too; before, a partial and a complete transfer differed only by a word buried in the
+   filename.
+
+**Every stopping point is a whole number of 7808-byte units**, which is the band's declared `max`:
 
 ```
-sequence_data 700004  — 500188 of 695389 bytes never arrived   (72 % lost)
-sequence_data 700013  — 2135 B, complete
-sequence_data 700021  —  66299 of  69228 bytes never arrived   (96 % lost)
-rrisqi_data.bin       — nothing (100004)
+195201 = 25 blocks + 1     390402 = 50 blocks + 2     421634 = 54 blocks + 2
+declared 695389 = 89.06 blocks  ← the declared size is NOT block-aligned
 ```
 
-**The failure is silent in the worst way**: the transfer completes, the file is written, and only the
-byte count says most of it is missing. A decoder handed the 700013 result cannot tell it apart from a
-complete one, and a partial `700021` is exactly the kind of input that makes a fixed-stride guess
-look almost right — which is how its layout came to be described as "still open" in the first place.
+**The band's, and not fixable from here: the amount served is arbitrary.** It is not a size limit,
+and persistence does not help. Riding out short windows (5 stalls, a 1.2 s pause between) produced a
+byte-identical result. And the decisive test runs the other way from every hypothesis:
 
-Not yet diagnosed. Candidates, in the order worth checking: a chunk-acknowledgement the band expects
-and does not get, so it stops sending; a receive window or timeout on our side that ends the transfer
-early and reports what arrived; and back-pressure from writing to `/sdcard` mid-stream. The complete
-stream being the smallest of the three (2135 B against 69 KB and 695 KB) points at size or duration
-rather than at the stream id.
+| asked for | declared | received | rounds |
+|---|---|---|---|
+| 3 days | 695389 | 421632 (54 blocks) | 4 |
+| **1 day** | **265674** | **62464 (8 blocks)** | **9** |
+
+A *smaller* request returned *less* data, after twice as many rounds. So the truncation tracks
+neither the request window nor the declared size. Across one morning the same file yielded 25, 25,
+50, 54, 54 and 8 blocks — and the worst result came last, after two large pulls minutes earlier,
+which is at least consistent with the service degrading under repeated use. **Spacing attempts out
+is the only lever left, and it is a usage change rather than a code one.**
+
+**The bytes that do arrive are sound.** The partial file has no chunk-aligned holes: its 116 zero
+runs are 64–378 bytes, none a multiple of 976, drifting steadily in phase — record padding, not
+loss. It ends exactly on a block boundary.
+
+### The bridge held a broadcast open past Android's limit — fixed
+
+Both `バンド書類（Huawei）` runs above raised an **ANR**, each exactly one minute after starting:
+`Broadcast of Intent … RUN_TASK … WorkspaceTransferReceiver`. `goAsync()` is not a licence to take
+as long as the work takes — a background broadcast must be finished within **60 s** or the system
+faults the app, and it names the broadcast rather than the work, so it reads as a broken receiver
+instead of a slow job.
+
+The reply is now bounded and the work is not: at 45 s the receiver releases the broadcast with
+`still running`, and the job carries on in the background where it can take as long as the band
+needs. Every fast command — which is almost all of them, at tens of milliseconds — keeps its
+synchronous result. Verified: the same pull that produced two ANRs produces none.
 
 **Pinning them needs the values the band itself displays for those same windows**, and that is
 currently blocked from both ends. There is no Huawei Health here any more, and **the band no longer

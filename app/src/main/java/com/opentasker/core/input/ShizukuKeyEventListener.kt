@@ -56,6 +56,22 @@ class ShizukuKeyEventListener {
     @Volatile private var bound = false
     @Volatile private var bindInFlight = false
     @Volatile private var grabUnavailable = false
+
+    /**
+     * Consecutive failed attempts to take the grab, before giving up on it for this run.
+     *
+     * `設定 [01]` deliberately `kill -9`s the grabber so a restart picks up new settings, and
+     * [ServiceConnection.onServiceDisconnected] rebinds at once. That rebind RACES the dying
+     * process: the kernel has not necessarily released its `EVIOCGRAB` yet, so `start()` returns
+     * "no devices" — and a single such failure used to latch [grabUnavailable] for the lifetime of
+     * the service, dropping the app into the detect-only fallback for good.
+     *
+     * That fallback publishes only short and long. Double, triple and long_repeat simply stop
+     * existing, and short presses stop being consumed — so the camera gesture, the volume panel and
+     * the zoom all die together while a long press keeps working, which reads as "everything broke"
+     * rather than "the grab was lost". It cost most of an afternoon, twice.
+     */
+    @Volatile private var grabFailures = 0
     /** The stale-grabber sweep is a once-per-process job, not a per-bind one. */
     @Volatile private var reaped = false
 
@@ -119,6 +135,7 @@ class ShizukuKeyEventListener {
         override fun onKey(evCode: Int, pressType: Int) {
             val mapped = EVCODE_MAP[evCode] ?: return
             val press = when (pressType) {
+                4 -> HardwareKeyContextEvents.PRESS_LONG_REPEAT
                 3 -> HardwareKeyContextEvents.PRESS_TRIPLE
                 2 -> HardwareKeyContextEvents.PRESS_DOUBLE
                 1 -> HardwareKeyContextEvents.PRESS_LONG
@@ -149,10 +166,16 @@ class ShizukuKeyEventListener {
                 .onFailure { AppLogger.warn(TAG, "grabber.start failed: ${it.message}") }
                 .getOrDefault(-1)
             if (devs <= 0) {
-                AppLogger.warn(TAG, "grab unavailable (start=$devs) — falling back to detect-only")
-                grabUnavailable = true
+                grabFailures++
+                if (grabFailures >= MAX_GRAB_FAILURES) {
+                    AppLogger.warn(TAG, "grab unavailable (start=$devs) after $grabFailures tries — detect-only")
+                    grabUnavailable = true
+                } else {
+                    AppLogger.warn(TAG, "grab start=$devs (try $grabFailures) — retrying shortly")
+                }
                 teardownBind()
             } else {
+                grabFailures = 0
                 // Seed the fresh service with the current gates; a rebind mid-call must not land ringing=false.
                 runCatching { svc.setScreenOn(screenOn) }
                 ringing = readRinging()
@@ -165,6 +188,10 @@ class ShizukuKeyEventListener {
             service = null
             bound = false
             bindInFlight = false
+            // A deliberate kill earns a fresh allowance: the previous failures were about the old
+            // process, not this one.
+            grabFailures = 0
+            grabUnavailable = false
             // Snappy restart: when the grabber dies while still enabled (e.g. 設定's kill on 71), rebind
             // immediately rather than waiting for the next poll — so 71 brings the grabber back at once.
             val s = appScope
@@ -260,7 +287,9 @@ class ShizukuKeyEventListener {
                 }
                 else -> {
                     if (!bound && !bindInFlight) bindGrabber()
-                    delay(BOUND_IDLE_MS)
+                    // A short wait while retrying a lost grab, so the rebind lands once the dying
+                    // process has actually released the device rather than a poll interval later.
+                    delay(if (grabFailures > 0) GRAB_RETRY_MS else BOUND_IDLE_MS)
                 }
             }
         }
@@ -450,17 +479,28 @@ class ShizukuKeyEventListener {
 
         // Volume keys only (114 vol-down, 115 vol-up). Power is intentionally NOT grabbed: an injected
         // POWER won't toggle the screen on this Huawei, so consuming it would deaden the power button.
+        /** How many failed grabs before falling back — enough to outlast a dying process's grab. */
+        private const val MAX_GRAB_FAILURES = 5
+
+        /** Gap between those attempts. */
+        private const val GRAB_RETRY_MS = 400L
+
         private val WATCHED_CODES = intArrayOf(114, 115)
 
         // The codes the native side can re-inject (android_keycode in evgrab.c maps exactly these). Only
         // these are dropped by the ringing gate — a key we cannot hand back must never be silently eaten.
         private val REINJECTED_CODES = setOf(114, 115)
 
-        // Multi-tap keys. Both volume keys get double (vol-down→camera, vol-up→media play/pause); vol-down
-        // also gets triple (speak time). A single short on a multi-tap key waits PKEY_DOUBLEMS before firing
-        // (to disambiguate); a tap fires immediately once the key's max count is reached.
+        // Multi-tap keys. Both volume keys now get double AND triple — double opens the camera on
+        // either key, triple opens video on either — so the two keys are symmetric and 白い熊 does
+        // not have to remember which one does what in the dark.
+        //
+        // A single short on a multi-tap key waits PKEY_DOUBLEMS before firing, to disambiguate; a tap
+        // fires immediately once the key's max count is reached. Giving vol-up triple therefore makes
+        // a single vol-up wait as long as a single vol-down already does — the cost of the symmetry,
+        // paid on both keys instead of one.
         private val DOUBLE_CODES = intArrayOf(114, 115)
-        private val TRIPLE_CODES = intArrayOf(114)
+        private val TRIPLE_CODES = intArrayOf(114, 115)
 
         // evdev code → (our key name, Android keycode), for the grabber callback.
         private val EVCODE_MAP = mapOf(
