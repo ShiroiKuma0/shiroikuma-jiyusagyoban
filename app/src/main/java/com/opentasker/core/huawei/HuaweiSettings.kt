@@ -26,6 +26,7 @@ object HuaweiSettings {
     private const val KEY_DEVICE_SUPPORT_TYPE = "device_support_type"
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
     private const val KEY_CHIZU_TOKEN = "chizu_token"
+    private const val KEY_LAST_FILE_PULL = "last_file_pull_ms"
     private const val KEY_LOOKBACK_HOURS = "lookback_hours"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
@@ -152,6 +153,19 @@ object HuaweiSettings {
      * floor exists at all; the short version is that without one a hole never heals.
      */
     /** 白い熊 地図's automation token, for handing it a walk. Blank until 白い熊 pastes it. */
+    /**
+     * When the `0x2C` file channel was last used, or 0.
+     *
+     * The channel degrades under repeated use: measured 2026-08-24, the same file gave 25, 25, 50,
+     * 54 and 54 blocks across a morning and then **8** on a pull a few minutes after two large ones.
+     * Nothing here can make the band serve more, so the only lever is not asking too often — and the
+     * only way to not ask too often is to remember when we last asked.
+     */
+    fun lastFilePull(context: Context): Long = prefs(context).getLong(KEY_LAST_FILE_PULL, 0L)
+
+    fun markFilePull(context: Context, atMs: Long = System.currentTimeMillis()) =
+        prefs(context).edit { putLong(KEY_LAST_FILE_PULL, atMs) }
+
     fun chizuToken(context: Context): String? =
         prefs(context).getString(KEY_CHIZU_TOKEN, null)?.ifEmpty { null }
 
