@@ -2,12 +2,10 @@
 
 **Between:** `shiroikuma.jiyusagyoban` (白い熊 自由作業盤) and `shiroikuma.chizu` (白い熊 地図).
 **Agreed:** 2026-08-23, between the two repos' chats, with 白い熊 directing.
-**Status:** both halves are built. 自由作業盤's is shipped and installed; 地図's landed in
-`5.4.0+022`; `+023` added the `track_id` canonicalisation and `+024` the `OPEN_TRACK` Activity and
-the pending map target — **`+024` is the one to install**, and it waits at `/sdcard/tmp/` for 白い熊.
-Nothing has made a real round trip yet — the automation switch and the token live in 地図's own
-settings, so the first genuine `IMPORT_TRACK` is 白い熊's to trigger. Until then Send to 地図 answers
-「地図 did not answer」, which is correct for a receiver that is not yet listening.
+**Status:** **working, both halves.** 自由作業盤 ships the walks window, the import and the button;
+地図 `5.4.0+025` ships the receiver, the renderer and the `OPEN_TRACK` Activity. A real walk has made
+the full round trip — imported, rendered over real streets, and opened centred in 地図 — verified on
+the phone by 白い熊.
 
 ## Why this exists
 
