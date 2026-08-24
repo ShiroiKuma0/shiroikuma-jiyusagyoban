@@ -431,9 +431,10 @@ object HuaweiSyncRunner {
      *
      * Deliberately a DUMP rather than a decoder. `sequence_data` is a container and we do not yet
      * know which of its stream ids holds sleep — Huawei Health was seen asking for three — and
-     * `rrisqi_data.bin` has never once returned data to us, because the band had only just been
-     * told to record RR intervals. Guessing a layout from that would produce a decoder that cannot
-     * be checked against anything. Bytes on disk can be.
+     * `rrisqi_data.bin` is intermittent: it returned 312 B on 2026-08-22 and answered
+     * `nothing (100004)` when asked for the same span on 2026-08-24. Guessing a layout from a file
+     * that may not come back would produce a decoder that cannot be checked against anything.
+     * Bytes on disk can be.
      *
      * Each id is tried in turn and the ones holding nothing are reported as such, which is the
      * actual question being asked here: which id is sleep?

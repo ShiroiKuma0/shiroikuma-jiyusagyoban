@@ -87,6 +87,10 @@ private fun walk(
         distanceMetres = metres + 12.0,
         durationSeconds = minutes * 60L,
         movingSeconds = minutes * 55L,
+        // Deliberately 12 s off the band's figure — the real walk's chunk spans summed to 1779 s
+        // against the band's 1767 s, and a preview that agreed perfectly would hide the one thing
+        // this row exists to show.
+        activeSeconds = minutes * 60L + 12,
         climbMetres = 18.0,
         descentMetres = 21.0,
         // walk 8 is 白い熊's real Prague walk, and Prague is in no region 地図 currently holds —

@@ -131,6 +131,8 @@ object HuaweiText {
     val walksActive = Loc("active", "実動")
     /** First fix to last, stops included. */
     val walksSpan = Loc("span", "通し")
+    /** 地図's active time — the figure that stands directly against the band's own. */
+    val walksAgainstBand = Loc("vs the band", "バンド比")
     val walksNoRegion = Loc(
         "This is the route on a blank ground: 地図 has no offline map covering this walk, so there " +
             "was nothing to draw underneath. Download the region in 地図, then press Draw the map " +
