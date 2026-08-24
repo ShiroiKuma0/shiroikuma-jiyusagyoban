@@ -73,9 +73,36 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         val action = intent.action
         val path = intent.getStringExtra(EXTRA_PATH)?.trim().orEmpty()
 
-        // Room DAOs are suspend-only — go async and answer from IO (well under the broadcast timeout).
+        // Room DAOs are suspend-only — go async and answer from IO.
+        //
+        // **`goAsync()` is not a licence to take as long as the work takes.** A background broadcast
+        // must be finished within 60 s or the system raises an ANR against the app — and it names
+        // the broadcast, not the work, so it reads as the receiver being broken rather than the job
+        // being slow. Pulling files off the band does exceed 60 s (2026-08-24: two ANRs, each
+        // exactly one minute after a `バンド書類（Huawei）` run), and nothing in the old code bounded
+        // it.
+        //
+        // So the reply is bounded and the work is not. Almost every command here answers in
+        // milliseconds and keeps its synchronous result; one that outruns the budget releases the
+        // broadcast with "still running" and carries on in the background, where it can take as long
+        // as the band needs. [finished] makes sure exactly one of the two paths answers.
         val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun finish() { if (finished.compareAndSet(false, true)) pending.finish() }
+
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        scope.launch {
+            kotlinx.coroutines.delay(BROADCAST_BUDGET_MS)
+            if (!finished.get()) {
+                pending.setResultCode(Activity.RESULT_OK)
+                pending.setResultData(
+                    "still running after ${BROADCAST_BUDGET_MS / 1000}s — released the broadcast; " +
+                        "the work continues and its own result is written where it normally goes",
+                )
+                finish()
+            }
+        }
+        scope.launch {
             try {
                 val repository = OpenTaskerBundleRepository(OpenTaskerApp_NoHilt.db)
                 when (action) {
@@ -225,7 +252,9 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                 pending.setResultData(message)
                 pending.setResultExtras(Bundle().apply { putString(EXTRA_ERROR, message) })
             } finally {
-                pending.finish()
+                // A no-op when the watchdog already answered — the work still ran to completion, it
+                // simply has no caller left to tell.
+                finish()
             }
         }
     }
@@ -302,6 +331,12 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         const val ACTION_EXPORT_WORKSPACE = "shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE"
         const val ACTION_IMPORT_BUNDLE = "shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE"
         const val ACTION_DELETE_ITEMS = "shiroikuma.jiyusagyoban.action.DELETE_ITEMS"
+        /**
+         * How long the broadcast may be held open. Comfortably under Android's 60 s ceiling for a
+         * background broadcast, with room for the reply itself to be delivered.
+         */
+        private const val BROADCAST_BUDGET_MS = 45_000L
+
         const val ACTION_RUN_TASK = "shiroikuma.jiyusagyoban.action.RUN_TASK"
         const val ACTION_SET_STARTUP_TASKS = "shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS"
 

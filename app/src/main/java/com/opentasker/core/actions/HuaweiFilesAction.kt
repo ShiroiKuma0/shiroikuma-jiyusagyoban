@@ -60,7 +60,13 @@ class HuaweiFilesAction : Action {
             onSuccess = { rows ->
                 val text = rows.joinToString("\n") { r ->
                     val who = if (r.id == null) r.name else "${r.name} ${r.id}"
-                    if (r.bytes > 0) "$who — ${r.bytes} B → ${r.path}" else "$who — ${r.note}"
+                    // A partial file must never read like a whole one. Before this, an incomplete
+                    // transfer and a complete one differed only by the word "partial" buried in the
+                    // FILENAME — the summary line said "421634 B → …" either way, which is exactly
+                    // the shape of report that gets skimmed and believed.
+                    if (r.bytes > 0 && r.note == "ok") "$who — ${r.bytes} B → ${r.path}"
+                    else if (r.bytes > 0) "$who — ${r.note} → ${r.path}"
+                    else "$who — ${r.note}"
                 }
                 ctx.variables.set("${prefix}Files", rows.count { it.bytes > 0 }.toString())
                 ctx.variables.set("${prefix}Summary", text)
