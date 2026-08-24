@@ -1675,6 +1675,7 @@ fun registerActionMetadata() {
                 ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
                 ActionField("action", "Intent action", hint = "MAIN, VIEW, etc."),
                 ActionField("category", "Intent category", hint = "Optional"),
+                ActionField("flags", "Intent flags", hint = "comma-separated: ACTIVITY_NEW_TASK, ACTIVITY_CLEAR_TASK, ACTIVITY_CLEAR_TOP, ACTIVITY_SINGLE_TOP. CLEAR_TASK forces a fresh start — that is what makes an app already running honour the action rather than just coming forward"),
             )
         )
     )

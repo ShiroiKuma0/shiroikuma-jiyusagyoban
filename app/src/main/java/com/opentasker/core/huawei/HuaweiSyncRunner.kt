@@ -463,6 +463,16 @@ object HuaweiSyncRunner {
                             runCatching { f.parentFile?.mkdirs(); f.writeBytes(r.bytes) }
                             FileOutcome(name, id, r.bytes.size, f.absolutePath, "ok")
                         }
+                        // Written, and named so it can never be mistaken for a whole file. What
+                        // arrived is real data and throwing it away was the worse error: for a
+                        // container of dated records the part that came back is readable on its
+                        // own, and it is the only evidence that says whether the declared size is
+                        // honest in the first place.
+                        is HuaweiFileClient.Result.Partial -> {
+                            val f = java.io.File(outDir, "huawei-${label}_$stamp.partial.bin")
+                            runCatching { f.parentFile?.mkdirs(); f.writeBytes(r.bytes) }
+                            FileOutcome(name, id, r.bytes.size, f.absolutePath, "partial — ${r.summary}")
+                        }
                     }
                 },
                 // One id failing must not cost the others: the whole point is to learn which ones

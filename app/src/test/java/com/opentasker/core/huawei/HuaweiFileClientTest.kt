@@ -141,15 +141,27 @@ class HuaweiFileClientTest {
         assertArrayEquals(band.content, data.bytes)
     }
 
-    @Test(expected = HuaweiFileIncompleteException::class)
-    fun `a short transfer throws rather than returning half a file`() {
-        runBlocking {
-            val band = FileBand(size = 4000, chunk = 500, dropFrom = 1500)
-            HuaweiFileClient(HuaweiSession(band)).fetch(
-                HuaweiFileClient.SEQUENCE_DATA, HuaweiFileClient.SEQUENCE_TYPE, 0, 1,
-                id = 1, timeoutMs = 300,
-            )
-        }
+    /**
+     * The bytes that arrived are kept and handed back. Throwing them away was the older behaviour
+     * and it cost a real 390 KB of `sequence_data` — assembled, then dropped because the transfer
+     * was not whole.
+     */
+    @Test
+    fun `a short transfer comes back as Partial, with the bytes that did arrive`() = runBlocking {
+        val band = FileBand(size = 4000, chunk = 500, dropFrom = 1500)
+        val r = HuaweiFileClient(HuaweiSession(band)).fetch(
+            HuaweiFileClient.SEQUENCE_DATA, HuaweiFileClient.SEQUENCE_TYPE, 0, 1,
+            id = 1, timeoutMs = 300,
+        )
+        val partial = r as HuaweiFileClient.Result.Partial
+        assertEquals(4000, partial.declared)
+        assertEquals(1500, partial.received)
+        assertEquals(2500, partial.missing)
+        // The prefix that did arrive must match the band's own bytes exactly — a partial file that
+        // is subtly wrong is worse than none, because it will be decoded.
+        assertArrayEquals(band.content.copyOf(1500), partial.bytes.copyOf(1500))
+        // And it must not be mistaken for a whole file by a caller that only checks for Data.
+        assertTrue(r !is HuaweiFileClient.Result.Data)
     }
 
     @Test
