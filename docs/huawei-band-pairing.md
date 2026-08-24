@@ -711,6 +711,38 @@ The reply is now bounded and the work is not: at 45 s the receiver releases the 
 needs. Every fast command — which is almost all of them, at tens of milliseconds — keeps its
 synchronous result. Verified: the same pull that produced two ANRs produces none.
 
+### Why the file is empty, and the one lead worth following
+
+`rrisqi_data.bin` has answered `nothing (100004)` on **four** attempts across two days, including one
+on a channel rested 28 minutes that returned `sequence_data`'s best-ever 60 blocks. So it is not
+fatigue and not the transfer: the band has no RR data to give.
+
+It had some on 2026-08-22 — 312 B, nine windows — and the note written then says that capture
+happened right after the band was told to record RR intervals. **Nothing in this app ever tells it
+that.** `SVC_RRI` (0x19) is referenced only by the probe.
+
+The probe's own sweep is the lead. Asked today, service 0x19 answers:
+
+```
+0x19/0x01  empty       100013          ← rejected
+0x19/0x01  tlv(1)      100000 (OK)
+0x19/0x01  tlv(1,=1)   100000 (OK)     ← shaped exactly like "enable = 1"
+0x19/0x02  …           same pattern
+```
+
+An empty payload is refused and a tag-1 payload is accepted, on both commands. That is the shape of
+a switch, and `tlv(1, 0x01)` is the obvious candidate for turning per-beat recording on.
+
+**Running the probe therefore probably just enabled it** — which is precisely why `huawei.probe`'s
+sweep field warns that it may set something on the band. The test is time, not code: leave the band
+worn for some hours and pull again. Data means the switch is real and belongs in
+`バンド計測設定（Huawei）` as a deliberate setting rather than a side effect of a diagnostic; still
+nothing means the command is a query and the lead is dead.
+
+**Until the file returns, the seven unnamed fields cannot be advanced at all** — not by more windows
+and not by ground truth, because both need the file. That is a change from "we lack a number the band
+displays": the blocker is now upstream of that, and it is the tractable one.
+
 **Pinning them needs the values the band itself displays for those same windows**, and that is
 currently blocked from both ends. There is no Huawei Health here any more, and **the band no longer
 returns the file at all**: asked on 2026-08-24 for the last three days it answered
