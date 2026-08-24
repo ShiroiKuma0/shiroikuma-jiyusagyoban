@@ -29,6 +29,7 @@ import com.opentasker.core.huawei.HuaweiSyncRunner
  * the others.
  */
 class HuaweiFilesAction : Action {
+
     override val id = "huawei.files"
     override val category = ActionCategory.SYSTEM
 
@@ -40,6 +41,28 @@ class HuaweiFilesAction : Action {
         val days = args["days"]?.trim()?.toIntOrNull()?.coerceIn(1, 30) ?: 3
         val ids = (args["ids"]?.trim()?.ifEmpty { null } ?: DEFAULT_IDS)
             .split(',').mapNotNull { it.trim().toIntOrNull() }
+
+        // Refuse a pull that lands too soon after the last one, and say when it may run.
+        //
+        // Not a rate limit for politeness: the band's file service visibly degrades under repeated
+        // use, and a pull inside the window returns a fraction of what a rested one does. Refusing
+        // is better than trying — a wasted attempt costs a Bluetooth session AND makes the next one
+        // worse, and a partial file that looks like a band fault is the expensive kind of wrong.
+        //
+        // `force` exists because a floor this soft must never be a wall: the window is a judgement
+        // from ONE morning's evidence, not a measurement, and 白い熊 can always overrule it.
+        val minGapMin = args["min_gap_min"]?.trim()?.toIntOrNull()?.coerceIn(0, 24 * 60) ?: DEFAULT_MIN_GAP_MIN
+        val forced = args["force"]?.trim()?.lowercase() in setOf("1", "true", "yes", "on")
+        val sinceMs = System.currentTimeMillis() - HuaweiSettings.lastFilePull(ctx.app)
+        val waitMin = minGapMin - (sinceMs / 60_000L)
+        if (!forced && minGapMin > 0 && HuaweiSettings.lastFilePull(ctx.app) > 0 && waitMin > 0) {
+            val text = "前回から ${sinceMs / 60_000L} 分。あと $waitMin 分待つこと。\n" +
+                "Last pull ${sinceMs / 60_000L} min ago — $waitMin min to go."
+            ctx.variables.set("${prefix}FilesResult", text)
+            store?.let { ctx.variables.set(it, text) }
+            ctx.logger("Huawei files: skipped, $waitMin min of the ${minGapMin}-min gap remain")
+            return ActionResult.Success
+        }
 
         val now = System.currentTimeMillis() / 1000
         val from = now - days * 86_400L
@@ -53,6 +76,10 @@ class HuaweiFilesAction : Action {
             add(Triple(HuaweiFileClient.RRI_DATA, HuaweiFileClient.RRI_TYPE, null))
         }
 
+        // Marked before the fetch, not after: an attempt that fails still used the channel, and it
+        // is the USE that degrades it. Marking on success would let a failing pull retry in a tight
+        // loop, which is precisely the thing that produced the 8-block result.
+        HuaweiSettings.markFilePull(ctx.app)
         val result = HuaweiSyncRunner.fetchFiles(
             ctx.app, address, requests, from, now, outDir, stamp,
         )
@@ -84,6 +111,15 @@ class HuaweiFilesAction : Action {
     }
 
     companion object {
+        /**
+         * Minutes to leave between pulls unless a task says otherwise.
+         *
+         * 白い熊's call, and honestly a judgement rather than a measurement: the evidence is a single
+         * morning in which a pull minutes after two large ones returned 8 blocks where a rested one
+         * returned 54.
+         */
+        const val DEFAULT_MIN_GAP_MIN = 10
+
         /** The three ids Huawei Health was captured asking `sequence_data` for. */
         const val DEFAULT_IDS = "700004,700013,700021"
     }
