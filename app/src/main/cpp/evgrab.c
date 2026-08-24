@@ -19,7 +19,6 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -42,6 +41,22 @@
 // Gesture types reported to Java (must match the listener's mapping).
 #define TYPE_SHORT  0
 #define TYPE_LONG   1
+#define TYPE_LONG_REPEAT 4
+
+// How often a held key repeats once it has gone long.
+//
+// This is the ONLY safe place to pace a hold. The obvious alternatives both fail on this phone, and
+// both were tried: a `sleep` inside the injected shell burst, and a trace written from this loop.
+// Each added work near the grabber's own timing, and the tap classifier that lives here — the thing
+// that tells a short press from a double from a triple — started misreading, so the camera gesture
+// and the volume panel broke together. Slowing the report rate instead REMOVES work rather than
+// adding it.
+//
+// Exactly 8 repeats per hold reach a task, measured, cause still unidentified. So this constant sets
+// how long a hold LASTS (8 x REPEAT_MS) while %Pkey_CamZoomBurst sets how far it TRAVELS
+// (8 x burst steps). 320 ms spreads the same travel over about 2.6 s.
+#define REPEAT_MS 320L
+
 #define TYPE_DOUBLE 2
 #define TYPE_TRIPLE 3
 
@@ -82,6 +97,7 @@ static long now_ms(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
+
 
 static int android_keycode(int evcode) {
     switch (evcode) {
@@ -204,16 +220,23 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject 
     int  longf[MAX_CODE];     // long already fired this hold
     int  tapc[MAX_CODE];      // taps counted in the current run
     long pend_ms[MAX_CODE];   // time of the last tap, awaiting another or the window expiry; 0 = none
+    long rep_ms[MAX_CODE];    // when the last long-repeat fired; 0 = not repeating
     memset(down_ms, 0, sizeof(down_ms));
     memset(longf, 0, sizeof(longf));
     memset(tapc, 0, sizeof(tapc));
     memset(pend_ms, 0, sizeof(pend_ms));
+    memset(rep_ms, 0, sizeof(rep_ms));
 
     while (!g_stop) {
         long now = now_ms(), timeout = -1;
         for (int c = 0; c < MAX_CODE; c++) {
             if (down_ms[c] && !longf[c]) {                 // hold pending long
                 long rem = long_ms - (now - down_ms[c]);
+                if (rem < 0) rem = 0;
+                if (timeout < 0 || rem < timeout) timeout = rem;
+            }
+            if (down_ms[c] && longf[c]) {                  // repeating — wake for the next step
+                long rem = REPEAT_MS - (now - rep_ms[c]);
                 if (rem < 0) rem = 0;
                 if (timeout < 0 || rem < timeout) timeout = rem;
             }
@@ -255,6 +278,7 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject 
                         }
                         down_ms[ev.code] = 0;
                         longf[ev.code] = 0;
+                        rep_ms[ev.code] = 0;              // release ends any repeat run
                     }
                     // value==2 (autorepeat): swallow
                 }
@@ -267,7 +291,19 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeRun(JNIEnv *env, jobject 
                 longf[c] = 1;                                 // long → report, swallow; cancels any tap run
                 tapc[c] = 0;
                 pend_ms[c] = 0;
+                rep_ms[c] = now;
                 (*env)->CallVoidMethod(env, thiz, onKey, (jint)c, TYPE_LONG);
+            }
+            // Still held after the long fired: keep reporting, as a SEPARATE type.
+            //
+            // A long press used to be a single event, so "hold to zoom" gave exactly one step. It is
+            // now a first TYPE_LONG followed by TYPE_LONG_REPEAT every REPEAT_MS until release.
+            // Separate on purpose: everything already bound to `long` — lock the phone, start
+            // recording — must fire once and never again, and it does, because it never sees the
+            // repeats. Only a binding that asks for `long_repeat` gets them.
+            if (down_ms[c] && longf[c] && (now - rep_ms[c]) >= REPEAT_MS) {
+                rep_ms[c] = now;
+                (*env)->CallVoidMethod(env, thiz, onKey, (jint)c, TYPE_LONG_REPEAT);
             }
             if (pend_ms[c] && (now - pend_ms[c]) > dbl_ms) {  // no further tap → fire the run
                 int count = tapc[c];

@@ -28,6 +28,15 @@ object HardwareKeyContextEvents {
     const val PRESS_DOUBLE = "double"
     const val PRESS_TRIPLE = "triple"
 
+    /**
+     * A key still held after [PRESS_LONG] fired, repeating until release.
+     *
+     * Deliberately its own type rather than more `long` events: everything bound to `long` — locking
+     * the phone, starting a recording — must happen once, and would happen over and over if the
+     * repeats arrived under the same name. Only a binding that asks for `long_repeat` sees them.
+     */
+    const val PRESS_LONG_REPEAT = "long_repeat"
+
     private val keys = MutableSharedFlow<ContextEvent>(
         extraBufferCapacity = 32,
     )
