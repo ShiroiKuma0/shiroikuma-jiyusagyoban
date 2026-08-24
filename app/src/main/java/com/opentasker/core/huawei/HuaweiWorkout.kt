@@ -107,6 +107,11 @@ object HuaweiWorkout {
         return Summary(
             number = number,
             startSeconds = u(0x04)?.toLong(),
+            // Tag 0x05 is a real epoch the band sends, not a value derived here — but it is the
+            // band's own arithmetic: measured on walk 8 it is exactly `start + duration`, where
+            // duration is time-with-the-recorder-running. The GPS track for that same walk spans
+            // 2 h 08 m of wall clock across three recording chunks, so this "end" is not when the
+            // walk finished. Anything wanting the walk's real span must read the track, not this.
             endSeconds = u(0x05)?.toLong(),
             durationSeconds = u(0x12)?.toLong() ?: u(0x09)?.toLong(),
             distanceMetres = u(0x07),

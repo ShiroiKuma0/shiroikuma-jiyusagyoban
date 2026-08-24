@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,11 +92,16 @@ fun HuaweiFacesScreen(
     state: HuaweiFacesState,
     contentPadding: PaddingValues,
     /**
-     * Where a cell's picture comes from. Defaulted to the archive, and overridable so a screenshot
-     * preview can render real thumbnails — the phone is normally locked, so a render is the only way
-     * this layout gets looked at before it ships.
+     * Where a cell's picture comes from, for callers not reading a real archive — today the
+     * screenshot previews, which are the only way this layout gets looked at before it ships,
+     * since the phone is normally locked.
+     *
+     * Null means the ordinary path: read the ZIP off the main thread. **A supplied one is called
+     * synchronously**, and that is the point — the screenshot engine renders a single frame and
+     * never runs a `produceState`, so an asynchronous seam drew every cell as "no picture" and the
+     * previews silently stopped being evidence of anything.
      */
-    previewOf: (HuaweiFaceLibrary.Entry) -> ByteArray? = { HuaweiFaceLibrary.preview(it.zip) },
+    previewOf: ((HuaweiFaceLibrary.Entry) -> ByteArray?)? = null,
     onReadBand: () -> Unit = {},
     onRemove: (HuaweiFaceLibrary.Entry) -> Unit = {},
     /** Last so it stays the trailing lambda — installing is what this window is for. */
@@ -202,7 +208,7 @@ private fun FaceCell(
     showing: Boolean,
     bandBusy: Boolean,
     sent: Int,
-    previewOf: (HuaweiFaceLibrary.Entry) -> ByteArray?,
+    previewOf: ((HuaweiFaceLibrary.Entry) -> ByteArray?)?,
     onInstall: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -218,14 +224,17 @@ private fun FaceCell(
                 .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            val bmp by produceState<ImageBitmap?>(null, face.zip.absolutePath) {
-                value = withContext(Dispatchers.IO) {
-                    previewOf(face)?.let {
-                        BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
-                    }
+            fun decode(bytes: ByteArray?): ImageBitmap? =
+                bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }
+            val supplied = previewOf
+            val image = if (supplied != null) {
+                remember(face.zip.absolutePath) { decode(supplied(face)) }
+            } else {
+                val bmp by produceState<ImageBitmap?>(null, face.zip.absolutePath) {
+                    value = withContext(Dispatchers.IO) { decode(HuaweiFaceLibrary.preview(face.zip)) }
                 }
+                bmp
             }
-            val image = bmp
             if (image != null) {
                 Image(image, face.name, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)))
             } else {

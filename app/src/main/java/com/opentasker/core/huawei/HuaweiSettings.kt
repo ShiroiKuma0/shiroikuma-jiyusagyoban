@@ -25,6 +25,7 @@ object HuaweiSettings {
     private const val KEY_AUTH_VERSION = "auth_version"
     private const val KEY_DEVICE_SUPPORT_TYPE = "device_support_type"
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
+    private const val KEY_CHIZU_TOKEN = "chizu_token"
     private const val KEY_LOOKBACK_HOURS = "lookback_hours"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
@@ -150,6 +151,13 @@ object HuaweiSettings {
      * How far back every routine sync looks. See [HuaweiSyncArgs.DEFAULT_LOOKBACK_HOURS] for why a
      * floor exists at all; the short version is that without one a hole never heals.
      */
+    /** 白い熊 地図's automation token, for handing it a walk. Blank until 白い熊 pastes it. */
+    fun chizuToken(context: Context): String? =
+        prefs(context).getString(KEY_CHIZU_TOKEN, null)?.ifEmpty { null }
+
+    fun setChizuToken(context: Context, value: String) =
+        prefs(context).edit { putString(KEY_CHIZU_TOKEN, value) }
+
     fun lookbackHours(context: Context): Int =
         prefs(context).getInt(KEY_LOOKBACK_HOURS, HuaweiSyncArgs.DEFAULT_LOOKBACK_HOURS)
 

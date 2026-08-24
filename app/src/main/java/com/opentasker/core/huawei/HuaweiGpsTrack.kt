@@ -17,23 +17,22 @@ import kotlin.math.cos
  * carried it. That is not a quirk worth being clever about; it is simply a different format that
  * happens to arrive over the same wire, and mixing the two up produces coordinates in the ocean.
  *
- * ## Two things we do not know, stated rather than hidden
+ * ## Two questions the first real walk answered
  *
- * **The Earth radius is contested.** Turning metres back into degrees needs one, and the only public
- * source contradicts itself: it uses 6378245 (Krasovsky 1940) while recording that the value its own
- * reverse engineering produced was 6383807, with the author unsure which is right. They differ by
- * 0.087% — about 0.9 m per kilometre walked from the start point. So [EARTH_RADIUS_M] is a
- * calibration constant, not a fact, and [decode] takes it as a parameter so a real track can settle
- * it. A five-kilometre walk that closes a loop back to its start is the experiment.
+ * **The datum is WGS-84.** Huawei's firmware handles GCJ-02 as well — China's deliberately offset
+ * datum — and carries separate fields for both elsewhere in the protocol, so this was a real doubt.
+ * 白い熊's walk of 2026-08-23 settles it: the track's first fix sits about 20 m from the phone's own
+ * reading of the same place, which is ordinary GPS spread. A GCJ-02 track would have landed 100–700 m
+ * away, consistently and in one direction. No shift is applied, and none is needed.
  *
- * **The datum is unknown.** Huawei's firmware handles both WGS-84 and GCJ-02 — China's deliberately
- * offset datum — and carries separate fields for them elsewhere in the protocol. Which one a
- * recorded track is stored in is not documented anywhere. The check is unmistakable on the first
- * real walk: WGS-84 lands on the road, GCJ-02 lands 100–700 m off it, consistently and in one
- * direction. Until that walk exists, this decodes as WGS-84 and does not pretend to know.
+ * **The Earth radius barely matters.** The only public source contradicts itself — 6378245
+ * (Krasovsky 1940) against the 6383807 its own reverse engineering produced — so [EARTH_RADIUS_M]
+ * remains a parameter. But over that 2.3 km walk the two differ by **two metres**, far below the
+ * noise in the readings themselves. Choosing between them is not worth an argument at these
+ * distances; a very long route could separate them, a normal one cannot.
  *
- * Neither unknown is a reason to wait. Both are answered by one walk, and everything else about the
- * format is ordinary.
+ * The decoded path measured 2.34 km against the band's own summary figure of 2.27 km — a 3% spread,
+ * which is what a polyline length normally runs against a device's smoothed distance.
  */
 object HuaweiGpsTrack {
 
@@ -66,7 +65,15 @@ object HuaweiGpsTrack {
         val isEmpty: Boolean get() = points.isEmpty()
     }
 
-    private const val HEADER_SKIP = 32
+    /**
+     * Thirty-THREE, not the thirty-two every published description says.
+     *
+     * Settled against 白い熊's own first recorded walk, 2026-08-23: at 32 the payload does not
+     * divide by the record size (1763.07 records), and at 33 it divides exactly (1763). The
+     * arithmetic is the proof — a one-byte error does not fail, it shifts every field by a byte and
+     * yields a start time in 2043 and a starting position in the ocean.
+     */
+    private const val HEADER_SKIP = 33
     private const val FLAGS = HEADER_SKIP
     private const val START_TIME = HEADER_SKIP + 1
     private const val START_LON = HEADER_SKIP + 5
