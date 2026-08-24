@@ -8,6 +8,104 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.87+2026-08-20.05-47.g4fc906f7+083 — 2026-08-24
+
+Built on upstream OpenTasker `0.2.87` (`4fc906f7`) — the same base as `+002`; everything below is
+the fork's own.
+
+**A HUAWEI Band 11 Pro, with no Huawei account and no Huawei software.** The whole conversation is
+reimplemented from a capture of Huawei Health talking to the band: Bluetooth **Classic RFCOMM on
+channel 16** (not BLE — the service is invisible to a normal scan and only `sdptool records` shows
+it), Huawei's `0x5A` framing with CRC16-XMODEM, the **HiChain3 bind/auth handshake**, and an AES-GCM
+session over it. A factory-reset band reaches a working watch face in ~15 s with the phone as its
+only companion. Pairing is a real BR/EDR passkey confirmed on both sides; changing companion needs
+only the band's own Settings → Disconnect, not a factory reset.
+
+**「健康（Huawei）」 — its own report**, brought in line with the Hume one: the morning rating in a
+thick-bordered yellow pill at the very top with the register folded into it as a clickable
+blue-bordered pill, then 「毎晩と運動」, 回復, 健康指数, and steps → sleep → the rest. Steps blue, heart
+rate red, blood oxygen orange-red. Every detail page scrolls and pinch-zooms across the **whole**
+archive — including the Hume era before this band existed, drawn as history rather than pooled with
+it, thinned by keeping the first reading per window and never averaging.
+
+**「バンド比較」 — the two bands side by side, never merged.** Band 11 solid on the upper track, Hume
+hollow below, one shared time axis and one shared scale, with a rail carrying the signed difference
+and a coverage tri-state. Device is encoded four ways — track position, mark fill, row label, rail
+tick direction — and none is colour, so it survives greyscale and red-green colour blindness.
+Bland–Altman is refused by name: its x-axis is the mean of the two devices, the one number that must
+not exist here. Only-one-band-has-this-minute is a first-class cell with its own footer count, and
+the invariant `both + humeOnly == humeSamples` is pinned by a test — the reader's proof that nothing
+was pooled.
+
+**Watch faces: 45 captured, installable, removable.** Faces cannot be built — the band refuses any
+whose announcement is not signed by Huawei — so they are lifted from Health's own downloads, verified
+against the digest the phone sent the band, and archived one ZIP per face with its preview. A grid
+installs any of them and reads back what the band holds. `0x27/0x03` tag 3 is **01 = install,
+02 = DELETE**, and there is no activate command: the version that "activated" a face was deleting the
+one it had just sent, proven across 33 captured installs.
+
+**Walks, with their GPS tracks, handed to 白い熊 地図.** The track format is decoded from the band's
+own file — the header is **33 bytes, not the 32 every published description gives** — and a walk is
+kept as its own folder with the raw `.bin`, the route as GPX, the summary, and the pictures 地図
+draws. 「運動（Huawei）」 is a grid of walks; one tap opens the large map, and 地図 renders it offscreen
+from its offline maps and hands back two PNGs we copy and keep, so the grid still draws when 地図 is
+frozen. Opening a walk in 地図 is an Activity rather than a broadcast, because a receiver with no
+visible window may not start one.
+
+**Weather on the band's face, fetched by 白い熊 天気** — so no second app ever sees the location. A
+provider picker lists what 天気 holds for the place and stores the choice; the band is pushed
+temperature, high, low and humidity, since it never fetches anything itself and displays whatever it
+was last given.
+
+**The band's language is pushed, not chosen.** It has no language menu at all; the companion sends
+`0x0C/0x01` with a BCP-47 tag and a units flag, which is why a trip to another phone silently turned
+it English. Two hand-flip tasks set Japanese and English, and nothing sets it automatically.
+
+**物理鍵 — the camera on either volume key, and hold-to-zoom.** Double-press opens the camera on
+*either* key, triple-press opens video on either, and while the camera is in front a single press
+shoots while a hold zooms. Only vol-down had triple-press before, so a triple binding on vol-up could
+never have fired however correct it looked. A long press was a single event by construction, so
+hold-to-zoom moved exactly one step; it now repeats until release as a **separate** event type, so
+everything bound to `long` — locking the phone, starting a recording — still happens exactly once.
+
+**A grabber that comes back.** 設定 `[01]` kills the key grabber so a restart picks up new settings,
+and the rebind raced the dying process, which had not released its `EVIOCGRAB`. One such failure
+latched the app into the `getevent` detect-only fallback **for the life of the service** — a fallback
+that publishes only short and long and consumes nothing, so double, triple and the volume panel all
+died together while a long press kept working. It now retries, and a deliberate kill clears the
+count.
+
+**Four reasons the Huawei charts looked empty, all ours.** The sync pointer never looked back;
+absent step records mean zero rather than missing; resting heart rate is the band's own null until it
+has computed one; and the sleep parser read only the first night in an append-only file. Fixed, with
+a 26-hour lookback floor.
+
+**The band's own time fields, corrected.** Workout "end" (tag `0x05`) is `start + ACTIVE duration`,
+not when the walk ended — a real walk spanned 2 h 08 m of wall clock across three recording chunks
+while the band reported 29 minutes. Durations are now labelled `active` and `span` so the two devices
+stop looking as if they disagree. And the band does **not** under-report distance: three
+implementations agreeing on 2340 m were one method implemented three times, and a dense polyline over
+noisy fixes over-measures by construction.
+
+**The file channel, left alone between pulls.** `0x2C` degrades under repeated use — the same file
+returned 54, 54, **8**, 58 and 60 blocks across one day, the 8 coming six minutes after two large
+pulls. A pull inside a ten-minute window is now refused with the time remaining rather than
+attempted, and the timestamp is written *before* the fetch, since it is the use that degrades it.
+Along the way the transfer itself was fixed: `FILE_NEGOTIATE`'s answer was being computed and
+discarded, `fileStart`'s `offset` had always been called with `0` so only the first 200-chunk window
+was ever fetched, and a short transfer threw its bytes away instead of returning them.
+
+**The adb bridge no longer ANRs.** `goAsync()` is not a licence to take as long as the work takes: a
+background broadcast must finish within 60 s or the system faults the app, and pulling files off the
+band exceeds that. The reply is now bounded and the work is not.
+
+**Left unnamed on purpose.** `rrisqi_data.bin` carries ten float fields per window; two are pinned —
+the valid-interval count, and the mean RR interval, which reproduces Health's heart rate at 2.15 bpm
+RMSE and is the only fit under 6 bpm across all 66 byte positions and both endiannesses. One more has
+a strong hypothesis. **The remaining seven are left unnamed**, with their ranges and six measured
+invariants recorded instead, because two of them happened to match a displayed value once and that is
+what coincidence looks like with seven candidates.
+
 ## 0.2.87+2026-08-20.05-47.g4fc906f7+002 — 2026-08-20
 
 Built on upstream OpenTasker `0.2.87` (`4fc906f7`).
