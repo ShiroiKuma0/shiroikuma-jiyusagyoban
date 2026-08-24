@@ -73,3 +73,5 @@ app/src/screenshotTest*/diff/
 # (never in ~/tmp — that's 白い熊's). Pushed to the device's /sdcard/tmp/ from here.
 .scratch/
 app/src/main/assets/ocr/
+__pycache__/
+app/src/test/resources/huawei/walk-real.bin

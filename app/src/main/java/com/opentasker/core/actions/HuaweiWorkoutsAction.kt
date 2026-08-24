@@ -31,7 +31,22 @@ class HuaweiWorkoutsAction : Action {
         val store = args["store"]?.trim()?.ifEmpty { null }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val days = args["days"]?.trim()?.toIntOrNull()?.coerceIn(1, 30) ?: 7
-        val outDir = args["out"]?.trim()?.ifEmpty { null } ?: "/sdcard/tmp"
+        val outDir = args["out"]?.trim()?.ifEmpty { null }
+            ?: com.opentasker.core.huawei.HuaweiWalkLibrary.DEFAULT_DIR
+
+        // The 地図 token is carried by the task and kept, because the window's Send button runs
+        // long after the action has finished and has no arguments of its own to read.
+        args["chizu_token"]?.trim()?.ifEmpty { null }
+            ?.let { com.opentasker.core.huawei.HuaweiSettings.setChizuToken(ctx.app, it) }
+
+        // A directory instead of a fetch opens the walks window. Same reasoning as the watch-face
+        // action's browse: it is the same job seen from the other end — 白い熊 looking at the walks
+        // rather than a task asking for them — and it does not deserve a second action id.
+        args["browse"]?.trim()?.ifEmpty { null }?.let { dir ->
+            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, dir, days)
+            ctx.variables.set("${prefix}Summary", "opened the walks")
+            return ActionResult.Success
+        }
 
         val now = System.currentTimeMillis() / 1000
         val from = now - days * 86_400L

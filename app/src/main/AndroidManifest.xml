@@ -235,6 +235,18 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- 「運動（Huawei）」 — the walks grid. Its own window and task affinity for the same reason
+             the watch-face picker has one: asking the band runs for tens of seconds over Bluetooth
+             and the grid has to still be there afterwards. -->
+        <activity
+            android:name="com.opentasker.ui.charts.huawei.HuaweiWalksActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".walks"
+            android:label="運動（Huawei）"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <activity
             android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
             android:exported="false"

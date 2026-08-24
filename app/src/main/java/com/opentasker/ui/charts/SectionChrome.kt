@@ -77,10 +77,16 @@ val sectionNote: Color
 fun SectionCard(
     accent: Color = sectionInk,
     onClick: (() -> Unit)? = null,
+    /**
+     * Extra layout for the card itself. Exists for grid cells: items in a `LazyVerticalGrid` row
+     * are only as tall as they ask to be, so without a `fillMaxHeight()` here a row of cards with
+     * different amounts of content comes out ragged. Every other caller leaves it alone.
+     */
+    modifier: Modifier = Modifier,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .border(1.5.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(18.dp))

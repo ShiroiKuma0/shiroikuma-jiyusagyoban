@@ -105,6 +105,60 @@ object HuaweiText {
     )
     val sleepFromHume = Loc("— the Hume band's night", "— Hume の夜")
 
+    // 「運動」 — the walks grid.
+    val walksTitle = Loc("Walks", "運動")
+    val walksAbout = Loc(
+        "Walks recorded by the band, with their GPS tracks. A walk is not part of the ordinary sync " +
+            "— it has to be asked for, so ask when you have recorded one.",
+        "バンドが記録した運動と、その GPS の軌跡。運動はふつうの同期には乗らない — " +
+            "取りに行く必要があるので、記録した日に押す。",
+    )
+    val walksDownload = Loc("Ask the band for new walks", "新しい運動を取りに行く")
+    val walksEmpty = Loc(
+        "No walks yet. Record one with the band's own Workout app — outdoors, and give it a minute " +
+            "to find satellites before you set off.",
+        "まだ何も無い。バンドの運動アプリで記録を — 屋外で、歩き出す前に一分ほど衛星を待つこと。",
+    )
+    val walksNoMap = Loc("no map yet", "地図はまだ")
+    val walksSend = Loc("Send to 地図", "地図へ送る")
+    val walksFixes = Loc("fixes", "点")
+    val walksNoneFound = Loc("The band had no new walks.", "バンドに新しい運動は無かった。")
+    val walksOpenIn = Loc("Open in 地図", "地図で開く")
+    val walksRedraw = Loc("Draw the map again", "地図を描き直す")
+    val walksChizuFigures = Loc("地図's own reading of the route", "地図が読んだ経路")
+    val walksMoving = Loc("moving", "移動")
+    /** The band's own figure, which is time-with-the-recorder-running, not wall clock. */
+    val walksActive = Loc("active", "実動")
+    /** First fix to last, stops included. */
+    val walksSpan = Loc("span", "通し")
+    val walksNoRegion = Loc(
+        "This is the route on a blank ground: 地図 has no offline map covering this walk, so there " +
+            "was nothing to draw underneath. Download the region in 地図, then press Draw the map " +
+            "again — the walk itself does not need re-sending.",
+        "経路だけで下地が無い。この散歩を覆う地図を 地図 が持っていないので、下に描くものが無かった。" +
+            "地図 でその地域を落としてから「地図を描き直す」を押せばよい。散歩そのものを送り直す必要はない。",
+    )
+    val walksNoMapLong = Loc(
+        "No map yet. 白い熊 地図 draws it: send the track over and it keeps it as one of its own " +
+            "tracks, then hands back a picture which is stored here.",
+        "地図はまだ無い。描くのは白い熊 地図 — 軌跡を送るとあちらの軌跡として保存され、" +
+            "絵が返ってきて、それをここに置く。",
+    )
+    val walksFilesTitle = Loc("Files", "書類")
+    val walksFilesNote = Loc(
+        "The route as GPX, and the raw bytes off the band beside it. The raw file is kept because a " +
+            "format understood slightly wrongly can only be corrected by re-reading it — which has " +
+            "already happened once.",
+        "GPX の軌跡と、バンドから来た生の書類。生のほうを残すのは、読み方が少し違っていたとき" +
+            "読み直せる唯一の道だから — 実際に一度そうなった。",
+    )
+    val walksSharedNote = Loc(
+        "The map comes from 白い熊 地図. It keeps the track; this keeps a copy of the picture, so the " +
+            "grid draws without asking another app anything.",
+        "地図は白い熊 地図が描いたもの。軌跡はあちらに、絵の写しはこちらに置く — " +
+            "一覧を出すのに毎回よそへ問い合わせなくて済むように。",
+    )
+
     val registerTitle = Loc("Every night and session", "あらゆる夜と運動")
     val registerSummary = Loc("%d nights on record · %d rated", "記録された夜 %d ／ 評価済み %d")
     /** Both numbers must come from ONE list of nights — see the note in HuaweiMorningCard. */
