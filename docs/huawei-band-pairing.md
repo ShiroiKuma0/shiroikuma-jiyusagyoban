@@ -636,9 +636,52 @@ Field 3 (+27) is the other 20 ms-quantised field and is always smaller than fiel
 likely the shortest interval in the window. **Health's HRV number is NOT any stored field** — of
 three overlapping entries, one (35 ms at 15:10) appears nowhere in its record at any offset or
 encoding, so Health derives it. Two fields each matched one of the other two, which is what
-coincidence looks like; nothing here is decoded on that basis. The four captured windows are ~56 s each (14:22, 14:40, 15:04, 15:10). The field
-meanings are NOT yet established and are not guessed here — pinning them needs the values the band
-itself displays for those same windows.
+coincidence looks like; nothing here is decoded on that basis.
+
+**The seven remaining fields are still unnamed, and the structure below is why they will stay that
+way until there is ground truth.** Nine unique windows exist across all three captures (2026-08-22,
+14:22 → 17:24, each 55–56 s). Everything here holds in all nine.
+
+| finding | evidence |
+|---|---|
+| **f7 is smaller than every other field, in every window** | range `0.41…1.52`, and the only field that is. A ratio or an index rather than a quantity |
+| **f2 < f1 always** | `3.3…12.6` against a count of `7…32` |
+| **f3 is 20 ms-quantised and f4, f5, f10 all sit below it** | so `f4, f5, f10 < f3 < f6`, and f3 shares f6's RR-domain grid |
+| **f2, f5, f8 and f9 all FALL as more beats are detected** | r = −0.80, −0.85, −0.68, −0.80 against the byte at record offset 13. The signature of dispersion measures over a noisy series: cleaner signal, less spread |
+| **byte 13 is ≥ the valid count in all nine windows, and never equal to it** | `16 36 53 42 51 41 53 29 51` against `14 16 32 19 9 9 12 7 20`. A candidate **detected**-interval counter, with valid/detected running 0.18…0.88 |
+| **no field is a function of any other** | an exhaustive search over `fi ≈ c·fj`, `c·fj·fk` and `c·fj/fk` at 8 % tolerance returns nothing. These are independent statistics, not derived columns |
+
+Ranges, for anyone matching against a displayed number: f2 `3.3…12.6`, f3 `220…520` (×20),
+f4 `1.3…71.4`, f5 `44.6…124.1`, f7 `0.41…1.52`, f8 `43.5…1442`, f9 `38.3…7008`, f10 `22.0…74.9`.
+
+### Open defect — the file channel drops most of a stream without erroring
+
+Asked on 2026-08-24 for the last three days, the `0x2C` transfer reported:
+
+```
+sequence_data 700004  — 500188 of 695389 bytes never arrived   (72 % lost)
+sequence_data 700013  — 2135 B, complete
+sequence_data 700021  —  66299 of  69228 bytes never arrived   (96 % lost)
+rrisqi_data.bin       — nothing (100004)
+```
+
+**The failure is silent in the worst way**: the transfer completes, the file is written, and only the
+byte count says most of it is missing. A decoder handed the 700013 result cannot tell it apart from a
+complete one, and a partial `700021` is exactly the kind of input that makes a fixed-stride guess
+look almost right — which is how its layout came to be described as "still open" in the first place.
+
+Not yet diagnosed. Candidates, in the order worth checking: a chunk-acknowledgement the band expects
+and does not get, so it stops sending; a receive window or timeout on our side that ends the transfer
+early and reports what arrived; and back-pressure from writing to `/sdcard` mid-stream. The complete
+stream being the smallest of the three (2135 B against 69 KB and 695 KB) points at size or duration
+rather than at the stream id.
+
+**Pinning them needs the values the band itself displays for those same windows**, and that is
+currently blocked from both ends. There is no Huawei Health here any more, and **the band no longer
+returns the file at all**: asked on 2026-08-24 for the last three days it answered
+`rrisqi_data.bin — nothing (100004)`, having returned 312 B on 2026-08-22. So the sample cannot be
+grown either. Nine windows, no ground truth, no derivable relations — the honest state is that the
+space is narrowed and the naming is not available.
 
 In `700013`/`700004` the record's timestamp pair is followed by a nested TLV container (tag `0x81`
 with a VarInt length) whose inner blocks carry ids in the `0x29B9xxxx` range. **`700021` is not

@@ -158,6 +158,7 @@ object HuaweiChizu {
                 distanceMetres = field("distance_m")?.toDoubleOrNull(),
                 durationSeconds = field("duration_s")?.toLongOrNull(),
                 movingSeconds = reply.extras["moving_time_s"]?.toLongOrNull(),
+                activeSeconds = reply.extras["active_time_s"]?.toLongOrNull(),
                 climbMetres = reply.extras["elevation_up"]?.toDoubleOrNull(),
                 descentMetres = reply.extras["elevation_down"]?.toDoubleOrNull(),
                 // `map` = real streets, `basemap` = only the bundled world map was underneath,

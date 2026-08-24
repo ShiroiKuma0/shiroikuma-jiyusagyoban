@@ -60,6 +60,13 @@ object HuaweiWalkLibrary {
         val distanceMetres: Double? = null,
         val durationSeconds: Long? = null,
         val movingSeconds: Long? = null,
+        /**
+         * Time with the recorder running, summed over the track's chunks — the **only** figure here
+         * directly comparable with the band's own duration, which measures the same thing. A
+         * disagreement between them is a finding; a disagreement between this and [durationSeconds]
+         * is not, because those measure different things.
+         */
+        val activeSeconds: Long? = null,
         val climbMetres: Double? = null,
         val descentMetres: Double? = null,
         /** `map`, `basemap` or `none` — how much real cartography was under the track. */
@@ -67,7 +74,7 @@ object HuaweiWalkLibrary {
     ) {
         val isEmpty: Boolean
             get() = distanceMetres == null && durationSeconds == null && movingSeconds == null &&
-                climbMetres == null && descentMetres == null && detail == null
+                activeSeconds == null && climbMetres == null && descentMetres == null && detail == null
     }
 
     /**
@@ -143,6 +150,7 @@ object HuaweiWalkLibrary {
                 distanceMetres = num("chizuDistanceMetres"),
                 durationSeconds = long("chizuDurationSeconds"),
                 movingSeconds = long("chizuMovingSeconds"),
+                activeSeconds = long("chizuActiveSeconds"),
                 climbMetres = num("chizuClimbMetres"),
                 descentMetres = num("chizuDescentMetres"),
                 detail = str("chizuMapDetail"),
@@ -230,6 +238,7 @@ object HuaweiWalkLibrary {
         c.distanceMetres?.let { put("chizuDistanceMetres", it) }
         c.durationSeconds?.let { put("chizuDurationSeconds", it) }
         c.movingSeconds?.let { put("chizuMovingSeconds", it) }
+        c.activeSeconds?.let { put("chizuActiveSeconds", it) }
         c.climbMetres?.let { put("chizuClimbMetres", it) }
         c.descentMetres?.let { put("chizuDescentMetres", it) }
         c.detail?.let { put("chizuMapDetail", it) }

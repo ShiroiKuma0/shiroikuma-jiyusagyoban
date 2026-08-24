@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import com.opentasker.core.huawei.HuaweiWalkLibrary
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
@@ -157,6 +158,23 @@ fun HuaweiWalkDetailScreen(
                         "↑%.0f m ↓%.0f m".format(Locale.US, up, down)
                     }
                     BodyText(listOfNotNull(km, span, moving, climb).joinToString(" · "))
+
+                    // 地図's active time is the ONE figure here that measures the same thing the
+                    // band's does, so it is the only one worth putting side by side. Shown with the
+                    // difference spelled out rather than left for the reader to subtract — a
+                    // disagreement here says one of the two is reading the walk wrongly, and that
+                    // is the whole reason this card exists.
+                    c.activeSeconds?.let { active ->
+                        val band = walk.durationSeconds
+                        val gap = band?.let { b ->
+                            val s = active - b
+                            " (${if (s >= 0) "+" else "−"}${abs(s)} s)"
+                        }.orEmpty()
+                        NoteText(
+                            "${HuaweiText.walksAgainstBand[lang]}: " +
+                                "${HuaweiText.walksActive[lang]} ${hhmm(active)}$gap",
+                        )
+                    }
                 }
             }
         }

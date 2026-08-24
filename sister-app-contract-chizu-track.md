@@ -74,7 +74,8 @@ is harmless because the pair wins. Every numeric extra is parsed from a string *
 
 **Answered by 地図** as named string extras: `track_id`, `name`, `stored_path`, `gpx_path`,
 `thumb_path`, `map_path`, `map_detail`, `zoom`, `distance_m`, `duration_s`, `moving_time_s`,
-`points`, `start_time`, `end_time`, `elevation_up`, `elevation_down`, `avg_speed`, `max_speed`.
+`points`, `start_time`, `end_time`, `elevation_up`, `elevation_down`, `avg_speed`, `max_speed`,
+`active_time_s`.
 Times are epoch milliseconds, distances metres, speeds m/s.
 
 **And packed into `result`**, in this order:
@@ -88,6 +89,58 @@ since been fixed and reads the named extras first, but a packed summary costs on
 a regression. **This order has already changed once**, which is why 自由作業盤's fallback splitter
 names its slots rather than indexing them by hand — a fallback that silently returns the wrong field
 is worse than no fallback at all.
+
+### `active_time_s` — the only figure comparable with the band's
+
+The walk with its gaps taken out: the deltas between consecutive points are summed, dropping any
+delta longer than the gap threshold (**60 s**) and never bridging a segment boundary.
+
+It exists because the band reports an **active** duration while `duration_s` is wall clock, and on a
+walk with long stops those differ by hours. `active_time_s` measures what the band measures, so it
+is the one number where a disagreement means something. 自由作業盤 shows it beside the band's own
+figure with the difference spelled out rather than left to be subtracted.
+
+**The threshold was measured, not chosen.** On the reference walk the deltas have a median of 1 s and
+exactly three exceed 10 s — 18 s, 1025 s and 4865 s. The sum is 1761 s for any threshold up to 15 s
+and **1779 s for every threshold from 20 s to 1024 s**: a plateau over a thousand seconds wide, with
+60 s sitting in the middle of it rather than near an edge. Both apps arrived at 1779 s independently,
+before either implementation saw the other's number.
+
+**The row is sensitive at the scale of one sample, and that is worth knowing.** The band's 1767 s
+falls *between* the two answers the data admits, and the single 18 s delta is the whole difference —
+so the `+12 s` 自由作業盤 displays would read `−6 s` under a stricter rule. That does not make the
+threshold arbitrary; the plateau is what justifies 60 s. It does mean the number is measuring
+something real and small, and should not be read as a precision claim.
+
+### What agreement between the two distances does and does not prove
+
+地図 measures 2344.5 m, 自由作業盤's decoder 2340 m, and 地図's own haversine over the stored copy
+2340 m. That was first read here as three measurements converging against the band's 2270 m, and
+therefore as the band under-reporting by 3 %. **That reading was wrong**, and it is worth keeping the
+correction rather than the tidy version.
+
+All three sum the **same raw 1 Hz polyline**. That is one method implemented three times — it
+validates the decoder, which is genuinely useful, and says nothing whatever about the distance. A
+dense polyline through noisy fixes systematically over-measures, because every fix's error is added
+to the path length. Thinning the same track shows it directly:
+
+```
+every  1 s  1763 pts   2340 m        every 10 s   177 pts   2134 m
+every  2 s   882 pts   2278 m        every 20 s    89 pts   2036 m
+every  3 s   588 pts   2255 m        every 30 s    59 pts   1998 m
+every  5 s   353 pts   2211 m        band                   2270 m
+```
+
+Monotonic, with no plateau — so no sampling rate is "the true length", and **the band's 2270 m lands
+on the 2 s figure**, exactly where a lightly smoothed estimate should. Nothing here indicts the band.
+
+**Dropped samples were ruled out separately**, since a lossy file channel could in principle shorten
+a track: 1758 of 1762 steps are exactly 1 s apart, and every longer gap is stationary — 18 s moving
+0.0 m, 1025 s moving 1.3 m, 4865 s moving 0.9 m. Only one 3 s gap covers 1.7 m where walking would
+give 3.9 m. The track is complete.
+
+**The band's GPX has no chunk structure.** It is one `<trkseg>` holding the whole span, so anyone
+summing segment spans gets 7669 s back, not 1779. The chunks exist only as the gaps.
 
 ### `map_detail` — the field that says whether the picture is worth keeping
 
