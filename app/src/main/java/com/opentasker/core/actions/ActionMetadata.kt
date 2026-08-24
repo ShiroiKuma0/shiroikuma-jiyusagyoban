@@ -1119,6 +1119,8 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("days", "How far back", FieldType.TEXT, hint = "days of history to ask for, 1–30. Default 3"),
                 ActionField("ids", "sequence_data stream ids", FieldType.TEXT, hint = "comma-separated. Default 700004,700013,700021 — the three Huawei Health was captured asking for"),
+                ActionField("min_gap_min", "Leave between pulls (minutes)", FieldType.NUMBER, hint = "default 10; 0 disables. The band's file channel degrades under repeated use — a pull six minutes after two large ones returned 8 blocks where a rested one returned 60 — so a pull inside the window is refused with the time remaining rather than attempted"),
+                ActionField("force", "Ignore the gap", FieldType.CHECKBOX, hint = "pull now regardless. The window is a judgement from one morning's evidence, not a measurement, so it must never be a wall"),
                 ActionField("out", "Write the files to", FieldType.TEXT, hint = "a directory. Default /sdcard/tmp"),
                 ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
                 ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Files and <prefix>Summary"),
