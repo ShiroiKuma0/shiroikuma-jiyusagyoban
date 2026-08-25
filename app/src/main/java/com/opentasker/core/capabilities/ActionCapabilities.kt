@@ -158,6 +158,7 @@ object ActionCapabilityRegistry {
         "net.speedtest" to ActionCapability(CapabilityLevel.Supported, "Measures download/upload throughput over a chosen transport (mobile or WiFi), time-boxed and byte-capped."),
         "audio.record.start" to ActionCapability(CapabilityLevel.RequiresSetup, "Records the microphone — needs the Microphone (RECORD_AUDIO) permission.", CapabilityRequirement.Microphone, blocking = true),
         "tasker.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported Tasker action could not be mapped to a supported 白い熊 自由作業盤 action."),
+        "macrodroid.unsupported" to ActionCapability(CapabilityLevel.Unsupported, "Imported MacroDroid action could not be mapped to a supported 白い熊 自由作業盤 action."),
     )
 
     /**

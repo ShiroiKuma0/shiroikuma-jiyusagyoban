@@ -3,17 +3,10 @@ package com.opentasker.ui
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * These are split contracts, not layout contracts. They assert that the app shell delegates its
- * heavy workflows and that no single screen file grows past the ceiling — never that a particular
- * composable lives in a particular filename, which turned every extraction into a false failure.
- */
 class ActiveAutomationModuleSplitTest {
     private val screensSourceRoot: Path = listOf(
         Path.of("src/main/java/com/opentasker/ui/screens"),
@@ -25,7 +18,11 @@ class ActiveAutomationModuleSplitTest {
     fun activeAutomationShellExposesSharedUiHelpersInternally() {
         // Asserted across the screens package: these helpers must exist and stay internal, but
         // pinning them to one filename turned extracting a shared component into a failure.
-        val screenSources = screenSources().values.joinToString(separator = System.lineSeparator())
+        val screenSources = Files.list(screensSourceRoot).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".kt") }
+                .toList()
+                .joinToString(separator = System.lineSeparator()) { it.readText() }
+        }
 
         listOf(
             "internal fun SummaryMetric",
@@ -39,14 +36,13 @@ class ActiveAutomationModuleSplitTest {
 
     @Test
     fun appShellKeepsPremiumCreateAndOnboardingActionsDiscoverable() {
-        val sources = screenSources()
+        val shellSource = screensSourceRoot.resolve("ActiveAutomationUi.kt").readText()
+        val listSource = screensSourceRoot.resolve("ActiveAutomationLists.kt").readText()
+        val editorSource = screensSourceRoot.resolve("EditorDialogs.kt").readText()
 
-        assertTrue(
-            "Create actions should stay labeled, not icon-only",
-            sources.getValue(soleOwnerOf("fun ActiveAutomationUi(")).contains("ExtendedFloatingActionButton"),
-        )
-        soleOwnerOf("R.string.action_browse_templates")
-        soleOwnerOf("widthIn(max = 420.dp)")
+        assertTrue("Create actions should stay labeled, not icon-only", shellSource.contains("ExtendedFloatingActionButton"))
+        assertTrue("First-run onboarding should recommend guided templates first", listSource.contains("R.string.action_browse_templates"))
+        assertTrue("Empty-state actions should not stretch awkwardly on large screens", editorSource.contains("widthIn(max = 420.dp)"))
     }
 
 // RETIRED: upstream's module-split layout for the automation shell (a 1,500-line ceiling on

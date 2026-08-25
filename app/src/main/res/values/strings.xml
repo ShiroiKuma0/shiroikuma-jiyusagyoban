@@ -1153,6 +1153,11 @@
     <string name="scene_element_type_text">Text</string>
     <string name="scene_element_type_slider">Slider</string>
     <string name="scene_element_type_image">Image</string>
+    <string name="scene_element_type_edit_text">Text field</string>
+    <string name="scene_element_type_checkbox">Checkbox</string>
+    <string name="scene_element_type_toggle">Toggle</string>
+    <string name="scene_element_type_number_picker">Number picker</string>
+    <string name="scene_element_type_spinner">Spinner</string>
     <string name="scene_element_type_map">Map</string>
     <string name="scene_element_type_web">Web content</string>
     <string name="scene_element_type_menu">Menu</string>

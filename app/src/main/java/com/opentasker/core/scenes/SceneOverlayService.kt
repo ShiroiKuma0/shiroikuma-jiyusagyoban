@@ -286,6 +286,9 @@ class SceneOverlayService : Service() {
                     unsupportedElementView(element)
                 }
             }
+            // Upstream 0.2.88 cut its enum to the four types it draws and dropped this branch with
+            // them. The fork keeps all eighteen, so the overlay still needs the catch-all.
+            else -> unsupportedElementView(element)
         }
     }
 

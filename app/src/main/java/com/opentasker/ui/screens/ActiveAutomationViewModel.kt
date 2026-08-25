@@ -53,6 +53,9 @@ import com.opentasker.core.transfer.ProjectConflictStrategy
 import com.opentasker.core.transfer.ProjectImportChoice
 import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerImportPreview
+import com.opentasker.core.transfer.MacroDroidImportPlanner
+import com.opentasker.core.transfer.MacroDroidImportReport
+import com.opentasker.core.transfer.MacroDroidImporter
 import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.widget.TaskShortcutHelper
@@ -79,7 +82,9 @@ import java.util.Date
 import java.util.Locale
 
 internal const val TASKER_MACRODROID_IMPORT_MAX_BYTES = 16 * 1024 * 1024
+internal const val TASKER_XML_IMPORT_MAX_BYTES = 4 * 1024 * 1024
 internal const val OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES = 8 * 1024 * 1024
+internal val TASKER_XML_MIME_TYPES = arrayOf("application/xml", "text/xml", "text/*", "*/*")
 internal val TASKER_MACRODROID_MIME_TYPES = arrayOf(
     "application/json",
     "text/json",
@@ -105,9 +110,36 @@ internal fun exportFileName(label: String): String {
 internal data class TaskerImportReviewState(
     val bundle: OpenTaskerBundle,
     val preview: TaskerImportPreview,
-    @StringRes val titleRes: Int,
+    // Upstream carries a @StringRes here; the fork's dialogs are written with plain strings.
+    val title: String,
     val mappedActionRows: List<String>,
     val unsupportedActionRows: List<String>,
+)
+
+/** The review state for a Tasker XML document, with its rows rendered for the shared dialog. */
+internal fun taskerImportReviewState(report: TaskerXmlImportReport) = TaskerImportReviewState(
+    bundle = TaskerImportPlanner.confirmedBundle(report),
+    preview = TaskerImportPlanner.preview(report),
+    title = "Review Tasker import",
+    mappedActionRows = report.mappedActions.map {
+        "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
+    },
+    unsupportedActionRows = report.unsupportedActions.map {
+        "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
+    },
+)
+
+/** The same, for a MacroDroid `.mdr` backup or `.macro` share (upstream 0.2.88). */
+internal fun macroDroidImportReviewState(report: MacroDroidImportReport) = TaskerImportReviewState(
+    bundle = MacroDroidImportPlanner.confirmedBundle(report),
+    preview = MacroDroidImportPlanner.preview(report),
+    title = "Review MacroDroid import",
+    mappedActionRows = report.mappedActions.map {
+        "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} -> ${it.openTaskerActionIds.joinToString()}"
+    },
+    unsupportedActionRows = report.unsupportedActions.map {
+        "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} (${it.reason})"
+    },
 )
 
 internal data class OpenTaskerBundleReviewState(
@@ -123,14 +155,6 @@ class ActiveAutomationViewModel(
     private val bundleRepository = OpenTaskerBundleRepository(db)
     private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val writeSettingsGuard = WriteSettingsGuard(db, appContext)
-    private val editHistoryTransitions = EditHistoryTransitions(
-        db,
-        appContext,
-        fallbackTaskSettings,
-        locationDwellStateStore,
-        writeSettingsGuard,
-        variableRepository,
-    )
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -656,8 +680,8 @@ class ActiveAutomationViewModel(
                 ) {
                     throw IllegalStateException("Review imported automation powers before enabling this profile.")
                 }
-                if (reviewedProfile.enabled && previous?.enabled != true) {
-                    writeSettingsGuard.requireWriteSettingsIfEnabled(reviewedProfile)
+                if (profile.enabled && previous?.enabled != true) {
+                    writeSettingsGuard.requireWriteSettingsIfEnabled(profile)
                 }
                 if (previousEntity != null) {
                     db.editHistoryDao().insert(
@@ -717,9 +741,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send("Tasker XML ready for review")
+                    events.send("${it.title.removePrefix("Review ").removeSuffix(" import")} import ready for review")
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import preview failed"}") }
+                .onFailure { events.send("Error: ${it.message ?: "Import preview failed"}") }
             _taskerImportBusy.value = false
         }
     }
@@ -922,7 +946,7 @@ class ActiveAutomationViewModel(
                     putExtra(Intent.EXTRA_TEXT, report)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                appContext.startActivity(Intent.createChooser(intent, appContext.getString(R.string.diagnostics_share_chooser)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
                 events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
             }
@@ -1118,6 +1142,19 @@ class ActiveAutomationViewModelFactory(
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
+}
+
+/**
+ * One picker serves both formats (upstream 0.2.88), so the read is bounded by the larger of the two
+ * caps and the caller decides what it got by looking at the first non-blank character.
+ */
+internal fun readBoundedTaskerOrMacroDroid(context: Context, uri: Uri): String {
+    return readBoundedDocumentText(
+        context = context,
+        uri = uri,
+        maxBytes = maxOf(TASKER_XML_IMPORT_MAX_BYTES, OPEN_TASKER_BUNDLE_IMPORT_MAX_BYTES),
+        label = "Tasker XML or MacroDroid backup",
+    )
 }
 
 internal fun readBoundedTaskerXml(context: Context, uri: Uri): String {
