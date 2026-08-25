@@ -289,12 +289,6 @@ class VariableExpander {
     /**
      * Tasker's wildcard match: `*` is the only special character, everything else is literal.
      * Used for imported "Matches"/"Doesn't Match" conditions (Tasker op codes 2/3), e.g.
-     * `%pa_do ~ view_url` or `%pa_json ~ *"say":*`. Regex metacharacters other than `*` are
-     * escaped so a pattern like `%pa_x1.example` matches a literal dot, not "any character".
-     */
-    /**
-     * Tasker's wildcard match: `*` is the only special character, everything else is literal.
-     * Used for imported "Matches"/"Doesn't Match" conditions (Tasker op codes 2/3), e.g.
      * `%pa_do ~ view_url` or `%pa_json ~ *"say":*`.
      *
      * Goes through [compileLinearRegex] (RE2, linear-time) with the same [MAX_REGEX_LENGTH] /

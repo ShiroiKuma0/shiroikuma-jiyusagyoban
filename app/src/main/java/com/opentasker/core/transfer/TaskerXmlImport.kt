@@ -598,7 +598,9 @@ object TaskerXmlImporter {
      * this fix) and reports that degradation via [ImportedCondition.warning]. Likewise, an `<op>`
      * code outside the known Tasker set (0-9, 12, 13) yields a null expression -- which for flow.if
      * specifically falls back to the old literal-"true" behavior -- but is now reported instead of
-     * silently reproduced.
+     * silently reproduced. Ops 4/5 are Tasker's "Matches Regex"/"Doesn't Match Regex" (verified
+     * against Map-Tasker's operator table); this evaluator has no regex condition operator, so
+     * they degrade to the plain wildcard match and that approximation is reported the same way.
      */
     private fun Element.parseImportedCondition(): ImportedCondition {
         val conditionList = directChildren("ConditionList").firstOrNull() ?: return ImportedCondition(null, null)
@@ -627,7 +629,17 @@ object TaskerXmlImporter {
                 "$lhs $token ${condition.childText("rhs")}"
             }
         }
-        return ImportedCondition(expression, multiConditionWarning)
+        val regexApproximationWarning = if (op == "4" || op == "5") {
+            "a regex \"Run only if\" comparison (op $op) was imported as a plain wildcard match"
+        } else {
+            null
+        }
+        return ImportedCondition(
+            expression,
+            listOfNotNull(multiConditionWarning, regexApproximationWarning)
+                .joinToString("; ")
+                .ifBlank { null },
+        )
     }
 
     private fun org.w3c.dom.NodeList.asElementList(): List<Element> =
@@ -678,8 +690,11 @@ object TaskerXmlImporter {
     // against 200, matching this project's own documented "Doesn't Match 200" HTTP-status check.
     // 3-9 don't appear in that corpus but are included for completeness. 8/9 are the "(Numeric)"
     // variants of =/!=; this evaluator has no numeric-aware equality distinct from string
-    // equality, so they map to the same tokens as 0/1. 12/13 (Is Set/Not Set) are unary and
-    // handled separately in parseImportedCondition, not through this map.
+    // equality, so they map to the same tokens as 0/1. 4/5 are the regex variants of 2/3
+    // ("Matches Regex"/"Doesn't Match Regex"); this evaluator has no regex condition operator,
+    // so they map to the wildcard tokens and parseImportedCondition reports the approximation
+    // as a lossy warning. 12/13 (Is Set/Not Set) are unary and handled separately in
+    // parseImportedCondition, not through this map.
     private val TASKER_CONDITION_OP_TOKENS = mapOf(
         "0" to "==",
         "1" to "!=",
