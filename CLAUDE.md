@@ -181,7 +181,9 @@ screenshot of the running app is possible.
   `custom` → `git push --force-with-lease origin custom`, `master` fast-forwards (this is the only one
   on github); (2) the workspace mirror at `~/〇/[666] 私資料/[666][60792] …` — a **local `git commit`
   only; it has NO github/remote and never will**. Build-only until 白い熊 says "Push."
-- **A Room schema bump must be replayed before it ships:** `python3 scripts/check-room-migration.py`.
+- **A Room schema bump must be replayed before it ships:** `python3 scripts/check-room-migration.py`
+  (`--all` replays EVERY exported version forward to the current one, which is the check that
+  actually covers an installed database — the default span only checks the newest hop).
   Room validates the live database against its exported JSON at OPEN time, so a mismatch as small as a
   missing `DEFAULT NULL` throws rather than opening — and only on a device holding the old database. A
   clean build, a fresh install and the full JVM suite can all pass while every existing install crashes

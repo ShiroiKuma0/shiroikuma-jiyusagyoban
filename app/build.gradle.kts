@@ -1538,6 +1538,12 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     // core:storage owns the entities now, so its KSP run is what exports the schema. It still
     // writes into app/schemas, which is where the androidTest migration assets are read from.
     dependsOn(":core:storage:kspDebugKotlin")
+    // Never declared by any build, only passed through: no commit in this repository -- across all
+    // 2173 of them, on every backup branch -- ever set OPEN_TASKER_DATABASE_SCHEMA_VERSION to one of
+    // these. They exist only as steps inside MIGRATION_17_18/18_19 and MIGRATION_22_23..26_27, which
+    // were written in the same commits as the bumps that jumped over them. Verified end to end by
+    // `python3 scripts/check-room-migration.py --all` (2026-08-25).
+    transitedVersions.set(setOf(18, 23, 24, 25, 26))
     schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
     databaseFile.set(rootProject.layout.projectDirectory.file(
         "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt",
