@@ -462,6 +462,36 @@ So nothing predicts what the band will part with. Send the delete, then re-read 
 what the band actually did. (One record carries `05` in tag 5 alongside `2a`/tag 7 = `02`; that pair
 is unexplained and does not track anything we drive.)
 
+### The band never speaks first on our session (2026-08-25)
+
+The satellite-assistance data expires every few hours and this app has never touched GNSS. The band
+has an **Update** button on that screen, so the plan was to press it and read the request — a band
+asking its companion for assistance data names the service and command that serve it, which is the
+one thing that cannot be looked up, because the only other implementation is AGPL and this fork takes
+no protocol constants from it.
+
+`huawei.probe listen_sec=N` listens without sending. What it found, with the link proven alive by a
+battery request every 30 s written into the same file:
+
+* **Update pressed, twice, in a 5-minute window** — nothing.
+* **Update pressed again in a fresh window** — nothing.
+* **The band taken off the wrist and put back on** — nothing, though `0x01/0x3D` WearStatus is
+  documented right here as a frame the band sends unprompted, from a session where it arrived 6 661
+  times in 90 seconds.
+
+So the band emits **no unsolicited frame at all** on a session of ours, including one it demonstrably
+does emit on Health's. The link is up — the keep-alive round-trips every time — and the band still
+does not speak first. That is a protocol-state difference, not a listening problem: our session
+authenticates and asks questions, and something Health does to make the band *volunteer* is missing.
+Whatever that is, the Health capture shows it.
+
+Two false negatives were produced getting here, and both were ours. The first listen buffered its
+report and wrote it only when the window closed, so killing it destroyed a capture that had already
+caught 白い熊 pressing Update twice — it appends live now. The second swallowed every poll failure
+into an empty list, so a link that had gone idle read exactly like a quiet band — it now proves the
+link on a timer and says so in the file. **"Nothing was heard" is only evidence when it appears next
+to proof that hearing worked.**
+
 ### The weather service has nine commands; we use two (2026-08-25)
 
 The push is acknowledged with a success code and the band's screen does not change — it keeps Huawei

@@ -1228,6 +1228,7 @@ fun registerActionMetadata() {
                 ActionField("out", "Write the report to", FieldType.TEXT, hint = "blank = /sdcard/tmp/huawei-probe_<millis>.txt. The path is also left in %HUAWEI_ProbeFile"),
                 ActionField("store", "Store the path in", FieldType.TEXT, hint = "a variable name to receive the report's path, or the reason it failed"),
                 ActionField("sweep", "Also probe unknown commands", FieldType.CHECKBOX, hint = "default off. Sends a count-shaped payload to fitness commands whose meaning is unknown — five of them ACCEPT it and return nothing, so this may set something on the band. Only turn it on deliberately"),
+                ActionField("listen_sec", "Listen for unprompted frames (seconds)", FieldType.NUMBER, hint = "blank = off. Sends nothing and records everything the band says on its own — the session already queues those frames and nothing has ever read them. A band wanting satellite assistance data asks its companion for it, and the request names the service that serves it. Entirely passive"),
                 ActionField("weather_sweep", "Also sweep the weather commands", FieldType.CHECKBOX, hint = "default off. Knocks on 0x0F/0x02..0x09 with EMPTY payloads — the band's census says it answers nine commands there and we use two. An empty payload is normally refused outright, which is the safest shape to probe with, but these are still unknown commands on the band. Only turn it on deliberately"),
             ),
         ),

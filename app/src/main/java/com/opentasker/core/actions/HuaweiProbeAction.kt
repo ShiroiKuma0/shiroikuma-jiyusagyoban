@@ -32,6 +32,7 @@ class HuaweiProbeAction : Action {
     private companion object {
         const val SWEEP_ARG = "sweep"
         const val WEATHER_SWEEP_ARG = "weather_sweep"
+        const val LISTEN_ARG = "listen_sec"
     }
 
     override val id = "huawei.probe"
@@ -362,6 +363,102 @@ class HuaweiProbeAction : Action {
                     }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
                     line("  0x0F/0x%02X  %s".format(cmd, r))
                 }
+            }
+            // Listen. Send nothing, ask nothing, write down everything the band says on its own.
+            //
+            // The session already queues unsolicited frames rather than dropping them, because the
+            // band asks the phone for things mid-session. Nothing has ever read that queue for its
+            // own sake, so what the band asks for has never been written down.
+            //
+            // The reason to do it now: the band is showing "Data expires in 6 h" for its satellite
+            // assistance data, and nothing in this app touches GNSS. A band that wants assistance
+            // data asks its companion for it, and the request names the service and command that
+            // serve it — which is exactly the thing that cannot be looked up, because the only other
+            // implementation is AGPL and this fork will not take protocol constants from it.
+            //
+            // Entirely passive, so unlike the sweeps this needs no permission to be careful with:
+            // the only risk is learning nothing.
+            val listenSec = args[LISTEN_ARG]?.trim()?.toIntOrNull()?.coerceIn(1, 3600)
+            if (listenSec != null) {
+                // Appended to its own file AS IT ARRIVES, never buffered.
+                //
+                // This is the whole lesson of 2026-08-25: the first listen did capture 白い熊
+                // pressing Update — twice — and the capture died with the process because the report
+                // was only written when the window closed. A capture that exists solely in memory is
+                // one interruption away from never having happened, and the cost is not ours: it was
+                // 白い熊 who had to go and find that dialog again.
+                //
+                // Writing every frame the instant it lands also removes the coordination entirely.
+                // There is no window to be inside any more: arm it, press whenever, read the file
+                // whenever. Nothing has to be timed against anything.
+                val liveFile = File(out.removeSuffix(".txt") + "-listen.txt")
+                fun heardLine(t: String) = runCatching { liveFile.appendText(t + "\n") }
+                runCatching {
+                    liveFile.writeText(
+                        "=== live listen, ${listenSec}s from " +
+                            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                                .format(java.util.Date()) + " ===\n" +
+                            "Press Update on the band's satellite screen whenever you like; every frame\n" +
+                            "is appended here the moment it arrives, so nothing is lost if this is cut short.\n",
+                    )
+                }
+                line("")
+                line("=== listening for $listenSec s — live at ${liveFile.path} ===")
+                var heard = 0
+                var failed = 0
+                var lastKeepAlive = 0L
+                val started = System.currentTimeMillis()
+                val until = started + listenSec * 1000L
+                while (System.currentTimeMillis() < until) {
+                    // Prove the instrument, every 30 s, and keep the link from going idle.
+                    //
+                    // A listener that cannot hear is indistinguishable from a band that is not
+                    // speaking, and this one swallowed every poll failure into an empty list — so
+                    // thirty minutes of a dead transport read exactly like thirty minutes of
+                    // silence. 白い熊 pressed Update against that, twice, for nothing. The link is
+                    // now asked a cheap question on a timer and the answer is written down, so
+                    // "nothing was heard" only ever appears next to evidence that hearing worked.
+                    if (System.currentTimeMillis() - lastKeepAlive > 30_000) {
+                        lastKeepAlive = System.currentTimeMillis()
+                        val alive = runCatching {
+                            session.request(
+                                HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_BATTERY,
+                                HuaweiProtocol.tlv(1), timeoutMs = 4_000,
+                            )
+                            "link alive"
+                        }.getOrElse { "LINK DEAD — ${it::class.java.simpleName}: ${it.message}" }
+                        val at = "  +%3ds  [%s]".format((System.currentTimeMillis() - started) / 1000, alive)
+                        heardLine(at)
+                        if (alive.startsWith("LINK")) {
+                            heardLine("  giving up: nothing can be heard over a dead link, and pretending")
+                            heardLine("  otherwise is what wasted 白い熊's time this morning.")
+                            line("  the link died during the listen — see ${liveFile.path}")
+                            break
+                        }
+                    }
+                    val frames = runCatching { session.poll(2_000) }
+                        .getOrElse {
+                            failed++
+                            heardLine("  +%3ds  poll failed: %s".format(
+                                (System.currentTimeMillis() - started) / 1000, it.message ?: it::class.java.simpleName))
+                            emptyList()
+                        }
+                    for (f in frames) {
+                        heard++
+                        val tlvs = runCatching { session.decrypt(f) }.getOrNull()
+                        val body = tlvs?.joinToString(",") {
+                            "0x%02X=%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(96))
+                        } ?: "(undecryptable) " + HuaweiCrypto.upperHex(f.payload).take(96)
+                        val at = "  +%3ds  0x%02X/0x%02X  %s".format(
+                            (System.currentTimeMillis() - started) / 1000, f.serviceId, f.commandId, body,
+                        )
+                        heardLine(at)
+                        line(at)
+                    }
+                }
+                heardLine(if (heard == 0) "  (nothing heard; $failed poll failure(s))" else "  $heard frame(s), $failed poll failure(s)")
+                if (heard == 0) line("  (silence — the band asked for nothing in $listenSec s)")
+                else line("  $heard frame(s)")
             }
             report.toString()
         }
