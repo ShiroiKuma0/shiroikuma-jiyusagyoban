@@ -19,9 +19,18 @@ package com.opentasker.core.huawei
  *    `60000 / meanRrMs` reproduces Health's heart rate across 8 overlapping points at RMSE 2.15 bpm,
  *    and it is the ONLY fit under 6 bpm across all 66 byte positions and both endiannesses.
  *
- * Field 3 is the other 20 ms-quantised value and is always smaller than field 6, so it is very
- * likely the shortest interval in the window — likely, not established, so it is carried in [raw]
- * under its number rather than given a name it might not deserve.
+ *  * **[rmssdMs] (field 5)** — RMSSD, the root mean square of successive differences, in
+ *    milliseconds. Established 2026-08-25 against the band's OWN per-beat series: `sequence_data`
+ *    700021 turned out to be (uint16 LE interval ms, uint16 LE quality) pairs, so RMSSD can be
+ *    computed here and compared. In 69 of 124 windows where both files provably describe the same
+ *    episode it agrees to within 1 %, at a ratio of 0.9927 — a scale of one, not an arbitrary
+ *    multiple. The other 55 are windows the two files do not share; no beat-selection rule changes
+ *    the split, and a shuffled null sits at 57 % median error.
+ *
+ * Field 3 is the other 20 ms-quantised value. It was read as the shortest interval in the window;
+ * the per-beat series says otherwise — the minimum matches it in 0 of 124 windows, while the RANGE
+ * (max − min), rounded to the 20 ms grid, matches exactly in 76 of 142. Carried in [raw] still,
+ * because half the windows is where the evidence stops.
  *
  * **Health's own HRV figure is NOT in this file.** Of three overlapping entries, one (35 ms) appears
  * nowhere in its record at any offset or encoding, so Health derives it from data it holds and we do
@@ -44,6 +53,15 @@ object HuaweiRri {
     ) {
         /** Heart rate implied by the mean interval, or null when the band recorded none. */
         val heartRate: Double? get() = if (meanRrMs > 0) 60_000.0 / meanRrMs else null
+
+        /**
+         * RMSSD in milliseconds — a real, standard HRV measure, computed by the band itself.
+         *
+         * The storage key stays `rri_f5` on purpose: rows already written under it would be orphaned
+         * by a rename, and that is a migration rather than a doc change. The name lives here, where
+         * it costs nothing to be right about.
+         */
+        val rmssdMs: Double get() = raw[5] ?: 0.0
 
         /**
          * Would Huawei Health publish this window?

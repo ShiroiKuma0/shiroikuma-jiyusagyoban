@@ -673,6 +673,53 @@ the paragraphs above were written from. Two claims made from nine do not survive
 Windows arrive every **10 min** (median; p10 6, p90 20), so the band records continuously and always
 has.
 
+### `sequence_data` 700021 IS the per-beat series — and it names two fields (2026-08-25)
+
+700021 was the last undecoded stream: *"a record header then a long blob of repeating 4-byte
+groups"*, not fixed-stride, layout open. Pulled alone on a rested channel it returned **97789 bytes**
+in 9 seconds — ten times the 9804-byte capture it had been described from, which was itself a
+starved pull.
+
+The layout is simple once the file is whole:
+
+| part | shape |
+|---|---|
+| file header | `00`, size as BE uint32, stream id as BE uint32 (`0x000AAE75` = 700021) |
+| record | 44-byte header: start/end epoch as BE uint32 at +0/+4, an LE echo of the start at +0x24 |
+| beats | **(uint16 LE interval in ms, uint16 LE quality)**, repeated to the next record header |
+
+Variable beat count per record is exactly why it looked strideless. The series validates against
+itself: **sum(intervals) lands within 25 s of the record's declared span in 263 of 266 records**, and
+quality is 100 for 19978 of 21513 beats, 50 for 1289, 0 for 154 — the `sqi` the filename has carried
+all along.
+
+**This is ground truth that needs neither Huawei Health nor a second phone.** RMSSD, SDNN, pNN50, the
+range — all computable here, for every window, and comparable against the ten rrisqi fields. Pairing
+is confirmed by the anchor rather than assumed: a 700021 record counts as the same episode as an
+rrisqi window only when the mean interval computed from its beats lands within one 20 ms step of f6.
+On those pairs f6 vs the computed mean is **r = +0.992**, which is what a correct pairing looks like.
+
+| field | name | evidence |
+|---|---|---|
+| **f5** | **RMSSD, ms** | agrees to within **1 % in 69 of 124** confirmed pairs, ratio **0.9927** — a scale of one, not a fitted multiple. A shuffled null sits at 57 % median error, and no beat-selection rule (all plausible / quality = 100 / quality ≥ 50) moves the 69 |
+| **f3** | **RR range (max − min), on the 20 ms grid** | exact in **76 of 142**; and the reading it replaces, the shortest interval, matches in **0 of 124** |
+
+**f3 was carried as "very likely the shortest interval". It is not** — the minimum never matches,
+and the range matches exactly in half the windows. That is what a per-beat series is for.
+
+The remaining six — f2, f4, f7, f8, f9, f10 — match no standard metric. The best fits are f2 ≈ 0.65 ×
+CV% at 10 % median error and f8 ≈ 1.67 × mean absolute successive difference at 29 %, against nulls
+of 47 % and 69 %: better than chance, nowhere near a name. **f4 and f10 match nothing at all** (every
+correlation under 0.1), which is itself worth recording, because they are the two that rise at night
+— a quantity that tracks sleep but not any within-window statistic is likely computed over a longer
+horizon than the window it is stored on.
+
+Why only half the windows match even for a named field: the two files do not always describe the same
+episode. rrisqi windows run 55–57 s with a median valid count of 21; 700021 records run 60 s (93 s
+later in the file) with a median of 66 beats. Where they coincide the agreement is near-exact; where
+they do not, nothing agrees, the anchor included. Tightening the start offset does not shift the
+split, so it is the episodes themselves, not the alignment.
+
 ### Physiology as ground truth: two fields behave like HRV, the rest like noise
 
 The file spans two nights, and f6 is established — so its own nocturnal dip anchors the split without
