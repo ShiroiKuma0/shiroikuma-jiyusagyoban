@@ -16,24 +16,24 @@ dependencyResolutionManagement {
 rootProject.name = "OpenTasker"
 include(":app")
 include(":baselineprofile")
+include(":core:common")
 
-// Upstream's core/* and feature/* module split is NOT taken by this fork (白い熊, 2026-08-11).
+// Upstream's core/* module split, adopted in stages (白い熊, 2026-08-25).
 //
-// The split is transitional: each library module points its source set back at
-// app/src/main/java/com/opentasker/..., and :app is meant to drop those same files through
-// `kotlin { sourceSets { configureEach { kotlin.exclude(...) } } }`. Under AGP 9's built-in Kotlin
-// that exclusion is silently ignored — :app compiles every "excluded" file anyway — so each type
-// exists twice and R8 fails the release build with "is defined multiple times". Upstream has not
-// hit it because the split landed after 0.2.84 and only a minified release build shows it.
+// It was rejected in 4aceaabd because the split was TRANSITIONAL: each library module pointed its
+// source set back at app/src/main/java/com/opentasker/..., :app was meant to drop the same files
+// through `kotlin { sourceSets { configureEach { kotlin.exclude(...) } } }`, and under AGP 9's
+// built-in Kotlin that exclusion is silently ignored — so every type existed twice and R8 failed the
+// release build with "is defined multiple times".
 //
-// 0.2.85 fixed their side of it, but not the split itself: the module dependencies became
-// `compileOnly` so their duplicate jars are no longer merged into the APK, while :app still
-// compiles every source and their own build file now says MODULE_OWNED_SOURCES "documents intent
-// rather than enforcing it". The modules therefore remain decorative, and compiling them here
-// would mean compiling this fork's much larger core/storage, core/engine and core/model trees in
-// isolation — which they are not written to survive, since our files in those packages reach into
-// com.opentasker.widget and friends that no module source set carries.
+// Upstream finished the split in 0.2.88: the modules own their sources and app/ no longer holds a
+// copy, so there is nothing left to duplicate. Adopting it removes the per-sync cost of moving
+// upstream's files back into :app, which had to be paid by hand in the middle of conflict
+// resolution and grew with every release.
 //
-// Adopting it properly would mean widening this fork's `internal` engine, storage and model
-// declarations to public so :app can still see them across a module boundary. Revisit when
-// upstream makes the modules the real owners; until then the app module compiles its own sources.
+// The cost it does carry is visibility: `internal` stops at a module boundary, so a declaration
+// :app still reaches has to be public. Modules are added one at a time, each with its own signed
+// build, rather than in one step.
+//
+// feature:automation is NOT taken: its only file, AutomationBlueprintInputField, is upstream's
+// blueprint input presentation, which this fork does not have.
