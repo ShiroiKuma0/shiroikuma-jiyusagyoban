@@ -471,6 +471,7 @@ dependencies {
     // Upstream's core/* modules, adopted in stages: see the note in settings.gradle.kts.
     implementation(project(":core:common"))
     implementation(project(":core:model"))
+    implementation(project(":core:engine"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -1835,6 +1836,7 @@ val productionSourceRoots: List<Directory> = listOf(
     layout.projectDirectory.dir("src/main/java"),
     rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
     rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/engine/src/main/kotlin"),
 ).filter { it.asFile.isDirectory }
 
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
