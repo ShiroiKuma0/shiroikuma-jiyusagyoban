@@ -253,13 +253,14 @@ object PreflightRunner {
 
         val steps = linkedMapOf<Int, PreflightStep>()
         val loopStack = ArrayDeque<PreflightLoopFrame>()
+        val armedElseIndices = mutableSetOf<Int>()
         var pc = 0
         var interpretedSteps = 0
         var halted = false
         while (!halted && pc in task.actions.indices && interpretedSteps++ < MAX_STEPS) {
             val spec = task.actions[pc]
             if (FlowControl.isControl(spec.type)) {
-                val control = simulateControl(pc, spec, structure, loopStack, variables, input)
+                val control = simulateControl(pc, spec, structure, loopStack, armedElseIndices, variables, input)
                 recordStep(steps, control.step.copy(taskPath = taskPath))
                 pc = control.nextPc
                 halted = control.halt
@@ -390,16 +391,17 @@ object PreflightRunner {
         spec: ActionSpec,
         structure: FlowStructure,
         loops: ArrayDeque<PreflightLoopFrame>,
+        armedElseIndices: MutableSet<Int>,
         variables: VariableStore,
         input: PreflightInputs,
     ): ControlSimulation {
-        fun step(decision: String, nextPc: Int, halt: Boolean = false) = ControlSimulation(
+        fun step(decision: String, nextPc: Int, halt: Boolean = false, skipped: Boolean = false) = ControlSimulation(
             step = PreflightStep(
                 taskPath = "",
                 actionIndex = index,
                 actionType = spec.type,
                 label = spec.label ?: spec.type,
-                status = PreflightStepStatus.SIMULATED,
+                status = if (skipped) PreflightStepStatus.SKIPPED else PreflightStepStatus.SIMULATED,
                 condition = spec.args["condition"] ?: spec.condition,
                 branchDecision = decision,
                 intendedEffect = PreflightActionRegistry.intendedEffect(spec.type),
@@ -407,22 +409,39 @@ object PreflightRunner {
             nextPc = nextPc,
             halt = halt,
         )
+        // Mirrors TaskRunner.stepControl: the generic "Run only if" guard applies to the control
+        // markers with real behavior (stop, foreach, try, if, else-if, endfor) and is ignored on
+        // the structural ones. Keep the two interpreters in step or the preview lies.
+        val guard = spec.condition?.trim()?.takeIf(String::isNotBlank)
+        fun guardMet(): Boolean = guard == null || evaluate(guard, variables, input).value
         return when (spec.type) {
             FlowControl.IF -> {
-                val condition = spec.args["condition"]?.trim()?.takeIf(String::isNotBlank)
-                    ?: spec.condition?.trim()?.takeIf(String::isNotBlank)
-                    ?: "true"
-                val evaluated = evaluate(condition, variables, input)
-                val next = if (evaluated.value) {
+                val argCondition = spec.args["condition"]?.trim()?.takeIf(String::isNotBlank)
+                val condition = argCondition ?: guard ?: "true"
+                val distinctGuard = guard != null && argCondition != null && guard != argCondition
+                val evaluated = evaluate(condition, variables, input).value && (!distinctGuard || guardMet())
+                val next = if (evaluated) {
                     index + 1
                 } else {
-                    structure.ifToElse[index]?.plus(1) ?: structure.ifToEndif.getValue(index) + 1
+                    val elseIndex = structure.ifToElse[index]
+                    if (elseIndex != null) armedElseIndices += elseIndex
+                    elseIndex ?: structure.ifToEndif.getValue(index) + 1
                 }
-                step("$condition -> ${evaluated.value}", next)
+                step("$condition -> $evaluated", next)
             }
-            FlowControl.ELSE -> step("else branch selected", structure.elseToEndif.getValue(index) + 1)
+            FlowControl.ELSE -> if (armedElseIndices.remove(index)) {
+                if (guardMet()) {
+                    step("else branch selected", index + 1)
+                } else {
+                    step("else if ($guard) -> false", structure.elseToEndif.getValue(index) + 1, skipped = true)
+                }
+            } else {
+                step("else", structure.elseToEndif.getValue(index) + 1)
+            }
             FlowControl.ENDIF -> step("endif", index + 1)
-            FlowControl.FOREACH -> {
+            FlowControl.FOREACH -> if (!guardMet()) {
+                step("foreach skipped: condition ($guard) -> false", structure.foreachToEndfor.getValue(index) + 1, skipped = true)
+            } else {
                 val listName = listOf("list", "in", "array", "items")
                     .firstNotNullOfOrNull { spec.args[it]?.trim()?.takeIf(String::isNotBlank) }
                 val itemVar = spec.args["var"]?.trim()?.takeIf(String::isNotBlank) ?: "item"
@@ -437,8 +456,12 @@ object PreflightRunner {
             }
             FlowControl.ENDFOR -> {
                 val frame = loops.lastOrNull()
-                if (frame == null) step("endfor without loop", index + 1, halt = true)
-                else {
+                if (frame == null) {
+                    step("endfor without loop", index + 1, halt = true)
+                } else if (!guardMet()) {
+                    loops.removeLast()
+                    step("endfor skipped: condition ($guard) -> false; loop exited", index + 1, skipped = true)
+                } else {
                     frame.index++
                     if (frame.index < frame.items.size) {
                         variables.set(frame.itemVar, frame.items[frame.index])
@@ -449,7 +472,16 @@ object PreflightRunner {
                     }
                 }
             }
-            FlowControl.STOP -> step("stop", index + 1, halt = true)
+            FlowControl.TRY -> if (!guardMet()) {
+                step("try skipped: condition ($guard) -> false", structure.tryToEndtry.getValue(index) + 1, skipped = true)
+            } else {
+                step(spec.type, index + 1)
+            }
+            FlowControl.STOP -> if (!guardMet()) {
+                step("stop skipped: condition ($guard) -> false", index + 1, skipped = true)
+            } else {
+                step("stop", index + 1, halt = true)
+            }
             else -> step(spec.type, index + 1)
         }
     }
