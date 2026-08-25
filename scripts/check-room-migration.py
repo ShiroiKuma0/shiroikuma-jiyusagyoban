@@ -54,6 +54,32 @@ def create_statements(version: int) -> list[str]:
     return out
 
 
+def _regions(body: str):
+    """Split a migration body into (text, bindings) regions, expanding `for (x in listOf(...))`.
+
+    Several migrations apply the same DDL to a list of tables. Read literally, their execSQL text
+    still contains `$table`, which is not SQL — SQLite rejects it and the replay stops at the first
+    such migration. That is how the v1..v16 spans went unverified while the tool reported success on
+    the default 28 -> 29 span: an unparseable migration looked exactly like a passing one.
+    """
+    position = 0
+    for loop in re.finditer(r"for \(\s*(\w+)\s+in\s+listOf\(([^)]*)\)\s*\)\s*\{", body):
+        yield body[position:loop.start()], [{}]
+        variable = loop.group(1)
+        values = re.findall(r'"([^"]*)"', loop.group(2))
+        index, depth = loop.end(), 1
+        while index < len(body) and depth:
+            if body[index] == "{":
+                depth += 1
+            elif body[index] == "}":
+                depth -= 1
+            index += 1
+        # One pass per value, statements in source order: the loop body runs table by table.
+        yield body[loop.end():index - 1], [{variable: value} for value in values]
+        position = index
+    yield body[position:], [{}]
+
+
 def migration_statements(source: int, target: int) -> list[str]:
     """The execSQL literals inside MIGRATION_<source>_<target>, in order."""
     text = MIGRATIONS.read_text(encoding="utf-8")
@@ -64,16 +90,31 @@ def migration_statements(source: int, target: int) -> list[str]:
     )
     if not block:
         sys.exit(f"MIGRATION_{source}_{target} is not declared in {MIGRATIONS.name}")
-    body = block.group(1)
     statements = []
-    for call in re.finditer(r'db\.execSQL\(\s*(""".*?"""\.trimIndent\(\)|(?:"[^"]*"(?:\s*\+\s*)?)+)', body, re.S):
-        raw = call.group(1)
-        if raw.startswith('"""'):
-            statements.append(re.sub(r'^"""|"""\.trimIndent\(\)$', "", raw).strip())
-        else:
-            statements.append("".join(re.findall(r'"([^"]*)"', raw)))
+    for region, bindings in _regions(block.group(1)):
+        literals = []
+        for call in re.finditer(r'db\.execSQL\(\s*(""".*?"""\.trimIndent\(\)|(?:"[^"]*"(?:\s*\+\s*)?)+)', region, re.S):
+            raw = call.group(1)
+            if raw.startswith('"""'):
+                literals.append(re.sub(r'^"""|"""\.trimIndent\(\)$', "", raw).strip())
+            else:
+                literals.append("".join(re.findall(r'"([^"]*)"', raw)))
+        for binding in bindings:
+            for literal in literals:
+                for name, value in binding.items():
+                    literal = literal.replace("${" + name + "}", value).replace("$" + name, value)
+                statements.append(literal)
     if not statements:
         sys.exit(f"MIGRATION_{source}_{target} declares no execSQL statements — the parser needs updating")
+    # A leftover template marker means the parser did not understand the migration. Say so instead
+    # of handing SQLite something that cannot parse and calling the resulting error a schema fault.
+    for statement in statements:
+        if "$" in statement:
+            sys.exit(
+                f"MIGRATION_{source}_{target} still contains an unresolved Kotlin template:\n"
+                f"    {statement}\n"
+                "  Teach _regions()/migration_statements() this shape before trusting the replay."
+            )
     return statements
 
 
@@ -95,8 +136,29 @@ def live_schema(connection: sqlite3.Connection) -> dict:
     return tables
 
 
+def replay(source: int, target: int) -> int:
+    return _replay(source, target)
+
+
 def main() -> int:
     current = current_version()
+    if len(sys.argv) == 2 and sys.argv[1] == "--all":
+        # Every exported version is a state some installed database can be sitting at, so every one
+        # of them has to reach `current`. Spot-checking only the newest span is what let the v1..v16
+        # migrations go unreplayed: the tool passed while a whole class of them could not even be
+        # parsed.
+        failures = []
+        for version in exported_versions():
+            if version >= current:
+                continue
+            if _replay(version, current) != 0:
+                failures.append(version)
+        print()
+        if failures:
+            print(f"{len(failures)} starting version(s) cannot reach {current}: {failures}")
+            return 1
+        print(f"every exported version reaches {current} with the schema Room expects.")
+        return 0
     if len(sys.argv) == 3:
         source, target = int(sys.argv[1]), int(sys.argv[2])
     else:
@@ -105,7 +167,10 @@ def main() -> int:
             print(f"Only schema {current} is exported — nothing to migrate from.")
             return 0
         source, target = earlier[-1], current
+    return _replay(source, target)
 
+
+def _replay(source: int, target: int) -> int:
     connection = sqlite3.connect(":memory:")
     for statement in create_statements(source):
         connection.execute(statement)
@@ -121,6 +186,7 @@ def main() -> int:
     got = live_schema(connection)
     expected = schema(target)
     problems: list[str] = []
+    notes: list[str] = []
     for entity in expected["entities"]:
         table = entity["tableName"]
         if table not in got:
@@ -135,10 +201,26 @@ def main() -> int:
             _, notnull, default = columns[name]
             if notnull != bool(field.get("notNull")):
                 problems.append(f"{table}.{name}: notNull is {notnull}, Room expects {bool(field.get('notNull'))}")
-            want = field.get("defaultValue")
             normalise = lambda value: None if value is None else str(value).strip()
-            if normalise(default) != normalise(want):
+            want, have = normalise(field.get("defaultValue")), normalise(default)
+            # The comparison is asymmetric on purpose, because Room's is. Room only holds a column
+            # to a default when the ENTITY declares one: a database that carries a default the
+            # entity does not declare still opens. That is not a loophole, it is what lets a
+            # hand-written `ADD COLUMN ... NOT NULL DEFAULT 0` work at all -- SQLite needs the
+            # default to fill existing rows, and Room's own generated CREATE TABLE never has one.
+            # This fork has shipped exactly that shape since v6 (position, isSecret,
+            # requiresRiskAcknowledgement) and those upgrades demonstrably open.
+            #
+            # Failing on it would be worse than useless: it is the common case, so it would fire on
+            # every run and train the reader to ignore the tool that exists to catch the ONE
+            # direction that really does throw -- a default Room expects and the database lacks.
+            if want is not None and have != want:
                 problems.append(f"{table}.{name}: default is {default!r}, Room expects {want!r}")
+            elif want is None and have is not None:
+                notes.append(
+                    f"{table}.{name}: the database will carry DEFAULT {have}, which Room's schema "
+                    f"does not declare. Room accepts this; noted so a deliberate change is visible."
+                )
         for index in entity.get("indices", []):
             if index["name"] not in indices:
                 problems.append(f"{table}: index {index['name']} missing after migration")
@@ -154,6 +236,8 @@ def main() -> int:
 
     print(f"{source} -> {target}: the migration produces exactly the schema Room expects "
           f"({len(expected['entities'])} tables checked).")
+    for note in notes:
+        print("  note:", note)
     return 0
 
 
