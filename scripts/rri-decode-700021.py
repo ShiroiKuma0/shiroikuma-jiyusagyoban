@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Name the rrisqi fields from the per-beat series in sequence_data 700021."""
+"""Decode sequence_data 700021 — the band's per-beat RR series — and check it against rrisqi.
+
+    python3 scripts/rri-decode-700021.py <700021.bin> <rrisqi.bin>
+
+700021 is a 44-byte record header (start/end epoch, BE uint32) followed by (uint16 LE interval in ms,
+uint16 LE quality) pairs until the next header. The variable beat count is why it read as strideless.
+
+This is the ground truth that named f5 (RMSSD) and f3 (the RR range on the 20 ms grid) without
+Huawei Health: with per-beat intervals, the standard metrics are computable here. Pull both files
+with the 健康 tasks バンド書類700021（Huawei） and バンドRR書類（Huawei）.
+"""
 import struct, sys, math, statistics as st, datetime
 PLAUS = range(1_780_000_000, 1_800_000_000)
 
@@ -37,7 +47,7 @@ print(f"rrisqi: {len(R)} windows\n")
 # sanity: beat count vs window span
 ok = sum(1 for x in B if x["beats"] and abs(sum(v for v,_ in x["beats"])/1000 - (x["e"]-x["s"])) < 25)
 print(f"sum(RR) within 25 s of the window span: {ok}/{len(B)}  <- the series really is the window")
-qs = collections_q = {}
+qs = {}
 for x in B:
     for _, q in x["beats"]: qs[q] = qs.get(q, 0) + 1
 print(f"quality values: {sorted(qs.items(), key=lambda kv: -kv[1])[:6]}\n")
