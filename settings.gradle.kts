@@ -17,6 +17,7 @@ rootProject.name = "OpenTasker"
 include(":app")
 include(":baselineprofile")
 include(":core:common")
+include(":core:model")
 
 // Upstream's core/* module split, adopted in stages (白い熊, 2026-08-25).
 //
