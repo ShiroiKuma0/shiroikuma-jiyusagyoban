@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "requiredArtifactCommit": "a49eebee05d93ab88ebf876f91f00274cc706b97",
-  "releaseTag": "v0.2.89",
+  "releaseTag": "v0.2.90",
   "releaseTagCommit": "a1efb25bd86d74acad6c854c058325088bf094fc",
   "application": {
-    "versionName": "0.2.89",
-    "versionCode": 91
+    "versionName": "0.2.90",
+    "versionCode": 92
   },
   "android": {
     "minSdk": 26,
