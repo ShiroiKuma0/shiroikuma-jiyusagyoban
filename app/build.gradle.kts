@@ -187,8 +187,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
-val appVersionCode = 91
-val appVersionName = "0.2.89"
+val appVersionCode = 92
+val appVersionName = "0.2.90"
 // F-Droid store listing limits, from the F-Droid build metadata reference.
 val FDROID_SHORT_DESCRIPTION_MAX_CHARS = 80
 val FDROID_CHANGELOG_MAX_CHARS = 500

@@ -1,0 +1,2 @@
+The engine skipped its generic run-only-if check for flow-control actions, because those dispatch before the guard evaluation every ordinary action goes through.
+Tasker XML export writes an action's run-only-if guard back as the ConditionList element real Tasker exports use, so a guarded action survives an export and re-import instead of coming back unconditional.

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v0.2.90
+
+Imported "Run only if" guards now hold on flow-control actions at runtime, and they survive a Tasker XML export.
+
+### Fixed
+
+- The engine skipped its generic run-only-if check for flow-control actions, because those dispatch before the guard evaluation every ordinary action goes through. An imported "Stop If" therefore stopped its task unconditionally even though the guard survived import intact. An unmet guard now skips the control action instead: Stop falls through to the next action, For and Try skip their whole block, End For exits the loop, an If applies a guard that differs from its own test alongside that test, and a guarded Else runs as Tasker's Else If. A guard the importer copied into an If's own test field still evaluates once, and the dry-run preview simulates the same rules the engine enforces.
+- Tasker XML export writes an action's run-only-if guard back as the ConditionList element real Tasker exports use, so a guarded action survives an export and re-import instead of coming back unconditional. A guard that cannot fit Tasker's single lhs/op/rhs shape (boolean chains, template expressions) is dropped with a warning rather than exported wrong, and a guard containing a secret value is omitted like every other sensitive field.
+
 ## v0.2.89
 
 Tasker imports now keep their "Run only if" guards. The importer fix was contributed by felalex.
