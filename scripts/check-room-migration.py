@@ -22,8 +22,8 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 SCHEMAS = REPO / "app/schemas/com.opentasker.core.storage.AppDatabase"
-MIGRATIONS = REPO / "app/src/main/java/com/opentasker/core/storage/DatabaseMigrations.kt"
-DATABASE = REPO / "app/src/main/java/com/opentasker/core/storage/AppDatabase.kt"
+MIGRATIONS = REPO / "core/storage/src/main/kotlin/com/opentasker/core/storage/DatabaseMigrations.kt"
+DATABASE = REPO / "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt"
 
 
 def current_version() -> int:
