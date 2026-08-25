@@ -377,17 +377,42 @@ object HuaweiSyncRunner {
                 )
             }
         }
-        session.send(
-            HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH,
-            HuaweiCommands.weather(place, temperatureC, now, humidity, highC, lowC),
-        )
-        // Give the band a moment to answer if it means to; its silence is normal here.
-        session.poll(2_000)
-        buildString {
+        // The band's own answer decides this, not the fact that bytes left the phone.
+        //
+        // This used to send, poll for two seconds, throw away whatever came back and return a
+        // summary built from the values it had just SENT — so "Praha 21°C · 39% · 12–23°C" was a
+        // restatement of the input dressed as a confirmation, and 白い熊 read "Weather pushed" for
+        // two days while the band's screen said "Refreshed: 2026-08-23" and showed no current
+        // temperature at all. WEATHER_PUSH is not in FIRE_AND_FORGET: the band is expected to
+        // answer, and the comment claiming its silence was normal was contradicted by that list.
+        val sent = buildString {
             append("$place ${temperatureC}°C")
             humidity?.let { append(" · ${it}%") }
             if (highC != null && lowC != null) append(" · $lowC–$highC°C")
             if (latitude != null && longitude != null) append(" · position sent")
+        }
+        val reply = runCatching {
+            session.request(
+                HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH,
+                HuaweiCommands.weather(place, temperatureC, now, humidity, highC, lowC),
+            )
+        }.getOrElse {
+            throw IllegalStateException(
+                "$sent — but the band never answered the push (${it.message ?: it::class.java.simpleName}). " +
+                    "Nothing here can say it landed, so this is not reported as sent.",
+            )
+        }
+        val code = session.decrypt(reply)
+            .firstOrNull { it.tag == HuaweiProtocol.TAG_RESULT }
+            ?.let { HuaweiProtocol.bytesToInt(it.value) }
+        when (code) {
+            null -> "$sent · the band answered without a result code"
+            // NOT "accepted": 白い熊 confirmed 2026-08-25 that this same success code came back
+            // while the band's weather screen stayed blank and dated 2026-08-23. The band
+            // acknowledges the FRAME; whether it stored or rendered the reading is not
+            // observable from here, and saying otherwise is the same lie in a smaller font.
+            HuaweiProtocol.RESULT_SUCCESS -> "$sent · frame acknowledged (the band does not confirm display)"
+            else -> throw IllegalStateException("$sent — the band REFUSED the push with result $code")
         }
     }
 
