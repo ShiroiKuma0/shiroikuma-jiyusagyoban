@@ -75,7 +75,7 @@ object TaskerXmlExporter {
         sb.appendLine("""<TaskerData sr="" dvi="1" tv="6.3.13">""")
 
         tasks.forEach { task ->
-            appendTask(sb, task, skipped, redactionContext, redactedActionFields)
+            appendTask(sb, task, skipped, redactionContext, redactedActionFields, warnings)
         }
 
         profiles.forEach { profile ->
@@ -112,6 +112,7 @@ object TaskerXmlExporter {
         skipped: MutableList<SkippedExportAction>,
         redactionContext: ExportRedactionPolicy.Context,
         redactedActionFields: MutableList<String>,
+        warnings: MutableList<String>,
     ) {
         sb.appendLine("""  <Task sr="task${task.id}">""")
         sb.appendLine("    <cdate>${System.currentTimeMillis()}</cdate>")
@@ -122,7 +123,7 @@ object TaskerXmlExporter {
         task.actions.forEachIndexed { index, action ->
             val taskerCode = taskerCodeFor(action)
             if (taskerCode != null) {
-                appendAction(sb, index, taskerCode, action, redactionContext, redactedActionFields)
+                appendAction(sb, index, taskerCode, action, redactionContext, redactedActionFields, warnings)
             } else {
                 skipped += SkippedExportAction(
                     taskName = task.name,
@@ -142,6 +143,7 @@ object TaskerXmlExporter {
         action: ActionSpec,
         redactionContext: ExportRedactionPolicy.Context,
         redactedActionFields: MutableList<String>,
+        warnings: MutableList<String>,
     ) {
         val sanitized = ExportRedactionPolicy.sanitizeActionArguments(action.type, action.args, redactionContext)
         sanitized.redactedFields.forEach { field -> redactedActionFields += "${action.type}.$field" }
@@ -193,8 +195,103 @@ object TaskerXmlExporter {
             "screen.timeout" -> appendInt(sb, 0, args["millis"] ?: "60000")
         }
 
+        appendConditionList(sb, action, redactionContext, warnings)
+
         sb.appendLine("    </Action>")
     }
+
+    /**
+     * Writes the action's "Run only if" guard (ActionSpec.condition) back as the sibling
+     * `<ConditionList>` element real Tasker exports use for the same concept, so an imported
+     * guard survives an export/import round trip on any action instead of silently becoming
+     * unconditional. Guards this app's richer condition syntax cannot squeeze into a single
+     * Tasker lhs/op/rhs triple (boolean chains, template expressions, <=/>=) are dropped with a
+     * warning rather than exported wrong. A flow.if whose guard differs from its own
+     * args["condition"] test is also warned and dropped: on import the ConditionList overwrites
+     * that arg, so exporting the guard would replace the if's actual test.
+     */
+    private fun appendConditionList(
+        sb: StringBuilder,
+        action: ActionSpec,
+        redactionContext: ExportRedactionPolicy.Context,
+        warnings: MutableList<String>,
+    ) {
+        val guard = action.condition?.trim()?.takeIf { it.isNotBlank() } ?: return
+        val ifTest = action.args["condition"]?.trim()?.takeIf { it.isNotBlank() }
+        if (action.type == "flow.if" && ifTest != null && guard != ifTest) {
+            warnings += "A run-only-if guard on a flow.if differs from the if's own test; " +
+                "Tasker XML holds one condition per action, so the guard was dropped."
+            return
+        }
+        if (ExportRedactionPolicy.redactText(guard, redactionContext.secretValues) != guard) {
+            warnings += "A run-only-if guard on '${action.type}' contains a secret value and was omitted; " +
+                "re-enter it after import."
+            return
+        }
+        val condition = taskerConditionFor(guard)
+        if (condition == null) {
+            warnings += "The run-only-if guard on '${action.type}' ('$guard') has no Tasker " +
+                "ConditionList equivalent and was dropped."
+            return
+        }
+        sb.appendLine("""      <ConditionList sr="if">""")
+        sb.appendLine("""        <Condition sr="c0" ve="3">""")
+        sb.appendLine("          <lhs>${escapeXml(condition.lhs)}</lhs>")
+        sb.appendLine("          <op>${condition.op}</op>")
+        sb.appendLine("          <rhs>${escapeXml(condition.rhs)}</rhs>")
+        sb.appendLine("        </Condition>")
+        sb.appendLine("      </ConditionList>")
+    }
+
+    private data class TaskerCondition(val lhs: String, val op: String, val rhs: String)
+
+    /**
+     * Reverse of TaskerXmlImport.parseImportedCondition: turns this app's condition string back
+     * into a single Tasker lhs/op/rhs triple when it has that shape. Anything the triple cannot
+     * express (&&/|| chains, template expressions, unsupported operators) returns null and the
+     * caller reports the loss.
+     */
+    private fun taskerConditionFor(condition: String): TaskerCondition? {
+        if (condition.contains("&&") || condition.contains("||") || condition.contains("{{")) return null
+        // Binary comparisons win over the unary is_set/not_set suffix, matching the evaluator:
+        // "%status == is_set" is an equality check against the literal word, not an existence
+        // check, so it must export as op 0 rather than op 12.
+        for ((token, op) in BINARY_CONDITION_OPS) {
+            val marker = " $token "
+            val index = condition.indexOf(marker)
+            if (index > 0) {
+                val lhs = condition.substring(0, index).trim()
+                val rhs = condition.substring(index + marker.length).trim()
+                if (lhs.isEmpty()) return null
+                return TaskerCondition(lhs, op, rhs)
+            }
+        }
+        for ((suffix, op) in UNARY_CONDITION_OPS) {
+            if (condition.endsWith(suffix, ignoreCase = true)) {
+                val lhs = condition.dropLast(suffix.length).trim()
+                if (lhs.isNotEmpty()) return TaskerCondition(lhs, op, "")
+            }
+        }
+        return null
+    }
+
+    // App condition operators -> Tasker Condition <op> codes (the import table's canonical
+    // inverse: regex ops 4/5 and numeric-equality ops 8/9 already collapsed on import). Two-char
+    // tokens are matched before their one-char substrings; every token is whitespace-bounded, so
+    // "a <= b" matches nothing here and is reported as unrepresentable instead of exported as "<".
+    private val BINARY_CONDITION_OPS = listOf(
+        "==" to "0",
+        "!=" to "1",
+        "!~" to "3",
+        "~" to "2",
+        "<" to "6",
+        ">" to "7",
+    )
+
+    private val UNARY_CONDITION_OPS = listOf(
+        " is_set" to "12",
+        " not_set" to "13",
+    )
 
     private fun appendProfile(
         sb: StringBuilder,

@@ -111,6 +111,7 @@ class TaskRunner(
 
         val loopStack = ArrayDeque<LoopFrame>()
         val tryStack = ArrayDeque<TryFrame>()
+        val armedElseIndices = mutableSetOf<Int>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
         var structuredFailure: StructuredTaskError? = null
@@ -137,7 +138,7 @@ class TaskRunner(
                 }
                 val spec = task.actions[pc]
                 if (FlowControl.isControl(spec.type)) {
-                    val outcome = stepControl(pc, spec, structure, loopStack, tryStack)
+                    val outcome = stepControl(pc, spec, structure, loopStack, tryStack, armedElseIndices)
                     results += outcome.result
                     traces += outcome.trace
                     if (outcome.halt) {
@@ -278,6 +279,7 @@ class TaskRunner(
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
         tryStack: ArrayDeque<TryFrame>,
+        armedElseIndices: MutableSet<Int>,
     ): ControlOutcome {
         fun outcome(message: String, nextPc: Int, halt: Boolean = false) = ControlOutcome(
             result = ActionResult.Success,
@@ -286,23 +288,68 @@ class TaskRunner(
             halt = halt,
         )
 
+        fun skipped(message: String, nextPc: Int) = ControlOutcome(
+            result = ActionResult.Skip,
+            trace = markerTrace(pc, spec, ActionResult.Skip, ActionTraceStatus.SKIPPED, message),
+            nextPc = nextPc,
+        )
+
+        // The generic "Run only if" guard (ActionSpec.condition — what a Tasker <ConditionList>
+        // imports to). Non-control actions evaluate it in runOne via shouldRun, but control
+        // actions are dispatched here before runOne is ever reached, so each branch with real
+        // behavior applies it explicitly. Tasker semantics: an unmet guard skips the action, it
+        // never aborts the task. For the block-opening markers (foreach, try) the whole block is
+        // the action, so skipping the marker skips its block — falling through into the body
+        // would execute it with no active frame and abort at the closing marker. flow.if handles
+        // the guard inside its own branch because the importer copies the guard into
+        // args["condition"] (both fields equal), and that one expression must not apply twice.
+        // The remaining markers are structural or error-path bookkeeping (endif, catch, endtry)
+        // and deliberately ignore the guard: skipping them would corrupt block state.
+        val guard = spec.condition?.trim()?.takeIf { it.isNotBlank() }
+        fun guardMet(): Boolean = guard == null || evaluateConditionString(guard)
+
         return when (spec.type) {
             FlowControl.IF -> {
-                val condition = spec.args["condition"]?.trim()?.takeIf { it.isNotBlank() }
-                    ?: spec.condition?.trim()?.takeIf { it.isNotBlank() }
-                    ?: "true"
-                val matched = evaluateConditionString(condition)
+                val argCondition = spec.args["condition"]?.trim()?.takeIf { it.isNotBlank() }
+                val condition = argCondition ?: guard ?: "true"
+                // A guard distinct from the if's own test gates the branch alongside it: both
+                // must hold. When the guard IS the test (an imported ConditionList lands in both
+                // fields with the same text) it is evaluated once.
+                val distinctGuard = guard != null && argCondition != null && guard != argCondition
+                val display = if (distinctGuard) "$condition, only if $guard" else condition
+                val matched = evaluateConditionString(condition) && (!distinctGuard || guardMet())
                 if (matched) {
-                    outcome("if ($condition) -> true", pc + 1)
+                    outcome("if ($display) -> true", pc + 1)
                 } else {
-                    val target = structure.ifToElse[pc]?.plus(1)
-                        ?: structure.ifToEndif.getValue(pc) + 1
-                    outcome("if ($condition) -> false", target)
+                    val elseIndex = structure.ifToElse[pc]
+                    if (elseIndex != null) {
+                        // Land on the else marker itself (not past it) so an "Else If" guard on
+                        // that marker can decide whether its branch runs.
+                        armedElseIndices += elseIndex
+                        outcome("if ($display) -> false", elseIndex)
+                    } else {
+                        outcome("if ($display) -> false", structure.ifToEndif.getValue(pc) + 1)
+                    }
                 }
             }
-            FlowControl.ELSE -> outcome("else", structure.elseToEndif.getValue(pc) + 1)
+            FlowControl.ELSE -> {
+                if (armedElseIndices.remove(pc)) {
+                    // Reached from a false if: this marker opens the else branch. A guard here is
+                    // Tasker's "Else If" — unmet means the branch is skipped, not run.
+                    if (guardMet()) {
+                        outcome(if (guard == null) "else" else "else if ($guard) -> true", pc + 1)
+                    } else {
+                        skipped("else if ($guard) -> false", structure.elseToEndif.getValue(pc) + 1)
+                    }
+                } else {
+                    // Fell in from the end of the taken if branch: exit the block.
+                    outcome("else", structure.elseToEndif.getValue(pc) + 1)
+                }
+            }
             FlowControl.ENDIF -> outcome("endif", pc + 1)
-            FlowControl.FOREACH -> {
+            FlowControl.FOREACH -> if (!guardMet()) {
+                skipped("foreach skipped: condition ($guard) -> false", structure.foreachToEndfor.getValue(pc) + 1)
+            } else {
                 val listName = listOf("list", "in", "array", "items")
                     .firstNotNullOfOrNull { key ->
                         spec.args[key]?.trim()?.takeIf(String::isNotBlank)?.let { raw ->
@@ -330,6 +377,11 @@ class TaskRunner(
                         nextPc = pc + 1,
                         halt = true,
                     )
+                } else if (!guardMet()) {
+                    // Tasker semantics for a skipped End For: no jump back happens, so the loop
+                    // exits and execution continues after the marker.
+                    loopStack.removeLast()
+                    skipped("endfor skipped: condition ($guard) -> false; loop exited", pc + 1)
                 } else {
                     frame.index++
                     if (frame.index < frame.items.size) {
@@ -341,7 +393,9 @@ class TaskRunner(
                     }
                 }
             }
-            FlowControl.TRY -> {
+            FlowControl.TRY -> if (!guardMet()) {
+                skipped("try skipped: condition ($guard) -> false", structure.tryToEndtry.getValue(pc) + 1)
+            } else {
                 val config = FlowControl.parseTryConfig(spec.args)
                     ?: return ControlOutcome(
                         result = ActionResult.Failure("invalid flow.try retry bounds"),
@@ -391,7 +445,11 @@ class TaskRunner(
                     outcome("endtry", pc + 1)
                 }
             }
-            FlowControl.STOP -> outcome("stop", pc + 1, halt = true)
+            FlowControl.STOP -> if (!guardMet()) {
+                skipped("stop skipped: condition ($guard) -> false", pc + 1)
+            } else {
+                outcome("stop", pc + 1, halt = true)
+            }
             else -> outcome(spec.type, pc + 1)
         }
     }

@@ -56,6 +56,117 @@ class TaskerXmlExportTest {
     }
 
     @Test
+    fun exportsRunOnlyIfGuardAsConditionList() {
+        val task = Task(
+            id = 1,
+            name = "Guarded stop",
+            actions = listOf(
+                ActionSpec(type = "flow.stop", condition = "%BATT < 20"),
+            ),
+        )
+        val report = TaskerXmlExporter.export(emptyList(), listOf(task))
+
+        assertTrue(report.xml.contains("<ConditionList sr=\"if\">"))
+        assertTrue(report.xml.contains("<lhs>%BATT</lhs>"))
+        assertTrue(report.xml.contains("<op>6</op>"))
+        assertTrue(report.xml.contains("<rhs>20</rhs>"))
+    }
+
+    @Test
+    fun exportsUnaryGuardWithTaskerIsSetOpCode() {
+        val task = Task(
+            id = 1,
+            name = "Guarded set",
+            actions = listOf(
+                ActionSpec(type = "var.set", args = mapOf("name" to "%MODE", "value" to "on"), condition = "%text is_set"),
+            ),
+        )
+        val report = TaskerXmlExporter.export(emptyList(), listOf(task))
+
+        assertTrue(report.xml.contains("<lhs>%text</lhs>"))
+        assertTrue(report.xml.contains("<op>12</op>"))
+    }
+
+    @Test
+    fun stopGuardSurvivesAnExportImportRoundTrip() {
+        // The round trip that used to lose the guard: an imported "Stop If" kept its condition in
+        // ActionSpec.condition, but export dropped it, so a re-import stopped unconditionally.
+        val task = Task(
+            id = 1,
+            name = "Guarded stop",
+            actions = listOf(
+                ActionSpec(type = "flow.stop", condition = "%pa_do == toggle"),
+            ),
+        )
+        val exported = TaskerXmlExporter.export(emptyList(), listOf(task))
+        val reimported = TaskerXmlImporter.parse(
+            rawXml = exported.xml,
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        val action = reimported.bundle.tasks.single().actions.single()
+        assertEquals("flow.stop", action.type)
+        assertEquals("%pa_do == toggle", action.condition)
+    }
+
+    @Test
+    fun flowIfGuardCopiedFromImportRoundTripsThroughConditionList() {
+        // An imported flow.if carries the same ConditionList text in both args["condition"] and
+        // the generic guard; exporting both the <Str> arg and the ConditionList reproduces that
+        // exact state on re-import.
+        val task = Task(
+            id = 1,
+            name = "Imported if",
+            actions = listOf(
+                ActionSpec(type = "flow.if", condition = "%text is_set", args = mapOf("condition" to "%text is_set")),
+                ActionSpec(type = "flow.endif"),
+            ),
+        )
+        val exported = TaskerXmlExporter.export(emptyList(), listOf(task))
+        val reimported = TaskerXmlImporter.parse(
+            rawXml = exported.xml,
+            appVersion = "test",
+            importedAtEpochMs = 123L,
+        )
+
+        val ifAction = reimported.bundle.tasks.single().actions.first()
+        assertEquals("%text is_set", ifAction.condition)
+        assertEquals("%text is_set", ifAction.args["condition"])
+    }
+
+    @Test
+    fun flowIfWithDistinctGuardWarnsInsteadOfClobberingItsTest() {
+        val task = Task(
+            id = 1,
+            name = "If with guard",
+            actions = listOf(
+                ActionSpec(type = "flow.if", condition = "%b == 2", args = mapOf("condition" to "%a == 1")),
+                ActionSpec(type = "flow.endif"),
+            ),
+        )
+        val report = TaskerXmlExporter.export(emptyList(), listOf(task))
+
+        assertFalse(report.xml.contains("<ConditionList"))
+        assertTrue(report.warnings.any { it.contains("flow.if") })
+    }
+
+    @Test
+    fun unrepresentableGuardIsDroppedWithWarningNotExportedWrong() {
+        val task = Task(
+            id = 1,
+            name = "Chained guard",
+            actions = listOf(
+                ActionSpec(type = "var.set", args = mapOf("name" to "%MODE", "value" to "on"), condition = "%a == 1 && %b == 2"),
+            ),
+        )
+        val report = TaskerXmlExporter.export(emptyList(), listOf(task))
+
+        assertFalse(report.xml.contains("<ConditionList"))
+        assertTrue(report.warnings.any { it.contains("no Tasker ConditionList equivalent") })
+    }
+
+    @Test
     fun exportsTimeContextsWithClockParts() {
         val profile = Profile(
             id = 1,
