@@ -69,11 +69,24 @@ class HuaweiFilesAction : Action {
         val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
             .format(java.util.Date())
 
+        // rrisqi FIRST, and this ordering is the whole point.
+        //
+        // It used to be last, after every sequence_data id, and that is why it answered
+        // `nothing (100004)` on four attempts across two days — read at the time as the band having
+        // no RR data at all, and turned into a hypothesis that some switch had to be flipped to make
+        // it record any. The band was recording the whole time. 700004 alone is 1.16 MB and does not
+        // finish (378691 of it after 8 rounds on 2026-08-25 07:05); by the time the channel had been
+        // dragged through that, everything after it came back empty. Asked first on a rested
+        // channel, rrisqi returned 20377 bytes — 308 windows over 2.7 days — in 1.7 seconds.
+        //
+        // It goes first rather than the ids being trimmed because it is both the smallest file and
+        // the one the whole Huawei experiment was for: 20 KB ahead of a megabyte costs the
+        // sequence_data pulls nothing they were reliably getting anyway.
         val requests = buildList {
+            add(Triple(HuaweiFileClient.RRI_DATA, HuaweiFileClient.RRI_TYPE, null))
             ids.forEach {
                 add(Triple(HuaweiFileClient.SEQUENCE_DATA, HuaweiFileClient.SEQUENCE_TYPE, it as Int?))
             }
-            add(Triple(HuaweiFileClient.RRI_DATA, HuaweiFileClient.RRI_TYPE, null))
         }
 
         // Marked before the fetch, not after: an attempt that fails still used the channel, and it
