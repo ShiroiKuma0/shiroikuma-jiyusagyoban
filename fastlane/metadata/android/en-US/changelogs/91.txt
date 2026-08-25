@@ -1,0 +1,3 @@
+The Tasker XML importer reads the ConditionList element that real Tasker exports attach to a guarded action.
+Imported Matches and Doesn't Match conditions evaluate through the same linear-time RE2 path and length bounds as every other runtime-built pattern, so a wildcard-heavy imported guard can't stall task execution.
+A regex Matches guard (Tasker ops 4 and 5) has no regex condition operator to land on, so it imports as a plain wildcard match.

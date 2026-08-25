@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.2.89
+
+Tasker imports now keep their "Run only if" guards. The importer fix was contributed by felalex.
+
+### Fixed
+
+- The Tasker XML importer reads the ConditionList element that real Tasker exports attach to a guarded action. Guards used to vanish on import, so a guarded action came in unconditional and an If action's own test degraded to the literal "true" with no warning. In one real backup that touched 118 of 210 actions. The importer now covers the full known operator set (string and numeric comparisons plus Is Set and Not Set), writes the parsed condition into flow.if's editor field so it doesn't open blank, and reports a lossy warning for a multi-condition list or an unknown operator instead of staying silent.
+- Imported Matches and Doesn't Match conditions evaluate through the same linear-time RE2 path and length bounds as every other runtime-built pattern, so a wildcard-heavy imported guard can't stall task execution. The condition parser also requires whitespace around the new ~ and !~ operators, keeping a literal tilde inside a value from breaking an unrelated comparison.
+- A regex Matches guard (Tasker ops 4 and 5) has no regex condition operator to land on, so it imports as a plain wildcard match. That approximation now shows up as a lossy import warning rather than being applied silently.
+
 ## v0.2.88
 
 OpenTasker now imports MacroDroid backups and makes variable or project deletion reversible. This release also adds Wi-Fi scanning and always-on display control, with reliability fixes across scheduling, plugins, imports, storage, and diagnostics.
