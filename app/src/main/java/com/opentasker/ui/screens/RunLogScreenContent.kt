@@ -456,7 +456,7 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, 
         RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.error
     }
     val sourceText = entry.source?.let { key ->
-        val name = runLogSourceName(key)
+        val name = RunLogSource.displayName(key)
         entry.sourceLabel?.let { "$name: $it" } ?: name
     } ?: diagnostics.source
     Card(

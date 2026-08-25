@@ -37,7 +37,7 @@ internal fun TaskerImportReviewDialog(
     AlertDialog(
         modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Review Tasker import") },
+        title = { Text(state.title) },
         text = {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -91,10 +91,8 @@ internal fun TaskerImportReviewDialog(
                 if (state.unsupportedActionRows.isNotEmpty()) {
                     item {
                         TaskerImportListSection(
-                            title = "Unsupported Tasker actions",
-                            values = state.report.unsupportedActions.map {
-                                "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
-                            },
+                            title = "Unsupported actions",
+                            values = state.unsupportedActionRows,
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
@@ -103,9 +101,7 @@ internal fun TaskerImportReviewDialog(
                     item {
                         TaskerImportListSection(
                             title = "Mapped actions",
-                            values = state.report.mappedActions.map {
-                                "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
-                            },
+                            values = state.mappedActionRows,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
                     }

@@ -30,7 +30,9 @@ internal class WriteSettingsGuard(
 
     fun requireWriteSettingsReady(actions: List<ActionSpec>) {
         if (WriteSettingsAdmission.blocked(actions, Settings.System.canWrite(appContext))) {
-            throw UiRejection(R.string.ui_error_write_settings_required)
+            // Fork: upstream throws its localized UiRejection here; the fork carries plain
+            // message strings, and the ViewModel surfaces `message` straight to the snackbar.
+            throw IllegalStateException(appContext.getString(R.string.ui_error_write_settings_required))
         }
     }
 }
