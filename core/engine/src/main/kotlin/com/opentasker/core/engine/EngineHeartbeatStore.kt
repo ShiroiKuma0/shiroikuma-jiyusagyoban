@@ -123,7 +123,7 @@ class EngineHeartbeatStore(context: Context) {
  * Pairs the first historical process exit after the last heartbeat with an unexpected heartbeat
  * gap. Kept pure so a JVM test can supply a fake historical exit source without an Android device.
  */
-internal fun correlateProcessExit(
+fun correlateProcessExit(
     heartbeat: EngineHeartbeatSnapshot,
     nowMillis: Long,
     platformAvailable: Boolean,
@@ -155,7 +155,7 @@ internal fun correlateProcessExit(
     )
 }
 
-internal fun EngineHeartbeatSnapshot.needsRecovery(
+fun EngineHeartbeatSnapshot.needsRecovery(
     nowMillis: Long,
     staleAfterMillis: Long = EngineHeartbeatStore.STALE_AFTER_MS,
 ): Boolean = stoppedCleanly ||
