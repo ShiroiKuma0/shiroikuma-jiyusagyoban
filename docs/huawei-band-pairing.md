@@ -462,6 +462,33 @@ So nothing predicts what the band will part with. Send the delete, then re-read 
 what the band actually did. (One record carries `05` in tag 5 alongside `2a`/tag 7 = `02`; that pair
 is unexplained and does not track anything we drive.)
 
+### The weather service has nine commands; we use two (2026-08-25)
+
+The push is acknowledged with a success code and the band's screen does not change — it keeps Huawei
+Health's `Hodkovicky` from 2026-08-23 with no current temperature at all. The place name never
+becomes ours, so the record is not merely unrendered: **it is not stored.**
+
+Two differences from the captured Health push. The place encoding was one — Health sent plain ASCII
+and we send 29 UTF-8 bytes — and it is **refuted**: pushing an ASCII `Praha` changed nothing on the
+screen. The other is the four tags we omit on purpose (10, 15, containers 129/133 — condition and
+icon), whose values the capture never mapped and which cannot be reproduced now that the capture and
+its `btsnoop.py` are gone from disk.
+
+The band's own census says 0x0F answers **nine** commands, 0x01…0x09. This app uses two. Swept with
+empty payloads (`huawei.probe weather_sweep=true`):
+
+```
+0x0F/0x02 0x03 0x04 0x06 0x07 0x08 0x09   all → result 100013
+```
+
+`100013` is the refuse-an-empty-payload code, the same answer 0x19 gives. So **all seven exist and
+are live, and every one of them wants a parameter** — none is a no-argument read. That weakens the
+hope of a read-back that would let the app check its own work, though one may still answer to a
+tagged payload, which is how 0x19 was opened.
+
+It does not explain the display. The push command is right, the frame is accepted, and the reading
+still does not land.
+
 ### Weather is a PUSH, not a request
 
 The band displays weather that the phone sends it. There is no fetching involved on our side and no

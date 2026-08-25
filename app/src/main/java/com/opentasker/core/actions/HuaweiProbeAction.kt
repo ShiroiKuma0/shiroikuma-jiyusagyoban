@@ -29,7 +29,10 @@ import java.io.File
  */
 class HuaweiProbeAction : Action {
 
-    private companion object { const val SWEEP_ARG = "sweep" }
+    private companion object {
+        const val SWEEP_ARG = "sweep"
+        const val WEATHER_SWEEP_ARG = "weather_sweep"
+    }
 
     override val id = "huawei.probe"
     override val category = ActionCategory.SYSTEM
@@ -320,6 +323,44 @@ class HuaweiProbeAction : Action {
                         }
                     }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
                     line("  0x19/0x%02X  %-11s %s".format(cmd, name, r))
+                }
+            }
+
+            // The weather service, swept on request only.
+            //
+            // The band's own census says 0x0F answers commands 0x01..0x09 — nine of them — and this
+            // app has only ever used two: 0x01 to push and 0x05 to set the unit. 0x0C (disable) is
+            // known from a capture and is not even in the census, so the census undercounts.
+            //
+            // Worth knowing because the weather push is broken in a way nothing here can see: the
+            // band acknowledges the frame with a success code and its screen keeps showing Huawei
+            // Health's last reading from 2026-08-23. Our record is not merely unrendered, it is not
+            // stored — the place name never changes. Two of these commands are worth hoping for: a
+            // read-back, which would let the app check its own work instead of asking 白い熊 to look
+            // at the wrist, and the "weather reports ON" that the capture notes concluded did not
+            // exist, on the strength of Health simply resuming pushes.
+            //
+            // Empty payloads on purpose: an empty one is normally refused outright (0x19 answers
+            // 100013 to one), which makes it the safest possible knock on a door whose function is
+            // unknown. This is still a sweep of unknown commands on 白い熊's own band, which is why
+            // it is opt-in and never runs as part of an ordinary diagnostic.
+            if (args[WEATHER_SWEEP_ARG]?.trim().equals("true", ignoreCase = true)) {
+                line("")
+                line("=== service 0x0F (weather) — command sweep, empty payloads ===")
+                line("  known: 0x01 push · 0x05 unit · 0x0C disable (not in the census)")
+                for (cmd in 0x02..0x09) {
+                    if (cmd == 0x05) {
+                        line("  0x0F/0x05  (unit — known, not swept)")
+                        continue
+                    }
+                    val r = runCatching {
+                        val f = session.request(HuaweiCommands.SVC_WEATHER, cmd, ByteArray(0), timeoutMs = 4_000)
+                        val tlvs = session.decrypt(f)
+                        resultOf(tlvs) + "   " + tlvs.joinToString(",") {
+                            "0x%02X=%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(48))
+                        }
+                    }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                    line("  0x0F/0x%02X  %s".format(cmd, r))
                 }
             }
             report.toString()
