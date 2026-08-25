@@ -33,6 +33,7 @@ class HuaweiProbeAction : Action {
         const val SWEEP_ARG = "sweep"
         const val WEATHER_SWEEP_ARG = "weather_sweep"
         const val LISTEN_ARG = "listen_sec"
+        const val WARMUP_ARG = "warmup"
     }
 
     override val id = "huawei.probe"
@@ -378,6 +379,48 @@ class HuaweiProbeAction : Action {
             //
             // Entirely passive, so unlike the sweeps this needs no permission to be careful with:
             // the only risk is learning nothing.
+            // The six commands Health sends on EVERY reconnect that our routine session never sends.
+            //
+            // Our withSession does linkParams, deviceStatus, securityNegotiation, authenticate — and
+            // then goes straight to work. Health follows the same handshake with these six, and the
+            // band's FIRST unsolicited frame lands 104 ms after the last of them. Our own Python
+            // first-run prototype sends all six, and it is the one session of ours the band has ever
+            // volunteered anything to; our Kotlin sessions send none and have never had a single
+            // unsolicited frame in any window.
+            //
+            // Bisectable from the task rather than by rebuilding: `warmup=1a05` sends one,
+            // `warmup=0102,0103,0137,1a05` sends four, `warmup=all` sends the lot. Every one is a
+            // command Health issues on every ordinary connect, and none writes a setting, a clock,
+            // a language or any wizard state. provision() is deliberately NOT reachable from here.
+            args[WARMUP_ARG]?.trim()?.lowercase()?.ifEmpty { null }?.let { spec ->
+                val want = if (spec == "all") listOf("0107", "0105", "0102", "0103", "0137", "1a05")
+                    else spec.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                line("")
+                line("=== warm-up: $want ===")
+                for (which in want) {
+                    val r = runCatching {
+                        val f = when (which) {
+                            "0107" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_PRODUCT_INFO, HuaweiCommands.productInfo())
+                            "0105" -> {
+                                val tz = java.util.TimeZone.getDefault()
+                                val off = tz.getOffset(System.currentTimeMillis()) / 60_000
+                                session.request(
+                                    HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SET_TIME,
+                                    HuaweiCommands.setTime(System.currentTimeMillis() / 1000, off / 60, off % 60),
+                                )
+                            }
+                            "0102" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES, HuaweiCommands.supportedServices())
+                            "0103" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_COMMANDS, HuaweiCommands.supportedCommands())
+                            "0137" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_EXPAND_CAPABILITY, HuaweiCommands.expandCapability())
+                            "1a05" -> session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount())
+                            else -> throw IllegalArgumentException("unknown warm-up step '$which'")
+                        }
+                        session.decrypt(f).joinToString(",") { "%d:%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(32)) }
+                    }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                    line("  $which  $r")
+                }
+            }
+
             val listenSec = args[LISTEN_ARG]?.trim()?.toIntOrNull()?.coerceIn(1, 3600)
             if (listenSec != null) {
                 // Appended to its own file AS IT ARRIVES, never buffered.

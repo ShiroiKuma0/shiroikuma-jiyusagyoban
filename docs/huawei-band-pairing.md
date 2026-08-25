@@ -492,63 +492,159 @@ into an empty list, so a link that had gone idle read exactly like a quiet band 
 link on a timer and says so in the file. **"Nothing was heard" is only evidence when it appears next
 to proof that hearing worked.**
 
-### The weather service has nine commands; we use two (2026-08-25)
+### Weather: the push and the forecast are ONE record (2026-08-25)
 
-The push is acknowledged with a success code and the band's screen does not change — it keeps Huawei
-Health's `Hodkovicky` from 2026-08-23 with no current temperature at all. The place name never
-becomes ours, so the record is not merely unrendered: **it is not stored.**
+For two days `天気送信（Huawei）` reported "Weather pushed" after every run while the band's screen
+kept Huawei Health's `Hodkovicky` dated 2026-08-23. This section used to blame the payload's shape.
+It was the **count**, and the reason it took two days to find is that the app was not listening.
 
-Two differences from the captured Health push. The place encoding was one — Health sent plain ASCII
-and we send 29 UTF-8 bytes — and it is **refuted**: pushing an ASCII `Praha` changed nothing on the
-screen. The other is the four tags we omit on purpose (10, 15, containers 129/133 — condition and
-icon), whose values the capture never mapped and which cannot be reproduced now that the capture and
-its `btsnoop.py` are gone from disk.
+**The band treats `0x0F/0x01` (the current-weather push) and `0x0F/0x08` (the forecast) as a single
+record.** An invalid forecast makes the band discard the push as well — after having already answered
+the push with `100000`. So a push that never landed looked exactly like one that did.
 
-The band's own census says 0x0F answers **nine** commands, 0x01…0x09. This app uses two. Swept with
-empty payloads (`huawei.probe weather_sweep=true`):
+**The forecast is refused unless it carries 24 hourly entries and at least 8 daily ones.** Measured
+against the band, holding everything else fixed:
+
+| hourly | daily | reply |
+|---|---|---|
+| 24 | 15 | `100000` |
+| 24 | 14 | `100000` |
+| 24 | 10 | `100000` |
+| 24 | **9** | `100000` |
+| 24 | **8** | `100000` |
+| 24 | 7 | `115001` |
+| 24 | 0 | `115001` |
+| **23** | 15 | `115001` |
+| 3 | 1 | `115001` — Health's own bytes, merely fewer of them |
+| 0 | 15 | `115001` |
+
+`115001` is the refusal. Every forecast this app ever sent carried one hour and one day.
+
+**We were throwing the answer away.** `runCatching { session.sendLarge(SVC_WEATHER, 0x08, …) }` and
+nothing else — the bytes left the phone, the call returned, and nobody asked the band what it
+thought. Reading that one reply turned a two-day mystery into a fifteen-minute bisection. Anything
+that sends and does not read is a place where this can happen again.
+
+Two theories died on the way and are recorded so they are not re-run: it is **not** the sequence
+(Health's three pre-push reads `0x0F/0x02` → `{1: FF}`, `0x06` → `{1: 00 0F}`, `0x0A` →
+`{1: 00 00 00 03}` were reproduced exactly, and the forecast was still refused), and it is **not**
+the place encoding (ASCII vs UTF-8 was refuted earlier and remains refuted).
+
+### Three fields the capture could not name, and a screen could
+
+A byte-level capture pins structure and cannot pin meaning: Health's tag 17 held 19 against a
+current 17 °C, which is a perfectly plausible temperature. 白い熊 photographed all ten of the band's
+weather pages, and each page is an oracle a capture cannot be. Sending deliberately absurd values
+and reading the wrist settled three fields in one round:
+
+| tag | proven by | meaning |
+|---|---|---|
+| `15` | sent 9 → page reads "9 / Strong" | **UV index**. Had been hard-coded to 3 and called unmapped, because all four captured pushes carried 3. |
+| `16` | sent 33 → "33 %" | **humidity** |
+| `17` | sent 100 → "100 km/h" | **wind speed, km/h** — not a temperature |
+| hourly `7` | series falls to 0 at dusk | **hourly UV**; the band's "Highest level" is its maximum |
+| `9` | sent 7 → headline "7°" | **current temperature** — it only ever appears once the record as a whole is accepted |
+
+**The band computes sun and moon itself.** On an ACCEPTED forecast carrying no moonrise, no moonset
+and no phase byte, the Moon page still read 02:33 / 19:07 and the Moon-phase page still read
+"Waxing gibbous · 93 % · Day 14", correctly. It derives them from the `0x18/0x07` position frame.
+Tags 22/23/26/27/30 are therefore optional; a 15-day list carrying only tags 18–21 is accepted.
+
+**The band recomputes the day high from the hourly series.** Push container `133` said 39 and the
+band showed 43 — the maximum of the 24 hourly temperatures sent. The low came from the push.
+
+### The condition-icon table, read off the wrist (2026-08-25)
+
+The band draws the icons and tells nobody, so the only instrument is 白い熊's eyes. Three forecasts
+were pushed in which **every cell printed its own code as its temperature** — hour `n` carried
+condition `n` and read `n°` — so any photograph, at any scroll position, labelled each icon
+unambiguously and no counting was needed.
+
+**Hourly tag 4 is the condition; tag 6 is not.** The first sweep varied tag 6 across 0…23 and all
+24 cells drew the same icon while the daily list plainly separated cloud from rain. Health writes a
+constant `1` into tag 4, which is exactly the sun-behind-cloud its captures always showed.
+
+**Hourly and daily share ONE table** — 2 is a bare cloud in both, 3 rain in both, 7 a single drop in
+both, 10 a downpour in both.
 
 ```
-0x0F/0x02 0x03 0x04 0x06 0x07 0x08 0x09   all → result 100013
+ 0 sun behind cloud      12 downpour              24 sun behind cloud
+ 1 mostly sunny          13 snow, light           25 heavy rain
+ 2 bare cloud            14 snow                  26 snow
+ 3 rain                  15 snow                  27 snow, heavier
+ 4 thunderstorm          16 snow                  28 snow, heavy
+ 5 sun behind cloud      17 snow, heavy           29 blowing snow
+ 6 rain                  18 fog                   30 blowing snow
+ 7 one drop              19 mist                  31 blowing snow
+ 8 two drops             20 wind-blown haze       32 single flake
+ 9 rain                  21 light drops           33 thermometer + sun   (heat)
+10 rain, heavier         22 light drops           34 thermometer + flake (cold)
+11 rain, heavy           23 rain                  35 BARE WIND LINES
 ```
 
-`100013` is the refuse-an-empty-payload code, the same answer 0x19 gives. So **all seven exist and
-are live, and every one of them wants a parameter** — none is a no-argument read. That weakens the
-hope of a read-back that would let the app check its own work, though one may still answer to a
-tagged payload, which is how 0x19 was opened.
+**The range is 0–35.** 36, 37 and **48** all draw the same plain sun, and 48 is far outside any
+plausible table — so that sun is the out-of-range fallback, not a clear-sky icon. A wrong code
+therefore fails *cheerfully*, rendering as fine weather, which is the kind of failure that hides.
+Unrecognised words map to 0 and never into the fallback.
 
-It does not explain the display. The push command is right, the frame is accepted, and the reading
-still does not land.
+**There is no sleet or hail icon.** The set runs sun / cloud / rain / snow / fog / wind / thermometer
+and stops; nothing depicts mixed or frozen-pellet precipitation. Codes 5 and 6 were read as "mixed
+drops" in an earlier round and `sleet`/`hail` were mapped onto them; photographed side by side with a
+known rain icon between them they are plainly a sun-behind-cloud and a plain rain. **Reading two
+icons from photographs taken minutes apart is not a comparison** — putting the candidates adjacent
+with a ruler between them is, and it overturned the earlier call.
+
+`35` matters out of proportion to its size: nothing in 0…23 depicted wind, so `wind` had been falling
+back to a bare cloud. The icon existed; the swept range simply had not reached it.
+
+**The band clamps BOTH ends of today's range to the hourly series.** A push saying 2/2 with an hourly
+strip running 1…35 displayed `35°/1°`. And **today's row draws its icon from the push, not from daily
+tag 19**, which is why row one has been useless in every sweep.
+
+**The day list shows SEVEN rows**, however many days are sent — a 15-row sweep wastes its last eight.
 
 ### Weather is a PUSH, not a request
 
 The band displays weather that the phone sends it. There is no fetching involved on our side and no
-HTTP proxying. Captured 2026-08-22 and re-captured properly 2026-08-23 by toggling each setting with
-a decrypted snoop running.
+HTTP proxying. Captured 2026-08-22, re-captured 2026-08-23, and corrected against the band itself
+2026-08-25.
 
 ```
-0x18/0x07   position   {1: epoch, 2: latitude, 3: longitude}
-0x0F/0x01   weather    {  8: place name, plain ASCII — "Hodkovicky"
-                          9: current °C            —  0x10 = 16
-                         12: observation epoch     —  07:00 that morning
-                         16: humidity %            —  0x4D = 77
-                         17: LOW °C  18: HIGH °C   —  12 and 18, around a current 16
-                         10, 15, and containers 129 / 133: condition and icon, unmapped }
-0x0F/0x05   unit       {1: 01} Fahrenheit · {1: 00} Celsius
-0x0F/0x0C   disable    {129: 02 01 02}   — the "Weather reports" switch, OFF only
+0x18/0x07   position   {1: epoch, 2: latitude, 3: longitude}   little-endian doubles
+0x0F/0x01   weather    { 129: {2: 01, 3: 01 03}  unmapped container, sent first
+                         133: {6: LOW °C, 7: HIGH °C}          <- the day range lives HERE
+                           8: place name, plain ASCII
+                           9: current °C
+                          10: unmapped, always 0
+                          12: day marker — 07:00 local, EQUAL to daily[0]'s own timestamp
+                          15: UV index
+                          16: humidity %
+                          17: wind speed km/h   FOUR bytes
+                          18: unmapped          FOUR bytes }
+0x0F/0x08   forecast   {129: 24 x tag 130 hourly, 144: >=8 x tag 145 daily}
+0x0F/0x0B   done       {129: <empty>}          sent right after the forecast
+0x0F/0x05   unit       {1: 01} Fahrenheit - {1: 00} Celsius
+0x0F/0x0C   switch     {129: {2: 02}} off - {129: {2: 01}} on
 ```
 
-**Three corrections to what this file used to say.**
+Hourly entry (tag 130, 24 B): `3` hour epoch, `4` = 1, `5` °C, `6` condition, `7` UV, `8` apparent °C.
+Daily entry (tag 145): `18` day epoch, `19` condition, `20` high, `21` low, and optionally `22`
+sunrise, `23` sunset, `26` moonrise, `27` moonset, `30` phase.
+
+**Corrections to what this file used to say.**
 
 *The temperature unit is on the WEATHER service, not the locale one.* `0x0C/0x05` was a reasonable
 guess from the locale command's own unit-system byte, and it is wrong: the switch is `0x0F/0x05`.
 
-*Tag 17 is the LOW and 18 the HIGH*, not the other way round — 12 and 18 around a current 16 °C.
-Written the wrong way round the band shows the day's range inverted, which reads as plausible weather
-rather than as a bug, so nothing would ever have reported it.
+*Tags 17 and 18 are NOT the low and the high.* This file asserted that for weeks. They are four bytes
+each, 17 is the wind speed, 18 is unmapped, and the day range is in container `133`. Writing a
+temperature into 17 put the wind speed on the band's wind page and nothing anywhere near the range.
 
-*There is no "weather reports on" command.* Switching it off sends `0x0F/0x0C`; switching it back on
-sends the band **nothing at all**. Health simply resumes pushing, and the band displays whatever it
-is next given. So re-enabling weather means pushing some.
+*There IS a "weather reports on" command, and this file used to deny it.* `0x0F/0x0C {129: {2: 02}}`
+is the off direction, captured while toggling the switch; `{129: {2: 01}}` is the on direction, which
+Health sends **when the companion re-establishes the weather session** — at pairing and after a
+reconnect — and not when the switch itself is tapped. That is why toggling the switch on appeared to
+send nothing: the capture was bounded by the tap, and the command belongs to a different event.
 
 **The coordinates are LITTLE-endian IEEE-754 doubles**, while every integer elsewhere in this
 protocol is big-endian. Decoding them the same way as everything else yields 10⁻¹²⁹ rather than an

@@ -115,6 +115,21 @@ object HuaweiSyncRunner {
             val token = HuaweiSettings.authToken(context)
                 ?: throw IllegalStateException("no stored token — pair the band first")
             api.authenticate(authId, token, Random.nextLong(1L, Long.MAX_VALUE))
+            // The six Huawei Health sends on EVERY reconnect, without which the band never speaks.
+            //
+            // Until 2026-08-25 this went straight from authenticate to the work, and in that state
+            // the band answers everything we ask and volunteers NOTHING — no weather pull, no
+            // satellite request, no RR stream. Every listening window we ran was silent, through a
+            // link proven alive each 30 s, while 白い熊 pressed buttons on the band for nothing.
+            //
+            // Health follows the same handshake with these six and the band's first unsolicited
+            // frame lands 104 ms later. Sending them here turned 90 s of silence into 30 frames:
+            // 0x0F/0x04 (send me weather) immediately, DataSync, a battery event, and 0x19/0x03 RR
+            // intervals every five seconds. That is the band behaving as it does for Health.
+            //
+            // All six are reads or declarations Health issues on every ordinary connect; none
+            // writes a setting, a clock, a language or any wizard state. They cost ~200 ms.
+            runCatching { api.announceCompanion() }
             block(session, api)
         }
     }
@@ -367,6 +382,27 @@ object HuaweiSyncRunner {
         lowC: Int?,
         latitude: Double?,
         longitude: Double?,
+        uvIndex: Int? = null,
+        windKmh: Int? = null,
+        /**
+         * The hourly series, first entry = the hour we are in.
+         *
+         * Timestamps are ignored and restamped by [HuaweiCommands.padHours], so a caller assembling
+         * these from parallel arrays does not have to know the hour boundary.
+         */
+        hourlyPoints: List<HuaweiCommands.HourlyPoint> = emptyList(),
+        /** Days, starting today. Empty falls back to the single high/low above. */
+        dailyDays: List<HuaweiCommands.DailyPoint> = emptyList(),
+        /** The first hourly entry's epoch, when the source knows its own alignment better than we do. */
+        hourStartOverride: Long? = null,
+        /** How many of [hourlyPoints] / [dailyDays] were real rather than carried across a gap. */
+        realHourly: Int? = null,
+        realDaily: Int? = null,
+        rawPayload: ByteArray? = null,
+        rawForecast: ByteArray? = null,
+        enableFirst: Boolean = false,
+        readBack: Boolean = false,
+        preReads: Boolean = false,
     ): Result<String> = withSession(context, address) { session, _ ->
         val now = System.currentTimeMillis() / 1000
         if (latitude != null && longitude != null) {
@@ -391,15 +427,141 @@ object HuaweiSyncRunner {
             if (highC != null && lowC != null) append(" · $lowC–$highC°C")
             if (latitude != null && longitude != null) append(" · position sent")
         }
+        // The exact bytes Health sends, when we are replaying rather than composing.
+        //
+        // Our push differs from Health's captured one in five ways and the capture contains no
+        // negative control, so it cannot say which of them costs the record. Composing a "corrected"
+        // payload from five simultaneous guesses would repeat this morning's mistake. Replaying
+        // Health's own 59 bytes verbatim tests the SHAPE alone; once that is known to land, the
+        // fields can be substituted back one at a time.
+        // Health's tag 12 is not "now": it is 07:00 local, and it equals daily[0]'s own timestamp
+        // exactly, with the following days stepping 86400 s from it. Both are built from this one
+        // value so they cannot drift apart.
+        val zone = java.time.ZoneId.systemDefault()
+        val dayMarker = java.time.LocalDate.now(zone).atStartOfDay(zone).plusHours(7).toEpochSecond()
+        val payload = rawPayload ?: HuaweiCommands.weather(
+            place, temperatureC, dayMarker, humidity, highC, lowC, uvIndex, windKmh,
+        )
+        // Health reads three things off the band BEFORE it pushes anything. We never have.
+        //
+        // Behind a flag, not on by default, because it is a hypothesis: on 2026-08-25 the forecast
+        // was found never to have been applied — not once, not even when byte-identical to Health's
+        // — while the push beside it always was. A flag lets one build test both orders from the
+        // task instead of costing a second build to answer.
+        val pre = StringBuilder()
+        if (preReads) {
+            for (cmd in HuaweiCommands.WEATHER_READS) {
+                val r = runCatching {
+                    val f = session.request(HuaweiCommands.SVC_WEATHER, cmd, HuaweiProtocol.tlv(1), timeoutMs = 4_000)
+                    session.decrypt(f).joinToString(",") { "%d:%s".format(it.tag, HuaweiCrypto.upperHex(it.value)) }
+                }.getOrElse { it::class.java.simpleName }
+                pre.append(" 0x%02X=%s".format(cmd, r))
+            }
+        }
+        if (enableFirst) {
+            runCatching {
+                session.send(HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_DISABLE, HuaweiCommands.weatherEnable())
+            }
+        }
         val reply = runCatching {
             session.request(
-                HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH,
-                HuaweiCommands.weather(place, temperatureC, now, humidity, highC, lowC),
+                HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH, payload,
             )
         }.getOrElse {
             throw IllegalStateException(
                 "$sent — but the band never answered the push (${it.message ?: it::class.java.simpleName}). " +
                     "Nothing here can say it landed, so this is not reported as sent.",
+            )
+        }
+        // 0x0F/0x02, 0x06 and 0x0A are READS. The earlier sweep called them all "refuses an empty
+        // payload" because it sent an empty PAYLOAD; the read form is tag 1 with a zero-length
+        // VALUE, which is a different thing on the wire. If any of them reflects what the band is
+        // actually holding, it is the oracle that stops this needing 白い熊's eyes on the wrist.
+        val reads = StringBuilder()
+        if (readBack) {
+            for (cmd in listOf(0x02, 0x06, 0x0A)) {
+                val r = runCatching {
+                    val f = session.request(HuaweiCommands.SVC_WEATHER, cmd, HuaweiProtocol.tlv(1), timeoutMs = 4_000)
+                    session.decrypt(f).joinToString(",") { "%d:%s".format(it.tag, HuaweiCrypto.upperHex(it.value)) }
+                }.getOrElse { it::class.java.simpleName }
+                reads.append(" 0x%02X=%s".format(cmd, r))
+            }
+        }
+        // The forecast, and the little frame Health sends after it.
+        //
+        // Health sends 0x0F/0x08 within 6 ms of EVERY push — 1290 bytes, two slices, 24 hourly and
+        // 15 daily entries — and then 0x0F/0x0B. We have never sent either. With the current-weather
+        // push now proven not to land on its own, even byte-for-byte, an incomplete record is the
+        // remaining structural difference: the band may simply not show a reading with no forecast
+        // behind it.
+        // The forecast is not optional: the band draws the current hour out of THIS, not out of the
+        // push above. Without it the reading is discarded and the screen keeps whatever it had.
+        //
+        // We have one reading, so we send one hour and one day. Health sends 24 and 15; padding to
+        // match would mean inventing weather. The hour is rounded DOWN to the hour boundary because
+        // every entry Health sends sits exactly on one, and the band picks the entry nearest now.
+        var realHours = 0
+        var realDays = 0
+        val builtForecast = rawForecast ?: run {
+            val hourStart = hourStartOverride ?: (now / 3600) * 3600
+            // Sunrise and sunset are ASTRONOMY, not weather: computed here from the position we
+            // were given, by the same calculator the sun contexts use. Whether the band reads them
+            // or works them out itself from the position frame is still unknown — the only test of
+            // that rode in a forecast the band refused, so it proved nothing either way.
+            val today = java.time.LocalDate.now(zone)
+            fun sunAt(event: String): Long? {
+                if (latitude == null || longitude == null) return null
+                val minute = com.opentasker.core.contexts.SunEventCalculator
+                    .eventMinuteOfDay(today, latitude, longitude, event, zone) ?: return null
+                return today.atStartOfDay(zone).plusMinutes(minute.toLong()).toEpochSecond()
+            }
+            // With no series we have exactly one reading, and padHours repeats it across the 24
+            // the band demands. The band then shows a flat line, which is what a single reading
+            // honestly looks like stretched over a day — the fix is a real series, not a curve
+            // invented here.
+            val known = hourlyPoints.ifEmpty {
+                listOf(HuaweiCommands.HourlyPoint(hourStart, temperatureC, uvIndex = uvIndex ?: 0))
+            }
+            realHours = minOf(realHourly ?: known.size, HuaweiCommands.FORECAST_HOURS)
+            val days = dailyDays.ifEmpty {
+                if (highC == null || lowC == null) emptyList()
+                else listOf(
+                    HuaweiCommands.DailyPoint(
+                        epochSeconds = dayMarker, highC = highC, lowC = lowC,
+                        sunriseSeconds = sunAt("sunrise"), sunsetSeconds = sunAt("sunset"),
+                    ),
+                )
+            }
+            if (days.isEmpty()) {
+                throw IllegalStateException(
+                    "$sent — no high/low, so there is no day to put in the forecast, and the band " +
+                        "refuses a forecast with no days (115001). Nothing was pushed.",
+                )
+            }
+            realDays = realDaily ?: days.size
+            HuaweiCommands.forecast(
+                HuaweiCommands.padHours(known, hourStart),
+                HuaweiCommands.padDays(days, dayMarker),
+            )
+        }
+        // The forecast's own answer, which this used to throw on the floor.
+        //
+        // `runCatching { sendLarge(...) }` and nothing else is why a forecast that never applied
+        // could look identical to one that did, for two days: the bytes left the phone, the call
+        // returned, and no one asked the band what it thought. Whatever it says now travels back in
+        // the result string, so the next failure is diagnosable from the task rather than from
+        // 白い熊's wrist.
+        val forecastCode = runCatching {
+            session.sendLarge(HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_FORECAST, builtForecast)
+            session.awaitFrame(HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_FORECAST, 6_000)
+        }.getOrNull()?.let { f ->
+            session.decrypt(f).firstOrNull { it.tag == HuaweiProtocol.TAG_RESULT }
+                ?.let { HuaweiProtocol.bytesToInt(it.value) }
+        }
+        runCatching {
+            session.send(
+                HuaweiCommands.SVC_WEATHER, HuaweiCommands.WEATHER_PUSH_DONE,
+                HuaweiCommands.weatherPushDone(),
             )
         }
         val code = session.decrypt(reply)
@@ -411,7 +573,23 @@ object HuaweiSyncRunner {
             // while the band's weather screen stayed blank and dated 2026-08-23. The band
             // acknowledges the FRAME; whether it stored or rendered the reading is not
             // observable from here, and saying otherwise is the same lie in a smaller font.
-            HuaweiProtocol.RESULT_SUCCESS -> "$sent · frame acknowledged (the band does not confirm display)"
+            HuaweiProtocol.RESULT_SUCCESS ->
+                "$sent · frame acknowledged (the band does not confirm display)" +
+                    " · forecast=" + when (forecastCode) {
+                        null -> "no answer"
+                        HuaweiProtocol.RESULT_SUCCESS ->
+                            if (rawForecast != null) "accepted"
+                            // The band takes 24 hours or nothing, and we rarely know 24. Saying how
+                            // many were real keeps a flat line from reading as a forecast.
+                            else "accepted (${HuaweiCommands.FORECAST_HOURS}h/$realHours real, " +
+                                "${maxOf(HuaweiCommands.FORECAST_DAYS_MIN, realDays)}d/$realDays real)"
+                        else -> throw IllegalStateException(
+                            "$place ${temperatureC}°C — the band REFUSED the forecast with $forecastCode, " +
+                                "so it discarded the reading with it and the screen did not change.",
+                        )
+                    } +
+                    (if (pre.isEmpty()) "" else " · pre$pre") +
+                    (if (reads.isEmpty()) "" else " · reads$reads")
             else -> throw IllegalStateException("$sent — the band REFUSED the push with result $code")
         }
     }
