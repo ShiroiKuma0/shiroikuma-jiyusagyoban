@@ -62,6 +62,22 @@ object HuaweiCommands {
     const val WEATHER_PUSH = 0x01
     const val WEATHER_UNIT = 0x05       // 01 Fahrenheit, 00 Celsius
     const val WEATHER_DISABLE = 0x0C    // the "Weather reports" switch, OFF direction only
+    const val WEATHER_FORECAST = 0x08   // 24 hourly + 15 daily entries; Health sends it after EVERY push
+    const val WEATHER_PUSH_DONE = 0x0B  // the little empty frame Health closes a push with
+
+    /**
+     * The three reads Health performs immediately BEFORE every weather push.
+     *
+     * `0x02` answers `{1: FF}`, `0x06` answers `{1: 00 0F}`, `0x0A` answers `{1: 00 00 00 03}` —
+     * capability masks of some kind. We have never sent any of them, and on 2026-08-25 the forecast
+     * we do send turned out never to have been applied even once, while the current-weather push in
+     * the same session always was. These reads are the remaining difference in the sequence, and
+     * they are the same shape of bug as the six announce commands that unblocked the session.
+     *
+     * The request form is tag 1 with a zero-length VALUE, which is not the same wire object as an
+     * empty payload — an earlier sweep sent the latter and concluded the band "refuses" them.
+     */
+    val WEATHER_READS = listOf(0x02, 0x06, 0x0A)
     const val SVC_LOCATION = 0x18
     const val LOCATION_PUSH = 0x07
 
@@ -345,24 +361,59 @@ object HuaweiCommands {
      * and place without them; sending a wrong condition code would put a confidently wrong icon on
      * 白い熊's wrist, which is worse than none.
      */
+    /**
+     * The current-weather push, in the shape Health actually sends.
+     *
+     * Rebuilt 2026-08-25 against a capture of Health pushing to this same band, after our own shape
+     * was acknowledged with `100000` and silently discarded for two days. Five things were wrong and
+     * they had to be fixed together — each replay that changed only some of them still failed, which
+     * is why this is one change rather than five:
+     *
+     *  * **Tags 17 and 18 are FOUR bytes**, big-endian. We sent one, which is the only outright
+     *    malformation: a length check failing after the transport has already answered success is
+     *    exactly the symptom we had.
+     *  * **The day range lives in container 133** `{6: low, 7: high}`, not in 17/18. What 17 and 18
+     *    actually mean is unmapped — Health sent 19 and 17 against a current 17 and a 13–21 range,
+     *    so 18 matched the current temperature and 17 matched nothing we can name.
+     *  * **Container 129, and tags 10 and 15**, are absent from ours entirely.
+     *  * **The containers come FIRST** on the wire.
+     *  * Tag 12 is not "now": it is the day marker, equal to the first daily-forecast entry's own
+     *    timestamp, and the daily entries step from it by exactly 86400 s.
+     *
+     * And a correct push is still not enough on its own — the band draws the current hour out of
+     * the [forecast], so [HuaweiSyncRunner.pushWeather] sends both.
+     */
     fun weather(
         place: String,
         temperatureC: Int,
-        observedAtSeconds: Long,
+        dayMarkerSeconds: Long,
         humidityPercent: Int?,
         highC: Int?,
         lowC: Int?,
+        uvIndex: Int? = null,
+        windKmh: Int? = null,
     ): ByteArray =
-        tlv(8, place) +
+        // 129 and 133 lead, as they do in every captured push.
+        tlv(129, tlv(2, byteArrayOf(1)) + tlv(3, byteArrayOf(1, 3))) +
+            (if (highC == null || lowC == null) ByteArray(0)
+            else tlv(133, tlv(6, byteArrayOf(lowC.toByte())) + tlv(7, byteArrayOf(highC.toByte())))) +
+            tlv(8, place) +
             tlv(9, byteArrayOf(temperatureC.toByte())) +
-            tlv(12, HuaweiProtocol.intBytes(observedAtSeconds.toInt(), 4)) +
+            tlv(10, byteArrayOf(0)) +
+            tlv(12, HuaweiProtocol.intBytes(dayMarkerSeconds.toInt(), 4)) +
+            // The UV index the band shows on its own UV page — confirmed 2026-08-25 by sending 9
+            // and reading "9 / Strong" off the wrist. It had stood in this file as a hard-coded 3
+            // labelled "unmapped" because Health's four captured pushes all happened to carry 3.
+            tlv(15, byteArrayOf((uvIndex ?: 0).toByte())) +
             (humidityPercent?.let { tlv(16, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
-            // 17 is the LOW and 18 the HIGH — the reverse of what this file said until a capture
-            // on 2026-08-23 showed 16 °C now with 12 and 18 either side of it. Written the old way
-            // round the band would have shown the day's range inverted, which reads as plausible
-            // weather rather than as a bug.
-            (lowC?.let { tlv(17, byteArrayOf(it.toByte())) } ?: ByteArray(0)) +
-            (highC?.let { tlv(18, byteArrayOf(it.toByte())) } ?: ByteArray(0))
+            // Wind speed in km/h — confirmed 2026-08-25 by sending 100 and reading "100 km/h" off
+            // the wrist. Health's capture had it at 19 against a 17°C reading, which is why it sat
+            // here for two days as "unmapped, temperature-like": 19 is a plausible temperature.
+            // A capture cannot tell a wind from a temperature; a screen can.
+            tlv(17, HuaweiProtocol.intBytes(windKmh ?: 0, 4)) +
+            // Still genuinely unmapped. Moving it to 44 changed nothing visible on any of the ten
+            // pages, so it is carried at the right WIDTH and nothing is claimed about its meaning.
+            tlv(18, HuaweiProtocol.intBytes(temperatureC, 4))
 
     /**
      * The temperature unit the band displays.
@@ -382,6 +433,265 @@ object HuaweiCommands {
      * way to re-enable weather is to push some: see [weather].
      */
     fun weatherDisable(): ByteArray = tlv(129, byteArrayOf(2, 1, 2))
+
+    /**
+     * The ON half of the same switch — `{129: {2: 01}}`.
+     *
+     * The note above said there was no matching "on", inferred from Health resuming pushes after the
+     * UI switch was turned back on. The 2026-08-25 capture shows why that inference was wrong: Health
+     * sends this at PAIRING and again after a reconnect, not when the switch is touched. It is part
+     * of establishing the weather session, which is exactly the part a companion that only ever
+     * pushes would never see.
+     */
+    fun weatherEnable(): ByteArray = tlv(129, byteArrayOf(2, 1, 1))
+
+    /**
+     * The forecast — and the reason a current-weather push alone never showed anything.
+     *
+     * Established 2026-08-25 by experiment, after a byte-exact replay of Health's 59-byte push was
+     * acknowledged and changed nothing: **the band draws the CURRENT HOUR OUT OF THE FORECAST, not
+     * out of the push.** Replaying Health's push together with its 1290-byte `0x0F/0x08` put its
+     * reading on screen instantly, and the temperature shown was 20 — the forecast's 13:00 entry —
+     * while the push's own current-temperature tag said 17. That also explains the very first
+     * symptom: a band with no hourly entry for *now* draws the current temperature as `--`.
+     *
+     * Structure, decoded from the capture:
+     *
+     *   129 → array of hourly `130 {3: epoch, 4: 01, 5: °C, 6: 07, 7: condition, 8: u32}`
+     *   144 → array of daily  `145 {18: epoch, 19: condition, 20: high, 21: low,
+     *                               22: sunrise, 23: sunset, 26: moonrise, 27: moonset, 30: phase}`
+     *
+     * Tags 4 and 6 are constant in every one of Health's 24 hourly entries; tag 8 tracks the
+     * temperature within a degree and is not otherwise understood, so it is given the temperature
+     * rather than a guess dressed up as a different number.
+     *
+     * **We send only the hours and days we actually have.** Health sends 24 and 15; padding ours out
+     * to match would mean inventing weather, which is exactly the kind of confident fiction this
+     * band's protocol has already cost enough time. A short array is what an honest forecast looks
+     * like when the source gives one reading.
+     */
+    /**
+     * How many hourly entries the band demands. Not a convention — a hard gate.
+     *
+     * Measured 2026-08-25 against the band itself, with the reply code finally being read:
+     * 24 hourly + 15 daily → `100000`; 24 + 14 → `100000`; **23 + 15 → `115001`**; 24 + 0 → refused;
+     * 3 + 1 (Health's own bytes, merely fewer of them) → refused.
+     *
+     * Everything `天気送信` ever sent carried ONE hour and ONE day, so every forecast it ever sent
+     * was thrown away — and because the band treats the push and the forecast as a single record,
+     * the push was discarded with it. That is the whole of the two-day "Weather pushed, screen never
+     * moves" bug: not the shape, not the sequence, not the encoding. The count.
+     */
+    const val FORECAST_HOURS = 24
+
+    /**
+     * How many daily entries the band demands. Also a hard gate, and a separate one.
+     *
+     * Measured the same afternoon, holding the hourly count at 24: 7 days → `115001`, **8 days →
+     * `100000`**, 10, 14 and 15 all accepted. A run with 15 days carrying ONLY tags 18–21 — no
+     * sunrise, no sunset, no moon — was also accepted, so the sun and moon tags are not part of
+     * this gate and an earlier test that seemed to say so was void (its payload had been refused
+     * for the count before anything in it was read).
+     */
+    const val FORECAST_DAYS_MIN = 8
+
+    /**
+     * A weather word from the 天気 contract to the band's own condition code.
+     *
+     * **Measured on the band across five sweeps, 2026-08-25.** Every cell printed its own code as
+     * its temperature — hour `n` carried condition `n` and read `n°` — so a photograph at any scroll
+     * position labelled each icon and no counting was needed. 白い熊 photographed the pages; the
+     * icons were read off the wrist.
+     *
+     * ```
+     *  0 sun behind cloud      12 downpour              24 sun behind cloud
+     *  1 mostly sunny          13 snow, light           25 heavy rain
+     *  2 bare cloud            14 snow                  26 snow
+     *  3 rain                  15 snow                  27 snow, heavier
+     *  4 thunderstorm          16 snow                  28 snow, heavy
+     *  5 sun behind cloud      17 snow, heavy           29 blowing snow
+     *  6 rain                  18 fog                   30 blowing snow
+     *  7 one drop              19 mist                  31 blowing snow
+     *  8 two drops             20 wind-blown haze       32 single flake
+     *  9 rain                  21 light drops           33 thermometer + sun   (heat)
+     * 10 rain, heavier         22 light drops           34 thermometer + flake (cold)
+     * 11 rain, heavy           23 rain                  35 BARE WIND LINES
+     * ```
+     *
+     * **The range is 0–35.** 36, 37 and 48 all draw the same plain sun, and 48 is far outside any
+     * plausible table, so that sun is the out-of-range fallback rather than a clear-sky icon. A
+     * wrong code therefore fails *cheerfully* — it renders as fine weather — which is the kind of
+     * failure that hides, so unrecognised words map to 0 and never into the fallback.
+     *
+     * **There is no sleet or hail icon.** Nothing in 0–35 depicts mixed or frozen-pellet
+     * precipitation: the set runs sun / cloud / rain / snow / fog / wind / thermometer and stops.
+     * Codes 5 and 6 were read as "mixed drops" in an earlier round and mapped to `sleet` and `hail`
+     * on that basis; photographed side by side with a known rain icon between them they are plainly
+     * a sun-behind-cloud and a plain rain, and that mapping was wrong. Both words now fall back to
+     * the nearest **real** family, which is a choice between two imperfect answers rather than a
+     * precision the band does not offer: `sleet` to snow because it is frozen and what it changes
+     * for the wearer is the ground, `hail` to rain because it falls as discrete precipitation.
+     * Neither is invented, and neither claims to be exact.
+     *
+     * Round one is worth recording as a warning: it swept hourly tag 6 across 0…23 and all 24 cells
+     * drew the same icon, while the daily list plainly separated cloud from rain. **Tag 6 is not the
+     * hourly condition; tag 4 is.** The hourly and daily spaces are ONE table.
+     */
+    fun conditionCode(word: String?): Int = when (word?.trim()?.lowercase()) {
+        "clear", "mostly_clear" -> 1
+        "partly_cloudy" -> 0
+        "cloudy", "overcast" -> 2
+        "wind" -> 35
+        "fog" -> 18
+        "haze" -> 19
+        "drizzle" -> 7
+        "rain" -> 9
+        "heavy_rain" -> 12
+        // No mixed-precipitation icon exists — see above. Nearest real family, honestly labelled.
+        "sleet" -> 14
+        "hail" -> 9
+        "snow" -> 14
+        "heavy_snow" -> 17
+        "thunderstorm" -> 4
+        else -> 0
+    }
+
+    /**
+     * Stretch however many hours we actually know into the 24 the band insists on.
+     *
+     * Deliberately a separate, named step rather than something [forecast] does quietly, because
+     * padding is the difference between a forecast and a flat line pretending to be one. The caller
+     * pads, so the caller can say how much of what it sent was real.
+     *
+     * Each missing hour repeats the last known point, re-stamped to its own hour. Extrapolating a
+     * curve would look more like weather and be no more true.
+     */
+    fun padHours(known: List<HourlyPoint>, startEpochSeconds: Long): List<HourlyPoint> {
+        require(known.isNotEmpty()) { "padHours needs at least one real reading to repeat" }
+        return (0 until FORECAST_HOURS).map { i ->
+            val hour = startEpochSeconds + 3600L * i
+            val src = known.getOrNull(i) ?: known.last()
+            src.copy(epochSeconds = hour)
+        }
+    }
+
+    /**
+     * Stretch however many days we know into the [FORECAST_DAYS_MIN] the band insists on.
+     *
+     * Separate and named for the same reason as [padHours]: repeating a high and a low forward for
+     * a week is not a week's forecast, and the code should not be able to pretend otherwise
+     * silently. Each padded day repeats the last known one, re-stamped 86400 s onward.
+     */
+    fun padDays(known: List<DailyPoint>, startEpochSeconds: Long): List<DailyPoint> {
+        require(known.isNotEmpty()) { "padDays needs at least one real day to repeat" }
+        return (0 until maxOf(FORECAST_DAYS_MIN, known.size)).map { i ->
+            val day = startEpochSeconds + 86_400L * i
+            val src = known.getOrNull(i) ?: known.last()
+            // A repeated day must not carry the FIRST day's sunrise: those are real values for a
+            // real date, and stamping them onto another date makes them wrong rather than absent.
+            if (i < known.size) src.copy(epochSeconds = day)
+            else src.copy(
+                epochSeconds = day,
+                sunriseSeconds = null, sunsetSeconds = null,
+                moonriseSeconds = null, moonsetSeconds = null, moonPhase = null,
+            )
+        }
+    }
+
+    /**
+     * The `0x0F/0x08` forecast: [FORECAST_HOURS] hourly entries and [FORECAST_DAYS_MIN] days.
+     *
+     * @throws IllegalArgumentException rather than letting the band refuse it. A wrong count comes
+     *   back as `115001` on a call whose reply nobody used to read, which cost two days; failing
+     *   here names the problem at the point that can fix it.
+     */
+    fun forecast(
+        hourly: List<HourlyPoint>,
+        daily: List<DailyPoint>,
+    ): ByteArray {
+        require(hourly.size == FORECAST_HOURS) {
+            "the band refuses a forecast that is not exactly $FORECAST_HOURS hours (got ${hourly.size})"
+        }
+        require(daily.size >= FORECAST_DAYS_MIN) {
+            "the band refuses a forecast with fewer than $FORECAST_DAYS_MIN days (got ${daily.size})"
+        }
+        val hours = hourly.fold(ByteArray(0)) { acc, h ->
+            acc + tlv(
+                130,
+                tlv(3, HuaweiProtocol.intBytes(h.epochSeconds.toInt(), 4)) +
+                    // Tag 4 is the condition and tag 6 is a constant — NOT the other way round,
+                    // which is what this file assumed until the icons were swept on the band.
+                    tlv(4, byteArrayOf(h.condition.toByte())) +
+                    tlv(5, byteArrayOf(h.temperatureC.toByte())) +
+                    tlv(6, byteArrayOf(7)) +
+                    tlv(7, byteArrayOf(h.uvIndex.toByte())) +
+                    tlv(8, HuaweiProtocol.intBytes(h.feelsLikeC, 4)),
+            )
+        }
+        val days = daily.fold(ByteArray(0)) { acc, d ->
+            acc + tlv(
+                145,
+                tlv(18, HuaweiProtocol.intBytes(d.epochSeconds.toInt(), 4)) +
+                    tlv(19, byteArrayOf(d.condition.toByte())) +
+                    tlv(20, byteArrayOf(d.highC.toByte())) +
+                    tlv(21, byteArrayOf(d.lowC.toByte())) +
+                    (d.sunriseSeconds?.let { tlv(22, HuaweiProtocol.intBytes(it.toInt(), 4)) } ?: ByteArray(0)) +
+                    (d.sunsetSeconds?.let { tlv(23, HuaweiProtocol.intBytes(it.toInt(), 4)) } ?: ByteArray(0)) +
+                    (d.moonriseSeconds?.let { tlv(26, HuaweiProtocol.intBytes(it.toInt(), 4)) } ?: ByteArray(0)) +
+                    (d.moonsetSeconds?.let { tlv(27, HuaweiProtocol.intBytes(it.toInt(), 4)) } ?: ByteArray(0)) +
+                    (d.moonPhase?.let { tlv(30, byteArrayOf(it.toByte())) } ?: ByteArray(0)),
+            )
+        }
+        return tlv(129, hours) + tlv(144, days)
+    }
+
+    /** One hour of the forecast the band draws its current reading from. */
+    /**
+     * One hour of the forecast.
+     *
+     * [condition] is **tag 4** and [uvIndex] is tag 7. Both were wrong here until 2026-08-25:
+     * the condition was being written into tag 6 (which changes nothing on screen — swept across
+     * 0…23 with no visible effect) and the UV into tag 7 only by accident of naming. Health holds
+     * a constant 1 in tag 4 and a constant 7 in tag 6, and its tag 7 runs 3,4,2,2,1,1,1,0,0…0,1,1
+     * — zero from dusk until morning, which is UV, not weather.
+     */
+    data class HourlyPoint(
+        val epochSeconds: Long,
+        val temperatureC: Int,
+        val condition: Int = 1,
+        val uvIndex: Int = 0,
+        val feelsLikeC: Int = temperatureC,
+    )
+
+    /** One day of the forecast, which is where the band's high/low come from. */
+    data class DailyPoint(
+        val epochSeconds: Long,
+        val highC: Int,
+        val lowC: Int,
+        val condition: Int = 1,
+        val sunriseSeconds: Long? = null,
+        val sunsetSeconds: Long? = null,
+        /**
+         * The moon, which the band shows on its further weather pages.
+         *
+         * **The band does not need any of these.** Settled 2026-08-25 on an ACCEPTED forecast:
+         * we sent no moonrise, no moonset and no phase byte, and the band's Moon page still read
+         * 02:33 / 19:07 and its Moon-phase page still read "Waxing gibbous · 93 % · Day 14",
+         * correctly. It computes them from the position frame we send it.
+         *
+         * (An earlier test appeared to show the same thing and was worthless — that payload had
+         * been refused with 115001 before anything in it was read. Only this one counts.)
+         *
+         * The fields stay because Health sends them and a future firmware might read them, but
+         * nothing depends on filling them, and there is no honest way to invent a moonrise.
+         */
+        val moonriseSeconds: Long? = null,
+        val moonsetSeconds: Long? = null,
+        val moonPhase: Int? = null,
+    )
+
+    /** `{129: <empty>}` — Health sends this within milliseconds of every push. Meaning unmapped. */
+    fun weatherPushDone(): ByteArray = tlv(129)
 
     private fun leDouble(v: Double): ByteArray {
         val bits = java.lang.Double.doubleToRawLongBits(v)

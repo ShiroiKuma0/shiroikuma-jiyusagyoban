@@ -8,6 +8,57 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.88+2026-08-21.18-40.gb5e3e38e+027 — 2026-08-25
+
+Built on upstream OpenTasker `0.2.88` (`b5e3e38e`). Also carries the `0.2.88` sync itself and the
+adoption of upstream's `core:*` module split.
+
+**The band's weather works.** It had been frozen on 2026-08-23 for two days while
+`天気送信（Huawei）` reported "Weather pushed" after every run, and the cause was not the one every
+theory that afternoon assumed.
+
+The band treats the current-weather push (`0x0F/0x01`) and the forecast (`0x0F/0x08`) as **one
+record**. Send an invalid forecast and it discards the push with it — silently, having already
+answered the push with a success code. And the forecast is refused unless it carries **exactly 24
+hourly entries and at least 8 daily ones**: 23 hours is refused, 7 days is refused, and Health's own
+bytes are refused when merely fewer of them are sent. We had always sent one hour and one day, so
+every forecast this app ever produced was thrown away, and the reading went with it. The refusal
+code is `115001`, and we had been discarding the band's reply to the forecast without looking at it
+— `runCatching { sendLarge(…) }` and nothing more, which is exactly why a push that never landed was
+indistinguishable from one that did. It is now read, and a refusal fails the task loudly.
+
+**Three fields named off the band's own screen**, where a byte-level capture could not name them:
+tag `15` is the **UV index** (it had been hard-coded to 3 and labelled unmapped, because Health's
+four captured pushes all happened to carry 3), tag `16` is **humidity**, and tag `17` is **wind
+speed in km/h** — which sat in the notes for two days as "unmapped, temperature-like" because
+Health's value was 19 against a 17 °C reading, and a capture cannot tell a wind from a temperature.
+The hourly `7` series, previously an unexplained run falling to zero at dusk, is the hourly UV, and
+the band's "Highest level" is its maximum.
+
+**Sun and moon need nothing from us.** With no moonrise, no moonset and no phase byte sent, the
+band's Moon and Moon-phase pages are still correct — it computes them from the position frame.
+
+**The condition icons are measured, not guessed.** Three sweeps were pushed in which every cell
+printed its own code as its temperature, so a photograph labelled each icon with no counting. The
+first swept the wrong field — hourly tag 4 is the condition, not tag 6 — and the hourly and daily
+spaces turned out to be one table, 0–35, with 36–47 all drawing the same plain sun where the range
+ends. `wind` had been falling back to a bare cloud because nothing in 0–23 depicts wind; the icon is
+`35`, bare wind lines.
+
+The sweeps also overturned one of their own readings, which is the point of doing five of them:
+codes 5 and 6 looked like mixed sleet/hail in a photograph taken alone, and `sleet`/`hail` were
+mapped onto them. Photographed side by side with a known rain icon between them they are plainly a
+sun-behind-cloud and a plain rain — comparing two icons from pictures taken minutes apart is not a
+comparison. **The band has no sleet or hail icon at all**: its set runs sun / cloud / rain / snow /
+fog / wind / thermometer and stops. Both words now fall to the nearest real family and the code says
+plainly that this is a choice between two imperfect answers rather than a precision the band offers.
+
+The action gains `uv`, `wind`, and the parallel series `hourly`, `hourly_uv`, `hourly_condition`,
+`hourly_feels`, `daily_high`, `daily_low`, `daily_condition`, matching the 天気 `QUERY_WEATHER`
+contract key for key. Until that app supplies the series, one reading is repeated across the 24
+hours and 8 days the band demands, and the action says so — `accepted (24h/1 real, 8d/1 real)` —
+rather than letting a flat line read as a forecast.
+
 ## 0.2.87+2026-08-20.05-47.g4fc906f7+083 — 2026-08-24
 
 Built on upstream OpenTasker `0.2.87` (`4fc906f7`) — the same base as `+002`; everything below is
