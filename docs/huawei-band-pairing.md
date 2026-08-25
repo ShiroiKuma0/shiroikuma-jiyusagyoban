@@ -638,6 +638,71 @@ three overlapping entries, one (35 ms at 15:10) appears nowhere in its record at
 encoding, so Health derives it. Two fields each matched one of the other two, which is what
 coincidence looks like; nothing here is decoded on that basis.
 
+### The four empty pulls were our request order, not the band (2026-08-25)
+
+`rrisqi_data.bin` answered `nothing (100004)` four times across two days, and that was read as the
+band holding no RR data — which grew into a hypothesis that `SVC_RRI` (0x19) had to be switched on
+before it would record any, testable only by waiting.
+
+It was none of that. **`huawei.files` asked for rrisqi LAST**, after every `sequence_data` id.
+`700004` alone is 1.16 MB and does not finish — 378691 bytes after 8 rounds on 2026-08-25 07:05 —
+and the file channel degrades under exactly that kind of use. Everything requested after it came
+back empty. The counter-evidence had been in plain sight the whole time: `storeRri` fetches the same
+file with nothing queued ahead of it, and the sync had been reporting **291 RR windows** while the
+diagnostic reported nothing.
+
+Asked first, on a channel rested ten minutes, rrisqi returned **20377 bytes in 1.7 seconds**:
+`(20377 − 48) / 66 = 308` records exactly, which is also the layout's own confirmation.
+`HuaweiFilesAction` now requests it first.
+
+### 308 windows: what survives, and what does not
+
+The corpus below is 308 windows spanning 2026-08-22 14:22 → 2026-08-25 06:51, against the **nine**
+the paragraphs above were written from. Two claims made from nine do not survive:
+
+| claim, from 9 windows | on 308 |
+|---|---|
+| f7 is smaller than every other field, in every window | 306/308 — a near-invariant, not an invariant |
+| **f2 < f1 always** | **280/308 — false as an absolute** |
+| f4, f5, f10 < f3 < f6 | 307/308 |
+| f3 < f6 | 308/308 ✓ |
+| f3 and f6 on the 20 ms grid | 308/308 ✓ |
+| byte 13 ≥ the valid count, never equal | **308/308, zero equalities** ✓ — much stronger now |
+| f2, f5, f8, f9 fall as more beats are detected | ✓ r = −0.61, −0.75, −0.69, −0.79 (f3 does too, at −0.66, which nine windows did not show) |
+
+Windows arrive every **10 min** (median; p10 6, p90 20), so the band records continuously and always
+has.
+
+### Physiology as ground truth: two fields behave like HRV, the rest like noise
+
+The file spans two nights, and f6 is established — so its own nocturnal dip anchors the split without
+needing Huawei Health. Median heart rate is **68.2 bpm** between 00:00 and 06:00 against **76.9**
+between 09:00 and 22:00, which is the dip, so the partition is sound.
+
+HRV rises in sleep. Of the ten fields, **only f4 (×1.13) and f10 (×1.05) rise at night**, alongside
+mean RR itself (×1.13). Every other field falls, by a lot: f2 ×0.64, f5 ×0.61, f7 ×0.66, f8 ×0.67,
+f3 ×0.71.
+
+That is two behavioural classes, and it is the first thing to separate these fields that did not come
+from a displayed number:
+
+* **f4 and f10 move with parasympathetic activity** — the signature of an HRV measure. f4 spans
+  0.59…88.73, which is percentage-shaped; f10 spans 9.10…92.16 with a median of 45.4, which is
+  SDNN-shaped in ms. Neither is named here on that basis alone.
+* **f2, f5, f7, f8 fall at night AND fall as detected beats rise.** Sleep is when the wrist is still
+  and the signal is cleanest, so an artefact or dispersion-of-error measure falls exactly then. This
+  is what the earlier correlation against byte 13 was already pointing at.
+* **f9 is nearly flat (×0.89)** and belongs to neither class on this evidence.
+
+**This weakens the one "very likely" in the paragraphs above.** f3 was read as the shortest interval
+in the window. A cleaner night should RAISE a minimum — fewer spurious short beats — and f3 instead
+falls by 29 %. A spread on the RR grid, driven by artefacts, fits that direction; a minimum does not.
+Not disproved, but it should no longer be carried as very likely.
+
+No field is a function of any other, on 308 windows as on nine: the closest are f8 ≈ c·f5² (r = 0.76)
+and f7 ≈ c·f5/f6 (r = 0.75), and both have ratios that wander over a 30-fold range, so neither is an
+identity.
+
 **The seven remaining fields are still unnamed, and the structure below is why they will stay that
 way until there is ground truth.** Nine unique windows exist across all three captures (2026-08-22,
 14:22 → 17:24, each 55–56 s). Everything here holds in all nine.
@@ -713,9 +778,9 @@ synchronous result. Verified: the same pull that produced two ANRs produces none
 
 ### Why the file is empty, and the one lead worth following
 
-`rrisqi_data.bin` has answered `nothing (100004)` on **four** attempts across two days, including one
-on a channel rested 28 minutes that returned `sequence_data`'s best-ever 60 blocks. So it is not
-fatigue and not the transfer: the band has no RR data to give.
+~~`rrisqi_data.bin` has answered `nothing (100004)` on **four** attempts across two days, including one on a channel rested 28 minutes that returned `sequence_data`'s best-ever 60 blocks. So it is not fatigue and not the transfer: the band has no RR data to give.~~
+
+**Superseded 2026-08-25** — see *The four empty pulls were our request order, not the band*. The band was recording throughout; `huawei.files` asked for rrisqi after a 1.16 MB file that never finished.
 
 It had some on 2026-08-22 — 312 B, nine windows — and the note written then says that capture
 happened right after the band was told to record RR intervals. **Nothing in this app ever tells it
