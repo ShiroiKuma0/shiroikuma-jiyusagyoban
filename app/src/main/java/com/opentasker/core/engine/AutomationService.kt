@@ -518,7 +518,8 @@ class AutomationService : Service() {
 
         // The exit task is owed only if the profile was admitted. One that never ran because it was
         // outranked has no cleanup to do, and running its exit task would undo state it never set.
-        if (wasAdmitted && (profile.exitTaskName.isNotBlank() || (profile.exitTaskId != null && profile.exitTaskId > 0))) {
+        val exitTaskId = profile.exitTaskId
+        if (wasAdmitted && (profile.exitTaskName.isNotBlank() || (exitTaskId != null && exitTaskId > 0))) {
             val domain = resolveTask(profile.exitTaskName, profile.exitTaskId ?: 0L)
             if (domain == null) {
                 AppLogger.warn("OpenTasker", "Exit task not found for profile ${profile.name} (name='${profile.exitTaskName}', id=${profile.exitTaskId})")

@@ -470,6 +470,7 @@ ksp {
 dependencies {
     // Upstream's core/* modules, adopted in stages: see the note in settings.gradle.kts.
     implementation(project(":core:common"))
+    implementation(project(":core:model"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -1570,7 +1571,7 @@ val registeredActionCount = Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),")
     .findAll(rootProject.file("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt").readText())
     .count()
 val contextFamilyCountFromSource = Regex("(?s)enum class ContextType\\s*\\{(.*?)\\}")
-    .find(rootProject.file("app/src/main/java/com/opentasker/core/model/ContextSpec.kt").readText())
+    .find(rootProject.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt").readText())
     ?.groupValues?.get(1)
     ?.let { body -> Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count() }
     ?: error("could not count the ContextType families")
@@ -1583,7 +1584,7 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     val readmeFilePath = repositoryRootPath.resolve("README.md")
     val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
     val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("app/src/main/java/com/opentasker/core/model/ContextSpec.kt")
+        .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
     val databaseFilePath = rootProject.layout.projectDirectory.asFile
         .resolve("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
@@ -1612,7 +1613,7 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     metadataFile.set(rootProject.layout.projectDirectory.file("fdroid/metadata/com.opentasker.app.yml"))
     moduleBuildFile.set(layout.projectDirectory.file("build.gradle.kts"))
     actionCatalogFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/actions/ActionCatalog.kt"))
-    contextSpecFile.set(rootProject.layout.projectDirectory.file("app/src/main/java/com/opentasker/core/model/ContextSpec.kt"))
+    contextSpecFile.set(rootProject.layout.projectDirectory.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt"))
     bundleFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/transfer/OpenTaskerBundle.kt"))
     versionCatalogFile.set(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
     wrapperFile.set(rootProject.layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties"))
@@ -1833,6 +1834,7 @@ val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyR
 val productionSourceRoots: List<Directory> = listOf(
     layout.projectDirectory.dir("src/main/java"),
     rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
 ).filter { it.asFile.isDirectory }
 
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
