@@ -733,9 +733,9 @@ f3 ×0.71.
 That is two behavioural classes, and it is the first thing to separate these fields that did not come
 from a displayed number:
 
-* **f4 and f10 move with parasympathetic activity** — the signature of an HRV measure. f4 spans
-  0.59…88.73, which is percentage-shaped; f10 spans 9.10…92.16 with a median of 45.4, which is
-  SDNN-shaped in ms. Neither is named here on that basis alone.
+* **f4 and f10 rise at night** while everything else falls. Read at the time as the signature of an
+  HRV measure — **wrongly**, see *f4 and f10 are not RR-derived* below, which had per-beat data to
+  test it against and this paragraph did not.
 * **f2, f5, f7, f8 fall at night AND fall as detected beats rise.** Sleep is when the wrist is still
   and the signal is cleanest, so an artefact or dispersion-of-error measure falls exactly then. This
   is what the earlier correlation against byte 13 was already pointing at.
@@ -750,7 +750,43 @@ No field is a function of any other, on 308 windows as on nine: the closest are 
 and f7 ≈ c·f5/f6 (r = 0.75), and both have ratios that wander over a 30-fold range, so neither is an
 identity.
 
-**The seven remaining fields are still unnamed, and the structure below is why they will stay that
+### f4 and f10 are not RR-derived at all (2026-08-25)
+
+Because they rise at night while every other field falls, f4 and f10 were read above as the
+HRV-shaped pair, and then — when they turned out to correlate with no within-window statistic — as
+values computed over a longer horizon than the window they are stored on. **Both readings are
+wrong**, and the per-beat series settles it.
+
+**A long-horizon value cannot jump between adjacent windows**, and these do:
+
+| field | lag-1 autocorrelation | median change between adjacent windows |
+|---|---|---|
+| f6 (mean RR, established, per-window) | +0.706 | 2.6 % |
+| **f4** | **+0.031** | **59.7 %** |
+| **f10** | **+0.132** | 34.9 % |
+
+f4 is the *least* autocorrelated field in the file. A 24-hour quantity sampled ten minutes apart
+would be nearly identical between neighbours; f4 shares essentially nothing with its predecessor.
+Sweeping trailing spans from 1 minute to 24 hours against SDNN, RMSSD, pNN50 and mean interval
+confirms it from the other side: f4 and f10 stay under |r| = 0.16 at **every** span, while f2, f7 and
+f8 peak at the shortest spans and decay as the span grows, which is what a per-window quantity does.
+
+They are not functions of the beats at all. Against everything the per-beat series can produce for
+their own window — SDNN, RMSSD, pNN50, SD1, SD2, min, max, range, IQR, CV, beat counts, the fraction
+of beats at each quality level, the fraction rejected — **every correlation for f4 and f10 is under
+0.16, and most are under 0.05.** Every other unknown field correlates with several of them at 0.4 to
+0.8.
+
+So the honest reading is: **f4 and f10 are computed from something other than the RR intervals**, and
+merely stored alongside them. That accounts for both facts at once — no relationship to any beat
+statistic, and a systematic day/night difference — in a way neither earlier reading did. Motion,
+skin temperature, SpO2 and PPG perfusion all differ between sleep and wake and none of them would
+track RR dispersion. Which one, this file cannot say.
+
+This removes f4 and f10 from the HRV candidate list rather than advancing them, which is the useful
+kind of negative: it is the only pair whose night-time rise now needs no HRV explanation.
+
+**The remaining fields are unnamed, and the structure below is why they will stay that
 way until there is ground truth.** Nine unique windows exist across all three captures (2026-08-22,
 14:22 → 17:24, each 55–56 s). Everything here holds in all nine.
 
