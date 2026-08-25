@@ -481,8 +481,9 @@ suspend fun logSkippedRun(
 /** Fail-closed decode: a corrupt stored task resolves to `null` instead of an empty action list. */
 private fun TaskEntity.decodedOrNull(ref: String): Task? {
     val result = toDomainDecodeResult()
-    if (result.issue != null) {
-        AppLogger.error(TAG, "Task '$ref' (id=$id) is corrupt: ${result.issue.message}")
+    val issue = result.issue
+    if (issue != null) {
+        AppLogger.error(TAG, "Task '$ref' (id=$id) is corrupt: ${issue.message}")
         return null
     }
     return result.value

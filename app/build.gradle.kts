@@ -472,6 +472,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:engine"))
+    implementation(project(":core:storage"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -1534,13 +1535,12 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     group = "verification"
     description = "Checks that all Room schema versions up to the current are exported and tracked."
 
-    // The fork does not take upstream's core/* module split (see settings.gradle.kts), so :app's
-    // own KSP run is what exports the schema, into app/schemas where the androidTest migration
-    // assets are read from.
-    dependsOn("kspDebugKotlin")
+    // core:storage owns the entities now, so its KSP run is what exports the schema. It still
+    // writes into app/schemas, which is where the androidTest migration assets are read from.
+    dependsOn(":core:storage:kspDebugKotlin")
     schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
     databaseFile.set(rootProject.layout.projectDirectory.file(
-        "app/src/main/java/com/opentasker/core/storage/AppDatabase.kt",
+        "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt",
     ))
 }
 
@@ -1587,7 +1587,7 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
         .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
     val databaseFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt")
+        .resolve("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
         readmeFilePath,
         repositoryRootPath.resolve("CHANGELOG.md"),
@@ -1620,7 +1620,7 @@ tasks.register<VerifyReleaseTruthTask>("verifyReleaseTruth") {
     wrapperFile.set(rootProject.layout.projectDirectory.file("gradle/wrapper/gradle-wrapper.properties"))
     flowControlFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/FlowStructure.kt"))
     taskRunnerFile.set(layout.projectDirectory.file("src/main/java/com/opentasker/core/engine/TaskRunner.kt"))
-    databaseFile.set(rootProject.layout.projectDirectory.file("app/src/main/java/com/opentasker/core/storage/AppDatabase.kt"))
+    databaseFile.set(rootProject.layout.projectDirectory.file("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt"))
     changelogFile.set(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
     repositoryDirectory.set(rootProject.layout.projectDirectory)
 }
@@ -1837,6 +1837,7 @@ val productionSourceRoots: List<Directory> = listOf(
     rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
     rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
     rootProject.layout.projectDirectory.dir("core/engine/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/storage/src/main/kotlin"),
 ).filter { it.asFile.isDirectory }
 
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
@@ -1867,6 +1868,9 @@ tasks.register("localQualityGate") {
     description = "Runs the deterministic local debug-quality and dependency-report gate."
     dependsOn(
         verifyReleaseAssetName,
+        ":core:common:testDebugUnitTest",
+        ":core:storage:testDebugUnitTest",
+        ":core:engine:testDebugUnitTest",
         "lintDebug",
         "compileDebugAndroidTestKotlin",
         "connectedDebugAndroidTest",
