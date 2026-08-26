@@ -594,6 +594,221 @@ object HuaweiSyncRunner {
         }
     }
 
+    /** What one GNSS serving attempt did. */
+    data class GnssOutcome(
+        val asked: Boolean,
+        val source: String?,
+        val served: List<String>,
+        val bytes: Int,
+        val detail: String,
+        /** When the band raised its request, and how long the watch had been waiting by then. */
+        val caughtAtMs: Long = 0L,
+        val waitedMs: Long = 0L,
+    )
+
+    /**
+     * Serve the band its GNSS assistance data.
+     *
+     * **This inverts the usual roles.** Everywhere else in this file we ask and the band answers;
+     * here the band asks (`0x1F/0x01`), tells us what it wants, and then drives a pull over `0x1C`
+     * whose order we do not choose. So this is a small server, and it runs until the band says the
+     * last file is done or goes quiet.
+     *
+     * We deliberately do **not** fetch what the band names. Its request string points at Huawei's
+     * own cloud (`higeo/v1/gnssinfo?...`), and honouring an arbitrary URL a device hands us is the
+     * `hw.wearable.httpProxy` hazard in a different costume — it would make this app the band's
+     * general HTTP client. Instead the caller supplies files it already has, and the band gets
+     * those. What it asked for is reported back so the caller can see it, and ignored.
+     *
+     * @param files name → contents. The name is what the band sees in the listing and asks for by,
+     *   so it must be the band's own (`HW_AGNSS_RTCM_33` and friends).
+     */
+    suspend fun serveGnss(
+        context: Context,
+        address: String,
+        files: Map<String, ByteArray>,
+        waitForAskMs: Long = 20_000,
+        announce: Boolean = true,
+        /**
+         * Called as the work happens, so a scene can show it live.
+         *
+         * The transfer is minutes of silence otherwise, and the band's own screen sits at 0 % the
+         * whole time — 白い熊 needs to see which side is waiting for whom.
+         */
+        onProgress: (phase: String, line: String?) -> Unit = { _, _ -> },
+        /**
+         * Checked once a second while waiting, so a long watch can be called off.
+         *
+         * Cooperative rather than an interrupt: the wait is the only place this can stop safely.
+         * Aborting mid-transfer would leave the band holding a half-written file it believes is
+         * whole, and its CRC check happens at the END — so it would not notice.
+         */
+        shouldCancel: () -> Boolean = { false },
+        /** Once a second while waiting, with how long the watch has been running. */
+        onTick: (elapsedMs: Long) -> Unit = {},
+    ): Result<GnssOutcome> = withSession(context, address) { session, _ ->
+        require(files.isNotEmpty()) { "no files to serve" }
+        val log = StringBuilder()
+        var source: String? = null
+
+        // The band asks on its own when its data is stale. If it does not ask, `announce` sends the
+        // ready signal unprompted — the capture shows the band opening the transfer 24 ms after
+        // that signal, so it may be the whole trigger. Untested; hence a flag rather than a claim.
+        // Waited in one-second slices rather than one long block, so the countdown on screen is a
+        // real clock and not a guess. Same total wait; the only difference is that it can be seen.
+        var ask: HuaweiProtocol.Frame? = null
+        val deadline = System.currentTimeMillis() + waitForAskMs
+        var cancelled = false
+        val watchStart = System.currentTimeMillis()
+        while (ask == null && System.currentTimeMillis() < deadline) {
+            if (shouldCancel()) {
+                cancelled = true
+                onProgress("Cancelled", "Called off before the band asked")
+                break
+            }
+            // Elapsed, not remaining. A countdown implies a deadline matters; what 白い熊 needs to
+            // see is how long this has been sitting there, and since when.
+            onTick(System.currentTimeMillis() - watchStart)
+            onProgress("Waiting for the band", null)
+            ask = session.awaitFrame(HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 1_000)
+        }
+        if (cancelled) log.append("cancelled; ")
+        val caughtAt = if (ask != null) System.currentTimeMillis() else 0L
+        if (ask != null) {
+            onProgress("The band asked", "The band asked for data")
+            log.append("band asked; ")
+            runCatching {
+                session.send(
+                    HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY,
+                    HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
+                )
+            }
+            // What it wants. Reported, never fetched — see the note above.
+            runCatching {
+                val what = session.request(
+                    HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_WHAT, HuaweiProtocol.tlv(129),
+                    timeoutMs = 6_000,
+                )
+                source = session.decrypt(what).firstOrNull { it.tag == 129 }?.let { outer ->
+                    HuaweiProtocol.parseTlvs(outer.value).firstOrNull { it.tag == 6 }
+                        ?.value?.toString(Charsets.UTF_8)
+                }
+                source?.let { onProgress("The band asked", "It wants: $it") }
+            }
+        } else if (!cancelled) {
+            onProgress("The band never asked", "The band never asked — its data is still fresh")
+            log.append("band did not ask; ")
+        }
+
+        if (!cancelled && (ask != null || announce)) {
+            runCatching {
+                session.send(
+                    HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_READY,
+                    HuaweiProtocol.tlv(1, byteArrayOf(3)),
+                )
+            }
+            log.append("ready sent; ")
+        }
+
+        val served = LinkedHashSet<String>()
+        var bytes = 0
+        var unit = 862      // the band restates both in 0x1C/0x02; these are the captured defaults
+        var current: String? = null
+
+        // The band drives. We answer until it says done, or until it stops talking.
+        loop@ while (!cancelled) {
+            val f = session.awaitService(HuaweiCommands.SVC_GNSS_FILES, 12_000) ?: break@loop
+            val tlvs = runCatching { session.decrypt(f) }.getOrElse { emptyList() }
+            fun str(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.value?.toString(Charsets.UTF_8)
+            fun num(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.let { HuaweiProtocol.bytesToInt(it.value) }
+
+            when (f.commandId) {
+                HuaweiCommands.GNSS_LIST -> {
+                    onProgress("Transferring", "Offering: " + files.keys.joinToString(", "))
+                    // NOTE: no result tag on this one — the capture's answer is tag 1 alone.
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_LIST,
+                        HuaweiProtocol.tlv(1, files.keys.joinToString(";")),
+                    )
+                }
+                HuaweiCommands.GNSS_PARAMS -> {
+                    num(3)?.let { if (it in 1..4096) unit = it }
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_PARAMS,
+                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
+                    )
+                }
+                HuaweiCommands.GNSS_PICK -> {
+                    current = str(1)
+                    onProgress("Transferring", "It chose ${current ?: "?"}")
+                    val data = files[current]
+                    if (data == null) {
+                        onProgress("Refused", "It asked for $current, which we do not have")
+                        log.append("band picked unknown '$current'; ")
+                        break@loop
+                    }
+                    // Size and CRC, and again no result tag.
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_PICK,
+                        HuaweiProtocol.tlv(2, HuaweiProtocol.intBytes(data.size, 4)) +
+                            HuaweiProtocol.tlv(3, HuaweiProtocol.intBytes(HuaweiProtocol.crc16(data), 2)),
+                    )
+                }
+                HuaweiCommands.GNSS_BLOCK -> {
+                    val name = str(1) ?: current
+                    val data = files[name] ?: break@loop
+                    val offset = num(2) ?: 0
+                    val length = (num(3) ?: 0).coerceAtMost(data.size - offset)
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_BLOCK,
+                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4) +
+                            HuaweiProtocol.tlv(2, GNSS_TOKEN + (name ?: "")) +
+                            HuaweiProtocol.tlv(3, HuaweiProtocol.intBytes(offset, 4)),
+                    )
+                    // 0x1C/0x05 is NOT TLV: one sequence byte, then raw file bytes. The sequence
+                    // restarts at 0 for every block, which is why it never exceeds 7 in the capture.
+                    var sent = 0
+                    var seq = 0
+                    while (sent < length) {
+                        val n = minOf(unit, length - sent)
+                        session.send(
+                            HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_DATA,
+                            byteArrayOf(seq.toByte()) + data.copyOfRange(offset + sent, offset + sent + n),
+                        )
+                        sent += n; seq++
+                    }
+                    bytes += sent
+                    onProgress("Transferring", "  sent $sent B of ${current ?: name}  ($bytes B total)")
+                }
+                HuaweiCommands.GNSS_DONE -> {
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_DONE,
+                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
+                    )
+                    current?.let { served.add(it); onProgress("Transferring", "$it complete") }
+                    current = null
+                }
+                else -> log.append("unhandled 0x1C/0x%02X; ".format(f.commandId))
+            }
+        }
+
+        GnssOutcome(
+            asked = ask != null, source = source, served = served.toList(), bytes = bytes,
+            detail = log.toString().trim().trimEnd(';'),
+            caughtAtMs = caughtAt, waitedMs = if (caughtAt == 0L) 0L else caughtAt - watchStart,
+        )
+    }
+
+    /**
+     * The 64 hex characters Health puts in every `0x1C/0x04` answer, ahead of the file name.
+     *
+     * Identical in all 121 responses across all seven files in the capture, appears nowhere else,
+     * and is not the SHA-256 or MD5 of any file — checked. The band never echoes it back. What it
+     * identifies cannot be told from one capture, so it is replayed verbatim rather than explained:
+     * if the band validates it we need it, and if it ignores it nothing is lost.
+     */
+    private const val GNSS_TOKEN = "42E41FAF3CAABEF0E56DFD793DF99E6DF15EA2FC9B18A5D73ABF0DC1D0F06CCA"
+
     /** One setting the band was asked to change, and what it said. */
     data class SettingOutcome(val name: String, val ok: Boolean, val detail: String)
 

@@ -1167,6 +1167,26 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.gnss",
+            name = "Huawei Band GNSS",
+            description = "Serve the band its satellite assistance data, so a GPS fix takes seconds instead of minutes",
+            category = "System",
+            fields = listOf(
+                ActionField("dir", "Folder holding the files", required = true, hint = "the band asks by NAME, so the files must be called HW_AGNSS_RTCM_33 and HW_PGNSS_* — put them there with an http.get task"),
+                ActionField("files", "Which files to offer", hint = "comma-separated names. Default: all seven. Serving only HW_AGNSS_RTCM_33 is legitimate — it is the one that expires in hours"),
+                ActionField("stage_from", "Seed the app's store from", hint = "one-off: copies files from this folder into the app's own storage. adb push cannot reach internal storage, and the predicted-ephemeris files cannot be downloaded, so this is their way in"),
+                ActionField("cancel_var", "Cancel variable", hint = "set it to 1 to call the wait off — for a long watch left running in the background"),
+                ActionField("wait", "Seconds to wait for the band to ask", hint = "default 20. The band asks on its own when its data is stale"),
+                ActionField("announce", "Send the ready signal anyway", FieldType.CHECKBOX, hint = "on by default. The band opens the transfer 24 ms after this signal, so it may be the whole trigger"),
+                ActionField("address", "Band address", hint = "defaults to the paired band"),
+                ActionField("prefix", "Variable prefix", hint = "default HUAWEI_"),
+                ActionField("store", "Store the summary in"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.weather",
             name = "Huawei Band weather",
             description = "Put weather on the band's screen. The band never fetches anything — it displays whatever the phone last pushed, so any task that can obtain a temperature can drive this, with no Huawei account. Condition icons are deliberately not sent: one capture cannot pin their codes, and a confidently wrong icon is worse than none",

@@ -78,6 +78,27 @@ object HuaweiCommands {
      * empty payload — an earlier sweep sent the latter and concluded the band "refuses" them.
      */
     val WEATHER_READS = listOf(0x02, 0x06, 0x0A)
+    // ---- GNSS assistance (0x1F asks, 0x1C carries) --------------------------------------
+    //
+    // The band ASKS for this and we answer, which is the reverse of everything else in this file.
+    // Decoded 2026-08-25 from a capture of Huawei Health serving it: 806 515 bytes across seven
+    // files in 16.9 s. `HW_AGNSS_RTCM_33` is 114 genuine RTCM 3 messages (1019 GPS, 1020 GLONASS,
+    // 1042 BeiDou, 1046 Galileo) — ordinary broadcast ephemeris, which is the short-lived kind the
+    // band means by "Data expires in 6 h". The six `HW_PGNSS_*` files are Huawei's own predicted
+    // ephemeris and are opaque.
+    const val SVC_GNSS_ASK = 0x1F
+    const val GNSS_NOTIFY = 0x01      // band --> phone: "I want assistance data"
+    const val GNSS_WHAT = 0x02        // phone --> band: "what?"  band answers with a source string
+    const val GNSS_READY = 0x03       // phone --> band: "it is here" — the band starts 0x1C on this
+
+    const val SVC_GNSS_FILES = 0x1C
+    const val GNSS_LIST = 0x01        // band asks what we hold; we answer ';'-joined names
+    const val GNSS_PARAMS = 0x02      // band states unit size (tag 3) and block size (tag 4)
+    const val GNSS_PICK = 0x03        // band names one file; we answer size (tag 2) + CRC16 (tag 3)
+    const val GNSS_BLOCK = 0x04       // band asks for [offset, length); we ack then stream 0x05
+    const val GNSS_DATA = 0x05        // phone --> band: ONE sequence byte then raw file bytes
+    const val GNSS_DONE = 0x06        // band says the file is complete
+
     const val SVC_LOCATION = 0x18
     const val LOCATION_PUSH = 0x07
 
