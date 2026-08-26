@@ -1167,6 +1167,21 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "ui.click",
+            name = "Tap by label",
+            description = "Press a control in another app by the words on it, using the accessibility service",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Label(s)", required = true, hint = "comma-separated alternatives — give the label in every language the phone might be in, e.g. ビデオ,Video"),
+                ActionField("package", "Only in this app", hint = "package name, e.g. com.huawei.camera — leave empty to search whatever is in front"),
+                ActionField("timeout", "Wait for it (ms)", FieldType.NUMBER, hint = "default 3000. The control often appears a moment after the app does"),
+                ActionField("store", "Store what was clicked in", hint = "the label actually matched, or empty when nothing did"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.gnss",
             name = "Huawei Band GNSS",
             description = "Serve the band its satellite assistance data, so a GPS fix takes seconds instead of minutes",

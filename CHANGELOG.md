@@ -8,10 +8,26 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
-## 0.2.88+2026-08-21.18-40.gb5e3e38e+035 — 2026-08-26
+## 0.2.88+2026-08-21.18-40.gb5e3e38e+036 — 2026-08-26
 
 Built on upstream OpenTasker `0.2.88` (`b5e3e38e`). Also carries the `0.2.88` sync itself and the
 adoption of upstream's `core:*` module split.
+
+**`ui.click` — press a control in another app by the words on it.** Built for the physical-key
+camera bindings, where the double press must land on the photo tab and the triple press on the
+video tab. By LABEL rather than coordinate, because the Mate XT reports a different geometry folded
+and unfolded and a remembered x/y lands somewhere else on the other panel; and with several
+candidate labels, because the caption is in whatever language the phone is set to. The accessibility
+service had `flagRetrieveInteractiveWindows` but not `canRetrieveWindowContent`, so it could not
+read another app's nodes at all — that is now on.
+
+**The physical-key camera bindings, fixed.** The triple press had been firing the non-secure
+`VIDEO_CAMERA` intent; only the secure camera activity may appear over the keyguard, so video
+started BEHIND the lock screen and was revealed only by unlocking. Both presses now open the secure
+camera — which records video perfectly well once running, the restriction being on which activity
+may appear rather than on what it does — and each then names its own tab. That second half also
+fixes the sticky mode, where a double press after a triple press reopened straight into video
+because nothing had ever said which tab was wanted.
 
 **The band gets its satellite data, with no Huawei account anywhere.** `huawei.gnss` is the first
 thing here where the band drives and we answer: it raises a request, names what it wants, and pulls
