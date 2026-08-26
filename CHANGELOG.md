@@ -8,6 +8,37 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.90+2026-08-25.04-06.g71800ef2+001 — 2026-08-26
+
+Built on upstream OpenTasker `0.2.90` (`71800ef2`). A pure sync: no fork behaviour changes, and the
+first build on the new upstream line.
+
+**Upstream's whole `0.2.89`/`0.2.90` line is one bug, found at both ends — Tasker's "Run only if"
+guard.** Tasker exports a guard as a sibling `ConditionList` element on *any* action, not as flat
+`Str` args and not only on `If`. The importer never read that element, so every guarded action came
+in unconditional and an `If`'s own test degraded to the literal `true` with no warning at all; in one
+real backup that silently mangled **118 of 210 actions**. And even with the guard imported intact the
+engine ignored it on **flow-control** actions, because those dispatch through `stepControl` before
+the generic condition check every ordinary action passes — so an imported "Stop If" stopped the task
+unconditionally. An unmet guard now skips the control action instead: `Stop` falls through, `For` and
+`Try` skip their block, `End For` exits the loop, and a guarded `Else` behaves as Tasker's `Else If`.
+Tasker XML **export** writes the guard back as a real `ConditionList`, so a guarded action finally
+round-trips; one that cannot fit Tasker's single `lhs`/`op`/`rhs` shape, or that carries a secret, is
+dropped with a warning rather than exported wrong. Imported `Matches` conditions run through the same
+linear-time RE2 path and length bounds as every other runtime pattern, and Tasker's regex ops 4 and
+5 — which have no regex operator to land on and therefore degrade to a plain wildcard — now say so as
+a lossy warning instead of changing semantics quietly.
+
+**`BUILD_NUMBER` reset to 1, legitimately.** `appVersionCode` itself moved (90 → 92), which is the
+one case where a reset is not a downgrade: `92 × 10000 + 1 = 920001` clears the `900036` recorded in
+`LAST_BUILT_VERSION_CODE`, so `buildFork`'s own guard passes rather than being talked past. A sync
+that moves only the `.g<sha>` pin still leaves the counter running.
+
+**Verified rather than assumed.** The Room migration chain was replayed `--all` — every exported
+version from 10 reaches 29 with exactly the schema Room expects — and the full JVM suite ran green at
+1814 tests. The schema did not move in this sync; the replay is what proves it, since Room validates
+against its exported JSON only when it opens a database that already exists.
+
 ## 0.2.88+2026-08-21.18-40.gb5e3e38e+036 — 2026-08-26
 
 Built on upstream OpenTasker `0.2.88` (`b5e3e38e`). Also carries the `0.2.88` sync itself and the
@@ -64,6 +95,15 @@ speed in km/h** — which sat in the notes for two days as "unmapped, temperatur
 Health's value was 19 against a 17 °C reading, and a capture cannot tell a wind from a temperature.
 The hourly `7` series, previously an unexplained run falling to zero at dusk, is the hourly UV, and
 the band's "Highest level" is its maximum.
+
+**Seven of `rrisqi`'s ten fields are named: it is a standard HRV panel.** `f2` is the SD of heart
+rate, `f3` the RR range, `f5` RMSSD, `f6` the mean RR interval, `f7` the Poincaré SD1/SD2 ratio, `f8`
+HF power and `f9` LF power. Each was claimed only on a **scale-free fit whose constant came out at
+1** — a fit that reproduces the field from the per-beat series with no free scaling — and never on a
+correlation, because on data this collinear a correlation proves nothing. That is not a stylistic
+preference: both earlier readings of `f4` and `f10` were made on correlation and both were wrong, and
+they are withdrawn here rather than left standing. The remaining three keep their recorded ranges and
+no name.
 
 **Sun and moon need nothing from us.** With no moonrise, no moonset and no phase byte sent, the
 band's Moon and Moon-phase pages are still correct — it computes them from the position frame.

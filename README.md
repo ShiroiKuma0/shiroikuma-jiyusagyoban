@@ -7,9 +7,9 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.87+2026-08-20.05-47.g4fc906f7+083`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.90+2026-08-25.04-06.g71800ef2+001`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
-[![version](https://img.shields.io/badge/version-0.2.87-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
+[![version](https://img.shields.io/badge/version-0.2.90-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 > The version names the upstream commit the fork is rebased on:
@@ -58,7 +58,11 @@ The band is spoken to directly, from a protocol worked out by watching Huawei He
 
 **Walks come off the band as real GPS tracks**, decoded from a format every published description gets wrong (the header is 33 bytes, not 32), and handed to **白い熊 地図** — which stores the route, renders a map of it offscreen and hands back two pictures we keep. A grid of walks, each with the band's own distance and 地図's independent reading beside it, because two readings of one route are how a decoder that is subtly wrong gets caught.
 
-**And it is honest about what it does not know.** Every Huawei filter and gate ships **off** — a Hampel filter pointed at an uncharacterised signal manufactures rejections, and drawing ✕ marks on day one would be inventing evidence. `rrisqi_data.bin` holds ten float fields per window; **two are pinned** (the valid-interval count, and the mean RR interval that reproduces Health's heart rate at 2.15 bpm RMSE), one has a strong hypothesis, and **the remaining seven are left unnamed** with their ranges recorded, because two of them happened to match a displayed value once and that is what coincidence looks like with seven candidates.
+**It serves the band its own satellite data, with no Huawei account anywhere.** `huawei.gnss` is the one place where the band drives and the phone answers: it raises a request, names what it wants, and pulls over a second service in an order we do not choose. Broadcast ephemeris comes from an open Huawei endpoint — no token, no signature — is unpacked from gzip and served on demand; asked while an Outdoor Walk was starting, the band took our own 7403-byte RTCM file 39 seconds after the watch opened. The band asks for **two different things and only one is reachable**: its Update button wants the *predicted* set, signed with a credential Huawei issues at runtime to Health's own package and certificate, so that half is served from captured files; when it actually needs a fix it asks for broadcast ephemeris instead, which can be refreshed freely and forever.
+
+**Weather reaches the band because the forecast is part of the push.** The band treats the current-weather push and the forecast as **one record** — send an invalid forecast and it discards the reading with it, silently, having already answered the push with a success code. And the forecast is refused unless it carries **exactly 24 hourly entries and at least 8 daily ones**. This app had always sent one of each, so every forecast it ever produced was thrown away and the reading went with it, while the task reported success. The band's reply is now read and a refusal (`115001`) fails the task loudly. The condition icons were mapped by pushing sweeps that printed each code as its own temperature and photographing the result — which also overturned two of its own earlier readings: the band has **no sleet or hail icon at all**, and both words now fall to the nearest real family with the code saying so.
+
+**And it is honest about what it does not know.** Every Huawei filter and gate ships **off** — a Hampel filter pointed at an uncharacterised signal manufactures rejections, and drawing ✕ marks on day one would be inventing evidence. `rrisqi_data.bin` holds ten float fields per window, and **seven of the ten are now named** — it is a standard HRV panel: the SD of heart rate, the RR range, RMSSD, the mean RR interval that reproduces Health's heart rate at 2.15 bpm RMSE, the Poincaré SD1/SD2 ratio, and HF and LF power. Each was claimed only on a **scale-free fit whose constant came out at 1**, never on a correlation — on data this collinear a correlation proves nothing, which is how two earlier readings of the remaining fields came to be wrong and were withdrawn. The last three stay unnamed with their ranges recorded.
 
 ---
 
@@ -294,9 +298,9 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (175 registered + 10 engine-handled)
+### Actions (192 registered + 10 engine-handled)
 
-**175 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**192 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/actions/ActionCatalog.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.
@@ -305,11 +309,15 @@ recomputes both figures from source and fails the build if this line drifts.
 
 **App (27)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
 
-**System (32)** — **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+**System (35)** — **Tap by Label** *(press a control in another app by the words on it — several candidate labels, because the caption follows the phone's language)* · **Huawei Band GNSS** *(serve the band its satellite assistance data, band-driven)* · **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
-**Settings (24)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings · Set Zen Rule · Clear Zen Rule · Temporary State *(applies a setting and restores it after a duration, surviving process death)* · Get Keyboard Info
+**Settings (26)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings · Set Zen Rule · Clear Zen Rule · Temporary State *(applies a setting and restores it after a duration, surviving process death)* · Get Keyboard Info
 
 **Variable (25)** — Set Variable · **Persist Variable** · Variable Clear · **Variable Split** · Variable Join · Variable Add · Variable Convert · Variable Search Replace · Parse/Format DateTime · Read Data *(JSON/CSV/XML → vars, path selectors)* · Format / Parse / Add Date-Time · Match / Replace / Split / Join / Substring Text *(linear-time RE2 regex)* · Array Set / Push / Pop / Clear / Process · Arrays Merge · Lookup Contact
+
+**Health (16)** — **Sync Huawei Band** · **Pair / Unpair Huawei Band** · **Huawei Band walks** *(GPS tracks, handed to 白い熊 地図)* · **Huawei Band weather** *(current push ＋ the 24-hour / 8-day forecast the band demands as one record)* · **Huawei Band language** · **Huawei Band recording settings** · **Install Huawei watch face** · **Pull Huawei Band files** · **Probe Huawei Band** · **Show Huawei Band Charts** · **Sync Band** *(Hume)* · **Find Band** · **Mark Training Session** · **Show Band Charts** · **Compare the two bands**
+
+**Text (3)** — **Recognise Text (OCR)** *(PP-OCRv5 on-device, six languages, no network)* · **Article to HTML (OCR)** · **Set OCR Models**
 
 **Flow (14)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment · Try · Catch · End Try *(bounded exponential retry, `FLOW_ERROR_*` handler variables)*
 
@@ -329,7 +337,7 @@ recomputes both figures from source and fails the build if this line drifts.
 
 **Plugin (2)** — Locale Plugin Setting · Locale Plugin Condition
 
-**Script (1)** — Run Termux Script &nbsp;·&nbsp; **Import (1)** — Unsupported Tasker Action
+**Script (1)** — Run Termux Script &nbsp;·&nbsp; **Import (2)** — Unsupported Tasker Action · Unsupported MacroDroid Action
 
 A **Shizuku-powered elevated tier** unlocks shell, airplane mode, screenshot, location mode, app freeze/unfreeze and more; **Termux** runs hash-pinned scripts.
 
@@ -337,7 +345,7 @@ A **Shizuku-powered elevated tier** unlocks shell, airplane mode, screenshot, lo
 
 ## Also inherited from OpenTasker
 
-So the full surface this builds on is visible: a floating-overlay **Scene** system (11 element types, input→variable binding, a system-wide overlay), a **visual flow editor** (pinch-zoom, edge routing, branch markers), **encrypted DB backup** (AES-256-GCM), **Locale/Tasker plugin** interop (both setting *and* condition), a **Run-Log expression debugger**, dotted/bracketed `var.set` JSON paths, RE2/J linear-time regex, and the full seven-context trigger engine — all retained and carried forward onto upstream **0.2.76**.
+So the full surface this builds on is visible: a floating-overlay **Scene** system (11 element types, input→variable binding, a system-wide overlay), a **visual flow editor** (pinch-zoom, edge routing, branch markers), **encrypted DB backup** (AES-256-GCM), **Locale/Tasker plugin** interop (both setting *and* condition), a **Run-Log expression debugger**, dotted/bracketed `var.set` JSON paths, RE2/J linear-time regex, and the full seven-context trigger engine — all retained and carried forward onto upstream **0.2.90**.
 
 ---
 
