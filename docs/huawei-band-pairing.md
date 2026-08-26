@@ -603,6 +603,53 @@ tag 19**, which is why row one has been useless in every sweep.
 
 **The day list shows SEVEN rows**, however many days are sent — a 15-row sweep wastes its last eight.
 
+### `rrisqi_data.bin` is a standard HRV panel (2026-08-26)
+
+Ten floats per ~60 s window, and for weeks only three had names. Decoded against the band's own
+per-beat RR series (`sequence_data` 700021), **seven of the ten are now standard HRV metrics** and
+the record reads as an ordinary panel rather than a Huawei invention:
+
+| | | | |
+|---|---|---|---|
+| `f1` | a count | `f6` | **mean RR (ms)** — the anchor |
+| `f2` | **SD of instantaneous HR (bpm)** | `f7` | **SD1/SD2**, the Poincaré ratio |
+| `f3` | **RR range**, on the 20 ms grid | `f8` | **HF power**, 0.15–0.40 Hz (ms²) |
+| `f4` | **not RR-derived** | `f9` | **LF power**, 0.04–0.15 Hz (ms²) |
+| `f5` | **RMSSD (ms)** | `f10` | **not RR-derived** |
+
+Verified by `scripts/rri-name-fields.py` over 257 paired windows. Every scale converges on 1 and
+every error falls as the window alignment tightens (|computed mean − f6| ≤ 20 → 10 → 5 ms), which
+is the signature of residual **pairing** error rather than a wrong model:
+
+```
+f2  hr_sd     0.993  1.9%   0.995  0.7%   0.996  0.5%
+f5  rmssd     0.993  1.2%   0.995  0.7%   0.994  0.5%
+f6  mean      0.990  0.7%   0.996  0.5%   0.999  0.3%
+f7  sd1/sd2   0.985  2.1%   0.988  1.4%   0.990  1.2%
+f8  hf        1.001  4.1%   1.013  2.4%   1.019  1.9%
+f9  lf        1.094 10.8%   1.114  5.7%   1.126  4.5%
+```
+
+**The spectral convention had to be found, not assumed.** f8 and f9 first fitted at a common scale
+of 0.248 — a shared constant, so a normalisation rather than two coincidences. A Hanning window sums
+to n/2, so normalising by `n²` as if the window were rectangular is a factor of exactly 4, and
+0.248 × 4 = 1. Linear detrend, 4 Hz interpolation of the tachogram, standard band edges.
+
+**f9 keeps a 7–13 % scale offset that no band edge removes, and that is expected**: these windows are
+~60 s, and 0.04 Hz is 2.4 cycles in 60 s, so LF is under-resolved by construction. The
+identification stands; the exact reproduction is limited by window length.
+
+**Two methodological traps, recorded because both nearly produced a false claim:**
+
+*Absolute tolerance floors.* An earlier pass tested `within max(2% of the mean, 0.5)` and reported
+"f7 ≈ CV in 93/124 windows". CV averages 0.05, so a floor of 0.5 was ten times the quantity and the
+test could not fail. Every tolerance here is relative.
+
+*Correlation proves nothing on this data.* Every fatigue-ish metric correlates with every other one
+across these windows — which is precisely why six fields once looked plausible and none was proven.
+A field is claimed only when the fit is scale-free: `field / metric` near-constant, and the constant
+coming out at 1.
+
 ### GNSS assistance: the band ASKS, and it asks for two different things (2026-08-26)
 
 The band cannot fetch satellite assistance data itself. Without a companion feeding it, a GPS fix
