@@ -237,6 +237,7 @@ object ActionCatalog {
         define("huawei.settings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiSettingsAction),
         define("huawei.weather", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWeatherAction),
         define("huawei.gnss", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiGnssAction),
+        define("ui.click", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiClickAction),
         define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("band.compare", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandCompareAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),

@@ -8,6 +8,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.contexts.AppForegroundChangedContextEvents
@@ -119,6 +120,63 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
 
         /** True when the user has enabled and the system has bound the service. */
         val isConnected: Boolean get() = instance != null
+
+        /**
+         * Click the first visible node whose text or description matches one of [candidates].
+         *
+         * By TEXT rather than by coordinate, and that is the whole point. The Mate XT reports a
+         * different geometry folded and unfolded, so a tap at a remembered x/y lands somewhere else
+         * on the other panel — see the `mate-xt-folded-screen` notes. A label is the same label in
+         * both states.
+         *
+         * Several candidates because the label is whatever language the phone is in: the camera's
+         * mode tabs read 写真 / ビデオ here and Photo / Video elsewhere, and a binding should not
+         * break when the locale switches.
+         *
+         * Walks up from the match to the nearest clickable ancestor: a tab's caption is usually a
+         * TextView inside the clickable row, so clicking the exact node that holds the text does
+         * nothing at all.
+         *
+         * @return the label actually clicked, or null when nothing matched in time.
+         */
+        fun clickByLabel(
+            candidates: List<String>,
+            packageName: String? = null,
+            timeoutMs: Long = 3_000,
+        ): String? {
+            val want = candidates.map { it.trim() }.filter { it.isNotEmpty() }
+            if (want.isEmpty()) return null
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                val svc = instance
+                val roots = buildList {
+                    svc?.rootInActiveWindow?.let { add(it) }
+                    // The secure camera sits in its own window over the keyguard, so the "active"
+                    // window is not always the one being looked for.
+                    svc?.windows?.forEach { w -> w.root?.let { add(it) } }
+                }
+                for (root in roots) {
+                    if (packageName != null && root.packageName?.toString() != packageName) continue
+                    findAndClick(root, want)?.let { return it }
+                }
+                Thread.sleep(120)
+            }
+            return null
+        }
+
+        private fun findAndClick(node: AccessibilityNodeInfo?, want: List<String>): String? {
+            if (node == null) return null
+            val label = (node.text?.toString() ?: node.contentDescription?.toString())?.trim()
+            if (label != null && want.any { it.equals(label, ignoreCase = true) }) {
+                var target: AccessibilityNodeInfo? = node
+                while (target != null && !target.isClickable) target = target.parent
+                if (target != null && target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return label
+            }
+            for (i in 0 until node.childCount) {
+                findAndClick(node.getChild(i), want)?.let { return it }
+            }
+            return null
+        }
 
         /**
          * True when the service is ENABLED in system settings, regardless of whether it is bound right
