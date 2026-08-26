@@ -183,6 +183,28 @@ class HuaweiSession(private val transport: HuaweiTransport) {
     suspend fun awaitFrame(service: Int, command: Int, timeoutMs: Long): HuaweiProtocol.Frame? =
         await(service, command, timeoutMs)
 
+    /**
+     * Wait for the next frame on a SERVICE, whatever command it carries.
+     *
+     * The GNSS assistance transfer inverts the usual roles: the band issues `0x1C/0x01`, `0x02`,
+     * `0x03`, `0x04` and `0x06` in an order this side does not choose, so a server loop cannot name
+     * the command it is waiting for the way [awaitFrame] requires. Frames belonging to other
+     * services stay in the queue for whoever does want them.
+     */
+    suspend fun awaitService(service: Int, timeoutMs: Long): HuaweiProtocol.Frame? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (true) {
+            queue.indexOfFirst { it.serviceId == service }
+                .takeIf { it >= 0 }
+                ?.let { return queue.removeAt(it) }
+            val remaining = deadline - System.currentTimeMillis()
+            if (remaining <= 0) return null
+            val chunk = transport.read(remaining)
+            if (chunk == null) { kotlinx.coroutines.delay(20); continue }
+            queue.addAll(rx.feed(chunk))
+        }
+    }
+
     private suspend fun await(service: Int, command: Int, timeoutMs: Long): HuaweiProtocol.Frame? {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (true) {

@@ -603,6 +603,60 @@ tag 19**, which is why row one has been useless in every sweep.
 
 **The day list shows SEVEN rows**, however many days are sent — a 15-row sweep wastes its last eight.
 
+### GNSS assistance: the band ASKS, and it asks for two different things (2026-08-26)
+
+The band cannot fetch satellite assistance data itself. Without a companion feeding it, a GPS fix
+takes minutes of cold search instead of seconds.
+
+**The roles are reversed here.** Everywhere else in this file we ask and the band answers. Here the
+band raises `0x1F/0x01`, names what it wants, and then drives a pull over `0x1C` in an order we do
+not choose. `serveGnss` is a small server; the band decides which files it takes and we only offer.
+
+```
+<-- 0x1F/0x01  band: "I want assistance data"        --> ack 100000
+--> 0x1F/0x02  "what?"   <-- band answers with a source string
+--> 0x1F/0x03  {1: 03} "it is here"                  <-- band acks, then opens 0x1C
+<-- 0x1C/0x01  "list what you have"  --> {1: "A;B;C"}      (NO result tag)
+<-- 0x1C/0x02  transfer params: tag 3 unit=862, tag 4 block=6896
+<-- 0x1C/0x03  "I want X"            --> {2: size, 3: CRC16}  (NO result tag)
+<-- 0x1C/0x04  [offset, length)      --> ack + 80-byte token + offset echo
+--> 0x1C/0x05  <seq byte><=862 raw bytes>  x N        NOT TLV
+<-- 0x1C/0x06  "done"                --> ack
+```
+
+**Two rounds, two different questions.** Measured on the band:
+
+| what the band is doing | it asks for | can we supply it? |
+|---|---|---|
+| its **Update** button pressed | `HW_EEV2/HW_PGNSS_PRED` — the predicted set, 6 files, 799 KB | only from captured files |
+| it **needs a fix** (starting Outdoor Walk) | `higeo/v1/gnssinfo?type=0x0004/HW_AGNSS` — broadcast ephemeris | **yes, freshly, forever** |
+
+On 2026-08-25 an Update press was offered the broadcast file in the same listing and **declined it**,
+taking only the predicted six. On 2026-08-26 08:48:40, with Outdoor Walk starting, the band asked for
+broadcast ephemeris and took `HW_AGNSS_RTCM_33` (7403 B) — our own download, 39 s after the watch
+opened. So the trigger is **need, not reconnect**, which is what an earlier theory here said.
+
+### Where the data comes from, and the one door that is shut
+
+**Broadcast ephemeris is OPEN.** `https://geo-dre.platform.dbankcloud.com/higeo/v1/gnssinfo?type=0x0004`
+answers a plain GET with no account, no token and no signature. The reply is gzip; unpacked it is
+7403 bytes of RTCM 3 — 114 messages, 1019 GPS ×31, 1020 GLONASS ×24, 1042 BeiDou ×31, 1046
+Galileo ×28 — the same size and the same composition as the file Huawei Health was captured handing
+the band. `dre` is Europe; `drcn`, `dra`, `drru` are the other regions. The whole `type` bitmask was
+swept: **nine valid bits, all RTCM, about 14 KB in total**, and nothing resembling the predicted set.
+
+**The predicted set is SHUT.** `/higeo/v2/geoFile` answers `405` to a GET and `Invalid authorization`
+to a POST. Health signs it: the disassembly shows the base string `"POST&/higeo/v2/geoFile&&" +
+params + "&ak=" + key + "&timestamp=" + ts`, signed by `com.huawei.wisesecurity.ucs.credential` —
+`applyCredential("com.huawei.hms.location")` then `CredentialSigner…signBase64()`. **The key is not
+in the APK**: the credential is applied for at runtime from Huawei's servers and issued to
+`com.huawei.health` against its package name and signing certificate. There is nothing to lift, and
+reproducing it would mean impersonating that identity.
+
+**What that costs.** Nothing while the phone is with the band: the band asks us for broadcast
+ephemeris and we always have it. The predicted set is the cushion for when the band is ALONE and has
+to fall back on a forecast — that is what expires.
+
 ### Weather is a PUSH, not a request
 
 The band displays weather that the phone sends it. There is no fetching involved on our side and no

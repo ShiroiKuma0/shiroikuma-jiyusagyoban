@@ -8,10 +8,24 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
-## 0.2.88+2026-08-21.18-40.gb5e3e38e+027 — 2026-08-25
+## 0.2.88+2026-08-21.18-40.gb5e3e38e+035 — 2026-08-26
 
 Built on upstream OpenTasker `0.2.88` (`b5e3e38e`). Also carries the `0.2.88` sync itself and the
 adoption of upstream's `core:*` module split.
+
+**The band gets its satellite data, with no Huawei account anywhere.** `huawei.gnss` is the first
+thing here where the band drives and we answer: it raises a request, names what it wants, and pulls
+over a second service in an order we do not choose. Broadcast ephemeris is downloaded from an open
+Huawei endpoint — no token, no signature — unpacked from gzip, and served on demand. Confirmed on
+the band 2026-08-26: asked while starting Outdoor Walk, it took our own 7403-byte RTCM file 39 s
+after the watch opened.
+
+The band asks for two different things and only one of them is reachable. Its Update button wants
+the PREDICTED set, whose endpoint is signed with a credential Huawei issues at runtime to Health's
+package and certificate — there is no secret in the APK to lift, so that half is served from
+captured files. When the band actually needs a fix it asks for broadcast ephemeris instead, which we
+can refresh freely and forever. The whole open type-space was swept to be sure: nine valid bits,
+~14 KB of RTCM, nothing like the predicted set.
 
 **The band's weather works.** It had been frozen on 2026-08-23 for two days while
 `天気送信（Huawei）` reported "Weather pushed" after every run, and the cause was not the one every

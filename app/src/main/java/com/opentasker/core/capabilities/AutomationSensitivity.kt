@@ -227,6 +227,10 @@ object AutomationSensitivityRegistry {
         "huawei.settings",
         // Writes to the band's display only.
         "huawei.weather",
+        // Writes satellite assistance data the band cannot fetch itself. Device control rather than
+        // data access: nothing personal is read, and nothing leaves the phone — the files served
+        // are ones already on disk, never the URL the band asks us to fetch.
+        "huawei.gnss",
         "huawei.workouts",
         "band.compare",
         // Drops a bond and a credential — device control in its most consequential form here.
