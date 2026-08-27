@@ -854,7 +854,16 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // it walks away mid-conversation, and each of them has its own ceiling (the session watchdog)
     // that reports what actually went wrong if it is allowed to fire first.
     actionType == "huawei.settings" || actionType == "huawei.weather" ||
-        actionType == "huawei.probe" || actionType == "huawei.language" -> HUAWEI_PAIR_TIMEOUT_MS
+        actionType == "huawei.probe" || actionType == "huawei.language" ||
+        actionType == "huawei.workouts" || actionType == "huawei.charts" ||
+        actionType == "huawei.unpair" -> HUAWEI_PAIR_TIMEOUT_MS
+    // The satellite watch is the one action here whose whole job is to WAIT. 衛星待受 asks for an
+    // hour, because the band raises its request when a walk starts and that is the moment worth
+    // catching — but every action is wrapped in `withTimeout(actionTimeoutMs(type))`, so an
+    // unlisted `huawei.gnss` was silently held to 60 s and the hour was a fiction. The one catch
+    // we have (2026-08-26, 39 s) survived only because the band happened to ask inside that minute.
+    // Its own ceiling is the `wait` argument, which the action caps and reports against.
+    actionType == "huawei.gnss" -> HUAWEI_GNSS_TIMEOUT_MS
     else -> DEFAULT_ACTION_TIMEOUT_MS
 }
 
@@ -864,6 +873,16 @@ private const val INTENT_SEND_TIMEOUT_MS = 660_000L // result_timeout max (600 s
 private const val ARTICLE_ACTION_TIMEOUT_MS = 1_800_000L // 30 minutes — a long article, many pages
 private const val HUAWEI_PAIR_TIMEOUT_MS = 600_000L // 180 s of human + handshake + 90 s serving, with margin
 private const val HUAWEI_SYNC_TIMEOUT_MS = 1_860_000L // the action's own maximum (1800 s) + 60 s margin
+
+/**
+ * The satellite watch: `HuaweiGnssAction.MAX_WAIT_SEC` (3600 s) plus the transfer that follows.
+ *
+ * The band asks and then pulls at its own pace — up to 806 KB across seven files — so the wait is
+ * not the whole action. `HuaweiSyncRunner`'s session watchdog (420 s) bounds what comes after the
+ * ask, and this sits above the two together so that the action's own ceiling is always the one that
+ * fires.
+ */
+private const val HUAWEI_GNSS_TIMEOUT_MS = 4_080_000L // 3600 s watch + 420 s transfer + 60 s margin
 
 /**
  * A watch-face install is bounded by HuaweiSyncRunner's own session watchdog (420 s) plus the grace
