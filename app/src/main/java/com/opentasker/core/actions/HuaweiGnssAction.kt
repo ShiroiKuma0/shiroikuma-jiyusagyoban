@@ -97,7 +97,11 @@ class HuaweiGnssAction : Action {
             )
         }
 
-        val waitSec = args["wait"]?.trim()?.toLongOrNull() ?: 20L
+        // Capped, so that the ceiling which fires is this one and not the engine's. TaskRunner wraps
+        // every action in `withTimeout`, and an action that outlives its budget is killed where it
+        // stands — for a band that means walking away mid-conversation. The budget is set from
+        // [MAX_WAIT_SEC] with room for the transfer that follows the ask.
+        val waitSec = (args["wait"]?.trim()?.toLongOrNull() ?: 20L).coerceIn(0L, MAX_WAIT_SEC)
         // Same convention as BandScanAction: a variable set to "1" calls the wait off. A watch left
         // running for an hour needs a way out that is not force-stopping the app.
         val cancelVar = args["cancel_var"]?.trim()?.ifEmpty { null }
@@ -204,6 +208,16 @@ class HuaweiGnssAction : Action {
     private companion object {
         /** Enough to see what happened, few enough to stay readable on a phone panel. */
         const val MAX_LOG_LINES = 12
+
+        /**
+         * The longest watch, in seconds — an hour, which is what 衛星待受 asks for.
+         *
+         * The band raises its request when an outdoor walk starts, so the watch has to still be
+         * standing when 白い熊 presses start; a minute of listening catches nothing but luck.
+         * `TaskRunner.HUAWEI_GNSS_TIMEOUT_MS` is set above this plus the transfer, so this ceiling
+         * is the one that fires and the action gets to say what happened.
+         */
+        const val MAX_WAIT_SEC = 3600L
 
         /** The band's own names, in the order Health serves them. */
         val DEFAULT_FILES = listOf(
