@@ -80,6 +80,7 @@ object HuaweiText {
     val sleepLight = Loc("Light", "浅い")
     val sleepRem = Loc("REM", "レム")
     val sleepAwake = Loc("Awake", "覚醒")
+    val sleepNap = Loc("Nap", "昼寝")
     val sleepAsleep = Loc("Asleep", "睡眠")
     val sleepBed = Loc("Bed time", "就寝")
     val sleepWoke = Loc("Woke", "起床")

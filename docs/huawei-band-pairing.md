@@ -943,9 +943,23 @@ The layout is simple once the file is whole:
 | beats | **(uint16 LE interval in ms, uint16 LE quality)**, repeated to the next record header |
 
 Variable beat count per record is exactly why it looked strideless. The series validates against
-itself: **sum(intervals) lands within 25 s of the record's declared span in 263 of 266 records**, and
-quality is 100 for 19978 of 21513 beats, 50 for 1289, 0 for 154 — the `sqi` the filename has carried
+itself: **sum(intervals) lands within 25 s of the record's declared span in 266 of 267 records**, and
+quality is 100 for 20059 of 21502 beats, 50 for 1293, 0 for 150 — the `sqi` the filename has carried
 all along.
+
+**Those totals were 263 of 266 until 2026-08-27, and the missing records were ours, not the band's.**
+The band writes a page index into every 976th byte of this file — that byte is the page's own number
+rather than data (see `HuaweiPagedFile.kt`). A 97789-byte capture carries 100 of them: 88 in a
+quality field's spare high byte, and the rest in record headers, two of which took the low byte of a
+big-endian start and left the record unfindable, so its beats were handed to the record before it.
+Reading the headers by their little-endian echo at `+0x24` — the one copy of the start a stamp
+cannot also have taken — recovers them, and the quality column then comes back as exactly
+{100, 50, 0} with no impossible value left anywhere in it.
+
+**No stamp has ever landed in an interval**, and that is structural rather than lucky: a record
+header is 44 bytes and a beat is 4, so beats sit at offsets congruent to 1 (mod 4) while stamps sit
+at 0 — each one falls on the same byte of the same field every time. Every metric below is computed
+from intervals, so none of them was ever reading a damaged number.
 
 **This is ground truth that needs neither Huawei Health nor a second phone.** RMSSD, SDNN, pNN50, the
 range — all computable here, for every window, and comparable against the ten rrisqi fields. Pairing

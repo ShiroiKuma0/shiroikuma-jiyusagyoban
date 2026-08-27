@@ -75,11 +75,22 @@ class HuaweiWalkShapeTest {
     }
 
     @Test
-    fun `time runs forward across the whole walk`() {
-        val pts = HuaweiGpsTrack.decode(bytes())!!.points
+    fun `time runs forward across the whole walk, and lasts what the band says it lasted`() {
+        val track = HuaweiGpsTrack.decode(bytes())!!
+        val pts = track.points
         assertTrue("timestamps must not go backwards", pts.zipWithNext().all { (a, b) -> b.epochSeconds >= a.epochSeconds })
-        val minutes = (pts.last().epochSeconds - pts.first().epochSeconds) / 60
-        assertTrue("a walk of $minutes min", minutes in 30..300)
+
+        // This assertion used to allow anything from 30 to 300 minutes, and it passed at 2 h 08 m —
+        // which is what the block indices did to a 29-minute walk. Three of them landed in the step
+        // field of this file and read as gaps of 1025 s, 18 s and 4865 s, so the decoded track
+        // claimed 1 h 38 m of standing still that never happened, and the wide bound hid it.
+        //
+        // The band's own summary is the referee: workout 8 ran 1767 s, and the track's first fix is
+        // 4 s in, so the file must span 1763 s. It does, exactly.
+        assertEquals(1763L, pts.last().epochSeconds - pts.first().epochSeconds + 1)
+
+        // 26508 bytes: a block index at every multiple of 976, the one at zero inside the header.
+        assertEquals(27, track.mendedPoints)
     }
 
     @Test

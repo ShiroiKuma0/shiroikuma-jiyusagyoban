@@ -37,30 +37,19 @@ under-resolved by construction. The identification is solid; the exact reproduct
 window length.
 """
 import struct, sys, math, statistics as st
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import numpy as np
 
 PLAUS = range(1_780_000_000, 1_800_000_000)
 
 
+from huawei_700021 import beats as _read_700021
+
+
 def beats(path):
-    b = open(path, "rb").read()
-    heads = [o for o in range(0x21, len(b) - 8)
-             if struct.unpack_from(">I", b, o)[0] in PLAUS
-             and struct.unpack_from(">I", b, o + 4)[0] in PLAUS
-             and 0 < struct.unpack_from(">I", b, o + 4)[0] - struct.unpack_from(">I", b, o)[0] <= 600]
-    if not heads:
-        return []
-    keep = [heads[0]]
-    for h in heads[1:]:
-        if h - keep[-1] >= 0x2C:
-            keep.append(h)
-    out = []
-    for i, h in enumerate(keep):
-        s, e = struct.unpack_from(">I", b, h)[0], struct.unpack_from(">I", b, h + 4)[0]
-        stop = keep[i + 1] if i + 1 < len(keep) else len(b)
-        out.append({"s": s, "e": e,
-                    "beats": [struct.unpack_from("<HH", b, p) for p in range(h + 0x2C, stop - 3, 4)]})
-    return out
+    """The shared reader — see scripts/huawei_700021.py for the page stamp it undoes."""
+    return _read_700021(path)[0]
 
 
 def rrisqi(path):

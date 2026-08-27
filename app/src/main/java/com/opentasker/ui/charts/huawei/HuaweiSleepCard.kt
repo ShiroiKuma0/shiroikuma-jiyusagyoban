@@ -154,6 +154,21 @@ private val LANES = listOf(
     HuaweiSleep.Stage.DEEP,
 )
 
+/**
+ * A nap has no lane and no colour of its own, deliberately.
+ *
+ * It is daytime sleep the band files as a whole separate session, and every nap seen so far is that
+ * session's ONE segment — so there is nothing beside it on the chart to tell it apart from, and a
+ * fifth lane would stand empty on every night. Adding a fifth hue would also mean putting a new
+ * colour through the whole palette's contrast gate before it could be drawn, which is a real piece
+ * of work to spend on a lane with one block in it.
+ *
+ * So it borrows light's lane and light's colour, and says "nap" on the label. The totals keep them
+ * apart regardless: [HuaweiSleep.Session.totals] groups by stage, so nap minutes are never counted
+ * as light minutes anywhere a number is shown.
+ */
+private val NAP_DRAWS_AS = HuaweiSleep.Stage.LIGHT
+
 private fun codeOf(stage: HuaweiSleep.Stage): Char =
     if (stage == HuaweiSleep.Stage.UNKNOWN) '?' else ('0' + stage.code)
 
@@ -165,6 +180,7 @@ internal fun colorOf(stage: HuaweiSleep.Stage): Color = when (stage) {
     HuaweiSleep.Stage.LIGHT -> ChartPalette.SLEEP_LIGHT
     HuaweiSleep.Stage.REM -> ChartPalette.SLEEP_REM
     HuaweiSleep.Stage.AWAKE -> ChartPalette.SLEEP_AWAKE
+    HuaweiSleep.Stage.NAP -> colorOf(NAP_DRAWS_AS)
     HuaweiSleep.Stage.UNKNOWN -> ChartPalette.UNKNOWN
 }
 
@@ -173,6 +189,7 @@ private fun labelOf(stage: HuaweiSleep.Stage) = when (stage) {
     HuaweiSleep.Stage.LIGHT -> HuaweiText.sleepLight
     HuaweiSleep.Stage.REM -> HuaweiText.sleepRem
     HuaweiSleep.Stage.AWAKE -> HuaweiText.sleepAwake
+    HuaweiSleep.Stage.NAP -> HuaweiText.sleepNap
     HuaweiSleep.Stage.UNKNOWN -> HuaweiText.sleepAwake
 }
 
@@ -207,7 +224,11 @@ internal fun Hypnogram(
         drawHypnogram(
             frame = frame,
             runs = runs,
-            rowOf = { code -> LANES.indexOf(stageOfCode(code)).takeIf { it >= 0 } ?: 0 },
+            rowOf = { code ->
+                val stage = stageOfCode(code)
+                val lane = if (stage == HuaweiSleep.Stage.NAP) NAP_DRAWS_AS else stage
+                LANES.indexOf(lane).takeIf { it >= 0 } ?: 0
+            },
             rows = LANES.size,
             colorOf = { code -> colorOf(stageOfCode(code)) },
         )

@@ -192,4 +192,78 @@ class HuaweiGpsTrackTest {
         // Seven decimals is ~1 cm — the track's own precision is far coarser, so nothing is lost.
         assertTrue(gpx.contains("lat=\"%.7f\"".format(java.util.Locale.US, track.points[0].latitude)))
     }
+
+    /**
+     * The block index that the transfer leaves in every 976th byte.
+     *
+     * This is not a hypothetical: the byte at every multiple of 976 holds that block's own number,
+     * in all three of 白い熊's walks, without exception. The fixture reproduces exactly that — a
+     * straight, steady walk with the indices written over it — because the failure it caused was
+     * invisible in every other way. The route still looked like a route; it simply claimed to have
+     * taken 1 h 38 m longer than it did, and the band's own duration was the only thing that
+     * disagreed.
+     */
+    private fun withBlockIndices(bytes: ByteArray): ByteArray {
+        val out = bytes.copyOf()
+        var at = 0
+        var index = 0
+        while (at < out.size) {
+            out[at] = (index and 0xFF).toByte()
+            at += HuaweiGpsTrack.TRANSFER_BLOCK
+            index++
+        }
+        return out
+    }
+
+    @Test
+    fun `a block index in the step field does not become an hour of standing still`() {
+        // Long enough to cross several boundaries: 976 bytes is just under 65 records.
+        val steady = List(400) { Quad(1, 1f, 0f) }
+        val clean = HuaweiGpsTrack.decode(file(steady))!!
+        val marked = HuaweiGpsTrack.decode(withBlockIndices(file(steady)))!!
+
+        // Same walk, same length, same last second. Before the fix the marked file ran minutes long,
+        // because a block index in the high byte of the step reads as 256 times itself.
+        assertEquals(clean.points.size, marked.points.size)
+        assertEquals(
+            clean.points.last().epochSeconds,
+            marked.points.last().epochSeconds,
+        )
+    }
+
+    @Test
+    fun `a block index in a delta is interpolated, not accumulated`() {
+        val steady = List(400) { Quad(1, 1f, 0f) }
+        val clean = HuaweiGpsTrack.decode(file(steady))!!
+        val marked = HuaweiGpsTrack.decode(withBlockIndices(file(steady)))!!
+
+        // Displacement accumulates, so a garbage float does not spoil one point — it translates
+        // every point after it. One metre per second, four hundred seconds: the end must still be
+        // 400 m east of the start, whatever the indices landed on.
+        val perMetreLon = 1.0 / HuaweiGpsTrack.EARTH_RADIUS_M / cos(lat0 * PI / 180.0) / (PI / 180.0)
+        assertEquals(lon0 + 400 * perMetreLon, clean.points.last().longitude, 1e-9)
+        assertEquals(lon0 + 400 * perMetreLon, marked.points.last().longitude, 1e-6)
+    }
+
+    @Test
+    fun `every record that crosses a block boundary says so`() {
+        val steady = List(400) { Quad(1, 1f, 0f) }
+        val marked = HuaweiGpsTrack.decode(withBlockIndices(file(steady)))!!
+
+        // 400 records of 15 bytes plus the 63-byte head is 6063 bytes: boundaries at 976 through
+        // 5856, and the one at zero falls inside the header. Six records carry an index.
+        assertEquals(6, marked.mendedPoints)
+
+        // The flagged records are exactly the ones straddling a multiple of 976.
+        val expected = (0 until 400)
+            .filter { i -> (63 + i * 15).let { o -> (o / 976) != ((o + 14) / 976) || o % 976 == 0 } }
+        assertEquals(expected, marked.points.indices.filter { marked.points[it].mended })
+
+        // A file WITHOUT the indices written in is left entirely alone. Each site is verified before
+        // anything is repaired — at a real page boundary the byte IS its own index, so a site that
+        // does not match is one the stamp never reached, and repairing it would invent damage. This
+        // is what protects a track long enough to have needed a second transfer window, where the
+        // alignment stops partway through.
+        assertEquals(0, HuaweiGpsTrack.decode(file(steady))!!.mendedPoints)
+    }
 }
