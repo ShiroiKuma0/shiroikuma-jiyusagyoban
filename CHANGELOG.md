@@ -8,6 +8,98 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.90+2026-08-25.04-06.g71800ef2+003 — 2026-08-27
+
+Built on upstream OpenTasker `0.2.90` (`71800ef2`). The page stamp from `+002` turned out not to be
+a walk problem — it is in every `sequence_data` stream too — so the sleep reader learns it, and the
+band's naps get a name.
+
+**It is the band's stamp, not our transfer.** `rrisqi_data.bin` comes through the identical client,
+session and code path and carries none of them; if our reassembly wrote them it would have written
+them there too. So the band stores GPS tracks and `sequence_data` in 976-byte flash pages, each
+stamped with its own index, and Huawei Health must skip them exactly as we now do. It also settles
+the GPS header that is "33 bytes, not the 32 every published description gives": byte 0 is page 0's
+index, landing on a header byte that is zero anyway. All of it now lives in one place,
+`HuaweiPagedFile`, which the track decoder and the sleep reader share.
+
+**Each site is verified before anything is repaired.** At a real page boundary the byte IS its own
+index, so a site that does not match is one the stamp never reached — which is what a file too big
+for a single transfer window looks like past the first one. `+002` assumed every 976th byte; this
+checks, and leaves an unstamped file completely alone.
+
+**Sleep survives a stamp instead of losing a night to it.** A stamp in the top bytes of a duration
+or a stage costs nothing, because real durations are minutes and stages are 1..5 — the value
+underneath is read whole. A stamp in a duration's low byte is solved from the night's own identity
+(anchored on the leading awake run, the last sleeping segment ends exactly on the declared wake
+time), which is reconstruction rather than interpolation and declines to guess when the arithmetic
+has two unknowns. And a stamp in one of the header's epochs used to make the base scan walk straight
+past the night — losing it whole, from an append-only file that never offers it again; that epoch is
+now recovered from the same identity. Nothing in 白い熊's seven captured nights was damaged: all four
+stamps landed in configuration blocks. This is for the roughly one in three that will not.
+
+**A nap is now called a nap.** Stage code 5 — first seen 2026-08-26, 17:04–18:37, one segment of
+5580 s exactly filling its declared span — mapped to `UNKNOWN`, so an hour and a half of daytime
+sleep counted as nothing at all and drew as `?`. With the code named, that session's asleep total is
+5580 s and the file's own alignment check passes for it, which is independent evidence it is sleep
+rather than another kind of awake. It draws in light's lane, in light's colour, labelled 昼寝: a
+fifth hue would have to clear the whole palette's contrast gate first, and every nap so far is a
+one-segment session of its own with nothing beside it to be confused with. The totals still keep
+them apart — nap minutes are never counted as light minutes anywhere a number is shown.
+
+**The per-beat RR tooling read three records fewer than the file holds.** 700021 carries 100 stamps
+in a 97789-byte capture; two took the low byte of a record header's big-endian start, which left the
+record unfindable and handed its beats to the one before it. That was the unexplained "263 of 266"
+in `docs/huawei-band-pairing.md`. Headers are now found by the little-endian echo at `+0x24` — the
+one copy of the start a stamp cannot also have taken — and are required to sit on the file's 4-byte
+grid, without which the relaxed scan admits a mid-record offset whose echo happens to look like an
+epoch. It reads **267 records, 266 self-consistent**, and the quality column comes back as exactly
+{100, 50, 0} with no impossible value left in it. **No stamp has ever landed in an interval**, and
+that is structural rather than lucky — beats sit at offsets congruent to 1 (mod 4) and stamps at 0 —
+so every HRV metric these files named was computed from numbers that were never damaged. The two
+scripts that each carried their own copy of this reader now share one, `scripts/huawei_700021.py`.
+
+Full JVM suite green at 1827 tests.
+
+## 0.2.90+2026-08-25.04-06.g71800ef2+002 — 2026-08-27
+
+Built on upstream OpenTasker `0.2.90` (`71800ef2`). Two fork fixes, both found while measuring how
+long the band took to get a satellite fix on 白い熊's walk that morning.
+
+**Every walk claimed 1 h 38 m of standing still that never happened.** The byte at every offset that
+is a multiple of 976 holds that block's own index — byte 976 is `1`, byte 1952 is `2` — in all three
+of 白い熊's walks, across all 72 boundaries, without exception. 976 is the band's transfer chunk
+size, already named in `HuaweiFileClient`. It overwrites a track byte rather than inserting one, and
+that was tested rather than assumed: every way of stripping those bytes back out turns the track to
+noise (7.5 % of records at the file's 1 s cadence, 64 % of steps under 5 m) where reading the file as
+it arrived gives 99.6 % and 99.0 %. Three of them land in the step field of every walk and read as
+gaps of 1025 s, 18 s and 4865 s; twelve to fourteen land inside the displacement floats, where —
+because displacement accumulates — one garbage value does not spoil a point but translates the whole
+rest of the route. The decoder now knows where they are: a step whose high byte is lost falls back to
+the low byte, which is intact; a step whose low byte is lost takes the neighbour's cadence; a lost
+displacement is interpolated from the records either side, which are always whole (65 records apart).
+Each such point carries `mended`, because none of them is a reading.
+
+**The band's own summary is the referee, and all three walks now land on it.** Track span plus the
+head start before the first fix, against the band's own duration: 1763 + 4 against 1767 (2026-08-23),
+1326 + 6 against 1333 (2026-08-25), 1730 + 21 against 1750 (2026-08-27) — each within a second or
+two of a figure they used to miss by an hour and a half. Before this, that first walk decoded as
+2 h 08 m. `HuaweiWalkShapeTest` asserted
+only that a walk lasted between 30 and 300 minutes, which is how a 29-minute walk passed as two hours
+for a week; it now asserts the exact span and the block-index count. The raw `.bin` is kept for
+exactly this reason, so the walks already on disk were repaired by re-decoding rather than re-walking.
+
+**The satellite watch was a one-minute watch.** `TaskRunner` wraps every action in
+`withTimeout(actionTimeoutMs(type))`, and `huawei.gnss` was not in that table — so 衛星待受's
+`wait=3600` was a fiction and the hour-long watch died after 60 s. The one catch on record (2026-08-26,
+39 s) survived only because the band happened to ask inside that minute. The band raises its request
+when an outdoor walk starts, so a watch that cannot outlive a minute cannot be standing when it
+matters. `huawei.gnss` now has its own budget, and the action caps its own wait so that its ceiling
+is the one that fires. `huawei.workouts`, `huawei.charts` and `huawei.unpair` were missing too: a
+walk fetch through a task was killed mid-transfer, which leaves the band mid-conversation with no
+companion — the failure the rest of that table exists to prevent.
+
+Full JVM suite green at 1817 tests.
+
 ## 0.2.90+2026-08-25.04-06.g71800ef2+001 — 2026-08-26
 
 Built on upstream OpenTasker `0.2.90` (`71800ef2`). A pure sync: no fork behaviour changes, and the

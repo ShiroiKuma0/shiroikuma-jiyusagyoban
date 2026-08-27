@@ -6,29 +6,36 @@
 700021 is a 44-byte record header (start/end epoch, BE uint32) followed by (uint16 LE interval in ms,
 uint16 LE quality) pairs until the next header. The variable beat count is why it read as strideless.
 
+The band also writes a PAGE STAMP into every 976th byte of this file — that byte is the page's own
+number, not data (see HuaweiPagedFile.kt). Measured 2026-08-27 on a 97789-byte capture: 100 stamps,
+91 of them in a quality field's spare high byte and 9 in a record header. Three of those nine took
+the low byte of a header's big-endian start, which made the record unreadable and handed its beats
+to the previous one — and that, not the band, is the "263 of 266" this script used to report. The
+true start survives as a little-endian echo at +0x24, so the headers are found by the echo and the
+stamped bytes are skipped rather than read.
+
+None of the stamps has ever landed in an INTERVAL, and that is structural rather than lucky: headers
+are 44 bytes and beats are 4, so every beat pair sits at an offset congruent to 1 (mod 4) while the
+stamps sit at 0, which puts each one on the same byte of the same field every time. The intervals
+these metrics are computed from were never touched.
+
 This is the ground truth that named f5 (RMSSD) and f3 (the RR range on the 20 ms grid) without
 Huawei Health: with per-beat intervals, the standard metrics are computable here. Pull both files
 with the 健康 tasks バンド書類700021（Huawei） and バンドRR書類（Huawei）.
 """
-import struct, sys, math, statistics as st, datetime
+import struct, sys, math, statistics as st, datetime, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
 PLAUS = range(1_780_000_000, 1_800_000_000)
 
+from huawei_700021 import beats as read_700021
+
+
 def beats(path):
-    b = open(path, "rb").read()
-    heads = [o for o in range(0x21, len(b)-8) if struct.unpack_from(">I", b, o)[0] in PLAUS
-             and struct.unpack_from(">I", b, o+4)[0] in PLAUS
-             and 0 < struct.unpack_from(">I", b, o+4)[0] - struct.unpack_from(">I", b, o)[0] <= 600]
-    # keep only headers 44+4k apart from the previous one (drop the LE echo inside each header)
-    keep = [heads[0]]
-    for h in heads[1:]:
-        if h - keep[-1] >= 0x2C: keep.append(h)
-    out = []
-    for i, h in enumerate(keep):
-        s, e = struct.unpack_from(">I", b, h)[0], struct.unpack_from(">I", b, h+4)[0]
-        stop = keep[i+1] if i+1 < len(keep) else len(b)
-        arr = [struct.unpack_from("<HH", b, p) for p in range(h+0x2C, stop-3, 4)]
-        out.append({"s": s, "e": e, "beats": arr})
-    return out
+    """The shared reader, with what the page stamps cost reported where it can be seen."""
+    records, mended = read_700021(path)
+    print(f"page stamps repaired: {mended['headers']} record header(s), {mended['beats']} beat(s)")
+    return records
+
 
 def rrisqi(path):
     b = open(path, "rb").read(); out, off = [], 0x30

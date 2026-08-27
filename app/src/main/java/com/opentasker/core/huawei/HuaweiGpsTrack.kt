@@ -47,13 +47,30 @@ object HuaweiGpsTrack {
     /** The other candidate, kept named so a calibration run has something to compare against. */
     const val EARTH_RADIUS_ALT_M = 6_383_807.0
 
-    /** One fix. [altitudeRaw] is in the file's own unit, which is not known to be metres. */
+    /**
+     * The band's page stamp, kept under this name because the tests and the walk arithmetic use it.
+     *
+     * Everything known about it — that it overwrites rather than inserts, that it is the band's own
+     * and not our transfer's, and why each site is verified before anything is repaired — lives in
+     * [HuaweiPagedFile], which the sleep reader shares.
+     */
+    const val TRANSFER_BLOCK = HuaweiPagedFile.PAGE
+
+    /**
+     * One fix. [altitudeRaw] is in the file's own unit, which is not known to be metres.
+     *
+     * [mended] marks a point whose record was hit by a block index: one byte of it is not a
+     * measurement. Where that byte mattered — the step, or either displacement — the value is
+     * reconstructed from its neighbours; where it fell in a field we do not decode, the flag is the
+     * only trace. About one point in 65 carries it, and none of them is a reading.
+     */
     data class Point(
         val epochSeconds: Long,
         val latitude: Double,
         val longitude: Double,
         val altitudeRaw: Int? = null,
         val paused: Boolean = false,
+        val mended: Boolean = false,
     )
 
     data class Track(
@@ -63,6 +80,9 @@ object HuaweiGpsTrack {
         val hasAltitude: Boolean,
     ) {
         val isEmpty: Boolean get() = points.isEmpty()
+
+        /** How many points had a byte reconstructed. See [Point.mended]. */
+        val mendedPoints: Int get() = points.count { it.mended }
     }
 
     /**
@@ -124,12 +144,38 @@ object HuaweiGpsTrack {
         var eastM = 0.0
         val points = ArrayList<Point>()
 
+        var lastDt = 1
+        var lastLon = 0f
+        var lastLat = 0f
+        var lastPaused = false
+
         while (offset + stride <= bytes.size) {
-            val dt = le16(bytes, offset)
-            val dLon = leFloat(bytes, offset + 4)
-            val dLat = leFloat(bytes, offset + 8)
-            val paused = (bytes[offset + 14].toInt() and 0xFF) == 1
-            val altitude = if (hasAltitude) le16(bytes, offset + 15) else null
+            // At most one byte of a record can be a block index: the marks are 976 bytes apart and a
+            // record is 15 or 19, so they never share one. -1 means this record arrived whole.
+            val mark = HuaweiPagedFile.stampIn(bytes, offset, stride)
+
+            // The high byte is the one that is lost when the mark lands on byte 1, and the low byte
+            // when it lands on byte 0. Byte 0 alone still carries every step this file actually
+            // uses — 99.6 % of them are 1 s — so a mark on byte 1 costs nothing but the ability to
+            // see a gap longer than 255 s, which is not a thing a walk contains. A mark on byte 0
+            // loses the step itself, and there the neighbour's cadence stands in for it.
+            val dt = when (mark) {
+                0 -> lastDt
+                1 -> bytes[offset].toInt() and 0xFF
+                else -> le16(bytes, offset)
+            }
+            // A clobbered delta is worse than a clobbered step: displacement ACCUMULATES, so one
+            // garbage float does not spoil one point, it translates the whole rest of the route.
+            // The neighbours either side are always intact (65 records apart), so their mean is the
+            // honest stand-in — at a 1 s cadence and walking pace it is wrong by centimetres.
+            val dLon = if (mark in 4..7) meanDelta(bytes, offset, stride, 4, lastLon) else leFloat(bytes, offset + 4)
+            val dLat = if (mark in 8..11) meanDelta(bytes, offset, stride, 8, lastLat) else leFloat(bytes, offset + 8)
+            val paused = if (mark == 14) lastPaused else (bytes[offset + 14].toInt() and 0xFF) == 1
+            val altitude = if (hasAltitude) {
+                if (mark in 15..16) null else le16(bytes, offset + 15)
+            } else {
+                null
+            }
             offset += stride
 
             // A delta that is not finite would poison every later point, since these accumulate.
@@ -138,12 +184,16 @@ object HuaweiGpsTrack {
             time += dt.toLong()
             northM += dLat
             eastM += dLon
+            lastDt = dt
+            lastLon = dLon
+            lastLat = dLat
+            lastPaused = paused
 
             val lat = (northM / earthRadiusM + lat0Rad) / rad
             val lon = (eastM / earthRadiusM / cosLat + lon0Rad) / rad
             if (lat !in -90.0..90.0 || lon !in -180.0..180.0) break
 
-            points += Point(time, lat, lon, altitude, paused)
+            points += Point(time, lat, lon, altitude, paused, mended = mark >= 0)
         }
 
         return Track(startTime, points, hasAltitude)
@@ -176,6 +226,21 @@ $body
   </trk>
 </gpx>
 """
+    }
+
+    /**
+     * The mean of the deltas either side of a clobbered one, at byte [field] of the record.
+     *
+     * The record after this one is always whole — marks are 976 bytes apart, which is 65 records —
+     * so this reads it directly rather than deferring the point. When there is no record after,
+     * [fallback] (the previous delta) carries the walk on at its last known velocity.
+     */
+    private fun meanDelta(bytes: ByteArray, offset: Int, stride: Int, field: Int, fallback: Float): Float {
+        val next = offset + stride
+        if (next + field + 4 > bytes.size) return fallback
+        val ahead = leFloat(bytes, next + field)
+        if (!ahead.isFinite()) return fallback
+        return (fallback + ahead) / 2f
     }
 
     private val PLAUSIBLE_EPOCH = 1_600_000_000L..2_500_000_000L
