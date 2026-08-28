@@ -33,6 +33,18 @@ object HuaweiText {
     val facesBandTitle = Loc("On the band", "バンドの中")
     val facesOnBand = Loc("✓ on the band", "✓ バンドに有り")
     val facesDelete = Loc("Remove", "外す")
+
+    val facesActivate = Loc("Show on band", "盤面にする")
+    val facesActivating = Loc("bringing it to the front…", "前に出しています…")
+    val facesFullTitle = Loc("The band is full", "バンドが一杯")
+    val facesFullBody = Loc(
+        "Every slot is taken, so one face has to go before this one can be installed. Removing a face from the band does not lose it — the library keeps its copy and it can be installed again.",
+        "空きがないので、入れる前に一つ外す必要がある。バンドから外しても失われない — 控えはこの一覧に残るので、いつでも入れ直せる。",
+    )
+    val facesFullPick = Loc("Which face should go?", "どれを外す？")
+    val facesFullConfirm = Loc("Remove and install", "外して入れる")
+    val facesCancel = Loc("Cancel", "やめる")
+    val facesUnknownFace = Loc("not in this library", "控えなし")
     val facesShowing = Loc("showing now", "表示中")
     val facesUnknownOnBand = Loc("not in this library", "この庫に無い")
     val facesCountUnit = Loc("faces", "文字盤")

@@ -73,6 +73,54 @@ class HuaweiFacesActivity : ComponentActivity() {
                         var state by remember { mutableStateOf(HuaweiFacesState(dir = dir)) }
                         val scope = androidx.compose.runtime.rememberCoroutineScope()
 
+                        // One place where an install starts, because there are now two ways in:
+                        // the button on a cell, and the same install resumed once 白い熊 has said
+                        // which face may be given up. [evict] is removed inside the SAME session
+                        // that then installs, so the band is never left a face lighter for nothing.
+                        fun startInstall(
+                            face: HuaweiFaceLibrary.Entry,
+                            evict: Pair<String, String>?,
+                        ) {
+                            state = state.copy(installing = face.id, bytesSent = 0, message = null)
+                            // On the runner's scope, not the composition's: the upload must survive
+                            // this window being closed, exactly as a sync does.
+                            HuaweiSyncRunner.scope.launch {
+                                val work = File(cacheDir, "watchface")
+                                val bin = HuaweiFaceLibrary.unpack(face, work)
+                                val result = if (bin == null) {
+                                    Result.failure(IllegalStateException("could not open ${face.zip.name}"))
+                                } else {
+                                    HuaweiSyncRunner.uploadWatchFace(
+                                        applicationContext,
+                                        HuaweiSettings.address(applicationContext),
+                                        bin,
+                                        evict,
+                                    ) { sent -> scope.launch { state = state.copy(bytesSent = sent) } }
+                                }
+                                HuaweiFaceLibrary.clean(face, work)
+                                val outcome = result.getOrNull()
+                                val text = result.fold(
+                                    onSuccess = { "${face.name} — ${it.message}" },
+                                    onFailure = { "${face.name} — ${it.message ?: "failed"}" },
+                                )
+                                scope.launch {
+                                    state = state.copy(
+                                        installing = null,
+                                        bytesSent = 0,
+                                        message = text,
+                                        // The band answered with its list on the way past, so the
+                                        // grid is current without asking for it again.
+                                        band = outcome?.store ?: state.band,
+                                        // Only a full band raises the question, and only when the
+                                        // band said what it is holding — asking "which one?" over
+                                        // a list we do not have would be asking about nothing.
+                                        roomNeeded = outcome?.takeIf { it.needsRoom }?.store
+                                            ?.let { RoomRequest(face, it.faces) },
+                                    )
+                                }
+                            }
+                        }
+
                         androidx.compose.runtime.LaunchedEffect(dir) {
                             val faces = withContext(Dispatchers.IO) {
                                 HuaweiFaceLibrary.list(File(dir))
@@ -129,32 +177,53 @@ class HuaweiFacesActivity : ComponentActivity() {
                                     }
                                 }
                             },
-                        ) { face ->
-                            if (state.bandBusy) return@HuaweiFacesScreen
-                            state = state.copy(installing = face.id, bytesSent = 0, message = null)
-                            // On the runner's scope, not the composition's: the upload must survive
-                            // this window being closed, exactly as a sync does.
-                            HuaweiSyncRunner.scope.launch {
-                                val work = File(cacheDir, "watchface")
-                                val bin = HuaweiFaceLibrary.unpack(face, work)
-                                val result = if (bin == null) {
-                                    Result.failure(IllegalStateException("could not open ${face.zip.name}"))
-                                } else {
-                                    HuaweiSyncRunner.uploadWatchFace(
+                            onActivate = { face ->
+                                if (state.bandBusy) return@HuaweiFacesScreen
+                                // The version the BAND holds, not the library's: they are the same
+                                // face but not necessarily the same build, and the band answers to
+                                // its own.
+                                val version = state.bandVersion(face.assetId) ?: face.version
+                                state = state.copy(activating = face.assetId, message = null)
+                                HuaweiSyncRunner.scope.launch {
+                                    val r = HuaweiSyncRunner.activateWatchFace(
                                         applicationContext,
                                         HuaweiSettings.address(applicationContext),
-                                        bin,
-                                    ) { sent -> scope.launch { state = state.copy(bytesSent = sent) } }
+                                        face.assetId,
+                                        version,
+                                    )
+                                    val fresh = HuaweiSyncRunner.listWatchFaces(
+                                        applicationContext,
+                                        HuaweiSettings.address(applicationContext),
+                                    ).getOrNull()
+                                    scope.launch {
+                                        state = state.copy(
+                                            activating = null,
+                                            band = fresh ?: state.band,
+                                            message = when {
+                                                r.getOrNull() == true -> "${face.name} — showing"
+                                                // Said plainly rather than dressed up: the protocol
+                                                // has no select command and this is the install
+                                                // command standing in for one, so it can decline.
+                                                r.isSuccess -> "${face.name} — the band kept the face it had; install it again to change the screen"
+                                                else -> "${face.name} — ${r.exceptionOrNull()?.message ?: "failed"}"
+                                            },
+                                        )
+                                    }
                                 }
-                                HuaweiFaceLibrary.clean(face, work)
-                                val text = result.fold(
-                                    onSuccess = { "${face.name} — ${it.message}" },
-                                    onFailure = { "${face.name} — ${it.message ?: "failed"}" },
-                                )
-                                scope.launch {
-                                    state = state.copy(installing = null, bytesSent = 0, message = text)
+                            },
+                            onResolveRoom = { victim ->
+                                val pending = state.roomNeeded?.incoming
+                                state = state.copy(roomNeeded = null)
+                                // Null is 白い熊 cancelling: the dialog closes and nothing on the
+                                // band is touched, which is why the removal waits for this answer
+                                // instead of happening when the install first hit a full band.
+                                if (victim != null && pending != null) {
+                                    startInstall(pending, victim.assetId to victim.version)
                                 }
-                            }
+                            },
+                        ) { face ->
+                            if (state.bandBusy) return@HuaweiFacesScreen
+                            startInstall(face, null)
                         }
                     }
                 }

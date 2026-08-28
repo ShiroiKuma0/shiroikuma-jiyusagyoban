@@ -37,7 +37,22 @@ import java.security.MessageDigest
 class HuaweiUploadClient(private val session: HuaweiSession) {
 
     /** What happened, in the band's own terms. */
-    data class Outcome(val ok: Boolean, val bytesSent: Int, val blocks: Int, val message: String)
+    /**
+     * What one install attempt did.
+     *
+     * [needsRoom] is not just another failure: it means the band has no free slot and the install
+     * never started, so the remedy is a decision about which face to give up rather than a retry.
+     * [store] carries what the band was holding when it said so, because the caller has to show
+     * that list to ask the question and a second read would be a second session.
+     */
+    data class Outcome(
+        val ok: Boolean,
+        val bytesSent: Int,
+        val blocks: Int,
+        val message: String,
+        val needsRoom: Boolean = false,
+        val store: FaceStore? = null,
+    )
 
     /**
      * One face the band is holding. [showing] is the one on screen right now.
@@ -63,10 +78,12 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
      * own units — it falls by one when a face lands and rises again when one is removed, which is
      * how "is there room?" gets answered without guessing.
      */
-    suspend fun listWatchFaces(): FaceStore? {
+    suspend fun listWatchFaces(timeoutMs: Long = 6_000): FaceStore? {
         val cfg = HuaweiCommands
         val reply = runCatching {
-            session.decrypt(session.request(cfg.SVC_WATCHFACE, cfg.WF_LIST, cfg.watchFaceList()))
+            session.decrypt(
+                session.request(cfg.SVC_WATCHFACE, cfg.WF_LIST, cfg.watchFaceList(), timeoutMs = timeoutMs),
+            )
         }.getOrNull() ?: return null
         val free = reply.firstOrNull { it.tag == 9 }?.value?.let { HuaweiProtocol.bytesToInt(it) } ?: -1
         val blob = reply.firstOrNull { it.tag == 129 }?.value ?: return FaceStore(emptyList(), free)
@@ -107,6 +124,85 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     }
 
     /**
+     * An install that ended with nothing transferred, and what that most likely means.
+     *
+     * **The band does not say it is full.** Measured on 白い熊's band, 2026-08-28: holding eighteen
+     * faces and reporting 85 free by its own figure, it accepted the announcement (`wf/3 r=0 s=1`,
+     * "send it") and then never asked for a single byte — twice, identically, for the same face.
+     * Its free-space number goes on claiming room long after it has stopped taking faces, so the
+     * `freeUnits == 0` test above will not fire and cannot be what raises the question.
+     *
+     * What actually identifies the condition is this: the band engaged and no byte ever moved. That
+     * is 白い熊's report — *"the band is full and a face needs to be removed"* — and removing one is
+     * the remedy that works, so this is where the window is asked which face may go.
+     *
+     * A transfer that had started and then died is NOT this: the link dropping mid-file is its own
+     * fault with its own fix, and offering to delete a face for it would be answering the wrong
+     * question. Hence the `bytesSent <= 0` guard.
+     */
+    private fun noTransfer(
+        why: String,
+        store: FaceStore?,
+        bytesSent: Int,
+        blocks: Int,
+        heard: CharSequence,
+    ): Outcome {
+        val shelf = store?.let { " · ${it.faces.size} faces, ${it.freeUnits} free" } ?: ""
+        val nothingMoved = bytesSent <= 0
+        val hint = if (nothingMoved && store != null) {
+            " — it takes no more faces until one is removed"
+        } else {
+            ""
+        }
+        return Outcome(
+            ok = false,
+            bytesSent = bytesSent,
+            blocks = blocks,
+            message = "$why$hint$shelf · $heard",
+            needsRoom = nothingMoved && store != null,
+            store = store,
+        )
+    }
+
+    /**
+     * Bring a face the band ALREADY holds to the front.
+     *
+     * There is no "make active" command in this protocol — that reading cost a face, because the
+     * tag it named (`0x27/0x03` tag 3 = 02) deletes rather than selects. What there is instead is
+     * the observation that installing IS activating: the second `0x27/0x03` of an install, tag 3 =
+     * 01, is what puts the new face on screen, and it carries nothing but the asset id, the version
+     * and the screen size. None of that is the file. So the same command sent for a face already on
+     * the band should move it to the front without a byte being transferred.
+     *
+     * **Measured on 白い熊's band, 2026-08-28**: `7186018013` was on the band and not on screen, and
+     * this brought it to the front in 3.7 s with zero bytes sent — the band's own list reporting it
+     * as showing afterwards. Then the same command put `7184229813` back. What used to cost a
+     * minute of transfer, or was simply impossible without one, is two round trips.
+     *
+     * It is still someone else's firmware, so the answer is verified rather than believed: the
+     * band's own list is re-read and the return value is whether the asset now carries the showing
+     * flag. A false return means the face is still there and still not on screen — nothing is lost,
+     * and the caller can fall back to a full install.
+     *
+     * Deliberately never tag 3 = 02, at any point, for any reason.
+     */
+    suspend fun activate(assetId: String, version: String): Boolean {
+        val cfg = HuaweiCommands
+        val caps = runCatching {
+            session.decrypt(session.request(cfg.SVC_WATCHFACE, cfg.WF_CAPABILITY, cfg.watchFaceCapability()))
+        }.getOrNull()
+        fun cap(t: Int) = caps?.firstOrNull { it.tag == t }?.value?.let { HuaweiProtocol.bytesToInt(it) }
+        session.send(
+            cfg.SVC_WATCHFACE, cfg.WF_CONTROL,
+            cfg.watchFaceInstall(assetId, version, cap(2) ?: 286, cap(3) ?: 482),
+        )
+        // The band takes a moment to redraw, and asking too early reads the old answer.
+        kotlinx.coroutines.delay(ACTIVATE_SETTLE_MS)
+        val after = listWatchFaces() ?: return false
+        return after.faces.any { it.assetId == assetId && it.showing }
+    }
+
+    /**
      * Install a captured watch face: announce it, send it when the band asks, then apply it.
      *
      * The order is not decoration. The band will happily accept a file it never asked for, verify
@@ -126,6 +222,53 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     ): Outcome {
         val cfg = HuaweiCommands
         val name = "${assetId}_$version"
+        var shelf = ""
+
+        // Ask what the band is holding BEFORE announcing anything. Two things are settled here for
+        // the price of one round trip inside the session we already have:
+        //
+        //  * A face the band already holds does not need a megabyte sent to it again. Announcing it
+        //    anyway ends in the band simply never asking for the file, which this used to report as
+        //    "it may already have this face installed" — a guess, where the list is an answer.
+        //  * A band with no free slot refuses the announcement, and the refusal is all 白い熊 ever
+        //    saw. Catching it here instead means the window can ask WHICH face to give up while
+        //    nothing has been sent and the session is still open.
+        // On a short leash. A band that is answering replies to this in milliseconds, and the
+        // whole point of asking is to save work — so a band that has stopped answering must not be
+        // able to spend the install's budget on a question whose answer is only an optimisation.
+        val before = listWatchFaces(PREFLIGHT_TIMEOUT_MS)
+        if (before != null) {
+            val already = before.faces.firstOrNull { it.assetId == assetId }
+            if (already != null) {
+                val shown = if (already.showing) "already on the wrist" else "already on the band"
+                return if (already.showing) {
+                    Outcome(true, 0, 0, "$name $shown", store = before)
+                } else {
+                    // On the band but not on screen: that is the activate job, not the install job,
+                    // and it costs one command instead of a minute of transfer.
+                    val ok = activate(assetId, version)
+                    Outcome(
+                        ok, 0, 0,
+                        if (ok) "$name was $shown — now showing" else "$name is $shown, but it would not come to the front",
+                        store = listWatchFaces() ?: before,
+                    )
+                }
+            }
+            // Carried into every message below, not just the refusal. A band that accepts the
+            // announcement and then goes quiet looks identical to a band with no room, and the
+            // difference is a number it already told us — measured 2026-08-28, when an install
+            // stalled after `wf/3 r=0 s=1` and nothing in the report said whether the shelf was
+            // the reason.
+            shelf = " · ${before.faces.size} faces, ${before.freeUnits} free"
+            if (before.freeUnits == 0) {
+                return Outcome(
+                    false, 0, 0,
+                    "the band has no room for $name — ${before.faces.size} faces and no free slot",
+                    needsRoom = true,
+                    store = before,
+                )
+            }
+        }
 
         // The band's own screen size travels in the announcement, so ask rather than assume.
         val caps = runCatching {
@@ -195,7 +338,9 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
                         cfg.WF_CONTROL -> when {
                             state == 1 -> asked = true
                             result != null && result != 0 ->
-                                return Outcome(false, sent, blocks, "the band refused $name (error $result) · $heard")
+                                return noTransfer(
+                                    "the band refused $name (error $result)", before, sent, blocks, heard,
+                                )
                             else -> installed = true
                         }
                     }
@@ -229,7 +374,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             // instantly — for the rest of its budget, burning a core to report a timeout that was
             // really a hang-up.
             if (!session.isOpen) {
-                return Outcome(false, maxOf(sent, 0), blocks, "the link to the band closed · $heard")
+                return Outcome(false, maxOf(sent, 0), blocks, "the link to the band closed$shelf · $heard")
             }
 
             // Only offer the file once the band has asked for it.
@@ -243,9 +388,8 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             }
 
             if (sent == 0 && !asked && System.currentTimeMillis() > engageBy) {
-                return Outcome(
-                    false, 0, 0,
-                    "the band never asked for $name — it may already have this face installed · $heard",
+                return noTransfer(
+                    "the band never asked for $name", before, 0, 0, heard,
                 )
             }
 
@@ -253,7 +397,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
                 // Nothing more is sent. The install IS the activation — the band puts the face on
                 // screen itself — and the command that used to follow this line (tag 3 = 02) deletes
                 // a face rather than selecting one, so it threw away the file we had just sent.
-                return Outcome(true, maxOf(sent, 0), blocks, "$name installed · $heard")
+                return Outcome(true, maxOf(sent, 0), blocks, "$name installed$shelf · $heard")
             }
 
             // The band asking for a block and then saying nothing is the case the engage timeout
@@ -261,14 +405,27 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             // That is how a run that had already failed still held the task list for four minutes.
             val silent = System.currentTimeMillis() - lastHeard
             if (silent > silenceMs) {
-                return Outcome(
-                    false, maxOf(sent, 0), blocks,
-                    "the band stopped answering ${silent / 1000}s ago, part way through $name · $heard",
+                return noTransfer(
+                    "the band stopped answering ${silent / 1000}s ago, part way through $name",
+                    before, maxOf(sent, 0), blocks, heard,
                 )
             }
         }
-        return Outcome(false, maxOf(sent, 0), blocks, "timed out · $heard")
+        return Outcome(false, maxOf(sent, 0), blocks, "timed out$shelf · $heard")
     }
+
+    /**
+     * How long the pre-install question may take before it is abandoned.
+     *
+     * Short on purpose: knowing what the band holds saves a wasted megabyte and turns "the band
+     * refused it" into "which face should go?", but neither is worth delaying the report that a
+     * band has gone silent. Without a bound this took the session's default six seconds against a
+     * band that answers nothing, and the stall tests measured it.
+     */
+    private val PREFLIGHT_TIMEOUT_MS = 2_500L
+
+    /** How long the band is given to redraw before its list is asked who is on screen. */
+    private val ACTIVATE_SETTLE_MS = 1_200L
 
     private var chunk = DEFAULT_CHUNK
 
