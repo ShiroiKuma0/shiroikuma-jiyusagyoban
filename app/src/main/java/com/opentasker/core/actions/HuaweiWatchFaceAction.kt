@@ -58,7 +58,14 @@ class HuaweiWatchFaceAction : Action {
         }
         return result.fold(
             onSuccess = { r ->
-                val text = "${r.message} · ${r.bytesSent} B in ${r.blocks} blocks"
+                // A task has no dialog to ask "which face should go?" in, so the answer it can act
+                // on has to be in the text: what the band is holding, and which one it is showing.
+                // Without this a headless run reports only that there was no room, which is the one
+                // thing 白い熊 already knew.
+                val shelf = if (!r.needsRoom) "" else r.store?.faces.orEmpty()
+                    .joinToString(", ") { it.assetId + if (it.showing) " (showing)" else "" }
+                    .let { if (it.isEmpty()) "" else " · on the band: $it" }
+                val text = "${r.message} · ${r.bytesSent} B in ${r.blocks} blocks$shelf"
                 ctx.variables.set("${prefix}Summary", text)
                 store?.let { ctx.variables.set(it, text) }
                 ctx.logger("Huawei watch face: $text")

@@ -20,6 +20,7 @@ import com.opentasker.ui.charts.huawei.HuaweiFacesState
 import com.opentasker.ui.theme.OpenTaskerTheme
 import java.io.ByteArrayOutputStream
 import java.io.File
+import com.opentasker.ui.charts.huawei.RoomRequest
 
 /**
  * The watch-face picker, rendered.
@@ -149,3 +150,76 @@ fun HuaweiFacesRemovingPreview() {
         )
     }
 }
+
+/**
+ * The band full, and the question that follows.
+ *
+ * Worth a preview of its own because it is the one screen here that 白い熊 meets at a bad moment —
+ * an install that will not go — and a dialog that reads badly then is worse than no dialog. The
+ * band's own faces come back as ten-digit asset ids; the library is what turns them into names, and
+ * the one it holds no copy of has to say so rather than showing a bare number.
+ */
+private val FULL_BAND = HuaweiUploadClient.FaceStore(
+    faces = listOf(
+        HuaweiUploadClient.InstalledFace("2182762613", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("7185922173", "2.1.1", showing = false),
+        HuaweiUploadClient.InstalledFace("7185695173", "2.1.1", showing = true),
+        HuaweiUploadClient.InstalledFace("9900112233", "1.0.0", showing = false),
+    ),
+    freeUnits = 0,
+)
+
+@PreviewTest
+@Preview(name = "Faces — band full", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiFacesRoomNeededPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Frame(
+            HuaweiFacesState(
+                faces = FACES,
+                loading = false,
+                band = FULL_BAND,
+                roomNeeded = RoomRequest(FACES[2], FULL_BAND.faces),
+            ),
+        )
+    }
+}
+
+@PreviewTest
+@Preview(name = "Faces — band full 日本語", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiFacesRoomNeededJaPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        Frame(
+            HuaweiFacesState(
+                faces = FACES,
+                loading = false,
+                band = FULL_BAND,
+                roomNeeded = RoomRequest(FACES[2], FULL_BAND.faces),
+            ),
+        )
+    }
+}
+
+/**
+ * A face on the band but not on screen: the only state where "Show on band" appears.
+ *
+ * The face already showing must NOT offer it — a button that does nothing is worse than no button —
+ * so this preview is the check that the two cells differ.
+ */
+@PreviewTest
+@Preview(name = "Faces — activating", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiFacesActivatingPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Frame(
+            HuaweiFacesState(
+                faces = FACES,
+                loading = false,
+                band = BAND,
+                activating = "7185922173",
+            ),
+        )
+    }
+}
+

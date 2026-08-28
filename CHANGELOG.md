@@ -8,6 +8,104 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.90+2026-08-25.04-06.g71800ef2+007 — 2026-08-28
+
+Built on upstream OpenTasker `0.2.90` (`71800ef2`). Two things about watch faces, both of which the
+band was answering all along.
+
+**The band's satellite fix, without the phone — its predicted ephemeris is now GENERATED here.**
+The band fixes in about twenty seconds while it holds a predicted set and takes minutes without one.
+Measured at the same place, both walks started the instant the workout began: 2026-08-27, set alive,
+**21 s**; 2026-08-28, forty-one minutes after it expired and with fresh broadcast RTCM served at the
+moment the band asked, **582 s** — 403 m from home before the first point landed. Broadcast
+ephemeris does not substitute, and Huawei's predicted endpoint is signed with a credential issued at
+runtime to Health's package and certificate. So `scripts/pgnss-build.py` builds the set instead:
+CODE's free five-day prediction (Bern, no login, 82 satellites) fitted to Kepler element sets
+**against the band's own propagator**, one per two-hour slice, written in the EEV2 layout. Output
+sizes are byte-identical to Huawei's own files. Verified by decoding its own bytes and propagating
+them against the precise orbit: **GPS median 0.37 m** (p95 1.88, max 16.1), **Galileo 0.28 m**
+(p95 2.94, max 9.7), **GLONASS 0.24 m** — 31 + 30 + 21 satellites in every one of the 36 blocks,
+and any set that cannot be fitted to within 50 m is dropped rather than shipped. BeiDou and QZSS
+ship as the captured files: neither has a free five-day product, and QZSS is Asia-Pacific anyway.
+
+Four traps, none of which show up in a solver's own residual. Ω0 is referenced to the week start and
+reaches thirty-odd radians, so it must be wrapped at encode time — saturating its ±π field puts the
+satellite on the far side of its orbit, 27 000 km of error from a sub-metre fit. The angles must NOT
+be bounded in the solver for the same reason: bounding them at ±4π clipped good solutions and threw
+away 631 of 2196 sets. GLONASS carries the **luni-solar residual** acceleration only — around
+3 µm/s² — not total acceleration, which saturates its 8-bit field. And eccentricity has to allow
+0.16, or Galileo E14 and E18, which are in the wrong orbits, vanish from all 36 blocks.
+
+**Pressing Update raises TWO rounds, and we were only answering the first.** The broadcast round
+comes first — one 7 KB RTCM file — and the predicted round follows as a separate `0x1F/0x01` ask
+after a lull. The serving loop listened only on the transfer channel, so it served the 7 KB, saw
+twelve seconds of quiet, and reported success after eight seconds while the band moved on to asking
+for the predicted set with nobody listening. On the wrist that is a transfer frozen at 0 % until it
+times out, and the task called it a success — correct about what it had done, wrong about what was
+needed. A round ending is no longer the session ending: the server now answers a fresh ask and
+carries on until the caller's own deadline. Confirmed on the band the same day — all six predicted
+files and the broadcast set, **806 515 B**, taken in two rounds.
+
+**A full band is now a question rather than a failure.** 白い熊: *"the band is full and a face needs
+to be removed, before a new one gets installed — however it isn't done automatically"*. It could
+not be: the install had nothing to go on but a transfer that did not happen, which reads as a broken
+install rather than as a full shelf. Now the failure carries the band's own list back with it, and
+the window asks **which face should go**; the chosen one is removed and the install continues **in
+the same session**, so the band is never left a face lighter for nothing. Cancelling touches nothing.
+
+**The band does not say it is full, and finding that out took the band itself.** The obvious test —
+`0x27/0x02` reports what it holds and a free figure — is wrong, and this shipped believing it for
+one build. Measured on 白い熊's band: holding **eighteen faces and reporting 85 free**, it accepted
+the announcement (`wf/3 r=0 s=1`, "send it") and then never asked for a single byte. Twice,
+identically, for the same face. Its free-space number goes on claiming room long after it has
+stopped taking faces, so `freeUnits == 0` would never have fired and the picker would never have
+appeared. What identifies the condition is what actually happens: **the band engaged and no byte
+moved**. A transfer that started and then died is deliberately not treated as this — the fix for a
+dropped link is not deleting one of 白い熊's faces. Every install now also reports what the band was
+holding and what it claimed was free, so the next surprise diagnoses itself.
+
+The picker is a dialog rather than a rule (白い熊's call, 2026-08-28): the band holds twelve and what
+is on the wrist is a choice, so evicting by oldest or largest would be this app deciding something
+it has no standing to decide. The face on screen is offered like any other — predicting what the
+band will refuse is exactly the mistake that once locked seven of 白い熊's own faces behind a rule
+that did not exist. Nothing is destroyed either way: the library keeps every face, and a removal is
+undone by installing it again. A face the band holds no copy of shows its ten-digit asset id and
+says so, rather than showing a bare number and hoping.
+
+**"Show on band" — changing the face without sending it again.** There is no *make active* command
+in this protocol; that reading cost a face, because the tag it named (`0x27/0x03` tag 3 = 02) deletes
+rather than selects. What there is instead is the observation that **installing IS activating**: the
+second `0x27/0x03` of an install, tag 3 = 01, is what puts the new face on screen, and it carries
+nothing but the asset id, the version and the screen size — none of which is the file. So the same
+command is now sent for a face already on the band, and a face is brought to the front for one
+command instead of a minute of transfer.
+
+**Measured on the band rather than argued for**: `7186018013` was on the band and not on screen, and
+the command moved it to the front in 3.7 s with **zero bytes sent**, the band's own list reporting it
+as showing afterwards; the same command then put `7184229813` back. It is still someone else's
+firmware, so the answer is verified rather than believed — the list is re-read and the claim is made
+only if the asset now carries the showing flag. If it does not, the button says the band kept the
+face it had and points at the install, which certainly works.
+
+The same knowledge tightens the install itself: a face the band already holds is no longer sent
+again. Announcing it used to end in the band silently never asking for the file, reported as "it may
+already have this face installed" — a guess, where the list is an answer. On the wrist already, it
+succeeds; on the band but not showing, it takes the one-command route above. Both were confirmed against the real band: `7184229813_2.1.1 already on the wrist · 0 B in 0 blocks`.
+
+A headless caller has no dialog to ask in, so `huawei.watchface` names the band's whole shelf, and
+which face is showing, in its own result text — otherwise a task run reports only that there was no
+room, which is the one thing 白い熊 already knew.
+
+The pre-flight question is on a short leash (2.5 s). Knowing what the band holds saves a wasted
+megabyte, but it must never delay the report that a band has gone silent — without a bound it spent
+the session's full six seconds against a band answering nothing, which the stall tests caught.
+
+Full JVM suite green at 1832 tests, and both new screens have screenshot previews in each language.
+
+Both halves were verified against the real band rather than against the fixtures alone: the shelf came
+back as eighteen faces with `7184229813` marked as showing, and the install of a face it does not
+hold raised the room question with all eighteen named.
+
 ## 0.2.90+2026-08-25.04-06.g71800ef2+003 — 2026-08-27
 
 Built on upstream OpenTasker `0.2.90` (`71800ef2`). The page stamp from `+002` turned out not to be

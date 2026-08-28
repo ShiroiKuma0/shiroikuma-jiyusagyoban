@@ -44,6 +44,12 @@ import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 /** What the window is doing, so a cell can show it without inventing its own state. */
 data class HuaweiFacesState(
@@ -59,13 +65,24 @@ data class HuaweiFacesState(
     val reading: Boolean = false,
     /** The face being removed, by asset id. */
     val deleting: String? = null,
+    /** The face being brought to the front, by asset id. */
+    val activating: String? = null,
+    /**
+     * Set when an install stopped because the band had no free slot.
+     *
+     * Carries the face that wanted in and what the band was holding when it said no, because the
+     * question "which one goes?" cannot be asked without both, and re-reading the band to ask it
+     * would be a second session.
+     */
+    val roomNeeded: RoomRequest? = null,
 ) {
     /**
      * Reading, installing and removing all open the one session the band allows, so any of them
      * makes every button in the grid inert. Deriving it here rather than at each call site is what
      * stops a new button being added that forgets one of the three.
      */
-    val bandBusy: Boolean get() = installing != null || reading || deleting != null
+    val bandBusy: Boolean
+        get() = installing != null || reading || deleting != null || activating != null
 
     /** Whether the band is holding this face — false whenever the band has not been read. */
     fun onBand(assetId: String): Boolean =
@@ -74,7 +91,17 @@ data class HuaweiFacesState(
     /** The face the band is showing right now, if it has been read. */
     fun isShowing(assetId: String): Boolean =
         band?.faces?.any { it.assetId == assetId && it.showing } == true
+
+    /** The version the BAND has for a face, which is the one a delete or an activate must name. */
+    fun bandVersion(assetId: String): String? =
+        band?.faces?.firstOrNull { it.assetId == assetId }?.version
 }
+
+/** An install waiting on 白い熊 to say which face may be given up. */
+data class RoomRequest(
+    val incoming: HuaweiFaceLibrary.Entry,
+    val onBand: List<HuaweiUploadClient.InstalledFace>,
+)
 
 /**
  * The watch-face library: pick one, install it.
@@ -104,6 +131,9 @@ fun HuaweiFacesScreen(
     previewOf: ((HuaweiFaceLibrary.Entry) -> ByteArray?)? = null,
     onReadBand: () -> Unit = {},
     onRemove: (HuaweiFaceLibrary.Entry) -> Unit = {},
+    onActivate: (HuaweiFaceLibrary.Entry) -> Unit = {},
+    /** The chosen victim, or null when 白い熊 cancels the install instead. */
+    onResolveRoom: (HuaweiUploadClient.InstalledFace?) -> Unit = {},
     /** Last so it stays the trailing lambda — installing is what this window is for. */
     onInstall: (HuaweiFaceLibrary.Entry) -> Unit,
 ) {
@@ -137,11 +167,74 @@ fun HuaweiFacesScreen(
                 bandBusy = state.bandBusy,
                 sent = state.bytesSent,
                 previewOf = previewOf,
+                activating = state.activating == face.assetId,
                 onInstall = { onInstall(face) },
                 onRemove = { onRemove(face) },
+                onActivate = { onActivate(face) },
             )
         }
     }
+    state.roomNeeded?.let { RoomDialog(it, state.faces, onResolveRoom) }
+}
+
+/**
+ * "The band is full — which face should go?"
+ *
+ * A dialog rather than an automatic eviction (白い熊, 2026-08-28). The band holds twelve and a face
+ * on the wrist is a choice, so picking the victim by rule — oldest, largest, whatever — would be
+ * this app deciding something it has no standing to decide. Nothing is destroyed either way: the
+ * library keeps every face, so a removal is undone by installing it again.
+ *
+ * The face currently on screen is offered like any other. Predicting what the band will refuse is
+ * exactly the mistake that once locked seven of 白い熊's own faces behind a rule that did not exist.
+ */
+@Composable
+private fun RoomDialog(
+    request: RoomRequest,
+    library: List<HuaweiFaceLibrary.Entry>,
+    onResolve: (HuaweiUploadClient.InstalledFace?) -> Unit,
+) {
+    val lang = LocalBandLanguage.current
+    var chosen by remember(request.incoming.id) {
+        mutableStateOf<HuaweiUploadClient.InstalledFace?>(null)
+    }
+    AlertDialog(
+        onDismissRequest = { onResolve(null) },
+        title = { Text(HuaweiText.facesFullTitle[lang]) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                BodyText("${request.incoming.name} — ${HuaweiText.facesFullBody[lang]}")
+                NoteText(HuaweiText.facesFullPick[lang])
+                request.onBand.forEach { face ->
+                    // The band names a face by a ten-digit asset id; the library is what turns that
+                    // into something 白い熊 recognises. A face we hold no copy of says so rather
+                    // than showing a bare number and hoping.
+                    val known = library.firstOrNull { it.assetId == face.assetId }
+                    val label = known?.name ?: "${face.assetId} (${HuaweiText.facesUnknownFace[lang]})"
+                    Row(
+                        Modifier.fillMaxWidth().clickable { chosen = face },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = chosen?.assetId == face.assetId, onClick = { chosen = face })
+                        Text(
+                            label + if (face.showing) " ●" else "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { chosen?.let(onResolve) }, enabled = chosen != null) {
+                Text(HuaweiText.facesFullConfirm[lang])
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = { onResolve(null) }) { Text(HuaweiText.facesCancel[lang]) }
+        },
+    )
 }
 
 /**
@@ -209,8 +302,10 @@ private fun FaceCell(
     bandBusy: Boolean,
     sent: Int,
     previewOf: ((HuaweiFaceLibrary.Entry) -> ByteArray?)?,
+    activating: Boolean,
     onInstall: () -> Unit,
     onRemove: () -> Unit,
+    onActivate: () -> Unit,
 ) {
     val lang = LocalBandLanguage.current
     val accent = if (installing) ChartPalette.HEART_RATE else ChartPalette.AXIS_TEXT
@@ -274,6 +369,23 @@ private fun FaceCell(
                 if (showing) "${HuaweiText.facesOnBand[lang]} · ${HuaweiText.facesShowing[lang]}"
                 else HuaweiText.facesOnBand[lang],
             )
+            // On the band but not on screen: the one case where a face can be brought to the front
+            // for a single command instead of another minute of transfer. Absent on the face that
+            // is already showing, where it would do nothing.
+            if (!showing) {
+                OutlinedButton(
+                    onClick = onActivate,
+                    enabled = !bandBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    if (activating) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(HuaweiText.facesActivate[lang])
+                    }
+                }
+            }
             // Offered for every face the band holds. Predicting which ones it will refuse is what
             // went wrong before; the band decides, and the result is re-read from it.
             OutlinedButton(
