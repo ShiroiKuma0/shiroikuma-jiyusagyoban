@@ -342,10 +342,33 @@ object HuaweiSyncRunner {
         HuaweiUploadClient(session).deleteWatchFace(assetId, version)
     }
 
+    /**
+     * Bring a face the band already holds to the front, without sending it again.
+     *
+     * See `HuaweiUploadClient.activate`: the protocol has no select command, so this is the install
+     * command sent for a face already present, and the return value is the band's own list agreeing
+     * that the face is now the one on screen.
+     */
+    suspend fun activateWatchFace(
+        context: Context,
+        address: String,
+        assetId: String,
+        version: String,
+    ): Result<Boolean> = withSession(context, address) { session, _ ->
+        HuaweiUploadClient(session).activate(assetId, version)
+    }
+
+    /**
+     * @param evict a face to remove first, as (assetId, version) — the band being full is answered
+     *   by 白い熊 choosing what to give up, and the removal has to happen in the SAME session as the
+     *   install that needs the slot. Two sessions would mean two connections and a window in which
+     *   the band is one face lighter for no reason.
+     */
     suspend fun uploadWatchFace(
         context: Context,
         address: String,
         file: java.io.File,
+        evict: Pair<String, String>? = null,
         onProgress: (Int) -> Unit = {},
     ): Result<HuaweiUploadClient.Outcome> = withSession(context, address) { session, _ ->
         val name = file.name.removeSuffix(".bin")
@@ -356,7 +379,20 @@ object HuaweiSyncRunner {
         // before it will take, or keep, the bytes.
         val meta = java.io.File(file.parentFile, "$name.json")
         require(meta.isFile) { "missing ${meta.name} beside the face — capture it with the file" }
-        HuaweiUploadClient(session).installWatchFace(
+        val client = HuaweiUploadClient(session)
+        if (evict != null) {
+            // Refuse to go on if the removal did not take. Installing anyway would hit the same
+            // full band, and 白い熊 would have given up a face for nothing.
+            val gone = client.deleteWatchFace(evict.first, evict.second)
+            if (!gone) {
+                return@withSession HuaweiUploadClient.Outcome(
+                    ok = false, bytesSent = 0, blocks = 0,
+                    message = "${evict.first} is still on the band — nothing was installed",
+                    store = client.listWatchFaces(),
+                )
+            }
+        }
+        client.installWatchFace(
             assetId = assetId,
             version = version,
             bytes = file.readBytes(),
@@ -716,8 +752,50 @@ object HuaweiSyncRunner {
         var current: String? = null
 
         // The band drives. We answer until it says done, or until it stops talking.
-        loop@ while (!cancelled) {
-            val f = session.awaitService(HuaweiCommands.SVC_GNSS_FILES, 12_000) ?: break@loop
+        //
+        // **It asks more than once.** Pressing Update on the band raises TWO rounds, not one: the
+        // broadcast round first — `type=0x0004/HW_AGNSS`, one 7 KB RTCM file — and then the
+        // PREDICTED round, which is the one worth having. They arrive as separate `0x1F/0x01` asks
+        // with a lull between them, and this loop only listens on `0x1C`. So it used to serve the
+        // 7 KB, see twelve seconds of quiet, and return "done" after eight seconds — while the band
+        // moved on to asking for the predicted set with nobody left listening. On the band that
+        // looks like a transfer stuck at 0 % until it times out, which is exactly what 白い熊 saw
+        // (2026-08-28). A round ending is not the session ending; only the caller's own deadline is.
+        loop@ while (!cancelled && System.currentTimeMillis() < deadline) {
+            val f = session.awaitService(HuaweiCommands.SVC_GNSS_FILES, 12_000) ?: run {
+                if (cancelled || System.currentTimeMillis() >= deadline) return@run null
+                val again = session.awaitFrame(
+                    HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 3_000,
+                ) ?: return@run null
+                onProgress("The band asked again", "Another round — answering")
+                log.append("band asked again; ")
+                runCatching {
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY,
+                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
+                    )
+                }
+                runCatching {
+                    val what = session.request(
+                        HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_WHAT, HuaweiProtocol.tlv(129),
+                        timeoutMs = 6_000,
+                    )
+                    session.decrypt(what).firstOrNull { it.tag == 129 }?.let { outer ->
+                        HuaweiProtocol.parseTlvs(outer.value).firstOrNull { it.tag == 6 }
+                            ?.value?.toString(Charsets.UTF_8)
+                    }?.let {
+                        source = it
+                        onProgress("The band asked again", "It wants: $it")
+                    }
+                }
+                runCatching {
+                    session.send(
+                        HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_READY,
+                        HuaweiProtocol.tlv(1, byteArrayOf(3)),
+                    )
+                }
+                session.awaitService(HuaweiCommands.SVC_GNSS_FILES, 12_000)
+            } ?: break@loop
             val tlvs = runCatching { session.decrypt(f) }.getOrElse { emptyList() }
             fun str(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.value?.toString(Charsets.UTF_8)
             fun num(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.let { HuaweiProtocol.bytesToInt(it.value) }
