@@ -3,6 +3,7 @@ package com.opentasker.core.huawei
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -59,6 +60,29 @@ class HuaweiWatchFaceStallTest {
             }
             sawFromClient += "0x%02x/0x%02x".format(svc, cmd)
 
+            // A full band is a HEALTHY band that has run out of space, so it answers everything
+            // except the request for bytes. Answering the list here is not scene-setting: it is the
+            // difference between "install failed" and a dialog that can name the faces to give up.
+            if (svc == HuaweiCommands.SVC_WATCHFACE && cmd == HuaweiCommands.WF_LIST) {
+                fun face(id: String, showing: Boolean): ByteArray {
+                    val body = tlv(3, id.toByteArray()) + tlv(4, "1.0.0".toByteArray()) +
+                        tlv(5, byteArrayOf(if (showing) 5 else 0))
+                    return byteArrayOf(0x82.toByte(), body.size.toByte()) + body
+                }
+                out.add(
+                    HuaweiProtocol.frame(
+                        svc, cmd,
+                        // 85 "free", while full. Not a contrivance — this is what 白い熊's band
+                        // reports while holding eighteen faces and refusing a nineteenth. Whatever
+                        // tag 9 counts, it is not slots, which is why the freeUnits == 0 pre-check
+                        // upstream of this never fires on the real hardware and the stall has to be
+                        // caught by behaviour instead.
+                        tlv(9, HuaweiProtocol.intBytes(85, 4)) +
+                            tlv(129, face("7186018013", true) + face("7184229813", false)),
+                    ),
+                )
+                return
+            }
             if (svc == HuaweiCommands.SVC_WATCHFACE && cmd == HuaweiCommands.WF_CAPABILITY) {
                 out.add(
                     HuaweiProtocol.frame(
@@ -146,6 +170,60 @@ class HuaweiWatchFaceStallTest {
         assertTrue(
             "the band did ask for the file, so the offer must have gone out: ${band.sawFromClient}",
             band.sawFromClient.contains("0x28/0x02"),
+        )
+    }
+
+    /**
+     * The full band, which is a stall with a question behind it.
+     *
+     * A band with no room accepts the announcement — it has no way of knowing the file is too big
+     * until it tries to keep it — and then simply never asks for a block. That shape is identical to
+     * a band that has crashed, so it used to be found by the silence budget forty-five seconds
+     * later, or not at all if the band was chattering about something else. 白い熊 met it as an
+     * install that "just hangs" (2026-08-28) and never saw the dialog that was waiting behind it.
+     *
+     * Two things are under test, and the second is the one that failed in his hands: that the stall
+     * is noticed on its own short budget, and that the outcome carries the band's list, because the
+     * window can only ask WHICH face to give up if it was told what the band is holding.
+     */
+    @Test
+    fun `a band that accepts the face and then takes no bytes is reported as full, with its list`() = runBlocking {
+        val face = ByteArray(40_000) { it.toByte() }
+        val band = BandThatGoesQuiet()
+
+        val started = System.currentTimeMillis()
+        val outcome = withTimeoutOrNull(20_000) {
+            HuaweiUploadClient(HuaweiSession(band)).installWatchFace(
+                assetId = "7185695173", version = "2.1.1", bytes = face, metaJson = metaJson(),
+                // Every other budget left long on purpose: only the room budget can end this in
+                // time, so a regression that leans on the silence timer again shows up as elapsed.
+                timeoutMs = 15_000, silenceMs = 12_000, engageMs = 12_000, roomMs = 300,
+            )
+        }
+        val elapsed = System.currentTimeMillis() - started
+
+        assertNotNull("installWatchFace never returned", outcome)
+        assertFalse(outcome!!.ok)
+        assertTrue(
+            "a stalled offer must be given up on its own budget, not the silence one: ${elapsed}ms",
+            elapsed < 5_000,
+        )
+        assertTrue(
+            "the offer must have gone out — this is a band that ASKED: ${band.sawFromClient}",
+            band.sawFromClient.contains("0x28/0x02"),
+        )
+        assertTrue(
+            "nothing moved, so the window must be told it can ask for room: ${outcome.message}",
+            outcome.needsRoom,
+        )
+        assertNotNull(
+            "the room question needs the band's own list to offer, or it asks about nothing",
+            outcome.store,
+        )
+        assertEquals(
+            "and the list must be the band's real one: ${outcome.store?.faces}",
+            listOf("7186018013", "7184229813"),
+            outcome.store?.faces?.map { it.assetId },
         )
     }
 

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -199,29 +201,64 @@ private fun RoomDialog(
         mutableStateOf<HuaweiUploadClient.InstalledFace?>(null)
     }
     AlertDialog(
+        // The app's own dialog frame — 1.5 dp of the theme's primary on a 28 dp corner, exactly as
+        // ImportReviewDialogs and EmojiPickerDialog wear it. Material draws no border of its own, so
+        // a dialog that omits this is a black panel on a black screen (白い熊, 2026-08-28).
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { onResolve(null) },
         title = { Text(HuaweiText.facesFullTitle[lang]) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 BodyText("${request.incoming.name} — ${HuaweiText.facesFullBody[lang]}")
                 NoteText(HuaweiText.facesFullPick[lang])
-                request.onBand.forEach { face ->
+                // Scrolling, and bounded. The band holds as many faces as it holds — eighteen on
+                // 白い熊's — and a plain Column asks the dialog for a height it cannot have: the
+                // slot squeezes the overflow instead of scrolling it, so the last row renders as
+                // two radio buttons stacked inside one line and everything past it is unreachable
+                // (白い熊, 2026-08-28). The cap leaves the prose above and the buttons below room.
+                LazyColumn(
+                    // Weighted, not a fixed cap. Material already bounds this slot — it lays the
+                    // text container out with `weight(1f, fill = false)` between the title and the
+                    // buttons — so weighting inside it hands the list exactly the height the dialog
+                    // has left on THIS screen, tall phone or short. A dp cap picked here would be
+                    // wrong on both: wasted space on one, a squeezed last row on the other.
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        // Framed, because the pane scrolls. A bare scrolling list inside a dialog
+                        // gives no sign of where it ends, so a row cut off at the bottom edge reads
+                        // as a rendering fault rather than as "there is more below" — which is
+                        // exactly how the unbounded version was first reported. The border makes it
+                        // a pane: what is inside it moves, what is outside it does not.
+                        .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                        // Clipped to the same shape so a row scrolling past cannot paint over the
+                        // rounded corners it is meant to be contained by.
+                        .clip(RoundedCornerShape(12.dp))
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    items(request.onBand, key = { it.assetId }) { face ->
                     // The band names a face by a ten-digit asset id; the library is what turns that
                     // into something 白い熊 recognises. A face we hold no copy of says so rather
                     // than showing a bare number and hoping.
-                    val known = library.firstOrNull { it.assetId == face.assetId }
-                    val label = known?.name ?: "${face.assetId} (${HuaweiText.facesUnknownFace[lang]})"
-                    Row(
-                        Modifier.fillMaxWidth().clickable { chosen = face },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = chosen?.assetId == face.assetId, onClick = { chosen = face })
-                        Text(
-                            label + if (face.showing) " ●" else "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
+                        val known = library.firstOrNull { it.assetId == face.assetId }
+                        val label = known?.name
+                            ?: "${face.assetId} (${HuaweiText.facesUnknownFace[lang]})"
+                        Row(
+                            Modifier.fillMaxWidth().clickable { chosen = face },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = chosen?.assetId == face.assetId,
+                                onClick = { chosen = face },
+                            )
+                            Text(
+                                label + if (face.showing) " ●" else "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
             }

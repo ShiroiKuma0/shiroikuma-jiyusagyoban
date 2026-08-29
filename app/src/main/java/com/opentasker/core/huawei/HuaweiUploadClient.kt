@@ -140,13 +140,24 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
      * fault with its own fix, and offering to delete a face for it would be answering the wrong
      * question. Hence the `bytesSent <= 0` guard.
      */
-    private fun noTransfer(
+    private suspend fun noTransfer(
         why: String,
         store: FaceStore?,
         bytesSent: Int,
         blocks: Int,
         heard: CharSequence,
+        askAgain: Boolean = false,
     ): Outcome {
+        // The pre-flight read is on a short leash so it cannot delay a report, which means it can
+        // come back empty on a band that was merely slow for a moment. Without a list there is no
+        // room question — the window has nothing to put in front of 白い熊 — so the one path that
+        // needs one asks a second time.
+        //
+        // Only that path, and only on a live link. Re-asking a band that has just been established
+        // to be silent, or one that hung up, is dead air added to a report of dead air: the first
+        // version of this did exactly that, and the stall tests caught it by the clock.
+        @Suppress("NAME_SHADOWING")
+        val store = store ?: if (askAgain && session.isOpen) listWatchFaces(PREFLIGHT_TIMEOUT_MS) else null
         val shelf = store?.let { " · ${it.faces.size} faces, ${it.freeUnits} free" } ?: ""
         val nothingMoved = bytesSent <= 0
         val hint = if (nothingMoved && store != null) {
@@ -218,6 +229,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
         timeoutMs: Long = 240_000,
         silenceMs: Long = SILENCE_TIMEOUT_MS,
         engageMs: Long = ENGAGE_TIMEOUT_MS,
+        roomMs: Long = ROOM_TIMEOUT_MS,
         onProgress: (Int) -> Unit = {},
     ): Outcome {
         val cfg = HuaweiCommands
@@ -260,6 +272,10 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             // stalled after `wf/3 r=0 s=1` and nothing in the report said whether the shelf was
             // the reason.
             shelf = " · ${before.faces.size} faces, ${before.freeUnits} free"
+            // Only believed when it says zero, and never relied on: tag 9 is not a slot count.
+            // 白い熊's band reports 85 free while holding eighteen faces and refusing the next one,
+            // so this catches a band honest enough to admit it and the stall budget catches the
+            // rest. Do not re-derive "full" from this number.
             if (before.freeUnits == 0) {
                 return Outcome(
                     false, 0, 0,
@@ -284,6 +300,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
         )
 
         var sent = 0
+        var offeredAt = 0L
         var blocks = 0
         var asked = false
         // The band either asks for the file within seconds of the announcement or it never will.
@@ -385,6 +402,22 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
                     cfg.uploadRequest(name, bytes.size, WATCH_FACE_FILE_ID, assetId, version),
                 )
                 sent = -1                       // "offered"; the first block sets a real count
+                offeredAt = System.currentTimeMillis()
+            }
+
+            // Offered, and not one byte asked for since.
+            //
+            // This IS the full band, and it is worth catching in its own right rather than letting
+            // the silence budget find it forty-five seconds later. A band with room asks for its
+            // first block immediately — a whole 921 KB face moves in about a minute across 124 of
+            // them — so a band that said "send it" and then wants nothing at all is not slow, it is
+            // out of space. 白い熊 met the old behaviour as an install that "just hangs" (2026-08-28):
+            // the question it needed to ask was already answerable, eight seconds in.
+            if (sent == -1 && offeredAt > 0 && System.currentTimeMillis() - offeredAt > roomMs) {
+                return noTransfer(
+                    "the band asked for $name and then took nothing", before, 0, 0, heard,
+                    askAgain = true,
+                )
             }
 
             if (sent == 0 && !asked && System.currentTimeMillis() > engageBy) {
@@ -423,6 +456,14 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
      * band that answers nothing, and the stall tests measured it.
      */
     private val PREFLIGHT_TIMEOUT_MS = 2_500L
+
+    /**
+     * How long a band may sit on an accepted file before it is treated as having no room.
+     *
+     * Generous against how fast a working transfer starts (immediately) and short against how long
+     * 白い熊 will watch a spinner with nothing happening.
+     */
+
 
     /** How long the band is given to redraw before its list is asked who is on screen. */
     private val ACTIVATE_SETTLE_MS = 1_200L
@@ -474,6 +515,17 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
          * install budget — is four minutes in which nothing is happening, nothing is reported, and
          * the Tasks list is greyed out.
          */
+        /**
+         * How long a band may sit on an accepted file before it is treated as having no room.
+         *
+         * Generous against how fast a working transfer starts — a band with space asks for its
+         * first block at once, and a whole 921 KB face moves in about a minute across 124 of them —
+         * and short against how long 白い熊 will watch a spinner do nothing. Wrong in the safe
+         * direction either way: being asked which face to give up can be cancelled, and nothing on
+         * the band is touched until it is answered.
+         */
+        const val ROOM_TIMEOUT_MS = 8_000L
+
         private const val SILENCE_TIMEOUT_MS = 45_000L
 
         /** How long to wait for the band to ask for the file before concluding it will not. */
