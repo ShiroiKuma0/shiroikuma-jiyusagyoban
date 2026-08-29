@@ -172,6 +172,51 @@ class HuaweiProbeAction : Action {
             line("battery ${runCatching { api.battery() }.getOrNull()}")
             line()
 
+            // Every product-info tag the band will answer, not the sixteen Health asks for.
+            //
+            // The question this settles: can a companion READ the band's display language at all?
+            // The locale service has no read — 0x0C/0x01 with empty tags answers nothing — so the
+            // only remaining hope was that the language rides along in product info. Our ordinary
+            // request enumerates a fixed list copied from Health's capture (tags 1, 2, 7, 9, 10, 17,
+            // 18, 22, 26, 29, 30, 31, 32, 33, 34, 35), and the band answers only what it is asked
+            // for, so a locale sitting in any other tag would be invisible no matter how often we
+            // looked (白い熊, 2026-08-29). This asks for all 127 and prints what comes back.
+            //
+            // Reading, not writing: this is the same command already sent at every session, with a
+            // longer list of empty tags. Nothing on the band is set by asking.
+            line("=== product info — ALL tags, looking for a language ===")
+            runCatching {
+                val all = (1..127).fold(ByteArray(0)) { acc, t -> acc + HuaweiProtocol.tlv(t) }
+                val tlvs = session.decrypt(
+                    session.request(
+                        HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_PRODUCT_INFO,
+                        all, timeoutMs = 12_000,
+                    ),
+                )
+                line("${tlvs.size} tags answered")
+                for (t in tlvs) {
+                    val text = t.value.toString(Charsets.US_ASCII)
+                        .trim { it <= ' ' || it == '\u0000' }
+                    val printable = text.isNotEmpty() && text.all { it in ' '..'~' }
+                    val hex = t.value.joinToString("") { "%02x".format(it) }
+                    // xx-YY is the only shape this band's locale field takes; flagged rather than
+                    // left for the eye, because that is the whole point of running this.
+                    val flag = if (
+                        text.length == 5 && text[2] == '-' &&
+                        text.take(2).all { it in 'a'..'z' } && text.drop(3).all { it in 'A'..'Z' }
+                    ) {
+                        "   <<< LANGUAGE TAG"
+                    } else {
+                        ""
+                    }
+                    line(
+                        "  tag ${t.tag}  (${t.value.size} B)  " +
+                            (if (printable) "\"$text\"" else hex.take(64)) + flag,
+                    )
+                }
+            }.onFailure { line("product info (all tags) failed: ${it.message}") }
+            line()
+
             // The census is a byte per service, in the order we asked. Decoded here rather than
             // dumped, because a 46-byte hex string is not an answer to "where does heart rate live".
             line("=== service census — what the band says it supports ===")

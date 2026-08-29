@@ -836,6 +836,7 @@ object HuaweiCommands {
     fun setLocale(locale: String, imperial: Boolean): ByteArray =
         tlv(1, locale) + tlv(2, byteArrayOf(if (imperial) 1 else 0))
 
+
     /** Count-then-index history: how many records exist in `[start, end]`. */
     fun fitnessCount(start: Long, end: Long): ByteArray =
         tlv(0x81) +

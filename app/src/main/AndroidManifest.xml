@@ -247,6 +247,17 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The board every other band window is reached from. Its own task affinity, so opening a
+             card's window puts that window in front rather than inside the board's stack. -->
+        <activity
+            android:name="com.opentasker.ui.charts.huawei.HuaweiBoardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".huaweiboard"
+            android:label="健康"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <activity
             android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
             android:exported="false"

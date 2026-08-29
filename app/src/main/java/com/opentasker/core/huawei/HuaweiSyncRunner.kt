@@ -159,7 +159,12 @@ object HuaweiSyncRunner {
         locale: String,
         imperial: Boolean,
     ): Result<Boolean> = withSession(context, address) { _, api ->
-        api.setLocale(locale, imperial).also { if (it) HuaweiSettings.setBandLocale(context, locale) }
+        // Through the announce, because a bare push is ACKed and ignored — see
+        // [HuaweiClient.pushLocale]. Still stored on the ACK rather than on proof, because there
+        // may be no proof to be had: what we store is "the language this phone asked for", and the
+        // dialog is careful to present it as exactly that.
+        api.pushLocale(HuaweiSettings.deviceName(context) ?: "HUAWEI Band", locale, imperial)
+            .also { if (it) HuaweiSettings.setBandLocale(context, locale) }
     }
 
     /**
