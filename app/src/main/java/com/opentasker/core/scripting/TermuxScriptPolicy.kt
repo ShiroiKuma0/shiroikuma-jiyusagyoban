@@ -36,6 +36,8 @@ internal data class TermuxCommandResult(
     val stderrOriginalLength: Int,
     /** Termux's `err` value, or null when Termux delivered no result bundle at all. */
     val errorCode: Int?,
+    /** Termux's own `errmsg`, bounded and sanitized. Never carries script output. */
+    val errorMessage: String = "",
 ) {
     /** False only when Termux never returned a result bundle for the command. */
     val delivered: Boolean get() = errorCode != null
@@ -76,6 +78,23 @@ internal sealed interface TermuxScriptExecutionResult {
     ) : TermuxScriptExecutionResult
 }
 
+/** Why a hash preflight did or did not produce a SHA-256 for the approved script. */
+internal sealed interface TermuxHashCheckResult {
+    data class Verified(val hash: String) : TermuxHashCheckResult
+
+    /** Termux never returned a result bundle for the command. */
+    data object NotDelivered : TermuxHashCheckResult
+
+    /** Termux itself refused or failed the command, before any shell ran. */
+    data class TermuxError(val errorCode: Int, val errorMessage: String) : TermuxHashCheckResult
+
+    /** The shell ran and exited non-zero, so the script is missing or sha256sum is unavailable. */
+    data class CommandFailed(val exitCode: Int) : TermuxHashCheckResult
+
+    /** The command succeeded but its output held no readable hash, or exceeded the capture limit. */
+    data object Unreadable : TermuxHashCheckResult
+}
+
 internal sealed interface TermuxPreparationResult {
     data class Ready(val script: PreparedTermuxScript) : TermuxPreparationResult
     data class Invalid(val message: String) : TermuxPreparationResult
@@ -100,6 +119,7 @@ internal object TermuxScriptPolicy {
     const val MAX_CAPTURE_PREFIX_LENGTH = 64
     const val HASH_OUTPUT_LIMIT_BYTES = 4 * 1024
     const val HASH_TIMEOUT_MS = 10_000L
+    const val MAX_ERROR_MESSAGE_LENGTH = 200
     const val HASH_EXECUTABLE = "\$PREFIX/bin/sh"
 
     private const val HASH_SCRIPT =
@@ -168,10 +188,29 @@ internal object TermuxScriptPolicy {
             timeoutMs = minOf(script.timeoutMs, HASH_TIMEOUT_MS),
         )
 
-    fun parseHashResult(result: TermuxCommandResult): String? {
-        if (!result.termuxSucceeded || result.exitCode != 0) return null
-        if (!isOutputWithinLimit(result, HASH_OUTPUT_LIMIT_BYTES)) return null
-        return hashRegex.find(result.stdout)?.value?.lowercase()
+    fun parseHashResult(result: TermuxCommandResult): TermuxHashCheckResult {
+        if (!result.delivered) return TermuxHashCheckResult.NotDelivered
+        if (!result.termuxSucceeded) {
+            return TermuxHashCheckResult.TermuxError(checkNotNull(result.errorCode), result.errorMessage)
+        }
+        if (result.exitCode != 0) return TermuxHashCheckResult.CommandFailed(result.exitCode)
+        if (!isOutputWithinLimit(result, HASH_OUTPUT_LIMIT_BYTES)) return TermuxHashCheckResult.Unreadable
+        val hash = hashRegex.find(result.stdout)?.value?.lowercase()
+            ?: return TermuxHashCheckResult.Unreadable
+        return TermuxHashCheckResult.Verified(hash)
+    }
+
+    /** Bounds and flattens Termux's own error text so it can be shown without leaking or wrapping. */
+    fun sanitizeErrorMessage(raw: String?): String {
+        val flattened = raw.orEmpty().map { if (it.isISOControl()) ' ' else it }
+            .joinToString("")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        return if (flattened.length <= MAX_ERROR_MESSAGE_LENGTH) {
+            flattened
+        } else {
+            flattened.take(MAX_ERROR_MESSAGE_LENGTH - 1) + "…"
+        }
     }
 
     fun verifiedExecutionRequest(script: PreparedTermuxScript, expectedHash: String): TermuxCommandRequest =
@@ -314,15 +353,37 @@ internal class TermuxScriptCoordinator(
             )
         }
 
-        val actualHash = TermuxScriptPolicy.parseHashResult(commandRunner(TermuxScriptPolicy.hashCheckRequest(script)))
-            ?: return TermuxScriptExecutionResult.Rejected(
+        val actualHash = when (
+            val check = TermuxScriptPolicy.parseHashResult(commandRunner(TermuxScriptPolicy.hashCheckRequest(script)))
+        ) {
+            is TermuxHashCheckResult.Verified -> check.hash
+            TermuxHashCheckResult.NotDelivered -> return TermuxScriptExecutionResult.Rejected(
                 TermuxScriptRejectionReason.HASH_CHECK_FAILED,
-                "Termux could not verify the approved script hash",
+                "Termux returned no result for the hash check. Set allow-external-apps=true in " +
+                    "~/.termux/termux.properties and reload Termux settings",
             )
+            is TermuxHashCheckResult.TermuxError -> return TermuxScriptExecutionResult.Rejected(
+                TermuxScriptRejectionReason.HASH_CHECK_FAILED,
+                buildString {
+                    append("Termux error ").append(check.errorCode)
+                    if (check.errorMessage.isNotEmpty()) append(": ").append(check.errorMessage)
+                    append(" while checking the script hash")
+                },
+            )
+            is TermuxHashCheckResult.CommandFailed -> return TermuxScriptExecutionResult.Rejected(
+                TermuxScriptRejectionReason.HASH_CHECK_FAILED,
+                "The hash check exited with code ${check.exitCode}. Confirm ${script.executable} exists " +
+                    "and that sha256sum is installed in Termux",
+            )
+            TermuxHashCheckResult.Unreadable -> return TermuxScriptExecutionResult.Rejected(
+                TermuxScriptRejectionReason.HASH_CHECK_FAILED,
+                "Termux returned no readable SHA-256 for the script",
+            )
+        }
         if (actualHash != expectedHash) {
             return TermuxScriptExecutionResult.Rejected(
                 TermuxScriptRejectionReason.HASH_MISMATCH,
-                "Script hash does not match its approved SHA-256 value",
+                "Hash mismatch: expected $expectedHash, Termux computed $actualHash",
             )
         }
 

@@ -185,10 +185,10 @@ class TermuxScriptBackendTest {
             },
         )
 
-        assertEquals(
-            TermuxScriptRejectionReason.HASH_CHECK_FAILED,
-            (result as TermuxScriptExecutionResult.Rejected).reason,
-        )
+        result as TermuxScriptExecutionResult.Rejected
+        assertEquals(TermuxScriptRejectionReason.HASH_CHECK_FAILED, result.reason)
+        assertTrue(result.message, result.message.startsWith("Termux returned no result"))
+        assertTrue("must point at the Termux prerequisite", "allow-external-apps" in result.message)
         assertEquals("script must not run without a delivered result", 1, calls)
     }
 
@@ -201,15 +201,67 @@ class TermuxScriptBackendTest {
             approvedHashFor = { approvedHash },
             commandRunner = {
                 calls++
-                hashResult(errorCode = 150)
+                hashResult(errorCode = 150).copy(errorMessage = "Executable file not found")
             },
         )
 
-        assertEquals(
-            TermuxScriptRejectionReason.HASH_CHECK_FAILED,
-            (result as TermuxScriptExecutionResult.Rejected).reason,
-        )
+        result as TermuxScriptExecutionResult.Rejected
+        assertEquals(TermuxScriptRejectionReason.HASH_CHECK_FAILED, result.reason)
+        assertTrue(result.message, result.message.startsWith("Termux error 150: Executable file not found"))
         assertEquals(1, calls)
+    }
+
+    @Test
+    fun coordinatorReportsTheHashCheckExitCodeWhenTheShellFails() = runBlocking {
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = { commandResult(exitCode = 127) },
+        )
+
+        result as TermuxScriptExecutionResult.Rejected
+        assertEquals(TermuxScriptRejectionReason.HASH_CHECK_FAILED, result.reason)
+        assertTrue(result.message, "exited with code 127" in result.message)
+        assertTrue("must name the script it could not hash", script in result.message)
+    }
+
+    @Test
+    fun coordinatorReportsAnUnreadableHashSeparatelyFromAnError() = runBlocking {
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = { commandResult(stdout = "not a hash\n") },
+        )
+
+        result as TermuxScriptExecutionResult.Rejected
+        assertEquals(TermuxScriptRejectionReason.HASH_CHECK_FAILED, result.reason)
+        assertTrue(result.message, "no readable SHA-256" in result.message)
+    }
+
+    @Test
+    fun hashMismatchNamesBothTheExpectedAndTheComputedHash() = runBlocking {
+        val computed = "b".repeat(64)
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = { hashResult(computed) },
+        )
+
+        result as TermuxScriptExecutionResult.Rejected
+        assertEquals(TermuxScriptRejectionReason.HASH_MISMATCH, result.reason)
+        assertEquals("Hash mismatch: expected $approvedHash, Termux computed $computed", result.message)
+    }
+
+    @Test
+    fun termuxErrorMessagesAreFlattenedAndBounded() {
+        assertEquals("one two three", TermuxScriptPolicy.sanitizeErrorMessage("one\ttwo\n  three "))
+        assertEquals("", TermuxScriptPolicy.sanitizeErrorMessage(null))
+        val long = TermuxScriptPolicy.sanitizeErrorMessage("z".repeat(500))
+        assertEquals(TermuxScriptPolicy.MAX_ERROR_MESSAGE_LENGTH, long.length)
+        assertTrue(long.endsWith("…"))
     }
 
     @Test

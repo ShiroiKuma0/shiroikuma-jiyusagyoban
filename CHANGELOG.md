@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- A failed Termux script now says which step failed instead of blaming the hash. The old wording covered a missing result, a Termux error, and a genuine mismatch with one sentence, so a correct hash still read as wrong. The five causes now report separately: no result came back (with the allow-external-apps setting named, since that is the usual cause), Termux reported an error (with its own message and code), the check exited non-zero (with the code and the script path, which covers a missing script or a missing sha256sum), the output held no readable hash, and a real mismatch that prints both the approved hash and the one Termux computed. The run log records the Termux error code alongside the exit code, and script output stays redacted throughout.
 - Termux scripts could never run. Termux reports "no internal error" as `Activity.RESULT_OK`, which is -1, and OpenTasker treated any value other than 0 as a failure, so the hash check that runs before every script was thrown away before the hash was even compared. The script then failed with "Termux could not verify the approved script hash" even when the SHA-256 the user entered was correct. A result carrying -1 or 0 now counts as success, a result Termux never delivered is tracked separately from one that arrived reporting an error, and the same check on the execution step was fixed with it.
 
 ## v0.2.90

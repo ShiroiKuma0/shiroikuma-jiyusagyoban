@@ -91,6 +91,7 @@ internal object TermuxCommandBroker {
             stdoutOriginalLength = parseOriginalLength(bundle, RESULT_STDOUT_ORIGINAL_LENGTH),
             stderrOriginalLength = parseOriginalLength(bundle, RESULT_STDERR_ORIGINAL_LENGTH),
             errorCode = bundle.getInt(RESULT_ERROR_CODE, TermuxCommandResult.ERROR_CODE_ABSENT),
+            errorMessage = TermuxScriptPolicy.sanitizeErrorMessage(bundle.getString(RESULT_ERROR_MESSAGE)),
         )
     }
 
@@ -109,6 +110,7 @@ internal object TermuxCommandBroker {
     private const val RESULT_STDERR = "stderr"
     private const val RESULT_EXIT_CODE = "exitCode"
     private const val RESULT_ERROR_CODE = "err"
+    private const val RESULT_ERROR_MESSAGE = "errmsg"
     private const val RESULT_STDOUT_ORIGINAL_LENGTH = "stdout_original_length"
     private const val RESULT_STDERR_ORIGINAL_LENGTH = "stderr_original_length"
 }

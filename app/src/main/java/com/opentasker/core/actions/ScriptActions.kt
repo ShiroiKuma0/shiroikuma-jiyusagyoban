@@ -47,7 +47,10 @@ class TermuxScriptAction : DeclaredAction(ActionCatalog.require(TermuxScriptBack
                 commandRunner = { request -> TermuxCommandBroker.execute(ctx.app, request) },
             )
             when (execution) {
-                is TermuxScriptExecutionResult.Rejected -> ActionResult.Failure(execution.message)
+                is TermuxScriptExecutionResult.Rejected -> {
+                    ctx.logger("Termux script rejected (${execution.reason}): ${execution.message}")
+                    ActionResult.Failure(execution.message)
+                }
                 is TermuxScriptExecutionResult.Completed -> completeExecution(ctx, capturePrefix, execution)
             }
         } catch (_: TimeoutCancellationException) {
@@ -77,12 +80,19 @@ class TermuxScriptAction : DeclaredAction(ActionCatalog.require(TermuxScriptBack
             ctx.variables.set("${capturePrefix}_stderr_length", result.stderrOriginalLength.toString())
         }
         ctx.logger(
-            "Termux script completed: hash=${execution.approvedHash}; exit=${result.exitCode}; " +
+            "Termux script completed: hash=${execution.approvedHash}; err=${result.errorCode ?: "none"}; " +
+                "exit=${result.exitCode}; " +
                 "stdout=<redacted:${TermuxScriptPolicy.utf8Size(result.stdout)}B>; " +
                 "stderr=<redacted:${TermuxScriptPolicy.utf8Size(result.stderr)}B>",
         )
         return when {
-            !result.termuxSucceeded -> ActionResult.Failure("Termux could not execute the approved script")
+            !result.termuxSucceeded -> ActionResult.Failure(
+                buildString {
+                    append("Termux could not execute the approved script")
+                    result.errorCode?.let { append(" (error ").append(it).append(')') }
+                    if (result.errorMessage.isNotEmpty()) append(": ").append(result.errorMessage)
+                },
+            )
             result.exitCode != 0 -> ActionResult.Failure("Termux script exited with code ${result.exitCode}")
             else -> ActionResult.Success
         }

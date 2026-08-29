@@ -242,11 +242,11 @@ class ImportBoundaryCorpusTest {
         val parsedHash = TermuxScriptPolicy.parseHashResult(
             TermuxCommandResult("$hash\n", "", 0, hash.length + 1, 0, 0),
         )
-        assertEquals(hash, parsedHash)
+        assertEquals(TermuxHashCheckResult.Verified(hash), parsedHash)
         val oversizedHash = TermuxScriptPolicy.parseHashResult(
             TermuxCommandResult("$hash\n${"x".repeat(TermuxScriptPolicy.HASH_OUTPUT_LIMIT_BYTES)}", "", 0, hash.length + 1 + TermuxScriptPolicy.HASH_OUTPUT_LIMIT_BYTES, 0, 0),
         )
-        assertEquals(null, oversizedHash)
+        assertEquals(TermuxHashCheckResult.Unreadable, oversizedHash)
     }
 
     private fun seedBundle() = OpenTaskerBundle(
