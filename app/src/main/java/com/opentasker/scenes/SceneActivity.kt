@@ -489,7 +489,28 @@ internal fun SceneElementView(
             Box(
                 Modifier.fillMaxSize()
                     .then(if (bg != null) Modifier.background(bg, shape) else Modifier)
-                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier),
+                    .then(if (styleBorderW > 0) Modifier.border(styleBorderW.dp, styleBorderColor ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
+                    // A TEXT carrying a tap task used to do NOTHING, silently: only BUTTON, the input
+                    // widgets and RECTANGLE/OVAL ever read `tapTaskName`, so a scene author who bound a
+                    // task to a text element got a dead element and no complaint from anywhere. 白い熊
+                    // met it as an eighteen-card board where not one card responded (2026-08-28).
+                    //
+                    // Binding it here rather than telling scenes to use BUTTON instead: a button draws
+                    // its label as a plain string, so it cannot carry the ⟦|30⟧…⟦/⟧ span markup that
+                    // makes a card's glyph larger than its caption — and "the element you want is the
+                    // one that silently ignores you" is not a rule worth keeping.
+                    .then(
+                        if (tapRef != null || longPressRef != null) {
+                            Modifier.pointerInput(element.id) {
+                                detectTapGestures(
+                                    onTap = { tapRef?.let(onRunTask) },
+                                    onLongPress = { longPressRef?.let(onRunTask) },
+                                )
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 if (strokeColor != null && strokeWpx != null) {
