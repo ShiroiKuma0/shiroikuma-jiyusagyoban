@@ -325,6 +325,32 @@ Three consequences worth keeping straight:
   `configure()` re-sends the stored choice on every pairing — but only when one has been stored, so
   a language picked on the band itself is never silently overwritten by us.
 
+**Two things about this command were wrong here until 2026-08-29, and both were found on the band
+rather than by reading:**
+
+* **There is no read. This is settled, not suspected.** `0x0C/0x01` with its tags left empty — this
+  protocol's own "tell me rather than propose" idiom, the way `fileNegotiate` asks for a chunk size —
+  returns nothing at all. Health never asks either; it assumes it is the band's only companion. The
+  remaining hope was that the language rides along in product info, so `huawei.probe` now asks for
+  **all 127 product-info tags** rather than the sixteen Health asks for. On 白い熊's band (2026-08-29)
+  that returned **34 tags and not one language field**: versions, serials, MACs, model names, a
+  signature — product identity, which a display language is not.
+
+  ```
+  tag 1 "1.0.0"   tag 3 "EA1CANDY.B49,VN1"   tag 7 "6.0.0.125(SP8C00M02)"   tag 9 "6KLTQ26326016653"
+  tag 10 "Candy-B49FB"   tag 17 "CDY-B49"   tag 33 "6.0.0.125"   tag 38 "HarmonyOS 6.0.0.125"   …
+  ```
+
+  **So a companion cannot know the band's language at all.** Do not go looking again, and do not
+  blind-probe command ids on a config service to find one — that is how a watch face got deleted by
+  a command believed to select one. The UI's job is to say whose word it is showing.
+* **A push sent on its own is ACKed and IGNORED.** "Right after announcing itself" is not narrative
+  detail — it is the condition. Sent mid-session it returns 100000, the same success code as
+  everything else, and the band does not change language: 白い熊 asked for English, was told it had
+  switched, and the band stayed Japanese. `pushLocale()` therefore sends `SetUpDeviceStatus` first
+  and only then the locale, reproducing the capture's adjacency. **Never report a language change
+  from the ACK** — the band ACKs a locale it has no pack for just the same.
+
 Ours is `huawei.language` (`locale`, `units`), driven by `%Huawei_BandLocale` from
 `健康の設定 -- [727][01]` — deliberately a different setting from `%Huawei_Language`, which is the
 language of *our window*. 白い熊 runs the band in Japanese and the report in English.

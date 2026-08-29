@@ -221,6 +221,7 @@ object ActionCatalog {
         // gives a new companion only seconds, so these cannot be separate steps.
         define("huawei.pair", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiPairAction),
         define("huawei.charts", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiChartsAction),
+        define("huawei.board", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::HuaweiBoardAction),
         // A read-only census of what the band supports. IDEMPOTENT: it counts and reads, never writes.
         define("huawei.probe", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiProbeAction),
         // NEVER retry-safe: it drops a credential and a Bluetooth bond.

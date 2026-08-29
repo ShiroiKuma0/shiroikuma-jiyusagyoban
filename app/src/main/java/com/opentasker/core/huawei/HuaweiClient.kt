@@ -202,6 +202,28 @@ class HuaweiClient(private val session: HuaweiSession) {
         true
     }.getOrDefault(false)
 
+    /**
+     * Push a language the way the band actually accepts one.
+     *
+     * The capture is explicit that Health sends the locale **immediately after announcing itself**,
+     * and `configure()` reproduces that adjacency. Sent on its own in an ordinary session, the band
+     * returns its success code — 100000, the same one it returns for everything — and does not
+     * change language: 白い熊 asked for English on 2026-08-29, was told it had switched, and the
+     * band stayed Japanese. So the announcement goes first here too.
+     *
+     * @return whether the band ACKED. That is NOT whether the language changed — the band ACKs a
+     *   locale it has no pack for just the same, falling back to English outside mainland China —
+     *   so the caller must verify by reading, never by believing this.
+     */
+    suspend fun pushLocale(deviceName: String, locale: String, imperial: Boolean): Boolean {
+        val cfg = HuaweiCommands
+        // Never answered; send and move on, exactly as configure() does.
+        runCatching {
+            session.send(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SETUP_DEVICE_STATUS, cfg.setUpDeviceStatus(deviceName))
+        }
+        return setLocale(locale, imperial)
+    }
+
     suspend fun configure(deviceName: String, epochSeconds: Long, zoneHours: Int, zoneMinutes: Int, locale: String? = null) {
         suspend fun attempt(service: Int, command: Int, payload: ByteArray) {
             runCatching { session.request(service, command, payload, timeoutMs = 6_000) }

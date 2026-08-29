@@ -105,31 +105,48 @@ object BandLanguageSwitch {
         appContext: Context,
         db: AppDatabase,
         to: BandLanguage,
+    ): Outcome = switchTo(appContext, db, to, VARIABLE) { ctx, tag -> BandSettings.setLanguage(ctx, tag) }
+
+    /**
+     * The same switch for any band's language variable.
+     *
+     * Both bands keep their display language in the one settings task and both read a preference at
+     * window launch, so the procedure is identical and only the two names differ — the variable the
+     * task defines, and the preference the window reads. Parameterising beats a second copy: the
+     * reasoning above about WHY it goes the long way round is the valuable part, and a copy would
+     * duplicate the code while leaving the reasoning behind.
+     */
+    suspend fun switchTo(
+        appContext: Context,
+        db: AppDatabase,
+        to: BandLanguage,
+        variable: String,
+        persist: (Context, String) -> Unit,
     ): Outcome {
         val candidates = db.taskDao().getAll()
             .mapNotNull { entity -> runCatching { entity.toDomain() }.getOrNull() }
-            .filter { definesVariable(it, VARIABLE) }
+            .filter { definesVariable(it, variable) }
 
         val task = choose(candidates) ?: return Outcome.Failed(
             if (candidates.isEmpty()) {
                 Loc(
-                    "No task sets %$VARIABLE — expected $SETTINGS_TASK.",
-                    "%$VARIABLE を設定するタスクがありません。$SETTINGS_TASK のはずです。",
+                    "No task sets %$variable — expected $SETTINGS_TASK.",
+                    "%$variable を設定するタスクがありません。$SETTINGS_TASK のはずです。",
                 )
             } else {
                 Loc(
-                    "${candidates.size} tasks set %$VARIABLE — cannot tell which is the setting.",
-                    "%$VARIABLE を設定するタスクが ${candidates.size} 個あります。どれが設定か判断できません。",
+                    "${candidates.size} tasks set %$variable — cannot tell which is the setting.",
+                    "%$variable を設定するタスクが ${candidates.size} 個あります。どれが設定か判断できません。",
                 )
             },
         )
 
         return try {
-            db.taskDao().update(retarget(task, VARIABLE, to.tag).toEntity())
+            db.taskDao().update(retarget(task, variable, to.tag).toEntity())
             val result = executeAndLogTask(
                 appContext = appContext,
                 db = db,
-                task = db.taskDao().getById(task.id)?.toDomain() ?: retarget(task, VARIABLE, to.tag),
+                task = db.taskDao().getById(task.id)?.toDomain() ?: retarget(task, variable, to.tag),
                 source = "健康 language pill",
                 logTag = "BandLanguageSwitch",
             )
@@ -137,7 +154,7 @@ object BandLanguageSwitch {
                 // What `band.charts` would have done with `lang=%Band_Language` on the next open.
                 // Written after the run, not before: if the task aborts, the window's language and
                 // the task's value are both still the old one, which is the honest pair.
-                BandSettings.setLanguage(appContext, to.tag)
+                persist(appContext, to.tag)
                 Outcome.Switched(to)
             } else {
                 val why = result.skippedReason ?: result.report.results

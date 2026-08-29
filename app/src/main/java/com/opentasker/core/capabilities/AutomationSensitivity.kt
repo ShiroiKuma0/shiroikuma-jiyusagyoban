@@ -171,6 +171,7 @@ object AutomationSensitivityRegistry {
         "huawei.sync",
         // Puts that history on screen. It transmits nothing and displays a body's worth of it.
         "huawei.charts",
+        "huawei.board",
         // Puts that same health history on screen. It transmits nothing, but it displays a body's
         // worth of it, which is the thing worth declaring.
         "band.charts",

@@ -1300,6 +1300,18 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.board",
+            name = "Huawei Band board",
+            description = "Open 健康 -- [727], the one page the whole band is driven from: sixteen cards — sync, the report, walks, satellites, weather, watch faces, the settings and the diagnostics — each a picture over a button, in the order the band is actually used. Tapping a card runs its task and closes the board, so it never covers the window it just opened; sync alone opens a dialog here, with the full backfill and the sync state beside it",
+            category = "Health",
+            fields = listOf(
+                ActionField("lang", "Display language", FieldType.TEXT, hint = "en-US or ja-JP. Shares the setting with 健康（Huawei）, and the board's own 日本語／英語 pill rewrites it in 健康の設定 rather than behind its back. Blank keeps whatever was set last"),
+            ),
+        ),
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.pair",
             name = "Pair Huawei Band",
             description = "Claim the HUAWEI Band 11 Pro for this phone — the Bluetooth pairing, the HiChain bind and the full configuration set in one run, because the band gives a new companion only seconds before abandoning its flow. No Huawei account and no Huawei software. Two confirmations are needed: a plain yes/no on the band (never a six-digit code), then Android's own dialog on the phone",
