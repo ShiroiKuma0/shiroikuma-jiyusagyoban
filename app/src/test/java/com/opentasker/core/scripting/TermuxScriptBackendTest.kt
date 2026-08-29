@@ -131,6 +131,104 @@ class TermuxScriptBackendTest {
     }
 
     @Test
+    fun coordinatorAcceptsTheResultOkErrorCodeRealTermuxReturns() = runBlocking {
+        // Termux reports "no internal error" as Activity.RESULT_OK (-1), not 0. Issue #14: treating
+        // anything but 0 as a failure rejected every real preflight before the hash was compared.
+        var calls = 0
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = {
+                calls++
+                if (calls == 1) {
+                    hashResult(errorCode = TermuxCommandResult.ERROR_CODE_OK)
+                } else {
+                    verifiedCommandResult(stdout = "ran", errorCode = TermuxCommandResult.ERROR_CODE_OK)
+                }
+            },
+        )
+
+        assertTrue("err = -1 must be read as success", result is TermuxScriptExecutionResult.Completed)
+        assertEquals("ran", (result as TermuxScriptExecutionResult.Completed).command.stdout)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun coordinatorStillAcceptsTheZeroErrorCodeOlderTermuxBundlesOmit() = runBlocking {
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = { request ->
+                if (request.arguments.getOrNull(2) == "opentasker-hash") {
+                    hashResult(errorCode = TermuxCommandResult.ERROR_CODE_ABSENT)
+                } else {
+                    verifiedCommandResult(errorCode = TermuxCommandResult.ERROR_CODE_ABSENT)
+                }
+            },
+        )
+
+        assertTrue(result is TermuxScriptExecutionResult.Completed)
+    }
+
+    @Test
+    fun coordinatorRejectsPreflightWhenTermuxDeliveredNoResultBundle() = runBlocking {
+        var calls = 0
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = {
+                calls++
+                hashResult(errorCode = null).copy(exitCode = -1)
+            },
+        )
+
+        assertEquals(
+            TermuxScriptRejectionReason.HASH_CHECK_FAILED,
+            (result as TermuxScriptExecutionResult.Rejected).reason,
+        )
+        assertEquals("script must not run without a delivered result", 1, calls)
+    }
+
+    @Test
+    fun coordinatorRejectsPreflightOnARealTermuxErrorCode() = runBlocking {
+        var calls = 0
+        val result = coordinator().execute(
+            ready = true,
+            invocation = invocation(),
+            approvedHashFor = { approvedHash },
+            commandRunner = {
+                calls++
+                hashResult(errorCode = 150)
+            },
+        )
+
+        assertEquals(
+            TermuxScriptRejectionReason.HASH_CHECK_FAILED,
+            (result as TermuxScriptExecutionResult.Rejected).reason,
+        )
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun commandResultSeparatesDeliveryFromTermuxSuccess() {
+        val undelivered = commandResult(errorCode = null)
+        val ok = commandResult(errorCode = TermuxCommandResult.ERROR_CODE_OK)
+        val absent = commandResult(errorCode = TermuxCommandResult.ERROR_CODE_ABSENT)
+        val failed = commandResult(errorCode = 1)
+
+        assertFalse(undelivered.delivered)
+        assertFalse(undelivered.termuxSucceeded)
+        assertTrue(ok.delivered)
+        assertTrue(ok.termuxSucceeded)
+        assertTrue(absent.termuxSucceeded)
+        assertTrue(failed.delivered)
+        assertFalse(failed.termuxSucceeded)
+    }
+
+    @Test
     fun coordinatorRejectsHashMismatchBeforeScriptDispatch() = runBlocking {
         var calls = 0
         val result = coordinator().execute(
@@ -276,8 +374,10 @@ class TermuxScriptBackendTest {
         timeoutMs = TermuxScriptPolicy.DEFAULT_TIMEOUT_MS,
     )
 
-    private fun hashResult(hash: String = approvedHash): TermuxCommandResult =
-        commandResult(stdout = "$hash  $script\n")
+    private fun hashResult(
+        hash: String = approvedHash,
+        errorCode: Int? = 0,
+    ): TermuxCommandResult = commandResult(stdout = "$hash  $script\n", errorCode = errorCode)
 
     private fun verifiedCommandResult(
         stdout: String = "",
@@ -285,7 +385,7 @@ class TermuxScriptBackendTest {
         stdoutOriginalLength: Int = TermuxScriptPolicy.utf8Size(stdout),
         stderrOriginalLength: Int = TermuxScriptPolicy.utf8Size(stderr),
         exitCode: Int = 0,
-        errorCode: Int = 0,
+        errorCode: Int? = 0,
     ): TermuxCommandResult {
         val marker = TermuxScriptPolicy.verificationSuccessMarker(approvedHash)
         return commandResult(
@@ -304,7 +404,7 @@ class TermuxScriptBackendTest {
         stdoutOriginalLength: Int = TermuxScriptPolicy.utf8Size(stdout),
         stderrOriginalLength: Int = TermuxScriptPolicy.utf8Size(stderr),
         exitCode: Int = 0,
-        errorCode: Int = 0,
+        errorCode: Int? = 0,
     ) = TermuxCommandResult(
         stdout = stdout,
         stderr = stderr,

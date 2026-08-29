@@ -468,6 +468,30 @@ class ActionGuardsTest {
         assertTrue("stderr content leaked into logs", logs.none { "private stderr" in it })
     }
 
+    @Test
+    fun termuxScriptTreatsTheResultOkErrorCodeAsASuccessfulRun() {
+        val variables = VariableStore()
+        val context = ActionContext(ContextWrapper(null), variables, logger = {})
+        val completed = TermuxScriptExecutionResult.Completed(
+            command = TermuxCommandResult(
+                stdout = "",
+                stderr = "",
+                exitCode = 0,
+                stdoutOriginalLength = 0,
+                stderrOriginalLength = 0,
+                errorCode = TermuxCommandResult.ERROR_CODE_OK,
+            ),
+            approvedHash = "a".repeat(64),
+        )
+
+        assertEquals(ActionResult.Success, TermuxScriptAction().completeExecution(context, null, completed))
+
+        val failed = completed.copy(command = completed.command.copy(errorCode = 150))
+        val result = TermuxScriptAction().completeExecution(context, null, failed)
+        assertTrue(result is ActionResult.Failure)
+        assertTrue((result as ActionResult.Failure).message.contains("could not execute"))
+    }
+
     // --- VolumeAction guards ---
 
     @Test

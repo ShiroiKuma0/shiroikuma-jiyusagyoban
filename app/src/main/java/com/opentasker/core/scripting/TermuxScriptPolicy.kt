@@ -34,8 +34,25 @@ internal data class TermuxCommandResult(
     val exitCode: Int,
     val stdoutOriginalLength: Int,
     val stderrOriginalLength: Int,
-    val errorCode: Int,
-)
+    /** Termux's `err` value, or null when Termux delivered no result bundle at all. */
+    val errorCode: Int?,
+) {
+    /** False only when Termux never returned a result bundle for the command. */
+    val delivered: Boolean get() = errorCode != null
+
+    /**
+     * Termux reports "no internal error" as `Activity.RESULT_OK` (-1), not 0, so a command that ran
+     * cleanly arrives with `err = -1`. A bundle that omits the key is read as 0 and also counts as
+     * success, which keeps older Termux builds working.
+     */
+    val termuxSucceeded: Boolean get() = errorCode == ERROR_CODE_OK || errorCode == ERROR_CODE_ABSENT
+
+    companion object {
+        /** `Activity.RESULT_OK`, the value Termux's `Errno.ERRNO_SUCCESS` carries. */
+        const val ERROR_CODE_OK = -1
+        const val ERROR_CODE_ABSENT = 0
+    }
+}
 
 internal enum class TermuxScriptRejectionReason {
     PERMISSION_DENIED,
@@ -152,7 +169,7 @@ internal object TermuxScriptPolicy {
         )
 
     fun parseHashResult(result: TermuxCommandResult): String? {
-        if (result.errorCode != 0 || result.exitCode != 0) return null
+        if (!result.termuxSucceeded || result.exitCode != 0) return null
         if (!isOutputWithinLimit(result, HASH_OUTPUT_LIMIT_BYTES)) return null
         return hashRegex.find(result.stdout)?.value?.lowercase()
     }

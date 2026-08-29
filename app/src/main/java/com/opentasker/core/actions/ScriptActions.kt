@@ -82,7 +82,7 @@ class TermuxScriptAction : DeclaredAction(ActionCatalog.require(TermuxScriptBack
                 "stderr=<redacted:${TermuxScriptPolicy.utf8Size(result.stderr)}B>",
         )
         return when {
-            result.errorCode != 0 -> ActionResult.Failure("Termux could not execute the approved script")
+            !result.termuxSucceeded -> ActionResult.Failure("Termux could not execute the approved script")
             result.exitCode != 0 -> ActionResult.Failure("Termux script exited with code ${result.exitCode}")
             else -> ActionResult.Success
         }

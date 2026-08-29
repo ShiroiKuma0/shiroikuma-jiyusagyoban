@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Termux scripts could never run. Termux reports "no internal error" as `Activity.RESULT_OK`, which is -1, and OpenTasker treated any value other than 0 as a failure, so the hash check that runs before every script was thrown away before the hash was even compared. The script then failed with "Termux could not verify the approved script hash" even when the SHA-256 the user entered was correct. A result carrying -1 or 0 now counts as success, a result Termux never delivered is tracked separately from one that arrived reporting an error, and the same check on the execution step was fixed with it.
+
 ## v0.2.90
 
 Imported "Run only if" guards now hold on flow-control actions at runtime, and they survive a Tasker XML export.

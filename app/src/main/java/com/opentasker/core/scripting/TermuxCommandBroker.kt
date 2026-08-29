@@ -79,7 +79,7 @@ internal object TermuxCommandBroker {
                 exitCode = -1,
                 stdoutOriginalLength = 0,
                 stderrOriginalLength = 0,
-                errorCode = -1,
+                errorCode = null,
             )
         }
         val stdout = bundle.getString(RESULT_STDOUT).orEmpty()
@@ -90,7 +90,7 @@ internal object TermuxCommandBroker {
             exitCode = bundle.getInt(RESULT_EXIT_CODE, -1),
             stdoutOriginalLength = parseOriginalLength(bundle, RESULT_STDOUT_ORIGINAL_LENGTH),
             stderrOriginalLength = parseOriginalLength(bundle, RESULT_STDERR_ORIGINAL_LENGTH),
-            errorCode = bundle.getInt(RESULT_ERROR_CODE, 0),
+            errorCode = bundle.getInt(RESULT_ERROR_CODE, TermuxCommandResult.ERROR_CODE_ABSENT),
         )
     }
 
