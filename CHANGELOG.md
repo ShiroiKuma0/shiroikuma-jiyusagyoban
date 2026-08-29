@@ -8,7 +8,7 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
-## 0.2.90+2026-08-25.04-06.g71800ef2+007 — 2026-08-28
+## 0.2.90+2026-08-25.04-06.g71800ef2+024 — 2026-08-29
 
 Built on upstream OpenTasker `0.2.90` (`71800ef2`). Two things about watch faces, both of which the
 band was answering all along.
@@ -105,6 +105,71 @@ Full JVM suite green at 1832 tests, and both new screens have screenshot preview
 Both halves were verified against the real band rather than against the fixtures alone: the shelf came
 back as eighteen faces with `7184229813` marked as showing, and the install of a face it does not
 hold raised the room question with all eighteen named.
+
+**「健康」 is a page now, not a scene.** The band is driven from a native board of sixteen cards —
+sync, the report, walks, watch faces, satellites, weather, sensors, language, pairing, diagnostics —
+each a picture over a yellow button, in the order the band is actually used. Being a page rather than
+a scene is the point: the other Huawei windows now open **on top of it** instead of under it. A card
+hands its task over and closes, because a launcher that stays in front of what it launched is in the
+way; sync is the exception and opens a dialog, having nothing to show but its own progress. The
+scene it replaces and its three helper tasks are retired.
+
+That dialog could not be dismissed, and the reason is worth recording: its progress watcher was a
+`while (true)` with nothing holding it, writing the sync state every 700 ms — so OK cleared it and
+the next tick wrote it back. It also overwrote the finished result, so the summary never appeared,
+and it kept polling for as long as the board was open. It is a held job now, cancelled when the
+dialog closes, when the run ends, and in `onDestroy`. The board's "busy" test had likewise forgotten
+that a sync is something in flight, so every tile stayed live underneath the dialog and the sync tile
+could be pressed again — the runner's mutex refused the second one, but a button that can be pressed
+only to be told no should not be pressable.
+
+**The band's language: one push that never worked, and one read that never can.** Both were found on
+the band rather than in the documentation.
+
+The push is accepted only *immediately after the companion announces itself*. Sent on its own in an
+ordinary session, the band answers `100000` — the same success code it returns for everything — and
+does not change language: a failure that reports itself as a success, which is how the old task could
+claim to have switched to English while the band stayed Japanese. `pushLocale()` sends
+`SetUpDeviceStatus` first, and the band now switches. This also explains why the band was in Japanese
+at all: pairing used to re-assert the stored locale through `configure()`, which has that adjacency,
+so the standalone action had most likely never worked.
+
+The read does not exist. `0x0C` has no query — the set command with its tags left empty, this
+protocol's own "tell me rather than propose" idiom, answers nothing — and the remaining hope, that
+the language rides along in product info, is now closed: `huawei.probe` asks for **all 127
+product-info tags** instead of the sixteen Huawei Health asks for, and the band returned **34 fields
+with no language among them** (versions, serials, MACs, model names, a signature — product identity,
+which a display language is not). So the dialog states what this phone last set, says plainly that
+the band has no way to answer, and offers **both languages side by side**. That is the only correct
+shape: "switch to the other one" has to know which one it is in, and that knowledge does not exist.
+It also opens with no radio at all, since there is nothing to ask. All three language tasks are
+retired — `バンド言語（Huawei）` pushed a fixed `%Huawei_BandLocale` and so could only ever set one
+language.
+
+**A watch-face install onto a full band no longer hangs.** There was already a free-slot pre-check
+and it never fires on this hardware: the band reports **85 free while holding eighteen faces and
+refusing the nineteenth**, so whatever that counter counts, it is not slots. The install fell through
+to a stall that only the silence budget caught 45 seconds later — or never, if the band was saying
+anything else at all, in which case it ran to the four-minute ceiling. A band with room asks for its
+first block at once (a whole 921 KB face moves in about a minute across 124 of them), so a band that
+accepts the announcement and then takes **no bytes** is not slow, it is full. That now has its own
+eight-second budget. The band's list is also re-read when the 2.5 s pre-flight came back empty —
+without a list the room question silently degraded into "it failed" — and that re-read is gated on a
+live link and a short timeout, because the first version of it added dead air to a report of dead
+air, which the stall tests caught by the clock.
+
+The dialog behind it could not be read either. It carried no border — Material draws none and this
+app adds its own — and its list was a plain column, so the slot squeezed the overflow instead of
+scrolling it: the last row rendered as two radio buttons inside one line and everything past it was
+unreachable. It is a bordered dialog now, with the faces in a framed, weighted scrolling pane. The
+preview that should have caught this passed for months because the "full band" fixture held **four**
+faces, and four fit; it holds eighteen now, and reports 85 free while full, so the fixture is the
+band rather than a polite one.
+
+**Scene TEXT elements honour their tap and long-press tasks.** They carried both in the model and the
+editor offered both, but the renderer ignored them — so a grid of text cells looked interactive and
+did nothing. Only `BUTTON` was wired, and a button cannot carry span markup, so the choice had been
+silent failure or losing the formatting.
 
 ## 0.2.90+2026-08-25.04-06.g71800ef2+003 — 2026-08-27
 
