@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-labelledby="title desc">
-  <title id="title">OpenTasker official app mark</title>
-  <desc id="desc">An open iris O containing a forward task chevron, connected to a mint status node.</desc>
-  <rect width="108" height="108" fill="#090C12"/>
-  <path d="M70 33C62 24 48 21 37 25C23 30 17 45 20 59C23 74 36 84 51 84C65 84 76 76 80 65"
-        fill="none" stroke="#8B5CF6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M45 42H55L68 55L55 68H45L58 55Z" fill="#8B5CF6"/>
-  <path d="M69 55H78" fill="none" stroke="#63E6A6" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="83" cy="55" r="5" fill="#63E6A6"/>
+  <title id="title">OpenTasker app mark</title>
+  <desc id="desc">A white O joined to a cyan T.</desc>
+  <path fill="#FBFBFB" fill-rule="evenodd" d="M41.3 31a21 21 0 1 1 0 42 21 21 0 1 1 0-42Zm0 7.5a13.5 13.5 0 1 0 0 27 13.5 13.5 0 1 0 0-27Z"/>
+  <path fill="#13A8D5" d="M51.2 42.8H87v7.4H75.2v28l-7.4-4.8V50.2H54.7a13.5 13.5 0 0 0-3.5-7.4Z"/>
 </svg>

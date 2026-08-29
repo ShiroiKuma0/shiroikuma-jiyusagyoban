@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+## v0.2.91
+
+OpenTasker has a new launcher identity and a tighter, quieter interface built for dense automation work.
+
+### Added
+
+- A new OT launcher mark with adaptive foreground, monochrome themed-icon support, density-specific legacy icons, a notification glyph, Play Store artwork, and a launch screen that stays crisp across Android launcher masks.
+
 ### Changed
 
+- The app shell and every main destination now share one navy, cyan, and AMOLED design system. Headers, project scope, navigation, cards, fields, controls, spacing, and status treatments use the same compact visual language.
+- Profiles opens directly on its search and automation rows. Run Log keeps every export action visible on a phone. Scenes uses a bottom create action, while Inspector shows one selected profile and its context sources before deeper diagnostics.
+- Setup, Variables, Flow, Diagnostics, and Settings were rebuilt around flatter surfaces, smaller radii, clearer status color, and less repeated copy.
 - Updated kotlinx-collections-immutable to 0.5.2, which corrects wrong results from bulk add, remove and retain operations on persistent hash sets and maps when a collision node meets a single element.
 
 ### Fixed

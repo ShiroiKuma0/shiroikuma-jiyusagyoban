@@ -19,12 +19,12 @@ object DesignSystem {
     }
 
     object Screen {
-        val horizontalPadding = 20.dp
-        val verticalPadding = 10.dp
-        val cardPadding = 16.dp
-        val heroCardPadding = 18.dp
-        val sectionGap = 12.dp
-        val cardGap = 8.dp
+        val horizontalPadding = 18.dp
+        val verticalPadding = 12.dp
+        val cardPadding = 14.dp
+        val heroCardPadding = 16.dp
+        val sectionGap = 16.dp
+        val cardGap = 6.dp
     }
 
     // ========== Border Radius Scale ==========
@@ -34,8 +34,8 @@ object DesignSystem {
         val sm = 4.dp      // Small radius (inputs, compact controls)
         val md = 6.dp      // Medium radius (cards, standard buttons)
         val lg = 8.dp      // Large radius (dialogs, large cards)
-        val xl = 10.dp     // Extra large radius (bottom sheets, premium cards)
-        val xxl = 12.dp    // Card radius (summary cards)
+        val xl = 8.dp      // Extra large radius (bottom sheets, premium cards)
+        val xxl = 8.dp     // Maximum surface radius
     }
 
     // ========== Elevation/Shadow Scale ==========
@@ -80,11 +80,11 @@ object DesignSystem {
 
     // ========== Semantic Colors ==========
     object SemanticColor {
-        val warningDark = androidx.compose.ui.graphics.Color(0xFFFFB4A2) // Peach — warm amber for warnings in dark theme
+        val warningDark = androidx.compose.ui.graphics.Color(0xFFFFB42E)
         // Text-grade amber, not the accent-grade #DF8E1D it replaced: that measured 2.5:1 on
         // surface and 2.2:1 on surfaceVariant, below the 4.5:1 AA floor for the 13sp warning
         // text it is used for.
-        val warningLight = androidx.compose.ui.graphics.Color(0xFF7A5000) // Deep amber — warnings on light surfaces
+        val warningLight = androidx.compose.ui.graphics.Color(0xFF775500)
     }
 
     // ========== Opacity Scale ==========

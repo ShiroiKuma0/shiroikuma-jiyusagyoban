@@ -6,7 +6,7 @@
     never matched it.
 -->
 <resources>
-    <color name="ic_launcher_background">#090C12</color>
+    <color name="ic_launcher_background">#0C172E</color>
     <color name="widget_background">#FBFAF6</color>
     <color name="widget_border">#89928A</color>
     <color name="widget_primary">#4D6653</color>

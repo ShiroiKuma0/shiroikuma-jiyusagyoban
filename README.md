@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.90-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.91-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
@@ -9,6 +9,16 @@
 **OpenTasker** is a fully open-source, on-device, FOSS alternative to [Tasker](https://tasker.joaoapps.com/) for Android.
 
 ---
+
+## Screenshots
+
+| Profiles | Tasks | Run Log |
+|---|---|---|
+| ![Profiles](fastlane/metadata/android/en-US/images/phoneScreenshots/01-profiles.png) | ![Tasks](fastlane/metadata/android/en-US/images/phoneScreenshots/02-tasks.png) | ![Run Log](fastlane/metadata/android/en-US/images/phoneScreenshots/03-run-log.png) |
+
+| Flow | Setup | Settings |
+|---|---|---|
+| ![Flow](fastlane/metadata/android/en-US/images/phoneScreenshots/04-flow.png) | ![Setup](fastlane/metadata/android/en-US/images/phoneScreenshots/05-setup.png) | ![Settings](fastlane/metadata/android/en-US/images/phoneScreenshots/06-settings.png) |
 
 ## Features
 

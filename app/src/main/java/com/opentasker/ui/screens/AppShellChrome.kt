@@ -44,9 +44,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.opentasker.app.R
 import com.opentasker.ui.theme.DesignSystem
-import com.opentasker.ui.theme.selectedContainerColor
 
 /**
  * App-shell chrome: the destination list, its icons, the top header and the small status
@@ -99,7 +99,7 @@ internal fun OpenTaskerHeader(
     onOpenSearch: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
     ) {
         Column(
@@ -113,8 +113,8 @@ internal fun OpenTaskerHeader(
                     .padding(
                         start = DesignSystem.Screen.horizontalPadding,
                         end = DesignSystem.Screen.horizontalPadding,
-                        top = 14.dp,
-                        bottom = 12.dp,
+                        top = 12.dp,
+                        bottom = 10.dp,
                     ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -122,7 +122,10 @@ internal fun OpenTaskerHeader(
                 Column(Modifier.weight(1f)) {
                     Text(
                         stringResource(screen.labelRes),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontSize = 28.sp,
+                            lineHeight = 33.sp,
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -155,22 +158,24 @@ internal fun OpenTaskerHeader(
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = stringResource(R.string.global_search_content_description),
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        imageVector = screen.icon(),
-                        contentDescription = stringResource(screen.labelRes),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .padding(10.dp)
-                            .size(20.dp),
-                    )
-                }
+                Icon(
+                    imageVector = screen.icon(),
+                    contentDescription = stringResource(screen.labelRes),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .size(24.dp),
+                )
             }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
         }
     }
 }
@@ -203,7 +208,7 @@ internal fun OpenTaskerNavigationItem(
                 .size(width = 48.dp, height = 30.dp)
                 .then(
                     if (selected) Modifier.background(
-                        color = selectedContainerColor(),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f),
                         shape = RoundedCornerShape(DesignSystem.Radii.sm),
                     ) else Modifier
                 ),
@@ -213,10 +218,10 @@ internal fun OpenTaskerNavigationItem(
                 icon,
                 contentDescription = label,
                 tint = contentColor,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
             )
         }
-        Spacer(Modifier.height(1.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,

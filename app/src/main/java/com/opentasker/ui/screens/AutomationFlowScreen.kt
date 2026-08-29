@@ -1,6 +1,7 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -178,51 +179,36 @@ private fun FlowOverviewCard(
     tasks: List<Task>,
     graphs: List<AutomationFlowGraph>,
 ) {
-    val contextCount = profiles.sumOf { it.contexts.size }
-    val actionCount = tasks.sumOf { it.actions.size }
     val warningCount = graphs.sumOf { it.warnings.size + it.lintFindings.size }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.nav_flow),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.header_flow_detail, profiles.size, tasks.size),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.flow_overview_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                FlowStatusPill(
-                    label = if (warningCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.label_issue_count, warningCount),
-                    color = if (warningCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                FlowMetric("${profiles.size}", stringResource(R.string.label_profiles), Modifier.weight(1f))
-                FlowMetric("$contextCount", stringResource(R.string.label_contexts), Modifier.weight(1f))
-                FlowMetric("$actionCount", stringResource(R.string.label_actions), Modifier.weight(1f))
-            }
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.nav_flow),
+                tint = if (warningCount == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(22.dp),
+            )
+            Text(
+                if (warningCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.label_issue_count, warningCount),
+                style = MaterialTheme.typography.titleSmall,
+                color = if (warningCount == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                stringResource(R.string.header_flow_detail, profiles.size, tasks.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -241,8 +227,9 @@ private fun FlowGraphCard(
         modifier = Modifier
             .fillMaxWidth()
             .semantics { contentDescription = graph.accessibilitySummary() },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -644,20 +631,16 @@ private fun FlowEdgeLabel(label: String) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -672,17 +655,20 @@ private fun FlowStatusPill(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.34f)),
+    Row(
+        modifier = modifier.padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .background(color, RoundedCornerShape(2.dp)),
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = color,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         )
     }
 }

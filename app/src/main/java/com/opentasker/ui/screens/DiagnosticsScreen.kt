@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -25,8 +24,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -133,43 +137,38 @@ private fun DiagnosticSummaryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (healthy) {
-                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
-            } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
-            },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+        border = BorderStroke(1.dp, statusColor.copy(alpha = 0.38f)),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(
-                    if (healthy) Icons.Filled.CheckCircle else Icons.Filled.Error,
-                    contentDescription = statusLabel,
-                    tint = statusColor,
-                )
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(statusLabel, style = MaterialTheme.typography.titleMedium, color = statusColor)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                if (healthy) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                contentDescription = statusLabel,
+                tint = statusColor,
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(statusLabel, style = MaterialTheme.typography.titleSmall, color = statusColor)
+                reason?.let {
                     Text(
-                        stringResource(R.string.diagnostics_summary_body),
+                        it,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    reason?.let {
-                        Text(
-                            it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                IconButton(onClick = onRefresh) {
-                    Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
                 }
             }
-            Button(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
+            }
+            IconButton(onClick = onShare) {
                 Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.diagnostics_share))
-                Text(stringResource(R.string.diagnostics_share), modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
@@ -177,10 +176,12 @@ private fun DiagnosticSummaryCard(
 
 @Composable
 private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateFormat) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             HealthRow(
@@ -196,7 +197,18 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 health?.lastHeartbeatAtMillis?.takeIf { it > 0L }?.let { formatter.format(Date(it)) }
                     ?: stringResource(R.string.diagnostics_never),
             )
-            HealthRow(
+            if (!expanded) {
+                HealthRow(
+                    stringResource(R.string.diagnostics_exact_alarm),
+                    health?.exactAlarmStatus ?: stringResource(R.string.diagnostics_loading),
+                )
+                HealthRow(
+                    stringResource(R.string.diagnostics_active_executions),
+                    health?.activeExecutionCount?.toString() ?: stringResource(R.string.diagnostics_loading),
+                )
+            }
+            if (expanded) {
+                HealthRow(
                 stringResource(R.string.diagnostics_process_exit),
                 health?.let { processExitSummary(it.processExitCorrelation, formatter) }
                     ?: stringResource(R.string.diagnostics_loading),
@@ -307,7 +319,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 stringResource(R.string.diagnostics_pending_executions),
                 health?.pendingExecutionCount?.toString() ?: stringResource(R.string.diagnostics_loading),
             )
-            if (health?.signals?.isNotEmpty() == true) {
+                if (health?.signals?.isNotEmpty() == true) {
                 Text(
                     stringResource(R.string.diagnostics_health_evidence),
                     style = MaterialTheme.typography.labelLarge,
@@ -332,6 +344,10 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                         color = color,
                     )
                 }
+                }
+            }
+            TextButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(if (expanded) R.string.diagnostics_hide_details else R.string.diagnostics_show_details))
             }
         }
     }
@@ -345,9 +361,9 @@ private fun AdmissionHealthCard(
     val now = System.currentTimeMillis()
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (snapshot == null) {
@@ -519,8 +535,9 @@ private fun SectionTitle(title: String) {
 private fun EmptyDiagnosticCard(message: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Text(message, modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -530,9 +547,9 @@ private fun EmptyDiagnosticCard(message: String) {
 private fun DiagnosticRecordCard(title: String, body: String, accent: Color) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.34f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)

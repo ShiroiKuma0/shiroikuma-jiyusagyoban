@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
@@ -51,7 +50,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -437,28 +436,12 @@ fun PermissionOnboardingScreen(
         if (!settingsOnly) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-                shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(DesignSystem.Radii.md),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Box(
-                            modifier = Modifier.size(72.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(
-                                progress = { progress },
-                                modifier = Modifier.fillMaxSize(),
-                                color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.surface,
-                                strokeWidth = 6.dp,
-                            )
-                            Text(
-                                stringResource(R.string.setup_progress_percent, (progress * 100).toInt()),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                            )
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text(
                                 stringResource(R.string.setup_progress_ready_count, grantedCount, requiredItems.size),
@@ -477,11 +460,18 @@ fun PermissionOnboardingScreen(
                                 if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                             )
                         }
+                        Text(
+                            stringResource(R.string.setup_progress_percent, (progress * 100).toInt()),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                        )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        PermissionMetric("$grantedCount", stringResource(R.string.status_ready), Modifier.weight(1f))
-                        PermissionMetric("$pendingCount", stringResource(R.string.status_needs_setup), Modifier.weight(1f))
-                    }
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    )
                     Text(
                         stringResource(R.string.setup_status_order),
                         style = MaterialTheme.typography.bodySmall,
@@ -492,6 +482,7 @@ fun PermissionOnboardingScreen(
         }
 
         if (settingsOnly) {
+            item { SettingsSectionLabel(stringResource(R.string.settings_section_general)) }
             if (UpdateCheckAvailability.isAvailable()) {
                 item {
                     UpdateCheckSetupCard(
@@ -534,6 +525,7 @@ fun PermissionOnboardingScreen(
                     }
                 }
             }
+            item { SettingsSectionLabel(stringResource(R.string.settings_section_data_recovery)) }
             item {
                 BackupSetupCard(
                     state = backupState,
@@ -553,6 +545,7 @@ fun PermissionOnboardingScreen(
                 )
             }
             item { TermuxScriptAllowlistCard(onMessage) }
+            item { SettingsSectionLabel(stringResource(R.string.settings_section_integrations)) }
             item {
                 PushTriggerSetupCard(
                     token = pushToken,
@@ -1429,10 +1422,20 @@ private fun PermissionStatusPill(label: String, color: Color) {
         Box(
             modifier = Modifier
                 .size(7.dp)
-                .background(color, CircleShape),
+                .background(color, RoundedCornerShape(2.dp)),
         )
         Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }
+}
+
+@Composable
+private fun SettingsSectionLabel(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+    )
 }
 
 private fun buildPermissionItems(

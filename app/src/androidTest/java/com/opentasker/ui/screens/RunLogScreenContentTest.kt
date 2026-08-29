@@ -139,12 +139,10 @@ class RunLogScreenContentTest {
         }
         composeTestRule.performAccessibilityChecks()
 
-        // The action row is lazy: on a narrower device the export buttons are not composed until
-        // the row scrolls, so performScrollTo alone cannot find them.
-        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("Export JSON"))
-        composeTestRule.onNodeWithText("Export JSON").performClick()
-        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("Export CSV"))
-        composeTestRule.onNodeWithText("Export CSV").performClick()
+        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("JSON"))
+        composeTestRule.onNodeWithText("JSON").performClick()
+        composeTestRule.onNodeWithTag(RUN_LOG_ACTIONS_TAG).performScrollToNode(hasText("CSV"))
+        composeTestRule.onNodeWithText("CSV").performClick()
         composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Load more"))
         composeTestRule.onNodeWithText("Load more").performClick()
 

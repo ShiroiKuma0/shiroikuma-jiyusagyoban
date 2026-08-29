@@ -140,6 +140,14 @@
     <string name="title_setup_checklist">Setup checklist</string>
     <string name="settings_title">Settings</string>
     <string name="settings_body">Manage appearance, recovery, background behavior, integrations, and other app-wide preferences.</string>
+    <string name="settings_section_general">General</string>
+    <string name="settings_section_data_recovery">Data and recovery</string>
+    <string name="settings_section_integrations">Integrations</string>
+    <string name="scenes_search_hint">Search scenes</string>
+    <string name="scenes_no_matches_title">No matching scenes</string>
+    <string name="scenes_no_matches_body">Try another search or clear the current query.</string>
+    <string name="diagnostics_show_details">Show details</string>
+    <string name="diagnostics_hide_details">Hide details</string>
     <string name="setup_section_engine">Engine baseline</string>
     <string name="setup_section_needed">Needed by enabled automations</string>
     <string name="setup_section_optional">Optional integrations</string>
@@ -510,6 +518,7 @@
     <string name="run_log_search_label">Search task or message</string>
     <string name="run_log_search_hint">permission, Wi-Fi, task name</string>
     <string name="run_log_share_diagnostic">Share diagnostic report</string>
+    <string name="run_log_share_short">Share</string>
     <string name="share_uri_unreadable">OpenTasker could not read the shared file. Re-share it with read access.</string>
     <string name="share_invalid">OpenTasker could not read that share.</string>
     <string name="run_log_more_actions">+%1$d more action(s)</string>
@@ -523,6 +532,8 @@
     <string name="run_log_kept">Kept</string>
     <string name="run_log_held_policy">Admission policy: %1$s</string>
     <string name="run_log_export_json">Export JSON</string>
+    <string name="run_log_export_json_short">JSON</string>
+    <string name="run_log_export_csv_short">CSV</string>
     <string name="run_log_export_csv">Export CSV</string>
     <string name="run_log_show_all_actions">Show all %1$d actions</string>
     <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>
@@ -538,6 +549,8 @@
     <string name="variables_deleted">Deleted %1$s</string>
     <string name="variables_updated">Updated %1$s</string>
     <string name="variables_masked_value">Masked sensitive value</string>
+    <string name="variables_sensitive_indicator">Sensitive variable</string>
+    <string name="variables_standard_indicator">Standard variable</string>
     <string name="variables_value_label">Value for %%%1$s</string>
     <string name="variables_create">Create variable</string>
     <string name="variables_created">Variable created</string>
@@ -653,6 +666,9 @@
     <string name="inspector_no_contexts_body">This profile cannot match because it has no context entries configured.</string>
     <string name="inspector_simulate_trigger">Simulate trigger</string>
     <string name="inspector_lint_title">Automation lint findings</string>
+    <string name="inspector_lint_count">%1$d finding(s)</string>
+    <string name="inspector_profile_selector">Profile</string>
+    <string name="inspector_profile_selector_content_description">Choose profile</string>
     <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
     <string name="inspector_profile_concurrency">Active %1$s · Burst %2$s · Overflow: %3$s</string>
     <string name="profile_concurrency_default">default</string>
@@ -933,6 +949,7 @@
     <string name="workspace_no_matching_tasks">No matching tasks</string>
     <string name="workspace_no_matching_tasks_body">Clear search to return to the full task library.</string>
     <string name="workspace_search_profiles">Search profiles...</string>
+    <string name="workspace_actions_content_description">Workspace tools</string>
     <string name="workspace_search_tasks">Search tasks...</string>
 
     <string name="flow_empty_content_description">Flow view empty</string>

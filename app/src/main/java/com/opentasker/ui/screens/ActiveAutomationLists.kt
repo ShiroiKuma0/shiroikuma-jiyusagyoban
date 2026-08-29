@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -45,7 +45,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -181,40 +180,39 @@ internal fun ProfilesScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
-        item {
-            WorkspaceSummaryCard(
-                profiles = profiles,
-                tasks = tasks,
-                runLogs = runLogs,
-                onBrowseTemplates = onBrowseTemplates,
-                onPreviewProfileShare = onPreviewProfileShare,
-                onExportOpenTaskerBundle = onExportOpenTaskerBundle,
-                onImportOpenTaskerBundle = onImportOpenTaskerBundle,
-                onImportOpenTaskerBundleText = onImportOpenTaskerBundleText,
-                openTaskerBundleBusy = openTaskerBundleBusy,
-                onImportTaskerXml = onImportTaskerXml,
-                onExportTaskerXml = onExportTaskerXml,
-                taskerImportBusy = taskerImportBusy,
-            )
-        }
         if (storageDecodeIssues.isNotEmpty()) {
             item {
                 StorageDecodeWarningCard(storageDecodeIssues)
             }
         }
         item {
-            OutlinedTextField(
-                value = profileSearchQuery,
-                onValueChange = { profileSearchQuery = it },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.workspace_search_profiles)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.variables_search_label)) },
-                trailingIcon = if (profileSearchQuery.isNotEmpty()) {
-                    { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.variables_search_clear)) } }
-                } else null,
-                singleLine = true,
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = profileSearchQuery,
+                    onValueChange = { profileSearchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(stringResource(R.string.workspace_search_profiles)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.variables_search_label)) },
+                    trailingIcon = if (profileSearchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { profileSearchQuery = "" }) { Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.variables_search_clear)) } }
+                    } else null,
+                    singleLine = true,
+                    shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                )
+                WorkspaceActionsButton(
+                    onBrowseTemplates = onBrowseTemplates,
+                    onPreviewProfileShare = onPreviewProfileShare,
+                    onExportOpenTaskerBundle = onExportOpenTaskerBundle,
+                    onImportOpenTaskerBundle = onImportOpenTaskerBundle,
+                    onImportOpenTaskerBundleText = onImportOpenTaskerBundleText,
+                    onImportTaskerXml = onImportTaskerXml,
+                    onExportTaskerXml = onExportTaskerXml,
+                )
+            }
         }
         if (groups.isNotEmpty()) {
             item {
@@ -269,114 +267,29 @@ internal fun ProfilesScreen(
 }
 
 @Composable
-private fun WorkspaceSummaryCard(
-    profiles: List<Profile>,
-    tasks: List<Task>,
-    runLogs: List<RunLogEntry>,
+private fun WorkspaceActionsButton(
     onBrowseTemplates: () -> Unit,
     onPreviewProfileShare: () -> Unit,
     onExportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundle: () -> Unit,
     onImportOpenTaskerBundleText: () -> Unit,
-    openTaskerBundleBusy: Boolean,
     onImportTaskerXml: () -> Unit,
     onExportTaskerXml: () -> Unit,
-    taskerImportBusy: Boolean,
 ) {
-    val enabledProfiles = profiles.count { it.enabled }
-    val configuredContexts = profiles.sumOf { it.contexts.size }
-    val totalActions = tasks.sumOf { it.actions.size }
-    val readiness = if (profiles.isEmpty()) 0f else enabledProfiles.toFloat() / profiles.size
-    val readinessPercent = (readiness * 100).toInt()
-    val recentFailure = runLogs.firstOrNull { !it.success }
-    val reviewDetails = stringResource(R.string.workspace_review_run_log_details)
     var actionsExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.nav_profiles),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.header_profiles_detail, enabledProfiles, profiles.size),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.workspace_review_readiness_templates),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Box {
-                    IconButton(onClick = { actionsExpanded = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_more))
-                    }
-                    DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
-                        WorkspaceActionMenuItem(R.string.workspace_templates) { actionsExpanded = false; onBrowseTemplates() }
-                        WorkspaceActionMenuItem(R.string.import_tasker) { actionsExpanded = false; onImportTaskerXml() }
-                        WorkspaceActionMenuItem(R.string.import_export_json) { actionsExpanded = false; onExportOpenTaskerBundle() }
-                        WorkspaceActionMenuItem(R.string.import_import_json) { actionsExpanded = false; onImportOpenTaskerBundle() }
-                        WorkspaceActionMenuItem(R.string.import_export_tasker_xml) { actionsExpanded = false; onExportTaskerXml() }
-                        WorkspaceActionMenuItem(R.string.import_paste_json_action) { actionsExpanded = false; onImportOpenTaskerBundleText() }
-                        WorkspaceActionMenuItem(R.string.profile_share_preview_action) { actionsExpanded = false; onPreviewProfileShare() }
-                    }
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-            ) {
-                LinearProgressIndicator(
-                    progress = { readiness },
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                )
-                Text(
-                    text = "$readinessPercent%",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SummaryMetric("${profiles.size}", stringResource(R.string.label_profiles), Modifier.weight(1f))
-                SummaryMetric("$configuredContexts", stringResource(R.string.label_contexts), Modifier.weight(1f))
-                SummaryMetric("$totalActions", stringResource(R.string.label_actions), Modifier.weight(1f))
-            }
-            if (recentFailure != null) {
-                InlineNotice(
-                    title = stringResource(R.string.workspace_recent_failure),
-                    body = stringResource(
-                        R.string.workspace_recent_failure_detail,
-                        recentFailure.taskName,
-                        recentFailure.message.ifBlank { reviewDetails },
-                    ),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+    Box {
+        IconButton(onClick = { actionsExpanded = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.workspace_actions_content_description))
+        }
+        DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
+            WorkspaceActionMenuItem(R.string.workspace_templates) { actionsExpanded = false; onBrowseTemplates() }
+            WorkspaceActionMenuItem(R.string.import_tasker) { actionsExpanded = false; onImportTaskerXml() }
+            WorkspaceActionMenuItem(R.string.import_export_json) { actionsExpanded = false; onExportOpenTaskerBundle() }
+            WorkspaceActionMenuItem(R.string.import_import_json) { actionsExpanded = false; onImportOpenTaskerBundle() }
+            WorkspaceActionMenuItem(R.string.import_export_tasker_xml) { actionsExpanded = false; onExportTaskerXml() }
+            WorkspaceActionMenuItem(R.string.import_paste_json_action) { actionsExpanded = false; onImportOpenTaskerBundleText() }
+            WorkspaceActionMenuItem(R.string.profile_share_preview_action) { actionsExpanded = false; onPreviewProfileShare() }
         }
     }
 }
@@ -384,52 +297,6 @@ private fun WorkspaceSummaryCard(
 @Composable
 private fun WorkspaceActionMenuItem(@androidx.annotation.StringRes labelRes: Int, onClick: () -> Unit) {
     DropdownMenuItem(text = { Text(stringResource(labelRes)) }, onClick = onClick)
-}
-
-@Composable
-private fun TaskLibrarySummaryCard(tasks: List<Task>, onCreateTask: () -> Unit) {
-    val totalActions = tasks.sumOf { it.actions.size }
-    val emptyTasks = tasks.count { it.actions.isEmpty() }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                shape = RoundedCornerShape(DesignSystem.Radii.md),
-            ) {
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = stringResource(R.string.nav_tasks),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(10.dp).size(24.dp),
-                )
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.header_tasks_detail, totalActions, tasks.size),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    stringResource(R.string.workspace_task_library_ready_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (emptyTasks > 0) {
-                StatusPill("$emptyTasks", MaterialTheme.colorScheme.error)
-            }
-        }
-    }
 }
 
 @Composable
@@ -502,8 +369,9 @@ private fun ProfileCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
@@ -640,9 +508,6 @@ internal fun TasksScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
-        item {
-            TaskLibrarySummaryCard(tasks = tasks, onCreateTask = onCreateTask)
-        }
         if (storageDecodeIssues.isNotEmpty()) {
             item {
                 StorageDecodeWarningCard(storageDecodeIssues)
@@ -719,14 +584,15 @@ private fun TaskCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
                 modifier = Modifier.clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -737,8 +603,8 @@ private fun TaskCard(
                         contentDescription = runDescription,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
-                            .padding(10.dp)
-                            .size(22.dp)
+                            .padding(8.dp)
+                            .size(20.dp)
                             .clearAndSetSemantics { },
                     )
                 }
@@ -753,14 +619,16 @@ private fun TaskCard(
                 Button(
                     onClick = onRun,
                     modifier = Modifier.semantics { contentDescription = runDescription },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(DesignSystem.Radii.sm),
                 ) {
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = runDescription,
                         modifier = Modifier.clearAndSetSemantics { },
                     )
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.action_run))
+                    Spacer(Modifier.width(2.dp))
+                    Text(stringResource(R.string.action_run), style = MaterialTheme.typography.labelLarge)
                 }
                 TaskActionsMenu(
                     contentDescription = stringResource(R.string.a11y_duplicate_task, task.name),
@@ -980,7 +848,7 @@ private fun ActionRow(
         ) {
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
-                shape = CircleShape,
+                shape = RoundedCornerShape(DesignSystem.Radii.sm),
                 modifier = Modifier.size(28.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -1077,8 +945,8 @@ private fun ContextRow(
     val editDescription = stringResource(R.string.a11y_edit_context, index + 1, contextTypeLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_context, index + 1, contextTypeLabel)
     Surface(
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        shape = RoundedCornerShape(DesignSystem.Radii.sm),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(

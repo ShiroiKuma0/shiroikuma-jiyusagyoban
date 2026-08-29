@@ -70,7 +70,7 @@ Runs are **asynchronous**. The receiver authenticates and validates the request,
 the foreground engine service, and replies immediately with an execution ID. It never waits for the
 task: Android expects broadcast work to finish in roughly 10 seconds while an OpenTasker task can
 wait up to 30 minutes, so a reply that carried the task's terminal result was reporting an outcome
-that had not happened yet — and the system could kill the receiver mid-run with no run-log entry.
+that had not happened yet. The system could kill the receiver mid-run with no run-log entry.
 
 Callers **must** declare the protocol version. A request without it is refused with an explicit
 error naming the required extra, rather than being silently reinterpreted.
@@ -92,7 +92,7 @@ Ordered-broadcast result extras:
 | `com.opentasker.extra.ACCEPTED` | boolean | `true` once the run is validated and enqueued. |
 | `com.opentasker.extra.EXECUTION_ID` | string | Poll this with `QUERY_EXECUTION`. |
 | `com.opentasker.extra.EXECUTION_STATE` | string | `ACCEPTED` on a successful request. |
-| `com.opentasker.extra.EXECUTION_TERMINAL` | boolean | Always `false` here — acceptance is not completion. |
+| `com.opentasker.extra.EXECUTION_TERMINAL` | boolean | Always `false` here. Acceptance is not completion. |
 | `com.opentasker.extra.ERROR` | string, present on failure |  |
 
 The run appears in the normal Run Log with its usual redaction, sourced as `External intent`.

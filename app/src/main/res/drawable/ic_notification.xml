@@ -1,32 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Notification small icon. Android renders small icons as an alpha silhouette, so this is the
-    OpenTasker mark drawn in solid white with no background; the platform tints it. The 108-unit
-    viewport is shared with ic_opentasker_mark_monochrome so the shape stays identical, scaled to
-    the 24dp notification size.
--->
+<!-- Android uses this vector as an alpha silhouette and applies the notification tint. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M70,33 C62,24 48,21 37,25 C23,30 17,45 20,59 C23,74 36,84 51,84 C65,84 76,76 80,65"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="10" />
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M41.3,31 A21,21 0,1 1,41.3,73 A21,21 0,1 1,41.3,31 M41.3,38.5 A13.5,13.5 0,1 0,41.3,65.5 A13.5,13.5 0,1 0,41.3,38.5" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M45,42 L55,42 L68,55 L55,68 L45,68 L58,55 Z" />
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M69,55 L78,55"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeWidth="7" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M83,50 A5,5 0,1 1,83,60 A5,5 0,1 1,83,50" />
+        android:pathData="M51.2,42.8 H87 V50.2 H75.2 V78.2 L67.8,73.4 V50.2 H54.7 A13.5,13.5 0,0 0,51.2,42.8 Z" />
 </vector>

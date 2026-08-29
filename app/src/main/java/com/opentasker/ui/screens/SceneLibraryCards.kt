@@ -111,7 +111,6 @@ internal fun SceneEmptyState(
 internal fun SceneOverviewCard(
     scenes: List<Scene>,
     tasks: List<Task>,
-    onCreateScene: () -> Unit,
 ) {
     val overlayReady = sceneOverlayReady()
     val issues = remember(scenes, tasks) {
@@ -121,49 +120,28 @@ internal fun SceneOverviewCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.Info,
-                        contentDescription = stringResource(R.string.nav_scenes),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.scenes_overview_summary, scenes.sumOf { it.elements.size }, scenes.size),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.title_scene_library),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                SceneOverlayReadinessPill(overlayReady = overlayReady)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                SceneMetric(scenes.size.toString(), stringResource(R.string.label_scenes), Modifier.weight(1f))
-                SceneMetric(scenes.sumOf { it.elements.size }.toString(), stringResource(R.string.label_elements), Modifier.weight(1f))
-                SceneMetric(errorCount.toString(), stringResource(R.string.label_errors), Modifier.weight(1f))
-            }
-            Button(
-                onClick = onCreateScene,
-                modifier = Modifier.fillMaxWidth(),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.lg),
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.scenes_create))
-            }
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = stringResource(R.string.nav_scenes),
+                tint = if (errorCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                stringResource(R.string.scenes_overview_summary, scenes.sumOf { it.elements.size }, scenes.size),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            SceneOverlayReadinessPill(overlayReady = overlayReady)
         }
     }
 }
@@ -196,8 +174,9 @@ internal fun SceneCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(

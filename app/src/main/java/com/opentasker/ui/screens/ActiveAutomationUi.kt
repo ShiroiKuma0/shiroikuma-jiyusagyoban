@@ -573,7 +573,6 @@ fun ActiveAutomationUi(
                 OpenTaskerScreen.Profiles -> {
                     val createLabel = stringResource(if (projectTasks.isEmpty()) R.string.task_new else R.string.profile_new)
                     ExtendedFloatingActionButton(
-                        modifier = Modifier.fillMaxWidth(0.92f),
                         onClick = {
                             if (projectTasks.isEmpty()) {
                                 showCreateTaskDialog = true
@@ -595,7 +594,6 @@ fun ActiveAutomationUi(
                 }
 
                 OpenTaskerScreen.Tasks -> ExtendedFloatingActionButton(
-                    modifier = Modifier.fillMaxWidth(0.92f),
                     onClick = { showCreateTaskDialog = true },
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -620,7 +618,7 @@ fun ActiveAutomationUi(
                 Column {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.78f))
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 0.dp,
                     ) {
                         primaryNavigationScreens.forEach { destination ->
@@ -689,7 +687,7 @@ fun ActiveAutomationUi(
                     modifier = Modifier
                         .fillMaxHeight()
                         .widthIn(min = 88.dp, max = 128.dp),
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
                     Column(

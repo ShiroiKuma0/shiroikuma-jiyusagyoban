@@ -1,149 +1,200 @@
-"""Render the Izzy/F-Droid store icon and feature graphic from the shipped adaptive icon.
+"""Render OpenTasker's launcher, brand, and store artwork from one geometry source."""
 
-The store icon must be the icon that actually installs, so the mark drawn here is a direct
-transcription of app/src/main/res/drawable/ic_opentasker_mark.xml (viewport 108x108) over the
-adaptive icon's background colour, @color/ic_launcher_background.
+from __future__ import annotations
 
-Rendered with PIL at 4x supersampling rather than an SVG library so the only dependency is one
-already used elsewhere on this machine.
-"""
+import math
 import os
+from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-BACKGROUND = (9, 12, 18)
-PURPLE = (139, 92, 246)
-GREEN = (99, 230, 166)
+NAVY = (12, 23, 46)
+NAVY_DEEP = (5, 10, 22)
+NAVY_LIGHT = (18, 38, 70)
+CYAN = (19, 168, 213)
+WHITE = (251, 251, 251)
+MUTED = (157, 174, 199)
 VIEWPORT = 108.0
-SUPERSAMPLE = 4
+SUPERSAMPLE = 8
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, "fastlane", "metadata", "android", "en-US", "images")
-
-
-def cubic(p0, p1, p2, p3, steps=64):
-    points = []
-    for index in range(steps + 1):
-        t = index / steps
-        u = 1 - t
-        x = u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0]
-        y = u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]
-        points.append((x, y))
-    return points
+REPO = Path(__file__).resolve().parent.parent
+RES = REPO / "app" / "src" / "main" / "res"
+DESIGN = REPO / "design" / "logo"
+EXPORTS = DESIGN / "exports"
+STORE = REPO / "fastlane" / "metadata" / "android" / "en-US" / "images"
 
 
-def stroke(draw, points, width, colour, scale):
-    """Round-capped, round-joined stroke drawn by stamping a circular brush along the path.
-
-    ImageDraw's joint="curve" leaves visible spikes where thick segments meet at an angle, which
-    is exactly what the arc in this mark is made of.
-    """
-    scaled = [(x * scale, y * scale) for x, y in points]
-    radius = max(0.5, width * scale / 2)
-    step = 0.4
-
-    def stamp(x, y):
-        draw.ellipse([x - radius, y - radius, x + radius, y + radius], fill=colour)
-
-    stamp(*scaled[0])
-    for (x0, y0), (x1, y1) in zip(scaled, scaled[1:]):
-        distance = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
-        for index in range(1, int(distance / step) + 1):
-            t = min(1.0, index * step / distance)
-            stamp(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t)
-        stamp(x1, y1)
+def _coord(value: float, size: int) -> float:
+    return value * size * SUPERSAMPLE / VIEWPORT
 
 
-def render_mark(size):
-    """Draw ic_opentasker_mark.xml into a transparent RGBA image of the given edge length."""
-    scale = size * SUPERSAMPLE / VIEWPORT
-    canvas = Image.new("RGBA", (size * SUPERSAMPLE, size * SUPERSAMPLE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(canvas)
-
-    arc = (
-        cubic((70, 33), (62, 24), (48, 21), (37, 25))
-        + cubic((37, 25), (23, 30), (17, 45), (20, 59))[1:]
-        + cubic((20, 59), (23, 74), (36, 84), (51, 84))[1:]
-        + cubic((51, 84), (65, 84), (76, 76), (80, 65))[1:]
-    )
-    stroke(draw, arc, 10, PURPLE, scale)
-
-    chevron = [(45, 42), (55, 42), (68, 55), (55, 68), (45, 68), (58, 55)]
-    draw.polygon([(x * scale, y * scale) for x, y in chevron], fill=PURPLE)
-
-    stroke(draw, [(69, 55), (78, 55)], 7, GREEN, scale)
-
-    cx, cy, r = 83 * scale, 55 * scale, 5 * scale
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=GREEN)
-
-    return canvas.resize((size, size), Image.LANCZOS)
+def _arc_edge(y: float) -> float:
+    center_x, center_y, radius = 41.3, 52.0, 13.5
+    return center_x + math.sqrt(radius * radius - (y - center_y) ** 2)
 
 
-def write(image, name):
-    path = os.path.join(OUT, name)
-    image.convert("RGB").save(path, "PNG", optimize=True)
-    print(f"{name}: {image.size[0]}x{image.size[1]} -> {os.path.getsize(path)} bytes")
+def render_mark(size: int, monochrome: bool = False) -> Image.Image:
+    """Return the O/T foreground on a truly transparent RGBA canvas."""
+    large = size * SUPERSAMPLE
+    image = Image.new("RGBA", (large, large), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    outer = tuple(_coord(value, size) for value in (20.3, 31.0, 62.3, 73.0))
+    inner = tuple(_coord(value, size) for value in (27.8, 38.5, 54.8, 65.5))
+    draw.ellipse(outer, fill=WHITE + (255,))
+    draw.ellipse(inner, fill=(0, 0, 0, 0))
+
+    top, bottom = 42.8, 50.2
+    points = [
+        (_arc_edge(top), top),
+        (87.0, top),
+        (87.0, bottom),
+        (75.2, bottom),
+        (75.2, 78.2),
+        (67.8, 73.4),
+        (67.8, bottom),
+        (_arc_edge(bottom), bottom),
+    ]
+    for step in range(1, 49):
+        y = bottom + (top - bottom) * step / 48
+        points.append((_arc_edge(y), y))
+    scaled = [(_coord(x, size), _coord(y, size)) for x, y in points]
+    draw.polygon(scaled, fill=(WHITE if monochrome else CYAN) + (255,))
+
+    return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def pick_font(size):
-    for candidate in (
-        r"C:\Windows\Fonts\segoeuisb.ttf",
-        r"C:\Windows\Fonts\seguisb.ttf",
-        r"C:\Windows\Fonts\segoeui.ttf",
-        r"C:\Windows\Fonts\arialbd.ttf",
-    ):
-        if os.path.isfile(candidate):
-            return ImageFont.truetype(candidate, size)
+def render_tile(size: int) -> Image.Image:
+    tile = Image.new("RGB", (size, size), NAVY)
+    mark = render_mark(size)
+    tile.paste(mark, (0, 0), mark)
+    return tile
+
+
+def fitted_mark(width: int, height: int) -> Image.Image:
+    mark = render_mark(1024)
+    bbox = mark.getbbox()
+    if bbox is None:
+        raise RuntimeError("The rendered mark is empty")
+    mark = mark.crop(bbox)
+    mark.thumbnail((width, height), Image.Resampling.LANCZOS)
+    return mark
+
+
+def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    names = ("segoeuib.ttf", "seguisb.ttf") if bold else ("segoeui.ttf", "seguisb.ttf")
+    for name in names:
+        candidate = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / name
+        if candidate.exists():
+            return ImageFont.truetype(str(candidate), size)
     return ImageFont.load_default()
 
 
-def build_icon():
-    size = 512
-    icon = Image.new("RGBA", (size, size), BACKGROUND + (255,))
-    icon.alpha_composite(render_mark(size))
-    write(icon, "icon.png")
+def feature_background(width: int, height: int) -> Image.Image:
+    image = Image.new("RGB", (width, height), NAVY_DEEP)
+    draw = ImageDraw.Draw(image)
+    for x in range(width):
+        ratio = x / max(1, width - 1)
+        color = tuple(round(a + (b - a) * ratio) for a, b in zip(NAVY_DEEP, NAVY_LIGHT))
+        draw.line((x, 0, x, height), fill=color)
+
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    glow_draw.ellipse((-90, -160, 540, 470), fill=CYAN + (42,))
+    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    return Image.alpha_composite(image.convert("RGBA"), glow).convert("RGB")
 
 
-def build_feature_graphic():
+def render_feature_graphic() -> Image.Image:
     width, height = 1024, 500
-    graphic = Image.new("RGBA", (width, height), BACKGROUND + (255,))
-    draw = ImageDraw.Draw(graphic)
+    image = feature_background(width, height).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    mark = fitted_mark(310, 310)
+    image.alpha_composite(mark, (72, (height - mark.height) // 2))
 
-    # A faint vertical lift keeps the flat background from reading as a rendering failure where
-    # the listing shows the graphic against white.
-    for y in range(height):
-        blend = int(12 * (1 - y / height))
-        draw.line(
-            [(0, y), (width, y)],
-            fill=(BACKGROUND[0] + blend, BACKGROUND[1] + blend, BACKGROUND[2] + blend, 255),
-        )
+    text_x = 430
+    draw.text((text_x, 142), "OpenTasker", font=font(74, bold=True), fill=WHITE)
+    draw.text((text_x, 242), "Automation that stays yours", font=font(34), fill=(204, 220, 240))
+    draw.rounded_rectangle((text_x, 318, 754, 368), radius=10, fill=CYAN, outline=(79, 211, 239), width=2)
+    draw.text((text_x + 22, 327), "OPEN SOURCE  •  LOCAL FIRST", font=font(18, bold=True), fill=NAVY_DEEP)
+    return image.convert("RGB")
 
-    margin = 104
-    mark_size = 300
-    graphic.alpha_composite(render_mark(mark_size), (margin, (height - mark_size) // 2))
 
-    text_x = margin + mark_size + 76
-    available = width - margin - text_x
+def launcher_mask(kind: str, size: int) -> Image.Image:
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    inset = 3
+    if kind == "Square":
+        draw.rectangle((inset, inset, size - inset, size - inset), fill=255)
+    elif kind == "Rounded":
+        draw.rounded_rectangle((inset, inset, size - inset, size - inset), radius=size // 5, fill=255)
+    elif kind == "Circle":
+        draw.ellipse((inset, inset, size - inset, size - inset), fill=255)
+    elif kind == "Squircle":
+        radius = (size - inset * 2) / 2
+        center = (size - 1) / 2
+        pixels = []
+        for y in range(size):
+            for x in range(size):
+                nx = abs((x - center) / radius)
+                ny = abs((y - center) / radius)
+                pixels.append(255 if nx**4 + ny**4 <= 1 else 0)
+        mask.putdata(pixels)
+    else:
+        raise ValueError(f"Unknown launcher mask: {kind}")
+    return mask
 
-    def fit(text, start_size):
-        """Largest size at or below start_size whose rendered width clears the right margin."""
-        for size in range(start_size, 11, -2):
-            font = pick_font(size)
-            if draw.textlength(text, font=font) <= available:
-                return font
-        return pick_font(12)
 
-    title_font = fit("OpenTasker", 94)
-    tagline_font = fit("Local-first Android automation", 36)
+def render_mask_preview() -> Image.Image:
+    width, height = 1500, 430
+    preview = Image.new("RGB", (width, height), (4, 8, 17))
+    tile = render_tile(300).convert("RGBA")
+    label_font = font(24, bold=True)
+    for index, label in enumerate(("Square", "Rounded", "Squircle", "Circle")):
+        x = 55 + index * 365
+        y = 40
+        shadow = Image.new("RGBA", (320, 320), (0, 0, 0, 0))
+        shadow_mask = launcher_mask(label, 300).filter(ImageFilter.GaussianBlur(14))
+        shadow.paste((0, 0, 0, 155), (10, 14), shadow_mask)
+        preview.paste(shadow, (x - 10, y - 10), shadow)
+        masked = Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+        masked.paste(tile, (0, 0), launcher_mask(label, 300))
+        preview.paste(masked, (x, y), masked)
+        text_box = ImageDraw.Draw(preview).textbbox((0, 0), label, font=label_font)
+        text_width = text_box[2] - text_box[0]
+        ImageDraw.Draw(preview).text((x + (300 - text_width) / 2, 365), label, font=label_font, fill=MUTED)
+    return preview
 
-    draw.text((text_x, 168), "OpenTasker", font=title_font, fill=(242, 240, 255))
-    draw.rectangle([text_x, 306, text_x + 88, 310], fill=GREEN)
-    draw.text((text_x, 340), "Local-first Android automation", font=tagline_font, fill=(156, 134, 240))
 
-    write(graphic, "featureGraphic.png")
+def save_assets() -> None:
+    STORE.mkdir(parents=True, exist_ok=True)
+    DESIGN.mkdir(parents=True, exist_ok=True)
+    EXPORTS.mkdir(parents=True, exist_ok=True)
+
+    render_tile(512).save(STORE / "icon.png", optimize=True)
+    render_feature_graphic().save(STORE / "featureGraphic.png", optimize=True)
+
+    render_mark(1024).save(DESIGN / "opentasker-mark.png", optimize=True)
+    render_tile(1024).save(DESIGN / "opentasker-mark-concept.png", optimize=True)
+    render_tile(1024).save(DESIGN / "opentasker-app-tile.png", optimize=True)
+    render_mask_preview().save(DESIGN / "launcher-mask-preview.png", optimize=True)
+    render_mark(432).save(RES / "mipmap" / "ic_launcher_foreground.png", optimize=True)
+
+    for size in (256, 512, 1024):
+        render_mark(size).save(EXPORTS / f"opentasker_emblem_true_transparent_{size}.png", optimize=True)
+    render_mark(1024).save(EXPORTS / "opentasker_emblem_true_transparent.png", optimize=True)
+
+    densities = {
+        "mipmap-ldpi": 36,
+        "mipmap-mdpi": 48,
+        "mipmap-hdpi": 72,
+        "mipmap-xhdpi": 96,
+        "mipmap-xxhdpi": 144,
+        "mipmap-xxxhdpi": 192,
+    }
+    for directory, size in densities.items():
+        render_tile(size).save(RES / directory / "ic_launcher.png", optimize=True)
 
 
 if __name__ == "__main__":
-    os.makedirs(OUT, exist_ok=True)
-    build_icon()
-    build_feature_graphic()
+    save_assets()

@@ -1,12 +1,23 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,8 +25,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.Scene
@@ -42,7 +55,12 @@ fun SceneLibraryScreen(
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
+    val filteredScenes = remember(sortedScenes, searchQuery) {
+        if (searchQuery.isBlank()) sortedScenes
+        else sortedScenes.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
     val listState = rememberLazyListState()
     val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
         sceneElementEditorState(scenes, elementEditorSceneId, elementEditorIndex, allowNew = true)
@@ -50,7 +68,7 @@ fun SceneLibraryScreen(
 
     LaunchedEffect(focusSceneId, sortedScenes) {
         val focusedIndex = focusSceneId?.let { id -> sortedScenes.indexOfFirst { it.id == id } } ?: -1
-        if (focusedIndex >= 0) listState.animateScrollToItem(focusedIndex + 1)
+        if (focusedIndex >= 0) listState.animateScrollToItem(focusedIndex + 2)
     }
 
     LaunchedEffect(elementEditorSceneId, elementEditor) {
@@ -109,46 +127,89 @@ fun SceneLibraryScreen(
         return
     }
 
-    LazyColumn(
-        state = listState,
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
     ) {
-        item {
-            SceneOverviewCard(
-                scenes = sortedScenes,
-                tasks = tasks,
-                onCreateScene = { showCreateDialog = true },
-            )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = DesignSystem.Screen.horizontalPadding,
+                top = DesignSystem.Screen.verticalPadding,
+                end = DesignSystem.Screen.horizontalPadding,
+                bottom = 96.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
+        ) {
+            item {
+                SceneOverviewCard(
+                    scenes = sortedScenes,
+                    tasks = tasks,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.scenes_search_hint)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.scenes_search_hint)) },
+                    trailingIcon = if (searchQuery.isNotEmpty()) {
+                        {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.variables_search_clear))
+                            }
+                        }
+                    } else null,
+                    singleLine = true,
+                )
+            }
+            if (filteredScenes.isEmpty()) {
+                item {
+                    InlineNotice(
+                        title = stringResource(R.string.scenes_no_matches_title),
+                        body = stringResource(R.string.scenes_no_matches_body),
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            items(filteredScenes, key = { it.id }) { scene ->
+                val sceneContext = LocalContext.current
+                SceneCard(
+                    scene = scene,
+                    tasks = tasks,
+                    onAddElement = {
+                        elementEditorSceneId = scene.id
+                        elementEditorIndex = null
+                    },
+                    onEditElement = { index, _ ->
+                        elementEditorSceneId = scene.id
+                        elementEditorIndex = index
+                    },
+                    onDeleteElement = { index, _ ->
+                        onRemoveElement(scene, index)
+                    },
+                    onUpdateScene = onUpdateScene,
+                    canUndo = historyAvailability.canUndoScene(scene.id),
+                    canRedo = historyAvailability.canRedoScene(scene.id),
+                    onUndo = { onUndoSceneEdit(scene) },
+                    onRedo = { onRedoSceneEdit(scene) },
+                    onDelete = { onDeleteScene(scene) },
+                    onDuplicate = { onDuplicateScene(scene) },
+                    onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
+                )
+            }
         }
-        items(sortedScenes, key = { it.id }) { scene ->
-            val sceneContext = LocalContext.current
-            SceneCard(
-                scene = scene,
-                tasks = tasks,
-                onAddElement = {
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = null
-                },
-                onEditElement = { index, _ ->
-                    elementEditorSceneId = scene.id
-                    elementEditorIndex = index
-                },
-                onDeleteElement = { index, _ ->
-                    onRemoveElement(scene, index)
-                },
-                onUpdateScene = onUpdateScene,
-                canUndo = historyAvailability.canUndoScene(scene.id),
-                canRedo = historyAvailability.canRedoScene(scene.id),
-                onUndo = { onUndoSceneEdit(scene) },
-                onRedo = { onRedoSceneEdit(scene) },
-                onDelete = { onDeleteScene(scene) },
-                onDuplicate = { onDuplicateScene(scene) },
-                onShowOverlay = { SceneOverlayService.show(sceneContext, scene) },
-            )
-        }
+        ExtendedFloatingActionButton(
+            onClick = { showCreateDialog = true },
+            icon = { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.scenes_create)) },
+            text = { Text(stringResource(R.string.scenes_create)) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = DesignSystem.Screen.horizontalPadding, bottom = 16.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(DesignSystem.Radii.md),
+        )
     }
 }

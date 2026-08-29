@@ -6,7 +6,9 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,21 +24,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -284,6 +295,15 @@ fun ContextInspectorScreen(
     val invariants by viewModel.invariants.collectAsState()
     val lintReport by viewModel.lintReport.collectAsState()
     val simulationProfile by viewModel.simulationProfile.collectAsState()
+    var selectedProfileId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val selectedProfile = snapshot.profiles.firstOrNull { it.profileId == selectedProfileId }
+        ?: snapshot.profiles.firstOrNull()
+
+    LaunchedEffect(snapshot.profiles, selectedProfileId) {
+        if (selectedProfileId == null || snapshot.profiles.none { it.profileId == selectedProfileId }) {
+            selectedProfileId = snapshot.profiles.firstOrNull()?.profileId
+        }
+    }
 
     DisposableEffect(viewModel) {
         viewModel.startObserving()
@@ -324,27 +344,10 @@ fun ContextInspectorScreen(
                 StorageDecodeWarningCard(storageDecodeIssues)
             }
         }
-        item {
-            AutomationInvariantPanel(
-                invariants = invariants,
-                report = lintReport,
-                onUpdate = viewModel::updateInvariants,
-            )
-        }
         if (oem.needsExtraSteps) {
             item {
                 OemRiskNotice(oem)
             }
-        }
-        item {
-            Text(
-                stringResource(R.string.inspector_sources_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        items(snapshot.sources, key = { it.key }) { source ->
-            ContextSourceCard(source = source, nowMs = snapshot.generatedAtMs)
         }
         item {
             Text(
@@ -362,14 +365,40 @@ fun ContextInspectorScreen(
                 )
             }
         } else {
-            items(snapshot.profiles, key = { it.profileId }) { profile ->
-                ProfileInspectorCard(
-                    profile = profile,
-                    nowMs = snapshot.generatedAtMs,
-                    lintFindings = lintFindings[profile.profileId].orEmpty(),
-                    onSimulate = { candidate -> viewModel.openSimulation(candidate) },
+            item {
+                InspectorProfileSelector(
+                    profiles = snapshot.profiles,
+                    selectedProfileId = selectedProfile?.profileId,
+                    onSelected = { selectedProfileId = it },
                 )
             }
+            selectedProfile?.let { profile ->
+                item(key = profile.profileId) {
+                    ProfileInspectorCard(
+                        profile = profile,
+                        nowMs = snapshot.generatedAtMs,
+                        lintFindings = lintFindings[profile.profileId].orEmpty(),
+                        onSimulate = { candidate -> viewModel.openSimulation(candidate) },
+                    )
+                }
+            }
+        }
+        item {
+            Text(
+                stringResource(R.string.inspector_sources_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        items(snapshot.sources, key = { it.key }) { source ->
+            ContextSourceCard(source = source, nowMs = snapshot.generatedAtMs)
+        }
+        item {
+            AutomationInvariantPanel(
+                invariants = invariants,
+                report = lintReport,
+                onUpdate = viewModel::updateInvariants,
+            )
         }
     }
 
@@ -382,73 +411,84 @@ fun ContextInspectorScreen(
 }
 
 @Composable
+private fun InspectorProfileSelector(
+    profiles: List<ProfileInspection>,
+    selectedProfileId: Long?,
+    onSelected: (Long) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val selected = profiles.firstOrNull { it.profileId == selectedProfileId } ?: profiles.first()
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(DesignSystem.Radii.md),
+        ) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                Text(
+                    stringResource(R.string.inspector_profile_selector),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(selected.profileName, style = MaterialTheme.typography.labelLarge)
+            }
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.inspector_profile_selector_content_description))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            profiles.forEach { profile ->
+                DropdownMenuItem(
+                    text = { Text(profile.profileName) },
+                    onClick = {
+                        onSelected(profile.profileId)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ContextInspectorSummaryCard(
     snapshot: ContextInspectionSnapshot,
     onRefresh: () -> Unit,
 ) {
-    val activeSources = snapshot.sources.count { it.status == ContextSourceStatus.Active }
     val attentionSources = snapshot.sources.count {
         it.status == ContextSourceStatus.NeedsSetup ||
             it.status == ContextSourceStatus.Missing ||
             it.status == ContextSourceStatus.Error
     }
-    val enabledProfiles = snapshot.profiles.count { it.enabled }
-    val matchingProfiles = snapshot.profiles.count { it.matching }
     val healthColor = if (attentionSources == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.nav_inspector),
-                        tint = healthColor,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (attentionSources == 0) {
-                            stringResource(R.string.inspector_ready)
-                        } else {
-                            stringResource(R.string.inspector_attention, attentionSources)
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.inspector_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                InspectorStatusPill(
-                    label = if (attentionSources == 0) {
-                        stringResource(R.string.inspector_ready)
-                    } else {
-                        stringResource(R.string.inspector_attention, attentionSources)
-                    },
-                    color = healthColor,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                InspectorMetric("$activeSources", stringResource(R.string.inspector_active_sources), Modifier.weight(1f))
-                InspectorMetric("$matchingProfiles", stringResource(R.string.inspector_matching), Modifier.weight(1f))
-                InspectorMetric("$enabledProfiles", stringResource(R.string.inspector_enabled), Modifier.weight(1f))
-            }
-            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.inspector_refresh), modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.inspector_refresh))
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.nav_inspector),
+                tint = healthColor,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                if (attentionSources == 0) {
+                    stringResource(R.string.inspector_ready)
+                } else {
+                    stringResource(R.string.inspector_attention, attentionSources)
+                },
+                style = MaterialTheme.typography.titleSmall,
+                color = healthColor,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onRefresh) {
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.inspector_refresh))
             }
         }
     }
@@ -469,7 +509,8 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)
             },
         ),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
@@ -516,6 +557,8 @@ private fun ProfileInspectorCard(
     lintFindings: List<AutomationLintFinding>,
     onSimulate: (Profile) -> Unit,
 ) {
+    var lintExpanded by remember(profile.profileId) { mutableStateOf(false) }
+    var detailsExpanded by remember(profile.profileId) { mutableStateOf(false) }
     val color = when {
         !profile.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         profile.matching -> MaterialTheme.colorScheme.tertiary
@@ -530,7 +573,8 @@ private fun ProfileInspectorCard(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             },
         ),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
@@ -553,89 +597,135 @@ private fun ProfileInspectorCard(
                     color = color,
                 )
             }
-            profile.profile?.let { candidate ->
-                Text(
-                    stringResource(
-                        R.string.inspector_profile_policy,
-                        candidate.priority,
-                        candidate.gracePeriodSec,
-                        profileLifetimeTitle(candidate.lifetime),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    stringResource(
-                        R.string.inspector_profile_concurrency,
-                        candidate.maxActiveExecutions?.toString() ?: stringResource(R.string.profile_concurrency_default),
-                        candidate.burstLimit?.toString() ?: stringResource(R.string.profile_concurrency_default),
-                        profileOverflowPolicyTitle(candidate.overflowPolicy),
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (candidate.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && candidate.expiresAtMs != null) {
+            if (detailsExpanded) {
+                profile.profile?.let { candidate ->
                     Text(
-                        stringResource(R.string.inspector_profile_expiry, formatProfileExpiryDate(candidate.expiresAtMs)),
+                        stringResource(
+                            R.string.inspector_profile_policy,
+                            candidate.priority,
+                            candidate.gracePeriodSec,
+                            profileLifetimeTitle(candidate.lifetime),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        stringResource(
+                            R.string.inspector_profile_concurrency,
+                            candidate.maxActiveExecutions?.toString() ?: stringResource(R.string.profile_concurrency_default),
+                            candidate.burstLimit?.toString() ?: stringResource(R.string.profile_concurrency_default),
+                            profileOverflowPolicyTitle(candidate.overflowPolicy),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (candidate.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && candidate.expiresAtMs != null) {
+                        Text(
+                            stringResource(R.string.inspector_profile_expiry, formatProfileExpiryDate(candidate.expiresAtMs)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-            }
-            profile.suppressionReason?.let { reason ->
-                InspectorNotice(
-                    title = stringResource(R.string.inspector_profile_suppressed_title),
-                    body = reason,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            if (profile.logicExplanation.isNotBlank()) {
-                Text(
-                    profile.logicExplanation,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            if (profile.contexts.isEmpty()) {
-                InspectorNotice(
-                    title = stringResource(R.string.inspector_no_contexts),
-                    body = stringResource(R.string.inspector_no_contexts_body),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else {
-                profile.contexts.forEach { check ->
-                    ContextCheckRow(check = check, nowMs = nowMs)
+                profile.suppressionReason?.let { reason ->
+                    InspectorNotice(
+                        title = stringResource(R.string.inspector_profile_suppressed_title),
+                        body = reason,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (profile.logicExplanation.isNotBlank()) {
+                    Text(
+                        profile.logicExplanation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (profile.contexts.isEmpty()) {
+                    InspectorNotice(
+                        title = stringResource(R.string.inspector_no_contexts),
+                        body = stringResource(R.string.inspector_no_contexts_body),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                } else {
+                    profile.contexts.forEach { check ->
+                        ContextCheckRow(check = check, nowMs = nowMs)
+                    }
                 }
             }
             val blockedPrefix = stringResource(R.string.automation_lint_blocked_prefix)
             val warningPrefix = stringResource(R.string.automation_lint_warning_prefix)
             if (lintFindings.isNotEmpty()) {
-                InspectorNotice(
-                    title = stringResource(R.string.inspector_lint_title),
-                    // Name the severity in the text. A mixed list collapses to a single colour
-                    // chosen by "any blocking", so colour alone cannot tell the rows apart - and
-                    // conveys nothing to a colour-blind reader either.
-                    body = lintFindings.joinToString("\n") { finding ->
-                        val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
-                            blockedPrefix
-                        } else {
-                            warningPrefix
+                val lintColor = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.secondary
+                }
+                Surface(
+                    color = lintColor.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, lintColor.copy(alpha = 0.42f)),
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { lintExpanded = !lintExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = stringResource(R.string.inspector_lint_title),
+                                tint = lintColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.inspector_lint_title), style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    stringResource(R.string.inspector_lint_count, lintFindings.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Icon(
+                                if (lintExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                contentDescription = stringResource(if (lintExpanded) R.string.action_collapse else R.string.action_expand),
+                                tint = lintColor,
+                            )
                         }
-                        "$prefix ${finding.title}: ${finding.detail} ${finding.suggestedFix}"
-                    },
-                    color = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.secondary
-                    },
-                )
+                        if (lintExpanded) {
+                            Text(
+                                lintFindings.joinToString("\n") { finding ->
+                                    val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
+                                        blockedPrefix
+                                    } else {
+                                        warningPrefix
+                                    }
+                                    "$prefix ${finding.title}: ${finding.detail} ${finding.suggestedFix}"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
             profile.profile?.let { candidate ->
-                OutlinedButton(
-                    onClick = { onSimulate(candidate) },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                 ) {
-                    Text(stringResource(R.string.inspector_simulate_trigger))
+                    TextButton(onClick = { detailsExpanded = !detailsExpanded }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(if (detailsExpanded) R.string.diagnostics_hide_details else R.string.diagnostics_show_details))
+                    }
+                    OutlinedButton(onClick = { onSimulate(candidate) }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.inspector_simulate_trigger), maxLines = 1)
+                    }
                 }
             }
         }
@@ -754,20 +844,7 @@ private fun InspectorMetric(value: String, label: String, modifier: Modifier = M
 
 @Composable
 private fun InspectorStatusPill(label: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    StatusPill(label = label, color = color)
 }
 
 @Composable

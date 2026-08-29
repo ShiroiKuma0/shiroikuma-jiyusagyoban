@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,22 +58,27 @@ fun ProjectScopeBar(
     val selectedName = projects.firstOrNull { it.id == selectedProjectId }?.name
         ?: stringResource(R.string.projects_all)
 
-    Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
     ) {
-        Column(Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = DesignSystem.Screen.horizontalPadding, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column(Modifier.weight(1f)) {
             Text(
                 stringResource(R.string.projects_scope_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier.padding(bottom = 2.dp),
             )
-            OutlinedButton(
+            TextButton(
                 onClick = { menuExpanded = true },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(DesignSystem.Radii.lg),
+                shape = RoundedCornerShape(DesignSystem.Radii.md),
             ) {
                 Icon(Icons.Filled.Folder, contentDescription = stringResource(R.string.projects_scope_label))
                 Text(
@@ -101,9 +107,10 @@ fun ProjectScopeBar(
                     )
                 }
             }
-        }
-        IconButton(onClick = { managerVisible = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.projects_manage))
+            }
+            IconButton(onClick = { managerVisible = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.projects_manage))
+            }
         }
     }
 

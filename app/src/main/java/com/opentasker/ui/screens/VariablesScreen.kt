@@ -99,14 +99,6 @@ fun VariablesScreen(
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
     ) {
         item {
-            VariableSummaryCard(
-                totalCount = variables.size,
-                visibleCount = filtered.size,
-                sensitiveCount = variables.count { it.isSecret },
-                onCreate = { showCreateDialog = true },
-            )
-        }
-        item {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -150,6 +142,20 @@ fun VariablesScreen(
                         pendingDeleteProjectId = variable.projectId
                     },
                 )
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = DesignSystem.Spacing.md),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                Button(
+                    onClick = { showCreateDialog = true },
+                    shape = RoundedCornerShape(DesignSystem.Radii.md),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.variables_create))
+                    Text(stringResource(R.string.variables_create), modifier = Modifier.padding(start = 6.dp))
+                }
             }
         }
     }
@@ -223,70 +229,6 @@ fun VariablesScreen(
 }
 
 @Composable
-private fun VariableSummaryCard(
-    totalCount: Int,
-    visibleCount: Int,
-    sensitiveCount: Int,
-    onCreate: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.xxl),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.sectionGap)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.VisibilityOff,
-                        contentDescription = stringResource(R.string.nav_variables),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.header_variables_detail, totalCount),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        if (totalCount == 0) {
-                            stringResource(R.string.empty_variables_body)
-                        } else {
-                            stringResource(R.string.variables_summary_body)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                VariablePill(
-                    label = stringResource(R.string.variables_shown_count, visibleCount),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                VariableMetric("$totalCount", stringResource(R.string.variables_saved_count_label), Modifier.weight(1f))
-                VariableMetric("$sensitiveCount", stringResource(R.string.label_masked), Modifier.weight(1f))
-            }
-            Button(onClick = onCreate, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.variables_create))
-                Text(stringResource(R.string.variables_create), modifier = Modifier.padding(start = 6.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun VariableMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    SummaryMetric(value = value, label = label, modifier = modifier)
-}
-
-@Composable
 private fun VariableEmptyState(title: String, body: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -323,16 +265,35 @@ private fun VariableRow(
     Card(
         onClick = onEdit,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(DesignSystem.Radii.sm),
+            ) {
+                Icon(
+                    if (sensitive) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = stringResource(
+                        if (sensitive) {
+                            R.string.variables_sensitive_indicator
+                        } else {
+                            R.string.variables_standard_indicator
+                        },
+                    ),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(11.dp),
+                )
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = "%${variable.name}",
@@ -369,20 +330,14 @@ private fun VariableRow(
 
 @Composable
 private fun VariablePill(label: String, color: Color) {
-    Surface(
-        color = color.copy(alpha = 0.14f),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelMedium,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-        )
-    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(vertical = 2.dp),
+    )
 }
 
 @Composable

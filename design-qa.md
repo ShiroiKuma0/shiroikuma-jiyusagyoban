@@ -1,56 +1,38 @@
 # Design QA
 
-## Source of truth
+## Reference set
 
-The ten visual references live in `docs/design/mockups/`. They define the page hierarchy, AMOLED palette, sage accent, coral warning color, compact row density, five-item navigation, full-width primary actions, and a maximum 12 dp corner radius.
+The selected visual direction is Quiet Workshop. The ten page references live in `design/mockups/`:
 
-## Comparison setup
+- `profiles-quiet-workshop.png`
+- `tasks-quiet-workshop.png`
+- `run-log-quiet-workshop.png`
+- `variables-quiet-workshop.png`
+- `flow-quiet-workshop.png`
+- `scenes-quiet-workshop.png`
+- `inspector-quiet-workshop.png`
+- `setup-quiet-workshop.png`
+- `diagnostics-quiet-workshop.png`
+- `settings-quiet-workshop.png`
 
-- Reference canvas: 853 x 1844 pixels, generated for a 390 x 844 dp mobile layout.
-- Implementation capture: 1080 x 2400 pixels from a Pixel 7 API 35 emulator at 420 dpi.
-- Review normalization: both sides were normalized to 853 x 1844 pixels so hierarchy, spacing, density, and component proportions could be judged together.
-- Combined evidence: `docs/design/qa/compare-profiles.png`, `compare-tasks.png`, `compare-flow.png`, `compare-setup.png`, and `compare-settings.png`.
-- Contact sheet: `docs/design/qa/comparison-contact-sheet.png`.
+The supplied logo reference is preserved at `design/logo/source-user-logo-2026-08-29.png`. Production artwork is under `app/src/main/res/`, `design/logo/`, and `fastlane/metadata/android/en-US/images/`.
 
-Each comparison places the visual reference on the left and the emulator implementation on the right.
+## Test viewport
 
-## Comparison history
+- Device profile: Pixel 7 API 35 emulator
+- Resolution: 1080 x 2400
+- Density: 420 dpi
+- Theme: AMOLED black
+- State: realistic seeded profiles, tasks, variables, scenes, run history, and setup gaps
 
-### Round 1
+## Comparison passes
 
-The app shell matched the direction, but task and profile cards exposed too many secondary actions. Setup and Settings also retained large nested cards that pushed important controls below the first viewport. Flow opened with an invariant editor instead of the automation path.
+The first pass captured all ten implemented destinations. It exposed repeated summaries, oversized controls, clipped Run Log actions, a misplaced Scenes create action, and an Inspector that buried live context data.
 
-Changes made:
+The second pass paired every reference and implementation screenshot in one side-by-side image at the same 1080 x 2400 viewport. The shared header was tightened, Profiles moved its workspace tools into the search row, Run Log actions were shortened, Scenes gained a bottom create action, and Inspector gained a single-profile selector with collapsible details.
 
-- Moved profile and task secondary actions into overflow menus.
-- Converted task actions to numbered divider rows with direct edit affordances.
-- Added the readiness progress treatment and compact metadata.
-- Replaced Setup permission cards with status rows and inline actions.
-- Reworked the first Settings controls into compact rows and collapsed backup and script details.
-- Removed the invariant panel from the Flow page and kept the generated automation path first.
-- Applied the 12 dp radius ceiling across the Material shape scale.
+A final paired review covered the changed Profiles, Run Log, Scenes, and Inspector screens. The remaining differences preserve real app functions or Android system chrome. No control is cropped, launcher-safe content stays inside the adaptive icon safe zone, and all core actions remain reachable.
 
-### Round 2
+## Final captures
 
-The combined comparisons show the same dominant hierarchy, palette, navigation model, control density, and page-level action placement. All primary controls remain usable with real application data.
-
-## Findings
-
-- P0: none.
-- P1: none.
-- P2: Profiles keeps a search field because real workspaces can contain many profiles.
-- P2: Setup counts and row labels reflect the emulator's actual permission state instead of the sample values in the reference.
-- P2: Settings retains OpenTasker's advanced recovery and integration controls below the compact appearance rows. Those controls are collapsed where practical so the first viewport remains close to the reference.
-
-## Interaction checks
-
-- Primary navigation switches between Profiles, Tasks, Run Log, and Setup.
-- More opens Variables, Flow, Scenes, Inspector, Diagnostics, and Settings.
-- Task run and overflow actions remain available.
-- Profile toggles and overflow actions remain available.
-- Theme selection, backup expansion, and permission actions expose working controls.
-- The page-level create actions remain full width and reachable above navigation.
-
-## Final result
-
-Passed. No critical or major visual mismatch remains in the reviewed states.
+Release screenshots are stored in `fastlane/metadata/android/en-US/images/phoneScreenshots/`. They were captured from the final debug build on the test viewport above and are marked for version code 93.

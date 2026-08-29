@@ -23,11 +23,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -113,8 +117,11 @@ internal fun RunLogScreenContent(
             .fillMaxSize()
             .padding(contentPadding)
             .testTag(RUN_LOG_LIST_TAG),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
+        contentPadding = PaddingValues(
+            horizontal = DesignSystem.Screen.horizontalPadding,
+            vertical = DesignSystem.Screen.verticalPadding,
+        ),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
     ) {
         if (activeExecutions.isNotEmpty()) {
             item {
@@ -148,23 +155,6 @@ internal fun RunLogScreenContent(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-        } else if (logs.isNotEmpty()) {
-            item {
-                RunLogSummaryCard(
-                    logs = logs,
-                    totalCount = totalCount,
-                    onShareDiagnostic = onShareDiagnostic,
-                    onRefresh = onRefresh,
-                    onExportJson = onExportJson,
-                    onExportCsv = onExportCsv,
-                )
-            }
-        }
-        item {
-            RunLogRetentionCard(
-                policy = retentionPolicy,
-                onPolicyChange = onRetentionPolicyChange,
-            )
         }
         if (logs.isNotEmpty() || taskOptions.isNotEmpty() || hasFilters) {
             item {
@@ -180,6 +170,18 @@ internal fun RunLogScreenContent(
                     onQueryChange = { onFiltersChange(filters.copy(query = it)) },
                     dateFilter = filters.date,
                     onDateFilterChange = { onFiltersChange(filters.copy(date = it)) },
+                )
+            }
+        }
+        if (logs.isNotEmpty()) {
+            item {
+                RunLogSummaryCard(
+                    logs = logs,
+                    totalCount = totalCount,
+                    onShareDiagnostic = onShareDiagnostic,
+                    onRefresh = onRefresh,
+                    onExportJson = onExportJson,
+                    onExportCsv = onExportCsv,
                 )
             }
         }
@@ -199,6 +201,12 @@ internal fun RunLogScreenContent(
                 }
             }
         }
+        item {
+            RunLogRetentionCard(
+                policy = retentionPolicy,
+                onPolicyChange = onRetentionPolicyChange,
+            )
+        }
     }
 }
 
@@ -207,83 +215,82 @@ private fun RunLogRetentionCard(
     policy: RunLogRetentionPolicy,
     onPolicyChange: (RunLogRetentionPolicy) -> Unit,
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.run_log_retention_title), style = MaterialTheme.typography.titleMedium)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.run_log_retention_title), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        policy.displayLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
+                )
+            }
+            if (expanded) {
                 Text(
                     stringResource(R.string.run_log_retention_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                RunLogRetentionOptions.all.forEach { option ->
-                    val selected = option.policy == policy
-                    val selectionDescription = if (selected) {
-                        stringResource(R.string.a11y_selected)
-                    } else {
-                        stringResource(R.string.a11y_not_selected)
-                    }
-                    OutlinedButton(
-                        onClick = { onPolicyChange(option.policy) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize()
-                            .semantics { stateDescription = selectionDescription },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (selected) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                            } else {
-                                Color.Transparent
+                Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    RunLogRetentionOptions.all.forEach { option ->
+                        val selected = option.policy == policy
+                        val selectionDescription = if (selected) {
+                            stringResource(R.string.a11y_selected)
+                        } else {
+                            stringResource(R.string.a11y_not_selected)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                onPolicyChange(option.policy)
+                                expanded = false
                             },
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        border = BorderStroke(
-                            1.dp,
-                            if (selected) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
-                            },
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                if (selected) {
-                                    Icon(
-                                        Icons.Filled.CheckCircle,
-                                        contentDescription = stringResource(R.string.label_selected),
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clearAndSetSemantics { },
-                                    )
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics { stateDescription = selectionDescription },
+                            shape = RoundedCornerShape(DesignSystem.Radii.sm),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
                                 } else {
-                                    Spacer(Modifier.size(16.dp))
-                                }
+                                    Color.Transparent
+                                },
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+                                },
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(option.label, style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    option.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
-                            Text(
-                                option.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
                         }
                     }
                 }
@@ -306,84 +313,91 @@ private fun RunLogFilterCard(
     dateFilter: RunLogDateFilter,
     onDateFilterChange: (RunLogDateFilter) -> Unit,
 ) {
+    val hasActiveFilters = statusFilter != RunLogStatusFilter.All || selectedTaskId != null || dateFilter != RunLogDateFilter.All
+    var expanded by rememberSaveable { mutableStateOf(hasActiveFilters) }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
-        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.run_log_find_runs), style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    placeholder = { Text(stringResource(R.string.run_log_search_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        Icons.Filled.FilterList,
+                        contentDescription = stringResource(if (expanded) R.string.action_collapse else R.string.action_expand),
+                        tint = if (hasActiveFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            if (expanded) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         stringResource(R.string.run_log_shown_count, visibleCount, totalCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
                     )
+                    if (hasActiveFilters || query.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                onStatusFilterChange(RunLogStatusFilter.All)
+                                onTaskFilterChange(null)
+                                onQueryChange("")
+                                onDateFilterChange(RunLogDateFilter.All)
+                            },
+                        ) {
+                            Text(stringResource(R.string.action_clear))
+                        }
+                    }
                 }
-                if (
-                    statusFilter != RunLogStatusFilter.All || selectedTaskId != null ||
-                    query.isNotBlank() || dateFilter != RunLogDateFilter.All
-                ) {
-                    TextButton(
-                        onClick = {
-                            onStatusFilterChange(RunLogStatusFilter.All)
-                            onTaskFilterChange(null)
-                            onQueryChange("")
-                            onDateFilterChange(RunLogDateFilter.All)
-                        },
-                    ) {
-                        Text(stringResource(R.string.action_clear))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    item {
+                        RunLogFilterChip(
+                            label = stringResource(R.string.run_log_any_task),
+                            selected = selectedTaskId == null,
+                            onClick = { onTaskFilterChange(null) },
+                        )
+                    }
+                    items(taskOptions, key = { it.first }) { (taskId, taskName) ->
+                        RunLogFilterChip(
+                            label = taskName,
+                            selected = selectedTaskId == taskId,
+                            onClick = { onTaskFilterChange(taskId) },
+                        )
+                    }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
+                        RunLogFilterChip(
+                            label = stringResource(filter.labelRes),
+                            selected = statusFilter == filter,
+                            onClick = { onStatusFilterChange(filter) },
+                        )
+                    }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                    items(RunLogDateFilter.entries.toList(), key = { it.name }) { filter ->
+                        RunLogFilterChip(
+                            label = stringResource(filter.labelRes),
+                            selected = dateFilter == filter,
+                            onClick = { onDateFilterChange(filter) },
+                        )
                     }
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item {
-                    RunLogFilterChip(
-                        label = stringResource(R.string.run_log_any_task),
-                        selected = selectedTaskId == null,
-                        onClick = { onTaskFilterChange(null) },
-                    )
-                }
-                items(taskOptions, key = { it.first }) { (taskId, taskName) ->
-                    RunLogFilterChip(
-                        label = taskName,
-                        selected = selectedTaskId == taskId,
-                        onClick = { onTaskFilterChange(taskId) },
-                    )
-                }
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                items(RunLogStatusFilter.entries.toList(), key = { it.name }) { filter ->
-                    RunLogFilterChip(
-                        label = stringResource(filter.labelRes),
-                        selected = statusFilter == filter,
-                        onClick = { onStatusFilterChange(filter) },
-                    )
-                }
-            }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                items(RunLogDateFilter.entries.toList(), key = { it.name }) { filter ->
-                    RunLogFilterChip(
-                        label = stringResource(filter.labelRes),
-                        selected = dateFilter == filter,
-                        onClick = { onDateFilterChange(filter) },
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                label = { Text(stringResource(R.string.run_log_search_label)) },
-                placeholder = { Text(stringResource(R.string.run_log_search_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }
@@ -403,7 +417,7 @@ private fun RunLogFilterChip(
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.semantics { stateDescription = selectionDescription },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(DesignSystem.Radii.sm),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (selected) {
                 selectedContainerColor()
@@ -440,39 +454,25 @@ private fun RunLogSummaryCard(
     val interrupted = outcomes.count { it == RunLogOutcome.Interrupted }
     val skipped = outcomes.count { it == RunLogOutcome.Skipped }
     val held = outcomes.count { it == RunLogOutcome.Held }
-    val latest = logs.firstOrNull()
-
+    val shareDescription = stringResource(R.string.run_log_share_diagnostic)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Icon(
-                        Icons.Filled.CheckCircle,
-                        contentDescription = stringResource(R.string.nav_run_log),
-                        tint = if (failures > 0 || interrupted > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(10.dp).size(24.dp),
-                    )
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.header_run_log_detail, totalCount),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.run_log_history_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = stringResource(R.string.nav_run_log),
+                    tint = if (failures > 0 || interrupted > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    stringResource(R.string.header_run_log_detail, totalCount),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
                 StatusPill(
                     when {
                         interrupted > 0 -> stringResource(R.string.status_interrupted)
@@ -490,35 +490,25 @@ private fun RunLogSummaryCard(
                     },
                 )
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { SummaryMetric("${outcomes.count { it == RunLogOutcome.Succeeded }}", stringResource(R.string.status_succeeded), Modifier.width(104.dp)) }
-                item { SummaryMetric("$failures", stringResource(R.string.status_failed), Modifier.width(104.dp)) }
-                item { SummaryMetric("$interrupted", stringResource(R.string.status_interrupted), Modifier.width(104.dp)) }
-                item { SummaryMetric("$skipped", stringResource(R.string.status_skipped), Modifier.width(104.dp)) }
-                item { SummaryMetric("$held", stringResource(R.string.status_held), Modifier.width(104.dp)) }
-            }
-            latest?.let {
-                Text(
-                    stringResource(R.string.run_log_latest, it.taskName),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier.fillMaxWidth().testTag(RUN_LOG_ACTIONS_TAG),
             ) {
-                item { OutlinedButton(onClick = onShareDiagnostic) {
-                    Text(stringResource(R.string.run_log_share_diagnostic), maxLines = 1)
+                item { TextButton(
+                    onClick = onShareDiagnostic,
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.semantics { contentDescription = shareDescription },
+                ) {
+                    Text(stringResource(R.string.run_log_share_short), style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 } }
-                item { OutlinedButton(onClick = onRefresh) {
-                    Text(stringResource(R.string.run_log_refresh), maxLines = 1)
+                item { TextButton(onClick = onRefresh, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.run_log_refresh), style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 } }
-                item { OutlinedButton(onClick = onExportJson) {
-                    Text(stringResource(R.string.run_log_export_json))
+                item { TextButton(onClick = onExportJson, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.run_log_export_json_short), style = MaterialTheme.typography.labelMedium)
                 } }
-                item { OutlinedButton(onClick = onExportCsv) {
-                    Text(stringResource(R.string.run_log_export_csv))
+                item { TextButton(onClick = onExportCsv, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.run_log_export_csv_short), style = MaterialTheme.typography.labelMedium)
                 } }
             }
         }
@@ -553,16 +543,17 @@ private fun RunLogCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = when (outcome) {
-                RunLogOutcome.Succeeded -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                RunLogOutcome.Failed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
-                RunLogOutcome.Skipped -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f)
-                RunLogOutcome.Held -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f)
-                RunLogOutcome.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.36f)
-                RunLogOutcome.Interrupted -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
-            }
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
-        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        border = BorderStroke(
+            1.dp,
+            if (outcome == RunLogOutcome.Failed || outcome == RunLogOutcome.Interrupted) {
+                accent.copy(alpha = 0.48f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        ),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -572,28 +563,34 @@ private fun RunLogCard(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
-                Icon(
-                    when (outcome) {
-                        RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
-                        RunLogOutcome.Failed -> Icons.Filled.Error
-                        RunLogOutcome.Skipped -> Icons.Filled.Info
-                        RunLogOutcome.Held -> Icons.Filled.Info
-                        RunLogOutcome.Cancelled -> Icons.Filled.Cancel
-                        RunLogOutcome.Interrupted -> Icons.Filled.Error
-                    },
-                    contentDescription = when (outcome) {
-                        RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
-                        RunLogOutcome.Failed -> stringResource(R.string.status_failed)
-                        RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
-                        RunLogOutcome.Held -> stringResource(R.string.status_held)
-                        RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
-                        RunLogOutcome.Interrupted -> stringResource(R.string.status_interrupted)
-                    },
-                    tint = accent,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clearAndSetSemantics { },
-                )
+                Surface(
+                    color = accent.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(DesignSystem.Radii.sm),
+                ) {
+                    Icon(
+                        when (outcome) {
+                            RunLogOutcome.Succeeded -> Icons.Filled.CheckCircle
+                            RunLogOutcome.Failed -> Icons.Filled.Error
+                            RunLogOutcome.Skipped -> Icons.Filled.Info
+                            RunLogOutcome.Held -> Icons.Filled.Info
+                            RunLogOutcome.Cancelled -> Icons.Filled.Cancel
+                            RunLogOutcome.Interrupted -> Icons.Filled.Error
+                        },
+                        contentDescription = when (outcome) {
+                            RunLogOutcome.Succeeded -> stringResource(R.string.status_succeeded)
+                            RunLogOutcome.Failed -> stringResource(R.string.status_failed)
+                            RunLogOutcome.Skipped -> stringResource(R.string.status_skipped)
+                            RunLogOutcome.Held -> stringResource(R.string.status_held)
+                            RunLogOutcome.Cancelled -> stringResource(R.string.status_cancelled)
+                            RunLogOutcome.Interrupted -> stringResource(R.string.status_interrupted)
+                        },
+                        tint = accent,
+                        modifier = Modifier
+                            .padding(9.dp)
+                            .size(20.dp)
+                            .clearAndSetSemantics { },
+                    )
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(entry.taskName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

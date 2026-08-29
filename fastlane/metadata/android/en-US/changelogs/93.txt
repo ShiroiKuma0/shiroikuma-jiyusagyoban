@@ -1,0 +1,3 @@
+A new OT launcher mark with adaptive foreground, monochrome themed-icon support, density-specific legacy icons, a notification glyph, Play Store artwork, and a launch screen that stays crisp across Android launcher masks.
+The app shell and every main destination now share one navy, cyan, and AMOLED design system.
+Profiles opens directly on its search and automation rows.
