@@ -160,13 +160,34 @@ fun HuaweiFacesRemovingPreview() {
  * the one it holds no copy of has to say so rather than showing a bare number.
  */
 private val FULL_BAND = HuaweiUploadClient.FaceStore(
+    // EIGHTEEN, because that is what "full" is on 白い熊's band. The first version of this fixture
+    // held four, and four faces fit — so the preview showed a tidy dialog for years of looking at
+    // it while the real one squeezed its overflow into the last row and could not be scrolled
+    // (白い熊, 2026-08-28). A fixture for a full band that is not full tests nothing: the count IS
+    // the condition under test.
     faces = listOf(
         HuaweiUploadClient.InstalledFace("2182762613", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2182762133", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2183834133", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2182955593", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2182951513", "2.9.5", showing = false),
+        HuaweiUploadClient.InstalledFace("2182951433", "2.9.5", showing = false),
         HuaweiUploadClient.InstalledFace("7185922173", "2.1.1", showing = false),
         HuaweiUploadClient.InstalledFace("7185695173", "2.1.1", showing = true),
+        HuaweiUploadClient.InstalledFace("7185780633", "2.1.1", showing = false),
+        HuaweiUploadClient.InstalledFace("7185111222", "2.1.1", showing = false),
         HuaweiUploadClient.InstalledFace("9900112233", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112244", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112255", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112266", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112277", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112288", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112299", "1.0.0", showing = false),
+        HuaweiUploadClient.InstalledFace("9900112211", "1.0.0", showing = false),
     ),
-    freeUnits = 0,
+    // 85, not 0 — the band reports free units while refusing the next face, which is why the
+    // free-slot pre-check never fires on it. See HuaweiWatchFaceStallTest.
+    freeUnits = 85,
 )
 
 @PreviewTest
