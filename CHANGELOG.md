@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Updated kotlinx-collections-immutable to 0.5.2, which corrects wrong results from bulk add, remove and retain operations on persistent hash sets and maps when a collision node meets a single element.
+
 ### Fixed
 
 - A failed Termux script now says which step failed instead of blaming the hash. The old wording covered a missing result, a Termux error, and a genuine mismatch with one sentence, so a correct hash still read as wrong. The five causes now report separately: no result came back (with the allow-external-apps setting named, since that is the usual cause), Termux reported an error (with its own message and code), the check exited non-zero (with the code and the script path, which covers a missing script or a missing sha256sum), the output held no readable hash, and a real mismatch that prints both the approved hash and the one Termux computed. The run log records the Termux error code alongside the exit code, and script output stays redacted throughout.
