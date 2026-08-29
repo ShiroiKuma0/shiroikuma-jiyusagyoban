@@ -16,55 +16,72 @@ class LauncherIconContractTest {
     ).first { Files.exists(it.resolve("app/src/main/AndroidManifest.xml")) }
 
     @Test
-    fun `adaptive icons keep color and themed layers separate`() {
+    fun `adaptive icons keep density color and themed layers separate`() {
         listOf("ic_launcher.xml", "ic_launcher_round.xml").forEach { name ->
-            val adaptive = read("app/src/main/res/mipmap/$name")
+            val adaptive = read("app/src/main/res/mipmap-anydpi-v26/$name")
             assertTrue("@color/ic_launcher_background" in adaptive)
-            assertTrue("@drawable/ic_opentasker_mark" in adaptive)
-            assertTrue("@drawable/ic_opentasker_mark_monochrome" in adaptive)
+            assertTrue("@mipmap/ic_launcher_foreground" in adaptive)
+            assertTrue("@mipmap/ic_launcher_monochrome" in adaptive)
         }
 
-        val foreground = read("app/src/main/res/drawable/ic_opentasker_mark.xml")
-        assertTrue("#FBFBFB" in foreground)
-        assertTrue("#13A8D5" in foreground)
-        assertFalse("The adaptive foreground must not bake in its background", "#0C172E" in foreground)
-
-        val monochrome = read("app/src/main/res/drawable/ic_opentasker_mark_monochrome.xml")
-        assertTrue("#FFFFFFFF" in monochrome)
-        assertFalse("#13A8D5" in monochrome)
-    }
-
-    @Test
-    fun `legacy launchers receive the exact density sizes`() {
         val expected = mapOf(
-            "mipmap-ldpi" to 36,
-            "mipmap-mdpi" to 48,
-            "mipmap-hdpi" to 72,
-            "mipmap-xhdpi" to 96,
-            "mipmap-xxhdpi" to 144,
-            "mipmap-xxxhdpi" to 192,
+            "mipmap-mdpi" to 108,
+            "mipmap-hdpi" to 162,
+            "mipmap-xhdpi" to 216,
+            "mipmap-xxhdpi" to 324,
+            "mipmap-xxxhdpi" to 432,
         )
 
         expected.forEach { (directory, size) ->
-            val image = ImageIO.read(file("app/src/main/res/$directory/ic_launcher.png").toFile())
-            assertEquals(size, image.width)
-            assertEquals(size, image.height)
-            assertEquals(0x0C172E, image.getRGB(0, 0) and 0xFFFFFF)
+            listOf("ic_launcher_foreground.png", "ic_launcher_monochrome.png").forEach { name ->
+                val image = ImageIO.read(file("app/src/main/res/$directory/$name").toFile())
+                assertEquals(size, image.width)
+                assertEquals(size, image.height)
+                assertEquals(0, image.getRGB(0, 0) ushr 24)
+                assertTrue((image.getRGB(size / 2, size / 2) ushr 24) > 0)
+            }
+            assertFalse(Files.exists(file("app/src/main/res/$directory/ic_launcher.png")))
         }
+        assertFalse(Files.exists(file("app/src/main/res/mipmap-ldpi/ic_launcher.png")))
+        assertFalse(Files.exists(file("app/src/main/res/mipmap/ic_launcher_foreground.png")))
     }
 
     @Test
-    fun `store and transparent masters match the launcher contract`() {
+    fun `store and transparent copies match the checked in master`() {
+        val primary = ImageIO.read(file("design/logo/source-user-logo-2026-08-29.png").toFile())
+        assertEquals(1024, primary.width)
+        assertEquals(1024, primary.height)
+        assertEquals(255, primary.getRGB(0, 0) ushr 24)
+
         val store = ImageIO.read(file("fastlane/metadata/android/en-US/images/icon.png").toFile())
         assertEquals(512, store.width)
         assertEquals(512, store.height)
-        assertEquals(0x0C172E, store.getRGB(0, 0) and 0xFFFFFF)
+        assertEquals(primary.getRGB(0, 0) and 0xFFFFFF, store.getRGB(0, 0) and 0xFFFFFF)
 
         val foreground = ImageIO.read(file("design/logo/opentasker-mark.png").toFile())
         assertEquals(1024, foreground.width)
         assertEquals(1024, foreground.height)
         assertEquals(0, foreground.getRGB(0, 0) ushr 24)
-        assertTrue((foreground.getRGB(foreground.width * 3 / 4, foreground.height * 44 / 100) ushr 24) > 0)
+        assertTrue((foreground.getRGB(foreground.width / 2, foreground.height / 2) ushr 24) > 0)
+        assertFalse(Files.exists(file("design/logo/opentasker-mark.svg")))
+    }
+
+    @Test
+    fun `notification silhouette keeps density sizes and real alpha`() {
+        val expected = mapOf(
+            "drawable-mdpi" to 24,
+            "drawable-hdpi" to 36,
+            "drawable-xhdpi" to 48,
+            "drawable-xxhdpi" to 72,
+            "drawable-xxxhdpi" to 96,
+        )
+        expected.forEach { (directory, size) ->
+            val image = ImageIO.read(file("app/src/main/res/$directory/ic_notification.png").toFile())
+            assertEquals(size, image.width)
+            assertEquals(size, image.height)
+            assertEquals(0, image.getRGB(0, 0) ushr 24)
+            assertTrue((image.getRGB(size / 2, size / 2) ushr 24) > 0)
+        }
     }
 
     @Test

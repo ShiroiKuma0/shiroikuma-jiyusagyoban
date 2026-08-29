@@ -35,4 +35,4 @@ A final paired review covered the changed Profiles, Run Log, Scenes, and Inspect
 
 ## Final captures
 
-Release screenshots are stored in `fastlane/metadata/android/en-US/images/phoneScreenshots/`. They were captured from the final debug build on the test viewport above and are marked for version code 93.
+Release screenshots are stored in `fastlane/metadata/android/en-US/images/phoneScreenshots/`. The unchanged in-app views were revalidated against version code 94 after the launcher artwork update.

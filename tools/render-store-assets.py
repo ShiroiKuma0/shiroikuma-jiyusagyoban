@@ -1,84 +1,105 @@
-"""Render OpenTasker's launcher, brand, and store artwork from one geometry source."""
+"""Render OpenTasker's Android and store artwork from checked-in source PNGs."""
 
 from __future__ import annotations
 
-import math
 import os
+from collections import Counter
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-NAVY = (12, 23, 46)
 NAVY_DEEP = (5, 10, 22)
 NAVY_LIGHT = (18, 38, 70)
 CYAN = (19, 168, 213)
 WHITE = (251, 251, 251)
 MUTED = (157, 174, 199)
-VIEWPORT = 108.0
-SUPERSAMPLE = 8
 
 REPO = Path(__file__).resolve().parent.parent
 RES = REPO / "app" / "src" / "main" / "res"
 DESIGN = REPO / "design" / "logo"
 EXPORTS = DESIGN / "exports"
 STORE = REPO / "fastlane" / "metadata" / "android" / "en-US" / "images"
+PRIMARY_SOURCE = DESIGN / "source-user-logo-2026-08-29.png"
+FOREGROUND_SOURCE = DESIGN / "source-android-foreground-2026-08.png"
+MONOCHROME_SOURCE = DESIGN / "source-monochrome-2026-08.png"
+
+ADAPTIVE_DENSITIES = {
+    "mdpi": 108,
+    "hdpi": 162,
+    "xhdpi": 216,
+    "xxhdpi": 324,
+    "xxxhdpi": 432,
+}
+NOTIFICATION_DENSITIES = {
+    "mdpi": 24,
+    "hdpi": 36,
+    "xhdpi": 48,
+    "xxhdpi": 72,
+    "xxxhdpi": 96,
+}
 
 
-def _coord(value: float, size: int) -> float:
-    return value * size * SUPERSAMPLE / VIEWPORT
+def load_source(path: Path) -> Image.Image:
+    image = Image.open(path).convert("RGBA")
+    if image.size != (1024, 1024):
+        raise ValueError(f"{path} is {image.size}, expected 1024x1024")
+    return image
 
 
-def _arc_edge(y: float) -> float:
-    center_x, center_y, radius = 41.3, 52.0, 13.5
-    return center_x + math.sqrt(radius * radius - (y - center_y) ** 2)
+def alpha_counts(image: Image.Image) -> tuple[int, int]:
+    counts = Counter(image.getchannel("A").getdata())
+    return counts[0], counts[255]
 
 
-def render_mark(size: int, monochrome: bool = False) -> Image.Image:
-    """Return the O/T foreground on a truly transparent RGBA canvas."""
-    large = size * SUPERSAMPLE
-    image = Image.new("RGBA", (large, large), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-
-    outer = tuple(_coord(value, size) for value in (20.3, 31.0, 62.3, 73.0))
-    inner = tuple(_coord(value, size) for value in (27.8, 38.5, 54.8, 65.5))
-    draw.ellipse(outer, fill=WHITE + (255,))
-    draw.ellipse(inner, fill=(0, 0, 0, 0))
-
-    top, bottom = 42.8, 50.2
-    points = [
-        (_arc_edge(top), top),
-        (87.0, top),
-        (87.0, bottom),
-        (75.2, bottom),
-        (75.2, 78.2),
-        (67.8, 73.4),
-        (67.8, bottom),
-        (_arc_edge(bottom), bottom),
-    ]
-    for step in range(1, 49):
-        y = bottom + (top - bottom) * step / 48
-        points.append((_arc_edge(y), y))
-    scaled = [(_coord(x, size), _coord(y, size)) for x, y in points]
-    draw.polygon(scaled, fill=(WHITE if monochrome else CYAN) + (255,))
-
-    return image.resize((size, size), Image.Resampling.LANCZOS)
+def remove_connected_background(image: Image.Image, tolerance: int = 14) -> Image.Image:
+    result = image.copy()
+    for point in ((0, 0), (1023, 0), (0, 1023), (1023, 1023)):
+        ImageDraw.floodfill(result, point, (0, 0, 0, 0), thresh=tolerance)
+    transparent, opaque = alpha_counts(result)
+    area = result.width * result.height
+    if transparent < area * 0.15 or opaque < area * 0.01:
+        raise ValueError(
+            f"background removal failed validation: transparent={transparent}, opaque={opaque}"
+        )
+    return result
 
 
-def render_tile(size: int) -> Image.Image:
-    tile = Image.new("RGB", (size, size), NAVY)
-    mark = render_mark(size)
-    tile.paste(mark, (0, 0), mark)
-    return tile
+def monochrome_layer(image: Image.Image) -> Image.Image:
+    pixels = []
+    for red, green, blue, source_alpha in image.getdata():
+        alpha = max(red, green, blue) * source_alpha // 255
+        pixels.append((255, 255, 255, alpha))
+    result = Image.new("RGBA", image.size)
+    result.putdata(pixels)
+    transparent, opaque = alpha_counts(result)
+    area = result.width * result.height
+    if transparent < area * 0.15 or opaque < area * 0.01:
+        raise ValueError(
+            f"monochrome conversion failed validation: transparent={transparent}, opaque={opaque}"
+        )
+    return result
 
 
-def fitted_mark(width: int, height: int) -> Image.Image:
-    mark = render_mark(1024)
-    bbox = mark.getbbox()
+def sample_corner_color(image: Image.Image) -> tuple[int, int, int]:
+    samples = []
+    for x, y in ((0, 0), (1023, 0), (0, 1023), (1023, 1023)):
+        crop = image.crop((max(0, x - 5), max(0, y - 5), min(1024, x + 6), min(1024, y + 6)))
+        samples.extend(crop.getdata())
+    return tuple(sum(pixel[channel] for pixel in samples) // len(samples) for channel in range(3))
+
+
+def save(image: Image.Image, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path, "PNG", optimize=True)
+
+
+def fitted(image: Image.Image, width: int, height: int) -> Image.Image:
+    bbox = image.getbbox()
     if bbox is None:
-        raise RuntimeError("The rendered mark is empty")
-    mark = mark.crop(bbox)
-    mark.thumbnail((width, height), Image.Resampling.LANCZOS)
-    return mark
+        raise ValueError("source artwork has no visible pixels")
+    result = image.crop(bbox)
+    result.thumbnail((width, height), Image.Resampling.LANCZOS)
+    return result
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -97,21 +118,18 @@ def feature_background(width: int, height: int) -> Image.Image:
         ratio = x / max(1, width - 1)
         color = tuple(round(a + (b - a) * ratio) for a, b in zip(NAVY_DEEP, NAVY_LIGHT))
         draw.line((x, 0, x, height), fill=color)
-
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    glow_draw = ImageDraw.Draw(glow)
-    glow_draw.ellipse((-90, -160, 540, 470), fill=CYAN + (42,))
+    ImageDraw.Draw(glow).ellipse((-90, -160, 540, 470), fill=CYAN + (42,))
     glow = glow.filter(ImageFilter.GaussianBlur(90))
-    return Image.alpha_composite(image.convert("RGBA"), glow).convert("RGB")
+    return Image.alpha_composite(image.convert("RGBA"), glow)
 
 
-def render_feature_graphic() -> Image.Image:
+def render_feature_graphic(mark: Image.Image) -> Image.Image:
     width, height = 1024, 500
-    image = feature_background(width, height).convert("RGBA")
+    image = feature_background(width, height)
     draw = ImageDraw.Draw(image)
-    mark = fitted_mark(310, 310)
-    image.alpha_composite(mark, (72, (height - mark.height) // 2))
-
+    fitted_mark = fitted(mark, 310, 310)
+    image.alpha_composite(fitted_mark, (72, (height - fitted_mark.height) // 2))
     text_x = 430
     draw.text((text_x, 142), "OpenTasker", font=font(74, bold=True), fill=WHITE)
     draw.text((text_x, 242), "Automation that stays yours", font=font(34), fill=(204, 220, 240))
@@ -133,22 +151,22 @@ def launcher_mask(kind: str, size: int) -> Image.Image:
     elif kind == "Squircle":
         radius = (size - inset * 2) / 2
         center = (size - 1) / 2
-        pixels = []
-        for y in range(size):
-            for x in range(size):
-                nx = abs((x - center) / radius)
-                ny = abs((y - center) / radius)
-                pixels.append(255 if nx**4 + ny**4 <= 1 else 0)
-        mask.putdata(pixels)
+        mask.putdata([
+            255
+            if abs((x - center) / radius) ** 4 + abs((y - center) / radius) ** 4 <= 1
+            else 0
+            for y in range(size)
+            for x in range(size)
+        ])
     else:
         raise ValueError(f"Unknown launcher mask: {kind}")
     return mask
 
 
-def render_mask_preview() -> Image.Image:
+def render_mask_preview(primary: Image.Image) -> Image.Image:
     width, height = 1500, 430
     preview = Image.new("RGB", (width, height), (4, 8, 17))
-    tile = render_tile(300).convert("RGBA")
+    tile = primary.resize((300, 300), Image.Resampling.LANCZOS)
     label_font = font(24, bold=True)
     for index, label in enumerate(("Square", "Rounded", "Squircle", "Circle")):
         x = 55 + index * 365
@@ -166,34 +184,73 @@ def render_mask_preview() -> Image.Image:
     return preview
 
 
+def adaptive_xml() -> str:
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <background android:drawable="@color/ic_launcher_background"/>\n'
+        '    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n'
+        '    <monochrome android:drawable="@mipmap/ic_launcher_monochrome"/>\n'
+        '</adaptive-icon>\n'
+    )
+
+
 def save_assets() -> None:
-    STORE.mkdir(parents=True, exist_ok=True)
-    DESIGN.mkdir(parents=True, exist_ok=True)
-    EXPORTS.mkdir(parents=True, exist_ok=True)
+    primary = load_source(PRIMARY_SOURCE)
+    foreground_source = load_source(FOREGROUND_SOURCE)
+    monochrome_source = load_source(MONOCHROME_SOURCE)
+    if alpha_counts(primary) != (0, 1024 * 1024):
+        raise ValueError("primary source must be fully opaque")
 
-    render_tile(512).save(STORE / "icon.png", optimize=True)
-    render_feature_graphic().save(STORE / "featureGraphic.png", optimize=True)
+    foreground = remove_connected_background(foreground_source)
+    monochrome = monochrome_layer(monochrome_source)
+    brand_mark = remove_connected_background(primary)
+    background = sample_corner_color(foreground_source)
 
-    render_mark(1024).save(DESIGN / "opentasker-mark.png", optimize=True)
-    render_tile(1024).save(DESIGN / "opentasker-mark-concept.png", optimize=True)
-    render_tile(1024).save(DESIGN / "opentasker-app-tile.png", optimize=True)
-    render_mask_preview().save(DESIGN / "launcher-mask-preview.png", optimize=True)
-    render_mark(432).save(RES / "mipmap" / "ic_launcher_foreground.png", optimize=True)
+    for density, size in ADAPTIVE_DENSITIES.items():
+        save(
+            foreground.resize((size, size), Image.Resampling.LANCZOS),
+            RES / f"mipmap-{density}" / "ic_launcher_foreground.png",
+        )
+        save(
+            monochrome.resize((size, size), Image.Resampling.LANCZOS),
+            RES / f"mipmap-{density}" / "ic_launcher_monochrome.png",
+        )
+
+    for density, size in NOTIFICATION_DENSITIES.items():
+        save(
+            monochrome.resize((size, size), Image.Resampling.LANCZOS),
+            RES / f"drawable-{density}" / "ic_notification.png",
+        )
+
+    adaptive = adaptive_xml()
+    anydpi = RES / "mipmap-anydpi-v26"
+    anydpi.mkdir(parents=True, exist_ok=True)
+    (anydpi / "ic_launcher.xml").write_text(adaptive, encoding="utf-8", newline="\n")
+    (anydpi / "ic_launcher_round.xml").write_text(adaptive, encoding="utf-8", newline="\n")
+    color = "#{:02X}{:02X}{:02X}".format(*background)
+    (RES / "values" / "ic_launcher_background.xml").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<resources>\n'
+        f'    <color name="ic_launcher_background">{color}</color>\n'
+        '</resources>\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+
+    save(primary.resize((512, 512), Image.Resampling.LANCZOS).convert("RGB"), STORE / "icon.png")
+    save(render_feature_graphic(brand_mark), STORE / "featureGraphic.png")
+    save(brand_mark, DESIGN / "opentasker-mark.png")
+    save(primary.convert("RGB"), DESIGN / "opentasker-mark-concept.png")
+    save(primary.convert("RGB"), DESIGN / "opentasker-app-tile.png")
+    save(render_mask_preview(primary), DESIGN / "launcher-mask-preview.png")
 
     for size in (256, 512, 1024):
-        render_mark(size).save(EXPORTS / f"opentasker_emblem_true_transparent_{size}.png", optimize=True)
-    render_mark(1024).save(EXPORTS / "opentasker_emblem_true_transparent.png", optimize=True)
-
-    densities = {
-        "mipmap-ldpi": 36,
-        "mipmap-mdpi": 48,
-        "mipmap-hdpi": 72,
-        "mipmap-xhdpi": 96,
-        "mipmap-xxhdpi": 144,
-        "mipmap-xxxhdpi": 192,
-    }
-    for directory, size in densities.items():
-        render_tile(size).save(RES / directory / "ic_launcher.png", optimize=True)
+        save(
+            brand_mark.resize((size, size), Image.Resampling.LANCZOS),
+            EXPORTS / f"opentasker_emblem_true_transparent_{size}.png",
+        )
+    save(brand_mark, EXPORTS / "opentasker_emblem_true_transparent.png")
 
 
 if __name__ == "__main__":

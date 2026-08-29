@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.2.92
+
+### Changed
+
+- New app icon: adaptive, themed (monochrome) and legacy variants regenerated from the 2026-08 icon set.
+
 ## v0.2.91
 
 OpenTasker has a new launcher identity and a tighter, quieter interface built for dense automation work.
