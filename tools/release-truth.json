@@ -1,33 +1,33 @@
 {
-  "schemaVersion": 1,
-  "requiredArtifactCommit": "bbd2a0743ea51fb947202c8b4b023a02e5ef68f4",
-  "releaseTag": "v0.2.92",
-  "releaseTagCommit": "6f5d09ea577312100fc51049f98d28d4d86f6676",
-  "application": {
-    "versionName": "0.2.92",
-    "versionCode": 94
-  },
-  "android": {
-    "minSdk": 26,
-    "compileSdk": 37,
-    "targetSdk": 37,
-    "buildTools": "36.0.0"
-  },
-  "dependencies": {
-    "kotlin": "2.4.10",
-    "gradle": "9.7.0",
-    "agp": "9.3.1",
-    "ksp": "2.3.11",
-    "room": "2.8.4",
-    "composeBom": "2026.06.01",
-    "work": "2.11.2"
-  },
-  "capabilities": {
-    "registeredActions": 77,
-    "engineHandledActions": 10,
-    "contextFamilies": 7,
-    "bundleSchemaVersion": 2,
-    "bundleSupportedSchemaVersions": "1..2",
-    "roomSchemaVersion": 15
-  }
+    "schemaVersion":  1,
+    "requiredArtifactCommit":  "8989fab1d8fd089e69d2af27e1c470305549152b",
+    "releaseTag":  "v0.2.93",
+    "releaseTagCommit":  "8989fab1d8fd089e69d2af27e1c470305549152b",
+    "application":  {
+                        "versionName":  "0.2.93",
+                        "versionCode":  95
+                    },
+    "android":  {
+                    "minSdk":  26,
+                    "compileSdk":  37,
+                    "targetSdk":  37,
+                    "buildTools":  "36.0.0"
+                },
+    "dependencies":  {
+                         "kotlin":  "2.4.10",
+                         "gradle":  "9.7.0",
+                         "agp":  "9.3.1",
+                         "ksp":  "2.3.11",
+                         "room":  "2.8.4",
+                         "composeBom":  "2026.06.01",
+                         "work":  "2.11.2"
+                     },
+    "capabilities":  {
+                         "registeredActions":  77,
+                         "engineHandledActions":  10,
+                         "contextFamilies":  7,
+                         "bundleSchemaVersion":  2,
+                         "bundleSupportedSchemaVersions":  "1..2",
+                         "roomSchemaVersion":  15
+                     }
 }
