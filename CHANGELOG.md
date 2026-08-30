@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v0.2.93
+
+### Security
+
+- The development signing key is no longer stored in this repository. Standard
+  release builds now use an external local signing identity, while F-Droid builds
+  remain unsigned for F-Droid to sign.
+- v0.2.93 uses a new signing identity because the old key was publicly available.
+  Anyone who installed v0.2.92 must uninstall it before installing this release.
+
 ## v0.2.92
 
 ### Changed

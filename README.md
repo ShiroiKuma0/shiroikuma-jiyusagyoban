@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.92-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
@@ -164,7 +164,7 @@ Untrusted imports are preflighted before object/DOM allocation. OpenTasker and M
 - Non-F-Droid builds can opt into a daily HTTPS-only GitHub release check from Setup. It sends no identifying data, stores only a newer-release link, and never downloads or installs updates; F-Droid builds omit this check because F-Droid supplies their updates.
 - Play distribution profile with SMS/phone-state manifest policy gate
 - Local release verification scripts for F-Droid metadata, readiness, and APK payload comparison
-- Environment-driven release signing, falling back to the repo-owned self-host key so a published artifact keeps a stable identity; the F-Droid distribution builds unsigned because F-Droid signs what it builds
+- Environment-driven release signing kept outside the repository; the F-Droid distribution builds unsigned because F-Droid signs what it builds
 - SQLite database backup/restore with WAL-safe validation and atomic staged restore, reviewed before staging (source, schema version, compatibility, entity counts) and cancellable afterwards; encrypted `.otbackup` v2 exports use bounded-memory, independently authenticated 64 KiB frames while legacy v1 files remain restorable. Secret rows stay ciphertext and the device-bound Keystore key is never copied, so a restore on another device requires secret re-entry
 - APK payload comparison harness for reproducibility checks
 - SQLCipher native libraries are included in both standard and F-Droid source builds; the release gate audits their 16 KB page alignment and keeps the dependency checksum-pinned
@@ -228,7 +228,10 @@ Compose screenshot references are generated and validated headlessly. Run
 references, then run `./gradlew :app:validateDebugScreenshotTest` to compare every theme, font-scale,
 and RTL case.
 
-Release build (signed with the repo-owned self-host key when no keystore env vars are set):
+Release builds require `OPEN_TASKER_RELEASE_KEYSTORE`,
+`OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD`, `OPEN_TASKER_RELEASE_KEY_ALIAS`, and
+`OPEN_TASKER_RELEASE_KEY_PASSWORD`. The key file stays outside this repository.
+
 ```bash
 ./gradlew :app:assembleRelease
 ```

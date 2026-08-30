@@ -1,0 +1,1 @@
+Removed the public development signing key. Release APKs now require an external local signing identity.

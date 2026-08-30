@@ -187,8 +187,8 @@ val releaseKeystorePath = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE")
 val releaseKeystorePassword = System.getenv("OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("OPEN_TASKER_RELEASE_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("OPEN_TASKER_RELEASE_KEY_PASSWORD")
-val appVersionCode = 94
-val appVersionName = "0.2.92"
+val appVersionCode = 95
+val appVersionName = "0.2.93"
 // F-Droid store listing limits, from the F-Droid build metadata reference.
 val FDROID_SHORT_DESCRIPTION_MAX_CHARS = 80
 val FDROID_CHANGELOG_MAX_CHARS = 500
@@ -261,19 +261,6 @@ android {
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
             }
-        } else {
-            // Self-host signing identity, checked in deliberately. Distributed builds are
-            // unsigned-by-policy in the sense that no private code-signing certificate is
-            // acquired, but Android refuses to install an APK with no signature at all, so
-            // published artifacts carry this repo-owned key. It lives in the repo rather than
-            // in ~/.android/debug.keystore because that file is machine-global and gets
-            // regenerated — which is exactly how the key that signed v0.2.79 was lost.
-            create("selfhost") {
-                storeFile = file("dev_keystore.jks")
-                storePassword = "opentasker"
-                keyAlias = "opentasker"
-                keyPassword = "opentasker"
-            }
         }
     }
 
@@ -288,11 +275,11 @@ android {
             // F-Droid builds from source and applies its own signature, so that distribution must
             // stay unsigned — it is also what makes AGP name the artifact
             // `app-release-unsigned.apk`, the path the build recipe and the reproducibility
-            // harness both expect. Every other distribution falls back to the repo-owned key.
+            // harness both expect. Every other distribution requires external signing.
             signingConfig = if (releaseBuildIsUnsigned) {
                 null
             } else {
-                signingConfigs.findByName("release") ?: signingConfigs.getByName("selfhost")
+                signingConfigs.findByName("release")
             }
         }
         create("benchmark") {
