@@ -211,10 +211,14 @@ object TaskerXmlImporter {
                 lossyWarnings += "A Tasker variable was skipped because it had no name."
                 return@mapNotNull null
             }
+            // Tasker globals are uppercase-first; import them as super-globals (projectId 0).
+            // (Lowercase Tasker vars are task-local and aren't persisted, but we keep them listed.)
             Variable(
                 name = name,
+                // "v" as well: the exporter writes the value as <v>, so a Tasker XML export read
+                // back in dropped every variable's value until this name was accepted here too.
                 value = element.childText("val", "value", "v"),
-                isGlobal = VariableNamePolicy.isGlobal(name),
+                projectId = 0,
             )
         }
 
@@ -499,6 +503,10 @@ object TaskerXmlImporter {
     }
 
     private fun parseDocument(rawXml: String): Document {
+        // A 白い熊 自由作業盤 JSON bundle imported here by mistake parses as garbage XML; say so clearly.
+        if (rawXml.trimStart().firstOrNull().let { it == '{' || it == '[' }) {
+            throw IllegalArgumentException("This looks like a 白い熊 自由作業盤 JSON bundle, not a Tasker XML export — use \"Import JSON\" instead.")
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
             isExpandEntityReferences = false

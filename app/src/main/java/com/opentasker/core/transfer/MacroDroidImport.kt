@@ -554,7 +554,7 @@ object MacroDroidImporter {
             if (rawName != name) {
                 lossyWarnings += "MacroDroid global variable '$rawName' was normalized to OpenTasker global '$name'."
             }
-            Variable(name = name, value = value, isGlobal = true)
+            Variable(name = name, value = value)
         }
     }
 
