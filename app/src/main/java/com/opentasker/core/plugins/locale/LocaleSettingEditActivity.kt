@@ -35,7 +35,7 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.screens.ContentLoadingState
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flow
@@ -63,10 +63,9 @@ class LocaleSettingEditActivity : ComponentActivity() {
 
         setContent {
             // Honor the persisted theme like MainActivity and the widget config activity,
-            // instead of defaulting to the system theme.
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = null)
-            val resolvedTheme = themeMode ?: return@setContent
-            OpenTaskerTheme(resolvedTheme) {
+            // instead of defaulting to the system theme (fork: ThemePrefs-driven OpenTaskerTheme).
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 val tasks by tasksFlow.collectAsState(initial = null)
                 Scaffold(
                     topBar = {

@@ -25,10 +25,14 @@ object MacroDroidImportPlanner {
             importSceneCount = 0,
             mappedActionCount = report.mappedActions.size,
             unsupportedActionCount = report.unsupportedActions.size,
-            capabilityWarnings = plan.capabilityRequirements
-                .filter { it.level != CapabilityLevel.Supported }
-                .map { "${it.actionId}: ${it.level.name.lowercase()} (${it.reason})" },
-            powerRequests = plan.powerRequests,
+            // Fork: the fork's bundle validator carries no capabilityRequirements/powerRequests, so
+            // the warnings are derived from the registry exactly as TaskerImportPlanner derives them.
+            capabilityWarnings = report.bundle.tasks
+                .flatMap { task -> task.actions.map { it.type } }
+                .distinct()
+                .map { actionId -> actionId to com.opentasker.core.capabilities.ActionCapabilityRegistry.get(actionId) }
+                .filter { (_, capability) -> capability.level != CapabilityLevel.Supported }
+                .map { (actionId, capability) -> "$actionId: ${capability.level.name.lowercase()} - ${capability.reason}" },
             warnings = (report.warnings + plan.warnings + emptyWarning).distinct(),
             lossyWarnings = (report.lossyWarnings + plan.lossyWarnings).distinct(),
             canImport = plan.canImport && hasImportableContent,

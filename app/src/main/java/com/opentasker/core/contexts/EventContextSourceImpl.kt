@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
  *   - "push": authenticated UnifiedPush distributor delivery
  *   - "share": sanitized Android Sharesheet text, URI, or file delivery
  *   - "broadcast": a named intent from another app, with bounded string extras
+ *   - "fold": foldable posture changed (folded / semi / unfolded), also exposed as %FOLD
  */
 class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
@@ -67,12 +68,15 @@ class EventContextSourceImpl : EventDemandContextSource {
         NotificationContextEvents.events,
         NfcContextEvents.events,
         BootContextEvents.events,
-        CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
-        // Exported, so only a matcher that can fire on it holds it open.
-        if (LocalePluginRequestQueryEvents.isRequested(requestedEvent)) LocalePluginRequestQueryEvents.events(app) else null,
+        CalendarSunContextEvents.events(app),
+        LocalePluginRequestQueryEvents.events(app),
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
         ShareContextEvents.events,
         BroadcastContextEvents.events,
+        OrientationContextEvents.events,
+        FoldContextEvents.events,
+        AppForegroundChangedContextEvents.events,
+        HardwareKeyContextEvents.events,
     )
 }

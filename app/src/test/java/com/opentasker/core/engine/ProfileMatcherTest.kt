@@ -30,7 +30,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Activated(null)),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Activated()),
             changes,
         )
     }
@@ -64,7 +64,7 @@ class ProfileMatcherTest {
             initialPulseSequence = sequence,
         ).toList()
 
-        assertEquals(listOf(ProfileStateChange.Activated(null)), changes)
+        assertEquals(listOf(ProfileStateChange.Activated()), changes)
     }
 
     @Test
@@ -94,25 +94,7 @@ class ProfileMatcherTest {
             hasPulseContexts = true,
         ).toList()
 
-        assertEquals(listOf(ProfileStateChange.Activated(null)), changes)
-    }
-
-    @Test
-    fun matchingPulseCarriesSourceEventForTaskVariables() = runBlocking {
-        val event = ContextEvent(
-            type = "event",
-            matched = true,
-            metadata = mapOf("event" to "share", "text" to "hello"),
-        )
-        val changes = profileStateChangesFromSnapshots(
-            snapshots = flowOf(
-                ProfileMatchSnapshot(allMatched = false, pulseSequence = 0),
-                ProfileMatchSnapshot(allMatched = true, pulseSequence = 1, event = event),
-            ),
-            hasPulseContexts = true,
-        ).toList()
-
-        assertEquals(event, (changes.single() as ProfileStateChange.Activated).event)
+        assertEquals(listOf(ProfileStateChange.Activated()), changes)
     }
 
     @Test
@@ -128,7 +110,7 @@ class ProfileMatcherTest {
         ).toList()
 
         assertEquals(
-            listOf(ProfileStateChange.Activated(null), ProfileStateChange.Deactivated),
+            listOf(ProfileStateChange.Activated(), ProfileStateChange.Deactivated),
             changes,
         )
     }
