@@ -44,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.isSystemInDarkTheme
 import com.opentasker.app.R
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.model.Task
@@ -52,8 +51,7 @@ import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.ui.screens.StorageDecodeWarningCard
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.emitAll
@@ -92,8 +90,8 @@ class TaskWidgetConfigActivity : ComponentActivity() {
             }
 
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
-            OpenTaskerTheme(themeMode) {
+            val themePrefs by ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 val taskState by tasksFlow.collectAsState(initial = WidgetTaskState())
                 ConfigScreen(
                     tasks = taskState.tasks,
