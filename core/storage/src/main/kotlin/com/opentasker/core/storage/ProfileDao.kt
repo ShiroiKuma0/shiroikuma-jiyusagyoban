@@ -3,22 +3,19 @@ package com.opentasker.core.storage
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
-import androidx.room.Insert
 import androidx.room.Index
+import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
-import androidx.room.Upsert
 import androidx.room.Update
 import kotlinx.serialization.encodeToString
 import com.opentasker.core.model.AutomationMode
-import com.opentasker.core.model.ContextExpressionNode
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.ProfileLifetime
 import com.opentasker.core.model.ProfileOverflowPolicy
 import com.opentasker.core.model.ContextSpec
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 
-@Entity("profiles", indices = [Index("projectId")])
+@Entity("profiles", indices = [Index(value = ["projectId", "name"], unique = true)])
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -28,9 +25,14 @@ data class ProfileEntity(
     val cooldownSec: Int,
     val contextsJson: String,
     val automationMode: String = AutomationMode.SINGLE.name,
-    val profileGroup: String? = null,
+    val projectId: Long? = null,
+    val position: Int = 0,
+    val enterTaskName: String = "",
+    val exitTaskName: String = "",
     val requiresRiskAcknowledgement: Boolean = false,
-    @androidx.room.ColumnInfo(defaultValue = "1") val projectId: Long = DEFAULT_PROJECT_ID,
+    // Upstream's profile policy columns. The fork keeps its own nullable projectId above (NULL =
+    // Unfiled, which upstream has no equivalent for), so upstream's non-null projectId line is not
+    // taken here — only the policy fields it introduced alongside it.
     @androidx.room.ColumnInfo(defaultValue = "0") val priority: Int = 0,
     @androidx.room.ColumnInfo(defaultValue = "0") val gracePeriodSec: Int = 0,
     @androidx.room.ColumnInfo(defaultValue = "'NEVER'") val lifetime: String = ProfileLifetime.NEVER.name,
@@ -45,29 +47,10 @@ data class ProfileEntity(
 
     fun toDomainDecodeResult(): StorageDecodeResult<Profile> {
         val mode = runCatching { AutomationMode.valueOf(automationMode) }.getOrDefault(AutomationMode.SINGLE)
-        val decodedContexts = runCatching {
-            StoredProfileContexts(
-                contexts = StorageJson.decodeFromString<List<ContextSpec>>(contextsJson),
-                expression = null,
-            )
-        }.recoverCatching {
-            val payload = StorageJson.decodeFromString<StoredProfileContexts>(contextsJson)
-            StoredProfileContexts(payload.contexts, payload.expression)
-        }.getOrElse { error ->
+        val contexts = runCatching { StorageJson.decodeFromString<List<ContextSpec>>(contextsJson) }
+            .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Profile(
-                        id,
-                        name,
-                        enabled,
-                        emptyList(),
-                        enterTaskId,
-                        exitTaskId,
-                        cooldownSec,
-                        mode,
-                        profileGroup,
-                        requiresRiskAcknowledgement,
-                        projectId,
-                    ),
+                    value = Profile(id, name, enabled, emptyList(), enterTaskId, exitTaskId, cooldownSec, mode, projectId, position, enterTaskName, exitTaskName, requiresRiskAcknowledgement = requiresRiskAcknowledgement),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.PROFILE,
                         recordId = id,
@@ -77,7 +60,6 @@ data class ProfileEntity(
                     ),
                 )
             }
-        val contexts = decodedContexts.contexts
 
         val profileLifetime = runCatching { ProfileLifetime.valueOf(lifetime) }
             .getOrDefault(ProfileLifetime.NEVER)
@@ -93,10 +75,11 @@ data class ProfileEntity(
                 exitTaskId = exitTaskId,
                 cooldownSec = cooldownSec,
                 automationMode = mode,
-                group = profileGroup,
-                requiresRiskAcknowledgement = requiresRiskAcknowledgement,
                 projectId = projectId,
-                contextExpression = decodedContexts.expression,
+                position = position,
+                enterTaskName = enterTaskName,
+                exitTaskName = exitTaskName,
+                requiresRiskAcknowledgement = requiresRiskAcknowledgement,
                 priority = priority,
                 gracePeriodSec = gracePeriodSec,
                 lifetime = profileLifetime,
@@ -112,46 +95,37 @@ data class ProfileEntity(
 }
 
 fun Profile.toEntity() = ProfileEntity(
-    id,
-    name,
-    enabled,
-    enterTaskId,
-    exitTaskId,
-    cooldownSec,
-    if (contextExpression == null) {
-        StorageJson.encodeToString(contexts)
-    } else {
-        StorageJson.encodeToString(StoredProfileContexts(contexts, contextExpression))
-    },
-    automationMode.name,
-    group,
-    requiresRiskAcknowledgement,
-    projectId,
-    priority,
-    gracePeriodSec,
-    lifetime.name,
-    expiresAtMs,
-    lifetimeConsumed,
-    maxActiveExecutions,
-    burstLimit,
-    overflowPolicy.name,
-    fallbackTaskId,
-)
-
-@kotlinx.serialization.Serializable
-private data class StoredProfileContexts(
-    val contexts: List<ContextSpec>,
-    val expression: ContextExpressionNode? = null,
+    id = id,
+    name = name,
+    enabled = enabled,
+    enterTaskId = enterTaskId,
+    exitTaskId = exitTaskId,
+    cooldownSec = cooldownSec,
+    contextsJson = StorageJson.encodeToString(contexts),
+    automationMode = automationMode.name,
+    projectId = projectId,
+    position = position,
+    enterTaskName = enterTaskName,
+    exitTaskName = exitTaskName,
+    requiresRiskAcknowledgement = requiresRiskAcknowledgement,
+    priority = priority,
+    gracePeriodSec = gracePeriodSec,
+    lifetime = lifetime.name,
+    expiresAtMs = expiresAtMs,
+    lifetimeConsumed = lifetimeConsumed,
+    maxActiveExecutions = maxActiveExecutions,
+    burstLimit = burstLimit,
+    overflowPolicy = overflowPolicy.name,
+    fallbackTaskId = fallbackTaskId,
 )
 
 @Dao
 interface ProfileDao {
     @Insert suspend fun insert(p: ProfileEntity): Long
-    @Upsert suspend fun upsert(p: ProfileEntity)
     @Update suspend fun update(p: ProfileEntity)
     @Delete suspend fun delete(p: ProfileEntity)
     @Query("SELECT * FROM profiles WHERE id = :id") suspend fun getById(id: Long): ProfileEntity?
-    @Query("SELECT * FROM profiles") suspend fun getAll(): List<ProfileEntity>
+    @Query("SELECT * FROM profiles ORDER BY position, id") suspend fun getAll(): List<ProfileEntity>
 
     /**
      * Case-insensitive name lookup for callers that must not load the whole table — notably the
@@ -171,7 +145,7 @@ interface ProfileDao {
     suspend fun countEnabled(): Int
     @Query("SELECT * FROM profiles WHERE enabled = 1 AND requiresRiskAcknowledgement = 0")
     suspend fun getAllEnabled(): List<ProfileEntity>
-    @Query("SELECT * FROM profiles") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
-    @Query("UPDATE profiles SET projectId = :targetProjectId WHERE projectId = :sourceProjectId")
-    suspend fun reassignProject(sourceProjectId: Long, targetProjectId: Long)
+    @Query("SELECT * FROM profiles ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<ProfileEntity>>
+    @Query("UPDATE profiles SET position = :position WHERE id = :id") suspend fun setPosition(id: Long, position: Int)
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM profiles") suspend fun nextPosition(): Int
 }

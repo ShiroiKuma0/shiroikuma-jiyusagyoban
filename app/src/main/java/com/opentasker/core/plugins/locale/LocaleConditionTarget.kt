@@ -1,7 +1,12 @@
 package com.opentasker.core.plugins.locale
 
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.VariableNamePolicy
+
+/**
+ * The fork's equivalent of upstream's SUPER_GLOBAL_PROJECT_ID: project 0 is the super-global scope that
+ * every %ALLCAPS variable lives in, and it is what a Locale condition means by "no project given".
+ */
+private const val SUPER_GLOBAL_PROJECT_ID = 0L
 
 enum class LocaleConditionKind(val wireName: String) {
     PROFILE_ACTIVE("profile_active"),
@@ -22,7 +27,7 @@ data class LocaleConditionSpec(
     val profileId: Long? = null,
     val contextIndex: Int? = null,
     val variableName: String? = null,
-    val variableProjectId: Long = DEFAULT_PROJECT_ID,
+    val variableProjectId: Long = SUPER_GLOBAL_PROJECT_ID,
     val operator: LocaleConditionOperator? = null,
     val expectedValue: String? = null,
     /** Configure-time read grant; required for every exported condition query. */
@@ -129,7 +134,7 @@ object LocaleConditionTarget {
                 variableProjectId = values[BUNDLE_KEY_VARIABLE_PROJECT_ID]
                     ?.takeIf(String::isNotBlank)
                     ?.let { parsePositiveId(it) ?: error("Invalid variable project.") }
-                    ?: DEFAULT_PROJECT_ID,
+                    ?: SUPER_GLOBAL_PROJECT_ID,
                 operator = values[BUNDLE_KEY_OPERATOR]?.let { raw ->
                     LocaleConditionOperator.entries.firstOrNull { it.wireName == raw }
                 } ?: error("Unknown Locale condition comparison operator."),

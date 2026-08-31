@@ -14,13 +14,16 @@ class ShizukuManifestContractTest {
 
         val packages = manifest.getElementsByTagName("package")
         val queriedPackages = (0 until packages.length)
-            .asSequence()
             .mapNotNull { packages.item(it).attributes.getNamedItem("android:name")?.nodeValue }
+            .toSet()
 
-        assertTrue(
-            "manifest must query Shizuku manager package",
-            ShizukuPowerBackend.MANAGER_PACKAGE in queriedPackages,
-        )
+        // EVERY manager we are willing to open, not just upstream's. A missing pin here does not fail
+        // loudly: getLaunchIntentForPackage simply answers null on Android 11+ even when the app IS
+        // installed, and "Open Shizuku" silently degrades to opening a web page — which is exactly the
+        // bug this assertion now guards (白い熊's phone runs the fork, which was never pinned).
+        for (pkg in ShizukuPowerBackend.MANAGER_PACKAGES) {
+            assertTrue("manifest must query Shizuku manager package $pkg", pkg in queriedPackages)
+        }
     }
 
     private fun loadMainManifest() =

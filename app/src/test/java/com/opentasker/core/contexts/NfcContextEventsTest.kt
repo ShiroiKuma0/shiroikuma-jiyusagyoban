@@ -41,6 +41,6 @@ class NfcContextEventsTest {
     fun writePlannerUsesDefaultForBlankLabel() {
         val plan = NfcTagWritePlanner.planTextRecord("   ")
 
-        assertEquals("OpenTasker NFC trigger", plan.text)
+        assertEquals("白い熊 自由作業盤 NFC trigger", plan.text)
     }
 }

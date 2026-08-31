@@ -17,7 +17,6 @@ data class TaskerImportPreview(
     val mappedActionCount: Int,
     val unsupportedActionCount: Int,
     val capabilityWarnings: List<String>,
-    val powerRequests: List<RecipePowerRequest>,
     val warnings: List<String>,
     val lossyWarnings: List<String>,
     val canImport: Boolean,
@@ -47,10 +46,12 @@ object TaskerImportPlanner {
             importSceneCount = report.bundle.scenes.size,
             mappedActionCount = report.mappedActions.size,
             unsupportedActionCount = report.unsupportedActions.size,
-            capabilityWarnings = plan.capabilityRequirements
-                .filter { it.level != CapabilityLevel.Supported }
-                .map { "${it.actionId}: ${it.level.name.lowercase()} - ${it.reason}" },
-            powerRequests = plan.powerRequests,
+            capabilityWarnings = report.bundle.tasks
+                .flatMap { task -> task.actions.map { it.type } }
+                .distinct()
+                .map { actionId -> actionId to com.opentasker.core.capabilities.ActionCapabilityRegistry.get(actionId) }
+                .filter { (_, capability) -> capability.level != CapabilityLevel.Supported }
+                .map { (actionId, capability) -> "$actionId: ${capability.level.name.lowercase()} - ${capability.reason}" },
             warnings = (report.warnings + plan.warnings + emptyWarning).distinct(),
             lossyWarnings = (report.lossyWarnings + plan.lossyWarnings).distinct(),
             canImport = plan.canImport && hasImportableContent,

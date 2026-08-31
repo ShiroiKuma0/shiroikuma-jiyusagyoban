@@ -18,9 +18,46 @@
 -keep class com.opentasker.core.power.ShizukuCommandUserService { *; }
 -keep interface com.opentasker.core.power.IShizukuCommandService { *; }
 
+# Native key grabber (Shizuku UserService). The JNI symbols are derived from the class + method names,
+# and the service is instantiated by name inside the privileged process — so it must NOT be renamed or
+# stripped. onNativeKey is called from JNI by name.
+-keep class com.opentasker.core.input.KeyGrabberService {
+    <init>(...);
+    native <methods>;
+    void onNativeKey(int, int);
+}
+-keep class com.opentasker.core.input.IKeyGrabber* { *; }
+
+# Wallpaper bridge (Shizuku UserService) — same reason again. Missing this rule cost a debugging
+# round: bindUserService simply never connected, the bind timed out after 8s, and wallpaper.live fell
+# back to the picker while still reporting success. There is no error to read; the class is just gone.
+-keep class com.opentasker.core.wallpaper.WallpaperBridgeService {
+    <init>();
+    *;
+}
+-keep class com.opentasker.core.wallpaper.IWallpaperBridge { *; }
+-keep class com.opentasker.core.wallpaper.IWallpaperBridge$* { *; }
+
+# Telephony bridge (Shizuku UserService) — same reason: Shizuku instantiates it BY NAME inside the
+# privileged process, so R8 renaming or stripping it makes bindUserService fail with nothing but a
+# null binder. The AIDL stub must survive intact too.
+-keep class com.opentasker.core.telephony.TelephonyBridgeService {
+    <init>(...);
+    *;
+}
+-keep class com.opentasker.core.telephony.ITelephonyBridge* { *; }
+
 # RE2J internals (uses sun.misc.Unsafe fallback)
 -dontwarn com.google.re2j.**
 -keep class com.google.re2j.** { *; }
+
+# apksig (on-device signing of generated share-relay APKs). It reflects over signature-algorithm and
+# signing-block helpers internally; R8 minification broke block encoding at runtime ("Failed to encode
+# signature block"), so keep the whole library and silence its optional-dependency warnings.
+-keep class com.android.apksig.** { *; }
+-dontwarn com.android.apksig.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
 
 # kotlinx-serialization
 -keepattributes *Annotation*, InnerClasses
@@ -32,3 +69,13 @@
 -keepclassmembers class <1>$Companion {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# ONNX Runtime (文字認識 / OCR).
+# Its native layer looks Java classes, fields and constructors up BY NAME through JNI — TensorInfo,
+# OnnxTensor, the value types it instantiates when converting a result back. R8 renaming them does not
+# fail at build or link time: the session is created fine and the process aborts inside
+# convertToTensorInfo on the first run() with a SIGABRT, which reads like a native bug rather than a
+# minification one. Keep the whole package.
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class ai.onnxruntime.** { *; }
+-dontwarn ai.onnxruntime.**

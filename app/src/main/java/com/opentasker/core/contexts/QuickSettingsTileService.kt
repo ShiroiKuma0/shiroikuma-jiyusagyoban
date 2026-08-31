@@ -7,6 +7,7 @@ import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.opentasker.core.external.AutomationTargetContract
 import com.opentasker.core.external.InternalTaskRunSource
+import com.opentasker.core.engine.EngineShutdown
 
 open class QuickSettingsTileService : TileService() {
 
@@ -20,6 +21,15 @@ open class QuickSettingsTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
+        // Fork: a stopped engine cannot run the bound task, so refuse before touching state rather
+        // than flipping the tile and dispatching a run that will be dropped.
+        if (EngineShutdown.refuse(this, "quick-settings tile")) {
+            qsTile?.let { tile ->
+                tile.state = Tile.STATE_UNAVAILABLE
+                tile.updateTile()
+            }
+            return
+        }
         val config = store.load(slot)
         if (config.taskId == null) {
             val configureIntent = Intent(this, QuickSettingsTileConfigActivity::class.java)
@@ -72,6 +82,9 @@ open class QuickSettingsTileService : TileService() {
             }
             tile.icon = config.icon(this)
             tile.state = when {
+                // Unavailable rather than merely inactive while the app is stopped, so the tile shows
+                // the truth instead of pretending a tap would do something.
+                EngineShutdown.isStopped(this) -> Tile.STATE_UNAVAILABLE
                 config.taskId == null -> Tile.STATE_UNAVAILABLE
                 config.active -> Tile.STATE_ACTIVE
                 else -> Tile.STATE_INACTIVE

@@ -70,9 +70,10 @@ class DurableGlobalsTest {
         val store = VariableStore()
         store.pushScope()
         store.set("local", "hello")
-        // var.persist copies a local into the global (uppercase) namespace.
-        store.set("Persisted", store.get("local")!!)
+        // var.persist copies a local into the global namespace. ALL-CAPS, because a MixedCase name is
+        // project-scoped and this store has no project — the scoping guard would keep it task-local.
+        store.set("PERSISTED", store.get("local")!!)
 
-        assertEquals("hello", store.globalSnapshot()["Persisted"])
+        assertEquals("hello", store.globalSnapshot()["PERSISTED"])
     }
 }

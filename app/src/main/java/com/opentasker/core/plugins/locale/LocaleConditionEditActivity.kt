@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,8 +43,7 @@ import com.opentasker.app.R
 import com.opentasker.core.model.ContextType
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
-import com.opentasker.ui.theme.ThemeMode
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -93,10 +91,12 @@ class LocaleConditionEditActivity : ComponentActivity() {
         }.flowOn(Dispatchers.IO)
 
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = ThemeMode.System)
+            // The fork has one appearance, read from ThemeStore, rather than upstream's
+            // light/dark/high-contrast triple — so this plugin editor looks like the rest of the app.
+            val themePrefs by ThemeStore.state.collectAsState()
             val profiles by profilesFlow.collectAsState(initial = emptyList())
             val variables by variablesFlow.collectAsState(initial = emptyList())
-            OpenTaskerTheme(themeMode) {
+            OpenTaskerTheme(prefs = themePrefs) {
                 LocaleConditionEditor(
                     profiles = profiles,
                     variables = variables,

@@ -202,7 +202,7 @@ class TaskerXmlExportTest {
 
     @Test
     fun exportsVariables() {
-        val variable = Variable(name = "MODE", value = "silent", isGlobal = true)
+        val variable = Variable(name = "MODE", value = "silent", projectId = 0)
         val report = TaskerXmlExporter.export(emptyList(), emptyList(), listOf(variable))
 
         assertEquals(1, report.exportedVariableCount)
@@ -216,8 +216,8 @@ class TaskerXmlExportTest {
             emptyList(),
             emptyList(),
             listOf(
-                Variable("MODE", "silent", isGlobal = true),
-                Variable("API_TOKEN", "must-not-export", isGlobal = true, isSecret = true),
+                Variable("MODE", "silent"),
+                Variable("API_TOKEN", "must-not-export", isSecret = true),
             ),
         )
 
@@ -251,7 +251,7 @@ class TaskerXmlExportTest {
                     ),
                 ),
             ),
-            variables = listOf(Variable("API_TOKEN", "sentinel", isGlobal = true, isSecret = true)),
+            variables = listOf(Variable("API_TOKEN", "sentinel", isSecret = true)),
         )
 
         assertFalse(report.xml.contains("sentinel"))
@@ -352,12 +352,14 @@ class TaskerXmlExportTest {
     fun variablesSurviveAnExportImportRoundTrip() {
         // The exporter writes <n>/<v>; the importer used to read only nme/val, so a file this app
         // produced and then re-imported dropped every variable as "skipped because it had no name".
+        // The fork derives scope from the name's first character, so an uppercase name is global
+        // by construction and there is no isGlobal argument to pass.
         val report = TaskerXmlExporter.export(
             profiles = emptyList(),
             tasks = emptyList(),
             variables = listOf(
-                Variable("MODE", "commute", isGlobal = true),
-                Variable("THRESHOLD", "20", isGlobal = true),
+                Variable("MODE", "commute"),
+                Variable("THRESHOLD", "20"),
             ),
         )
 

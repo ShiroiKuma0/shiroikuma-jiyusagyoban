@@ -73,7 +73,7 @@ class LocationContextSourceImpl(
                 stopUpdates()
                 emitBlocked(
                     reason = "missing_location_permission",
-                    detail = "Foreground location permission is required before OpenTasker can emit live location context values.",
+                    detail = "Foreground location permission is required before 白い熊 自由作業盤 can emit live location context values.",
                 )
                 return
             }

@@ -79,12 +79,15 @@ class PastedImportSourceTest {
     }
 
     @Test
-    fun thePasteDialogRoutesBothFormatsThroughOneEntryPoint() {
+    fun theDocumentPickerRoutesBothFormatsThroughOneEntryPoint() {
+        // Upstream 0.2.88 puts the format sniff behind its paste dialog. The fork's shell has no
+        // paste-import dialog — PastedImportSource is reachable only from the document picker here —
+        // so the contract is asserted where the fork actually routes: one picker entry point that
+        // sends XML to the Tasker planner and anything else to the MacroDroid one.
         val viewModel = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
-        val shell = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationUi.kt")
 
-        assertTrue("The shell must call the format-sniffing entry point", "previewPastedImport(" in shell)
-        assertTrue("JSON paste must be unchanged", "OpenTaskerBundleTextImport.decode(rawText)" in viewModel)
-        assertTrue("Tasker XML paste must reach the planner", "TaskerImportPlanner.preview(report)" in viewModel)
+        assertTrue("One entry point must read both formats", "readBoundedTaskerOrMacroDroid(" in viewModel)
+        assertTrue("Tasker XML must reach its planner", "TaskerImportPlanner.preview(report)" in viewModel)
+        assertTrue("MacroDroid must reach its planner", "MacroDroidImportPlanner.preview(report)" in viewModel)
     }
 }

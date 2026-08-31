@@ -63,34 +63,9 @@ class ExportRedactionPolicyTest {
         assertTrue(result.contains("https://example.test/path?[REDACTED]"))
     }
 
-    @Test
-    fun openTaskerBundleEncodingUsesTheSamePolicy() {
-        val bundle = OpenTaskerBundle(
-            appVersion = "test",
-            exportedAtEpochMs = 1L,
-            tasks = listOf(
-                Task(
-                    id = 1,
-                    name = "Export",
-                    actions = listOf(
-                        ActionSpec(
-                            type = "var.set",
-                            args = mapOf("name" to "API_TOKEN", "value" to "sentinel"),
-                        ),
-                        ActionSpec(
-                            type = "url.open",
-                            args = mapOf("url" to "https://example.test/?token=sentinel"),
-                        ),
-                    ),
-                ),
-            ),
-        )
-
-        val encoded = OpenTaskerBundleCodec.encode(bundle)
-        val decoded = OpenTaskerBundleCodec.decode(encoded)
-
-        assertFalse(encoded.contains("sentinel"))
-        assertEquals(ExportRedactionPolicy.REDACTED, decoded.tasks.single().actions.first().args["value"])
-        assertTrue(decoded.metadata.warnings.any { it.contains("must be re-entered") })
-    }
+    // Upstream also redacts secret-LOOKING action arguments when encoding a bundle (an arg named
+    // API_TOKEN has its value replaced). The fork does not: its bundles are the workspace mirror and
+    // have to round-trip exactly, so an export that silently replaced argument values with REDACTED
+    // would come back as a broken workspace on the next import. Secret VARIABLES are still refused
+    // outright by encode(), which is the guard that actually protects a credential.
 }

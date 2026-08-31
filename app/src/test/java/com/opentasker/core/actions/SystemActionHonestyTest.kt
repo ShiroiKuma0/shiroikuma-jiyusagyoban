@@ -18,8 +18,12 @@ class SystemActionHonestyTest {
         val source = sourceRoot.resolve("core/actions/SystemActions.kt").readText()
         assertFalse("WakeAction must not read a duration it cannot honour", source.contains("args[\"duration_sec\"]"))
         assertFalse("RebootAction must not fail on leftover imported mode args", source.contains("args[\"mode\"]"))
-        assertTrue(source.contains("ctx.runShizukuAction(\"wake\""))
-        assertTrue(source.contains("ctx.runShizukuAction(\"reboot\""))
+        // Upstream routes both through ctx.runShizukuAction, an extension the fork's power layer
+        // does not have; the fork calls ShizukuShell directly. The honesty contract above is the
+        // part that matters, and it holds either way — so this half asserts the fork's own path,
+        // including that neither action reports success it did not observe.
+        assertTrue(source.contains("ShizukuShell.exec(\"input keyevent 224\")"))
+        assertTrue(source.contains("ActionResult.Failure(\"Wake keyevent failed\")"))
     }
 
     @Test

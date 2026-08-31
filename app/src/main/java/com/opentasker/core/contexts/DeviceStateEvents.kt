@@ -37,6 +37,10 @@ object DeviceStateEvents {
         state.update { current -> current + patch }
     }
 
+    /** Audio-record state, so a profile STATE context can gate on `recording=true` / `recording=false`. */
+    fun publishRecording(active: Boolean): Boolean =
+        statePatches.tryEmit(mapOf("recording" to active.toString()))
+
     internal fun wifiPatch(
         ssid: String,
         connected: Boolean,

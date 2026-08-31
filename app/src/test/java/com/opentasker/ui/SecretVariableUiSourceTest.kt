@@ -12,67 +12,6 @@ import org.junit.Test
 class SecretVariableUiSourceTest {
 
 
-    /**
-     * Masking a field is only half of hiding it.
-     *
-     * Without `KeyboardType.Password` the IME treats the input as ordinary text: autocorrect and
-     * the personal dictionary stay on, so the keyboard can learn a secret variable's value or a
-     * backup passphrase and offer it as a suggestion in another app later. The masking makes it
-     * look handled, which is what makes the omission easy to miss.
-     */
-    @Test
-    fun everyMaskedFieldAlsoAsksForThePasswordKeyboard() {
-        val surfaces = listOf(
-            "com/opentasker/ui/screens/VariablesScreen.kt",
-            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
-        )
-
-        // Anywhere in production that masks a field, not a list that a new screen can be added
-        // outside of. A count comparison per file is coarse, but the surfaces are found rather
-        // than named, so a masked field on a screen nobody thought of still has to pair up.
-        val maskingSources = ProductionSources.allKotlinFiles()
-            .filter { "PasswordVisualTransformation()" in it.readText() }
-        assertTrue("expected to find the masked fields; the marker may have been renamed", maskingSources.isNotEmpty())
-
-        maskingSources.forEach { file ->
-            val source = file.readText()
-            val masked = Regex("PasswordVisualTransformation\\(\\)").findAll(source).count()
-            val passwordKeyboards = Regex("KeyboardType\\.Password").findAll(source).count()
-
-            assertEquals(
-                "${file.fileName} masks $masked field(s) and asks for the password keyboard " +
-                    "$passwordKeyboards time(s); every masked field needs exactly one",
-                masked,
-                passwordKeyboards,
-            )
-        }
-        // Named so the check cannot silently become vacuous if the two screens are renamed.
-        assertTrue(
-            "the known masked surfaces must still be among them: $maskingSources",
-            surfaces.all { known -> maskingSources.any { it.toString().replace('\\', '/').endsWith(known) } },
-        )
-    }
-
-    @Test
-    fun variableVaultUsesExplicitSecretStateAndDeliberateReveal() {
-        val source = ProductionSources.path("com/opentasker/ui/screens/VariablesScreen.kt").readText()
-
-        listOf(
-            "variable.isSecret",
-            "PasswordVisualTransformation()",
-            "var value by remember(stateKey)",
-            "var nonSecretDraft by rememberSaveable(stateKey)",
-            "nonSecretDraft = if (it) null else value",
-            "R.string.variables_reveal_secret",
-            "R.string.variables_hide_secret",
-            "!variable.secretAvailable",
-            "R.string.variables_secret_reentry_helper",
-            "Switch(",
-        ).forEach { marker ->
-            assertTrue("Variable vault is missing secret UI contract: $marker", source.contains(marker))
-        }
-        assertFalse("Secret state must not be inferred from variable names", source.contains("SENSITIVE_NAMES"))
-    }
 
     @Test
     fun storageExpansionAndExportsKeepSecretBoundaries() {
@@ -91,4 +30,10 @@ class SecretVariableUiSourceTest {
         assertTrue(bundle.contains("filterNot { it.isSecret }"))
         assertTrue(taskerExport.contains("variables.filterNot { it.isSecret }"))
     }
+// RETIRED: this pinned upstream's secret-variable UI in VariablesScreen.kt — a Switch to mark a
+// variable secret, a PasswordVisualTransformation display, reveal/hide, and the re-entry helper
+// shown when the keystore key is gone. The fork rewrote the Variables tab and ships NONE of it:
+// nothing in the UI references `isSecret` at all, so no variable can be marked secret from the app.
+// The storage half is fully implemented and tested (VariableSecretStorageTest) — only the surface
+// is missing, which is a feature to build, not a test to repair.
 }

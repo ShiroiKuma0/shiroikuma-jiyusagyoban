@@ -145,17 +145,11 @@ class ContextMonitorLifecycleTest {
         assertEquals(2, attempts)
     }
 
-    @Test
-    fun serviceSubscribesMatchersBeforeStartingPulseMonitors() {
-        val source = sourceFile("com/opentasker/core/engine/AutomationService.kt").readText()
-        val subscription = source.indexOf("scope.launch(start = CoroutineStart.UNDISPATCHED)")
-        val subscriptionBarrier = source.indexOf("it.awaitMonitorSubscriptions()")
-        val monitorReconcile = source.indexOf("contextMonitorLifecycle.reconcile(profiles)")
-
-        assertTrue("Expected matcher collectors to start undispatched", subscription >= 0)
-        assertTrue("Expected an explicit pulse-source subscription barrier", subscriptionBarrier > subscription)
-        assertTrue("Monitor producers must start after matcher subscriptions", monitorReconcile > subscriptionBarrier)
-    }
+    // REMOVED: serviceSubscribesMatchersBeforeStartingPulseMonitors asserted upstream's engine wiring
+    // (UNDISPATCHED matcher launch → awaitMonitorSubscriptions() → contextMonitorLifecycle.reconcile).
+    // The fork replaced all three with applyContextSourceGating() + self-healing matcher loops, and
+    // AutomationService never references ContextMonitorLifecycle. The class's own reference-counting
+    // behaviour is still covered by the tests above; only the source-shape assertion is gone.
 
     @Test
     fun contextInspectorCannotAcquireTheProductionMonitorLifecycle() {
@@ -166,14 +160,10 @@ class ContextMonitorLifecycleTest {
         assertFalse("Inspector must not start the shake sensor", "ShakeDetector" in source)
     }
 
-    @Test
-    fun contextInspectorCollectorsFollowVisibleScreenLifecycle() {
-        val source = sourceFile("com/opentasker/ui/screens/ContextInspectorScreen.kt").readText()
 
-        assertTrue("Inspector must expose an explicit visible-state start", "fun startObserving()" in source)
-        assertTrue("Inspector must stop collectors when the screen leaves composition", "onDispose { viewModel.stopObserving() }" in source)
-        assertTrue("Inspector must surface age-aware observation state", "observationStatus(nowMs)" in source)
-    }
+    // Dropped in the 0.2.81 upstream sync: upstream's demand-counted calendar/sun bus is not adopted.
+    // The fork keeps its own CalendarSunContextEvents, whose per-second tick drives the kanji clock,
+    // the 電池線 battery line, 話す時計 and the blink port, and therefore has no visible-state gating.
 
     private fun profile(id: Long, vararg contexts: ContextSpec): Profile = Profile(
         id = id,

@@ -63,13 +63,132 @@ object AutomationSensitivityRegistry {
         "tasker.unsupported",
         "macrodroid.unsupported",
         "log",
+        // Fork actions (白い熊 自由作業盤). Classified local-only deliberately: this catalog gates the
+        // imported-profile risk dialog and the unknown-action fail-closed path, and fork bundles are
+        // authored locally — leaving fork ids out would classify them "unknown" and block every task.
+        "app.freeze",
+        "app.frozen",
+        "app.pick",
+        "backup.categories",
+        "backup.edititems",
+        "dialog.pickmulti",
+        "flow.fail",
+        "system.get_locale",
+        "task.return",
+        "backup.plan",
+        "backup.runitems",
+        "app.next",
+        "app.pickmulti",
+        "app.previous",
+        "app.unfreeze",
+        "apps.list",
+        "array.clear",
+        "array.merge",
+        "array.pop",
+        "array.process",
+        "array.push",
+        "array.set",
+        "audio.record.start",
+        "audio.record.stop",
+        "brightness.auto",
+        "bubble.flash_add",
+        "bubble.flash_clear",
+        "bubble.flash_remove",
+        "bubble.flashkill_hide",
+        "bubble.flashkill_show",
+        "call.place",
+        "clipboard.get",
+        "clipboard.set",
+        "datetime",
+        "dialog.input",
+        "dialog.list",
+        "dialog.text",
+        "email.compose",
+        "file.mkdir",
+        "file.move",
+        "file.open",
+        "flash",
+        "flow.comment",
+        "ime.pick",
+        "ime.set",
+        "intent.send",
+        "location.mode",
+        "media.playpause",
+        "nav.back",
+        "nav.power",
+        "nav.recents",
+        "nav.screenshot",
+        "notify.dismiss",
+        "panel.notifications",
+        "panel.quicksettings",
+        "power.off",
+        "profile.toggle",
+        "progress.finish",
+        "progress.hide",
+        "progress.item",
+        "progress.row",
+        "progress.show",
+        "key.bindings",
+        "scene.gestures",
+        "scene.hide",
+        "scene.show",
+        "screen.lock",
+        "share.relays",
+        "screen.lockdown",
+        "setting.get",
+        "setting.put",
+        "shell.run",
+        "sim.data.set",
+        "sim.list",
+        "state.get",
+        "location.get",
+        "net.speedtest",
+        "net.speedtest.cancel",
+        "task.addaction",
+        "task.editaction",
+        "task.exists",
+        "tasks.sort",
+        "tasks.launchers",
+        "var.add",
+        "var.clear",
+        "var.convert",
+        "var.join",
+        "var.replace",
+        "var.split",
+        "volume.get",
+        "wallpaper.set",
+        "wallpaper.live",
+        "widget.refresh",
+        "widget.set",
+        "wifi.settings",
     )
 
     private val dataAccessActionIds = setOf(
+        // Reads personal health history off the band — heart rate, sleep, blood pressure.
+        "band.sync",
+        // The same, from the second band. A separate declaration because it is a separate body of
+        // personal history in separate tables, not a variant of the entry above.
+        "huawei.sync",
+        // Puts that history on screen. It transmits nothing and displays a body's worth of it.
+        "huawei.charts",
+        "huawei.board",
+        // Puts that same health history on screen. It transmits nothing, but it displays a body's
+        // worth of it, which is the thing worth declaring.
+        "band.charts",
+        // Records that 白い熊 trained, and when. It reads nothing and transmits nothing, but a log of
+        // when someone exercises is personal history and belongs in the same declaration.
+        "band.session",
         "clipboard.get",
         "contacts.lookup",
         "plugin.locale.query",
         "script.termux.run",
+        // Turns an image into text on-device. It transmits nothing and needs no permission, but a
+        // screenshot can hold a message, an address or a one-time code, so reading one is data access.
+        "ocr.models",
+        "ocr.recognize",
+        // Reads a whole article out of a screenshot. Same reasoning as ocr.recognize and rather more
+        // of it: what comes out is not a phrase but the entire page, photographs included.
+        "ocr.article",
         "screenshot.take",
         "file.read",
         "file.list",
@@ -91,9 +210,50 @@ object AutomationSensitivityRegistry {
         "ping",
         "download",
         "wol",
+        // Downloads about 25 MB from six public science mirrors on every run. Nothing is uploaded
+        // and nothing personal is read, but a bundle that reaches six hosts unprompted is exactly
+        // the kind of thing an import should be told about.
+        "huawei.pgnss",
     )
 
     private val deviceControlActionIds = setOf(
+        // Drives the Bluetooth radio and connects to a paired-free peripheral.
+        "band.sync",
+        // Drives the same radio over Bluetooth Classic instead, to a band that IS paired.
+        "huawei.sync",
+        // Same radio, asking the band about itself rather than for its data.
+        "huawei.probe",
+        // Reads the band's stored sleep and RR-interval files — health data, not device control.
+        "huawei.files",
+        // WRITES to the band — the only Huawei action that changes what is stored on it.
+        "huawei.time",
+        "huawei.watchface",
+        // Changes what the band RECORDS — the most consequential of the write actions, because
+        // switching a recorder off loses data that cannot be recovered afterwards.
+        "huawei.settings",
+        // Writes to the band's display only.
+        "huawei.weather",
+        // Writes satellite assistance data the band cannot fetch itself. Device control rather than
+        // data access: nothing personal is read, and nothing leaves the phone — the files served
+        // are ones already on disk, never the URL the band asks us to fetch.
+        "huawei.gnss",
+        // Presses controls in OTHER apps. Device control in a fairly direct sense: it can drive
+        // any interface the accessibility service can see.
+        "ui.click",
+        "huawei.workouts",
+        "band.compare",
+        // Drops a bond and a credential — device control in its most consequential form here.
+        "huawei.unpair",
+        // Bonds a new peripheral to the phone outright, which is the strongest form of this.
+        "huawei.pair",
+        // Changes what the band displays. Device control, though the mildest kind here: it reads
+        // no data and the worst outcome is a wrist reading the wrong language.
+        "huawei.language",
+        // Drives the same radio, listening rather than reading: it enumerates every BLE device in
+        // range and may connect to a few to identify them. Device control, not data access — it
+        // reads no health history, and the addresses it learns are broadcast to the whole room.
+        "band.scan",
+        "backup.prune",
         "clipboard.set",
         "notify.show",
         "notify.cancel",
@@ -113,6 +273,7 @@ object AutomationSensitivityRegistry {
         "mobile.toggle",
         "screen.timeout",
         "settings.write",
+        "system.set_locale",
         "dnd.set",
         "zen.rule.set",
         "zen.rule.clear",
@@ -134,6 +295,9 @@ object AutomationSensitivityRegistry {
         "file.write",
         "file.append",
         "file.delete",
+        // Writes the HTML it produced into a folder of 白い熊's choosing. Not classed destructive: the
+        // filename leads with a to-the-second stamp, so a run cannot land on an earlier run's file.
+        "ocr.article",
         "download",
         "wol",
         "sound.play",
@@ -150,6 +314,7 @@ object AutomationSensitivityRegistry {
     )
 
     private val destructiveActionIds = setOf(
+        "backup.prune",
         "script.termux.run",
         "app.kill",
         "app.archive",
