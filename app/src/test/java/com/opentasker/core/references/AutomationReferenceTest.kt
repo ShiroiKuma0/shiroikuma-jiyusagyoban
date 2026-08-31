@@ -319,7 +319,7 @@ class AutomationReferenceTest {
 
     @Test
     fun variableIndexAndRenameCoverLegacyTemplatesConditionsScenesAndProfiles() {
-        val variable = Variable("ApiToken", "secret", isGlobal = true, projectId = 7)
+        val variable = Variable("ApiToken", "secret", projectId = 7)
         val profile = Profile(
             id = 1,
             name = "Home",
@@ -393,7 +393,7 @@ class AutomationReferenceTest {
         )
         assertTrue(
             AutomationReferenceIndex.referencesTo(
-                Variable("RotatedToken", "secret", isGlobal = true, projectId = 7),
+                Variable("RotatedToken", "secret", projectId = 7),
                 profiles = rewrite.profiles,
                 tasks = rewrite.tasks,
                 scenes = rewrite.scenes,
@@ -411,7 +411,7 @@ class AutomationReferenceTest {
 
     @Test
     fun variableReferencesKeepLocalAndGlobalNamespacesSeparate() {
-        val local = Variable("local_name", "value", isGlobal = false, projectId = 7)
+        val local = Variable("local_name", "value", projectId = 7)
         val task = caller(
             ActionSpec(
                 type = "text.show",

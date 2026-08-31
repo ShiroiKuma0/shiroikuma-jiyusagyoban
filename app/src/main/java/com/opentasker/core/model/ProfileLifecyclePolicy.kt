@@ -69,6 +69,19 @@ object ProfileLifecyclePolicy {
         strings: ProfileLifecycleStrings = ProfileLifecycleStrings.English,
     ): String? = suppressor(profile, candidates)?.let { strings.suppressedByPriority(it.name) }
 
+    /**
+     * The profiles that become eligible when the matched set shrinks from [before] to [remaining]:
+     * those something in [before] was outranking that nothing in [remaining] still outranks.
+     *
+     * Kept pure and here rather than inline in the service so it can be tested at all — the engine
+     * that calls it is an Android Service. Only profiles still in [remaining] can be released: one
+     * that stopped matching is not eligible for anything, whoever stopped outranking it.
+     */
+    fun released(before: Collection<Profile>, remaining: Collection<Profile>): List<Profile> =
+        remaining.filter { candidate ->
+            suppressor(candidate, before) != null && suppressor(candidate, remaining) == null
+        }
+
     const val MIN_PRIORITY = -100
     const val MAX_PRIORITY = 100
     const val MAX_GRACE_PERIOD_SEC = 3_600

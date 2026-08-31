@@ -15,8 +15,9 @@ class AppLoggerBoundarySourceTest {
         .map(Path::toAbsolutePath)
         .first { Files.exists(it.resolve("settings.gradle.kts")) }
 
-    // AppLogger moved into core:common, so the scan has to follow production code across the
-    // module boundary rather than stopping at the app source root.
+    // Upstream splits production Kotlin across core/* modules; the fork keeps one tree (see
+    // settings.gradle.kts). The absent roots filter themselves out, so this list also works
+    // unchanged on a future sync that does adopt the split.
     private val sourceRoots: List<Path> = listOf(
         repoRoot.resolve("app/src/main/java/com/opentasker"),
         repoRoot.resolve("core/common/src/main/kotlin/com/opentasker"),
@@ -26,10 +27,22 @@ class AppLoggerBoundarySourceTest {
         repoRoot.resolve("feature/automation/src/main/kotlin/com/opentasker"),
     ).filter(Files::isDirectory)
 
+    /**
+     * [AppLogger] itself — under either layout — plus the Shizuku key-grabber, which runs in a
+     * **separate privileged process** spawned by Shizuku (uid 2000). AppLogger's value is its in-app
+     * ring, and that ring lives in the app's process; logging there from the grabber would write into
+     * a buffer nothing can read. Platform logging is the only channel it has.
+     */
+    private val allowedFiles = listOf(
+        repoRoot.resolve("app/src/main/java/com/opentasker/core/logging/AppLogger.kt"),
+        repoRoot.resolve("core/common/src/main/kotlin/com/opentasker/core/logging/AppLogger.kt"),
+        repoRoot.resolve("app/src/main/java/com/opentasker/core/input/KeyGrabberService.kt"),
+    ).map(Path::normalize)
+
     @Test
     fun androidPlatformLoggingOnlyHappensInsideAppLogger() {
         val offenders = kotlinFiles()
-            .filter { it.name != "AppLogger.kt" }
+            .filter { it.normalize() !in allowedFiles }
             .filter { source ->
                 val text = source.readText()
                 text.contains(platformLogImport) || platformLogCallPattern.containsMatchIn(text)

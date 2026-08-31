@@ -16,7 +16,17 @@ data class Scene(
     val widthDp: Int,
     val heightDp: Int,
     val elements: List<SceneElement> = emptyList(),
-    val projectId: Long = DEFAULT_PROJECT_ID,
+    val projectId: Long? = null,            // null = Unfiled
+    val position: Int = 0,                  // manual sort order within its tab
+    val bgColor: String? = null,            // panel background "#AARRGGBB"; null = theme background (black)
+    val cornerRadiusDp: Int = 16,           // panel corner radius
+    val scrimAlpha: Int = 55,               // modal scrim darkness, 0..100 %
+    val borderColor: String? = null,        // panel border "#AARRGGBB"; null = theme outline (yellow)
+    val borderWidth: Int = 0,               // panel border thickness dp (0 = none)
+    // Default presentation, used by scene.show when the matching arg is omitted (an explicit arg wins).
+    val defaultPosition: String = "center", // "top" / "center" / "bottom"
+    val defaultModal: Boolean = true,       // true = block the app underneath; false = tap-through HUD
+    val defaultDismissOnOutside: Boolean = true, // tap outside (scrim) dismisses a modal scene
 )
 
 @Serializable
@@ -31,26 +41,42 @@ data class SceneElement(
     val config: Map<String, String> = emptyMap(),
     val tapTaskId: Long? = null,
     val longPressTaskId: Long? = null,
+    // Name of the linked task, resolved BEFORE the id (which is only a legacy fallback). A name survives
+    // re-imports that re-id the task, and disambiguates same-name tasks by project. Empty = no link / not
+    // yet backfilled (older scenes carry only the id; export + the editor populate these going forward).
+    val tapTaskName: String = "",
+    val longPressTaskName: String = "",
 )
 
 /**
- * Only the types the overlay can actually draw.
- *
- * Twelve more were declared (EDIT_TEXT, CHECKBOX, TOGGLE, NUMBER_PICKER, SPINNER, MAP, WEB, MENU,
- * VIDEO, OVAL, RECTANGLE, DOODLE) but nothing ever rendered them: the editor refused to create
- * them and the overlay drew a grey "unsupported" label. They were removed rather than translated.
+ * Fork note (upstream 0.2.88): upstream cut this enum down to the four types ITS overlay draws
+ * (BUTTON, TEXT, SLIDER, IMAGE) on the grounds that the other twelve were pickable in name only.
+ * That is not true here — the fork's own SceneActivity, SceneElementDrafts and UiEnumLabels render
+ * and offer them — so the full set stays. Dropping them would silently rewrite every saved element
+ * of those types into a TEXT box on first read.
  */
 @Serializable
 enum class SceneElementType {
-    BUTTON, TEXT, SLIDER, IMAGE,
+    BUTTON, TEXT, EDIT_TEXT, CHECKBOX, TOGGLE, SLIDER,
+    NUMBER_PICKER, SPINNER, IMAGE, MAP, WEB, MENU, VIDEO,
+    OVAL, RECTANGLE, DOODLE,
+    // A horizontal fill bar: `value` (0..100, usually a %var) fills `fillColor` over `trackColor`;
+    // when `charging` is truthy a highlight sweeps along the filled part. Used by the battery line.
+    PROGRESS,
+    // Neon meteor ribbons orbiting the element's perimeter in a rounded-rect band — the native port
+    // LEGACY tombstone (2026-07-16): meteors moved natively into 白い熊 音楽; kept only so
+    // archived exports/backups with METEOR elements still decode. Renders nothing; not offered
+    // in the editor.
+    METEOR,
 }
 
 /**
- * Decodes a removed element type as [SceneElementType.TEXT] instead of failing the whole scene.
+ * Decodes an element type this build does not know as [SceneElementType.TEXT] instead of failing
+ * the whole scene.
  *
- * A scene saved by an older build can name one of the twelve removed types. The element keeps its
- * position, size and task bindings; its leftover config keys are ignored, and saving the scene
- * again writes the fallback, so the migration is one-way and happens on first read.
+ * Upstream added this for the twelve types it removed. The fork keeps every one of those, so the
+ * fallback only ever fires for a genuinely unknown name — a scene written by a future build, or a
+ * hand-edited bundle with a typo — where losing one element beats losing the scene.
  */
 object SceneElementTypeSerializer : KSerializer<SceneElementType> {
     override val descriptor: SerialDescriptor =

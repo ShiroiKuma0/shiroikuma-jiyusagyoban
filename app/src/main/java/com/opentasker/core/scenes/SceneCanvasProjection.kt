@@ -42,6 +42,32 @@ object SceneCanvasProjector {
         }
     }
 
+    /**
+     * Convert a dragged canvas size (in canvas dp) back to scene dp, keeping the element's
+     * top-left fixed: the result is clamped to [minSizeDp] and to whatever still fits the panel
+     * from the element's current x/y.
+     */
+    fun sceneSizeForCanvasSize(
+        scene: Scene,
+        element: SceneElement,
+        canvasW: Float,
+        canvasH: Float,
+        canvasWidth: Float,
+        canvasHeight: Float,
+        minSizeDp: Int = 8,
+    ): Pair<Int, Int> {
+        val safeWidth = scene.widthDp.takeIf { it > 0 } ?: 1
+        val safeHeight = scene.heightDp.takeIf { it > 0 } ?: 1
+        val safeCanvasWidth = canvasWidth.takeIf { it > 0f } ?: 1f
+        val safeCanvasHeight = canvasHeight.takeIf { it > 0f } ?: 1f
+        val maxW = (safeWidth - element.xDp).coerceAtLeast(minSizeDp)
+        val maxH = (safeHeight - element.yDp).coerceAtLeast(minSizeDp)
+        return Pair(
+            (canvasW * safeWidth / safeCanvasWidth).roundToInt().coerceIn(minSizeDp, maxW),
+            (canvasH * safeHeight / safeCanvasHeight).roundToInt().coerceIn(minSizeDp, maxH),
+        )
+    }
+
     fun scenePositionForCanvasOffset(
         scene: Scene,
         element: SceneElement,

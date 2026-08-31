@@ -1,21 +1,16 @@
 package com.opentasker.ui.screens
 
-import android.annotation.SuppressLint
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,11 +19,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -43,94 +34,82 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
-import com.opentasker.core.actions.ActionFieldPolicy
-import com.opentasker.core.actions.ActionFileScope
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
-import com.opentasker.core.actions.DEFAULT_EDITOR_EVENT_VARIABLES
-import com.opentasker.core.actions.EditorEventVariable
 import com.opentasker.core.actions.FieldType
-import com.opentasker.core.actions.NotificationTaskBindings
-import com.opentasker.core.actions.NotificationTaskCandidate
-import com.opentasker.core.actions.NotificationTaskReference
-import com.opentasker.core.actions.NotificationTaskResolution
-import com.opentasker.core.actions.VariableChipOption
-import com.opentasker.core.actions.acceptsVariableType
-import com.opentasker.core.actions.insertVariableChip
-import com.opentasker.core.actions.mergeActionArguments
-import com.opentasker.core.actions.typedVariableOptions
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
-import com.opentasker.core.engine.FlowControl
+import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import com.opentasker.core.engine.SUB_TASK_PARAM_PREFIX
 import com.opentasker.core.model.ActionSpec
-import com.opentasker.core.model.Task
-import com.opentasker.core.model.Variable
-import com.opentasker.core.engine.tryRetryPlan
+import com.opentasker.ui.components.RgbaColorPickerDialog
+import com.opentasker.ui.components.ThemedDropdownMenu
 import com.opentasker.ui.theme.DesignSystem
-import androidx.compose.runtime.produceState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.opentasker.widget.WidgetEditor
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import android.os.Environment
+import android.provider.DocumentsContract
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.window.Dialog
 
-internal data class LocalizedActionMetadata(
-    val metadata: ActionMetadata,
-    val name: String,
-    val description: String,
-    val category: String,
-)
-
+/**
+ * Upstream's picker search, on the fork's metadata.
+ *
+ * Upstream filters a `LocalizedActionMetadata` triple it builds by resolving three `@StringRes` ids
+ * per action. The fork keeps name/description/category as inline strings on [ActionMetadata] itself,
+ * so there is nothing to localize first and the filter runs straight over the metadata. Matching
+ * covers the display name, the description and the stable action id, so `file.read` finds the action
+ * as readily as "Read file" does.
+ */
 internal fun filterActionPickerItems(
-    items: List<LocalizedActionMetadata>,
+    items: List<ActionMetadata>,
     query: String,
-): List<LocalizedActionMetadata> {
+): List<ActionMetadata> {
     val normalizedQuery = query.trim()
     if (normalizedQuery.isEmpty()) return items
     return items.filter { item ->
         item.name.contains(normalizedQuery, ignoreCase = true) ||
             item.description.contains(normalizedQuery, ignoreCase = true) ||
-            item.metadata.id.contains(normalizedQuery, ignoreCase = true)
+            item.id.contains(normalizedQuery, ignoreCase = true)
     }
 }
 
-internal const val ACTION_CONTINUE_ON_ERROR_TAG = "action_continue_on_error"
-internal const val ACTION_VARIABLE_PICKER_TAG = "action_variable_picker"
-
 @Composable
-@SuppressLint("LocalContextGetResourceValueCall")
 internal fun ActionPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (ActionMetadata) -> Unit,
 ) {
-    val context = LocalContext.current
-    val configuration = LocalConfiguration.current
     var query by rememberSaveable { mutableStateOf("") }
-    val localizedActions = remember(configuration) {
-        ActionMetadataRegistry.all()
-            .asSequence()
-            .filter { it.pickerVisible }
-            .map { metadata ->
-                LocalizedActionMetadata(
-                    metadata = metadata,
-                    name = context.getString(metadata.nameRes),
-                    description = context.getString(metadata.descriptionRes),
-                    category = context.getString(metadata.categoryRes),
-                )
-            }
-            .toList()
-    }
-    val filteredActions = remember(localizedActions, query) { filterActionPickerItems(localizedActions, query) }
+    // The fork's metadata is inline strings, so the catalogue needs no locale rekeying — build it once.
+    val allActions = remember { ActionMetadataRegistry.all().toList() }
+    val filteredActions = remember(allActions, query) { filterActionPickerItems(allActions, query) }
     val actionGroups = remember(filteredActions) {
         filteredActions
             .groupBy { it.category }
@@ -179,8 +158,7 @@ internal fun ActionPickerDialog(
                                     modifier = Modifier.padding(top = 4.dp),
                                 )
                             }
-                            items(actions, key = { it.metadata.id }) { localized ->
-                                val metadata = localized.metadata
+                            items(actions, key = { it.id }) { metadata ->
                                 val capability = ActionCapabilityRegistry.get(metadata.id)
                                 Card(
                                     onClick = { onSelect(metadata) },
@@ -209,7 +187,7 @@ internal fun ActionPickerDialog(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
                                         ) {
-                                            Text(localized.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                                            Text(metadata.name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                             if (capability.level != CapabilityLevel.Supported) {
                                                 StatusPill(
                                                     if (capability.level == CapabilityLevel.Unsupported) stringResource(R.string.label_unsupported) else stringResource(R.string.label_setup),
@@ -217,9 +195,9 @@ internal fun ActionPickerDialog(
                                                 )
                                             }
                                         }
-                                        Text(localized.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(metadata.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         if (capability.level != CapabilityLevel.Supported) {
-                                            Text(stringResource(capability.reasonRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                            Text(capability.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                         }
                                     }
                                 }
@@ -234,82 +212,61 @@ internal fun ActionPickerDialog(
     )
 }
 
+/**
+ * Older spellings a form field still reads its value from, keyed by (action id, field key). The
+ * editor migrates the value into the current field, so on save the stale key must NOT be carried
+ * over — it would sit alongside the edited one and shadow it. See [preservedActionArgs].
+ */
+private val LEGACY_ARG_ALIASES: Map<Pair<String, String>, String> = mapOf(
+    ("brightness.set" to "brightness") to "level",
+    ("screenshot.take" to "path") to "filename",
+    ("file.read" to "var") to "variable",
+    ("file.write" to "text") to "content",
+    ("file.append" to "text") to "content",
+    ("file.list" to "var") to "variable",
+    ("http.get" to "var") to "variable",
+    ("http.post" to "data") to "body",
+    ("http.post" to "var") to "variable",
+)
+
 internal fun existingActionArgValue(
     actionId: String,
     key: String,
     args: Map<String, String>,
-    tasks: List<Task> = emptyList(),
-): String = args[key] ?: notificationTaskEditorValue(actionId, key, args, tasks) ?: when (actionId to key) {
-    "brightness.set" to "brightness" -> args["level"]
-    "screenshot.take" to "path" -> args["filename"]
-    "file.read" to "var" -> args["variable"]
-    "file.write" to "text" -> args["content"]
-    "file.append" to "text" -> args["content"]
-    "file.list" to "var" -> args["variable"]
-    "http.get" to "var" -> args["variable"]
-    "http.post" to "data" -> args["body"]
-    "http.post" to "var" -> args["variable"]
-    else -> null
-}.orEmpty()
+): String = (args[key] ?: LEGACY_ARG_ALIASES[actionId to key]?.let { args[it] }).orEmpty()
 
-private fun notificationTaskEditorValue(
+/**
+ * The action's existing args that no form field covers — carried across a save untouched.
+ *
+ * The editor rebuilds `args` from its visible fields alone, so anything the metadata doesn't declare
+ * would be dropped by the act of opening an action and pressing Save. That is silent and destructive:
+ * a `scene.hide` losing its `scene` becomes "dismiss EVERY scene", and a `task.return` loses its
+ * `ret:<name>` payload. Rescuing them keeps an edit to one field from rewriting the rest.
+ *
+ * Three kinds of key are deliberately NOT rescued: the field keys themselves (the form owns those,
+ * including one the user just cleared), the [LEGACY_ARG_ALIASES] a field read its value through (the
+ * old key would shadow the new one), and Run Task's `param:` args (its own editor below owns them, so
+ * a parameter deleted there must stay deleted).
+ */
+internal fun preservedActionArgs(
     actionId: String,
-    key: String,
-    args: Map<String, String>,
-    tasks: List<Task>,
-): String? {
-    if (actionId != "notify.show") return null
-    val buttonIndex = (1..NotificationTaskBindings.BUTTON_COUNT)
-        .firstOrNull { NotificationTaskBindings.taskIdKey(it) == key }
-        ?: return null
-    val reference = NotificationTaskBindings.parse(args, buttonIndex) ?: return ""
-    return when (val resolution = NotificationTaskBindings.resolve(reference, tasks.toNotificationCandidates())) {
-        is NotificationTaskResolution.Bound -> resolution.task.id.toString()
-        else -> ""
+    fieldKeys: List<String>,
+    existing: Map<String, String>,
+): Map<String, String> {
+    val owned = fieldKeys.toSet() + fieldKeys.mapNotNull { LEGACY_ARG_ALIASES[actionId to it] }
+    return existing.filterKeys { key ->
+        key !in owned && !(actionId == SUB_TASK_ACTION_ID && key.startsWith(SUB_TASK_PARAM_PREFIX))
     }
 }
-
-internal fun unresolvedNotificationTaskBindings(
-    actionId: String,
-    args: Map<String, String>,
-    tasks: List<Task>,
-): Map<String, NotificationTaskResolution> {
-    if (actionId != "notify.show") return emptyMap()
-    val candidates = tasks.toNotificationCandidates()
-    return (1..NotificationTaskBindings.BUTTON_COUNT).mapNotNull { buttonIndex ->
-        val reference = NotificationTaskBindings.parse(args, buttonIndex) ?: return@mapNotNull null
-        val resolution = NotificationTaskBindings.resolve(reference, candidates)
-        if (resolution is NotificationTaskResolution.Bound) {
-            null
-        } else {
-            NotificationTaskBindings.taskIdKey(buttonIndex) to resolution
-        }
-    }.toMap()
-}
-
-private fun List<Task>.toNotificationCandidates(): List<NotificationTaskCandidate> =
-    map { NotificationTaskCandidate(it.id, it.name) }
 
 @Composable
 internal fun ActionConfigDialog(
     state: ActionEditState,
-    tasks: List<Task> = emptyList(),
-    enclosingActions: List<ActionSpec> = emptyList(),
-    globalVariables: List<Variable> = emptyList(),
-    eventVariables: List<EditorEventVariable> = DEFAULT_EDITOR_EVENT_VARIABLES,
     onDismiss: () -> Unit,
     onSave: (ActionSpec) -> Unit,
 ) {
-    val metadataName = stringResource(state.metadata.nameRes)
-    val metadataDescription = stringResource(state.metadata.descriptionRes)
-    var label by rememberSaveable(state.existing?.id, state.metadata.id, metadataName) {
-        mutableStateOf(state.existing?.label ?: metadataName)
-    }
-    var condition by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(state.existing?.condition.orEmpty())
-    }
-    var continueOnError by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(state.existing?.continueOnError ?: false)
+    var label by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(state.existing?.label ?: state.metadata.name)
     }
     var values by rememberSaveable(state.existing?.id, state.metadata.id) {
         mutableStateOf(
@@ -318,88 +275,43 @@ internal fun ActionConfigDialog(
                     actionId = state.metadata.id,
                     key = field.key,
                     args = state.existing?.args.orEmpty(),
-                    tasks = tasks,
                 )
             }
         )
     }
-    val initialTaskBindingIssues = remember(state.existing?.args, state.metadata.id, tasks) {
-        unresolvedNotificationTaskBindings(
-            actionId = state.metadata.id,
-            args = state.existing?.args.orEmpty(),
-            tasks = tasks,
-        )
-    }
-    var addressedTaskBindingKeys by rememberSaveable(state.existing?.id, state.metadata.id) {
-        mutableStateOf(emptyList<String>())
-    }
-    val taskBindingIssues = initialTaskBindingIssues.filterKeys { it !in addressedTaskBindingKeys }
     val capability = remember(state.metadata.id) { ActionCapabilityRegistry.get(state.metadata.id) }
-    val availableTaskIds = remember(tasks) { tasks.mapTo(mutableSetOf()) { it.id } }
-    val validationIssues = ActionFieldPolicy.validateForm(state.metadata, values, availableTaskIds)
-    val variableOptions = remember(enclosingActions, state.index, globalVariables, eventVariables) {
-        typedVariableOptions(
-            actions = enclosingActions,
-            editingIndex = state.index,
-            globalNames = globalVariables.map(Variable::name),
-            eventVariables = eventVariables,
+    val missingRequired = state.metadata.fields.any { it.required && values[it.key].isNullOrBlank() }
+
+    // Run Task carries dynamic named parameters as `param:<name>` args that no metadata field covers.
+    // Edit them here (seeded from the existing action) and merge them back on Save — without this the
+    // save would rebuild args from the visible fields alone and silently drop every parameter.
+    val isRunTask = state.metadata.id == SUB_TASK_ACTION_ID
+    var params by rememberSaveable(state.existing?.id, state.metadata.id) {
+        mutableStateOf(
+            state.existing?.args.orEmpty()
+                .filterKeys { it.startsWith(SUB_TASK_PARAM_PREFIX) }
+                .map { it.key.removePrefix(SUB_TASK_PARAM_PREFIX) to it.value },
         )
-    }
-    val retryPlan = remember(enclosingActions, state.index, state.metadata.id) {
-        if (state.metadata.id == FlowControl.TRY && state.index != null) {
-            tryRetryPlan(enclosingActions, state.index)
-        } else {
-            null
-        }
     }
 
     AlertDialog(
+        // Yellow edge + more height: this is the full editor, so give it room without being a full page.
+        modifier = Modifier
+            .fillMaxWidth(0.96f)
+            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         // Back and Cancel still dismiss in one tap; only a stray tap on the scrim is refused.
         // These forms carry many fields, and discarding them has no undo because nothing was
         // saved yet.
         properties = DialogProperties(dismissOnClickOutside = false),
-        title = { Text(metadataName) },
+        title = { Text(state.metadata.name) },
         text = {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 420.dp),
+                modifier = Modifier.heightIn(max = 620.dp),
                 verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {
                 item {
-                    Text(metadataDescription, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (state.metadata.id == FlowControl.TRY) {
-                        Spacer(Modifier.height(8.dp))
-                        if (retryPlan == null ||
-                            (retryPlan.retryableActionIds.isEmpty() && retryPlan.nonRetryableActionIds.isEmpty())
-                        ) {
-                            Text(
-                                stringResource(R.string.flow_try_retry_summary_empty),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            retryPlan.retryableActionIds.takeIf { it.isNotEmpty() }?.let { actionIds ->
-                                Text(
-                                    stringResource(
-                                        R.string.flow_try_retryable_summary,
-                                        actionIds.map { actionId -> actionDisplayName(actionId) }.joinToString(),
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                            retryPlan.nonRetryableActionIds.takeIf { it.isNotEmpty() }?.let { actionIds ->
-                                Text(
-                                    stringResource(
-                                        R.string.flow_try_non_retryable_summary,
-                                        actionIds.map { actionId -> actionDisplayName(actionId) }.joinToString(),
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
-                        }
-                    }
+                    Text(state.metadata.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (capability.level != CapabilityLevel.Supported) {
                         Spacer(Modifier.height(8.dp))
                         Surface(
@@ -410,22 +322,12 @@ internal fun ActionConfigDialog(
                             },
                             shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         ) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
-                                Text(
-                                    stringResource(capability.reasonRes),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                // The reason alone told users what was missing but not where to
-                                // fix it, which is what sent people to edit the manifest instead.
-                                if (capability.level == CapabilityLevel.RequiresSetup) {
-                                    Text(
-                                        stringResource(R.string.capability_grant_from_setup),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
+                            Text(
+                                capability.reason,
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -434,95 +336,49 @@ internal fun ActionConfigDialog(
                         onValueChange = { label = it },
                         label = { Text(stringResource(R.string.action_label_field)) },
                         supportingText = { Text(stringResource(R.string.action_label_hint)) },
-                        singleLine = true,
+                        // Labels are frequently multi-line (bilingual notes) — a single line hid the rest and
+                        // made them uneditable. Grow with the text; there's plenty of dialog height.
+                        minLines = 3,
+                        maxLines = 12,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = condition,
-                        onValueChange = { condition = it },
-                        label = { Text(stringResource(R.string.action_condition_label)) },
-                        supportingText = { Text(stringResource(R.string.action_condition_helper)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    VariableChipPicker(
-                        options = variableOptions.filter { it.type != com.opentasker.core.actions.ActionValueType.ARRAY },
-                        onSelect = { option -> condition = insertVariableChip(condition, option) },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    val continueStateDescription = stringResource(
-                        if (continueOnError) R.string.label_on else R.string.label_off,
-                    )
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
-                        shape = RoundedCornerShape(DesignSystem.Radii.lg),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag(ACTION_CONTINUE_ON_ERROR_TAG)
-                            .toggleable(
-                                value = continueOnError,
-                                role = Role.Switch,
-                                onValueChange = { continueOnError = it },
-                            )
-                            .semantics { stateDescription = continueStateDescription },
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.action_continue_on_error_label), style = MaterialTheme.typography.labelLarge)
-                                Text(
-                                    stringResource(R.string.action_continue_on_error_helper),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Switch(checked = continueOnError, onCheckedChange = null)
-                        }
-                    }
                 }
                 items(state.metadata.fields, key = { it.key }) { field ->
                     ActionFieldInput(
                         field = field,
                         value = values[field.key].orEmpty(),
-                        onChange = { newValue ->
-                            values = values + (field.key to newValue)
-                            if (field.fieldType == FieldType.TASK && field.key !in addressedTaskBindingKeys) {
-                                addressedTaskBindingKeys = addressedTaskBindingKeys + field.key
-                            }
-                        },
-                        tasks = tasks,
-                        issue = validationIssues[field.key],
-                        variableOptions = variableOptions.filter { option -> field.acceptsVariableType(option.type) },
+                        onChange = { newValue -> values = values + (field.key to newValue) },
                     )
-                    taskBindingIssues[field.key]?.let { issue ->
-                        Text(
-                            notificationTaskBindingIssueText(issue),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                }
+                if (isRunTask) {
+                    item {
+                        RunTaskParametersSection(params = params, onChange = { params = it })
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                enabled = validationIssues.isEmpty() && taskBindingIssues.isEmpty() && capability.canAdd,
+                enabled = !missingRequired && capability.canAdd,
                 onClick = {
+                    val paramArgs = if (isRunTask) {
+                        params.filter { it.first.isNotBlank() }
+                            .associate { "$SUB_TASK_PARAM_PREFIX${it.first.trim()}" to it.second }
+                    } else {
+                        emptyMap()
+                    }
                     onSave(
                         ActionSpec(
                             id = state.existing?.id ?: 0,
                             type = state.metadata.id,
-                            label = label.trim().takeUnless { it.isBlank() || it == metadataName },
-                            args = mergeActionArguments(
+                            label = label.trim().ifBlank { state.metadata.name },
+                            args = preservedActionArgs(
+                                actionId = state.metadata.id,
+                                fieldKeys = state.metadata.fields.map { it.key },
                                 existing = state.existing?.args.orEmpty(),
-                                fields = state.metadata.fields,
-                                editedValues = values,
-                            ),
-                            continueOnError = continueOnError,
-                            condition = condition.trim().ifBlank { null },
+                            ) + values.filterValues { it.isNotBlank() } + paramArgs,
+                            continueOnError = state.existing?.continueOnError ?: false,
+                            condition = state.existing?.condition,
                         )
                     )
                 },
@@ -534,18 +390,65 @@ internal fun ActionConfigDialog(
     )
 }
 
+/**
+ * Editor for a Run Task action's named parameters (the `param:<name>` args the sub-task reads as
+ * {{ param.name }}). A row per parameter — name + value + delete — plus an add button. The parent
+ * merges these back into the action's args on Save.
+ */
 @Composable
-internal fun ActionFieldInput(
-    field: ActionField,
-    value: String,
-    onChange: (String) -> Unit,
-    tasks: List<Task> = emptyList(),
-    suggestedPackage: String? = null,
-    issue: ActionFieldPolicy.Issue? = null,
-    variableOptions: List<VariableChipOption> = emptyList(),
+private fun RunTaskParametersSection(
+    params: List<Pair<String, String>>,
+    onChange: (List<Pair<String, String>>) -> Unit,
 ) {
-    val label = stringResource(field.labelRes) + if (field.required) " *" else ""
-    val hint = field.hintRes?.let { stringResource(it) }
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Text(
+            "Parameters",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            "Named values passed to the task; it reads each as {{ param.name }} (or %@name).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        params.forEachIndexed { index, (name, value) ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { newName ->
+                        onChange(params.toMutableList().also { it[index] = newName to it[index].second })
+                    },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { newValue ->
+                        onChange(params.toMutableList().also { it[index] = it[index].first to newValue })
+                    },
+                    label = { Text("Value") },
+                    modifier = Modifier.weight(1.4f),
+                )
+                IconButton(onClick = { onChange(params.toMutableList().also { it.removeAt(index) }) }) {
+                    Icon(Icons.Filled.Delete, contentDescription = "Remove parameter")
+                }
+            }
+        }
+        OutlinedButton(onClick = { onChange(params + ("" to "")) }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Add parameter")
+        }
+    }
+}
+
+@Composable
+internal fun ActionFieldInput(field: ActionField, value: String, onChange: (String) -> Unit) {
+    val label = field.label + if (field.required) " *" else ""
     when (field.fieldType) {
         FieldType.CHECKBOX -> {
             val checked = value.toBoolean()
@@ -571,7 +474,7 @@ internal fun ActionFieldInput(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(label, style = MaterialTheme.typography.labelLarge)
-                    hint?.let {
+                    field.hint?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -580,412 +483,215 @@ internal fun ActionFieldInput(
         }
         }
 
-        FieldType.MULTILINE -> VariableTextField(
+        FieldType.MULTILINE -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
-            label = label,
-            hint = hint,
-            supportingText = actionFieldSupportingText(field, issue),
-            isError = issue != null,
+            label = { Text(label) },
+            placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
             minLines = 3,
-            variableOptions = variableOptions,
-        )
-
-        FieldType.NUMBER -> VariableTextField(
-            value = value,
-            onValueChange = onChange,
-            label = label,
-            hint = hint,
-            supportingText = actionFieldSupportingText(field, issue),
-            isError = issue != null,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (field.numberRule?.allowedLiterals.isNullOrEmpty()) KeyboardType.Decimal else KeyboardType.Text,
-            ),
-            singleLine = true,
-            variableOptions = variableOptions,
-        )
-
-        FieldType.TASK -> TaskActionFieldInput(
-            label = label,
-            hint = hint,
-            value = value,
-            tasks = tasks,
-            onChange = onChange,
-        )
-
-        FieldType.APP -> InstalledAppFieldInput(
-            label = label,
-            hint = hint,
-            value = value,
-            required = field.required,
-            suggestedPackage = suggestedPackage,
-            onChange = onChange,
-        )
-
-        FieldType.DROPDOWN -> ActionDropdownFieldInput(
-            field = field,
-            label = label,
-            hint = hint,
-            value = value,
-            issue = issue,
-            onChange = onChange,
-        )
-
-        FieldType.FILE -> ActionFileFieldInput(
-            field = field,
-            label = label,
-            hint = hint,
-            value = value,
-            issue = issue,
-            onChange = onChange,
-        )
-
-        FieldType.TEXT -> VariableTextField(
-            value = value,
-            onValueChange = onChange,
-            label = label,
-            hint = hint,
-            supportingText = actionFieldSupportingText(field, issue),
-            isError = issue != null,
-            singleLine = true,
-            variableOptions = variableOptions,
-        )
-    }
-
-    if (issue != null && field.fieldType in setOf(FieldType.TASK, FieldType.APP, FieldType.CHECKBOX)) {
-        ActionFieldErrorText(issue)
-    }
-}
-
-@Composable
-private fun VariableTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    label: String,
-    hint: String?,
-    supportingText: (@Composable () -> Unit)?,
-    isError: Boolean,
-    variableOptions: List<VariableChipOption>,
-    singleLine: Boolean = false,
-    minLines: Int = 1,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            label = { Text(label) },
-            placeholder = hint?.let { { Text(it) } },
-            supportingText = supportingText,
-            isError = isError,
-            keyboardOptions = keyboardOptions,
-            singleLine = singleLine,
-            minLines = minLines,
             modifier = Modifier.fillMaxWidth(),
         )
-        VariableChipPicker(
-            options = variableOptions,
-            onSelect = { option -> onValueChange(insertVariableChip(value, option)) },
-        )
-    }
-}
 
-@Composable
-private fun VariableChipPicker(
-    options: List<VariableChipOption>,
-    onSelect: (VariableChipOption) -> Unit,
-) {
-    if (options.isEmpty()) return
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(ACTION_VARIABLE_PICKER_TAG),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            stringResource(R.string.action_variable_picker_label),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        FieldType.NUMBER -> OutlinedTextField(
+            value = value,
+            onValueChange = { onChange(it.filter { ch -> ch.isDigit() || ch == '-' || ch == '.' }) },
+            label = { Text(label) },
+            placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(
-                options,
-                key = { option ->
-                    "${option.scope}:${option.actionIndex}:${option.name}:${option.reference}:${option.type}"
-                },
-            ) { option ->
-                FilterChip(
-                    selected = false,
-                    onClick = { onSelect(option) },
-                    label = {
-                        Text(
-                            variableChipLabel(option),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                )
+
+        // #AARRGGBB via the shared RGBA slider picker; a tappable swatch shows the current value.
+        FieldType.COLOR -> {
+            var showPicker by remember { mutableStateOf(false) }
+            val parsed = remember(value) {
+                runCatching { if (value.isBlank()) null else android.graphics.Color.parseColor(value) }.getOrNull()
             }
-        }
-    }
-}
-
-@Composable
-private fun variableChipLabel(option: VariableChipOption): String = when (option.scope) {
-    com.opentasker.core.actions.VariableChipScope.STEP -> stringResource(
-        R.string.action_variable_chip_step,
-        (option.actionIndex ?: 0) + 1,
-        option.name,
-    )
-    com.opentasker.core.actions.VariableChipScope.EVENT -> stringResource(R.string.action_variable_chip_event, option.name)
-    com.opentasker.core.actions.VariableChipScope.GLOBAL -> stringResource(R.string.action_variable_chip_global, option.name)
-}
-
-@Composable
-private fun actionFieldSupportingText(
-    field: ActionField,
-    issue: ActionFieldPolicy.Issue?,
-): (@Composable () -> Unit)? = when {
-    issue != null -> {{ ActionFieldErrorText(issue) }}
-    field.required -> {{ Text(stringResource(R.string.label_required)) }}
-    else -> null
-}
-
-@Composable
-private fun ActionFieldErrorText(issue: ActionFieldPolicy.Issue) {
-    val text = when (issue.error) {
-        ActionFieldPolicy.Error.REQUIRED -> stringResource(R.string.label_required)
-        ActionFieldPolicy.Error.INVALID_NUMBER -> stringResource(R.string.action_field_error_invalid_number)
-        ActionFieldPolicy.Error.BELOW_MINIMUM -> stringResource(
-            R.string.action_field_error_below_minimum,
-            formatActionNumberLimit(issue.limit),
-        )
-        ActionFieldPolicy.Error.ABOVE_MAXIMUM -> stringResource(
-            R.string.action_field_error_above_maximum,
-            formatActionNumberLimit(issue.limit),
-        )
-        ActionFieldPolicy.Error.INVALID_OPTION -> stringResource(R.string.action_field_error_invalid_option)
-        ActionFieldPolicy.Error.INVALID_BOOLEAN -> stringResource(R.string.action_field_error_invalid_boolean)
-        ActionFieldPolicy.Error.INVALID_TASK -> stringResource(R.string.action_field_error_invalid_task)
-        ActionFieldPolicy.Error.INVALID_APP -> stringResource(R.string.action_field_error_invalid_app)
-        ActionFieldPolicy.Error.INVALID_FILE -> stringResource(R.string.action_field_error_invalid_file)
-        ActionFieldPolicy.Error.CONFLICTING_VALUE -> stringResource(R.string.action_field_error_conflicting_value)
-        ActionFieldPolicy.Error.BODY_NOT_ALLOWED -> stringResource(R.string.action_field_error_body_not_allowed)
-        ActionFieldPolicy.Error.INVALID_DEFINITION -> stringResource(R.string.action_field_error_invalid_definition)
-    }
-    Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-}
-
-private fun formatActionNumberLimit(limit: Double?): String = when {
-    limit == null -> ""
-    limit % 1.0 == 0.0 -> limit.toLong().toString()
-    else -> limit.toString()
-}
-
-@Composable
-private fun ActionDropdownFieldInput(
-    field: ActionField,
-    label: String,
-    hint: String?,
-    value: String,
-    issue: ActionFieldPolicy.Issue?,
-    onChange: (String) -> Unit,
-) {
-    var expanded by rememberSaveable(field.key) { mutableStateOf(false) }
-    val selectedLabel = field.options.firstOrNull { it.value == value }?.let { stringResource(it.labelRes) }
-        ?: if (value.isBlank()) stringResource(R.string.label_none)
-        else stringResource(R.string.action_field_unknown_option, value)
-    Box(Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showPicker = true }.padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Column(Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.labelLarge)
-                    Text(selectedLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    hint?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(label, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (parsed == null) "Default" else value.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(if (parsed == null) Color.Transparent else Color(parsed))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                )
+            }
+            if (showPicker) {
+                RgbaColorPickerDialog(
+                    initial = value,
+                    onConfirm = { onChange(it); showPicker = false },
+                    onClear = { onChange(""); showPicker = false },
+                    onDismiss = { showPicker = false },
+                )
+            }
+        }
+
+        // Visual widget-layout editor (full-screen), with a raw-JSON advanced fallback below it.
+        FieldType.WIDGET_LAYOUT -> {
+            var editing by remember { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (value.isBlank()) "Design layout (visual editor)" else "Edit layout visually")
+                }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text("Layout JSON (advanced)") },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (editing) {
+                Dialog(
+                    onDismissRequest = { editing = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                ) {
+                    WidgetEditor(
+                        initialJson = value,
+                        onDone = { onChange(it); editing = false },
+                        onCancel = { editing = false },
+                    )
+                }
+            }
+        }
+
+        // Editable combo: free-text (so it can be a %variable) PLUS a dropdown of the field's options.
+        FieldType.DROPDOWN -> {
+            var expanded by remember { mutableStateOf(false) }
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onChange,
+                    label = { Text(label) },
+                    placeholder = field.hint?.let { { Text(it) } },
+                    supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                    singleLine = true,
+                    trailingIcon = if (field.options.isEmpty()) null else {
+                        {
+                            IconButton(onClick = { expanded = true }) {
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose a value")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    field.options.forEach { opt ->
+                        DropdownMenuItem(text = { Text(opt) }, onClick = { onChange(opt); expanded = false })
                     }
                 }
             }
-            issue?.let { ActionFieldErrorText(it) }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (!field.required) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.label_none)) },
-                    onClick = {
-                        onChange("")
-                        expanded = false
-                    },
-                )
-            }
-            field.options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(option.labelRes)) },
-                    onClick = {
-                        onChange(option.value)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
 
-@Composable
-private fun ActionFileFieldInput(
-    field: ActionField,
-    label: String,
-    hint: String?,
-    value: String,
-    issue: ActionFieldPolicy.Issue?,
-    onChange: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    var expanded by rememberSaveable(field.key) { mutableStateOf(false) }
-    val openDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            onChange(uri.toString())
-        }
-    }
-    // Walking the sandbox is disk work; doing it in remember{} ran it on the main thread while
-    // composing the field, so a large user_files tree janked the editor open.
-    val fileScope = field.fileRule?.scope
-    val savedPaths by produceState(emptyList<String>(), context.filesDir, fileScope) {
-        this.value = if (fileScope != ActionFileScope.OPENTASKER) {
-            emptyList()
-        } else {
-            withContext(Dispatchers.IO) {
-                val root = java.io.File(context.filesDir, "user_files")
-                runCatching {
-                    if (!root.exists()) {
-                        emptyList()
-                    } else {
-                        root.walkTopDown()
-                            .drop(1)
-                            .take(100)
-                            .map { file ->
-                                file.relativeTo(root).invariantSeparatorsPath +
-                                    if (file.isDirectory) "/" else ""
-                            }
-                            .toList()
+        // Editable text (a package name or %var) plus an installed-apps picker that fills it.
+        FieldType.APP_PACKAGE -> {
+            var showPicker by remember { mutableStateOf(false) }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onChange,
+                label = { Text(label) },
+                placeholder = field.hint?.let { { Text(it) } },
+                supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { showPicker = true }) {
+                        Icon(Icons.Filled.Apps, contentDescription = "Pick an app")
                     }
-                }.getOrDefault(emptyList())
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (showPicker) {
+                AppPickerDialog(
+                    onDismiss = { showPicker = false },
+                    onPick = { pkg -> onChange(pkg); showPicker = false },
+                )
             }
         }
-    }
-    Column(Modifier.fillMaxWidth()) {
-        OutlinedTextField(
+
+        FieldType.TEXT -> OutlinedTextField(
             value = value,
             onValueChange = onChange,
             label = { Text(label) },
-            placeholder = hint?.let { { Text(it) } },
-            supportingText = actionFieldSupportingText(field, issue),
-            isError = issue != null,
-            singleLine = true,
+            placeholder = field.hint?.let { { Text(it) } },
+            supportingText = if (field.required) {{ Text(stringResource(R.string.label_required)) }} else null,
+            // Not single-line: short values stay compact but long ones (a font name, a path, a message)
+            // wrap and grow so they stay fully editable rather than scrolling inside one hidden line.
+            maxLines = 8,
+            // Opt-in folder icon that fills the field from the system directory/file picker.
+            trailingIcon = if (field.pathPicker) {
+                { PathPickerTrailingIcon(onPath = onChange) }
+            } else {
+                null
+            },
             modifier = Modifier.fillMaxWidth(),
         )
-        Box {
-            TextButton(
-                onClick = {
-                    if (field.fileRule?.scope == ActionFileScope.OPENTASKER) expanded = true
-                    else openDocument.launch(arrayOf("*/*"))
-                },
-            ) { Text(stringResource(R.string.action_browse)) }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                if (savedPaths.isEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_file_picker_empty)) },
-                        onClick = { expanded = false },
-                        enabled = false,
-                    )
-                } else {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_file_picker_saved_files)) },
-                        onClick = {},
-                        enabled = false,
-                    )
-                    savedPaths.forEach { path ->
-                        DropdownMenuItem(
-                            text = { Text(path) },
-                            onClick = {
-                                onChange(path.trimEnd('/'))
-                                expanded = false
-                            },
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
+/**
+ * A folder icon whose menu opens the system directory or file picker (SAF) and reports the chosen
+ * item as a plain filesystem path (e.g. /storage/emulated/0/Download/…) — no persistent URI grant is
+ * taken because callers only need the path string. Sits in a field's trailing-icon slot.
+ */
 @Composable
-internal fun TaskActionFieldInput(
-    label: String,
-    hint: String?,
-    value: String,
-    tasks: List<Task>,
-    onChange: (String) -> Unit,
-) {
-    var expanded by rememberSaveable(label) { mutableStateOf(false) }
-    val selectedId = value.toLongOrNull()
-    val selectedLabel = when {
-        value.isBlank() -> stringResource(R.string.label_none)
-        selectedId == null -> stringResource(R.string.action_task_binding_invalid_value, value)
-        else -> tasks.firstOrNull { it.id == selectedId }?.name
-            ?: stringResource(R.string.action_task_binding_missing_id, selectedId)
+private fun PathPickerTrailingIcon(onPath: (String) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val treeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        documentUriToFsPath(uri, isTree = true)?.let { onPath(if (it.endsWith("/")) it else "$it/") }
     }
-    Box(Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelLarge)
-                Text(selectedLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                hint?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.label_none)) },
-                onClick = {
-                    onChange("")
-                    expanded = false
-                },
-            )
-            tasks.sortedBy { it.name.lowercase() }.forEach { task ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_task_picker_option, task.name, task.id)) },
-                    onClick = {
-                        onChange(task.id.toString())
-                        expanded = false
-                    },
-                )
-            }
-        }
+    val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        documentUriToFsPath(uri, isTree = false)?.let(onPath)
+    }
+    IconButton(onClick = { menu = true }) {
+        Icon(Icons.Filled.Folder, contentDescription = "Pick a folder or file")
+    }
+    ThemedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+        DropdownMenuItem(
+            text = { Text("Pick folder…") },
+            onClick = { menu = false; treeLauncher.launch(null) },
+        )
+        DropdownMenuItem(
+            text = { Text("Pick file…") },
+            onClick = { menu = false; fileLauncher.launch(arrayOf("*/*")) },
+        )
     }
 }
 
-@Composable
-private fun notificationTaskBindingIssueText(issue: NotificationTaskResolution): String = when (issue) {
-    is NotificationTaskResolution.Bound -> ""
-    is NotificationTaskResolution.Missing -> when (val reference = issue.reference) {
-        is NotificationTaskReference.Id -> stringResource(R.string.action_task_binding_missing_id, reference.taskId)
-        is NotificationTaskReference.LegacyName -> stringResource(R.string.action_task_binding_missing_name, reference.taskName)
-        is NotificationTaskReference.Invalid -> stringResource(R.string.action_task_binding_invalid_value, reference.rawValue)
+/**
+ * Convert a Storage Access Framework document/tree Uri from the external-storage provider to a real
+ * filesystem path. Handles the primary volume (/storage/emulated/0) and named secondary volumes
+ * (/storage/<id>). Returns null for other providers (a content Uri that has no filesystem path).
+ */
+private fun documentUriToFsPath(uri: Uri?, isTree: Boolean): String? {
+    if (uri == null || uri.authority != "com.android.externalstorage.documents") return null
+    val docId = runCatching {
+        if (isTree) DocumentsContract.getTreeDocumentId(uri) else DocumentsContract.getDocumentId(uri)
+    }.getOrNull() ?: return null
+    val parts = docId.split(":", limit = 2)
+    val volume = parts[0]
+    val relative = parts.getOrNull(1).orEmpty()
+    val base = if (volume.equals("primary", ignoreCase = true)) {
+        Environment.getExternalStorageDirectory().absolutePath
+    } else {
+        "/storage/$volume"
     }
-    is NotificationTaskResolution.Ambiguous -> stringResource(
-        R.string.action_task_binding_ambiguous_name,
-        issue.taskName,
-    )
-    is NotificationTaskResolution.Invalid -> stringResource(R.string.action_task_binding_invalid_value, issue.rawValue)
+    return if (relative.isEmpty()) base else "$base/$relative"
 }

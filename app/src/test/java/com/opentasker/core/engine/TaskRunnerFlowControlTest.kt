@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -19,6 +20,12 @@ class TaskRunnerFlowControlTest {
         recorded.clear()
         // Records the (expanded) "v" argument so we can observe which body actions ran and loop values.
         ActionRegistry.register(object : Action {
+            override val id = "test.flow.boom"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult =
+                ActionResult.Failure("the action broke")
+        })
+        ActionRegistry.register(object : Action {
             override val id = "test.flow.record"
             override val category = ActionCategory.FLOW
             override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -29,6 +36,7 @@ class TaskRunnerFlowControlTest {
     }
 
     private fun record(value: String) = ActionSpec(type = "test.flow.record", args = mapOf("v" to value))
+    private fun boom(id: Long = 0L) = ActionSpec(id = id, type = "test.flow.boom")
     private fun ctrl(type: String, args: Map<String, String> = emptyMap()) = ActionSpec(type = type, args = args)
 
     private fun run(variables: VariableStore = VariableStore(), vararg actions: ActionSpec): TaskRunReport =
@@ -194,5 +202,46 @@ class TaskRunnerFlowControlTest {
         )
         assertFalse(report.success)
         assertTrue(recorded.isEmpty())
+    }
+
+    @Test
+    fun anUnhandledFailureNamesTheActionThatEndedTheRun() {
+        // This is what a recovery task is handed, so it has to identify the real culprit — not the
+        // task in general, and not a later action that never ran.
+        val report = run(VariableStore(), record("first"), boom(id = 42L), record("never"))
+
+        assertFalse(report.success)
+        val error = requireNotNull(report.structuredError) { "a failed run must carry its error" }
+        assertEquals("test.flow.boom", error.actionType)
+        assertEquals(42L, error.actionId)
+        assertEquals(2, error.actionIndex)
+        assertEquals("the action broke", error.message)
+        // The action after the failure must not have run.
+        assertEquals(listOf("first"), recorded)
+    }
+
+    @Test
+    fun aFailureCaughtByFlowTryLeavesNothingToRecoverFrom() {
+        // flow.catch handled it, so the run succeeded and there is no error to hand a recovery task.
+        val report = run(
+            VariableStore(),
+            ctrl(FlowControl.TRY),
+            boom(),
+            ctrl(FlowControl.CATCH),
+            record("recovered"),
+            ctrl(FlowControl.ENDTRY),
+        )
+
+        assertTrue(report.success)
+        assertNull(report.structuredError)
+        assertEquals(listOf("recovered"), recorded)
+    }
+
+    @Test
+    fun aSucceedingRunCarriesNoError() {
+        val report = run(VariableStore(), record("only"))
+
+        assertTrue(report.success)
+        assertNull(report.structuredError)
     }
 }
