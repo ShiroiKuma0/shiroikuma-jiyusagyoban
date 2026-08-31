@@ -16,6 +16,8 @@
 
 ### Changed
 
+- Updated SQLCipher to 4.18.0, which carries SQLite 3.53.4. This also moves
+  androidx.sqlite to 2.7.0 underneath Room.
 - Updated OkHttp to 5.5.0, which stops the hostname verifier accepting hosts
   that fail IP canonicalisation and applies HTTP/1 timeouts while a request body
   is still being flushed. Both sit under the HTTP Request and Home Assistant

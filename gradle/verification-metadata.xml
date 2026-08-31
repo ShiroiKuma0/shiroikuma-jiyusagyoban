@@ -29,6 +29,11 @@
             <trusting group="androidx.databinding" />
             <trusting group="androidx.datastore" />
             <trusting group="androidx.lifecycle" />
+            <trusting group="androidx.sqlite" name="sqlite" version="2.7.0" />
+            <trusting group="androidx.sqlite" name="sqlite-android" version="2.7.0" />
+            <trusting group="androidx.sqlite" name="sqlite-framework" version="2.7.0" />
+            <trusting group="androidx.sqlite" name="sqlite-framework-android" version="2.7.0" />
+            <trusting group="androidx.sqlite" name="sqlite-jvm" version="2.7.0" />
             <trusting group="androidx.test.uiautomator" />
             <trusting group="androidx.work" />
             <trusting group="^androidx[.]compose($|([.].*))" regex="true" />
@@ -88,6 +93,7 @@
          </trusted-key>
          <trusted-key id="600EA202B1EC682F4A788E5AAC7A514BC9F9BB70" group="io.opencensus" name="opencensus-api" version="0.31.0" />
          <trusted-key id="61DEBD732F3F07771269972E2F87304808D40CEC" group="net.zetetic" name="sqlcipher-android" version="4.17.0" />
+         <trusted-key id="61DEBD732F3F07771269972E2F87304808D40CEC" group="net.zetetic" name="sqlcipher-android" version="4.18.0" />
          <trusted-key id="694621A7227D8D5289699830ABE9F3126BB741C1" group="^com[.]google($|([.].*))" regex="true" />
          <trusted-key id="696B6199A2A9D8C29CE78CC0D041CAD2E452550F" group="com.google.protobuf" />
          <trusted-key id="6DD3B8C64EF75253BEB2C53AD908A43FB7EC07AC" group="jakarta.activation" />
@@ -2841,6 +2847,40 @@
          </artifact>
          <artifact name="savedstate-ktx-1.4.0.module">
             <sha256 value="7cf86881220aa594c4ad1685ebd0f295e3d97b9c0fdc31b28300f4318a5045a8" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.sqlite" name="sqlite" version="2.7.0">
+         <artifact name="sqlite-2.7.0.module">
+            <sha256 value="16c59dab81642065102400887e7f80c311176afcb4f60eb82e5af6f29b3fdc56" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.sqlite" name="sqlite-android" version="2.7.0">
+         <artifact name="sqlite-android-2.7.0.module">
+            <sha256 value="15f4ecc975059e6e9d568badfcfa1873c49b512460dbde7f526717f9e9518306" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="sqlite.aar">
+            <sha256 value="61694731fb7108d40e2b9ffbb72af21f8b3de33b4af304130cc62f42fa5e001d" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.sqlite" name="sqlite-framework" version="2.7.0">
+         <artifact name="sqlite-framework-2.7.0.module">
+            <sha256 value="73edbb6a649f0a41d0a5a8f8746382336407a416f7434ab14369f3406054ebe1" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.sqlite" name="sqlite-framework-android" version="2.7.0">
+         <artifact name="sqlite-framework-android-2.7.0.module">
+            <sha256 value="b4a0ae27632800ad84c4e3a61935e073ee788e2ee05d35023fec3888f61fb433" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="sqlite-framework.aar">
+            <sha256 value="1e74396eea06ce66f234da8ae3702ac813d5524464250857c1435927c1a63dc6" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.sqlite" name="sqlite-jvm" version="2.7.0">
+         <artifact name="sqlite-jvm-2.7.0.jar">
+            <sha256 value="7a6d8db5ae363d96a4f65c9b6f6b3361b178c41e15a4f06bb2cd59403807474f" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="sqlite-jvm-2.7.0.module">
+            <sha256 value="be428d0b8c5ca1cb15883c15f680d9c9357a0e4031a3e1f3598ba160dac79b49" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.sqlite" name="sqlite" version="2.6.2">
@@ -5695,6 +5735,14 @@
          </artifact>
          <artifact name="kxml2-2.3.0.pom">
             <sha256 value="31ce606f4e9518936299bb0d27c978fa61e185fd1de7c9874fe959a53e34a685" origin="OpenTasker: Maven Central direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
+         </artifact>
+      </component>
+      <component group="net.zetetic" name="sqlcipher-android" version="4.18.0">
+         <artifact name="sqlcipher-android-4.18.0.aar">
+            <sha256 value="f59aaf02ffd4de649f85a6c0d296f9a91763764c07707997834abc0cfc745222" origin="OpenTasker: Maven Central published .sha256" />
+         </artifact>
+         <artifact name="sqlcipher-android-4.18.0.module">
+            <sha256 value="ee4e7bd3baeeb4b6354c877860bf05a7cc5e4ff4fd72bd550345861e24e649ab" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="net.zetetic" name="sqlcipher-android" version="4.17.0">
