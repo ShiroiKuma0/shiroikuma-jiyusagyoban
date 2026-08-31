@@ -9,8 +9,18 @@
   a release asset also verifies the APK really carries a signature, so an
   unsigned build cannot reach a release page under the published filename.
 
+### Added
+
+- Installing a starter template that needs a permission now opens Setup showing
+  just the grants that template is waiting on, instead of leaving the new
+  automation to fail on its first run with nothing explaining why.
+- Settings has a "Run onboarding again" action that reopens the starter
+  templates.
+
 ### Fixed
 
+- Dismissing the first-launch template dialog no longer counts as finishing
+  onboarding, so backing out of it does not hide the flow forever.
 - The F-Droid metadata gate no longer fails on a stale store-screenshot version
   stamp. The v0.2.93 bump left it recording the previous release's code.
 

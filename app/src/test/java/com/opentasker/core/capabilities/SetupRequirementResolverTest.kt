@@ -111,4 +111,24 @@ class SetupRequirementResolverTest {
             SetupRequirementResolver.resolve(listOf(profile), emptyList()),
         )
     }
+
+    @Test
+    fun actionTypesResolveBeforeAnythingIsStored() {
+        // Onboarding scopes Setup to a freshly installed template, which has no profile or task
+        // rows yet, so the requirements have to come from the action types alone.
+        assertEquals(
+            setOf(SetupRequirement.WRITE_SETTINGS, SetupRequirement.CONTACTS),
+            SetupRequirementResolver.resolveForActionTypes(
+                listOf("brightness.set", "contacts.lookup", "var.set"),
+            ),
+        )
+    }
+
+    @Test
+    fun aTemplateThatNeedsNothingSpecialResolvesEmpty() {
+        assertEquals(
+            emptySet<SetupRequirement>(),
+            SetupRequirementResolver.resolveForActionTypes(listOf("var.set", "flow.wait")),
+        )
+    }
 }

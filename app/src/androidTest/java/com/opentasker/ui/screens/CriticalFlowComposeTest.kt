@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,6 +33,7 @@ import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionNumberRule
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.apps.InstalledApp
+import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.ContextType
@@ -72,6 +74,60 @@ class CriticalFlowComposeTest {
         composeTestRule.onNodeWithText("Work-hours focus").assertIsDisplayed()
         composeTestRule.onNodeWithText("Start time *").assertIsDisplayed()
         composeTestRule.onNodeWithText("Create for Review").assertIsEnabled()
+    }
+
+    @Test
+    fun settingsOffersRunningOnboardingAgain() {
+        var reopenedTemplatePicker = false
+        composeTestRule.setContent {
+            TestTheme {
+                PermissionOnboardingScreen(
+                    contentPadding = PaddingValues(0.dp),
+                    onMessage = {},
+                    backupState = BackupSetupState(busy = false),
+                    onCreateBackup = {},
+                    onExportBackup = {},
+                    onImportBackup = {},
+                    settingsOnly = true,
+                    onRunOnboardingAgain = { reopenedTemplatePicker = true },
+                )
+            }
+        }
+
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("Run onboarding again"))
+        composeTestRule.onNodeWithText("Show templates").performClick()
+        assertTrue("Settings must be able to reopen the template picker", reopenedTemplatePicker)
+    }
+
+    @Test
+    fun setupScopedToAnInstalledTemplateHidesTheRestUntilAsked() {
+        composeTestRule.setContent {
+            TestTheme {
+                PermissionOnboardingScreen(
+                    contentPadding = PaddingValues(0.dp),
+                    onMessage = {},
+                    backupState = BackupSetupState(busy = false),
+                    onCreateBackup = {},
+                    onExportBackup = {},
+                    onImportBackup = {},
+                    focusRequirements = setOf(SetupRequirement.WRITE_SETTINGS),
+                )
+            }
+        }
+
+        // Scoped to the one grant the template needs, the banner explains why and unrelated rows
+        // are not competing with it. Battery optimization is the control: it renders on an empty
+        // workspace and carries no requirement of its own, so it can only disappear because of
+        // the focus filter.
+        composeTestRule.onNodeWithTag(SETUP_FOCUS_BANNER_TAG).assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Battery optimization").assertCountEquals(0)
+
+        composeTestRule.onNodeWithText("Show the full checklist").performClick()
+        composeTestRule.onNodeWithTag(SETUP_FOCUS_BANNER_TAG).assertDoesNotExist()
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("Battery optimization"))
+        composeTestRule.onNodeWithText("Battery optimization").assertIsDisplayed()
     }
 
     @Test

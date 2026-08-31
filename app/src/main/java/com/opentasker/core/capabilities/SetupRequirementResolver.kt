@@ -64,6 +64,16 @@ object SetupRequirementResolver {
         return requirements
     }
 
+    /**
+     * What a set of action types needs, before any of it exists as a stored profile. Onboarding
+     * uses this to scope Setup to the grants a freshly installed template is waiting on.
+     */
+    fun resolveForActionTypes(actionTypes: List<String>): Set<SetupRequirement> {
+        val requirements = linkedSetOf<SetupRequirement>()
+        actionTypes.forEach { type -> requirements += actionRequirements(type) }
+        return requirements
+    }
+
     private fun contextRequirements(context: ContextSpec): Set<SetupRequirement> {
         val tokens = context.config.entries
             .flatMap { (key, value) -> listOf(key, value) }

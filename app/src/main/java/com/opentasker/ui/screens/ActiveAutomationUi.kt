@@ -127,6 +127,8 @@ import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
+import com.opentasker.core.capabilities.SetupRequirement
+import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
@@ -259,6 +261,7 @@ fun ActiveAutomationUi(
     var showBundleTextImportDialog by rememberSaveable { mutableStateOf(false) }
     var bundleTextImportDraft by rememberSaveable { mutableStateOf("") }
     var onboardingTemplateFlow by rememberSaveable { mutableStateOf(false) }
+    var setupFocusRequirements by remember { mutableStateOf<Set<SetupRequirement>>(emptySet()) }
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
     LaunchedEffect(onboardingCompleted) {
@@ -679,6 +682,7 @@ fun ActiveAutomationUi(
                 globalFallbackTaskId = globalFallbackTaskId,
                 onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
                 settingsOnly = settingsOnly,
+                focusRequirements = if (settingsOnly) emptySet() else setupFocusRequirements,
                 onRunOnboardingAgain = if (settingsOnly) {
                     {
                         scope.launch { OnboardingPreference.reset(context) }
@@ -1143,7 +1147,18 @@ fun ActiveAutomationUi(
             onInstall = { values ->
                 viewModel.installProfileTemplate(template, values)
                 selectedTemplateId = null
-                screenOrdinal = OpenTaskerScreen.Profiles.ordinal
+                // A template whose actions need a grant would otherwise land on Profiles and fail
+                // on its first run with nothing explaining why, so send them to Setup scoped to
+                // exactly what this template is waiting on.
+                val needed = SetupRequirementResolver.resolveForActionTypes(
+                    template.actions.map { it.type },
+                )
+                setupFocusRequirements = needed
+                screenOrdinal = if (needed.isEmpty()) {
+                    OpenTaskerScreen.Profiles.ordinal
+                } else {
+                    OpenTaskerScreen.Setup.ordinal
+                }
                 finishOnboarding(OnboardingExit.InstalledTemplate)
             },
         )

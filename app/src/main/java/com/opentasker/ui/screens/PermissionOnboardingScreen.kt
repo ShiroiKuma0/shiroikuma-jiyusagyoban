@@ -112,6 +112,7 @@ import com.opentasker.core.power.ShizukuPowerState
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
 import com.opentasker.core.scripting.TermuxScriptState
+import androidx.compose.ui.platform.testTag
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
@@ -143,6 +144,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+
+internal const val SETUP_FOCUS_BANNER_TAG = "setup_focus_banner"
 
 private enum class SetupSection {
     ENGINE,
@@ -350,6 +353,7 @@ fun PermissionOnboardingScreen(
     onGlobalFallbackTaskChange: (Long?) -> Unit = {},
     settingsOnly: Boolean = false,
     onRunOnboardingAgain: (() -> Unit)? = null,
+    focusRequirements: Set<SetupRequirement> = emptySet(),
 ) {
     val context = LocalContext.current
     val viewModelFactory = remember(context) {
@@ -408,9 +412,20 @@ fun PermissionOnboardingScreen(
     val automationRequirements = remember(profiles, tasks) {
         SetupRequirementResolver.resolve(profiles, tasks)
     }
-    val visibleItems = remember(items, automationRequirements) {
+    // A template installed from onboarding scopes Setup to the grants that template actually
+    // needs, so a first-time user sees the two rows standing between them and a working
+    // automation rather than the whole checklist. Clearing the focus restores the full list.
+    var focusCleared by rememberSaveable(focusRequirements) { mutableStateOf(false) }
+    val activeFocus = if (focusCleared) emptySet() else focusRequirements
+    val visibleItems = remember(items, automationRequirements, activeFocus) {
         items.filter { item ->
-            item.section != SetupSection.NEEDED || item.requirements.any(automationRequirements::contains)
+            val neededHere = item.section != SetupSection.NEEDED ||
+                item.requirements.any(automationRequirements::contains)
+            if (activeFocus.isEmpty()) {
+                neededHere
+            } else {
+                item.requirements.any(activeFocus::contains)
+            }
         }
     }
     val sectionItems = remember(visibleItems) {
@@ -434,6 +449,27 @@ fun PermissionOnboardingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (activeFocus.isNotEmpty()) item {
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag(SETUP_FOCUS_BANNER_TAG),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                shape = RoundedCornerShape(DesignSystem.Radii.md),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        stringResource(R.string.setup_focus_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        stringResource(R.string.setup_focus_body),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    TextButton(onClick = { focusCleared = true }) {
+                        Text(stringResource(R.string.setup_focus_show_all))
+                    }
+                }
+            }
+        }
         if (!settingsOnly) item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
