@@ -18,6 +18,9 @@
 
 - Every text file is now stored with LF endings, so a small edit to the
   changelog diffs as a small edit.
+- The install instructions and the store changelog now explain that v0.2.93 is
+  signed with a new key, will not install over v0.2.92 or earlier, and needs a
+  backup exported before the old copy is uninstalled.
 
 ## v0.2.93
 

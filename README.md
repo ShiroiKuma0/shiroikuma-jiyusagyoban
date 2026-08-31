@@ -206,6 +206,8 @@ There is no F-Droid or IzzyOnDroid listing yet, so releases come from this repos
 
 **By hand:** download the APK attached to the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. From the next release on, that file is named `OpenTasker-v<version>.apk`; `v0.2.87` and earlier predate the naming gate, and `v0.2.87` ships its APK as `app-release.apk`.
 
+**Upgrading from v0.2.92 or earlier?** v0.2.93 is signed with a new key, so Android refuses to install it over an older copy. The install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` until the old one is removed. Uninstalling also erases the automation database, so export a backup before you do anything else. Open Setup, export a copy of the database or an encrypted `.otbackup` snapshot to a folder you control, then uninstall the old build, install v0.2.93, and restore. A backup that only lives in app storage goes away with the app, so make sure the copy you keep is the exported one. Secret variable values stay bound to the device that created them and have to be re-entered after a restore. The previous key was published in this repository, which is why it was retired instead of reused.
+
 Releases tagged `v0.1.0`, `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. All four carry versionCode 1 and were signed with a key that no longer exists, so they cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. The live line is `v0.2.x`, and its newest tag is the one to take.
 
 ---

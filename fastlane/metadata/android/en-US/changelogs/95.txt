@@ -1,1 +1,3 @@
 Removed the public development signing key. Release APKs now require an external local signing identity.
+
+This release is signed with a new key, so it will not install over v0.2.92 or earlier. Export a backup from Setup first, then uninstall the old copy and install this one. Secret variable values are device-bound and must be re-entered after a restore.
