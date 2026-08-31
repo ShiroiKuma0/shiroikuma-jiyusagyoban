@@ -453,14 +453,22 @@ class ActiveAutomationViewModel(
     private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
     internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
 
-    private val _taskerImportBusy = MutableStateFlow(false)
-    val taskerImportBusy: StateFlow<Boolean> = _taskerImportBusy.asStateFlow()
+    private val automationTransfer = ImportExportCoordinator(viewModelScope)
+    val taskerImportBusy: StateFlow<Boolean> = automationTransfer.busy
+    val taskerImportProgress: StateFlow<TransferProgress?> = automationTransfer.progress
 
     private val _openTaskerBundleReview = MutableStateFlow<OpenTaskerBundleReviewState?>(null)
     internal val openTaskerBundleReview: StateFlow<OpenTaskerBundleReviewState?> = _openTaskerBundleReview.asStateFlow()
 
-    private val _openTaskerBundleBusy = MutableStateFlow(false)
-    val openTaskerBundleBusy: StateFlow<Boolean> = _openTaskerBundleBusy.asStateFlow()
+    private val bundleTransfer = ImportExportCoordinator(viewModelScope)
+    val openTaskerBundleBusy: StateFlow<Boolean> = bundleTransfer.busy
+    val openTaskerBundleProgress: StateFlow<TransferProgress?> = bundleTransfer.progress
+
+    /** Stops whichever transfer is running; nothing is written until a review is confirmed. */
+    fun cancelTransfers() {
+        automationTransfer.cancel()
+        bundleTransfer.cancel()
+    }
 
     private val _semanticDiffReview = MutableStateFlow<SemanticDiffReviewState?>(null)
     internal val semanticDiffReview: StateFlow<SemanticDiffReviewState?> = _semanticDiffReview.asStateFlow()
@@ -1173,11 +1181,10 @@ class ActiveAutomationViewModel(
         }
 
     fun previewLocalProfileShare(appVersion: String) {
-        viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+        bundleTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    reportStage(TransferStage.Plan)
                     val bundle = bundleRepository.exportBundle(
                         appVersion = appVersion,
                         name = "OpenTasker Community Share",
@@ -1188,17 +1195,16 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { _profileShareReview.value = it }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_share_preview)) }
-            _openTaskerBundleBusy.value = false
         }
     }
 
     fun previewTaskerOrMacroDroid(uri: Uri, appVersion: String) {
-        viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+        automationTransfer.launch { report ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    report(TransferStage.Preflight)
                     val raw = readBoundedTaskerOrMacroDroid(appContext, uri)
+                    report(TransferStage.Decode)
                     if (raw.removePrefix("\uFEFF").trimStart().startsWith("<")) {
                         taskerImportReviewState(TaskerXmlImporter.parse(rawXml = raw, appVersion = appVersion))
                     } else {
@@ -1211,22 +1217,20 @@ class ActiveAutomationViewModel(
                     events.send(message(R.string.ui_message_automation_import_ready))
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_automation_import_preview)) }
-            _taskerImportBusy.value = false
         }
     }
 
     fun clearTaskerImportReview() {
-        if (!_taskerImportBusy.value) {
+        if (!taskerImportBusy.value) {
             _taskerImportReview.value = null
         }
     }
 
     internal fun confirmTaskerImport(state: TaskerImportReviewState) {
-        viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+        automationTransfer.launch { report ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    report(TransferStage.Write)
                     bundleRepository.importBundle(state.bundle)
                 }
             }
@@ -1241,16 +1245,14 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_automation_import)) }
-            _taskerImportBusy.value = false
         }
     }
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
-        viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+        bundleTransfer.launch { report ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    report(TransferStage.Write)
                     val bundle = bundleRepository.exportBundle(
                         appVersion = appVersion,
                         name = "OpenTasker Workspace Export",
@@ -1274,7 +1276,6 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_export)) }
-            _openTaskerBundleBusy.value = false
         }
     }
 
@@ -1286,11 +1287,10 @@ class ActiveAutomationViewModel(
      * secret's literal plaintext - was never exercised outside tests.
      */
     fun exportTaskerXml(uri: Uri) {
-        viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+        automationTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    reportStage(TransferStage.Write)
                     val report = TaskerXmlExporter.export(
                         profiles = db.profileDao().getAll().map { it.toDomain() },
                         tasks = db.taskDao().getAll().map { it.toDomain() },
@@ -1313,7 +1313,6 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_export)) }
-            _taskerImportBusy.value = false
         }
     }
 
@@ -1341,12 +1340,12 @@ class ActiveAutomationViewModel(
     }
 
     private fun previewTaskerXmlText(rawText: String, appVersion: String) {
-        viewModelScope.launch {
-            if (_taskerImportBusy.value) return@launch
-            _taskerImportBusy.value = true
+        automationTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    reportStage(TransferStage.Preflight)
                     val rawXml = PastedImportSource.requireTaskerXmlWithinBudget(rawText)
+                    reportStage(TransferStage.Decode)
                     val report = TaskerXmlImporter.parse(rawXml = rawXml, appVersion = appVersion)
                     taskerImportReviewState(report)
                 }
@@ -1356,16 +1355,14 @@ class ActiveAutomationViewModel(
                     events.send(message(R.string.ui_message_tasker_xml_ready))
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_tasker_xml_preview)) }
-            _taskerImportBusy.value = false
         }
     }
 
     private fun previewOpenTaskerBundleSource(load: suspend () -> OpenTaskerBundle) {
-        viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+        bundleTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    reportStage(TransferStage.Decode)
                     buildProfileShareReview(load())
                 }
             }
@@ -1384,7 +1381,6 @@ class ActiveAutomationViewModel(
                         events.send(errorMessage(error, R.string.ui_error_bundle_preview))
                     }
                 }
-            _openTaskerBundleBusy.value = false
         }
     }
 
@@ -1421,7 +1417,7 @@ class ActiveAutomationViewModel(
     }
 
     fun clearProfileShareReview() {
-        if (!_openTaskerBundleBusy.value) {
+        if (!openTaskerBundleBusy.value) {
             _profileShareReview.value = null
         }
     }
@@ -1453,13 +1449,13 @@ class ActiveAutomationViewModel(
     }
 
     fun clearOpenTaskerBundleReview() {
-        if (!_openTaskerBundleBusy.value) {
+        if (!openTaskerBundleBusy.value) {
             _openTaskerBundleReview.value = null
         }
     }
 
     fun resolveOpenTaskerVariableConflict(name: String, resolution: VariableConflictResolution) {
-        if (_openTaskerBundleBusy.value) return
+        if (openTaskerBundleBusy.value) return
         val review = _openTaskerBundleReview.value ?: return
         if (review.plan.variableConflicts.none { it.name == name }) return
         _openTaskerBundleReview.value = review.copy(
@@ -1470,11 +1466,10 @@ class ActiveAutomationViewModel(
     fun confirmOpenTaskerBundleImport() {
         val review = _openTaskerBundleReview.value ?: return
         if (review.plan.variableConflicts.any { it.name !in review.variableResolutions }) return
-        viewModelScope.launch {
-            if (_openTaskerBundleBusy.value) return@launch
-            _openTaskerBundleBusy.value = true
+        bundleTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.IO) {
+                    reportStage(TransferStage.Write)
                     bundleRepository.importBundle(review.bundle, review.variableResolutions)
                 }
             }
@@ -1490,7 +1485,6 @@ class ActiveAutomationViewModel(
                     )
                 }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_bundle_import)) }
-            _openTaskerBundleBusy.value = false
         }
     }
 
