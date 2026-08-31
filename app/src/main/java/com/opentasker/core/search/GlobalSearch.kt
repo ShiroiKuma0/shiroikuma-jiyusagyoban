@@ -19,7 +19,7 @@ data class GlobalSearchResult(
     val entityId: Long,
     val title: String,
     val detail: String,
-    val projectId: Long,
+    val projectId: Long?,   // fork: null = Unfiled
     val actionIndex: Int? = null,
     val variableName: String? = null,
 )

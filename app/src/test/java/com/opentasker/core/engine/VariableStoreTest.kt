@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,15 +30,34 @@ class VariableStoreTest {
         assertFalse(store.globalSnapshot().containsKey("event"))
     }
 
+    /**
+     * The fork scopes by the name's FIRST character, not by mixed case: `MyVar` persists, `myVar` is
+     * task-local and dies with its scope. (Upstream treated any name containing an uppercase letter as
+     * global, which made `%myValue` durable — here it deliberately is not.)
+     */
     @Test
-    fun mixedCaseNameIsGlobalAndSurvivesLocalScope() {
+    fun allCapsNameIsSuperGlobalAndSurvivesLocalScope() {
         val store = VariableStore()
         store.pushScope()
-        store.set("myVar", "global")
+        // ALL-CAPS: a MixedCase name is project-scoped, and this store has no project, so the guard
+        // would keep it task-local. That case is covered in ActionGuardsTest.
+        store.set("MYVAR", "global")
         store.popScope()
 
-        assertEquals("global", store.get("myVar"))
-        assertEquals("global", store.globalSnapshot()["myVar"])
+        assertEquals("global", store.get("MYVAR"))
+        assertEquals("global", store.globalSnapshot()["MYVAR"])
+    }
+
+    @Test
+    fun lowercaseInitialNameIsTaskLocalAndDiesWithItsScope() {
+        val store = VariableStore()
+        store.pushScope()
+        store.set("myVar", "local")
+        assertEquals("local", store.get("myVar"))
+        store.popScope()
+
+        assertNull(store.get("myVar"))
+        assertNull(store.globalSnapshot()["myVar"])
     }
 
     @Test

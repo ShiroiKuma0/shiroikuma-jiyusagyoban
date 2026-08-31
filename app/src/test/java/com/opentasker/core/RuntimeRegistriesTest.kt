@@ -43,10 +43,10 @@ class RuntimeRegistriesTest {
         registerActionMetadata()
 
         assertFieldKeys("brightness.set", "brightness")
-        assertFieldKeys("screenshot.take", "path")
-        assertFieldKeys("file.read", "path", "var")
-        assertFieldKeys("file.write", "path", "text")
-        assertFieldKeys("file.append", "path", "text")
+        assertFieldKeys("screenshot.take", "path", "store")
+        assertFieldKeys("file.read", "path", "var", "shared")
+        assertFieldKeys("file.write", "path", "text", "shared")
+        assertFieldKeys("file.append", "path", "text", "shared")
         assertFieldKeys("file.list", "path", "var", "pattern")
         assertFieldKeys(
             "http.request",
@@ -57,6 +57,52 @@ class RuntimeRegistriesTest {
         )
         assertFieldKeys("http.get", "url", "var", "allow_http")
         assertFieldKeys("http.post", "url", "data", "var", "allow_http")
+    }
+
+    /**
+     * Every arg `ShowSceneAction` / `HideSceneAction` read had to be hand-written into a bundle's JSON
+     * because no field declared it — and, worse, the editor rebuilds args from its fields, so opening
+     * such an action and saving dropped them (a `scene.hide` without `scene` dismisses EVERY scene).
+     * Keep the forms and the runtime argument lists in step.
+     */
+    @Test
+    fun sceneFormsExposeEveryRuntimeArgument() {
+        registerActionMetadata()
+
+        assertFieldKeys(
+            "scene.show",
+            "scene", "keepScreenOn", "position", "modal", "dismissOnOutside", "timeout",
+            "inset", "vAlign", "heightFraction", "widthFraction", "hAlign",
+            "fullWidth", "fullscreen", "edgeCenter", "showWhenLocked",
+        )
+        assertFieldKeys("scene.hide", "scene")
+    }
+
+    /**
+     * The remaining arguments a form never declared, each found by auditing what the runtime actually
+     * reads: a volume in percent rather than raw steps, the progress row's fold-out note, a typed
+     * intent extra per slot (Poweramp's `rating` wants an int), and the auto-dismiss on the two
+     * dialogs that had no way to set one. Pinned so the forms don't drift from the runtime again.
+     */
+    @Test
+    fun formsDeclareTheArgumentsTheirActionsRead() {
+        registerActionMetadata()
+
+        assertFieldKeys("volume.set", "stream", "level", "percent")
+        assertFieldKeys("volume.get", "stream", "var", "percent")
+        assertFieldKeys(
+            "progress.row",
+            "index", "state", "detail", "items", "item_labels", "parents", "only", "separator",
+            "label", "note",
+        )
+        assertFieldKeys("app.pickmulti", "variable", "title", "separator", "include_self", "timeout")
+        assertFieldKeys("tasks.launchers", "project", "group", "suffix", "timeout")
+
+        // Every extra slot can be typed, not just the first — an inconsistent form is its own trap.
+        val intentFields = ActionMetadataRegistry.get("intent.send")!!.fields.map { it.key }
+        (1..6).forEach { slot ->
+            assertTrue("intent.send missing extra${slot}_type", "extra${slot}_type" in intentFields)
+        }
     }
 
     @Test

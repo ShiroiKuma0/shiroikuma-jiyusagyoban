@@ -51,14 +51,10 @@ class SceneElementDraftsTest {
         assertEquals("50", element.config["value"])
     }
 
-    @Test
-    fun imageDraftStartsWithoutAPlaceholderSource() {
-        val element = SceneElementDrafts.defaultElement(Scene(id = 1, name = "Panel", widthDp = 320, heightDp = 240), SceneElementType.IMAGE)
 
-        assertEquals("", element.config["source"])
-        assertEquals("true", element.config["decorative"])
-        assertTrue(SceneElementConfigValidator.validate(element).any { "source" in it })
-    }
+    // Dropped in the 0.2.81 upstream sync: upstream's scene-image draft validation (an image draft
+    // starts with an empty source and must decode before save) is not adopted — the fork keeps its own
+    // SceneElementDrafts, where a new image element starts with a placeholder source.
 
     @Test
     fun sliderConfigRequiresValueWithinBounds() {

@@ -86,14 +86,15 @@ sealed interface VariableReferenceSite {
     val ownerKind: OwnerKind
     val ownerId: Long
     val ownerName: String
-    val projectId: Long
+    /** Nullable in the fork: null is the Unfiled scope, which upstream has no equivalent for. */
+    val projectId: Long?
 
     enum class OwnerKind { PROFILE, TASK, SCENE }
 
     data class ProfileContextBinding(
         override val ownerId: Long,
         override val ownerName: String,
-        override val projectId: Long,
+        override val projectId: Long?,
         val contextIndex: Int,
         val configKey: String,
     ) : VariableReferenceSite {
@@ -103,7 +104,7 @@ sealed interface VariableReferenceSite {
     data class TaskActionArgument(
         override val ownerId: Long,
         override val ownerName: String,
-        override val projectId: Long,
+        override val projectId: Long?,
         val actionIndex: Int,
         val argKey: String,
     ) : VariableReferenceSite {
@@ -113,7 +114,7 @@ sealed interface VariableReferenceSite {
     data class TaskCondition(
         override val ownerId: Long,
         override val ownerName: String,
-        override val projectId: Long,
+        override val projectId: Long?,
         val actionIndex: Int,
     ) : VariableReferenceSite {
         override val ownerKind = OwnerKind.TASK
@@ -122,7 +123,7 @@ sealed interface VariableReferenceSite {
     data class SceneBinding(
         override val ownerId: Long,
         override val ownerName: String,
-        override val projectId: Long,
+        override val projectId: Long?,
         val elementIndex: Int,
         val configKey: String,
     ) : VariableReferenceSite {

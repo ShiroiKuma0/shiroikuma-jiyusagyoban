@@ -9,6 +9,10 @@ import android.net.Uri
 import android.view.KeyEvent
 import java.io.File
 import kotlinx.coroutines.suspendCancellableCoroutine
+// The fork keeps plain Action implementations alongside upstream's DeclaredAction ones in this
+// file, so both symbols stay imported.
+import com.opentasker.core.engine.Action
+import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.platform.AndroidAudioHardening
@@ -21,7 +25,13 @@ import com.opentasker.core.platform.AudioUsageEligibility
  * Args:
  *   - "path": file path or URI (e.g., content://media/external/audio/media/123)
  *   - "volume": 0-100 (optional)
- *   - "stream": music (default) or alarm (optional)
+ *   - "stream": media (default) / notification / ring / alarm / system — the volume stream the
+ *     sound rides. notification/ring/system follow the ringer mode, so the system-bar
+ *     vibrate/silent tile mutes them (白い熊: 通知明滅 tones must respect quiet mode); media and
+ *     alarm play regardless.
+ *   - "wait": true (default) blocks the task until playback finishes; false starts playback and
+ *     returns immediately so the next actions (vibration, overlays) run WHILE the sound plays —
+ *     a notification tone must buzz and sound simultaneously, not tone-then-buzz (白い熊: 通知明滅).
  */
 /** Schemes MediaPlayer may open directly: everything else must go through the HTTP action. */
 private val LOCAL_SOUND_SCHEMES = setOf("file", "content", "android.resource")
@@ -30,70 +40,51 @@ class PlaySoundAction : DeclaredAction(ActionCatalog.require("sound.play")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val path = args["path"] ?: return ActionResult.Failure("missing path")
-        val stream = AudioOutputStream.parse(args["stream"])
-            ?: return ActionResult.Failure("invalid stream: ${args["stream"]}")
-        AndroidAudioHardening.failureIfIneligible(
-            ctx,
-            "sound playback",
-            stream.usage,
-            offersAlarmStream = stream == AudioOutputStream.MUSIC,
-        )?.let { return it }
+        AndroidAudioHardening.failureIfIneligible(ctx, "sound playback")?.let { return it }
         val volume = args["volume"]?.toFloatOrNull()?.let { (it / 100f).coerceIn(0f, 1f) }
-
-        // fromFile encodes a '#' or '?' in a file name, and MediaPlayer only knows lowercase schemes.
-        val uri = if (path.contains("://")) Uri.parse(path).normalizeScheme() else Uri.fromFile(File(path))
-        // Local sources only. MediaPlayer will happily stream a remote URL, and that traffic
-        // never passes the HTTP action's policy checks - which is the sole justification for
-        // the manifest's cleartext allowance - so a public http:// sound would have punched
-        // straight through the private-network rule this app documents as enforced in code.
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != null && scheme !in LOCAL_SOUND_SCHEMES) {
-            return ActionResult.Failure(
-                "sound.play accepts a file path or content URI; $scheme:// sources are not supported",
-            )
+        val attributes = when (val stream = args["stream"]?.trim()?.lowercase().orEmpty()) {
+            "", "media", "music" -> null // MediaPlayer default: USAGE_MEDIA
+            "notification" -> soundAttributes(AudioAttributes.USAGE_NOTIFICATION)
+            "ring" -> soundAttributes(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+            "alarm" -> soundAttributes(AudioAttributes.USAGE_ALARM)
+            "system" -> soundAttributes(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            else -> return ActionResult.Failure("unknown stream: $stream (use media, notification, ring, alarm or system)")
         }
 
-        if (stream != AudioOutputStream.ALARM) {
-            val player = try {
-                MediaPlayer.create(ctx.app, uri) ?: return ActionResult.Failure("could not create player for: $path")
-            } catch (ex: Exception) {
-                return ActionResult.Failure("failed to open: ${ex.message}", ex)
+        val player = try {
+            // fromFile encodes a '#' or '?' in a file name, and MediaPlayer only knows lowercase schemes.
+            val uri = if (path.contains("://")) Uri.parse(path).normalizeScheme() else Uri.fromFile(java.io.File(path))
+            // Local sources only. MediaPlayer will happily stream a remote URL, and that traffic
+            // never passes the HTTP action's policy checks - which is the sole justification for
+            // the manifest's cleartext allowance - so a public http:// sound would have punched
+            // straight through the private-network rule this app documents as enforced in code.
+            val scheme = uri.scheme?.lowercase()
+            if (scheme != null && scheme !in LOCAL_SOUND_SCHEMES) {
+                return ActionResult.Failure(
+                    "sound.play accepts a file path or content URI; $scheme:// sources are not supported",
+                )
             }
-            return playToEnd(ctx, player, path, volume)
+            val created =
+                if (attributes == null) MediaPlayer.create(ctx.app, uri)
+                else MediaPlayer.create(ctx.app, uri, null, attributes, AudioManager.AUDIO_SESSION_ID_GENERATE)
+            created ?: return ActionResult.Failure("could not create player for: $path")
+        } catch (ex: Exception) {
+            return ActionResult.Failure("failed to open: ${ex.message}", ex)
         }
 
-        val audioManager = ctx.app.getSystemService(AudioManager::class.java)
-        val attributes = alarmAudioAttributes(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-        val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-            .setAudioAttributes(attributes)
-            .build()
-        // Android 17 only exempts alarm audio once its audio server has seen the exact-alarm grant, and
-        // that record is refreshed by the app's own focus or volume call or its own AudioTrack. A
-        // MediaPlayer's track lives in the media server, so without this request the sound is muted in
-        // the background while the player still runs to completion and reports success. A refused
-        // request (a phone call holds focus) changes nothing about the record, so the sound still plays.
-        if (audioManager.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            ctx.logger("Audio focus was not granted for the alarm sound")
-        }
-        return try {
-            val player = try {
-                MediaPlayer.create(ctx.app, uri, null, attributes, audioManager.generateAudioSessionId())
-                    ?: return ActionResult.Failure("could not create player for: $path")
-            } catch (ex: Exception) {
-                return ActionResult.Failure("failed to open: ${ex.message}", ex)
-            }
-            playToEnd(ctx, player, path, volume)
-        } finally {
-            audioManager.abandonAudioFocusRequest(focus)
-        }
-    }
-
-    private suspend fun playToEnd(ctx: ActionContext, player: MediaPlayer, path: String, volume: Float?): ActionResult {
         if (volume != null) {
             player.setVolume(volume, volume)
         }
 
         ctx.logger("Play: $path")
+        val wait = args["wait"]?.trim()?.lowercase() != "false"
+        if (!wait) {
+            // Fire-and-forget: the player outlives the action and releases itself when done.
+            player.setOnCompletionListener { it.release() }
+            player.setOnErrorListener { mp, _, _ -> mp.release(); true }
+            player.start()
+            return ActionResult.Success
+        }
         return suspendCancellableCoroutine { cont ->
             player.setOnCompletionListener {
                 player.release()
@@ -129,6 +120,19 @@ class PauseSoundAction : DeclaredAction(ActionCatalog.require("sound.pause")) {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Pause playback")
         return dispatchMediaKey(ctx, KeyEvent.KEYCODE_MEDIA_PAUSE)
+    }
+}
+
+/**
+ * Toggle play/pause (single media key that resumes if paused, pauses if playing).
+ */
+class TogglePlayPauseAction : Action {
+    override val id = "media.playpause"
+    override val category = ActionCategory.MEDIA
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        ctx.logger("Toggle play/pause")
+        return dispatchMediaKey(ctx, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
     }
 }
 
@@ -181,6 +185,14 @@ class MuteAction : DeclaredAction(ActionCatalog.require("media.mute")) {
         }
     }
 }
+
+/** Sonification attributes for a non-media usage, so the sound rides that usage's volume stream
+ *  (and, for notification/ring/system, is muted by the ringer's vibrate/silent modes). */
+private fun soundAttributes(usage: Int): AudioAttributes =
+    AudioAttributes.Builder()
+        .setUsage(usage)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
 
 private fun dispatchMediaKey(ctx: ActionContext, keyCode: Int): ActionResult {
     AndroidAudioHardening.failureIfIneligible(ctx, "media-key dispatch")?.let { return it }

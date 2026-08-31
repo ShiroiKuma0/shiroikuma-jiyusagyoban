@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.opentasker.core.engine.EngineShutdown
 
 open class QuickSettingsTileService : TileService() {
 
@@ -47,6 +48,15 @@ open class QuickSettingsTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
+        // Fork: a stopped engine cannot run the bound task, so refuse before touching state rather
+        // than flipping the tile and dispatching a run that will be dropped.
+        if (EngineShutdown.refuse(this, "quick-settings tile")) {
+            qsTile?.let { tile ->
+                tile.state = Tile.STATE_UNAVAILABLE
+                tile.updateTile()
+            }
+            return
+        }
         val config = store.load(slot)
         if (config.taskId == null || boundTaskMissing) {
             val configureIntent = Intent(this, QuickSettingsTileConfigActivity::class.java)
@@ -110,7 +120,9 @@ open class QuickSettingsTileService : TileService() {
                 }
             }
             tile.icon = config.icon(this)
-            tile.state = config.tileState(taskMissing = boundTaskMissing)
+            // Unavailable rather than merely inactive while the app is stopped, so the tile shows
+            // the truth instead of pretending a tap would do something.
+            tile.state = if (EngineShutdown.isStopped(this)) Tile.STATE_UNAVAILABLE else config.tileState(taskMissing = boundTaskMissing)
             tile.updateTile()
         }
     }

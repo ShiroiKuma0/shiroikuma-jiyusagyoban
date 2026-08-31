@@ -40,7 +40,7 @@ internal fun nfcWriteFailureRes(error: Throwable): Int =
 
 object NfcTagWritePlanner {
     private const val MAX_TEXT_CHARS = 120
-    private const val DEFAULT_TEXT = "OpenTasker NFC trigger"
+    private const val DEFAULT_TEXT = "白い熊 自由作業盤 NFC trigger"
 
     fun planTextRecord(label: String): NfcTagWritePlan {
         val text = normalizeLabel(label).ifBlank { DEFAULT_TEXT }

@@ -1,5 +1,12 @@
-import java.net.URLEncoder
 import java.io.File
+import java.io.RandomAccessFile
+import java.net.URI
+import java.security.MessageDigest
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Properties
+import java.net.URLEncoder
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
@@ -26,12 +33,15 @@ import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
 import com.opentasker.build.publishedCertificateSha256
 
-// Kept close under the current count. A floor far below it lets a large batch of tests be
-// deleted silently; the headroom only absorbs intentional consolidation. The count spans the core
-// modules as well as :app (1,518 passing on 2026-09-26, 41 of them in the module suites). The
-// floor cannot be what protects those 41, since :app alone soon clears any fixed number, so the
-// task also requires every suite in JVM_TEST_MODULES to report passing tests of its own.
-private val JVM_TEST_FLOOR = 1490
+// The fork's own floor, not upstream's: this tree drops the upstream tests whose subject the fork
+// does not ship (direct-boot setup UI, promoted notifications, dependency verification, the
+// duplication and semantic-diff wiring) and adds its own for the band, OCR, charts and scenes.
+// Kept close under the current count, as upstream keeps theirs: a floor far below it lets a large
+// batch of tests be deleted silently, and the headroom only absorbs intentional consolidation.
+// The count spans the core modules as well as :app. The floor cannot be what protects the module
+// suites, since :app alone soon clears any fixed number, so the task also requires every suite in
+// JVM_TEST_MODULES to report passing tests of its own.
+private val JVM_TEST_FLOOR = 1332
 
 /** The modules that own JVM tests `:app:testDebugUnitTest` does not run. */
 private val JVM_TEST_MODULES = listOf(":core:storage", ":core:engine", ":core:common")
@@ -109,8 +119,19 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
             val relative = file.relativeTo(repositoryRoot.get().asFile)
             val text = file.readText()
             if (file.name == "CHANGELOG.md") {
-                check("## v${versionName.get()}" in text) {
-                    "$relative has no '## v${versionName.get()}' section for the current release."
+                // Either heading style counts, because this fork documents its releases under its
+                // OWN identity. Upstream writes "## v0.2.90"; we write
+                // "## 0.2.90+2026-08-25.04-06.g71800ef2+024" — the upstream base plus the commit it
+                // is rebased on plus our build counter — and our tags deliberately carry no "v"
+                // (a leading v is banned repo-wide; see the versioning rules in CLAUDE.md). Demanding
+                // upstream's form here failed on every build of a fork that had done nothing wrong
+                // (2026-08-30).
+                val documented = "## v${versionName.get()}" in text ||
+                    Regex("(?m)^##\\s+${Regex.escape(versionName.get())}\\+").containsMatchIn(text)
+                check(documented) {
+                    "$relative documents no release for ${versionName.get()} — expected a " +
+                        "'## v${versionName.get()}' heading or this fork's " +
+                        "'## ${versionName.get()}+<base>.<time>.g<sha>+<build>' form."
                 }
             }
             check(versionName.get() in text) {
@@ -159,6 +180,88 @@ val FDROID_CHANGELOG_MAX_CHARS = 500
 val FDROID_MIN_SCREENSHOTS = 4
 /** Store metadata files are LF regardless of the build host. */
 val NEWLINE = 10.toChar().toString()
+
+// --- shiroikuma fork: per-build version tail ---
+// forkVersionName = "<upstreamBase>+<base date>.<HH-MM>.g<base sha>+NNN",
+// forkVersionCode = <upstreamCode>*10000 + N, where N = BUILD_NUMBER from gradle.properties, bumped
+// by every build. `+` separates the three top-level groups — upstream's version, the pin, our
+// counter — while the pin's own date, time and sha stay dot-joined, since they describe one commit.
+//
+// N runs MONOTONICALLY. It is reset to 1 only when appVersionCode itself moves — never merely because
+// a sync moved the .g<sha> pin. An installer compares versionCode and nothing else; the date and sha
+// in versionName are cosmetic. Since upstream leaves appVersionCode standing for months at a time
+// (0.2.79 took ten commits without a bump; 0.2.82 is on its third sync), resetting on every sync made
+// every sync a downgrade: 840030 installed, 840002 offered. buildFork enforces the invariant below.
+val forkBuildNumber = (project.findProperty("BUILD_NUMBER") as String?)?.trim()?.toIntOrNull() ?: 1
+val lastBuiltVersionCode = (project.findProperty("LAST_BUILT_VERSION_CODE") as String?)?.trim()?.toIntOrNull() ?: 0
+
+// `providers.exec`, NOT a raw ProcessBuilder: this build has Gradle's configuration cache on, which
+// refuses an external process started at configuration time. The provider API is the supported form —
+// it also registers the git output as a cache input, so the pin re-resolves when the base moves.
+// isIgnoreExitValue: a repo with no local `master` (shallow clone, tarball) must degrade to an empty
+// pin, never fail the build.
+val repoRootDir = project.rootDir
+fun gitOutput(vararg command: String): String = try {
+    providers.exec {
+        commandLine(*command)
+        workingDir = repoRootDir
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim()
+} catch (e: Exception) {
+    println("Git command [${command.joinToString(" ")}] failed [$e]")
+    ""
+}
+
+// shiroikuma fork: upstream-base pin. `custom` is rebased onto every upstream commit, so upstream's
+// versionName stands still for months — the 0.2.79 line alone took 10 upstream commits without a
+// bump. The sha is what says whether we are behind upstream. It is the merge-base of HEAD and master
+// (the upstream mirror), i.e. the upstream commit our patches sit on, NOT our own HEAD, and NOT
+// master's tip (which overstates it when custom is not yet rebased).
+val upstreamBaseSha = gitOutput("git", "merge-base", "HEAD", "master").take(8)
+
+// That same commit's timestamp, so versions sort chronologically — a bare sha orders them at
+// random, and a bare date ties the moment two syncs land on one day, which is exactly what happened
+// the week upstream got busy: the next field along is then the random sha, so the newer build sorts
+// wherever its hex falls. Hence HH-MM (白い熊, 2026-08-12). Committer date, never build time —
+// every build on one upstream base must share a pin.
+//
+// In UTC: format the raw epoch, NOT --date=format: (the commit's own zone, which this repo used
+// until 2026-08-12) and NOT --date=format-local: (this host's). A watcher reading the same commit
+// back from the GitHub API sees a Z-normalised date, so only UTC lets both sides compute the same
+// string — and with HH-MM a wrong zone misstates the hour on every build instead of quietly
+// skewing ~5% of them by a day.
+val upstreamBaseStamp = if (upstreamBaseSha.length == 8) {
+    gitOutput("git", "show", "-s", "--format=%ct", upstreamBaseSha).toLongOrNull()?.let {
+        Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd.HH-mm"))
+    } ?: ""
+} else {
+    ""
+}
+
+// `+` opens each top-level group. Never `~`: git check-ref-format rejects it, so /publish-version
+// could not tag the release; it sorts above every digit (putting 0.2.8 after 0.2.86); and dpkg
+// reads it as a pre-release marker. Never `_` either — not a legal character in a Debian version,
+// which the electron-builder sister forks build from this same string.
+val upstreamPin = when {
+    upstreamBaseSha.length != 8 -> ""
+    upstreamBaseStamp.length == 16 -> "+$upstreamBaseStamp.g$upstreamBaseSha"
+    else -> "+g$upstreamBaseSha"          // git present but the timestamp lookup failed
+}
+
+// Zero-padded in the NAME only, so +002 sorts before +010. versionCode keeps the plain integer.
+val paddedBuild = forkBuildNumber.toString().padStart(3, '0')
+val forkVersionName = "$appVersionName$upstreamPin+$paddedBuild"
+val forkVersionCode = appVersionCode * 10000 + forkBuildNumber
+
+// --- shiroikuma fork: release signing from a gitignored keystore.properties ---
+// (falls back to the upstream OPEN_TASKER_* env vars when the file is absent).
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
+}
+val useKeystoreProperties = keystorePropertiesFile.exists()
+
 val allowedDistributions = setOf("standard", "fdroid", "play")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
@@ -206,7 +309,7 @@ val releaseAssetDirectoryName = if (selectedDistribution == "fdroid") {
 }
 val smsActionAvailable = selectedDistribution != "play"
 val smsReceiveAvailable = selectedDistribution != "play"
-val hasReleaseSigning = listOf(
+val hasReleaseSigning = useKeystoreProperties || listOf(
     releaseKeystorePath,
     releaseKeystorePassword,
     releaseKeyAlias,
@@ -228,13 +331,14 @@ android {
     compileSdk = 37
     buildToolsVersion = "36.0.0"
     experimentalProperties["android.experimental.enableScreenshotTest"] = true
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.opentasker.app"
+        applicationId = "shiroikuma.jiyusagyoban"
         minSdk = 26
         targetSdk = 37
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = forkVersionCode
+        versionName = forkVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DISTRIBUTION", "\"$selectedDistribution\"")
         buildConfigField("Boolean", "SMS_ACTION_AVAILABLE", smsActionAvailable.toString())
@@ -246,6 +350,16 @@ android {
         manifestPlaceholders["smsTriggerEnabled"] = smsReceiveAvailable.toString()
         manifestPlaceholders["phoneStatePermissionName"] = if (smsActionAvailable) "android.permission.READ_PHONE_STATE" else "android.permission.ACCESS_NETWORK_STATE"
         manifestPlaceholders["callLogPermissionName"] = if (smsActionAvailable) "android.permission.READ_CALL_LOG" else "android.permission.ACCESS_NETWORK_STATE"
+        ndk {
+            // The native key-grabber (libevgrab.so) ships arm64 only, matching our single-ABI APK.
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     signingConfigs {
@@ -257,10 +371,17 @@ android {
         }
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(releaseKeystorePath!!)
-                storePassword = releaseKeystorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
+                if (useKeystoreProperties) {
+                    storeFile = file(keystoreProperties.getProperty("storeFile"))
+                    storePassword = keystoreProperties.getProperty("storePassword")
+                    keyAlias = keystoreProperties.getProperty("keyAlias")
+                    keyPassword = keystoreProperties.getProperty("keyPassword")
+                } else {
+                    storeFile = file(releaseKeystorePath!!)
+                    storePassword = releaseKeystorePassword
+                    keyAlias = releaseKeyAlias
+                    keyPassword = releaseKeyPassword
+                }
             }
         }
     }
@@ -268,6 +389,16 @@ android {
     buildTypes {
         getByName("debug") {
             isPseudoLocalesEnabled = true
+            // Side by side with the installed release build, never on top of it.
+            //
+            // The release APK is signed with the fork's own key, so a debug APK sharing its
+            // applicationId cannot update it — the install fails INSTALL_FAILED_UPDATE_INCOMPATIBLE,
+            // and the only way through would be `adb uninstall`, which destroys the workspace
+            // database. That made `connectedAndroidTest` unrunnable on a real phone: the one device
+            // an instrumented test is worth running on is the one carrying the data.
+            //
+            // With a distinct id the two coexist and the release build is never touched.
+            applicationIdSuffix = ".debug"
         }
     release {
             isMinifyEnabled = true
@@ -321,6 +452,7 @@ android {
         aidl = true
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     androidResources {
@@ -333,6 +465,9 @@ android {
         // llvm-strip, so the APK would differ by NDK version, or with no NDK at all, and F-Droid's
         // rebuild couldn't match ours. Only DataStore's tiny counter lib carries symbols (~10 KB).
         jniLibs.keepDebugSymbols += "**/*.so"
+        // Extract libevgrab.so to nativeLibraryDir so the Shizuku UserService (KeyGrabberService) can
+        // System.load() it by absolute path from the privileged process.
+        jniLibs.useLegacyPackaging = true
     }
 
     sourceSets {
@@ -369,16 +504,18 @@ dependencies {
             because("Instrumentation must not silently fall back to an unsigned 2019 transition build.")
         }
     }
+
+    // Upstream's core/* modules, adopted in stages: see the note in settings.gradle.kts.
     implementation(project(":core:common"))
     implementation(project(":core:model"))
-    implementation(project(":core:storage"))
     implementation(project(":core:engine"))
-    implementation(project(":feature:automation"))
+    implementation(project(":core:storage"))
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.documentfile)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -391,7 +528,6 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.sqlcipher.android)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.work.runtime.ktx)
@@ -403,6 +539,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
+    // On-device OCR (文字認識): PP-OCRv5 detection + recognition. Only the arm64 native library ships,
+    // because defaultConfig.ndk.abiFilters already excludes the rest.
+    implementation(libs.onnxruntime.android)
     implementation(libs.re2j)
     implementation(libs.jsoup)
     implementation(libs.shizuku.api)
@@ -410,6 +549,8 @@ dependencies {
     implementation(libs.shizuku.provider)
     implementation(libs.unifiedpush.connector)
     baselineProfile(project(":baselineprofile"))
+    // On-device APK signing for the generated per-target share-relay APKs (core/share/relay).
+    implementation(libs.apksig)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
@@ -1562,6 +1703,12 @@ tasks.register<VerifyRoomSchemaTask>("verifyRoomSchema") {
     // core:storage owns the entities now, so its KSP run is what exports the schema. It still
     // writes into app/schemas, which is where the androidTest migration assets are read from.
     dependsOn(":core:storage:kspDebugKotlin")
+    // Never declared by any build, only passed through: no commit in this repository -- across all
+    // 2173 of them, on every backup branch -- ever set OPEN_TASKER_DATABASE_SCHEMA_VERSION to one of
+    // these. They exist only as steps inside MIGRATION_17_18/18_19 and MIGRATION_22_23..26_27, which
+    // were written in the same commits as the bumps that jumped over them. Verified end to end by
+    // `python3 scripts/check-room-migration.py --all` (2026-08-25).
+    transitedVersions.set(setOf(18, 23, 24, 25, 26))
     schemaDirectory.set(layout.projectDirectory.dir("schemas/com.opentasker.core.storage.AppDatabase"))
     databaseFile.set(rootProject.layout.projectDirectory.file(
         "core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt",
@@ -1586,6 +1733,20 @@ val verifyPerformanceEvidence = tasks.register<VerifyPerformanceEvidenceTask>("v
         dependsOn("generateBaselineProfile")
     }
 }
+
+// The capability counts, derived from source exactly as verifyReleaseTruth derives them.
+//
+// verifyDocumentationTruth used to carry `actionCount.set(74)` as a literal while verifyReleaseTruth
+// recomputed 168 from the registry, so the two gates demanded contradictory README text and no README
+// could satisfy both — which is why the documentation gate had been red for a long time. One source now.
+val registeredActionCount = Regex("(?m)^\\s+[A-Za-z0-9]+Action\\(\\),")
+    .findAll(rootProject.file("app/src/main/java/com/opentasker/core/RuntimeRegistries.kt").readText())
+    .count()
+val contextFamilyCountFromSource = Regex("(?s)enum class ContextType\\s*\\{(.*?)\\}")
+    .find(rootProject.file("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt").readText())
+    ?.groupValues?.get(1)
+    ?.let { body -> Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count() }
+    ?: error("could not count the ContextType families")
 
 val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("verifyDocumentationTruth") {
     group = "verification"
@@ -1630,6 +1791,12 @@ tasks.register("verifyFdroidReadiness") {
     group = "verification"
     description = "Checks the F-Droid distribution profile for known proprietary dependency families."
 
+    // Read at CONFIGURATION time. Touching a script-level val (or declaring a local `fun`) inside
+    // doLast makes the task capture the script object, which the configuration cache cannot serialize —
+    // the checks all passed while the build failed on that alone.
+    val coordinates = releaseRuntimeCoordinates
+    val distribution = selectedDistribution
+
     doLast {
         val forbiddenGroups = setOf(
             "com.google.android.gms",
@@ -1645,7 +1812,7 @@ tasks.register("verifyFdroidReadiness") {
             "crashlytics",
             "appsflyer",
         )
-        val forbidden = releaseRuntimeCoordinates.get()
+        val forbidden = coordinates.get()
             .mapNotNull { coordinate ->
                 val (group, name) = coordinate.split(':', limit = 3)
                 val blockedGroup = forbiddenGroups.any { forbiddenGroup ->
@@ -1660,7 +1827,10 @@ tasks.register("verifyFdroidReadiness") {
         check(forbidden.isEmpty()) {
             "F-Droid profile includes dependencies that need policy review: ${forbidden.joinToString()}"
         }
-        println("F-Droid readiness check passed for distribution=$selectedDistribution")
+        // Upstream dropped a `check(distribution in distributions)` here: the value is already
+        // validated by the require() at the top of this script, so the assertion could never fail
+        // and the readiness check was reporting a pass it had not earned.
+        println("F-Droid readiness check passed for distribution=$distribution")
     }
 }
 
@@ -1962,14 +2132,13 @@ val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyR
 }
 
 // Where production Kotlin lives. Source-scanning gates that walk a tree must walk all of these:
-// a gate pointed only at app/ silently stopped covering the 44 files the core modules now own.
+// one pointed only at app/ silently stops covering whatever a core module owns.
 val productionSourceRoots: List<Directory> = listOf(
     layout.projectDirectory.dir("src/main/java"),
-    rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
     rootProject.layout.projectDirectory.dir("core/common/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("core/storage/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/model/src/main/kotlin"),
     rootProject.layout.projectDirectory.dir("core/engine/src/main/kotlin"),
-    rootProject.layout.projectDirectory.dir("feature/automation/src/main/kotlin"),
+    rootProject.layout.projectDirectory.dir("core/storage/src/main/kotlin"),
 ).filter { it.asFile.isDirectory }
 
 val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegexCorpus") {
@@ -2102,3 +2271,137 @@ tasks.register("generateFdroidChangelog") {
         println("Wrote ${outputFile.relativeTo(rootProject.projectDir)} (${outputFile.readText().length} chars)")
     }
 }
+
+// --- shiroikuma fork: archive naming + one-shot build task ---
+base {
+    archivesName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a"
+}
+
+tasks.register("buildFork") {
+    group = "build"
+    description = "Build the signed release APK, copy it to ~/tmp, and bump BUILD_NUMBER for next time."
+    dependsOn("assembleRelease")
+    // Configuration-cache-safe: capture every project-derived value HERE (configuration time) —
+    // the doLast lambda must not touch `layout` / `rootProject` / other project services.
+    val apkName = "shiroikuma-jiyusagyoban_${forkVersionName}_arm64-v8a.apk"
+    val outputDirProvider = layout.buildDirectory.dir("outputs/apk/release")
+    val propsFile = rootProject.file("gradle.properties")
+    val versionCode = forkVersionCode
+    val nextBuildNumber = forkBuildNumber + 1
+    // The guard that makes the monotonic rule a fact rather than a convention: a build whose
+    // versionCode does not exceed the highest one this repo has already produced cannot install over
+    // it, so refuse to produce it at all rather than discover it on the phone.
+    check(versionCode > lastBuiltVersionCode) {
+        "versionCode $versionCode would not exceed the last built $lastBuiltVersionCode — an installer " +
+            "reads this as a downgrade and refuses the update. Raise BUILD_NUMBER in gradle.properties " +
+            "(it must keep running upward while appVersionCode stays at $appVersionCode); reset it to 1 " +
+            "only when appVersionCode itself moves."
+    }
+    doLast {
+        val outputDir = outputDirProvider.get().asFile
+        val targetDir = File(System.getProperty("user.home"), "tmp").apply { mkdirs() }
+        val apk = outputDir.listFiles { _, name -> name.endsWith(".apk") }?.firstOrNull()
+            ?: throw GradleException("No APK found in $outputDir")
+        val target = File(targetDir, apkName)
+        apk.copyTo(target, overwrite = true)
+        println("\u001b[1;36m>>> ${target.absolutePath}\u001b[0m")
+        println("\u001b[1;36m>>> versionCode $versionCode\u001b[0m")
+
+        // Auto-increment BUILD_NUMBER, and record the code just built as the new floor.
+        val text = propsFile.readText()
+        val bumped =
+            if (Regex("(?m)^BUILD_NUMBER=").containsMatchIn(text))
+                text.replace(Regex("(?m)^BUILD_NUMBER=.*$"), "BUILD_NUMBER=$nextBuildNumber")
+            else text.trimEnd() + "\n\n# shiroikuma fork: per-build version tail\nBUILD_NUMBER=$nextBuildNumber\n"
+        propsFile.writeText(
+            if (Regex("(?m)^LAST_BUILT_VERSION_CODE=").containsMatchIn(bumped))
+                bumped.replace(Regex("(?m)^LAST_BUILT_VERSION_CODE=.*$"), "LAST_BUILT_VERSION_CODE=$versionCode")
+            else bumped.trimEnd() + "\nLAST_BUILT_VERSION_CODE=$versionCode\n"
+        )
+        println("\u001b[1;36m>>> BUILD_NUMBER bumped to $nextBuildNumber\u001b[0m")
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// 文字認識 (OCR) dictionaries — PP-OCRv5, Apache-2.0.
+//
+// The DICTIONARIES ship (95 KB all told) and the ~100 MB of ONNX weights do NOT (白い熊, 2026-08-08).
+// A dictionary has to match its model exactly, so bundling them removes a whole failure mode and
+// costs nothing; the weights are chosen in 「文字認識」 settings and read from wherever they live.
+// That takes the APK from 129 MB back to about 5 MB, which matters because no build is ever deleted
+// from the phone — twenty of them is 2.5 GB at the old size.
+//
+// Fetched once per machine, pinned to immutable revisions and verified by SHA-256.
+val ocrAssetsDir = layout.projectDirectory.dir("src/main/assets/ocr")
+
+data class OcrModelAsset(val name: String, val url: String, val sha256: String)
+
+val ocrModelAssets = listOf(
+    // NOTE: CRLF. OcrCharset strips the trailing '\r'; without that every recognised character carries one.
+    OcrModelAsset(
+        "dict_jpn.txt",
+        "https://huggingface.co/bukuroo/PPOCRv5-ONNX/resolve/47b3e1b4e90c79737cb71f562a6c85809067c7a5/ppocrv5_dict.txt",
+        "1ea29636956177e400af712d9782e7693f3fb25f98617bed10479d2965a836fd",
+    ),
+    OcrModelAsset(
+        "dict_latin.txt",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/latin/dict.txt",
+        "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff",
+    ),
+    OcrModelAsset(
+        "dict_eslav.txt",
+        "https://huggingface.co/monkt/paddleocr-onnx/resolve/7b02d0a30a07ba2b92ad1ff5a8941ae2c633de65/languages/eslav/dict.txt",
+        "3e95f1581557162870cacdba5af91a4c6be2890710d395b0c3c7578e7ee5e6eb",
+    ),
+)
+
+val downloadOcrModels = tasks.register("downloadOcrModels") {
+    group = "build setup"
+    description = "Fetch the pinned PP-OCRv5 dictionaries into src/main/assets/ocr (SHA-256 verified)."
+
+    val targetDir = ocrAssetsDir.asFile
+    val assets = ocrModelAssets
+    outputs.files(assets.map { File(targetDir, it.name) })
+    outputs.upToDateWhen { assets.all { File(targetDir, it.name).isFile } }
+
+    doLast {
+        fun digestOf(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { stream ->
+                val buffer = ByteArray(1 shl 16)
+                while (true) {
+                    val read = stream.read(buffer)
+                    if (read <= 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
+        targetDir.mkdirs()
+        // Weights left behind by an older build would be packaged for nothing.
+        targetDir.listFiles()?.forEach { if (it.name.endsWith(".onnx")) it.delete() }
+
+        assets.forEach { asset ->
+            val file = File(targetDir, asset.name)
+            if (file.isFile && digestOf(file) == asset.sha256) return@forEach
+
+            println(">>> OCR dictionary: fetching ${asset.name}")
+            val temporary = File(targetDir, "${asset.name}.part")
+            URI(asset.url).toURL().openStream().use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            }
+            val actual = digestOf(temporary)
+            if (actual != asset.sha256) {
+                temporary.delete()
+                throw GradleException(
+                    "OCR dictionary ${asset.name} failed verification.\n" +
+                        "  expected ${asset.sha256}\n  actual   $actual"
+                )
+            }
+            temporary.renameTo(file)
+        }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadOcrModels) }

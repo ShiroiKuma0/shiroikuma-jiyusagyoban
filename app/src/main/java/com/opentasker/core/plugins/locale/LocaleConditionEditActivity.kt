@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +50,7 @@ import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.screens.FullScreenContentLoading
 import com.opentasker.ui.screens.contextTitleRes
-import com.opentasker.ui.theme.ThemePreference
+import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
@@ -96,11 +95,12 @@ class LocaleConditionEditActivity : ComponentActivity() {
         }.flowOn(Dispatchers.IO).catch { closeWithoutDatabase(it) }
 
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = null)
-            val resolvedTheme = themeMode ?: return@setContent
+            // The fork has one appearance, read from ThemeStore, rather than upstream's
+            // light/dark/high-contrast triple — so this plugin editor looks like the rest of the app.
+            val themePrefs by ThemeStore.state.collectAsState()
             val profiles by profilesFlow.collectAsState(initial = null)
             val variables by variablesFlow.collectAsState(initial = null)
-            OpenTaskerTheme(resolvedTheme) {
+            OpenTaskerTheme(prefs = themePrefs) {
                 val loadedProfiles = profiles
                 val loadedVariables = variables
                 if (loadedProfiles == null || loadedVariables == null) {

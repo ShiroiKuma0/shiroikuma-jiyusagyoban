@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="80dp"
+    android:minResizeHeight="80dp"
+    android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen"
+    android:configure="com.opentasker.widget.StyledWidgetConfigActivity"
+    android:initialLayout="@layout/styled_widget"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_styled_description"
+    android:updatePeriodMillis="0" />

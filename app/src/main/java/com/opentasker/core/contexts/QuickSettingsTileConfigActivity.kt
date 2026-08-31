@@ -82,10 +82,8 @@ class QuickSettingsTileConfigActivity : ComponentActivity() {
             }
         }
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = null)
-            val resolvedTheme = themeMode ?: return@setContent
             val tasks by tasksFlow.collectAsState(initial = null)
-            OpenTaskerTheme(resolvedTheme) {
+            OpenTaskerTheme {
                 val loadedTasks = tasks
                 if (loadedTasks == null) {
                     FullScreenContentLoading()
