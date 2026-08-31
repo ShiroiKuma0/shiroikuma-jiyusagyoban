@@ -1,0 +1,22 @@
+# Every text file is stored LF. Editing tools on this project write LF, so a
+# CRLF-committed file turns a one-bullet change into a whole-file diff and makes
+# git blame useless: CHANGELOG.md had already drifted to mixed endings before
+# this policy existed.
+* text=auto eol=lf
+
+# cmd.exe is only dependable with CRLF, so batch files are checked out CRLF
+# while still being stored LF like everything else.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.jar binary
+*.apk binary
+*.aar binary
+*.jks binary
+*.keystore binary
+*.p12 binary
+*.so binary
+*.zip binary
+*.gz binary
