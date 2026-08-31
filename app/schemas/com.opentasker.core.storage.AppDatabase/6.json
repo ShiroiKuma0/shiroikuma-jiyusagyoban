@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "69bfc5010f87bbe4e2f0d181e37d5efc",
+    "identityHash": "4ae33371ef7d1ff8a1188629c1768551",
     "entities": [
       {
         "tableName": "profiles",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `enterTaskId` INTEGER NOT NULL, `exitTaskId` INTEGER, `cooldownSec` INTEGER NOT NULL, `contextsJson` TEXT NOT NULL, `automationMode` TEXT NOT NULL, `profileGroup` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `enterTaskId` INTEGER NOT NULL, `exitTaskId` INTEGER, `cooldownSec` INTEGER NOT NULL, `contextsJson` TEXT NOT NULL, `automationMode` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -56,9 +56,15 @@
             "notNull": true
           },
           {
-            "fieldPath": "profileGroup",
-            "columnName": "profileGroup",
-            "affinity": "TEXT"
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -70,7 +76,7 @@
       },
       {
         "tableName": "tasks",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `priority` INTEGER NOT NULL, `collisionMode` TEXT NOT NULL, `actionsJson` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `priority` INTEGER NOT NULL, `collisionMode` TEXT NOT NULL, `actionsJson` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -101,6 +107,17 @@
             "columnName": "actionsJson",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -112,7 +129,7 @@
       },
       {
         "tableName": "scenes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `widthDp` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, `elementsJson` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `widthDp` INTEGER NOT NULL, `heightDp` INTEGER NOT NULL, `elementsJson` TEXT NOT NULL, `projectId` INTEGER, `position` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -143,6 +160,17 @@
             "columnName": "elementsJson",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "projectId",
+            "columnName": "projectId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -154,7 +182,7 @@
       },
       {
         "tableName": "variables",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `value` TEXT NOT NULL, `isGlobal` INTEGER NOT NULL, `isSecret` INTEGER NOT NULL, PRIMARY KEY(`name`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `value` TEXT NOT NULL, `isGlobal` INTEGER NOT NULL, PRIMARY KEY(`name`))",
         "fields": [
           {
             "fieldPath": "name",
@@ -171,12 +199,6 @@
           {
             "fieldPath": "isGlobal",
             "columnName": "isGlobal",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "isSecret",
-            "columnName": "isSecret",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -293,11 +315,52 @@
             "id"
           ]
         }
+      },
+      {
+        "tableName": "projects",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `color` INTEGER, `sortOrder` INTEGER NOT NULL, `description` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sortOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "description",
+            "columnName": "description",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '69bfc5010f87bbe4e2f0d181e37d5efc')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4ae33371ef7d1ff8a1188629c1768551')"
     ]
   }
 }

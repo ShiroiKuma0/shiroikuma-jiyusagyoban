@@ -1,9 +1,11 @@
 package com.opentasker.core.engine
 
 import com.opentasker.core.engine.variables.ArrayStore
+import com.opentasker.core.engine.variables.GlobalVariableScope
+import com.opentasker.core.engine.variables.InMemoryGlobalScope
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.expressions.TemplateScope
-import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.storage.SUPER_GLOBAL_PROJECT_ID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -20,12 +22,22 @@ data class TrackedExpansion(
 )
 
 /**
- * In-memory variable store with a global scope and stack of local scopes.
- * Thread-safe for concurrent read/write access.
+ * Variable store for one task execution. Three scopes, chosen by the name's casing:
+ *   - `%ALLCAPS`   → **super-global**: persistent, app-wide ([GlobalVariableScope] bucket 0).
+ *   - `%MixedCase` → **project-global**: persistent, owned by the running task's [projectId]
+ *                    (an Unfiled task — projectId 0 — falls back to the super bucket, so nothing breaks).
+ *   - `%lowercase` → **task-local**: ephemeral, lives only for this execution (local stack / base scope).
  *
- * Naming convention (matches Tasker):
- *   - a name containing any uppercase letter → global, persistent
- *   - an all-lowercase name → local to the current task invocation
+ * Non-ASCII names (e.g. Japanese) have no uppercase first letter, so they are task-local — do NOT
+ * gate names through [com.opentasker.core.model.VariableNamePolicy] here; its ASCII-only pattern
+ * would silently reject them.
+ *
+ * Persistent scopes are delegated to a shared [GlobalVariableScope] (the DB-backed singleton at runtime),
+ * so globals survive across runs; only the local scopes are per-store. Thread-safe.
+ *
+ * Secret provenance (upstream): values written under [withSensitiveWrites], flagged via
+ * [set]'s `sensitive` parameter, or seeded via [seedGlobals]' `secretNames` are tracked so
+ * expansions and the template scope can mask them.
  *
  * Enhanced with operator support:
  *   - Math: %VAR(+5), %VAR(*2), %VAR(//), %VAR(/round)
@@ -34,18 +46,47 @@ data class TrackedExpansion(
  *   - Arrays: %list(#), %list(1), %list()
  *   - JSON: %json.path.to.field
  */
-class VariableStore {
-    private val globals = ConcurrentHashMap<String, String>()
-    private val rootLocals = ConcurrentHashMap<String, String>()
+class VariableStore private constructor(
+    private val globalScope: GlobalVariableScope,
+    /** 0 = Unfiled/super; >0 = the running task's project. Exposed so actions can resolve
+     *  project-scoped references (e.g. a scene by its `(project, name)` key). */
+    val projectId: Long,
+    private val arrayStore: ArrayStore,
+    // Global-name sensitivity is shared with child scopes (the underlying global values are too).
+    private val globalSensitiveNames: MutableSet<String>,
+    private val declaredSecretGlobals: MutableSet<String>,
+    private val sensitiveArrayNames: MutableSet<String>,
+) {
+    /** Standalone store with no persistence (ad-hoc / unit tests). */
+    constructor() : this(
+        InMemoryGlobalScope(), SUPER_GLOBAL_PROJECT_ID, ArrayStore(),
+        ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
+    )
+
+    /** Store for a task run under [taskProjectId] (null = Unfiled → super scope), sharing [globalScope]. */
+    constructor(globalScope: GlobalVariableScope, taskProjectId: Long?) : this(
+        globalScope, taskProjectId ?: SUPER_GLOBAL_PROJECT_ID, ArrayStore(),
+        ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet(),
+    )
+
+    // Bottom ephemeral scope: holds `%lowercase` vars set before any scope is pushed.
+    private val baseScope = ConcurrentHashMap<String, String>()
     private val localStack = java.util.Collections.synchronizedList(mutableListOf<MutableMap<String, String>>())
-    private val globalSensitiveNames = ConcurrentHashMap.newKeySet<String>()
-    private val declaredSecretGlobals = ConcurrentHashMap.newKeySet<String>()
-    private val rootLocalSensitiveNames = ConcurrentHashMap.newKeySet<String>()
+    private val baseScopeSensitiveNames = ConcurrentHashMap.newKeySet<String>()
     private val localSensitiveStack = java.util.Collections.synchronizedList(mutableListOf<MutableSet<String>>())
-    private val sensitiveArrayNames = ConcurrentHashMap.newKeySet<String>()
     private val sensitiveWriteDepth = AtomicInteger(0)
     private val expander = VariableExpander()
-    private val arrayStore = ArrayStore()
+
+    /**
+     * A store for a called sub-task: shares the persistent [globalScope] and the [arrayStore], but
+     * starts with fresh local scopes (so `%lowercase` locals stay isolated). [childProjectId] is the
+     * sub-task's own project, so its `%MixedCase` vars resolve to that project's bucket.
+     */
+    fun childScope(childProjectId: Long?): VariableStore =
+        VariableStore(
+            globalScope, childProjectId ?: SUPER_GLOBAL_PROJECT_ID, arrayStore,
+            globalSensitiveNames, declaredSecretGlobals, sensitiveArrayNames,
+        )
 
     fun pushScope() {
         localStack.add(java.util.concurrent.ConcurrentHashMap())
@@ -60,68 +101,133 @@ class VariableStore {
         }
     }
 
+    /** The persistent bucket for a name, or null if the name is task-local (`%lowercase`). */
+    private fun bucketOf(name: String): Long? {
+        if (name.isEmpty() || !name[0].isUpperCase()) return null            // local
+        val allCaps = name.none { it.isLetter() && it.isLowerCase() }
+        return if (allCaps) SUPER_GLOBAL_PROJECT_ID else projectId           // super vs project
+    }
+
+    /** A "project-scoped" name — MixedCase (uppercase-initial with ≥1 lowercase letter). Such a name is
+     *  routed to the running project by [bucketOf]; it must never persist in the super bucket. */
+    private fun isProjectScopedName(name: String): Boolean =
+        name.isNotEmpty() && name[0].isUpperCase() && name.any { it.isLowerCase() }
+
+    /**
+     * Whether [set] would actually persist this name, rather than quietly keeping it task-local.
+     *
+     * Two names do not persist: an all-lowercase one (task-local by definition), and a MixedCase one in
+     * an **unfiled** task — [set]'s guard keeps that local rather than writing a dead shadow-copy into
+     * the super bucket. Exposed so a caller can tell the difference; `var.persist` deliberately does
+     * NOT refuse on it, because the value still resolves for the rest of the run.
+     */
+    fun persistsGlobally(name: String): Boolean {
+        val bucket = bucketOf(name) ?: return false
+        return !(bucket == SUPER_GLOBAL_PROJECT_ID && isProjectScopedName(name))
+    }
+
     fun set(name: String, value: String, sensitive: Boolean = false) {
-        val normalizedName = VariableNamePolicy.normalize(name) ?: return
-        val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(normalizedName)
-        if (VariableNamePolicy.isGlobal(normalizedName)) {
-            // Global taint is monotonic: once a global is declared-secret or tainted it stays
-            // sensitive for the life of the store. The flag is set BEFORE the value is published and
-            // is never cleared here, so a concurrent plain write from another parallel run on the
-            // same global cannot race the flag off and leak the value — the previous read-then-clear
-            // could drop a sensitive flag another thread had just set.
-            if (shouldRemainSensitive || normalizedName in declaredSecretGlobals) {
-                globalSensitiveNames += normalizedName
-            }
-            globals[normalizedName] = value
-        } else {
-            synchronized(localStack) {
-                val target = localStack.lastOrNull()
-                if (target == null) {
-                    rootLocals[normalizedName] = value
-                    updateSensitivity(rootLocalSensitiveNames, normalizedName, shouldRemainSensitive)
-                } else {
-                    target[normalizedName] = value
-                    updateSensitivity(localSensitiveStack.last(), normalizedName, shouldRemainSensitive)
-                }
+        val shouldRemainSensitive = sensitive || sensitiveWriteDepth.get() > 0 || isSensitive(name)
+        val bucket = bucketOf(name)
+        // Invariant: a project-scoped (MixedCase) name has no home in the super bucket. Set outside any
+        // project (projectId 0 — an unfiled task), it would become a dead shadow-copy of the real
+        // project-global, so keep it task-local instead of promoting it to super. ALL-CAPS super-globals
+        // and in-project MixedCase sets are unaffected. (Guard #1 of the "no MixedCase in super" invariant.)
+        if (bucket == null || (bucket == SUPER_GLOBAL_PROJECT_ID && isProjectScopedName(name))) {
+            setInLocalScope(name, value, shouldRemainSensitive)
+            return
+        }
+        // The sensitivity of a global is a read-modify-write, and it MUST be atomic. Two profile runs
+        // racing the same name — one marking it secret, one overwriting it plainly — used to lose the
+        // flag: the plain writer sampled `isSensitive` (above) before the secret writer set it, then
+        // cleared it on the way out. A cleared flag means the value is persisted and exported in
+        // plaintext, so this re-reads the set INSIDE the lock and only ever clears when nobody has
+        // marked it. Sensitivity is monotonic within a run: plain writes never undo a secret one.
+        synchronized(globalSensitiveLock) {
+            val sensitiveNow = shouldRemainSensitive ||
+                name in globalSensitiveNames ||
+                name in declaredSecretGlobals
+            globalScope.set(bucket, name, value)
+            updateSensitivity(globalSensitiveNames, name, sensitiveNow)
+        }
+    }
+
+    /** Guards the check-then-act on [globalSensitiveNames]; see the note in [set]. */
+    private val globalSensitiveLock = Any()
+
+    /**
+     * Force a value into the task-local scope regardless of the name's casing. Used to inject an
+     * event's own snapshot (e.g. a notification's `%NOTIF_*`) for this one invocation, so a queued
+     * task reads ITS event's values — [get] checks locals first, shadowing the shared super-global.
+     */
+    fun setLocal(name: String, value: String) {
+        setInLocalScope(name, value, sensitiveWriteDepth.get() > 0)
+    }
+
+    private fun setInLocalScope(name: String, value: String, sensitive: Boolean) {
+        synchronized(localStack) {
+            val target = localStack.lastOrNull()
+            if (target == null) {
+                baseScope[name] = value
+                updateSensitivity(baseScopeSensitiveNames, name, sensitive)
+            } else {
+                target[name] = value
+                updateSensitivity(localSensitiveStack.last(), name, sensitive)
             }
         }
     }
 
     fun get(name: String): String? {
-        val normalizedName = VariableNamePolicy.normalize(name) ?: return null
         synchronized(localStack) {
             for (i in localStack.indices.reversed()) {
-                localStack[i][normalizedName]?.let { return it }
+                localStack[i][name]?.let { return it }
             }
         }
-        return rootLocals[normalizedName] ?: globals[normalizedName]
+        baseScope[name]?.let { return it }
+        val bucket = bucketOf(name) ?: return null
+        return globalScope.get(bucket, name)
     }
 
     fun isSensitive(name: String): Boolean {
-        val normalizedName = VariableNamePolicy.normalize(name) ?: return false
         synchronized(localStack) {
             for (index in localStack.indices.reversed()) {
-                if (normalizedName in localStack[index]) return normalizedName in localSensitiveStack[index]
+                if (name in localStack[index]) return name in localSensitiveStack[index]
             }
         }
-        if (rootLocals.containsKey(normalizedName)) return normalizedName in rootLocalSensitiveNames
-        return normalizedName in globalSensitiveNames
+        if (baseScope.containsKey(name)) return name in baseScopeSensitiveNames
+        return name in globalSensitiveNames
+    }
+
+    /** Unset a variable in whichever scope owns it and drop any array of the same name (Variable Clear). */
+    fun unset(name: String) {
+        baseScope.remove(name)
+        baseScopeSensitiveNames.remove(name)
+        synchronized(localStack) {
+            localStack.forEach { it.remove(name) }
+            localSensitiveStack.forEach { it.remove(name) }
+        }
+        bucketOf(name)?.let { globalScope.unset(it, name) }
+        globalSensitiveNames.remove(name)
+        arrayStore.remove(name)
+        sensitiveArrayNames.remove(name)
     }
 
     /**
-     * Seed the global scope with previously persisted values before a run starts. Only affects the
-     * global namespace; local task scopes are untouched.
+     * Seed the global scope with previously persisted values before a run starts. With the fork's
+     * DB-backed [GlobalVariableScope] the values themselves are already live; this records the
+     * secret-provenance metadata (and tolerates in-memory scopes by writing missing values through).
      */
     fun seedGlobals(values: Map<String, String>, secretNames: Set<String> = emptySet()) {
-        values.forEach { (rawName, value) ->
-            VariableNamePolicy.promoteToGlobal(rawName)?.let { name -> globals[name] = value }
+        values.forEach { (name, value) ->
+            val bucket = bucketOf(name) ?: return@forEach
+            if (globalScope.get(bucket, name) == null) globalScope.set(bucket, name, value)
         }
-        secretNames.mapNotNullTo(declaredSecretGlobals, VariableNamePolicy::promoteToGlobal)
-        globalSensitiveNames += declaredSecretGlobals
+        declaredSecretGlobals += secretNames
+        globalSensitiveNames += secretNames
     }
 
-    /** Snapshot of the current global scope, used to persist durable globals after a run. */
-    fun globalSnapshot(): Map<String, String> = globals.toMap()
+    /** Snapshot of the current global scope (this store's visible buckets). */
+    fun globalSnapshot(): Map<String, String> = globalScope.snapshot(projectId)
 
     /** Secret/taint metadata paired with [globalSnapshot] for encrypted durable persistence. */
     fun globalSensitiveSnapshot(): Set<String> = globalSensitiveNames.toSet()
@@ -131,12 +237,12 @@ class VariableStore {
      * Arrays can be accessed via %arrayName(#) for length, %arrayName(0) for index, etc.
      */
     fun setArray(name: String, values: List<String>, sensitive: Boolean = false) {
-        // Array taint is monotonic for the same reason global taint is (see [set]): mark before
-        // publishing and never clear, so a later plain write can't race a secret array's flag off.
-        if (sensitive || sensitiveWriteDepth.get() > 0 || name in sensitiveArrayNames) {
-            sensitiveArrayNames += name
-        }
         arrayStore.put(name, values)
+        updateSensitivity(
+            sensitiveArrayNames,
+            name,
+            sensitive || sensitiveWriteDepth.get() > 0 || name in sensitiveArrayNames,
+        )
     }
 
     /**
@@ -177,24 +283,6 @@ class VariableStore {
         return expander.evaluateCondition(expr, this, arrayStore)
     }
 
-    fun toTemplateScope(event: Map<String, String> = emptyMap()): TemplateScope {
-        val taskValues = rootLocals.toMutableMap()
-        synchronized(localStack) {
-            localStack.forEach { scope -> taskValues += scope }
-        }
-        return TemplateScope(
-            global = globals.toMap(),
-            task = taskValues.toMap(),
-            event = event.toMap(),
-            arrays = arrayStore.snapshot(),
-            sensitiveGlobal = globalSensitiveNames.toSet(),
-            sensitiveTask = synchronized(localStack) {
-                localSensitiveStack.flatMapTo(rootLocalSensitiveNames.toMutableSet()) { it }
-            },
-            sensitiveArrays = sensitiveArrayNames.toSet(),
-        )
-    }
-
     suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T {
         if (!sensitive) return block()
         sensitiveWriteDepth.incrementAndGet()
@@ -203,6 +291,27 @@ class VariableStore {
         } finally {
             sensitiveWriteDepth.decrementAndGet()
         }
+    }
+
+    fun toTemplateScope(
+        event: Map<String, String> = emptyMap(),
+        param: Map<String, String> = emptyMap(),
+    ): TemplateScope {
+        val taskValues = LinkedHashMap<String, String>()
+        taskValues.putAll(baseScope)
+        synchronized(localStack) { localStack.forEach { scope -> taskValues += scope } }
+        return TemplateScope(
+            global = globalScope.snapshot(projectId),
+            task = taskValues,
+            event = event.toMap(),
+            param = param.toMap(),
+            arrays = arrayStore.snapshot(),
+            sensitiveGlobal = globalSensitiveNames.toSet(),
+            sensitiveTask = synchronized(localStack) {
+                localSensitiveStack.flatMapTo(baseScopeSensitiveNames.toMutableSet()) { it }
+            },
+            sensitiveArrays = sensitiveArrayNames.toSet(),
+        )
     }
 
     /**
@@ -237,7 +346,8 @@ class VariableStore {
      * Set a value at a nested path within an array variable.
      *
      * `fullPath` is `arrayName[index]`. Sets the element at the given index,
-     * growing the array with empty strings if needed.
+     * growing the array with empty strings if needed. Out-of-range indices
+     * (negative or above [MAX_ARRAY_INDEX]) fail closed.
      *
      * Returns true if the write succeeded.
      */

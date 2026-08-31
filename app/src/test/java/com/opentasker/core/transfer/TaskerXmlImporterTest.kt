@@ -8,8 +8,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TaskerXmlImporterTest {
+    /**
+     * The fork dropped `Variable.isGlobal`: scope is no longer carried on the model at all, it is
+     * derived from the name's first character by `VariableStore` (uppercase = persisted, lowercase =
+     * task-local). So the importer no longer classifies a Tasker variable on the way in — it imports
+     * every one into the super bucket (`projectId = 0`) with its name intact and lets the read side
+     * decide. This asserts that, which is the behaviour that now exists.
+     */
     @Test
-    fun mixedCaseTaskerVariableIsGlobalButAllLowercaseVariableIsLocal() {
+    fun taskerVariablesImportIntoTheSuperBucketWithNamesAndValuesIntact() {
         val report = TaskerXmlImporter.parse(
             rawXml = """
                 <TaskerData>
@@ -21,8 +28,13 @@ class TaskerXmlImporterTest {
             importedAtEpochMs = 123L,
         )
 
-        assertTrue(report.bundle.variables.single { it.name == "%myValue" }.isGlobal)
-        assertFalse(report.bundle.variables.single { it.name == "%local" }.isGlobal)
+        assertEquals(2, report.bundle.variables.size)
+        val mixed = report.bundle.variables.single { it.name == "%myValue" }
+        val lower = report.bundle.variables.single { it.name == "%local" }
+        assertEquals("global", mixed.value)
+        assertEquals("local", lower.value)
+        assertEquals(0L, mixed.projectId)
+        assertEquals(0L, lower.projectId)
     }
 
     @Test
@@ -100,7 +112,7 @@ class TaskerXmlImporterTest {
 
         val variable = report.bundle.variables.single()
         assertEquals("%FOO", variable.name)
-        assertTrue(variable.isGlobal)
+        assertEquals(0L, variable.projectId)
 
         val requirement = report.bundle.metadata.capabilityRequirements.single { it.actionId == "tasker.unsupported" }
         assertEquals(CapabilityLevel.Unsupported, requirement.level)
