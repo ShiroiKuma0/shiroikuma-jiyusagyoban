@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path name="user_files" path="user_files/" />
+    <!-- 記事変換 hands the article it wrote to whatever on the phone reads HTML, and that file lives
+         on shared storage (/sdcard/tmp by default). Nothing is granted implicitly: a reader only ever
+         sees the one URI we attach to an explicit ACTION_VIEW. -->
+    <external-path name="shared" path="." />
+</paths>

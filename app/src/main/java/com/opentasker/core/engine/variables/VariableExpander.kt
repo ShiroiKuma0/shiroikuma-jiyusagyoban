@@ -40,7 +40,8 @@ class VariableExpander {
         arrayStore: ArrayStore,
         quoteValue: (String) -> String = { it },
         conditionals: Boolean = true,
-        unset: Unset = Unset.AS_WRITTEN,
+        // FORK: an unset variable reads as nothing by default (see VariableStore.expandTracked).
+        unset: Unset = Unset.BLANK,
     ): String {
         return try {
             expandInternal(expr, variableStore, arrayStore, quoteValue, conditionals, unset)
@@ -71,7 +72,8 @@ class VariableExpander {
         arrayStore: ArrayStore,
         quoteValue: (String) -> String = { it },
         conditionals: Boolean = true,
-        unset: Unset = Unset.AS_WRITTEN,
+        // FORK: an unset variable reads as nothing by default (see VariableStore.expandTracked).
+        unset: Unset = Unset.BLANK,
     ): String {
         // Handle conditionals: (cond) ? true_val : false_val
         val ternary = if (conditionals) parseTernary(expr) else null
@@ -494,7 +496,7 @@ class VariableExpander {
             unaryExistenceResult(normalized, expandOperand)?.let { return it }
             unaryParityResult(normalized, expandOperand)?.let { return it }
             // A variable on its own, such as `%enabled`, is a boolean once it has its value.
-            return expandOperand(normalized, Unset.AS_WRITTEN).trim().toBoolean()
+            return expandOperand(normalized, Unset.BLANK).trim().toBoolean()
         }
         // Trimmed after expansion: command output and file reads end with a newline, and a value
         // that came back empty matches nothing, so two empty sides aren't "equal". An unset side
@@ -502,7 +504,10 @@ class VariableExpander {
         // except in a numeric comparison, where it's 0. A number isn't trimmed here, since
         // taskerNumber strips only what Tasker does, and a no-break space left on it isn't a number.
         val numeric = comparison.operator in NUMERIC_OPERATORS
-        val unset = if (numeric) Unset.ZERO else Unset.AS_WRITTEN
+        // FORK: an unset side reads as nothing on both kinds of comparison, as it always has here —
+        // upstream's AS_WRITTEN / ZERO (Tasker's reading) would turn every `x%var == x` check in
+        // 白い熊's tasks around, and make an unset `%n < 5` true.
+        val unset = Unset.BLANK
         val left = expandOperand(comparison.left, unset).let { if (numeric) it else it.trim() }
         val right = expandOperand(comparison.right, unset).let { if (numeric) it else it.trim() }
 
@@ -513,8 +518,13 @@ class VariableExpander {
             ComparisonOperator.GE -> compareNumbers(left, right) { l, r -> l >= r }
             ComparisonOperator.LT -> compareNumbers(left, right) { l, r -> l < r }
             ComparisonOperator.GT -> compareNumbers(left, right) { l, r -> l > r }
-            ComparisonOperator.MATCHES -> matchesPattern(left, withEnglishOnOff(right), emptyMatchesNothing = true)
-            ComparisonOperator.NOT_MATCHES -> !matchesPattern(left, withEnglishOnOff(right), emptyMatchesNothing = false)
+            // FORK: `~` keeps the fork's wildcard match, where `*` is the only special character.
+            // Upstream's Tasker reading (2026-11-11: `/` alternatives, `+`, a leading `!`, `~R`, case
+            // ignored for a lowercase pattern) changes what existing conditions mean — `/ping*` would
+            // match "ping", `*/sdcard/*` everything. Tasker's own matcher stays available as
+            // [matches] for the steps that are Tasker's (Variable Clear).
+            ComparisonOperator.MATCHES -> left.isNotEmpty() && matchesStarGlob(left, right)
+            ComparisonOperator.NOT_MATCHES -> !matchesStarGlob(left, right)
             ComparisonOperator.MATCHES_REGEX -> findsRegex(left, right)
             ComparisonOperator.NOT_MATCHES_REGEX -> !findsRegex(left, right)
         }
@@ -526,6 +536,25 @@ class VariableExpander {
      * [matchesGlob], where [emptyMatchesNothing] keeps `%a ~ *` false while `%a` is empty. An empty
      * pattern matches nothing, as in Tasker, which checks for one before it looks for the `!`.
      */
+    /** The fork's `~`: `*` is the only special character, everything else is literal, case counts. */
+    private fun matchesStarGlob(value: String, pattern: String): Boolean {
+        if (pattern.length > MAX_REGEX_LENGTH || value.length > MAX_REGEX_INPUT_LENGTH) return false
+        val regex = buildString {
+            append("(?s)\\A")
+            pattern.split("*").forEachIndexed { index, literal ->
+                if (index > 0) append(".*")
+                append(Re2Pattern.quote(literal))
+            }
+            append("\\z")
+        }
+        val matcher = compileLinearRegex(regex)?.matcher(value) ?: return false
+        return try {
+            matcher.find()
+        } catch (e: RuntimeException) {
+            false
+        }
+    }
+
     private fun matchesPattern(value: String, pattern: String, emptyMatchesNothing: Boolean): Boolean = when {
         pattern.isEmpty() -> false
         pattern.startsWith("~R") -> findsRegex(value, pattern.substring(2))
@@ -1057,10 +1086,8 @@ class ArrayStore {
     }
 
     /** Drops the array [name], returning whether there was one. */
-    fun remove(name: String): Boolean = synchronized(lock) { arrays.remove(name) != null }
-
-    companion object {
-        private const val MAX_ARRAYS = 500
+    fun remove(name: String): Boolean {
+        return synchronized(lock) { arrays.remove(name) != null }
     }
 
     fun get(name: String, index: Int): String {
@@ -1081,4 +1108,8 @@ class ArrayStore {
 
     fun snapshot(): Map<String, List<String>> =
         synchronized(lock) { LinkedHashMap(arrays).mapValues { (_, values) -> values.toList() } }
+
+    companion object {
+        private const val MAX_ARRAYS = 500
+    }
 }

@@ -1,6 +1,6 @@
 package com.opentasker.core.diagnostics
 
-import com.opentasker.core.engine.EngineHeartbeat
+import com.opentasker.core.engine.EngineHeartbeatSnapshot
 import com.opentasker.core.engine.EngineExitCorrelationState
 import com.opentasker.core.engine.HistoricalProcessExit
 import org.junit.Assert.assertEquals
@@ -21,7 +21,7 @@ class EngineExitCorrelationTest {
         )
 
         val correlation = EngineHealthReader.correlateProcessExit(
-            heartbeat = EngineHeartbeat(lastAliveAtMillis = 1_000L, stoppedCleanly = false),
+            heartbeat = EngineHeartbeatSnapshot(lastAliveAtMillis = 1_000L, stoppedCleanly = false),
             nowMillis = 10_000L,
             read = fakeExitSource,
             staleAfterMillis = 1_000L,
@@ -36,7 +36,7 @@ class EngineExitCorrelationTest {
 
     @Test
     fun staleHeartbeatWithoutRecordIsDistinguishedFromUnsupportedPlatform() {
-        val heartbeat = EngineHeartbeat(lastAliveAtMillis = 1_000L, stoppedCleanly = false)
+        val heartbeat = EngineHeartbeatSnapshot(lastAliveAtMillis = 1_000L, stoppedCleanly = false)
         val noRecord = EngineHealthReader.correlateProcessExit(
             heartbeat = heartbeat,
             nowMillis = 10_000L,
@@ -58,7 +58,7 @@ class EngineExitCorrelationTest {
     @Test
     fun cleanOrCurrentHeartbeatDoesNotInventAnExit() {
         val current = EngineHealthReader.correlateProcessExit(
-            heartbeat = EngineHeartbeat(lastAliveAtMillis = 9_500L, stoppedCleanly = false),
+            heartbeat = EngineHeartbeatSnapshot(lastAliveAtMillis = 9_500L, stoppedCleanly = false),
             nowMillis = 10_000L,
             read = HistoricalProcessExitRead(
                 platformAvailable = true,
@@ -67,7 +67,7 @@ class EngineExitCorrelationTest {
             staleAfterMillis = 1_000L,
         )
         val clean = EngineHealthReader.correlateProcessExit(
-            heartbeat = EngineHeartbeat(lastAliveAtMillis = 1_000L, stoppedCleanly = true),
+            heartbeat = EngineHeartbeatSnapshot(lastAliveAtMillis = 1_000L, stoppedCleanly = true),
             nowMillis = 10_000L,
             read = HistoricalProcessExitRead(
                 platformAvailable = true,

@@ -111,4 +111,57 @@ class ProfileLifecyclePolicyTest {
         assertNull(normalized.expiresAtMs)
         assertFalse(normalized.lifetimeConsumed)
     }
+
+    private fun profile(id: Long, name: String, priority: Int = 0, enabled: Boolean = true) =
+        Profile(id = id, name = name, enterTaskId = id * 10, priority = priority, enabled = enabled)
+
+    @Test
+    fun releasingTheOutrankingProfileFreesOnlyWhatNothingElseStillOutranks() {
+        val high = profile(1, "High", priority = 10)
+        val middle = profile(2, "Middle", priority = 5)
+        val low = profile(3, "Low")
+
+        // While all three match, High outranks both others.
+        val all = listOf(high, middle, low)
+        assertEquals(high, ProfileLifecyclePolicy.suppressor(middle, all))
+        assertEquals(high, ProfileLifecyclePolicy.suppressor(low, all))
+
+        // High deactivates: Middle is free, but Low is now outranked by Middle instead.
+        val afterHigh = listOf(middle, low)
+        assertEquals(listOf(middle), ProfileLifecyclePolicy.released(all, afterHigh))
+
+        // Middle deactivates too: only now is Low released.
+        assertEquals(listOf(low), ProfileLifecyclePolicy.released(afterHigh, listOf(low)))
+    }
+
+    @Test
+    fun equalPrioritiesNeverSuppressEachOtherSoNothingIsEverReleased() {
+        // The default priority is the common case: every profile left at 0 must run concurrently.
+        // Arbitrating equal priorities by id would make each one mutually exclusive with the rest.
+        val first = profile(1, "First")
+        val second = profile(2, "Second")
+        val third = profile(3, "Third")
+        val all = listOf(first, second, third)
+
+        assertNull(ProfileLifecyclePolicy.suppressor(second, all))
+        assertNull(ProfileLifecyclePolicy.suppressor(third, all))
+        assertEquals(emptyList<Profile>(), ProfileLifecyclePolicy.released(all, listOf(second, third)))
+    }
+
+    @Test
+    fun aProfileThatStoppedMatchingIsNotReleased() {
+        val high = profile(1, "High", priority = 10)
+        val low = profile(2, "Low")
+
+        // Both leave the matched set at once: Low is not "freed", it simply no longer matches.
+        assertEquals(emptyList<Profile>(), ProfileLifecyclePolicy.released(listOf(high, low), emptyList()))
+    }
+
+    @Test
+    fun aDisabledProfileOutranksNothing() {
+        val disabledHigh = profile(1, "High", priority = 10, enabled = false)
+        val low = profile(2, "Low")
+
+        assertNull(ProfileLifecyclePolicy.suppressor(low, listOf(disabledHigh, low)))
+    }
 }

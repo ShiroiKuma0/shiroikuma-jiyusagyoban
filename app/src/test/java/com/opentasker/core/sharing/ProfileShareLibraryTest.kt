@@ -33,7 +33,12 @@ class ProfileShareLibraryTest {
                     actions = listOf(
                         ActionSpec(type = "notify.show"),
                         ActionSpec(type = "script.termux.run"),
-                        ActionSpec(type = "app.kill"),
+                        // The unsupported exemplar stays `reboot`, not upstream's `app.kill`. Upstream
+                        // swapped them in 8b32a9b because its Shizuku user service made reboot
+                        // setup-gated; the fork is the other way round — it drives app.kill through
+                        // Shizuku (so it is addable) and keeps reboot unsupported, since shell access
+                        // is not enough for it and it wants device-owner privilege.
+                        ActionSpec(type = "reboot"),
                         ActionSpec(type = "log"),
                     ),
                 )
@@ -63,8 +68,8 @@ class ProfileShareLibraryTest {
         val requirements = manifest.capabilityRequirements.associateBy { it.actionId }
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("notify.show").level)
         assertEquals(CapabilityLevel.RequiresSetup, requirements.getValue("script.termux.run").level)
-        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("app.kill").level)
-        assertTrue(manifest.findings.any { it.message.contains("app.kill") && it.severity == ShareFindingSeverity.Blocker })
+        assertEquals(CapabilityLevel.Unsupported, requirements.getValue("reboot").level)
+        assertTrue(manifest.findings.any { it.message.contains("reboot") && it.severity == ShareFindingSeverity.Blocker })
     }
 
     @Test

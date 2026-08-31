@@ -5,9 +5,10 @@ import kotlinx.serialization.Serializable
 /**
  * A Profile binds one or more Contexts to a Task. Legacy profiles use implicit AND semantics;
  * profiles with [contextExpression] evaluate that explicit nested boolean tree instead.
- * Activation runs [enterTaskId]; deactivation runs [exitTaskId] (if set). An [enterTaskId] of 0
- * means the profile has no enter task, which is valid when it has an exit task: it goes on without
- * running anything and runs [exitTaskId] when its contexts stop matching.
+ * Activation runs the enter task; deactivation runs the exit task (if set). The task is resolved by
+ * [enterTaskName]/[exitTaskName] FIRST, with [enterTaskId]/[exitTaskId] as the fallback. An
+ * [enterTaskId] of 0 means the profile has no enter task, which is valid when it has an exit task:
+ * it goes on without running anything and runs the exit task when its contexts stop matching.
  */
 @Serializable
 data class Profile(
@@ -19,9 +20,17 @@ data class Profile(
     val exitTaskId: Long? = null,
     val cooldownSec: Int = 0,
     val automationMode: AutomationMode = AutomationMode.SINGLE,
-    val group: String? = null,
+    val projectId: Long? = null,            // null = Unfiled
+    val position: Int = 0,                  // manual sort order within its tab
+    // Task link by NAME — resolved FIRST at run time, with enterTaskId/exitTaskId as the fallback. This
+    // survives bundle re-imports that re-id a task (which otherwise orphan the id link → "Missing task #N").
+    val enterTaskName: String = "",
+    val exitTaskName: String = "",
+    val group: String? = null,              // upstream's profile-group tag; our project grouping is canonical (kept for source compatibility)
     val requiresRiskAcknowledgement: Boolean = false,
-    val projectId: Long = DEFAULT_PROJECT_ID,
+    // Upstream 0.2.80 nested ALL/ANY/NOT context grouping. The fork does not ship the authoring UI
+    // for it, so this stays null and every read path takes upstream's own legacy branch: contexts are
+    // combined with implicit AND, exactly as the fork has always evaluated them.
     val contextExpression: ContextExpressionNode? = null,
     /** Higher-priority profiles win deterministic arbitration when multiple profiles match. */
     val priority: Int = 0,

@@ -148,6 +148,11 @@ internal class ProfileMatcher(
                         nowMs = holdClock(),
                         holdLimitMs = standInHoldMs,
                     )
+                        // Fork: carry the event's per-invocation variable snapshot (e.g. %NOTIF_*) so
+                        // a burst cannot race on a shared super-global. Upstream threads the whole
+                        // ContextEvent as well; the fork's snapshot is what the queued per-invocation
+                        // task actually reads.
+                        .copy(vars = preparedEvent.vars)
                 }.endingStandInHolds(standInHoldMs, holdClock).onEach { update ->
                     publishLiveContextState(profile.id, index, update)
                 }
@@ -216,7 +221,9 @@ internal class ProfileMatcher(
                 matched = if (spec.invert) !rawMatched else rawMatched,
                 pulseContext = spec.type == ContextType.EVENT,
                 pulseSequence = if (spec.type == ContextType.EVENT && rawMatched) 1L else 0L,
-                event = event?.takeIf { rawMatched },
+                // The fork threads each event's own variable snapshot rather than the event object,
+                // so a simulated trigger reports exactly what a real one would hand the task.
+                vars = if (rawMatched) event?.vars.orEmpty() else emptyMap(),
             )
         }
         return ProfileMatchSnapshot(
@@ -226,7 +233,7 @@ internal class ProfileMatcher(
                 profile.contextExpression,
             ),
             pulseSequence = updates.maxOfOrNull { it.pulseSequence } ?: 0L,
-            event = updates.lastOrNull { it.event != null }?.event,
+            vars = updates.lastOrNull { it.vars.isNotEmpty() }?.vars.orEmpty(),
         )
     }
 
@@ -241,7 +248,13 @@ internal class ProfileMatcher(
             AppLogger.warn(tag, "Slow profile evaluation: ${duration}ms (threshold: ${performanceThresholdMs}ms)")
         }
 
-        return snapshot
+        // Fork: carry the firing context's per-invocation snapshot: prefer a matched pulse (event)
+        // context, else any matched context. Level (STATE) profiles have none — they keep the
+        // shared globals.
+        val eventVars = contextMatches.lastOrNull { it.pulseContext && it.matched }?.vars
+            ?: contextMatches.lastOrNull { it.matched }?.vars
+            ?: emptyMap()
+        return snapshot.copy(vars = eventVars)
     }
 
     private fun markPulseContextSubscribed(index: Int, expectedCount: Int) {
@@ -293,6 +306,7 @@ internal data class ContextMatchUpdate(
     val heldStandIn: ContextMatchUpdate? = null,
     /** When the latest hold over a stand-in began, kept after it runs out until a measured value. */
     val holdingSinceMs: Long? = null,
+    val vars: Map<String, String> = emptyMap(),
 ) {
     companion object {
         /** An event that hasn't come yet is a known "no"; a state that hasn't been read is unknown. */
@@ -502,6 +516,7 @@ internal data class ProfileMatchSnapshot(
     val event: ContextEvent? = null,
     val awaitingFirstReadings: Boolean = false,
     val readMatched: Boolean = allMatched,
+    val vars: Map<String, String> = emptyMap(),
 )
 
 /** What [contextMatches] add up to for a profile with [specs] and [expression]. */
@@ -552,7 +567,7 @@ internal fun profileStateChangesFromSnapshots(
         val pulses = snapshots.scan(PulseAccumulator(lastPulseSequence = initialPulseSequence, change = null)) { previous, snapshot ->
             val pulseChanged = snapshot.pulseSequence != previous.lastPulseSequence
             val change = if (pulseChanged && snapshot.pulseSequence > 0 && snapshot.readMatched) {
-                ProfileStateChange.Activated(snapshot.event)
+                ProfileStateChange.Activated(snapshot.vars)
             } else {
                 null
             }
@@ -573,7 +588,7 @@ internal fun profileStateChangesFromSnapshots(
             .scan(Pair(initiallyActive, initiallyActive)) { (_, prev), now -> Pair(prev, now) }
             .mapNotNull { (prev, now) ->
                 val change = when {
-                    !prev && now -> ProfileStateChange.Activated(null)
+                    !prev && now -> ProfileStateChange.Activated()
                     prev && !now -> ProfileStateChange.Deactivated
                     else -> null
                 }
@@ -698,6 +713,7 @@ internal fun evaluateContextExpression(
 }
 
 sealed class ProfileStateChange {
-    data class Activated(val event: ContextEvent?) : ProfileStateChange()
+    /** [vars] = the triggering event's per-invocation snapshot (e.g. notification %NOTIF_*), or empty. */
+    data class Activated(val vars: Map<String, String> = emptyMap()) : ProfileStateChange()
     data object Deactivated : ProfileStateChange()
 }
