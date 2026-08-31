@@ -2,17 +2,24 @@ package com.opentasker.core.scenes
 
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.SceneElementType
+import com.opentasker.core.model.SceneElementTypeSerializer
 import com.opentasker.core.storage.StorageJson
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * RETIRED IN PART: upstream 0.2.88 cut [SceneElementType] to the four types ITS overlay draws and
+ * added three tests asserting that only those four remain, that a scene naming a removed type
+ * decodes as TEXT, and that saving it writes that fallback back. The fork keeps all eighteen — its
+ * own SceneActivity, SceneElementDrafts and UiEnumLabels render and offer them — so those
+ * assertions would demand a one-way rewrite of every saved element of a "removed" type into a text
+ * box, silently, on first read.
+ *
+ * What survives is the half that is still true here: a type name this build does not know decodes
+ * as TEXT instead of failing the whole scene, and the decode is case-insensitive so a hand-edited
+ * bundle is not quietly downgraded.
+ */
 class SceneElementTypeMigrationTest {
-    private val removedTypeNames = listOf(
-        "EDIT_TEXT", "CHECKBOX", "TOGGLE", "NUMBER_PICKER", "SPINNER", "MAP",
-        "WEB", "MENU", "VIDEO", "OVAL", "RECTANGLE", "DOODLE",
-    )
-
     private fun sceneJson(typeName: String): String =
         """
         {"id":7,"name":"Old scene","widthDp":320,"heightDp":240,"elements":[
@@ -22,79 +29,34 @@ class SceneElementTypeMigrationTest {
         """.trimIndent()
 
     @Test
-    fun onlyRenderableTypesRemain() {
+    fun theTypesTheForkKeepsStillRoundTrip() {
+        listOf("EDIT_TEXT", "CHECKBOX", "TOGGLE", "NUMBER_PICKER", "SPINNER", "MAP",
+               "WEB", "MENU", "VIDEO", "OVAL", "RECTANGLE", "DOODLE", "PROGRESS", "METEOR")
+            .forEach { name ->
+                val scene = StorageJson.decodeFromString(Scene.serializer(), sceneJson(name))
+                assertEquals(
+                    "$name must survive a round trip, not fall back to TEXT",
+                    SceneElementType.valueOf(name),
+                    scene.elements.single().type,
+                )
+            }
+    }
+
+    @Test
+    fun aTypeThisBuildDoesNotKnowDecodesAsTextRatherThanFailingTheScene() {
+        val scene = StorageJson.decodeFromString(Scene.serializer(), sceneJson("SOMETHING_A_FUTURE_BUILD_ADDED"))
+        val element = scene.elements.single()
+        assertEquals(SceneElementType.TEXT, element.type)
+        // The element keeps everything but its type, so the scene is not lost with it.
+        assertEquals(10, element.xDp)
+        assertEquals(3L, element.tapTaskId)
+    }
+
+    @Test
+    fun aHandEditedLowercaseTypeResolvesToTheTypeItNames() {
         assertEquals(
-            listOf(
-                SceneElementType.BUTTON,
-                SceneElementType.TEXT,
-                SceneElementType.SLIDER,
-                SceneElementType.IMAGE,
-            ),
-            SceneElementType.entries.toList(),
+            SceneElementType.PROGRESS,
+            StorageJson.decodeFromString(SceneElementTypeSerializer, "\"progress\""),
         )
-        assertEquals(
-            "Every declared type must be one the editor can create",
-            SceneElementType.entries.toList(),
-            SceneElementDrafts.editableTypes,
-        )
-    }
-
-    @Test
-    fun aSceneSavedWithARemovedTypeStillLoads() {
-        removedTypeNames.forEach { typeName ->
-            val scene = StorageJson.decodeFromString<Scene>(sceneJson(typeName))
-            val element = scene.elements.single()
-
-            assertEquals("$typeName must fall back rather than fail the scene", SceneElementType.TEXT, element.type)
-            assertEquals("The element must keep its position", 10, element.xDp)
-            assertEquals("The element must keep its size", 100, element.widthDp)
-            assertEquals("The element must keep its tap binding", 3L, element.tapTaskId)
-            assertEquals("The element must keep its long-press binding", 4L, element.longPressTaskId)
-        }
-    }
-
-    @Test
-    fun aMigratedElementValidatesAndReSavesAsItsFallback() {
-        val scene = StorageJson.decodeFromString<Scene>(sceneJson("CHECKBOX"))
-
-        assertTrue(
-            "A migrated element must not report config errors",
-            SceneElementConfigValidator.validate(scene.elements.single()).isEmpty(),
-        )
-
-        val round = StorageJson.decodeFromString<Scene>(StorageJson.encodeToString(scene))
-        assertEquals(SceneElementType.TEXT, round.elements.single().type)
-        assertTrue("The fallback must be written on save", "\"type\":\"TEXT\"" in StorageJson.encodeToString(scene))
-    }
-
-    @Test
-    fun aHandEditedLowercaseTypeStillDecodesToItsRealType() {
-        // The bundle codec decodes enums case-insensitively for hand-edited documents. A strict
-        // match here would silently drop "image" to the TEXT fallback and skip its validation.
-        val scene = StorageJson.decodeFromString<Scene>(sceneJson("image"))
-
-        assertEquals(SceneElementType.IMAGE, scene.elements.single().type)
-        assertTrue(
-            "An invalid image must still be reported rather than migrated away",
-            SceneElementConfigValidator.validate(scene.elements.single()).isNotEmpty(),
-        )
-    }
-
-    @Test
-    fun aMigratedElementKeepsTheCaptionItWasAuthoredWith() {
-        val overlay = com.opentasker.ProductionSources
-            .read("com/opentasker/core/scenes/SceneOverlayService.kt")
-
-        assertTrue(
-            "A migrated element must not render as an invisible empty text view",
-            "element.config[\"text\"] ?: element.config[\"label\"].orEmpty()" in overlay,
-        )
-    }
-
-    @Test
-    fun anUnknownTypeFromAnyFutureBuildFallsBackTheSameWay() {
-        val scene = StorageJson.decodeFromString<Scene>(sceneJson("SOMETHING_NEW"))
-
-        assertEquals(SceneElementType.TEXT, scene.elements.single().type)
     }
 }

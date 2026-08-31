@@ -1,0 +1,511 @@
+package com.opentasker.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.opentasker.ui.components.ThemedDropdownMenu
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.opentasker.core.model.Project
+import com.opentasker.core.model.ProjectFilter
+import com.opentasker.core.storage.SortMethod
+
+/** Color presets offered when creating/editing a project (plus "no color"). */
+private val PROJECT_COLOR_PRESETS = listOf(
+    0xFFFFFF00.toInt(), // yellow (theme accent)
+    0xFFFF6B6B.toInt(), // red
+    0xFF4FC3F7.toInt(), // blue
+    0xFF81C784.toInt(), // green
+    0xFFBA68C8.toInt(), // purple
+    0xFFFFB74D.toInt(), // orange
+)
+
+/** Top-bar chip + dropdown that picks the active project filter (or opens management). */
+@Composable
+fun ProjectSwitcher(
+    filter: ProjectFilter,
+    projects: List<Project>,
+    onSelect: (ProjectFilter) -> Unit,
+    onManage: () -> Unit,
+    onExportEverything: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val label = when (filter) {
+        ProjectFilter.All -> "All"
+        ProjectFilter.Unfiled -> "Unfiled"
+        is ProjectFilter.Of -> projects.firstOrNull { it.id == filter.projectId }?.name ?: "Project"
+    }
+    Box {
+        TextButton(onClick = { expanded = true }) {
+            Icon(Icons.Filled.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                label,
+                modifier = Modifier.padding(horizontal = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose project")
+        }
+        ThemedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            FilterItem("All", filter == ProjectFilter.All) { onSelect(ProjectFilter.All); expanded = false }
+            FilterItem("Unfiled", filter == ProjectFilter.Unfiled) { onSelect(ProjectFilter.Unfiled); expanded = false }
+            projects.forEach { project ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ColorDot(project.color)
+                            Text(project.name)
+                        }
+                    },
+                    leadingIcon = {
+                        if (filter is ProjectFilter.Of && filter.projectId == project.id) {
+                            Icon(Icons.Filled.Check, contentDescription = "Selected")
+                        }
+                    },
+                    onClick = { onSelect(ProjectFilter.Of(project.id)); expanded = false },
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Export everything…") },
+                leadingIcon = { Icon(Icons.Filled.Upload, contentDescription = null) },
+                onClick = { onExportEverything(); expanded = false },
+            )
+            DropdownMenuItem(
+                text = { Text("Manage projects…") },
+                leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                onClick = { onManage(); expanded = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FilterItem(label: String, selected: Boolean, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label) },
+        leadingIcon = { if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected") },
+        onClick = onClick,
+    )
+}
+
+/** Projects tab content: create / rename / recolor / reorder / delete projects. */
+@Composable
+fun ProjectsManagementScreen(
+    contentPadding: PaddingValues,
+    projects: List<Project>,
+    memberCount: (Long) -> Int,
+    sortMethod: SortMethod,
+    onToggleSort: () -> Unit,
+    createSignal: Int,
+    onCreate: (String, Int?) -> Unit,
+    onUpdate: (Project) -> Unit,
+    onDelete: (Project, Boolean) -> Unit,
+    onReorder: (List<Long>) -> Unit,
+    onExportProject: (Project) -> Unit,
+    currentProjectId: Long? = null,
+    onSelectProject: (Long) -> Unit = {},
+) {
+    val manual = sortMethod == SortMethod.MANUAL
+    var editing by remember { mutableStateOf<Project?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf<Project?>(null) }
+    // The shell "+" menu's "New project" action ticks createSignal to open the create dialog here
+    // (mirrors how SceneLibraryScreen consumes its create signal).
+    LaunchedEffect(createSignal) {
+        if (createSignal > 0) creating = true
+    }
+
+    Column(Modifier.fillMaxSize().padding(contentPadding)) {
+        // The sort toggle used to live in this screen's own top bar; the shell now owns the top bar, so
+        // keep the Manual/A–Z toggle reachable as a small control above the list.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onToggleSort) {
+                Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
+                Text(if (manual) "Manual" else "A–Z", modifier = Modifier.padding(start = 4.dp))
+            }
+        }
+        if (projects.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    "No projects yet. Create one to group profiles, tasks, and scenes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            // Drag-to-reorder (manual sort only): a per-row handle lifts the row; it swaps with its
+            // neighbour once dragged past half a slot, and the new order persists on drop. Replaces the
+            // old up/down arrows. 白い熊
+            val order = remember(projects) { mutableStateListOf<Project>().also { it.addAll(projects) } }
+            var dragId by remember { mutableStateOf<Long?>(null) }
+            var dragOffsetY by remember { mutableFloatStateOf(0f) }
+            var rowH by remember { mutableFloatStateOf(0f) }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(order, key = { it.id }) { project ->
+                    val isDragging = project.id == dragId
+                    ProjectManagementRow(
+                        project = project,
+                        members = memberCount(project.id),
+                        reorderable = manual,
+                        isCurrent = project.id == currentProjectId,
+                        isDragging = isDragging,
+                        dragOffsetY = if (isDragging) dragOffsetY else 0f,
+                        onMeasureHeight = { rowH = it },
+                        onSelect = { onSelectProject(project.id) },
+                        onEdit = { editing = project },
+                        onDelete = { deleting = project },
+                        onExport = { onExportProject(project) },
+                        dragHandle = {
+                            Icon(
+                                Icons.Filled.DragIndicator,
+                                contentDescription = "Drag to reorder",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.pointerInput(project.id) {
+                                    detectDragGestures(
+                                        onDragStart = { dragId = project.id; dragOffsetY = 0f },
+                                        onDrag = { change, amount ->
+                                            change.consume()
+                                            dragOffsetY += amount.y
+                                            val di = order.indexOfFirst { it.id == dragId }
+                                            val step = rowH + 8.dp.toPx()  // row height + list spacing
+                                            if (di >= 0 && rowH > 0f) {
+                                                when {
+                                                    dragOffsetY > step / 2 && di < order.lastIndex -> {
+                                                        order.add(di + 1, order.removeAt(di)); dragOffsetY -= step
+                                                    }
+                                                    dragOffsetY < -step / 2 && di > 0 -> {
+                                                        order.add(di - 1, order.removeAt(di)); dragOffsetY += step
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = { onReorder(order.map { it.id }); dragId = null; dragOffsetY = 0f },
+                                        onDragCancel = { dragId = null; dragOffsetY = 0f },
+                                    )
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    if (creating) {
+        ProjectEditDialog(
+            initial = null,
+            siblingNames = projects.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
+            onDismiss = { creating = false },
+            onConfirm = { name, color -> onCreate(name, color); creating = false },
+        )
+    }
+    editing?.let { project ->
+        ProjectEditDialog(
+            initial = project,
+            siblingNames = projects.filter { it.id != project.id }.mapTo(mutableSetOf()) { it.name.trim().lowercase() },
+            onDismiss = { editing = null },
+            onConfirm = { name, color ->
+                onUpdate(project.copy(name = name, color = color))
+                editing = null
+            },
+        )
+    }
+    deleting?.let { project ->
+        DeleteProjectDialog(
+            project = project,
+            members = memberCount(project.id),
+            onDismiss = { deleting = null },
+            onReassign = { onDelete(project, false); deleting = null },
+            onDeleteItems = { onDelete(project, true); deleting = null },
+        )
+    }
+}
+
+@Composable
+private fun ProjectManagementRow(
+    project: Project,
+    members: Int,
+    reorderable: Boolean,
+    isCurrent: Boolean,
+    isDragging: Boolean,
+    dragOffsetY: Float,
+    onMeasureHeight: (Float) -> Unit,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onExport: () -> Unit,
+    dragHandle: @Composable () -> Unit,
+) {
+    // Tapping the row makes this the active project (filter). The current one is clearly highlighted with an
+    // accent border + tint. In manual sort the drag handle lifts the row (translationY) to reorder. 白い熊
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { onMeasureHeight(it.size.height.toFloat()) }
+            .zIndex(if (isDragging) 1f else 0f)
+            .graphicsLayer {
+                translationY = dragOffsetY
+                if (isDragging) { shadowElevation = 12f; alpha = 0.95f }
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onSelect)
+            .then(
+                if (isCurrent) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                else Modifier,
+            )
+            .border(
+                if (isCurrent) 2.dp else 1.dp,
+                if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(12.dp),
+            )
+            .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ColorDot(project.color)
+        Column(Modifier.weight(1f)) {
+            Text(
+                project.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = if (isCurrent) FontWeight.Bold else null,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "$members item${if (members == 1) "" else "s"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (reorderable) {
+            dragHandle()
+        }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.Upload, contentDescription = "Export project") }
+        IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, contentDescription = "Edit") }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun ProjectEditDialog(
+    initial: Project?,
+    siblingNames: Set<String> = emptySet(),
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, color: Int?) -> Unit,
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var color by remember { mutableStateOf(initial?.color) }
+    // Project names are unique across the workspace.
+    val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial == null) "New project" else "Edit project") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    isError = nameClash,
+                    supportingText = if (nameClash) {
+                        { Text("A project with that name already exists.") }
+                    } else null,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Color", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SelectableDot(color = null, selected = color == null) { color = null }
+                    PROJECT_COLOR_PRESETS.forEach { preset ->
+                        SelectableDot(color = preset, selected = color == preset) { color = preset }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank() && !nameClash) {
+                Text(if (initial == null) "Create" else "Save")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun DeleteProjectDialog(
+    project: Project,
+    members: Int,
+    onDismiss: () -> Unit,
+    onReassign: () -> Unit,
+    onDeleteItems: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text("Delete \"${project.name}\"?") },
+        text = {
+            Text(
+                if (members == 0) {
+                    "This project has no items."
+                } else {
+                    "This project has $members item${if (members == 1) "" else "s"}. Move them to Unfiled, or delete them too."
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onReassign) { Text("Move to Unfiled") }
+        },
+        dismissButton = {
+            if (members > 0) {
+                TextButton(
+                    onClick = onDeleteItems,
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text("Delete items too") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+/** Move-to-project picker shown for a single profile / task / scene. */
+@Composable
+fun ProjectPickerDialog(
+    title: String,
+    projects: List<Project>,
+    currentProjectId: Long?,
+    onPick: (Long?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                PickerRow("Unfiled", null, currentProjectId == null) { onPick(null) }
+                projects.forEach { project ->
+                    PickerRow(project.name, project.color, currentProjectId == project.id) { onPick(project.id) }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun PickerRow(label: String, color: Int?, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ColorDot(color)
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (selected) Icon(Icons.Filled.Check, contentDescription = "Current", tint = MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun ColorDot(color: Int?) {
+    Box(
+        Modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .background(if (color != null) Color(color) else Color.Transparent)
+            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+    )
+}
+
+@Composable
+private fun SelectableDot(color: Int?, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(if (color != null) Color(color) else MaterialTheme.colorScheme.surface)
+            .border(
+                if (selected) 2.dp else 1.dp,
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                CircleShape,
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (color == null) {
+            Text("∅", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
