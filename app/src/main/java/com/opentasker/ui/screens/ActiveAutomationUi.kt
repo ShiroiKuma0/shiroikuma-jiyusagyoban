@@ -293,6 +293,8 @@ fun ActiveAutomationUi(
     var importedProfileReviewId by rememberSaveable { mutableLongStateOf(NO_DIALOG_ENTITY_ID) }
     val taskerImportReview by viewModel.taskerImportReview.collectAsState()
     val taskerImportBusy by viewModel.taskerImportBusy.collectAsState()
+    val taskerImportProgress by viewModel.taskerImportProgress.collectAsState()
+    val openTaskerBundleProgress by viewModel.openTaskerBundleProgress.collectAsState()
     val openTaskerBundleReview by viewModel.openTaskerBundleReview.collectAsState(); val openTaskerBundleBusy by viewModel.openTaskerBundleBusy.collectAsState(); val semanticDiffReview by viewModel.semanticDiffReview.collectAsState(); val highlightedFlowNodeKeys by viewModel.highlightedFlowNodeKeys.collectAsState(); val simulationProfile by viewModel.simulationProfile.collectAsState()
     val profileShareReview by viewModel.profileShareReview.collectAsState(); val preflightReview by viewModel.preflightReview.collectAsState()
     val preflightBusy by viewModel.preflightBusy.collectAsState()
@@ -989,6 +991,8 @@ fun ActiveAutomationUi(
             state = state,
             busy = taskerImportBusy,
             onDismiss = viewModel::clearTaskerImportReview,
+            progress = taskerImportProgress,
+            onCancel = viewModel::cancelTransfers,
             onConfirm = { viewModel.confirmTaskerImport(state) },
         )
     }
@@ -999,6 +1003,8 @@ fun ActiveAutomationUi(
             busy = openTaskerBundleBusy,
             onDismiss = viewModel::clearOpenTaskerBundleReview,
             onVariableConflictResolution = viewModel::resolveOpenTaskerVariableConflict,
+            progress = openTaskerBundleProgress,
+            onCancel = viewModel::cancelTransfers,
             onConfirm = viewModel::confirmOpenTaskerBundleImport,
         )
     }
@@ -1021,6 +1027,7 @@ fun ActiveAutomationUi(
             busy = openTaskerBundleBusy,
             onTextChanged = { bundleTextImportDraft = it.take(MAX_PASTED_BUNDLE_CHARS) },
             onDismiss = { if (!openTaskerBundleBusy) showBundleTextImportDialog = false },
+            onCancel = viewModel::cancelTransfers,
             onConfirm = {
                 showBundleTextImportDialog = false
                 viewModel.previewPastedImport(bundleTextImportDraft, BuildConfig.VERSION_NAME)

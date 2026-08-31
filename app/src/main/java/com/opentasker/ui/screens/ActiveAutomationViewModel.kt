@@ -468,6 +468,7 @@ class ActiveAutomationViewModel(
     fun cancelTransfers() {
         automationTransfer.cancel()
         bundleTransfer.cancel()
+        preflightTransfer.cancel()
     }
 
     private val _semanticDiffReview = MutableStateFlow<SemanticDiffReviewState?>(null)
@@ -510,8 +511,8 @@ class ActiveAutomationViewModel(
     private val _runActionBusy = MutableStateFlow(false)
     val runActionBusy: StateFlow<Boolean> = _runActionBusy.asStateFlow()
 
-    private val _preflightBusy = MutableStateFlow(false)
-    val preflightBusy: StateFlow<Boolean> = _preflightBusy.asStateFlow()
+    private val preflightTransfer = ImportExportCoordinator(viewModelScope)
+    val preflightBusy: StateFlow<Boolean> = preflightTransfer.busy
 
     init {
         refreshRunLogPage()
@@ -1908,15 +1909,14 @@ class ActiveAutomationViewModel(
     }
 
     fun clearPreflightReview() {
-        if (!_preflightBusy.value) _preflightReview.value = null
+        if (!preflightBusy.value) _preflightReview.value = null
     }
 
     private fun startPreflight(target: PreflightTarget, inputs: PreflightInputs) {
-        viewModelScope.launch {
-            if (_preflightBusy.value) return@launch
-            _preflightBusy.value = true
+        preflightTransfer.launch { reportStage ->
             runCatching {
                 withContext(Dispatchers.Default) {
+                    reportStage(TransferStage.Plan)
                     val availableTasks = tasks.value.toList()
                     val report = when (target) {
                         is PreflightTarget.TaskTarget -> PreflightRunner.preflightTask(
@@ -1934,7 +1934,6 @@ class ActiveAutomationViewModel(
                 }
             }.onSuccess { _preflightReview.value = it }
                 .onFailure { events.send(errorMessage(it, R.string.ui_error_preflight)) }
-            _preflightBusy.value = false
         }
     }
 

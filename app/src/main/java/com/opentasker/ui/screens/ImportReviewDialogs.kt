@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -56,6 +57,7 @@ internal fun OpenTaskerBundleTextImportDialog(
     busy: Boolean,
     onTextChanged: (String) -> Unit,
     onDismiss: () -> Unit,
+    onCancel: () -> Unit = {},
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
@@ -91,9 +93,11 @@ internal fun OpenTaskerBundleTextImportDialog(
                 )
             }
         },
+        // Stays enabled while busy. Disabling it left the only way out of a long import as force
+        // stopping the app, because nothing held the job to cancel.
         dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            TextButton(onClick = if (busy) onCancel else onDismiss) {
+                Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
             }
         },
     )
@@ -105,6 +109,8 @@ internal fun OpenTaskerBundleReviewDialog(
     busy: Boolean,
     onDismiss: () -> Unit,
     onVariableConflictResolution: (String, VariableConflictResolution) -> Unit = { _, _ -> },
+    progress: TransferProgress? = null,
+    onCancel: () -> Unit = {},
     onConfirm: () -> Unit,
 ) {
     val bundle = state.bundle
@@ -123,6 +129,7 @@ internal fun OpenTaskerBundleReviewDialog(
                     .fillMaxWidth()
                     .heightIn(max = 460.dp),
             ) {
+                if (busy) item { TransferProgressRow(progress) }
                 item {
                     Text(
                         stringResource(R.string.import_disabled_notice),
@@ -283,9 +290,11 @@ internal fun OpenTaskerBundleReviewDialog(
                 )
             }
         },
+        // Stays enabled while busy. Disabling it left the only way out of a long import as force
+        // stopping the app, because nothing held the job to cancel.
         dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            TextButton(onClick = if (busy) onCancel else onDismiss) {
+                Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
             }
         },
     )
@@ -360,6 +369,8 @@ internal fun TaskerImportReviewDialog(
     state: TaskerImportReviewState,
     busy: Boolean,
     onDismiss: () -> Unit,
+    progress: TransferProgress? = null,
+    onCancel: () -> Unit = {},
     onConfirm: () -> Unit,
 ) {
     val preview = state.preview
@@ -374,6 +385,7 @@ internal fun TaskerImportReviewDialog(
                     .fillMaxWidth()
                     .heightIn(max = 460.dp),
             ) {
+                if (busy) item { TransferProgressRow(progress) }
                 item {
                     Text(
                         stringResource(R.string.import_disabled_notice),
@@ -456,9 +468,11 @@ internal fun TaskerImportReviewDialog(
                 Text(if (busy) stringResource(R.string.status_importing) else stringResource(R.string.import_for_review))
             }
         },
+        // Stays enabled while busy. Disabling it left the only way out of a long import as force
+        // stopping the app, because nothing held the job to cancel.
         dismissButton = {
-            TextButton(enabled = !busy, onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+            TextButton(onClick = if (busy) onCancel else onDismiss) {
+                Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
             }
         },
     )
@@ -513,4 +527,36 @@ private fun TaskerImportListSection(
         },
         color = color,
     )
+}
+
+/**
+ * What a running transfer is doing. A relabelled button could not distinguish reading a 16 MiB
+ * backup from writing it, so a large import looked identical to a hang.
+ */
+@Composable
+internal fun TransferProgressRow(progress: TransferProgress?) {
+    if (progress == null) return
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs),
+    ) {
+        Text(
+            stringResource(progress.stage.labelRes()),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val fraction = progress.fraction
+        if (fraction == null) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+private fun TransferStage.labelRes(): Int = when (this) {
+    TransferStage.Preflight -> R.string.transfer_stage_preflight
+    TransferStage.Decode -> R.string.transfer_stage_decode
+    TransferStage.Plan -> R.string.transfer_stage_plan
+    TransferStage.Write -> R.string.transfer_stage_write
 }

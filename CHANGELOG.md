@@ -11,6 +11,9 @@
 
 ### Added
 
+- A running import, export, or preview can be stopped. The review dialog's
+  button becomes Stop while work is in progress and says which step it is on,
+  instead of going grey and refusing to close.
 - Installing a starter template that needs a permission now opens Setup showing
   just the grants that template is waiting on, instead of leaving the new
   automation to fail on its first run with nothing explaining why.

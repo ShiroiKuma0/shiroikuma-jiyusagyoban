@@ -71,6 +71,11 @@
     <!-- Common actions -->
     <string name="action_create">Create</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_stop">Stop</string>
+    <string name="transfer_stage_preflight">Checking the file</string>
+    <string name="transfer_stage_decode">Reading it</string>
+    <string name="transfer_stage_plan">Working out what changes</string>
+    <string name="transfer_stage_write">Saving</string>
     <string name="action_save">Save</string>
     <string name="action_delete">Delete</string>
     <string name="action_dismiss">Dismiss</string>
