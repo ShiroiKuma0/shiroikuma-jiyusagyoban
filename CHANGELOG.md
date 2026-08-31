@@ -8,6 +8,33 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-08-30.06-19.g0ce851e3+001 — 2026-08-31
+
+Rebased onto upstream **0.2.93**, which took three releases and a rewritten history.
+
+### Upstream
+
+- **v0.2.91** rebuilt every screen on a navy-and-cyan design system and gave the app a new launcher
+  identity. Both are declined here: this fork's screens have diverged far past upstream's — its
+  scene library alone is +1525 lines against upstream's +98 — and the icon stays black and yellow.
+  What was taken is the Termux fix underneath the redesign, which mattered: Termux scripts could
+  never run, because Termux reports success as `RESULT_OK` (-1) and OpenTasker treated anything
+  non-zero as failure, so the hash check was discarded before the hash was ever compared.
+- **v0.2.92** is another icon regeneration, also declined.
+- **v0.2.93** removes upstream's development signing key from the repository because it had become
+  public, and **rewrites the entire history to purge it**. That is why this sync is a resync: our
+  master could not fast-forward, and every upstream commit changed sha.
+
+### This fork
+
+- `app/dev_keystore.jks` is gone from the tree, and the `.gitignore` exception that kept it is gone
+  with it. Nothing of ours was ever signed with it — our release signing has always come from a
+  gitignored `keystore.properties` pointing outside the tree — so the identity of our builds is
+  unchanged and this installs as an ordinary update. Upstream's "uninstall the old version first"
+  warning applies to upstream's builds, not to these.
+- The 132 fork commits behind this release are preserved on `backup/custom-0.2.90-pre-resync`.
+  A per-commit rebase had no shared ancestry left to work with, so the delta was flattened.
+
 ## 0.2.90+2026-08-25.04-06.g71800ef2+024 — 2026-08-29
 
 Built on upstream OpenTasker `0.2.90` (`71800ef2`). The band gets a page of its own to be driven
