@@ -1,0 +1,1471 @@
+{
+  "schemaVersion": 5,
+  "appVersion": "0.2.79.2026-08-02.g915979d9+017",
+  "exportedAtEpochMs": 1785500000000,
+  "projects": [
+    {
+      "name": "接続",
+      "note": "Data-speed testing across both SIMs and WiFi."
+    }
+  ],
+  "tasks": [
+    {
+      "name": "接続の設定",
+      "projectName": "接続",
+      "note": "SETTINGS for the whole 接続 project. Everything tunable lives here and nowhere else — edit a value, run this task once, and every measurement task picks it up.\n\nSIM identity is addressed by SLOT (0 = SIM1, 1 = SIM2), never by subscription id: this phone already carries five subIds for two physical SIMs, left over from earlier insertions, so a hardcoded id breaks the next time a SIM is reseated.\n\nVariables are %Setsuzoku_* — leading uppercase, so they are persisted globals the scenes can read.",
+      "actions": [
+        {
+          "type": "var.set",
+          "label": "SIM1 (slot 0) display name",
+          "args": {
+            "name": "Setsuzoku_Sim0Name",
+            "value": "T-Mobile"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM1 colour — dark red, used in dialogs, scenes and the report",
+          "args": {
+            "name": "Setsuzoku_Sim0Color",
+            "value": "#880000"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM2 (slot 1) display name — subscript two, as 白い熊 asked",
+          "args": {
+            "name": "Setsuzoku_Sim1Name",
+            "value": "O₂"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM2 colour — blue",
+          "args": {
+            "name": "Setsuzoku_Sim1Color",
+            "value": "#0000FF"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "WiFi leg colour, for the triple test",
+          "args": {
+            "name": "Setsuzoku_WifiColor",
+            "value": "#00AA55"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Seconds per leg. The CLOCK is the limiter, as in Ookla — not a byte count",
+          "args": {
+            "name": "Setsuzoku_Secs",
+            "value": "10"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Parallel streams. One TCP stream is capped by window/RTT and under-reports a fast link",
+          "args": {
+            "name": "Setsuzoku_Streams",
+            "value": "8"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Milliseconds of TCP slow-start excluded from the headline average",
+          "args": {
+            "name": "Setsuzoku_RampMs",
+            "value": "2000"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Modem settle after a SIM switch, before measuring — or the first samples time the handover",
+          "args": {
+            "name": "Setsuzoku_SettleMs",
+            "value": "4000"
+          }
+        },
+        {
+          "type": "flash",
+          "label": "Confirm",
+          "args": {
+            "text": "接続の設定 ✓  %Setsuzoku_Sim0Name / %Setsuzoku_Sim1Name — %Setsuzoku_Secs s × %Setsuzoku_Streams streams"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 一枚測定",
+      "projectName": "接続",
+      "note": "CORE measurement for ONE SIM. Called with param slot (0 or 1); not meant to be run directly — the wrappers below set the parameter.\n\nAssumes WiFi is already off (the caller owns that): per-network binding is refused by EMUI with EPERM, so cellular can only be measured by being the default route.\n\nResults land in %Setsuzoku_S<slot>* so both SIMs' figures survive side by side for the report.",
+      "actions": [
+        {
+          "type": "sim.list",
+          "label": "Record the pre-test data slot so Cancel can restore it",
+          "args": {
+            "prefix": "Setsuzoku_Pre"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Publish as a GLOBAL — scenes cannot see task-local variables",
+          "args": {
+            "name": "Setsuzoku_CurSlot",
+            "value": "{{ param.slot }}"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Publish as a GLOBAL — scenes cannot see task-local variables",
+          "args": {
+            "name": "Setsuzoku_CurName",
+            "value": "{{ param.name }}"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Publish as a GLOBAL — scenes cannot see task-local variables",
+          "args": {
+            "name": "Setsuzoku_CurColor",
+            "value": "{{ param.color }}"
+          }
+        },
+        {
+          "type": "flash",
+          "label": "Say which SIM is being tested — 白い熊 must always see this",
+          "args": {
+            "text": "%Setsuzoku_CurName を測定中…"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Point mobile data at this slot (Shizuku → ISub.setDefaultDataSubId)",
+          "args": {
+            "slot": "%Setsuzoku_CurSlot",
+            "settle_ms": "%Setsuzoku_SettleMs",
+            "store_previous": "Setsuzoku_PrevSlot"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Live overlay — sticky (a stray touch must not kill a running test)",
+          "args": {
+            "scene": "接続 測定中",
+            "dismissOnOutside": "false",
+            "keepScreenOn": "true"
+          }
+        },
+        {
+          "type": "net.speedtest",
+          "label": "Measure this SIM: nearest Ookla server, both directions",
+          "args": {
+            "transport": "cellular",
+            "direction": "both",
+            "seconds": "%Setsuzoku_Secs",
+            "streams": "%Setsuzoku_Streams",
+            "ramp_ms": "%Setsuzoku_RampMs",
+            "prefix": "SPD_"
+          }
+        },
+        {
+          "type": "scene.hide",
+          "label": "Close the live overlay",
+          "args": {
+            "scene": "接続 測定中"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Keep this SIM's download figure",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Down",
+            "value": "%SPD_DownAvg"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…upload",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Up",
+            "value": "%SPD_UpAvg"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…latency (time to first byte)",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Ms",
+            "value": "%SPD_DownMs"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…peak download",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Peak",
+            "value": "%SPD_DownPeak"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…which server served it. Non-empty %SPD_DownFallback means the nearest server was NOT used and the figure is not comparable",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Host",
+            "value": "%SPD_DownHost"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…and the name, so the report can label it",
+          "args": {
+            "name": "Setsuzoku_S{{ param.slot }}Name",
+            "value": "%Setsuzoku_CurName"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 両SIM",
+      "projectName": "接続",
+      "note": "DUAL test: both SIMs, one after the other. This is the main task — make the home-screen shortcut point here.\n\nSequence: remember WiFi → WiFi off → SIM1 → SIM2 → data back to SIM1 → WiFi back as found → report.\n\nWiFi is switched off because EMUI refuses to let this app bind a socket to a non-default network (EPERM), so a SIM can only be measured while it IS the default route. Its previous state is captured first and restored at the end.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "Remember whether WiFi was on, so it can be put back exactly as found",
+          "args": {
+            "wifi": "Setsuzoku_WifiWas"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "WiFi OFF — cellular can only be measured as the DEFAULT route; EMUI refuses per-network socket binding (EPERM)",
+          "args": {
+            "state": "off"
+          }
+        },
+        {
+          "type": "flow.wait",
+          "label": "Let the cellular route actually take over before measuring",
+          "args": {
+            "millis": "4000"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "SIM1",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "0",
+            "param:name": "%Setsuzoku_Sim0Name",
+            "param:color": "%Setsuzoku_Sim0Color"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "SIM2",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "1",
+            "param:name": "%Setsuzoku_Sim1Name",
+            "param:color": "%Setsuzoku_Sim1Color"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Put mobile data back on SIM1 — 白い熊's normal SIM. Runs even after a failed leg",
+          "args": {
+            "slot": "0",
+            "settle_ms": "1000"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF beforehand (fail-safe: unknown → restore)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Restore WiFi",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "Mark which legs the report should show",
+          "args": {
+            "name": "Setsuzoku_Legs",
+            "value": "0,1"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Final report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- SIM1のみ",
+      "projectName": "接続",
+      "note": "Single-SIM test for SIM1 (slot 0). Same flow as the dual test but one leg — WiFi is still saved, dropped and restored, because the SIM must be the default route to be measurable.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "Remember whether WiFi was on, so it can be put back exactly as found",
+          "args": {
+            "wifi": "Setsuzoku_WifiWas"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "WiFi OFF — cellular can only be measured as the DEFAULT route; EMUI refuses per-network socket binding (EPERM)",
+          "args": {
+            "state": "off"
+          }
+        },
+        {
+          "type": "flow.wait",
+          "label": "Let the cellular route actually take over before measuring",
+          "args": {
+            "millis": "4000"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "Measure SIM1",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "0",
+            "param:name": "%Setsuzoku_Sim0Name",
+            "param:color": "%Setsuzoku_Sim0Color"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Put mobile data back on SIM1 — 白い熊's normal SIM. Runs even after a failed leg",
+          "args": {
+            "slot": "0",
+            "settle_ms": "1000"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF beforehand (fail-safe: unknown → restore)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Restore WiFi",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "Report only this leg",
+          "args": {
+            "name": "Setsuzoku_Legs",
+            "value": "0"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Final report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- SIM2のみ",
+      "projectName": "接続",
+      "note": "Single-SIM test for SIM2 (slot 1). Same flow as the dual test but one leg — WiFi is still saved, dropped and restored, because the SIM must be the default route to be measurable.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "Remember whether WiFi was on, so it can be put back exactly as found",
+          "args": {
+            "wifi": "Setsuzoku_WifiWas"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "WiFi OFF — cellular can only be measured as the DEFAULT route; EMUI refuses per-network socket binding (EPERM)",
+          "args": {
+            "state": "off"
+          }
+        },
+        {
+          "type": "flow.wait",
+          "label": "Let the cellular route actually take over before measuring",
+          "args": {
+            "millis": "4000"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "Measure SIM2",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "1",
+            "param:name": "%Setsuzoku_Sim1Name",
+            "param:color": "%Setsuzoku_Sim1Color"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Put mobile data back on SIM1 — 白い熊's normal SIM. Runs even after a failed leg",
+          "args": {
+            "slot": "0",
+            "settle_ms": "1000"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF beforehand (fail-safe: unknown → restore)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Restore WiFi",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "Report only this leg",
+          "args": {
+            "name": "Setsuzoku_Legs",
+            "value": "1"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Final report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 現在のSIM",
+      "projectName": "接続",
+      "note": "Whichever SIM currently carries data — no switching at all, so it is the quickest check and the one that cannot disturb your SIM setup. The dialog and the report still name the SIM being tested, read live from the system rather than assumed.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "Remember whether WiFi was on, so it can be put back exactly as found",
+          "args": {
+            "wifi": "Setsuzoku_WifiWas"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "WiFi OFF — cellular can only be measured as the DEFAULT route; EMUI refuses per-network socket binding (EPERM)",
+          "args": {
+            "state": "off"
+          }
+        },
+        {
+          "type": "flow.wait",
+          "label": "Let the cellular route actually take over before measuring",
+          "args": {
+            "millis": "4000"
+          }
+        },
+        {
+          "type": "sim.list",
+          "label": "Read which slot currently carries data, and both carrier names",
+          "args": {
+            "prefix": "SIM_"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Use the live slot as the leg index",
+          "args": {
+            "name": "cur",
+            "value": "%SIM_DataSlot"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Slot 0 → SIM1's name and colour",
+          "args": {
+            "condition": "%cur == 0"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM1 name",
+          "args": {
+            "name": "curname",
+            "value": "%Setsuzoku_Sim0Name"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM1 colour",
+          "args": {
+            "name": "curcolor",
+            "value": "%Setsuzoku_Sim0Color"
+          }
+        },
+        {
+          "type": "flow.else",
+          "label": "else slot 1",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "SIM2 name",
+          "args": {
+            "name": "curname",
+            "value": "%Setsuzoku_Sim1Name"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "SIM2 colour",
+          "args": {
+            "name": "curcolor",
+            "value": "%Setsuzoku_Sim1Color"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "task.run",
+          "label": "Measure the SIM already carrying data — no switching",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "%cur",
+            "param:name": "%curname",
+            "param:color": "%curcolor"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF beforehand (fail-safe: unknown → restore)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Restore WiFi",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "Report just this leg",
+          "args": {
+            "name": "Setsuzoku_Legs",
+            "value": "%cur"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Final report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 三重",
+      "projectName": "接続",
+      "note": "TRIPLE test: WiFi + both SIMs.\n\nThe WiFi leg runs FIRST, deliberately — it is the only moment WiFi is still connected. Once it is measured the radio goes off for the two SIM legs, then everything is restored. Doing it in any other order would mean toggling WiFi twice.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "Remember WiFi state",
+          "args": {
+            "wifi": "Setsuzoku_WifiWas"
+          }
+        },
+        {
+          "type": "flash",
+          "label": "Say what is being measured",
+          "args": {
+            "text": "WiFi を測定中…"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Live overlay — sticky (a stray touch must not kill a running test)",
+          "args": {
+            "scene": "接続 測定中",
+            "dismissOnOutside": "false",
+            "keepScreenOn": "true"
+          }
+        },
+        {
+          "type": "net.speedtest",
+          "label": "WiFi leg — measured over the CURRENT default route, no binding needed",
+          "args": {
+            "transport": "wifi",
+            "direction": "both",
+            "seconds": "%Setsuzoku_Secs",
+            "streams": "%Setsuzoku_Streams",
+            "ramp_ms": "%Setsuzoku_RampMs",
+            "prefix": "SPD_"
+          }
+        },
+        {
+          "type": "scene.hide",
+          "label": "Close overlay",
+          "args": {
+            "scene": "接続 測定中"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "Keep the WiFi figures under leg 'w'",
+          "args": {
+            "name": "Setsuzoku_SwDown",
+            "value": "%SPD_DownAvg"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…upload",
+          "args": {
+            "name": "Setsuzoku_SwUp",
+            "value": "%SPD_UpAvg"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…latency",
+          "args": {
+            "name": "Setsuzoku_SwMs",
+            "value": "%SPD_DownMs"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…peak",
+          "args": {
+            "name": "Setsuzoku_SwPeak",
+            "value": "%SPD_DownPeak"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…server",
+          "args": {
+            "name": "Setsuzoku_SwHost",
+            "value": "%SPD_DownHost"
+          }
+        },
+        {
+          "type": "var.set",
+          "label": "…label",
+          "args": {
+            "name": "Setsuzoku_SwName",
+            "value": "WiFi"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Now drop WiFi so each SIM can be the default route",
+          "args": {
+            "state": "off"
+          }
+        },
+        {
+          "type": "flow.wait",
+          "label": "Let cellular take over",
+          "args": {
+            "millis": "4000"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "SIM1",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "0",
+            "param:name": "%Setsuzoku_Sim0Name",
+            "param:color": "%Setsuzoku_Sim0Color"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "SIM2",
+          "args": {
+            "task": "接続 -- 一枚測定",
+            "param:slot": "1",
+            "param:name": "%Setsuzoku_Sim1Name",
+            "param:color": "%Setsuzoku_Sim1Color"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Data back to SIM1",
+          "args": {
+            "slot": "0",
+            "settle_ms": "1000"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF beforehand (fail-safe: unknown → restore)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "Restore WiFi",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "var.set",
+          "label": "Report all three legs",
+          "args": {
+            "name": "Setsuzoku_Legs",
+            "value": "w,0,1"
+          }
+        },
+        {
+          "type": "scene.show",
+          "label": "Final report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 自動判定",
+      "projectName": "接続",
+      "note": "BLIND wrapper — the one to reach for when you do not want to think about it.\n\nWiFi on  → triple test (WiFi + both SIMs).\nWiFi off → dual test (both SIMs only), because there is no WiFi to measure.\n\nIt decides from the live radio state, not from what was true last time.",
+      "actions": [
+        {
+          "type": "state.get",
+          "label": "What is WiFi doing right now?",
+          "args": {
+            "wifi": "wifinow"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "WiFi is on → measure it too",
+          "args": {
+            "condition": "%wifinow == true"
+          }
+        },
+        {
+          "type": "task.run",
+          "label": "Triple test",
+          "args": {
+            "task": "接続 -- 三重"
+          }
+        },
+        {
+          "type": "flow.else",
+          "label": "else",
+          "args": {}
+        },
+        {
+          "type": "task.run",
+          "label": "Dual test — nothing to measure on WiFi",
+          "args": {
+            "task": "接続 -- 両SIM"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "name": "接続 報告閉",
+      "projectName": "接続",
+      "note": "Closes the report overlay. Bound to the report's 閉じる button.",
+      "actions": [
+        {
+          "type": "scene.hide",
+          "label": "Close the report",
+          "args": {
+            "scene": "接続 報告"
+          }
+        }
+      ]
+    },
+    {
+      "name": "接続 -- 中止",
+      "projectName": "接続",
+      "note": "CANCEL. Stops the transfer at once, then puts the phone back exactly as it was: WiFi to its pre-test state and mobile data to the SIM that was carrying it before the test started (%Setsuzoku_PreDataSlot, captured at the top of every measurement).",
+      "actions": [
+        {
+          "type": "net.speedtest.cancel",
+          "label": "Abort the running transfer immediately",
+          "args": {}
+        },
+        {
+          "type": "scene.hide",
+          "label": "Close the live overlay",
+          "args": {
+            "scene": "接続 測定中"
+          }
+        },
+        {
+          "type": "sim.data.set",
+          "label": "Restore the data SIM that was active before the test",
+          "args": {
+            "slot": "%Setsuzoku_PreDataSlot",
+            "settle_ms": "500"
+          }
+        },
+        {
+          "type": "flow.if",
+          "label": "Restore WiFi unless it was positively OFF (fail-safe)",
+          "args": {
+            "condition": "%Setsuzoku_WifiWas != false"
+          }
+        },
+        {
+          "type": "wifi.toggle",
+          "label": "WiFi back on",
+          "args": {
+            "state": "on"
+          }
+        },
+        {
+          "type": "flow.endif",
+          "label": "end",
+          "args": {}
+        },
+        {
+          "type": "flash",
+          "label": "Confirm to 白い熊",
+          "args": {
+            "text": "接続 — 中止しました（WiFi と SIM を復元）"
+          }
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "name": "接続 測定中",
+      "projectName": "接続",
+      "note": "LIVE overlay, near-fullscreen (380x760 dp). Black panel, yellow border and headings.\n\nEvery field reads a GLOBAL (%Setsuzoku_Cur*, %SPD_*) — scenes render outside the running task's local scope, so task-local names render blank, which is what made the first version look empty.\n\n中止 cancels the transfer immediately AND restores WiFi + the pre-test data SIM.",
+      "widthDp": 380,
+      "heightDp": 760,
+      "elements": [
+        {
+          "type": "RECTANGLE",
+          "xDp": 18,
+          "yDp": 30,
+          "widthDp": 118,
+          "heightDp": 156,
+          "config": {
+            "bgColor": "%Setsuzoku_CurColor",
+            "cornerRadius": "16"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 44,
+          "yDp": 64,
+          "widthDp": 66,
+          "heightDp": 58,
+          "config": {
+            "bgColor": "#FFFF00",
+            "cornerRadius": "8"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 44,
+          "yDp": 86,
+          "widthDp": 66,
+          "heightDp": 3,
+          "config": {
+            "bgColor": "%Setsuzoku_CurColor",
+            "cornerRadius": "1"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 73,
+          "yDp": 64,
+          "widthDp": 3,
+          "heightDp": 58,
+          "config": {
+            "bgColor": "%Setsuzoku_CurColor",
+            "cornerRadius": "1"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 146,
+          "yDp": 46,
+          "widthDp": 220,
+          "heightDp": 56,
+          "config": {
+            "text": "%Setsuzoku_CurName",
+            "textSize": "42",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 146,
+          "yDp": 110,
+          "widthDp": 220,
+          "heightDp": 36,
+          "config": {
+            "text": "SIM%Setsuzoku_CurSlot",
+            "textSize": "26",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 146,
+          "yDp": 150,
+          "widthDp": 220,
+          "heightDp": 26,
+          "config": {
+            "text": "%SPD_Phase",
+            "textSize": "18",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 190,
+          "widthDp": 360,
+          "heightDp": 106,
+          "config": {
+            "text": "%SPD_CurMB",
+            "textSize": "88",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 300,
+          "widthDp": 360,
+          "heightDp": 36,
+          "config": {
+            "text": "MB/s",
+            "textSize": "28",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 338,
+          "widthDp": 360,
+          "heightDp": 26,
+          "config": {
+            "text": "%SPD_Cur Mb/s",
+            "textSize": "18",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "PROGRESS",
+          "xDp": 30,
+          "yDp": 376,
+          "widthDp": 320,
+          "heightDp": 26,
+          "config": {
+            "value": "%SPD_Pct",
+            "max": "100",
+            "fillColor": "#FFFF00",
+            "trackColor": "#333333"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 408,
+          "widthDp": 360,
+          "heightDp": 26,
+          "config": {
+            "text": "%SPD_Pct %",
+            "textSize": "18",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 20,
+          "yDp": 446,
+          "widthDp": 160,
+          "heightDp": 24,
+          "config": {
+            "text": "平均  MB/s",
+            "textSize": "17",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 20,
+          "yDp": 472,
+          "widthDp": 160,
+          "heightDp": 42,
+          "config": {
+            "text": "%SPD_AvgMB",
+            "textSize": "32",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 20,
+          "yDp": 516,
+          "widthDp": 160,
+          "heightDp": 22,
+          "config": {
+            "text": "%SPD_Avg Mb/s",
+            "textSize": "14",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 200,
+          "yDp": 446,
+          "widthDp": 160,
+          "heightDp": 24,
+          "config": {
+            "text": "最高  MB/s",
+            "textSize": "17",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 200,
+          "yDp": 472,
+          "widthDp": 160,
+          "heightDp": 42,
+          "config": {
+            "text": "%SPD_PeakMB",
+            "textSize": "32",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 200,
+          "yDp": 516,
+          "widthDp": 160,
+          "heightDp": 22,
+          "config": {
+            "text": "%SPD_Peak Mb/s",
+            "textSize": "14",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 550,
+          "widthDp": 360,
+          "heightDp": 24,
+          "config": {
+            "text": "%SPD_Mb MB  ·  %SPD_Secs s  ·  %SPD_DownStreams 本",
+            "textSize": "15",
+            "textColor": "#999999",
+            "align": "center"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 578,
+          "widthDp": 360,
+          "heightDp": 22,
+          "config": {
+            "text": "%SPD_DownHost",
+            "textSize": "13",
+            "textColor": "#666666",
+            "align": "center"
+          }
+        },
+        {
+          "type": "BUTTON",
+          "xDp": 90,
+          "yDp": 646,
+          "widthDp": 200,
+          "heightDp": 76,
+          "config": {
+            "label": "中止",
+            "textSize": "30",
+            "bold": "true",
+            "textColor": "#000000",
+            "cornerRadius": "14",
+            "bgColor": "#FFFF00"
+          },
+          "tapTaskName": "接続 -- 中止"
+        }
+      ],
+      "bgColor": "#000000",
+      "borderColor": "#FFFF00",
+      "borderWidth": 3
+    },
+    {
+      "name": "接続 報告",
+      "projectName": "接続",
+      "note": "FINAL REPORT, near-fullscreen. One block per leg in that SIM's colour.\n\n'初byte' is time to FIRST BYTE (DNS+TCP+TLS+HTTP) — NOT an ICMP ping. Ookla's 27 ms ping and this 325 ms are different measurements; labelling it 遅延 invited a false comparison.",
+      "widthDp": 380,
+      "heightDp": 760,
+      "elements": [
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 20,
+          "widthDp": 360,
+          "heightDp": 50,
+          "config": {
+            "text": "接続 — 測定結果",
+            "textSize": "36",
+            "bold": "true",
+            "textColor": "#FFFF00",
+            "align": "center"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 10,
+          "yDp": 84,
+          "widthDp": 360,
+          "heightDp": 150,
+          "config": {
+            "cornerRadius": "14",
+            "bgColor": "#111111",
+            "borderColor": "%Setsuzoku_WifiColor",
+            "borderWidth": "3"
+          }
+        },
+        {
+          "type": "OVAL",
+          "xDp": 24,
+          "yDp": 106,
+          "widthDp": 62,
+          "heightDp": 62,
+          "config": {
+            "bgColor": "%Setsuzoku_WifiColor",
+            "borderColor": "#FFFF00",
+            "borderWidth": "2"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 100,
+          "widthDp": 260,
+          "heightDp": 40,
+          "config": {
+            "text": "%Setsuzoku_SwName",
+            "textSize": "30",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 142,
+          "widthDp": 260,
+          "heightDp": 34,
+          "config": {
+            "text": "↓ %Setsuzoku_SwDownMB MB/s",
+            "textSize": "26",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 178,
+          "widthDp": 260,
+          "heightDp": 30,
+          "config": {
+            "text": "↑ %Setsuzoku_SwUpMB MB/s",
+            "textSize": "22",
+            "textColor": "#FFFF00",
+            "bold": "true"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 24,
+          "yDp": 208,
+          "widthDp": 340,
+          "heightDp": 22,
+          "config": {
+            "text": "最高 %Setsuzoku_SwPeak · 初byte %Setsuzoku_SwMs ms",
+            "textSize": "14",
+            "textColor": "#888888"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 10,
+          "yDp": 246,
+          "widthDp": 360,
+          "heightDp": 150,
+          "config": {
+            "cornerRadius": "14",
+            "bgColor": "#111111",
+            "borderColor": "%Setsuzoku_Sim0Color",
+            "borderWidth": "3"
+          }
+        },
+        {
+          "type": "OVAL",
+          "xDp": 24,
+          "yDp": 268,
+          "widthDp": 62,
+          "heightDp": 62,
+          "config": {
+            "bgColor": "%Setsuzoku_Sim0Color",
+            "borderColor": "#FFFF00",
+            "borderWidth": "2"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 262,
+          "widthDp": 260,
+          "heightDp": 40,
+          "config": {
+            "text": "%Setsuzoku_S0Name",
+            "textSize": "30",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 304,
+          "widthDp": 260,
+          "heightDp": 34,
+          "config": {
+            "text": "↓ %Setsuzoku_S0DownMB MB/s",
+            "textSize": "26",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 340,
+          "widthDp": 260,
+          "heightDp": 30,
+          "config": {
+            "text": "↑ %Setsuzoku_S0UpMB MB/s",
+            "textSize": "22",
+            "textColor": "#FFFF00",
+            "bold": "true"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 24,
+          "yDp": 370,
+          "widthDp": 340,
+          "heightDp": 22,
+          "config": {
+            "text": "最高 %Setsuzoku_S0Peak · 初byte %Setsuzoku_S0Ms ms",
+            "textSize": "14",
+            "textColor": "#888888"
+          }
+        },
+        {
+          "type": "RECTANGLE",
+          "xDp": 10,
+          "yDp": 408,
+          "widthDp": 360,
+          "heightDp": 150,
+          "config": {
+            "cornerRadius": "14",
+            "bgColor": "#111111",
+            "borderColor": "%Setsuzoku_Sim1Color",
+            "borderWidth": "3"
+          }
+        },
+        {
+          "type": "OVAL",
+          "xDp": 24,
+          "yDp": 430,
+          "widthDp": 62,
+          "heightDp": 62,
+          "config": {
+            "bgColor": "%Setsuzoku_Sim1Color",
+            "borderColor": "#FFFF00",
+            "borderWidth": "2"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 424,
+          "widthDp": 260,
+          "heightDp": 40,
+          "config": {
+            "text": "%Setsuzoku_S1Name",
+            "textSize": "30",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 466,
+          "widthDp": 260,
+          "heightDp": 34,
+          "config": {
+            "text": "↓ %Setsuzoku_S1DownMB MB/s",
+            "textSize": "26",
+            "bold": "true",
+            "textColor": "#FFFF00"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 100,
+          "yDp": 502,
+          "widthDp": 260,
+          "heightDp": 30,
+          "config": {
+            "text": "↑ %Setsuzoku_S1UpMB MB/s",
+            "textSize": "22",
+            "textColor": "#FFFF00",
+            "bold": "true"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 24,
+          "yDp": 532,
+          "widthDp": 340,
+          "heightDp": 22,
+          "config": {
+            "text": "最高 %Setsuzoku_S1Peak · 初byte %Setsuzoku_S1Ms ms",
+            "textSize": "14",
+            "textColor": "#888888"
+          }
+        },
+        {
+          "type": "TEXT",
+          "xDp": 10,
+          "yDp": 574,
+          "widthDp": 360,
+          "heightDp": 22,
+          "config": {
+            "text": "サーバー %Setsuzoku_S0Host",
+            "textSize": "14",
+            "textColor": "#777777",
+            "align": "center"
+          }
+        },
+        {
+          "type": "BUTTON",
+          "xDp": 90,
+          "yDp": 646,
+          "widthDp": 200,
+          "heightDp": 76,
+          "config": {
+            "label": "閉じる",
+            "textSize": "30",
+            "bold": "true",
+            "textColor": "#000000",
+            "cornerRadius": "14",
+            "bgColor": "#FFFF00"
+          },
+          "tapTaskName": "接続 報告閉"
+        }
+      ],
+      "bgColor": "#000000",
+      "borderColor": "#FFFF00",
+      "borderWidth": 3
+    }
+  ]
+}

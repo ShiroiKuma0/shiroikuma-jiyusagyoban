@@ -135,6 +135,7 @@ object SyntheticTriggerSimulator {
                         pulseSequence = if (result.spec.type == ContextType.EVENT && result.rawMatched) 1L else 0L,
                         event = result.event.takeIf { result.rawMatched },
                         unknown = result.valueUnknown,
+                        vars = if (result.rawMatched) result.event.vars else emptyMap(),
                     )
                 }.toTypedArray(),
                 profile.contexts,

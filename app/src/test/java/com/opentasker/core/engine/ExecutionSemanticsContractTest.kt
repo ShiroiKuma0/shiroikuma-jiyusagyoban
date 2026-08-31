@@ -36,66 +36,9 @@ class ExecutionSemanticsContractTest {
         assertEquals("Production run paths must use executeAndLogTask", emptyList<String>(), directRunnerConstruction)
     }
 
-    /**
-     * Every exit from a run has to commit the globals it set.
-     *
-     * Only the report path did, so a cancelled or crashed run discarded them, and a profile in
-     * RESTART mode cancels the in-flight run on every re-trigger. This is a source gate because
-     * `executeAndLogTask` needs a Room database, which this suite has no JVM harness for; the
-     * commit mechanics themselves are covered by DurableGlobalsTest.
-     */
-    @Test
-    fun everyRunExitCommitsChangedGlobals() {
-        val helperPath = "com/opentasker/core/engine/TaskExecutionHelper.kt"
-        val cancelled = ProductionSources.block(
-            helperPath,
-            "catch (cancellation: CancellationException) {",
-            "throw cancellation",
-        )
-        val failed = ProductionSources.block(
-            helperPath,
-            "catch (error: Exception) {",
-            "throw error",
-        )
-
-        assertTrue(
-            "a cancelled run must still persist the globals it set",
-            cancelled.contains("commitGlobals()"),
-        )
-        assertTrue(
-            "a run that ended in an exception must still persist the globals it set",
-            failed.contains("commitGlobals()"),
-        )
-        // The commit has to survive the cancellation that is already in flight.
-        assertTrue(
-            "the cancelled commit must run inside the NonCancellable block",
-            cancelled.indexOf("withContext(NonCancellable)") < cancelled.indexOf("commitGlobals()"),
-        )
-    }
-
-    @Test
-    fun actionReorderUsesOneTransactionAndSnapshotsThePreviousOrder() {
-        // Scanned across the screens package: the contract is that the reorder path is one
-        // transaction, not that it stays in a particular filename.
-        val screensRoot = sourceRoot.resolve("com/opentasker/ui/screens")
-        val owner = Files.list(screensRoot).use { paths ->
-            paths.filter { it.fileName.toString().endsWith(".kt") }
-                .filter { it.readText().contains("fun moveTaskAction(") }
-                .toList()
-        }
-        assertEquals("Expected exactly one declaration of moveTaskAction", 1, owner.size)
-        val source = owner.single().readText()
-        // Stop at the next member declaration whatever modifiers it carries; keying on a bare
-        // `fun ` let the slice silently swallow the rest of the class.
-        val body = source.substringAfter("fun moveTaskAction(")
-        val method = Regex("""\n    (?:private |internal |public )?(?:suspend )?fun """)
-            .find(body)
-            ?.let { body.substring(0, it.range.first) }
-            ?: body
-
-        assertTrue(method.contains("db.withTransaction"))
-        assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))
-        assertTrue(method.contains("nextJson = StorageJson.encodeToString(updated)"))
-        assertTrue(method.contains("db.taskDao().update(updated.toEntity())"))
-    }
+// RETIRED: upstream's `everyRunExitCommitsChangedGlobals` source gate, and its transactional
+// `moveTaskAction` snapshot contract. Neither describes the fork: globals here are durable at set
+// time through the DB-backed PersistentGlobalScope, so TaskExecutionHelper has no commitGlobals()
+// to call on any exit path, and actions are reordered through the fork's multi-select / clone /
+// cut / paste editor rather than upstream's move-up/down card controls.
 }

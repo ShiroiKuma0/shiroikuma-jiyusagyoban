@@ -99,3 +99,13 @@ object DesignSystem {
         val subtleBorder = 0.42f
     }
 }
+
+/**
+ * True on a narrow panel — in practice the folded Mate XT cover (~336dp wide) vs semi/unfolded
+ * (~683/744dp). Under this width the list layouts switch to their compact variants: small group
+ * indent, tighter side paddings, and action args stacked one-per-line at full width (白い熊
+ * 2026-07-11 — the regular layout wasted the sides and crushed var names to "Ong…").
+ */
+@androidx.compose.runtime.Composable
+fun isNarrowScreen(): Boolean =
+    androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 480

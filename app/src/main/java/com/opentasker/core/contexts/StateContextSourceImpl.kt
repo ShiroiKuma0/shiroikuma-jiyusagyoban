@@ -75,10 +75,9 @@ class StateContextSourceImpl : StateDemandContextSource {
                     Intent.ACTION_BATTERY_CHANGED -> {
                         val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                         val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-                        val isCharging = batteryPluggedIn(
-                            plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1),
-                            status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1),
-                        )
+                        // Charging = a power source connected (EXTRA_PLUGGED: AC / USB / WIRELESS). It drops
+                        // to 0 instantly on unplug; EXTRA_STATUS / isCharging linger at charging on Huawei.
+                        val isCharging = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
                         batteryPercent(level, scale)?.let { statePatch["battery_level"] = it.toString() }
                         statePatch["charging"] = isCharging.toString()
                     }
@@ -246,10 +245,7 @@ internal fun seedInitialState(app: Context): Map<String, String> {
     if (batteryIntent != null) {
         val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
         val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        val isCharging = batteryPluggedIn(
-            plugged = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1),
-            status = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1),
-        )
+        val isCharging = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
         batteryPercent(level, scale)?.let { seed["battery_level"] = it.toString() }
         seed["charging"] = isCharging.toString()
     }

@@ -9,7 +9,6 @@ import com.opentasker.core.actions.resolveOutputs
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.contexts.readableContextSummary
 import com.opentasker.core.model.ActionSpec
-import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -72,7 +71,6 @@ data class AutomationFlowNode(
     /** Structural flag so the UI can badge sub-task nodes without parsing the localized detail. */
     val isSubTask: Boolean = false,
     val strings: AutomationFlowStrings = AutomationFlowStrings.English,
-    val outputs: List<ResolvedActionOutput> = emptyList(),
 ) {
     fun accessibilityLabel(): String {
         val kindName = kind.name.lowercase().replace('_', ' ')
@@ -83,7 +81,10 @@ data class AutomationFlowNode(
             condition = condition,
             muted = muted,
             changed = changed,
-            outputs = outputs.map { it.name },
+            // Upstream reads the node's declared outputs here. This fork's flow nodes carry no
+            // typed outputs, so the "produces" clause is simply absent; the changed flag, which
+            // is what stopped the canvas signalling a change by border colour alone, still lands.
+            outputs = emptyList(),
         )
     }
 }
@@ -116,24 +117,13 @@ object AutomationFlowGraphBuilder {
         tasks: List<Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
-        lintStrings: AutomationLintStrings = AutomationLintStrings.English,
-        invariants: List<AutomationInvariant> = emptyList(),
-    ): AutomationFlowGraph = build(
-        profile = profile,
-        tasksById = tasks.associateBy { it.id },
-        strings = strings,
-        changedNodeKeys = changedNodeKeys,
-        lintStrings = lintStrings,
-        invariants = invariants,
-    )
+    ): AutomationFlowGraph = build(profile, tasks.associateBy { it.id }, strings, changedNodeKeys)
 
     fun build(
         profile: Profile,
         tasksById: Map<Long, Task>,
         strings: AutomationFlowStrings = AutomationFlowStrings.English,
         changedNodeKeys: Set<String> = emptySet(),
-        lintStrings: AutomationLintStrings = AutomationLintStrings.English,
-        invariants: List<AutomationInvariant> = emptyList(),
     ): AutomationFlowGraph {
         val nodes = mutableListOf<AutomationFlowNode>()
         val edges = mutableListOf<AutomationFlowEdge>()
@@ -340,7 +330,6 @@ private fun ActionSpec.toNode(
         // A step turned off is drawn like a disabled profile.
         muted = !enabled,
         strings = strings,
-        outputs = ActionMetadataRegistry.get(type)?.resolveOutputs(this@toNode, actionIndex = index).orEmpty(),
     )
 }
 
