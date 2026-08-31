@@ -104,15 +104,31 @@ class LocalReleaseGateContractTest {
             build.contains("OPEN_TASKER_RELEASE_KEY_PASSWORD, or build the F-Droid profile with"),
         )
         assertTrue(
-            "Staging must verify the artifact is signed for every signed distribution",
-            build.contains("requireSignature.set(!releaseBuildIsUnsigned)"),
+            "Staging must refuse the distribution that has no publishable asset",
+            build.contains("stagingIsSupported.set(!releaseBuildIsUnsigned)"),
         )
         assertTrue(
             "Staging must reject an unsigned APK rather than rename it",
             build.contains("check(apkIsSigned(source))"),
         )
+        // The signature check must be unconditional. Skipping it for the unsigned distribution is
+        // what let an unsigned APK be copied to the published asset name.
+        assertFalse(
+            "The signature check must not be conditional on the distribution",
+            build.contains("if (requireSignature.get())"),
+        )
         assertTrue(
-            "Signature detection must read the APK signing block directly",
+            "A failed signature check must not leave a stale asset behind",
+            build.indexOf("deleteRecursively()") < build.indexOf("check(apkIsSigned(source))"),
+        )
+        // A hand-rolled container scan can be fooled by a crafted archive comment, so the check
+        // defers to apksigner, which actually validates the signature.
+        assertTrue(
+            "Signature detection must run apksigner",
+            build.contains("ProcessBuilder(signer.absolutePath, \"verify\", apk.absolutePath)"),
+        )
+        assertFalse(
+            "The hand-rolled signing-block scan must not come back",
             build.contains("APK Sig Block 42"),
         )
 

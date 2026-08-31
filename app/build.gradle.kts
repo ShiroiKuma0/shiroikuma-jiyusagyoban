@@ -1,6 +1,5 @@
 import java.net.URLEncoder
 import java.io.File
-import java.io.RandomAccessFile
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
@@ -1278,28 +1277,42 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     @get:Input
     abstract val versionName: Property<String>
 
-    /** False only for the F-Droid distribution, which is unsigned because F-Droid signs it. */
+    /**
+     * False for the F-Droid distribution. Staging exists to publish a GitHub release asset, and
+     * F-Droid builds and signs its own APK from source, so there is nothing to stage there. This
+     * refuses the whole task rather than relaxing the signature check, which would otherwise copy
+     * `app-release-unsigned.apk` to the published asset name.
+     */
     @get:Input
-    abstract val requireSignature: Property<Boolean>
+    abstract val stagingIsSupported: Property<Boolean>
+
+    /** apksigner from the pinned build tools; resolved at configuration time for the cache. */
+    @get:Input
+    abstract val apkSignerPath: Property<String>
 
     @TaskAction
     fun stage() {
+        check(stagingIsSupported.get()) {
+            "stageReleaseAsset publishes a GitHub release asset, and the F-Droid distribution is " +
+                "built and signed by F-Droid from source, so it has nothing to stage. Build the " +
+                "standard distribution to produce a publishable asset."
+        }
         val source = sourceApk.get().asFile
         check(source.isFile) { "Release APK is missing: ${source.absolutePath}" }
-        // The staging copy renames whatever it is given to the published asset name, so an
-        // unsigned APK would otherwise arrive on a release page wearing the right filename. The
-        // name check downstream cannot see this: it only reads the name this task chose.
-        if (requireSignature.get()) {
-            check(apkIsSigned(source)) {
-                "Release APK ${source.name} carries no APK signing block and no v1 signature, so it " +
-                    "is unsigned. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
-                    "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
-                    "OPEN_TASKER_RELEASE_KEY_PASSWORD and rebuild before staging anything."
-            }
-        }
+        // Clear first. A failed signature check below must not leave a previously staged asset
+        // sitting in the directory a release is uploaded from.
         val destinationDirectory = stagingDirectory.get().asFile
         check(!destinationDirectory.exists() || destinationDirectory.deleteRecursively()) {
             "Could not clear stale release assets from ${destinationDirectory.absolutePath}"
+        }
+        // The staging copy renames whatever it is given to the published asset name, so an
+        // unsigned APK would otherwise arrive on a release page wearing the right filename. The
+        // name check downstream cannot see this: it only reads the name this task chose.
+        check(apkIsSigned(source)) {
+            "Release APK ${source.name} carries no APK signing block and no v1 signature, so it " +
+                "is unsigned. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
+                "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
+                "OPEN_TASKER_RELEASE_KEY_PASSWORD and rebuild before staging anything."
         }
         check(destinationDirectory.mkdirs()) {
             "Could not create release asset directory ${destinationDirectory.absolutePath}"
@@ -1308,66 +1321,26 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     }
 
     /**
-     * True when the APK carries an APK Signing Block (v2/v3/v3.1) or a v1 JAR signature. Reading
-     * the container directly keeps this independent of where the SDK put apksigner on this host.
+     * Asks apksigner, which is the only thing that actually validates a signature. Reading the
+     * container by hand looked adequate and was not: a crafted archive comment can present a
+     * fabricated end-of-central-directory record, so a hand-rolled scan can be talked into
+     * reporting an unsigned file as signed.
      */
-    private fun apkIsSigned(apk: File): Boolean = hasApkSigningBlock(apk) || hasJarSignature(apk)
-
-    private fun hasApkSigningBlock(apk: File): Boolean {
-        RandomAccessFile(apk, "r").use { file ->
-            val length = file.length()
-            // The end-of-central-directory record sits within the last 22 bytes plus a comment of
-            // at most 65,535 bytes, so this window always contains it.
-            val windowLength = minOf(length, MAX_EOCD_SEARCH_BYTES).toInt()
-            if (windowLength < EOCD_MIN_BYTES) return false
-            val window = ByteArray(windowLength)
-            file.seek(length - windowLength)
-            file.readFully(window)
-
-            var eocd = -1
-            for (candidate in windowLength - EOCD_MIN_BYTES downTo 0) {
-                if (window[candidate] == 0x50.toByte() &&
-                    window[candidate + 1] == 0x4B.toByte() &&
-                    window[candidate + 2] == 0x05.toByte() &&
-                    window[candidate + 3] == 0x06.toByte()
-                ) {
-                    eocd = candidate
-                    break
-                }
-            }
-            if (eocd < 0) return false
-
-            val centralDirectoryOffset = readLittleEndianInt(window, eocd + EOCD_CENTRAL_DIRECTORY_OFFSET)
-            if (centralDirectoryOffset < APK_SIG_BLOCK_MAGIC.size || centralDirectoryOffset > length) {
-                return false
-            }
-            // The signing block ends with its magic immediately before the central directory.
-            val magic = ByteArray(APK_SIG_BLOCK_MAGIC.size)
-            file.seek(centralDirectoryOffset - APK_SIG_BLOCK_MAGIC.size)
-            file.readFully(magic)
-            return magic.contentEquals(APK_SIG_BLOCK_MAGIC)
+    private fun apkIsSigned(apk: File): Boolean {
+        val signer = File(apkSignerPath.get())
+        check(signer.isFile) {
+            "apksigner is missing at ${signer.absolutePath}. It ships with the pinned Android " +
+                "build tools, so install that build-tools version before staging a release."
         }
-    }
-
-    private fun hasJarSignature(apk: File): Boolean = ZipFile(apk).use { archive ->
-        archive.entries().asSequence().any { entry ->
-            val name = entry.name.uppercase()
-            name.startsWith("META-INF/") &&
-                (name.endsWith(".RSA") || name.endsWith(".DSA") || name.endsWith(".EC"))
+        val process = ProcessBuilder(signer.absolutePath, "verify", apk.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            logger.lifecycle("apksigner rejected ${apk.name}: $output")
         }
-    }
-
-    private fun readLittleEndianInt(buffer: ByteArray, at: Int): Long =
-        (buffer[at].toLong() and 0xFF) or
-            ((buffer[at + 1].toLong() and 0xFF) shl 8) or
-            ((buffer[at + 2].toLong() and 0xFF) shl 16) or
-            ((buffer[at + 3].toLong() and 0xFF) shl 24)
-
-    private companion object {
-        val APK_SIG_BLOCK_MAGIC = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
-        const val MAX_EOCD_SEARCH_BYTES = 66_000L
-        const val EOCD_MIN_BYTES = 22
-        const val EOCD_CENTRAL_DIRECTORY_OFFSET = 16
+        return exitCode == 0
     }
 }
 
@@ -1792,7 +1765,15 @@ val stageReleaseAsset = tasks.register<StageReleaseAssetTask>("stageReleaseAsset
     sourceApk.set(rootProject.layout.projectDirectory.file(expectedReleaseApkPath))
     stagingDirectory.set(releaseAssetStagingDirectory)
     versionName.set(appVersionName)
-    requireSignature.set(!releaseBuildIsUnsigned)
+    stagingIsSupported.set(!releaseBuildIsUnsigned)
+    apkSignerPath.set(
+        androidComponents.sdkComponents.sdkDirectory.map { sdk ->
+            val toolsDir = sdk.dir("build-tools/${android.buildToolsVersion}").asFile
+            val windowsTool = toolsDir.resolve("apksigner.bat")
+            val tool = if (windowsTool.isFile) windowsTool else toolsDir.resolve("apksigner")
+            tool.absolutePath
+        },
+    )
 }
 
 /**
