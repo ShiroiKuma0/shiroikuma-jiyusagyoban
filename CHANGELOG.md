@@ -22,6 +22,10 @@
 
 ### Fixed
 
+- Variables and Flow no longer flash their empty state for a moment on a cold
+  start before stored data arrives, which read as data loss.
+- The Variables tab's empty state offers a "New variable" button and explains
+  what variables are for instead of naming action IDs.
 - Dismissing the first-launch template dialog no longer counts as finishing
   onboarding, so backing out of it does not hide the flow forever.
 - The F-Droid metadata gate no longer fails on a stale store-screenshot version

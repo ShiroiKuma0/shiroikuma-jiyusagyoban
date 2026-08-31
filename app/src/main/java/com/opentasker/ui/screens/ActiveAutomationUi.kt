@@ -825,6 +825,7 @@ fun ActiveAutomationUi(
                 profiles = projectProfiles,
                 tasks = projectTasks, invariants = invariants,
                 contentPadding = innerPadding, changedNodeKeys = highlightedFlowNodeKeys,
+                contentLoaded = contentLoaded,
                 onNodeTargetSelected = openFlowTarget, onUpdateInvariants = viewModel::updateAutomationInvariants,
                 onAddContext = { profileId ->
                     val profile = profiles.firstOrNull { it.id == profileId }
@@ -859,6 +860,7 @@ fun ActiveAutomationUi(
                     viewModel.deleteVariable(name, successMessage, projectId)
                 },
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                contentLoaded = contentLoaded,
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(

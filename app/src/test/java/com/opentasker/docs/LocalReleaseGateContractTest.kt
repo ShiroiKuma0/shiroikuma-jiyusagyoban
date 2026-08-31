@@ -61,7 +61,12 @@ class LocalReleaseGateContractTest {
         val build = repoRoot.resolve("app/build.gradle.kts").readText()
         val manifest = repoRoot.resolve("app/src/main/AndroidManifest.xml").readText()
 
-        assertTrue(build.contains("resolutionResult.allComponents"))
+        // The policy must be derived from the resolved graph, and must refuse a graph that does
+        // not resolve: allComponents silently omits failures, so reading it alone would report
+        // success about a build that cannot happen.
+        assertTrue(build.contains("configuration.incoming.resolutionResult"))
+        assertTrue(build.contains("resolution.allComponents"))
+        assertTrue(build.contains("UnresolvedDependencyResult"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
         assertTrue(build.contains("private val JVM_TEST_FLOOR = 1200"))

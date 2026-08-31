@@ -65,7 +65,14 @@ fun VariablesScreen(
     onUpdate: (previousName: String?, name: String, value: String, isSecret: Boolean, successMessage: UiMessage, projectId: Long) -> Unit,
     onDelete: (name: String, successMessage: UiMessage, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
+    contentLoaded: Boolean = true,
 ) {
+    // An unread database and an empty one look identical from here, so without this a cold start
+    // with stored variables flashes "No global variables yet" before Room's first emission.
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var editTargetName by rememberSaveable { mutableStateOf<String?>(null) }
     var editTargetProjectId by rememberSaveable { mutableStateOf(DEFAULT_PROJECT_ID) }
@@ -126,6 +133,11 @@ fun VariablesScreen(
                         stringResource(R.string.empty_variables_body)
                     } else {
                         stringResource(R.string.empty_variables_search_body)
+                    },
+                    onCreate = if (variables.isEmpty()) {
+                        { showCreateDialog = true }
+                    } else {
+                        null
                     },
                 )
             }
@@ -229,7 +241,7 @@ fun VariablesScreen(
 }
 
 @Composable
-private fun VariableEmptyState(title: String, body: String) {
+private fun VariableEmptyState(title: String, body: String, onCreate: (() -> Unit)? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
@@ -250,6 +262,11 @@ private fun VariableEmptyState(title: String, body: String) {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (onCreate != null) {
+                    TextButton(onClick = onCreate, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                        Text(stringResource(R.string.empty_variables_create))
+                    }
+                }
             }
         }
     }

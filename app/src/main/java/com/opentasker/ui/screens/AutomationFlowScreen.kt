@@ -83,7 +83,14 @@ fun AutomationFlowScreen(
     changedNodeKeys: Set<String> = emptySet(),
     invariants: List<AutomationInvariant> = emptyList(),
     onUpdateInvariants: (List<AutomationInvariant>) -> Unit = {},
+    contentLoaded: Boolean = true,
 ) {
+    // Without this a cold start draws the "nothing to graph yet" state for a frame, which reads
+    // as data loss on a workspace that has profiles.
+    if (!contentLoaded) {
+        ContentLoadingState(contentPadding)
+        return
+    }
     val resources = LocalContext.current.resources
     val lintStrings = AutomationLintStrings.from(resources)
     val graphs = remember(profiles, tasks, resources, changedNodeKeys, invariants) {

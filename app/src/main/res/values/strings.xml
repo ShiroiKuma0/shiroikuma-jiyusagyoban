@@ -504,7 +504,8 @@
     <string name="empty_run_log_title">No run log entries</string>
     <string name="empty_run_log_body">Entries appear here after profiles trigger task execution.</string>
     <string name="empty_variables_title">No global variables yet</string>
-    <string name="empty_variables_body">Global variables appear here after tasks store values with the var.set or var.persist action.</string>
+    <string name="empty_variables_body">Store values your tasks can reuse. Tasks can set them too, and anything they save shows up here.</string>
+    <string name="empty_variables_create">New variable</string>
     <string name="variables_summary_body">Saved globals for this project. Secret values stay masked until you reveal them.</string>
     <plurals name="import_review_more">
         <item quantity="one">%d more</item>
