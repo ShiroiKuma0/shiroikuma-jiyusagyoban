@@ -1,19 +1,64 @@
 package com.opentasker.core.power
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import com.opentasker.core.logging.AppLogger
 import androidx.core.content.edit
 import rikka.shizuku.Shizuku
 
 object ShizukuPowerBackend {
+    /**
+     * Shizuku manager packages, most-preferred first: 白い熊's own fork, then upstream's.
+     *
+     * Only the upstream id used to be known here, so on this phone — which runs the fork —
+     * `getLaunchIntentForPackage` always answered null and "Open Shizuku settings" fell through to a
+     * web page instead of the app. Both are declared in `<queries>`; without that, package visibility
+     * hides them on Android 11+ even when installed.
+     */
+    val MANAGER_PACKAGES = listOf("shiroikuma.shizuku", "moe.shizuku.privileged.api")
+
+    /** The installed manager, or null when none is. */
+    fun managerPackage(context: Context): String? =
+        MANAGER_PACKAGES.firstOrNull { isPackageInstalled(context, it) }
+
     const val MANAGER_PACKAGE = "moe.shizuku.privileged.api"
-    const val SETUP_URL = "https://shizuku.rikka.app/guide/setup/"
+
+    /**
+     * Where to send someone who has no Shizuku at all — **our** fork's page, not upstream's guide.
+     * That is the build 白い熊 actually runs, and the only one whose install instructions match this
+     * phone; upstream's setup guide describes a different app and a different APK.
+     */
+    const val SETUP_URL = "https://github.com/ShiroiKuma0/shiroikuma-shizuku"
+
+    /**
+     * The single answer to "open Shizuku": the installed manager's launcher screen — fork first, then
+     * upstream — or our fork's GitHub page when neither is installed.
+     *
+     * One helper because there are two callers (the Setup tab's card and the permission dialog's pill)
+     * and they used to resolve this independently, which is how both ended up opening a web page on a
+     * phone that HAS Shizuku installed.
+     */
+    fun openManagerIntent(context: Context): Intent =
+        MANAGER_PACKAGES.firstNotNullOfOrNull { context.packageManager.getLaunchIntentForPackage(it) }
+            ?: Intent(Intent.ACTION_VIEW, Uri.parse(SETUP_URL))
     private const val TAG = "ShizukuPowerBackend"
     private const val PREFERENCES = "shizuku-power"
     private const val KEY_KILL_SWITCH = "kill-switch-enabled"
 
+    /**
+     * Every action that can only run through the privileged transport, so [hintForAction] can say so.
+     *
+     * This has to hold exactly the keys [ShizukuCommandPolicy] pins commands for. It is a second list
+     * of the same fact, and it drifted: `wake` was pinned there and never added here, so the one thing
+     * this set exists to do — explain WHY a blocked action is blocked — fell through to the generic
+     * "Optional elevated backend is not active." for the one action that fails without Shizuku
+     * outright ([com.opentasker.core.actions.WakeAction] returns "Screen wake needs Shizuku" and stops).
+     * `screen.off` survived the same omission only because it tries accessibility first.
+     * `allowlistPinsEveryElevatedCommandVariant` is what compares the two; keep them in step.
+     */
     val elevatedActionIds: Set<String> = setOf(
         "airplane.toggle",
         "mobile.toggle",
@@ -51,7 +96,7 @@ object ShizukuPowerBackend {
     }
 
     fun inspect(context: Context): ShizukuPowerStatus = statusFor(
-        managerInstalled = isPackageInstalled(context, MANAGER_PACKAGE),
+        managerInstalled = managerPackage(context) != null,
         killSwitchEnabled = killSwitchEnabled,
         serviceRunning = runCatching { Shizuku.pingBinder() }.getOrDefault(false),
         permissionGranted = runCatching {

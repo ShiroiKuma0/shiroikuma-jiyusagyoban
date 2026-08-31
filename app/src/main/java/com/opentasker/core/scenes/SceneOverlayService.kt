@@ -48,6 +48,7 @@ class SceneOverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         startForegroundWithNotification()
     }
 
@@ -89,6 +90,7 @@ class SceneOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         removeOverlay()
         super.onDestroy()
     }
@@ -284,6 +286,9 @@ class SceneOverlayService : Service() {
                     unsupportedElementView(element)
                 }
             }
+            // Upstream 0.2.88 cut its enum to the four types it draws and dropped this branch with
+            // them. The fork keeps all eighteen, so the overlay still needs the catch-all.
+            else -> unsupportedElementView(element)
         }
     }
 
@@ -422,6 +427,11 @@ class SceneOverlayService : Service() {
 
     companion object {
         private const val TAG = "SceneOverlayService"
+
+        /** True while a scene is shown through this service — for the Monitor / shutdown inventory. */
+        @Volatile
+        var isRunning = false
+            private set
 
         const val EXTRA_SCENE_ID = "com.opentasker.extra.SCENE_ID"
         const val EXTRA_SCENE_JSON = "com.opentasker.extra.SCENE_JSON"

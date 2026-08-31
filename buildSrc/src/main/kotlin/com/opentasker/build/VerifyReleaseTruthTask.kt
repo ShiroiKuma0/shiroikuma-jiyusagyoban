@@ -155,8 +155,13 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
             "bundleSupportedSchemaVersions" to listOf(
                 sourceValue(
                     bundle,
-                    Regex("(?m)^\\s*const val MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
-                    "minimum supported bundle schema version",
+                    // MIN_READABLE, not upstream's MIN_SUPPORTED. The fork made a deliberate hard
+                    // cut at v5 — the on-disk format carries no ids at all, so an older id-bearing
+                    // file is rejected with a re-export prompt rather than migrated — and renamed
+                    // the constant to say so. Upstream's name survived here while the constant it
+                    // reads did not, which left this gate failing on every build (2026-08-30).
+                    Regex("(?m)^\\s*const val MIN_READABLE_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),
+                    "minimum readable bundle schema version",
                 ),
                 sourceValue(
                     bundle,

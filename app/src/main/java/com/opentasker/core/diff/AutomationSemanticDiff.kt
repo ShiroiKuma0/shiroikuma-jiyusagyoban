@@ -633,12 +633,16 @@ object AutomationSemanticDiff {
         else append(operator).append('(').append(children.joinToString(",") { it.semanticKey() }).append(')')
     }
 
+    /**
+     * The fork's projectId is nullable — null means Unfiled — so the match key carries `Long?`
+     * rather than upstream's non-null id.
+     */
     private fun <T> match(
         values: List<T>,
         id: Long,
-        projectId: Long,
+        projectId: Long?,
         name: String,
-        key: (T) -> Triple<Long, Long, String>,
+        key: (T) -> Triple<Long, Long?, String>,
     ): T? = values.firstOrNull { value ->
         val candidate = key(value)
         candidate.first == id && candidate.second == projectId && id > 0L
