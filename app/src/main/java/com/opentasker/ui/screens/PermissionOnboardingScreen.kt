@@ -412,20 +412,16 @@ fun PermissionOnboardingScreen(
     val automationRequirements = remember(profiles, tasks) {
         SetupRequirementResolver.resolve(profiles, tasks)
     }
-    // A template installed from onboarding scopes Setup to the grants that template actually
-    // needs, so a first-time user sees the two rows standing between them and a working
-    // automation rather than the whole checklist. Clearing the focus restores the full list.
-    var focusCleared by rememberSaveable(focusRequirements) { mutableStateOf(false) }
-    val activeFocus = if (focusCleared) emptySet() else focusRequirements
-    val visibleItems = remember(items, automationRequirements, activeFocus) {
+    // A template installed from onboarding surfaces the grants it needs. This *adds* those rows,
+    // it never hides anything: a freshly installed template is disabled by default, so
+    // automationRequirements is still empty and the NEEDED rows it depends on would otherwise not
+    // be listed at all. Filtering instead of adding meant the row the user was sent here for could
+    // be the only one on screen, and the engine's own notification and alarm rows disappeared.
+    val visibleItems = remember(items, automationRequirements, focusRequirements) {
         items.filter { item ->
-            val neededHere = item.section != SetupSection.NEEDED ||
-                item.requirements.any(automationRequirements::contains)
-            if (activeFocus.isEmpty()) {
-                neededHere
-            } else {
-                item.requirements.any(activeFocus::contains)
-            }
+            item.section != SetupSection.NEEDED ||
+                item.requirements.any(automationRequirements::contains) ||
+                item.requirements.any(focusRequirements::contains)
         }
     }
     val sectionItems = remember(visibleItems) {
@@ -449,7 +445,7 @@ fun PermissionOnboardingScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (activeFocus.isNotEmpty()) item {
+        if (focusRequirements.isNotEmpty()) item {
             Card(
                 modifier = Modifier.fillMaxWidth().testTag(SETUP_FOCUS_BANNER_TAG),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
@@ -464,9 +460,6 @@ fun PermissionOnboardingScreen(
                         stringResource(R.string.setup_focus_body),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    TextButton(onClick = { focusCleared = true }) {
-                        Text(stringResource(R.string.setup_focus_show_all))
-                    }
                 }
             }
         }

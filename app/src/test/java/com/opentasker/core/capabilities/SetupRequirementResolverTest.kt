@@ -113,13 +113,38 @@ class SetupRequirementResolverTest {
     }
 
     @Test
-    fun actionTypesResolveBeforeAnythingIsStored() {
-        // Onboarding scopes Setup to a freshly installed template, which has no profile or task
-        // rows yet, so the requirements have to come from the action types alone.
+    fun templateActionsResolveBeforeAnythingIsStored() {
+        // Onboarding points Setup at a freshly installed template, which has no profile or task
+        // rows yet, so the requirements have to come from the template itself.
         assertEquals(
             setOf(SetupRequirement.WRITE_SETTINGS, SetupRequirement.CONTACTS),
-            SetupRequirementResolver.resolveForActionTypes(
-                listOf("brightness.set", "contacts.lookup", "var.set"),
+            SetupRequirementResolver.resolveForTemplate(
+                actionTypes = listOf("brightness.set", "contacts.lookup", "var.set"),
+                contexts = emptyList(),
+            ),
+        )
+    }
+
+    @Test
+    fun aTemplateTriggerCarriesItsOwnGrantEvenWhenNoActionNeedsOne() {
+        // The calendar template only turns the volume down, so reading actions alone produced a
+        // checklist that omitted the one grant its trigger depends on and then reported it ready.
+        assertEquals(
+            setOf(SetupRequirement.CALENDAR, SetupRequirement.DND),
+            SetupRequirementResolver.resolveForTemplate(
+                actionTypes = listOf("volume.set"),
+                contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to "calendar"))),
+            ),
+        )
+    }
+
+    @Test
+    fun anAppUsageTriggerNeedsUsageAccessThoughItsActionsDoNot() {
+        assertEquals(
+            setOf(SetupRequirement.USAGE_ACCESS),
+            SetupRequirementResolver.resolveForTemplate(
+                actionTypes = listOf("flow.wait", "notify.show"),
+                contexts = listOf(ContextSpec(ContextType.APPLICATION, mapOf("package" to "com.example"))),
             ),
         )
     }
@@ -128,7 +153,10 @@ class SetupRequirementResolverTest {
     fun aTemplateThatNeedsNothingSpecialResolvesEmpty() {
         assertEquals(
             emptySet<SetupRequirement>(),
-            SetupRequirementResolver.resolveForActionTypes(listOf("var.set", "flow.wait")),
+            SetupRequirementResolver.resolveForTemplate(
+                actionTypes = listOf("var.set", "flow.wait"),
+                contexts = emptyList(),
+            ),
         )
     }
 }

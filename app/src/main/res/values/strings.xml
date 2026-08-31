@@ -142,8 +142,7 @@
     <string name="settings_body">Manage appearance, recovery, background behavior, integrations, and other app-wide preferences.</string>
     <string name="settings_section_general">General</string>
     <string name="setup_focus_title">Finish setting up your new automation</string>
-    <string name="setup_focus_body">These are the permissions the template you just installed needs. Everything else is hidden for now.</string>
-    <string name="setup_focus_show_all">Show the full checklist</string>
+    <string name="setup_focus_body">The template you just installed needs the access listed below before it can run.</string>
     <string name="settings_run_onboarding_title">Run onboarding again</string>
     <string name="settings_run_onboarding_body">Reopen the starter templates you were offered on first launch.</string>
     <string name="settings_run_onboarding_action">Show templates</string>

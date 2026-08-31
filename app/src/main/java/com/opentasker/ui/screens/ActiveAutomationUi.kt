@@ -261,7 +261,9 @@ fun ActiveAutomationUi(
     var showBundleTextImportDialog by rememberSaveable { mutableStateOf(false) }
     var bundleTextImportDraft by rememberSaveable { mutableStateOf("") }
     var onboardingTemplateFlow by rememberSaveable { mutableStateOf(false) }
-    var setupFocusRequirements by remember { mutableStateOf<Set<SetupRequirement>>(emptySet()) }
+    // Saved by name: MainActivity declares no configChanges, so a rotation while Setup is open
+    // would otherwise drop the focus and take the template's rows off screen with it.
+    var setupFocusRequirements by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
     val onboardingCompleted by OnboardingPreference.hasCompleted(context).collectAsState(initial = true)
     LaunchedEffect(onboardingCompleted) {
@@ -682,10 +684,16 @@ fun ActiveAutomationUi(
                 globalFallbackTaskId = globalFallbackTaskId,
                 onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
                 settingsOnly = settingsOnly,
-                focusRequirements = if (settingsOnly) emptySet() else setupFocusRequirements,
+                focusRequirements = if (settingsOnly) {
+                    emptySet()
+                } else {
+                    setupFocusRequirements.mapTo(mutableSetOf(), SetupRequirement::valueOf)
+                },
+                // Deliberately does not clear the persisted onboarding flag. Doing so meant an
+                // established user who opened this out of curiosity and tapped outside the dialog
+                // got the first-run flow again on every cold start, with no way back.
                 onRunOnboardingAgain = if (settingsOnly) {
                     {
-                        scope.launch { OnboardingPreference.reset(context) }
                         showTemplateDialog = true
                         onboardingTemplateFlow = true
                     }
@@ -1150,10 +1158,11 @@ fun ActiveAutomationUi(
                 // A template whose actions need a grant would otherwise land on Profiles and fail
                 // on its first run with nothing explaining why, so send them to Setup scoped to
                 // exactly what this template is waiting on.
-                val needed = SetupRequirementResolver.resolveForActionTypes(
-                    template.actions.map { it.type },
+                val needed = SetupRequirementResolver.resolveForTemplate(
+                    actionTypes = template.actions.map { it.type },
+                    contexts = template.contexts.map { ContextSpec(it.type, it.config) },
                 )
-                setupFocusRequirements = needed
+                setupFocusRequirements = needed.map(SetupRequirement::name)
                 screenOrdinal = if (needed.isEmpty()) {
                     OpenTaskerScreen.Profiles.ordinal
                 } else {

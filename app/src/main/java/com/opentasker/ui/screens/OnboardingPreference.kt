@@ -23,12 +23,6 @@ object OnboardingPreference {
         }
     }
 
-    /** Lets someone run the guided first-launch flow again from Settings. */
-    suspend fun reset(context: Context) {
-        context.onboardingDataStore.edit { prefs ->
-            prefs[KEY_COMPLETED] = false
-        }
-    }
 }
 
 internal enum class OnboardingExit {

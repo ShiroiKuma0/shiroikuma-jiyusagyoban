@@ -101,7 +101,7 @@ class CriticalFlowComposeTest {
     }
 
     @Test
-    fun setupScopedToAnInstalledTemplateHidesTheRestUntilAsked() {
+    fun setupSurfacesAnInstalledTemplatesGrantWithoutHidingTheEngineRows() {
         composeTestRule.setContent {
             TestTheme {
                 PermissionOnboardingScreen(
@@ -116,18 +116,41 @@ class CriticalFlowComposeTest {
             }
         }
 
-        // Scoped to the one grant the template needs, the banner explains why and unrelated rows
-        // are not competing with it. Battery optimization is the control: it renders on an empty
-        // workspace and carries no requirement of its own, so it can only disappear because of
-        // the focus filter.
         composeTestRule.onNodeWithTag(SETUP_FOCUS_BANNER_TAG).assertIsDisplayed()
-        composeTestRule.onAllNodesWithText("Battery optimization").assertCountEquals(0)
 
-        composeTestRule.onNodeWithText("Show the full checklist").performClick()
-        composeTestRule.onNodeWithTag(SETUP_FOCUS_BANNER_TAG).assertDoesNotExist()
+        // The row the template is waiting on has to be reachable. An installed template is
+        // disabled until its first enable, so this row is not in the resolved requirements of the
+        // workspace and only appears because the focus adds it.
+        composeTestRule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("Modify system settings"))
+        composeTestRule.onNodeWithText("Modify system settings").assertIsDisplayed()
+
+        // Focus must not take the engine's own rows away. Battery optimization carries no
+        // requirement of its own, so a filter that replaced the normal rule would drop it.
         composeTestRule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText("Battery optimization"))
         composeTestRule.onNodeWithText("Battery optimization").assertIsDisplayed()
+    }
+
+    @Test
+    fun setupWithoutAFocusDoesNotShowTheTemplateBanner() {
+        composeTestRule.setContent {
+            TestTheme {
+                PermissionOnboardingScreen(
+                    contentPadding = PaddingValues(0.dp),
+                    onMessage = {},
+                    backupState = BackupSetupState(busy = false),
+                    onCreateBackup = {},
+                    onExportBackup = {},
+                    onImportBackup = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(SETUP_FOCUS_BANNER_TAG).assertDoesNotExist()
+        // Without a focus the disabled-template row is not listed, which is what makes the
+        // previous test's assertion meaningful rather than a row that was always there.
+        composeTestRule.onAllNodesWithText("Modify system settings").assertCountEquals(0)
     }
 
     @Test

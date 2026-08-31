@@ -65,11 +65,20 @@ object SetupRequirementResolver {
     }
 
     /**
-     * What a set of action types needs, before any of it exists as a stored profile. Onboarding
-     * uses this to scope Setup to the grants a freshly installed template is waiting on.
+     * What a template needs, before any of it exists as a stored profile. Onboarding uses this to
+     * point Setup at the grants a freshly installed template is waiting on.
+     *
+     * Contexts matter as much as actions here. A calendar trigger that only turns the volume down
+     * needs calendar access, and an app-usage trigger needs usage access, while neither action
+     * requires anything at all. Reading actions alone sent exactly those templates to Profiles, or
+     * worse, showed a checklist that omitted the one grant the trigger depended on.
      */
-    fun resolveForActionTypes(actionTypes: List<String>): Set<SetupRequirement> {
+    fun resolveForTemplate(
+        actionTypes: List<String>,
+        contexts: List<ContextSpec>,
+    ): Set<SetupRequirement> {
         val requirements = linkedSetOf<SetupRequirement>()
+        contexts.forEach { context -> requirements += contextRequirements(context) }
         actionTypes.forEach { type -> requirements += actionRequirements(type) }
         return requirements
     }
