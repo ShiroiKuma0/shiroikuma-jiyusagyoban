@@ -7,7 +7,6 @@ import android.location.LocationManager
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,31 +22,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -64,41 +51,25 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.core.contexts.ContextEventObservation
 import com.opentasker.core.contexts.ContextInspectionSnapshot
-import com.opentasker.core.contexts.ContextObservationStatus
 import com.opentasker.core.contexts.ContextSourceRegistry
 import com.opentasker.core.contexts.ContextSourceSnapshot
 import com.opentasker.core.contexts.ContextSourceStatus
 import com.opentasker.core.contexts.ProfileInspection
 import com.opentasker.core.contexts.inspectProfiles
-import com.opentasker.core.contexts.observationStatus
-import com.opentasker.core.capabilities.AutomationLint
-import com.opentasker.core.capabilities.AutomationLintFinding
-import com.opentasker.core.capabilities.AutomationLintReport
-import com.opentasker.core.capabilities.AutomationLintSeverity
-import com.opentasker.core.capabilities.AutomationLintStrings
-import com.opentasker.core.capabilities.AutomationInvariantStore
-import com.opentasker.core.contexts.BroadcastContextEvents
-import com.opentasker.core.engine.CausalLoopDiagnostics
+import com.opentasker.core.contexts.toContextSourceLabel
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.ContextType
-import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.Profile
-import com.opentasker.core.model.ProfileLifecycleStrings
-import com.opentasker.core.model.Task
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
-import com.opentasker.core.storage.StorageDecodeIssue
-import com.opentasker.ui.utils.expandCollapseToggle
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -118,71 +89,11 @@ class ContextInspectorViewModel(
     private val latestEvents = MutableStateFlow<Map<String, ContextEventObservation>>(emptyMap())
     private val sourceErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     private val refreshTick = MutableStateFlow(clock())
-    private val sourceCollectorJobs = mutableMapOf<String, Job>()
-    private var refreshJob: Job? = null
     private val locationDwellStateStore = LocationDwellStateStore(appContext, clock)
-    private val invariantStore = AutomationInvariantStore(appContext)
 
-    /** The profile a synthetic-trigger simulation is running against; survives rotation. */
-    private val _simulationProfile = MutableStateFlow<Profile?>(null)
-    val simulationProfile: StateFlow<Profile?> = _simulationProfile.asStateFlow()
-
-    fun openSimulation(profile: Profile) {
-        _simulationProfile.value = profile
-    }
-
-    fun clearSimulation() {
-        _simulationProfile.value = null
-    }
-
-    private val profileDecodeResults = db.profileDao()
+    private val profiles: StateFlow<List<Profile>> = db.profileDao()
         .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val profiles: StateFlow<List<Profile>> = profileDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase(Locale.US) }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val taskDecodeResults = db.taskDao()
-        .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val tasks: StateFlow<List<Task>> = taskDecodeResults
-        .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    private val _invariants = MutableStateFlow(invariantStore.load())
-    val invariants: StateFlow<List<AutomationInvariant>> = _invariants.asStateFlow()
-
-    fun updateInvariants(value: List<AutomationInvariant>) {
-        _invariants.value = invariantStore.save(value)
-    }
-
-    val lintReport: StateFlow<AutomationLintReport> = combine(profiles, tasks, invariants) { profiles, tasks, invariants ->
-        AutomationLint.analyze(
-            profiles,
-            tasks,
-            strings = AutomationLintStrings.from(appContext.resources),
-            invariants = invariants,
-            nowMs = clock(),
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AutomationLintReport())
-
-    val lintFindings: StateFlow<Map<Long, List<AutomationLintFinding>>> = lintReport.map { report ->
-        report.findings
-            .flatMap { finding -> finding.profileIds.map { profileId -> profileId to finding } }
-            .groupBy({ it.first }, { it.second })
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
-    val storageDecodeIssues: StateFlow<List<StorageDecodeIssue>> = profileDecodeResults
-        .map { results -> results.mapNotNull { it.issue } }
+        .map { entities -> entities.map { it.toDomain() }.sortedBy { it.name.lowercase(Locale.US) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val snapshot: StateFlow<ContextInspectionSnapshot> = combine(
@@ -190,42 +101,45 @@ class ContextInspectorViewModel(
         latestEvents,
         sourceErrors,
         refreshTick,
-        CausalLoopDiagnostics.latest,
-    ) { profiles, observations, errors, now, causalLoop ->
+    ) { profiles, observations, errors, now ->
         val sources = buildContextSourceSnapshots(appContext, observations, errors)
         ContextInspectionSnapshot(
             generatedAtMs = now,
             sources = sources,
-            profiles = inspectProfiles(
-                profiles = profiles,
-                sourceSnapshots = sources,
-                observationTransformer = { profile, index, spec, observation ->
-                    if (spec.type == ContextType.LOCATION) {
-                        // observe() is read-only: the Inspector must never persist or clear the
-                        // engine's dwell timers from its own independent location stream.
-                        observation.copy(event = locationDwellStateStore.observe(profile.id, index, spec, observation.event))
-                    } else {
-                        observation
-                    }
-                },
-                nowMs = now,
-                lifecycleStrings = ProfileLifecycleStrings.from(appContext.resources),
-            ),
-            causalLoop = causalLoop,
+            profiles = inspectProfiles(profiles, sources) { profile, index, spec, observation ->
+                if (spec.type == ContextType.LOCATION) {
+                    // observe() is read-only: the Inspector must never persist or clear the
+                    // engine's dwell timers from its own independent location stream.
+                    observation.copy(event = locationDwellStateStore.observe(profile.id, index, spec, observation.event))
+                } else {
+                    observation
+                }
+            },
         )
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyContextInspectionSnapshot(clock()))
+
+    init {
+        startSourceCollectors()
+        viewModelScope.launch {
+            while (isActive) {
+                delay(5_000)
+                refresh()
+            }
+        }
+    }
 
     fun refresh() {
         refreshTick.value = clock()
     }
 
-    /** Start only while the inspector is visible; the shared event bus then has real demand. */
-    fun startObserving() {
-        if (sourceCollectorJobs.values.any(Job::isActive)) return
+    private fun startSourceCollectors() {
         requiredContextSourceKeys().forEach { key ->
+            // Never power on GPS just by opening the Inspector — location is only sampled when a profile
+            // actually needs it (白い熊). The location row shows last-known / setup state, not live updates.
+            if (key == "location") return@forEach
             val source = ContextSourceRegistry.get(key) ?: return@forEach
-            sourceCollectorJobs[key] = viewModelScope.launch {
+            viewModelScope.launch {
                 source.events(appContext)
                     .catch { error ->
                         AppLogger.warn("OpenTasker.ContextInspector", "Context source failed for $key", error)
@@ -242,30 +156,7 @@ class ContextInspectorViewModel(
                     }
             }
         }
-        refreshJob?.cancel()
-        refreshJob = viewModelScope.launch {
-            while (isActive) {
-                delay(5_000)
-                refresh()
-            }
-        }
     }
-
-    fun stopObserving() {
-        sourceCollectorJobs.values.forEach(Job::cancel)
-        sourceCollectorJobs.clear()
-        refreshJob?.cancel()
-        refreshJob = null
-        latestEvents.value = emptyMap()
-        sourceErrors.value = emptyMap()
-        refresh()
-    }
-
-    override fun onCleared() {
-        stopObserving()
-        super.onCleared()
-    }
-
 }
 
 class ContextInspectorViewModelFactory(
@@ -291,32 +182,11 @@ fun ContextInspectorScreen(
     val factory = remember(db, context) { ContextInspectorViewModelFactory(db, context) }
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
     val snapshot by viewModel.snapshot.collectAsState()
-    val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
-    val lintFindings by viewModel.lintFindings.collectAsState()
-    val invariants by viewModel.invariants.collectAsState()
-    val lintReport by viewModel.lintReport.collectAsState()
-    val simulationProfile by viewModel.simulationProfile.collectAsState()
-    var selectedProfileId by rememberSaveable { mutableStateOf<Long?>(null) }
-    val selectedProfile = snapshot.profiles.firstOrNull { it.profileId == selectedProfileId }
-        ?: snapshot.profiles.firstOrNull()
 
-    LaunchedEffect(snapshot.profiles, selectedProfileId) {
-        if (selectedProfileId == null || snapshot.profiles.none { it.profileId == selectedProfileId }) {
-            selectedProfileId = snapshot.profiles.firstOrNull()?.profileId
-        }
-    }
-
-    DisposableEffect(viewModel) {
-        viewModel.startObserving()
-        onDispose { viewModel.stopObserving() }
-    }
-
-    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty() && invariants.isEmpty()) {
+    if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty()) {
         InspectorEmptyState(contentPadding)
         return
     }
-
-    val oem = remember { OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND) }
 
     LazyColumn(
         modifier = modifier
@@ -327,62 +197,6 @@ fun ContextInspectorScreen(
     ) {
         item {
             ContextInspectorSummaryCard(snapshot = snapshot, onRefresh = viewModel::refresh)
-        }
-        snapshot.causalLoop?.let { causalLoop ->
-            item {
-                InspectorNotice(
-                    title = stringResource(R.string.inspector_causal_loop_title),
-                    body = stringResource(
-                        R.string.inspector_causal_loop_body,
-                        causalLoop.profileChain.joinToString(" -> "),
-                    ),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-        if (storageDecodeIssues.isNotEmpty()) {
-            item {
-                StorageDecodeWarningCard(storageDecodeIssues)
-            }
-        }
-        if (oem.needsExtraSteps) {
-            item {
-                OemRiskNotice(oem)
-            }
-        }
-        item {
-            Text(
-                stringResource(R.string.inspector_match_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (snapshot.profiles.isEmpty()) {
-            item {
-                InspectorNotice(
-                    title = stringResource(R.string.empty_profiles_inspector),
-                    body = stringResource(R.string.inspector_no_profiles_body),
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        } else {
-            item {
-                InspectorProfileSelector(
-                    profiles = snapshot.profiles,
-                    selectedProfileId = selectedProfile?.profileId,
-                    onSelected = { selectedProfileId = it },
-                )
-            }
-            selectedProfile?.let { profile ->
-                item(key = profile.profileId) {
-                    ProfileInspectorCard(
-                        profile = profile,
-                        nowMs = snapshot.generatedAtMs,
-                        lintFindings = lintFindings[profile.profileId].orEmpty(),
-                        onSimulate = { candidate -> viewModel.openSimulation(candidate) },
-                    )
-                }
-            }
         }
         item {
             Text(
@@ -395,56 +209,23 @@ fun ContextInspectorScreen(
             ContextSourceCard(source = source, nowMs = snapshot.generatedAtMs)
         }
         item {
-            AutomationInvariantPanel(
-                invariants = invariants,
-                report = lintReport,
-                onUpdate = viewModel::updateInvariants,
+            Text(
+                stringResource(R.string.inspector_match_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-
-    simulationProfile?.let { profile ->
-        SyntheticTriggerSimulationDialog(
-            profile = profile,
-            onDismiss = { viewModel.clearSimulation() },
-        )
-    }
-}
-
-@Composable
-private fun InspectorProfileSelector(
-    profiles: List<ProfileInspection>,
-    selectedProfileId: Long?,
-    onSelected: (Long) -> Unit,
-) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val selected = profiles.firstOrNull { it.profileId == selectedProfileId } ?: profiles.first()
-
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(DesignSystem.Radii.md),
-        ) {
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
-                Text(
-                    stringResource(R.string.inspector_profile_selector),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (snapshot.profiles.isEmpty()) {
+            item {
+                InspectorNotice(
+                    title = stringResource(R.string.empty_profiles_inspector),
+                    body = "Create a profile before reviewing match explanations.",
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                Text(selected.profileName, style = MaterialTheme.typography.labelLarge)
             }
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.inspector_profile_selector_content_description))
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            profiles.forEach { profile ->
-                DropdownMenuItem(
-                    text = { Text(profile.profileName) },
-                    onClick = {
-                        onSelected(profile.profileId)
-                        expanded = false
-                    },
-                )
+        } else {
+            items(snapshot.profiles, key = { it.profileId }) { profile ->
+                ProfileInspectorCard(profile = profile, nowMs = snapshot.generatedAtMs)
             }
         }
     }
@@ -455,41 +236,46 @@ private fun ContextInspectorSummaryCard(
     snapshot: ContextInspectionSnapshot,
     onRefresh: () -> Unit,
 ) {
+    val activeSources = snapshot.sources.count { it.status == ContextSourceStatus.Active }
     val attentionSources = snapshot.sources.count {
         it.status == ContextSourceStatus.NeedsSetup ||
             it.status == ContextSourceStatus.Missing ||
             it.status == ContextSourceStatus.Error
     }
+    val enabledProfiles = snapshot.profiles.count { it.enabled }
+    val matchingProfiles = snapshot.profiles.count { it.matching }
     val healthColor = if (attentionSources == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(18.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(
-                Icons.Filled.CheckCircle,
-                contentDescription = stringResource(R.string.nav_inspector),
-                tint = healthColor,
-                modifier = Modifier.size(20.dp),
-            )
-            Text(
-                if (attentionSources == 0) {
-                    stringResource(R.string.inspector_ready)
-                } else {
-                    stringResource(R.string.inspector_attention, attentionSources)
-                },
-                style = MaterialTheme.typography.titleSmall,
-                color = healthColor,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.inspector_refresh))
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.title_context_inspector), style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        stringResource(R.string.inspector_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                InspectorStatusPill(
+                    label = if (attentionSources == 0) "Ready" else "$attentionSources attention",
+                    color = healthColor,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
+                InspectorMetric("$activeSources", "Active sources", Modifier.weight(1f))
+                InspectorMetric("$matchingProfiles", "Matching", Modifier.weight(1f))
+                InspectorMetric("$enabledProfiles", "Enabled", Modifier.weight(1f))
+            }
+            OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.inspector_refresh))
             }
         }
     }
@@ -498,7 +284,6 @@ private fun ContextInspectorSummaryCard(
 @Composable
 private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     val color = sourceStatusColor(source.status)
-    val observationStatus = source.observationStatus(nowMs)
     val observation = source.lastObservation
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -507,42 +292,32 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                 ContextSourceStatus.NeedsSetup,
                 ContextSourceStatus.Missing,
                 ContextSourceStatus.Error -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.20f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             },
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
+        shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Icon(sourceStatusIcon(source.status), contentDescription = stringResource(source.status.resourceId), tint = color, modifier = Modifier.size(22.dp))
+                Icon(sourceStatusIcon(source.status), contentDescription = source.status.label, tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val lastUpdateLabel = stringResource(R.string.inspector_last_update)
                     val noValueLabel = stringResource(R.string.inspector_no_value)
                     Text(
-                        observation?.let {
-                            stringResource(
-                                R.string.inspector_last_update_value,
-                                lastUpdateLabel,
-                                formatRelativeTime(LocalContext.current, it.observedAtMs, nowMs),
-                            )
-                        } ?: noValueLabel,
+                        observation?.let { "$lastUpdateLabel ${formatRelativeTime(it.observedAtMs, nowMs)}" } ?: noValueLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                InspectorStatusPill(stringResource(source.status.resourceId), color)
-                InspectorStatusPill(
-                    stringResource(observationStatus.resourceId),
-                    observationStatusColor(observationStatus),
-                )
+                InspectorStatusPill(source.status.label, color)
             }
             source.setupDetail?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             source.error?.let {
-                InspectorNotice(stringResource(R.string.inspector_source_error), it, MaterialTheme.colorScheme.error)
+                InspectorNotice("Source error", it, MaterialTheme.colorScheme.error)
             }
             observation?.let {
                 ContextMetadataBlock(event = it, nowMs = nowMs)
@@ -552,14 +327,7 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
 }
 
 @Composable
-private fun ProfileInspectorCard(
-    profile: ProfileInspection,
-    nowMs: Long,
-    lintFindings: List<AutomationLintFinding>,
-    onSimulate: (Profile) -> Unit,
-) {
-    var lintExpanded by remember(profile.profileId) { mutableStateOf(false) }
-    var detailsExpanded by remember(profile.profileId) { mutableStateOf(false) }
+private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
     val color = when {
         !profile.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         profile.matching -> MaterialTheme.colorScheme.tertiary
@@ -574,14 +342,14 @@ private fun ProfileInspectorCard(
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
             },
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(DesignSystem.Radii.md),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.28f)),
+        shape = RoundedCornerShape(16.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else stringResource(R.string.inspector_not_matching),
+                    contentDescription = if (profile.matching) stringResource(R.string.status_matching) else "Not matching",
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )
@@ -598,138 +366,15 @@ private fun ProfileInspectorCard(
                     color = color,
                 )
             }
-            if (detailsExpanded) {
-                profile.profile?.let { candidate ->
-                    Text(
-                        stringResource(
-                            R.string.inspector_profile_policy,
-                            candidate.priority,
-                            candidate.gracePeriodSec,
-                            profileLifetimeTitle(candidate.lifetime),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        stringResource(
-                            R.string.inspector_profile_concurrency,
-                            candidate.maxActiveExecutions?.toString() ?: stringResource(R.string.profile_concurrency_default),
-                            candidate.burstLimit?.toString() ?: stringResource(R.string.profile_concurrency_default),
-                            profileOverflowPolicyTitle(candidate.overflowPolicy),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (candidate.lifetime == com.opentasker.core.model.ProfileLifetime.UNTIL_DATE && candidate.expiresAtMs != null) {
-                        Text(
-                            stringResource(R.string.inspector_profile_expiry, formatProfileExpiryDate(candidate.expiresAtMs)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                profile.suppressionReason?.let { reason ->
-                    InspectorNotice(
-                        title = stringResource(R.string.inspector_profile_suppressed_title),
-                        body = reason,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-                if (profile.logicExplanation.isNotBlank()) {
-                    Text(
-                        profile.logicExplanation,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-                if (profile.contexts.isEmpty()) {
-                    InspectorNotice(
-                        title = stringResource(R.string.inspector_no_contexts),
-                        body = stringResource(R.string.inspector_no_contexts_body),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                } else {
-                    profile.contexts.forEach { check ->
-                        ContextCheckRow(check = check, nowMs = nowMs)
-                    }
-                }
-            }
-            // Not the "Blocks enabling" prefix: this list describes profiles that already exist
-            // and are already running, so nothing here is being refused. That prefix belongs to
-            // the imported-profile review, which really does withhold the enable button.
-            val conflictPrefix = stringResource(R.string.automation_lint_conflict_prefix)
-            val warningPrefix = stringResource(R.string.automation_lint_warning_prefix)
-            if (lintFindings.isNotEmpty()) {
-                val lintColor = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.secondary
-                }
-                Surface(
-                    color = lintColor.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, lintColor.copy(alpha = 0.42f)),
-                    shape = RoundedCornerShape(DesignSystem.Radii.md),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .expandCollapseToggle(lintExpanded) { lintExpanded = !lintExpanded },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.Info,
-                                contentDescription = stringResource(R.string.inspector_lint_title),
-                                tint = lintColor,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.inspector_lint_title), style = MaterialTheme.typography.labelLarge)
-                                Text(
-                                    stringResource(R.string.inspector_lint_count, lintFindings.size),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Icon(
-                                if (lintExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                contentDescription = stringResource(if (lintExpanded) R.string.action_collapse else R.string.action_expand),
-                                tint = lintColor,
-                            )
-                        }
-                        if (lintExpanded) {
-                            Text(
-                                lintFindings.joinToString("\n") { finding ->
-                                    val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
-                                        conflictPrefix
-                                    } else {
-                                        warningPrefix
-                                    }
-                                    "$prefix ${finding.title}: ${finding.detail} ${finding.suggestedFix}"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-            profile.profile?.let { candidate ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
-                ) {
-                    TextButton(onClick = { detailsExpanded = !detailsExpanded }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(if (detailsExpanded) R.string.diagnostics_hide_details else R.string.diagnostics_show_details))
-                    }
-                    OutlinedButton(onClick = { onSimulate(candidate) }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.inspector_simulate_trigger), maxLines = 1)
-                    }
+            if (profile.contexts.isEmpty()) {
+                InspectorNotice(
+                    title = stringResource(R.string.inspector_no_contexts),
+                    body = stringResource(R.string.inspector_no_contexts_body),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else {
+                profile.contexts.forEach { check ->
+                    ContextCheckRow(check = check, nowMs = nowMs)
                 }
             }
         }
@@ -741,7 +386,6 @@ private fun ContextCheckRow(
     check: com.opentasker.core.contexts.ContextCheck,
     nowMs: Long,
 ) {
-    val context = LocalContext.current
     val color = if (check.effectiveMatched) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -751,17 +395,10 @@ private fun ContextCheckRow(
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-                InspectorStatusPill(
-                    stringResource(R.string.inspector_context_number, check.index + 1),
-                    MaterialTheme.colorScheme.secondary,
-                )
+                InspectorStatusPill("#${check.index + 1}", MaterialTheme.colorScheme.secondary)
                 Column(Modifier.weight(1f)) {
                     Text(
-                        stringResource(
-                            R.string.inspector_context_source,
-                            stringResource(contextTitleRes(check.spec.type)),
-                            check.sourceLabel,
-                        ),
+                        "${check.spec.type.name.lowercase(Locale.US).replaceFirstChar { it.titlecase(Locale.US) }} via ${check.sourceLabel}",
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
@@ -772,18 +409,15 @@ private fun ContextCheckRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                InspectorStatusPill(
-                    if (check.effectiveMatched) stringResource(R.string.inspector_match) else stringResource(R.string.inspector_no_match),
-                    color,
-                )
+                InspectorStatusPill(if (check.effectiveMatched) "Match" else "No match", color)
             }
             Text(check.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            locationDwellDetail(context, check, nowMs)?.let {
+            locationDwellDetail(check, nowMs)?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             check.lastObservation?.let {
                 Text(
-                    stringResource(R.string.inspector_observed, formatRelativeTime(context, it.observedAtMs, nowMs)),
+                    "Observed ${formatRelativeTime(it.observedAtMs, nowMs)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -801,39 +435,23 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.inspector_latest_value), style = MaterialTheme.typography.labelLarge)
+            Text("Latest value", style = MaterialTheme.typography.labelLarge)
             Text(
-                stringResource(R.string.inspector_matched, event.event.matched),
+                "matched=${event.event.matched}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            event.event.metadata["component"]?.let { component ->
+            event.event.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
                 Text(
-                    if (component.isBlank()) {
-                        stringResource(R.string.inspector_component_unavailable)
-                    } else {
-                        stringResource(R.string.inspector_observed_component, component)
-                    },
+                    "$key=$value",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            event.event.metadata.entries
-                .filterNot { it.key == "component" || it.key == "component_status" || it.key.startsWith("_setup_") }
-                .sortedBy { it.key }
-                .forEach { (key, value) ->
-                    Text(
-                        stringResource(R.string.inspector_metadata, key, value),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-            }
             Text(
-                formatAbsoluteTime(LocalContext.current, event.observedAtMs, nowMs),
+                formatAbsoluteTime(event.observedAtMs, nowMs),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -848,7 +466,20 @@ private fun InspectorMetric(value: String, label: String, modifier: Modifier = M
 
 @Composable
 private fun InspectorStatusPill(label: String, color: Color) {
-    StatusPill(label = label, color = color)
+    Surface(
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.32f)),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -864,19 +495,15 @@ private fun OemRiskNotice(oem: OemBatteryGuidance.Guidance) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),
     ) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(Icons.Filled.Error, contentDescription = stringResource(R.string.inspector_warning), tint = color, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Error, contentDescription = "Warning", tint = color, modifier = Modifier.size(20.dp))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    stringResource(
-                        R.string.inspector_oem_risk,
-                        oem.oemName,
-                        stringResource(oemRiskLevelLabelRes(oem.riskLevel)),
-                    ),
+                    "${oem.oemName} background risk: ${oem.riskLevel.name.lowercase(Locale.US)}",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    stringResource(R.string.inspector_oem_summary, oem.summary),
+                    "${oem.summary} Open the Setup tab for OEM-specific steps.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -923,13 +550,13 @@ private fun InspectorEmptyState(contentPadding: PaddingValues) {
             ) {
                 Icon(
                     Icons.Filled.Info,
-                    contentDescription = stringResource(R.string.inspector_unavailable_content_description),
+                    contentDescription = "Context inspector unavailable",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
-                Text(stringResource(R.string.inspector_unavailable_title), style = MaterialTheme.typography.titleLarge)
+                Text("Context inspector unavailable", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    stringResource(R.string.inspector_unavailable_body),
+                    "Runtime context sources have not registered yet. Open Setup to confirm permissions, then refresh after sources begin reporting.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -952,14 +579,6 @@ private fun sourceStatusColor(status: ContextSourceStatus): Color = when (status
     ContextSourceStatus.Error -> MaterialTheme.colorScheme.error
 }
 
-@Composable
-private fun observationStatusColor(status: ContextObservationStatus): Color = when (status) {
-    ContextObservationStatus.Ready -> MaterialTheme.colorScheme.tertiary
-    ContextObservationStatus.Loading -> MaterialTheme.colorScheme.secondary
-    ContextObservationStatus.Stale -> MaterialTheme.colorScheme.onSurfaceVariant
-    ContextObservationStatus.Error -> MaterialTheme.colorScheme.error
-}
-
 private fun sourceStatusIcon(status: ContextSourceStatus) = when (status) {
     ContextSourceStatus.Active -> Icons.Filled.CheckCircle
     ContextSourceStatus.Waiting -> Icons.Filled.Info
@@ -979,7 +598,7 @@ private fun buildContextSourceSnapshots(
         val setup = contextSourceSetup(context, key)
         ContextSourceSnapshot(
             key = key,
-            label = context.getString(sourceLabelResource(key)),
+            label = key.toContextSourceLabel(),
             registered = key in registeredKeys,
             setupReady = setup.ready,
             setupDetail = setup.detail,
@@ -987,16 +606,6 @@ private fun buildContextSourceSnapshots(
             lastObservation = observations[key],
         )
     }
-}
-
-private fun sourceLabelResource(key: String): Int = when (key) {
-    "app" -> R.string.context_source_application
-    "time" -> R.string.context_source_time
-    "state" -> R.string.context_source_state
-    "event" -> R.string.context_source_event
-    "location" -> R.string.context_source_location
-    "plugin" -> R.string.context_source_plugin
-    else -> R.string.context_source_unknown
 }
 
 private data class ContextSourceSetup(val ready: Boolean, val detail: String)
@@ -1007,9 +616,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = granted,
             detail = if (granted) {
-                context.getString(R.string.inspector_setup_usage_granted)
+                "Usage access is granted for foreground-app context checks."
             } else {
-                context.getString(R.string.inspector_setup_usage_missing)
+                "Usage access is missing; application contexts cannot report foreground packages."
             },
         )
     }
@@ -1018,9 +627,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = true,
             detail = if (exactReady) {
-                context.getString(R.string.inspector_setup_clock_exact)
+                "Clock source is registered and exact alarms are available for scheduled engine ticks."
             } else {
-                context.getString(R.string.inspector_setup_clock_inexact)
+                "Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback."
             },
         )
     }
@@ -1030,9 +639,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         ContextSourceSetup(
             ready = true,
             detail = if (wifiReady && locationReady) {
-                context.getString(R.string.inspector_setup_state_ready)
+                "Battery, charging, screen, headset, and WiFi-related state checks have required runtime access."
             } else {
-                context.getString(R.string.inspector_setup_state_partial)
+                "Battery, charging, screen, and headset checks are available; WiFi state may need location or nearby WiFi setup."
             },
         )
     }
@@ -1040,9 +649,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val notificationReady = hasNotificationListenerAccess(context)
         val calendarReady = hasPermission(context, Manifest.permission.READ_CALENDAR)
         val calendarDetail = if (calendarReady) {
-            context.getString(R.string.inspector_setup_calendar_ready)
+            "Calendar events can be matched with redacted metadata."
         } else {
-            context.getString(R.string.inspector_setup_calendar_missing)
+            "Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates."
         }
         // The broadcast receiver's state is not a permission, it is a live registration, and the
         // question people actually have is whether anything is listening yet.
@@ -1058,14 +667,11 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         }
         ContextSourceSetup(
             ready = true,
-            detail = listOf(
-                if (notificationReady) {
-                    context.getString(R.string.inspector_setup_event_ready, calendarDetail)
-                } else {
-                    context.getString(R.string.inspector_setup_event_notification_missing, calendarDetail)
-                },
-                broadcastDetail,
-            ).joinToString(" "),
+            detail = if (notificationReady) {
+                "Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. $calendarDetail $broadcastDetail"
+            } else {
+                "Boot, system, NFC, calendar, and sun events are registered. Notification events need Notification Access in Setup before Android will bind the listener. $calendarDetail $broadcastDetail"
+            },
         )
     }
     "location" -> {
@@ -1084,7 +690,7 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
             ),
         )
     }
-    else -> ContextSourceSetup(ready = true, detail = context.getString(R.string.inspector_setup_source_generic))
+    else -> ContextSourceSetup(ready = true, detail = "Source setup status is not specialized yet.")
 }
 
 private fun requiredContextSourceKeys(): Set<String> =
@@ -1108,60 +714,42 @@ private fun hasNotificationListenerAccess(context: Context): Boolean {
     return enabledListeners?.contains(context.packageName, ignoreCase = true) == true
 }
 
-private val ContextSourceStatus.resourceId: Int
-    get() = when (this) {
-        ContextSourceStatus.Active -> R.string.inspector_status_active
-        ContextSourceStatus.Waiting -> R.string.inspector_status_waiting
-        ContextSourceStatus.NeedsSetup -> R.string.inspector_status_needs_setup
-        ContextSourceStatus.Missing -> R.string.inspector_status_missing
-        ContextSourceStatus.Error -> R.string.inspector_status_error
-    }
-
-private val ContextObservationStatus.resourceId: Int
-    get() = when (this) {
-        ContextObservationStatus.Loading -> R.string.inspector_observation_loading
-        ContextObservationStatus.Ready -> R.string.inspector_observation_ready
-        ContextObservationStatus.Stale -> R.string.inspector_observation_stale
-        ContextObservationStatus.Error -> R.string.inspector_observation_error
-    }
-
 private fun emptyContextInspectionSnapshot(nowMs: Long): ContextInspectionSnapshot =
     ContextInspectionSnapshot(generatedAtMs = nowMs, sources = emptyList(), profiles = emptyList())
 
-private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long): String {
+private fun formatRelativeTime(observedAtMs: Long, nowMs: Long): String {
     val seconds = ((nowMs - observedAtMs) / 1000L).coerceAtLeast(0)
     return when {
-        seconds < 5 -> context.getString(R.string.inspector_time_just_now)
-        seconds < 60 -> context.getString(R.string.inspector_time_seconds, seconds)
-        seconds < 3_600 -> context.getString(R.string.inspector_time_minutes, seconds / 60)
-        else -> context.getString(R.string.inspector_time_hours, seconds / 3_600)
+        seconds < 5 -> "just now"
+        seconds < 60 -> "${seconds}s ago"
+        seconds < 3_600 -> "${seconds / 60}m ago"
+        else -> "${seconds / 3_600}h ago"
     }
 }
 
-private fun formatAbsoluteTime(context: Context, observedAtMs: Long, nowMs: Long): String {
+private fun formatAbsoluteTime(observedAtMs: Long, nowMs: Long): String {
     val formatted = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(observedAtMs))
-    return context.getString(R.string.inspector_time_absolute, formatted, formatRelativeTime(context, observedAtMs, nowMs))
+    return "$formatted - ${formatRelativeTime(observedAtMs, nowMs)}"
 }
 
-private fun locationDwellDetail(context: Context, check: com.opentasker.core.contexts.ContextCheck, nowMs: Long): String? {
+private fun locationDwellDetail(check: com.opentasker.core.contexts.ContextCheck, nowMs: Long): String? {
     if (check.spec.type != ContextType.LOCATION) return null
     val observation = check.lastObservation ?: return null
     val metadata = observation.event.metadata
     val state = metadata["dwellState"] ?: return null
     val dwellMillis = parseDwellMillis(check.spec.config)
-    val target = dwellMillis.takeIf { it > 0L }?.let { context.getString(R.string.inspector_dwell_target, formatDuration(context, it)) }.orEmpty()
+    val target = dwellMillis.takeIf { it > 0L }?.let { " of ${formatDuration(it)}" }.orEmpty()
     val observedAt = metadata["observedAtEpochMs"]?.toLongOrNull() ?: observation.observedAtMs
     val insideSince = metadata["insideSinceEpochMs"]?.toLongOrNull()
-    val insideFor = insideSince?.let { formatDuration(context, (observedAt - it).coerceAtLeast(0L)) }
+    val insideFor = insideSince?.let { formatDuration((observedAt - it).coerceAtLeast(0L)) }
 
     return when (state) {
-        "inside" -> insideFor?.let { context.getString(R.string.inspector_dwell_inside, it, target) }
-            ?: context.getString(R.string.inspector_dwell_inside_waiting)
+        "inside" -> insideFor?.let { "Dwell: inside for $it$target." } ?: "Dwell: inside; waiting for a stable entry time."
         "accuracy_blocked" -> insideFor?.let {
-            context.getString(R.string.inspector_dwell_accuracy_blocked, it, target)
-        } ?: context.getString(R.string.inspector_dwell_accuracy_blocked_no_timer)
-        "outside" -> context.getString(R.string.inspector_dwell_outside)
-        "unknown" -> context.getString(R.string.inspector_dwell_unknown)
+            "Dwell: latest fix is inside but blocked by accuracy; retained timer at $it$target."
+        } ?: "Dwell: latest fix is inside but blocked by accuracy."
+        "outside" -> "Dwell: outside radius; timer reset."
+        "unknown" -> "Dwell: waiting for valid geofence config and location metadata."
         else -> null
     }
 }
@@ -1176,11 +764,11 @@ private fun parseDwellMillis(config: Map<String, String>): Long {
 private fun firstConfig(config: Map<String, String>, vararg keys: String): String =
     keys.firstNotNullOfOrNull { config[it]?.trim()?.takeIf(String::isNotBlank) }.orEmpty()
 
-private fun formatDuration(context: Context, ms: Long): String {
+private fun formatDuration(ms: Long): String {
     val seconds = (ms / 1000L).coerceAtLeast(0L)
     return when {
-        seconds < 60 -> context.getString(R.string.inspector_duration_seconds, seconds)
-        seconds < 3_600 -> context.getString(R.string.inspector_duration_minutes_seconds, seconds / 60, seconds % 60)
-        else -> context.getString(R.string.inspector_duration_hours_minutes, seconds / 3_600, (seconds % 3_600) / 60)
+        seconds < 60 -> "${seconds}s"
+        seconds < 3_600 -> "${seconds / 60}m ${seconds % 60}s"
+        else -> "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"
     }
 }
