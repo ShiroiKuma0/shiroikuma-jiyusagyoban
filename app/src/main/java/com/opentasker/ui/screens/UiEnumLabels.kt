@@ -98,11 +98,31 @@ internal fun oemRiskLevelLabelRes(level: OemBatteryGuidance.RiskLevel): Int = wh
 internal fun sceneElementTypeLabelRes(type: SceneElementType): Int = when (type) {
     SceneElementType.BUTTON -> R.string.scene_element_type_button
     SceneElementType.TEXT -> R.string.scene_element_type_text
+    SceneElementType.EDIT_TEXT -> R.string.scene_element_type_edit_text
+    SceneElementType.CHECKBOX -> R.string.scene_element_type_checkbox
+    SceneElementType.TOGGLE -> R.string.scene_element_type_toggle
     SceneElementType.SLIDER -> R.string.scene_element_type_slider
+    SceneElementType.NUMBER_PICKER -> R.string.scene_element_type_number_picker
+    SceneElementType.SPINNER -> R.string.scene_element_type_spinner
     SceneElementType.IMAGE -> R.string.scene_element_type_image
+    SceneElementType.MAP -> R.string.scene_element_type_map
+    SceneElementType.WEB -> R.string.scene_element_type_web
+    SceneElementType.MENU -> R.string.scene_element_type_menu
+    SceneElementType.VIDEO -> R.string.scene_element_type_video
+    SceneElementType.OVAL -> R.string.scene_element_type_oval
+    SceneElementType.RECTANGLE -> R.string.scene_element_type_rectangle
+    SceneElementType.DOODLE -> R.string.scene_element_type_doodle
+    // Fork-only element types upstream's enum does not carry.
+    SceneElementType.PROGRESS -> R.string.scene_element_type_progress
+    SceneElementType.METEOR -> R.string.scene_element_type_meteor
 }
 
+/**
+ * Upstream resolves this through `ActionMetadata.nameRes`. The fork keeps action names as inline
+ * strings on the metadata, so the name is read directly and the generic resource is only the
+ * fallback for an action id with no registered metadata.
+ */
 @Composable
-internal fun actionDisplayName(actionId: String): String = stringResource(
-    ActionMetadataRegistry.get(actionId)?.nameRes ?: R.string.action_unknown_name,
-)
+internal fun actionDisplayName(actionId: String): String =
+    ActionMetadataRegistry.get(actionId)?.name?.takeUnless(String::isBlank)
+        ?: stringResource(R.string.action_unknown_name)

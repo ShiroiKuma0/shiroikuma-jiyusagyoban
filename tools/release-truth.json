@@ -1,33 +1,33 @@
 {
-    "schemaVersion":  1,
-    "requiredArtifactCommit":  "8989fab1d8fd089e69d2af27e1c470305549152b",
-    "releaseTag":  "v0.2.93",
-    "releaseTagCommit":  "c683f64c37db2b17dfb6faefe3bc245b2f5111f9",
-    "application":  {
-                        "versionName":  "0.2.93",
-                        "versionCode":  95
-                    },
-    "android":  {
-                    "minSdk":  26,
-                    "compileSdk":  37,
-                    "targetSdk":  37,
-                    "buildTools":  "36.0.0"
-                },
-    "dependencies":  {
-                         "kotlin":  "2.4.10",
-                         "gradle":  "9.7.0",
-                         "agp":  "9.3.2",
-                         "ksp":  "2.3.11",
-                         "room":  "2.8.4",
-                         "composeBom":  "2026.06.01",
-                         "work":  "2.11.2"
-                     },
-    "capabilities":  {
-                         "registeredActions":  77,
-                         "engineHandledActions":  10,
-                         "contextFamilies":  7,
-                         "bundleSchemaVersion":  2,
-                         "bundleSupportedSchemaVersions":  "1..2",
-                         "roomSchemaVersion":  15
-                     }
+    "schemaVersion": 1,
+    "requiredArtifactCommit": "8989fab1d8fd089e69d2af27e1c470305549152b",
+    "releaseTag": "v0.2.93",
+    "releaseTagCommit": "c683f64c37db2b17dfb6faefe3bc245b2f5111f9",
+    "application": {
+        "versionName": "0.2.93",
+        "versionCode": 95
+    },
+    "android": {
+        "minSdk": 26,
+        "compileSdk": 37,
+        "targetSdk": 37,
+        "buildTools": "36.0.0"
+    },
+    "dependencies": {
+        "kotlin": "2.4.10",
+        "gradle": "9.7.0",
+        "agp": "9.3.2",
+        "ksp": "2.3.11",
+        "room": "2.8.4",
+        "composeBom": "2026.06.01",
+        "work": "2.11.2"
+    },
+    "capabilities": {
+        "registeredActions": 195,
+        "engineHandledActions": 10,
+        "contextFamilies": 7,
+        "bundleSchemaVersion": 5,
+        "bundleSupportedSchemaVersions": "5..5",
+        "roomSchemaVersion": 29
+    }
 }
