@@ -1357,7 +1357,20 @@ val releaseRuntimeCoordinates = providers.provider {
     val configuration = configurations.single { candidate ->
         candidate.isCanBeResolved && candidate.name.equals("releaseRuntimeClasspath", ignoreCase = true)
     }
-    configuration.incoming.resolutionResult.allComponents.mapNotNull { component ->
+    val resolution = configuration.incoming.resolutionResult
+    // allComponents silently omits anything that failed to resolve, so every gate built on this
+    // list would describe a graph the build cannot actually produce and report success. A seeded
+    // version conflict failed the build at packaging while this check still passed.
+    val unresolved = resolution.allDependencies
+        .filterIsInstance<org.gradle.api.artifacts.result.UnresolvedDependencyResult>()
+        .map { it.requested.displayName }
+        .distinct()
+        .sorted()
+    check(unresolved.isEmpty()) {
+        "The release runtime graph does not resolve, so nothing can be verified about it. " +
+            "Unresolved: ${unresolved.joinToString()}"
+    }
+    resolution.allComponents.mapNotNull { component ->
         val id = component.id as? org.gradle.api.artifacts.component.ModuleComponentIdentifier
         id?.let { "${it.group}:${it.module}:${it.version}" }
     }
