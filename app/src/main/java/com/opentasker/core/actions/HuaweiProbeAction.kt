@@ -1,0 +1,569 @@
+package com.opentasker.core.actions
+
+import com.opentasker.core.engine.Action
+import com.opentasker.core.engine.ActionCategory
+import com.opentasker.core.engine.ActionContext
+import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.HuaweiCommands
+import com.opentasker.core.huawei.HuaweiCrypto
+import com.opentasker.core.huawei.HuaweiProtocol
+import com.opentasker.core.huawei.HuaweiRecords
+import com.opentasker.core.huawei.HuaweiSettings
+import com.opentasker.core.huawei.HuaweiSyncRunner
+import java.io.File
+
+/**
+ * `Probe Huawei Band` — ask the band what it actually supports, and write the answer to a file.
+ *
+ * This exists because the charts can only show what we ask for, and until now we did not know what
+ * there was to ask. Heart rate, blood oxygen and resting heart rate all read "nothing recorded" on
+ * the first real report — not because the band has no such data, but because the step-record service
+ * carries only motion fields and nothing else was ever requested.
+ *
+ * The band answers all of this itself. Its service census is a byte per service in the order we ask,
+ * and its command census is the same one level down — both were captured during provisioning and
+ * both were truncated in the logs, so this re-asks and keeps the whole reply.
+ *
+ * Worth keeping rather than deleting after one use: a firmware update can change any of it, and the
+ * next person to wonder where a metric lives should be able to ask rather than infer.
+ */
+class HuaweiProbeAction : Action {
+
+    private companion object {
+        const val SWEEP_ARG = "sweep"
+        const val WEATHER_SWEEP_ARG = "weather_sweep"
+        const val LISTEN_ARG = "listen_sec"
+        const val WARMUP_ARG = "warmup"
+    }
+
+    override val id = "huawei.probe"
+    override val category = ActionCategory.SYSTEM
+
+    /**
+     * The fitness commands whose meaning is established. Always probed: both only count.
+     *
+     * 0x0C is here despite the census not flagging it — it answers anyway, which is why the census
+     * is treated as a guide rather than gospel.
+     */
+    private val fitnessProbes = listOf(
+        0x0A to "step count",
+        0x0C to "activity-bout count",
+    )
+
+    /**
+     * Commands whose meaning is unknown. **Opt-in, because these are not reads.**
+     *
+     * In the captured Huawei Health session every one of these answered with a bare result tag
+     * while the queries answered with data — a setter accepting an argument, not a query declining
+     * one. 0x0E, 0x16, 0x17, 0x18 and 0x19 all returned 100000 OK to a count-shaped payload from
+     * this probe, so something was set on the band and what is unknown.
+     */
+    private val sweepProbes = listOf(
+        0x0E to "SETTER", 0x11 to "?", 0x12 to "?", 0x13 to "?", 0x14 to "?",
+        0x15 to "?", 0x16 to "SETTER", 0x17 to "SETTER", 0x18 to "SETTER",
+        0x19 to "SETTER", 0x1A to "?", 0x1B to "?",
+    )
+
+    /**
+     * Fitness commands Huawei Health uses to READ, whose meaning we do not know.
+     *
+     * Safe without the sweep flag, and that is evidence rather than optimism: in the capture these
+     * answered with data where the setters answered with a bare acknowledgement. Sleep is expected
+     * to be among them — the band displays last night's sleep so it holds it, and every query
+     * already accounted for is steps or activity bouts.
+     */
+    private val unknownQueries = listOf(0x03, 0x1E, 0x1F, 0x26)
+
+    /** 100000 is success; everything else is the band saying why not. */
+    private fun resultOf(tlvs: List<HuaweiProtocol.Tlv>): String {
+        val r = tlvs.firstOrNull { it.tag == HuaweiProtocol.TAG_RESULT } ?: return "no result tag"
+        val code = HuaweiProtocol.bytesToInt(r.value)
+        return "result $code" + if (code == HuaweiProtocol.RESULT_SUCCESS) " (OK)" else ""
+    }
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
+        val out = args["out"]?.trim()?.ifEmpty { null }
+            ?: "/sdcard/tmp/huawei-probe_${System.currentTimeMillis()}.txt"
+        val report = StringBuilder()
+        fun line(s: String = "") = report.append(s).append('\n')
+
+        val now = System.currentTimeMillis() / 1000
+        val dayAgo = now - 24 * 3600
+
+        // A census of what is actually STORED, before any radio is touched. Written first and
+        // unconditionally: when a chart and a coverage card disagree, the rows are the arbiter, and
+        // asking the band about it answers a different question entirely.
+        run {
+            val db = com.opentasker.app.OpenTaskerApp_NoHilt.db
+            val dao = db.huaweiSampleDao()
+            line("=== stored samples, last 24 h (hour buckets, local time) ===")
+            val metrics = runCatching { dao.metrics() }.getOrDefault(emptyList())
+            for (metric in metrics) {
+                val times = runCatching { dao.timesFor(metric, dayAgo, now) }.getOrDefault(emptyList())
+                val buckets = IntArray(25)
+                times.forEach { t ->
+                    val h = ((t - dayAgo) / 3600).toInt().coerceIn(0, 24)
+                    buckets[h]++
+                }
+                val strip = buckets.joinToString("") {
+                    when {
+                        it == 0 -> "."
+                        it < 10 -> it.toString()
+                        else -> "#"
+                    }
+                }
+                val first = times.firstOrNull()?.let { java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000) }
+                val last = times.lastOrNull()?.let { java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000) }
+                // Values, not only counts: a metric can be present in every minute and still draw
+                // nothing, because its readings are zeros the chart is told to treat as absent.
+                val vals = runCatching { dao.range(metric, dayAgo, now).map { it.value } }
+                    .getOrDefault(emptyList())
+                val zeros = vals.count { it == 0.0 }
+                val stat = if (vals.isEmpty()) "" else
+                    " min=%.0f max=%.0f zero=%d".format(vals.min(), vals.max(), zeros)
+                line("%-14s %5d  %s  %s .. %s%s".format(
+                    metric, times.size, strip, first ?: "-", last ?: "-", stat,
+                ))
+            }
+            line("legend: one character per hour, oldest first — . none, 1-9 that many, # ten or more")
+            line()
+
+            line("=== stored sleep ===")
+            val sleepDao = db.huaweiSleepDao()
+            line("segments ${runCatching { sleepDao.count() }.getOrDefault(-1)}")
+            val newest = runCatching { sleepDao.newestSession() }.getOrNull()
+            line("newest session start " + (newest?.let {
+                java.text.SimpleDateFormat("MM-dd HH:mm").format(it * 1000)
+            } ?: "none"))
+            newest?.let { st ->
+                runCatching { sleepDao.session(st) }.getOrNull()?.forEach {
+                    line("  %s  %s .. %s".format(
+                        it.stage,
+                        java.text.SimpleDateFormat("HH:mm").format(it.startSeconds * 1000),
+                        java.text.SimpleDateFormat("HH:mm").format((it.startSeconds + it.durationSeconds) * 1000),
+                    ))
+                }
+            }
+            line()
+
+            line("=== recent syncs ===")
+            runCatching { db.huaweiSyncDao().recent(8) }.getOrDefault(emptyList()).forEach {
+                line("  %s ok=%s %s".format(
+                    java.text.SimpleDateFormat("MM-dd HH:mm").format(it.startedAt),
+                    it.ok, (it.message ?: "").take(90),
+                ))
+            }
+            line()
+        }
+
+        if (args["census_only"]?.trim().equals("true", ignoreCase = true)) {
+            runCatching { File(out).writeText(report.toString()) }
+            ctx.variables.set("HUAWEI_ProbeFile", out)
+            args["store"]?.trim()?.ifEmpty { null }?.let { ctx.variables.set(it, out) }
+            return ActionResult.Success
+        }
+
+        val result = HuaweiSyncRunner.withSession(ctx.app, address) { session, api ->
+            line("=== identity ===")
+            runCatching { api.identity() }.onSuccess {
+                line("firmware ${it.firmware}   model ${it.model}   serial ${it.serial}")
+            }.onFailure { line("identity failed: ${it.message}") }
+            line("battery ${runCatching { api.battery() }.getOrNull()}")
+            line()
+
+            // Every product-info tag the band will answer, not the sixteen Health asks for.
+            //
+            // The question this settles: can a companion READ the band's display language at all?
+            // The locale service has no read — 0x0C/0x01 with empty tags answers nothing — so the
+            // only remaining hope was that the language rides along in product info. Our ordinary
+            // request enumerates a fixed list copied from Health's capture (tags 1, 2, 7, 9, 10, 17,
+            // 18, 22, 26, 29, 30, 31, 32, 33, 34, 35), and the band answers only what it is asked
+            // for, so a locale sitting in any other tag would be invisible no matter how often we
+            // looked (白い熊, 2026-08-29). This asks for all 127 and prints what comes back.
+            //
+            // Reading, not writing: this is the same command already sent at every session, with a
+            // longer list of empty tags. Nothing on the band is set by asking.
+            line("=== product info — ALL tags, looking for a language ===")
+            runCatching {
+                val all = (1..127).fold(ByteArray(0)) { acc, t -> acc + HuaweiProtocol.tlv(t) }
+                val tlvs = session.decrypt(
+                    session.request(
+                        HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_PRODUCT_INFO,
+                        all, timeoutMs = 12_000,
+                    ),
+                )
+                line("${tlvs.size} tags answered")
+                for (t in tlvs) {
+                    val text = t.value.toString(Charsets.US_ASCII)
+                        .trim { it <= ' ' || it == '\u0000' }
+                    val printable = text.isNotEmpty() && text.all { it in ' '..'~' }
+                    val hex = t.value.joinToString("") { "%02x".format(it) }
+                    // xx-YY is the only shape this band's locale field takes; flagged rather than
+                    // left for the eye, because that is the whole point of running this.
+                    val flag = if (
+                        text.length == 5 && text[2] == '-' &&
+                        text.take(2).all { it in 'a'..'z' } && text.drop(3).all { it in 'A'..'Z' }
+                    ) {
+                        "   <<< LANGUAGE TAG"
+                    } else {
+                        ""
+                    }
+                    line(
+                        "  tag ${t.tag}  (${t.value.size} B)  " +
+                            (if (printable) "\"$text\"" else hex.take(64)) + flag,
+                    )
+                }
+            }.onFailure { line("product info (all tags) failed: ${it.message}") }
+            line()
+
+            // The census is a byte per service, in the order we asked. Decoded here rather than
+            // dumped, because a 46-byte hex string is not an answer to "where does heart rate live".
+            line("=== service census — what the band says it supports ===")
+            runCatching {
+                val f = session.request(
+                    HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES,
+                    HuaweiCommands.supportedServices(), timeoutMs = 8_000,
+                )
+                val answer = session.decrypt(f).firstOrNull { it.tag == 2 }?.value
+                    ?: session.decrypt(f).firstOrNull()?.value
+                if (answer == null) {
+                    line("no census in the reply")
+                } else {
+                    val asked = HuaweiCommands.SUPPORTED_SERVICES
+                    line("asked about ${asked.size}, answered ${answer.size}")
+                    val yes = ArrayList<String>()
+                    for (i in asked.indices) {
+                        val svc = asked[i].toInt() and 0xFF
+                        val ok = i < answer.size && answer[i].toInt() != 0
+                        if (ok) yes += "0x%02X".format(svc)
+                        line("  0x%02X  %s".format(svc, if (ok) "YES" else "no"))
+                    }
+                    line("supported: ${yes.joinToString(" ")}")
+                }
+            }.onFailure { line("census failed: ${it.message}") }
+            line()
+
+            line("=== command census (raw) ===")
+            runCatching {
+                val f = session.request(
+                    HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_COMMANDS,
+                    HuaweiCommands.supportedCommands(), timeoutMs = 8_000,
+                )
+                session.decrypt(f).forEach {
+                    line("  tag 0x%02X (%d B) %s".format(it.tag, it.value.size, HuaweiCrypto.upperHex(it.value)))
+                }
+            }.onFailure { line("command census failed: ${it.message}") }
+            line()
+
+            // The direct question: which count commands on the fitness service answer at all, and
+            // with what. A count is the safe probe — it reads nothing and changes nothing.
+            line("=== unknown QUERIES Health reads (0x03, 0x1E, 0x1F, 0x26) ===")
+            for (cmd in unknownQueries) {
+                runCatching {
+                    val f = session.request(
+                        HuaweiCommands.SVC_FITNESS, cmd,
+                        HuaweiCommands.fitnessCount(dayAgo, now), timeoutMs = 6_000,
+                    )
+                    val tlvs = session.decrypt(f)
+                    val count = HuaweiRecords.parseCount(tlvs)
+                    line("  0x07/0x%02X  %s".format(cmd, if (count != null) "count=$count" else resultOf(tlvs)))
+                    for (t in tlvs) {
+                        line("      tag 0x%02X (%d B) %s".format(
+                            t.tag, t.value.size, HuaweiCrypto.upperHex(t.value).take(120)))
+                        if (t.tag and 0x80 != 0 && t.value.size > 2) {
+                            runCatching {
+                                for (n in HuaweiProtocol.parseTlvs(t.value)) {
+                                    line("        0x%02X (%d B) %s".format(
+                                        n.tag, n.value.size, HuaweiCrypto.upperHex(n.value).take(80)))
+                                }
+                            }
+                        }
+                    }
+                }.onFailure { line("  0x07/0x%02X  — %s".format(cmd, it.message)) }
+            }
+            line()
+
+            val sweep = args[SWEEP_ARG]?.trim().equals("true", ignoreCase = true)
+            line("=== fitness service 0x07 — count probes over the last 24 h ===")
+            if (!sweep) line("  (unknown-command sweep OFF — pass sweep=true to include it)")
+            for ((cmd, guess) in fitnessProbes + if (sweep) sweepProbes else emptyList()) {
+                val r = runCatching {
+                    val f = session.request(
+                        HuaweiCommands.SVC_FITNESS, cmd,
+                        HuaweiCommands.fitnessCount(dayAgo, now), timeoutMs = 4_000,
+                    )
+                    val tlvs = session.decrypt(f)
+                    val count = HuaweiRecords.parseCount(tlvs)
+                    // The result CODE, not merely that a result tag was present: without it there is
+                    // no telling "wrong command" from "right command, wrong payload", which is the
+                    // only question this sweep exists to answer.
+                    buildString {
+                        append(if (count != null) "count=$count" else resultOf(tlvs))
+                        append("   tags=")
+                        append(tlvs.joinToString(",") { "0x%02X".format(it.tag) })
+                    }
+                }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                line("  0x07/0x%02X  %-18s %s".format(cmd, guess, r))
+            }
+            line()
+
+            // Sleep is reachable (0x0C counts) but its RECORD shape is unknown, and a parser
+            // cannot be written against a guess. Fetch one and print its TLV structure — the same
+            // way the step record was decoded. Read-only: a count and an indexed read.
+            // 0x0C/0x0D was labelled "sleep" on nothing but the plan's guess, and it is NOT sleep.
+            // Decoded on 2026-08-22 its events run right through the working day — 09:18, 10:23,
+            // 11:57, 12:14 — and 白い熊 confirmed the 36-minute one at 08:37 was a morning walk and
+            // the short night-time ones were trips to the bathroom. They are activity bouts:
+            //
+            //   0x83 per event: 0x04 = 01 (constant), 0x06 = 00 (constant),
+            //   0x05 = <4-byte epoch start><2-byte duration in MINUTES>, non-overlapping.
+            //
+            // Sleep is elsewhere. The band displays last night's sleep, so it holds it; which
+            // command serves it is not yet known, and guessing is what produced this mislabel.
+            line("=== activity bouts — 0x07/0x0C count, 0x0D fetch (NOT sleep) ===")
+            runCatching {
+                val cf = session.request(
+                    HuaweiCommands.SVC_FITNESS, 0x0C,
+                    HuaweiCommands.fitnessCount(dayAgo, now), timeoutMs = 8_000,
+                )
+                val n = HuaweiRecords.parseCount(session.decrypt(cf)) ?: 0
+                line("count=$n over the last 24 h")
+                // Zero-based, as the step service turned out to be.
+                for (index in 0 until minOf(n, 2)) {
+                    val rf = session.request(
+                        HuaweiCommands.SVC_FITNESS, 0x0D,
+                        HuaweiCommands.fitnessRecord(index), timeoutMs = 8_000,
+                    )
+                    line("  record $index:")
+                    fun dump(tlvs: List<HuaweiProtocol.Tlv>, indent: String) {
+                        for (t in tlvs) {
+                            val hex = HuaweiCrypto.upperHex(t.value)
+                            line("$indent tag 0x%02X (%d B) %s".format(t.tag, t.value.size, hex.take(96)))
+                            // Container tags carry nested TLVs; 0x80 marks them in this protocol.
+                            if (t.tag and 0x80 != 0 && t.value.size > 2) {
+                                runCatching { dump(HuaweiProtocol.parseTlvs(t.value), "$indent  ") }
+                            }
+                        }
+                    }
+                    dump(session.decrypt(rf), "   ")
+                }
+            }.onFailure { line("sleep fetch failed: ${it.message}") }
+            line()
+
+            // 0x19/0x01 already answered 100000 (success) to a count-shaped payload, so the
+            // command is right and the payload is not. Three shapes, cheapest first.
+            line("=== service 0x19 (RR intervals — real HRV) ===")
+            val rriPayloads = listOf(
+                "empty" to ByteArray(0),
+                "tlv(1)" to HuaweiProtocol.tlv(1),
+                "tlv(1,=1)" to HuaweiProtocol.tlv(1, byteArrayOf(1)),
+                "count(24h)" to HuaweiCommands.fitnessCount(dayAgo, now),
+            )
+            for (cmd in listOf(0x01, 0x02)) {
+                for ((name, payload) in rriPayloads) {
+                    val r = runCatching {
+                        val f = session.request(HuaweiCommands.SVC_RRI, cmd, payload, timeoutMs = 4_000)
+                        val tlvs = session.decrypt(f)
+                        resultOf(tlvs) + "   " + tlvs.joinToString(",") {
+                            "0x%02X=%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(24))
+                        }
+                    }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                    line("  0x19/0x%02X  %-11s %s".format(cmd, name, r))
+                }
+            }
+
+            // The weather service, swept on request only.
+            //
+            // The band's own census says 0x0F answers commands 0x01..0x09 — nine of them — and this
+            // app has only ever used two: 0x01 to push and 0x05 to set the unit. 0x0C (disable) is
+            // known from a capture and is not even in the census, so the census undercounts.
+            //
+            // Worth knowing because the weather push is broken in a way nothing here can see: the
+            // band acknowledges the frame with a success code and its screen keeps showing Huawei
+            // Health's last reading from 2026-08-23. Our record is not merely unrendered, it is not
+            // stored — the place name never changes. Two of these commands are worth hoping for: a
+            // read-back, which would let the app check its own work instead of asking 白い熊 to look
+            // at the wrist, and the "weather reports ON" that the capture notes concluded did not
+            // exist, on the strength of Health simply resuming pushes.
+            //
+            // Empty payloads on purpose: an empty one is normally refused outright (0x19 answers
+            // 100013 to one), which makes it the safest possible knock on a door whose function is
+            // unknown. This is still a sweep of unknown commands on 白い熊's own band, which is why
+            // it is opt-in and never runs as part of an ordinary diagnostic.
+            if (args[WEATHER_SWEEP_ARG]?.trim().equals("true", ignoreCase = true)) {
+                line("")
+                line("=== service 0x0F (weather) — command sweep, empty payloads ===")
+                line("  known: 0x01 push · 0x05 unit · 0x0C disable (not in the census)")
+                for (cmd in 0x02..0x09) {
+                    if (cmd == 0x05) {
+                        line("  0x0F/0x05  (unit — known, not swept)")
+                        continue
+                    }
+                    val r = runCatching {
+                        val f = session.request(HuaweiCommands.SVC_WEATHER, cmd, ByteArray(0), timeoutMs = 4_000)
+                        val tlvs = session.decrypt(f)
+                        resultOf(tlvs) + "   " + tlvs.joinToString(",") {
+                            "0x%02X=%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(48))
+                        }
+                    }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                    line("  0x0F/0x%02X  %s".format(cmd, r))
+                }
+            }
+            // Listen. Send nothing, ask nothing, write down everything the band says on its own.
+            //
+            // The session already queues unsolicited frames rather than dropping them, because the
+            // band asks the phone for things mid-session. Nothing has ever read that queue for its
+            // own sake, so what the band asks for has never been written down.
+            //
+            // The reason to do it now: the band is showing "Data expires in 6 h" for its satellite
+            // assistance data, and nothing in this app touches GNSS. A band that wants assistance
+            // data asks its companion for it, and the request names the service and command that
+            // serve it — which is exactly the thing that cannot be looked up, because the only other
+            // implementation is AGPL and this fork will not take protocol constants from it.
+            //
+            // Entirely passive, so unlike the sweeps this needs no permission to be careful with:
+            // the only risk is learning nothing.
+            // The six commands Health sends on EVERY reconnect that our routine session never sends.
+            //
+            // Our withSession does linkParams, deviceStatus, securityNegotiation, authenticate — and
+            // then goes straight to work. Health follows the same handshake with these six, and the
+            // band's FIRST unsolicited frame lands 104 ms after the last of them. Our own Python
+            // first-run prototype sends all six, and it is the one session of ours the band has ever
+            // volunteered anything to; our Kotlin sessions send none and have never had a single
+            // unsolicited frame in any window.
+            //
+            // Bisectable from the task rather than by rebuilding: `warmup=1a05` sends one,
+            // `warmup=0102,0103,0137,1a05` sends four, `warmup=all` sends the lot. Every one is a
+            // command Health issues on every ordinary connect, and none writes a setting, a clock,
+            // a language or any wizard state. provision() is deliberately NOT reachable from here.
+            args[WARMUP_ARG]?.trim()?.lowercase()?.ifEmpty { null }?.let { spec ->
+                val want = if (spec == "all") listOf("0107", "0105", "0102", "0103", "0137", "1a05")
+                    else spec.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                line("")
+                line("=== warm-up: $want ===")
+                for (which in want) {
+                    val r = runCatching {
+                        val f = when (which) {
+                            "0107" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_PRODUCT_INFO, HuaweiCommands.productInfo())
+                            "0105" -> {
+                                val tz = java.util.TimeZone.getDefault()
+                                val off = tz.getOffset(System.currentTimeMillis()) / 60_000
+                                session.request(
+                                    HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SET_TIME,
+                                    HuaweiCommands.setTime(System.currentTimeMillis() / 1000, off / 60, off % 60),
+                                )
+                            }
+                            "0102" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES, HuaweiCommands.supportedServices())
+                            "0103" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_COMMANDS, HuaweiCommands.supportedCommands())
+                            "0137" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_EXPAND_CAPABILITY, HuaweiCommands.expandCapability())
+                            "1a05" -> session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount())
+                            else -> throw IllegalArgumentException("unknown warm-up step '$which'")
+                        }
+                        session.decrypt(f).joinToString(",") { "%d:%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(32)) }
+                    }.getOrElse { "— ${it::class.java.simpleName}: ${it.message}" }
+                    line("  $which  $r")
+                }
+            }
+
+            val listenSec = args[LISTEN_ARG]?.trim()?.toIntOrNull()?.coerceIn(1, 3600)
+            if (listenSec != null) {
+                // Appended to its own file AS IT ARRIVES, never buffered.
+                //
+                // This is the whole lesson of 2026-08-25: the first listen did capture 白い熊
+                // pressing Update — twice — and the capture died with the process because the report
+                // was only written when the window closed. A capture that exists solely in memory is
+                // one interruption away from never having happened, and the cost is not ours: it was
+                // 白い熊 who had to go and find that dialog again.
+                //
+                // Writing every frame the instant it lands also removes the coordination entirely.
+                // There is no window to be inside any more: arm it, press whenever, read the file
+                // whenever. Nothing has to be timed against anything.
+                val liveFile = File(out.removeSuffix(".txt") + "-listen.txt")
+                fun heardLine(t: String) = runCatching { liveFile.appendText(t + "\n") }
+                runCatching {
+                    liveFile.writeText(
+                        "=== live listen, ${listenSec}s from " +
+                            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                                .format(java.util.Date()) + " ===\n" +
+                            "Press Update on the band's satellite screen whenever you like; every frame\n" +
+                            "is appended here the moment it arrives, so nothing is lost if this is cut short.\n",
+                    )
+                }
+                line("")
+                line("=== listening for $listenSec s — live at ${liveFile.path} ===")
+                var heard = 0
+                var failed = 0
+                var lastKeepAlive = 0L
+                val started = System.currentTimeMillis()
+                val until = started + listenSec * 1000L
+                while (System.currentTimeMillis() < until) {
+                    // Prove the instrument, every 30 s, and keep the link from going idle.
+                    //
+                    // A listener that cannot hear is indistinguishable from a band that is not
+                    // speaking, and this one swallowed every poll failure into an empty list — so
+                    // thirty minutes of a dead transport read exactly like thirty minutes of
+                    // silence. 白い熊 pressed Update against that, twice, for nothing. The link is
+                    // now asked a cheap question on a timer and the answer is written down, so
+                    // "nothing was heard" only ever appears next to evidence that hearing worked.
+                    if (System.currentTimeMillis() - lastKeepAlive > 30_000) {
+                        lastKeepAlive = System.currentTimeMillis()
+                        val alive = runCatching {
+                            session.request(
+                                HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_BATTERY,
+                                HuaweiProtocol.tlv(1), timeoutMs = 4_000,
+                            )
+                            "link alive"
+                        }.getOrElse { "LINK DEAD — ${it::class.java.simpleName}: ${it.message}" }
+                        val at = "  +%3ds  [%s]".format((System.currentTimeMillis() - started) / 1000, alive)
+                        heardLine(at)
+                        if (alive.startsWith("LINK")) {
+                            heardLine("  giving up: nothing can be heard over a dead link, and pretending")
+                            heardLine("  otherwise is what wasted 白い熊's time this morning.")
+                            line("  the link died during the listen — see ${liveFile.path}")
+                            break
+                        }
+                    }
+                    val frames = runCatching { session.poll(2_000) }
+                        .getOrElse {
+                            failed++
+                            heardLine("  +%3ds  poll failed: %s".format(
+                                (System.currentTimeMillis() - started) / 1000, it.message ?: it::class.java.simpleName))
+                            emptyList()
+                        }
+                    for (f in frames) {
+                        heard++
+                        val tlvs = runCatching { session.decrypt(f) }.getOrNull()
+                        val body = tlvs?.joinToString(",") {
+                            "0x%02X=%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(96))
+                        } ?: "(undecryptable) " + HuaweiCrypto.upperHex(f.payload).take(96)
+                        val at = "  +%3ds  0x%02X/0x%02X  %s".format(
+                            (System.currentTimeMillis() - started) / 1000, f.serviceId, f.commandId, body,
+                        )
+                        heardLine(at)
+                        line(at)
+                    }
+                }
+                heardLine(if (heard == 0) "  (nothing heard; $failed poll failure(s))" else "  $heard frame(s), $failed poll failure(s)")
+                if (heard == 0) line("  (silence — the band asked for nothing in $listenSec s)")
+                else line("  $heard frame(s)")
+            }
+            report.toString()
+        }
+
+        return result.fold(
+            onSuccess = { text ->
+                runCatching { File(out).writeText(text) }
+                ctx.variables.set("HUAWEI_ProbeFile", out)
+                ctx.logger("Huawei probe written to $out")
+                args["store"]?.trim()?.ifEmpty { null }?.let { ctx.variables.set(it, out) }
+                ActionResult.Success
+            },
+            onFailure = {
+                val why = it.message ?: it::class.java.simpleName
+                args["store"]?.trim()?.ifEmpty { null }?.let { k -> ctx.variables.set(k, why) }
+                ActionResult.Failure(why)
+            },
+        )
+    }
+}
