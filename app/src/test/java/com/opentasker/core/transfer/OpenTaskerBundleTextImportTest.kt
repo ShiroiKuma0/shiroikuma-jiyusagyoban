@@ -1,6 +1,5 @@
 package com.opentasker.core.transfer
 
-import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.model.Project
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -12,7 +11,7 @@ class OpenTaskerBundleTextImportTest {
         val bundle = OpenTaskerBundle(
             appVersion = "0.2.79",
             exportedAtEpochMs = 1L,
-            projects = listOf(Project(DEFAULT_PROJECT_ID, "Default", 0)),
+            projects = listOf(Project(id = 1L, name = "Default")),
         )
 
         val decoded = OpenTaskerBundleTextImport.decode(

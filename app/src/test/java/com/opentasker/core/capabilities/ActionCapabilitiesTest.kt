@@ -10,18 +10,42 @@ import org.junit.Test
 class ActionCapabilitiesTest {
     @Test
     fun unsupportedActionsCannotBeAddedFromUi() {
-        assertFalse(ActionCapabilityRegistry.get("app.kill").canAdd)
-        assertFalse(ActionCapabilityRegistry.get("wifi.toggle").canAdd)
+        // `wifi.toggle` is NOT in this list any more: the fork drives it through Shizuku, so it is
+        // setup-gated and addable. These two genuinely cannot work — reboot needs device-owner
+        // privilege, and the Quick Settings tile update is unimplemented.
+        assertFalse(ActionCapabilityRegistry.get("reboot").canAdd)
+        assertFalse(ActionCapabilityRegistry.get("tile.set").canAdd)
     }
 
     @Test
-    fun elevatedActionsAreAddableButRequireShizukuSetup() {
-        ShizukuPowerBackend.elevatedActionIds.forEach { actionId ->
+    /**
+     * The fork ships privileged Shizuku execution (`runElevated`), so these actions are **setup-gated**
+     * rather than unsupported: addable, and honest that they need Shizuku installed, running and
+     * granted. Upstream's opposite assertion — that this app never ships a privileged transport — is
+     * the thing the fork exists to change.
+     */
+    fun elevatedActionsAreSetupGatedOnShizuku() {
+        // `reboot` is the exception and stays unsupported: shell access is not enough for it, it wants
+        // device-owner or system-app privilege, so it fails closed rather than pretending Shizuku helps.
+        (ShizukuPowerBackend.elevatedActionIds - "reboot").forEach { actionId ->
             val capability = ActionCapabilityRegistry.get(actionId)
-            assertEquals("$actionId must require setup", CapabilityLevel.RequiresSetup, capability.level)
-            assertTrue(capability.canAdd)
-            assertTrue(capability.reason.contains("Shizuku"))
+            assertEquals("$actionId should be setup-gated", CapabilityLevel.RequiresSetup, capability.level)
+            assertTrue("$actionId must remain addable", capability.canAdd)
+            // Shizuku for most; `screen.off` is driven by the accessibility service's global action
+            // instead. Either way the gate must be a real, named requirement the Setup tab can resolve.
+            assertTrue(
+                "$actionId must name a resolvable requirement",
+                capability.requirement in setOf(CapabilityRequirement.Shizuku, CapabilityRequirement.Accessibility),
+            )
         }
+    }
+
+    @Test
+    fun rebootStaysUnsupportedBecauseShizukuIsNotEnoughForIt() {
+        val capability = ActionCapabilityRegistry.get("reboot")
+
+        assertEquals(CapabilityLevel.Unsupported, capability.level)
+        assertFalse(capability.canAdd)
     }
 
     @Test

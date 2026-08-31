@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-variant overlay, so a debug build can be installed ALONGSIDE the release one.
+
+  The debug variant carries `applicationIdSuffix = ".debug"` precisely so it never has to replace
+  the release build on 白い熊's phone — replacing it would mean `adb uninstall`, and that destroys
+  the workspace database. But two packages cannot both declare the same custom permission: Android
+  refuses the second install with INSTALL_FAILED_DUPLICATE_PERMISSION, and the release build owns
+  `com.opentasker.permission.AUTOMATION`.
+
+  So the debug build simply does not declare it, and the one receiver guarded by it drops its guard
+  along with it — an unguarded receiver in a debug package that no sister app addresses is
+  harmless, whereas leaving `android:permission` pointing at a permission this package no longer
+  declares would make the receiver unresolvable.
+
+  Nothing here reaches the release build: this file applies to the debug variant only. The file
+  provider and Shizuku authorities already interpolate ${applicationId}, so they never collided.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <permission
+        android:name="com.opentasker.permission.AUTOMATION"
+        tools:node="remove" />
+
+    <application>
+        <receiver
+            android:name="com.opentasker.core.external.AutomationTargetReceiver"
+            android:permission=""
+            tools:replace="android:permission" />
+    </application>
+
+</manifest>

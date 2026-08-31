@@ -55,18 +55,22 @@ class ImportBoundaryCorpusTest {
             )
         }
 
-        val duplicateIds = seedBundle().copy(
+        // The fork's bundle format carries no ids at all — a NAME is the identity — so the blocking
+        // collision is a duplicate name, not a duplicate id.
+        val duplicateNames = seedBundle().copy(
             tasks = listOf(
-                Task(id = 7, name = "First", actions = listOf(ActionSpec(type = "log"))),
-                Task(id = 7, name = "Second", actions = listOf(ActionSpec(type = "log"))),
+                Task(id = 7, name = "Same", actions = listOf(ActionSpec(type = "log"))),
+                Task(id = 8, name = "Same", actions = listOf(ActionSpec(type = "log"))),
             ),
         )
-        val plan = OpenTaskerBundleCodec.validate(duplicateIds)
+        val plan = OpenTaskerBundleCodec.validate(duplicateNames)
         assertFalse(plan.canImport)
-        assertTrue(plan.warnings.any { it.contains("duplicate task ids") })
+        assertTrue(plan.warnings.any { it.contains("duplicate task names") })
 
-        assertBoundedFailure("oversized JSON") {
-            OpenTaskerBundleCodec.decode(seed, ImportResourceBudget.Default.copy(maxJsonChars = 32))
+        // The fork's decode() carries its own fixed size cap rather than an injectable budget, so the
+        // boundary this exercises is the other hard gate it fails closed on: the name-based schema cut.
+        assertBoundedFailure("pre-name-based bundle schema") {
+            OpenTaskerBundleCodec.decode("""{"schemaVersion":1,"tasks":[]}""")
         }
     }
 

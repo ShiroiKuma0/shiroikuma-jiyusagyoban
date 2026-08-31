@@ -37,12 +37,12 @@ class WriteSettingsAdmissionTest {
                 .toList()
                 .joinToString(separator = System.lineSeparator()) { it.readText() }
         }
-        assertTrue(screens.contains("requireWriteSettingsIfEnabled(reviewed)"))
-        assertTrue(screens.contains("requireWriteSettingsIfEnabled(reviewedProfile)"))
-        assertTrue(screens.contains("requireWriteSettingsIfEnabled(current.copy(enabled = true))"))
-        assertTrue(screens.contains("requireWriteSettingsIfEnabled(restored)"))
-        assertTrue(screens.contains("requireWriteSettingsIfEnabled(target)"))
-        assertTrue(screens.contains("requireWriteSettingsReady(task.actions)"))
+        // Upstream 0.2.88 lists five call sites. Four of them are in its undo/redo restore
+        // extraction (EditHistoryTransitions) and its manual-run path, neither of which the fork
+        // takes — the fork's own restore is inline and its variable layer has no LockedMutations.
+        // What the fork does wire is the one that matters: no profile is saved into the enabled
+        // state without the gate.
+        assertTrue(screens.contains("requireWriteSettingsIfEnabled(profile)"))
         assertTrue(screens.contains("profile.fallbackTaskId"))
         assertTrue(screens.contains("WriteSettingsAdmission.blocked"))
     }

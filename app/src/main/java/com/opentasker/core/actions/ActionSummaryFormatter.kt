@@ -8,8 +8,9 @@ import com.opentasker.app.R
  *
  * The parameter portion always goes through [ActionArgumentSensitivity], so task rows, flow
  * nodes, and preflight cannot accidentally expose a credential while trying to explain a step.
- * Every built-in action resolves [ActionMetadata.summaryRes] through the registry; the fallback
- * keeps forward-compatible or test-only action metadata grammatical as well.
+ * Upstream resolves a per-action `summaryRes` template through the registry. The fork keeps its
+ * metadata as inline strings rather than string resources, so the action NAME comes straight from
+ * the metadata and every action shares the one generic template.
  */
 object ActionSummaryFormatter {
     const val MAX_ARGUMENTS = 3
@@ -21,17 +22,13 @@ object ActionSummaryFormatter {
         args: Map<String, String>,
     ): String {
         val metadata = ActionMetadataRegistry.get(actionType)
-        val actionName = metadata
-            ?.let { resources.getString(it.nameRes) }
-            ?.takeUnless(String::isBlank)
-            ?: resources.getString(R.string.action_unknown_name)
+        val actionName = metadata?.name?.takeUnless(String::isBlank) ?: actionType
         val parameters = ActionArgumentSensitivity.summarize(
             actionType = actionType,
             args = args,
             limit = MAX_ARGUMENTS,
             maxValueLength = MAX_VALUE_LENGTH,
         ).ifBlank { resources.getString(R.string.action_summary_default_parameters) }
-        val templateRes = metadata?.summaryRes ?: R.string.action_parameter_summary
-        return resources.getString(templateRes, actionName, parameters)
+        return resources.getString(R.string.action_parameter_summary, actionName, parameters)
     }
 }

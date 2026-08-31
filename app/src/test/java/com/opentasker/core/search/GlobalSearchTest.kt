@@ -25,7 +25,7 @@ class GlobalSearchTest {
         ),
     )
     private val profile = Profile(id = 20, name = "Morning report", enterTaskId = task.id)
-    private val variable = Variable(name = "ReportName", value = "Quarterly report", isGlobal = true)
+    private val variable = Variable(name = "ReportName", value = "Quarterly report")
     private val scene = Scene(
         id = 30,
         name = "Report dashboard",

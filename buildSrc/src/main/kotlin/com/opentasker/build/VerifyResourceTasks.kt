@@ -6,6 +6,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
@@ -138,6 +139,27 @@ abstract class VerifyRoomSchemaTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val databaseFile: RegularFileProperty
 
+    /**
+     * Versions the schema chain passes THROUGH without any build ever declaring them.
+     *
+     * Room exports a schema for the version the code declares, and only that one. When a release
+     * bumps the version by more than one -- writing MIGRATION_17_18 and MIGRATION_18_19 in the same
+     * commit -- the intermediate number exists in the migration chain but was never a version any
+     * build compiled at, so no JSON for it can exist. It cannot be regenerated either: the entity
+     * definitions that would describe it were never written.
+     *
+     * Nothing is at risk from that. A database is only ever AT REST on a declared version, and Room
+     * validates only at rest; the intermediate states are passed through inside one upgrade and
+     * never compared against a schema. `scripts/check-room-migration.py --all` replays every
+     * exported version forward to the current one and so covers these spans end to end.
+     *
+     * Listing them explicitly, rather than relaxing the check to "1..current minus whatever is
+     * absent", is the point: a version missing because someone forgot to commit its JSON still
+     * fails here, loudly. Adding a number to this list has to be a decision someone wrote down.
+     */
+    @get:Input
+    abstract val transitedVersions: SetProperty<Int>
+
     @TaskAction
     fun verify() {
         val schemaDir = schemaDirectory.get().asFile
@@ -149,9 +171,22 @@ abstract class VerifyRoomSchemaTask : DefaultTask() {
             ?.get(1)
             ?.toInt()
             ?: error("Could not derive Room schema version from ${database.path}.")
-        val missing = (1..currentVersion).filter { !File(schemaDir, "$it.json").isFile }
+        val transited = transitedVersions.getOrElse(emptySet())
+        val missing = (1..currentVersion)
+            .filter { !File(schemaDir, "$it.json").isFile }
+            .filterNot { it in transited }
         check(missing.isEmpty()) {
-            "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to regenerate, then commit."
+            "Room schema files missing for version(s): ${missing.joinToString()}. Run a build to " +
+                "regenerate, then commit. (If a version was only ever passed through by a multi-step " +
+                "bump, no build ever declared it and no schema can exist: record it in " +
+                "verifyRoomSchema's transitedVersions, with the reason.)"
+        }
+        // A number left in the list after its schema turns up means the list is now lying about
+        // history, so say so rather than letting it rot.
+        val present = transited.filter { File(schemaDir, "$it.json").isFile }
+        check(present.isEmpty()) {
+            "verifyRoomSchema lists version(s) ${present.joinToString()} as never declared, but a " +
+                "schema for them exists. Remove them from transitedVersions."
         }
 
         // Existence is not drift detection. Change an entity without bumping the version and KSP
@@ -171,6 +206,7 @@ abstract class VerifyRoomSchemaTask : DefaultTask() {
                 append("regenerated schema if the change is intentional.")
             }
         }
-        println("Room schema drift gate passed: versions 1..$currentVersion present and unmodified.")
+        val transitedNote = if (transited.isEmpty()) "" else " (${transited.sorted().joinToString()} were never declared, so have no schema)"
+        println("Room schema drift gate passed: every declared version through $currentVersion is present and unmodified$transitedNote.")
     }
 }

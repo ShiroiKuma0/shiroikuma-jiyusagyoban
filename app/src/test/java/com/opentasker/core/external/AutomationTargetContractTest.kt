@@ -71,7 +71,8 @@ class AutomationTargetContractTest {
         assertTrue(scene.contains("InternalTaskRunSource.SCENE_OVERLAY"))
         assertTrue(service.contains("AutomationTargetContract.EXTRA_RUN_SOURCE"))
         assertTrue(service.contains("runExternalTask("))
-        assertTrue(service.contains("parentExecutionId = parentExecutionId"))
+        // The fork does not carry upstream 0.2.80's ExecutionEnvelope, so AutomationService does not
+        // re-thread a causal parent id; the rest of the canonical-builder contract still holds.
 
         // Exact-list equality over every production root. Walking app/ alone would have let a
         // second producer in a core module pass unnoticed.

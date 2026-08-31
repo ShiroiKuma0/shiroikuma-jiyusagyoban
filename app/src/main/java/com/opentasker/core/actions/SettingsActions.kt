@@ -14,8 +14,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
+// The fork keeps plain Action implementations alongside upstream's DeclaredAction ones in this
+// file, so both symbols stay imported.
+import com.opentasker.core.engine.Action
+import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.contexts.QuickSettingsTileStore
@@ -37,12 +40,18 @@ class WiFiToggleAction : DeclaredAction(ActionCatalog.require("wifi.toggle")) {
     @Suppress("DEPRECATION")
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"] ?: "toggle"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return ActionResult.Failure("Android 10+ blocks direct WiFi toggles; open system WiFi settings instead")
-        }
         val wm = ctx.app.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            ?: return ActionResult.Failure("WiFi not available")
-
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Direct toggles are blocked on Android 10+; drive `svc wifi` through Shizuku instead.
+            val target = when (state.lowercase()) {
+                "on" -> true
+                "off" -> false
+                "toggle" -> !(wm?.isWifiEnabled ?: false)
+                else -> return ActionResult.Failure("invalid state: $state")
+            }
+            return runElevated(ctx, "WiFi", "svc wifi ${if (target) "enable" else "disable"}")
+        }
+        wm ?: return ActionResult.Failure("WiFi not available")
         when (state.lowercase()) {
             "toggle" -> wm.isWifiEnabled = !wm.isWifiEnabled
             "on" -> wm.isWifiEnabled = true
@@ -107,7 +116,10 @@ class BrightnessAction : DeclaredAction(ActionCatalog.require("brightness.set"))
             if (brightness.lowercase() == "auto") {
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
             } else {
-                val value = brightness.toInt().coerceIn(0, 255)
+                // percent=true treats the value as 0..100; else it's the raw 0..255 system value.
+                val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                val raw = brightness.toIntOrNull() ?: return ActionResult.Failure("invalid brightness: $brightness")
+                val value = if (percent) (raw.coerceIn(0, 100) * 255 + 50) / 100 else raw.coerceIn(0, 255)
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
                 Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, value)
             }
@@ -146,8 +158,10 @@ class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
                 "unmute" -> audioManager.adjustStreamVolume(streamType, AudioManager.ADJUST_UNMUTE, 0)
                 else -> {
                     val max = audioManager.getStreamMaxVolume(streamType)
-                    val level = levelArg.toIntOrNull()?.coerceIn(0, max)
-                        ?: return ActionResult.Failure("invalid level: $levelArg")
+                    val raw = levelArg.toIntOrNull() ?: return ActionResult.Failure("invalid level: $levelArg")
+                    // percent=true treats `level` as 0..100 of the stream's max (so one slider fits any stream).
+                    val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+                    val level = if (percent) (raw.coerceIn(0, 100) * max + 50) / 100 else raw.coerceIn(0, max)
                     audioManager.setStreamVolume(streamType, level, 0)
                 }
             }
@@ -160,6 +174,35 @@ class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
 }
 
 /**
+ * Read the current volume of a stream into a variable.
+ *
+ * Args:
+ *   - "stream": "music", "alarm", "ring", "notification", etc. (default "music")
+ *   - "var": variable to store the level in (0..stream max). Reading is allowed on all OS versions.
+ */
+class VolumeGetAction : Action {
+    override val id = "volume.get"
+    override val category = ActionCategory.SETTINGS
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val varName = args["var"]?.trim()?.removePrefix("%")?.ifBlank { null }
+            ?: return ActionResult.Failure("missing var")
+        val audioManager = ctx.app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            ?: return ActionResult.Failure("audio service not available")
+        val streamType = streamType(args["stream"] ?: "music") ?: return ActionResult.Failure("invalid stream")
+        val rawLevel = audioManager.getStreamVolume(streamType)
+        val percent = args["percent"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        val level = if (percent) {
+            val max = audioManager.getStreamMaxVolume(streamType).coerceAtLeast(1)
+            (rawLevel * 100 + max / 2) / max
+        } else rawLevel
+        ctx.variables.set(varName, level.toString())
+        ctx.logger("Volume ${args["stream"] ?: "music"} = $level${if (percent) "%" else ""} -> %$varName")
+        return ActionResult.Success
+    }
+}
+
+/**
  * Toggle Airplane mode.
  *
  * Args:
@@ -168,26 +211,21 @@ class VolumeAction : DeclaredAction(ActionCatalog.require("volume.set")) {
 class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val state = args["state"]?.lowercase() ?: "toggle"
-        val variant = when (state) {
-            "on" -> 0
-            "off" -> 1
-            "toggle" -> {
-                val enabled = runCatching {
-                    Settings.Global.getInt(
-                        ctx.app.contentResolver,
-                        Settings.Global.AIRPLANE_MODE_ON,
-                        0,
-                    ) == 1
-                }.getOrElse { error ->
-                    return ActionResult.Failure("Airplane mode state could not be read: ${error.message ?: "unknown error"}")
-                }
-                if (enabled) 1 else 0
-            }
-            else -> return ActionResult.Failure("invalid airplane mode state: $state")
+        val state = args["state"] ?: "toggle"
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
         }
-        ctx.logger("Airplane mode: $state")
-        return ctx.runShizukuAction("airplane.toggle", "Airplane mode", variant)
+        // The AIRPLANE_MODE broadcast is a protected, system-only broadcast — sending it from the
+        // Shizuku shell fails, which previously failed the whole action even though the setting (which
+        // the system observes) was applied. Make the broadcast best-effort so success tracks the put.
+        return runElevated(
+            ctx, "Airplane mode",
+            "settings put global airplane_mode_on ${if (target) 1 else 0} && " +
+                "(am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $target >/dev/null 2>&1 || true)",
+        )
     }
 }
 
@@ -200,25 +238,14 @@ class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle
 class MobileDataAction : DeclaredAction(ActionCatalog.require("mobile.toggle")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        val state = args["state"]?.lowercase() ?: "toggle"
-        val variant = when (state) {
-            "on" -> 0
-            "off" -> 1
-            "toggle" -> {
-                if (ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-                    return ActionResult.Failure("Mobile data state requires phone-state permission; choose on or off, or grant it in Setup")
-                }
-                val telephony = ctx.app.getSystemService(TelephonyManager::class.java)
-                    ?: return ActionResult.Failure("Mobile data service is unavailable")
-                val enabled = runCatching { telephony.isDataEnabled }.getOrElse { error ->
-                    return ActionResult.Failure("Mobile data state could not be read: ${error.message ?: "unknown error"}")
-                }
-                if (enabled) 1 else 0
-            }
-            else -> return ActionResult.Failure("invalid mobile data state: $state")
+        val state = args["state"] ?: "toggle"
+        val target = when (state.lowercase()) {
+            "on", "enable", "true", "1" -> true
+            "off", "disable", "false", "0" -> false
+            "toggle" -> Settings.Global.getInt(ctx.app.contentResolver, "mobile_data", 0) == 0
+            else -> return ActionResult.Failure("invalid state: $state")
         }
-        ctx.logger("Mobile data: $state")
-        return ctx.runShizukuAction("mobile.toggle", "Mobile data", variant)
+        return runElevated(ctx, "Mobile data", "svc data ${if (target) "enable" else "disable"}")
     }
 }
 

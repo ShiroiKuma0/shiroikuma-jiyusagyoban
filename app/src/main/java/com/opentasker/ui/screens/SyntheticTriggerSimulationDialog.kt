@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.engine.CooldownStore
 import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.engine.ExecutionAdmissionStrings
@@ -229,7 +230,9 @@ private fun SyntheticContextCard(result: SyntheticContextResult) {
                         stringResource(
                             R.string.synthetic_trigger_context_number,
                             result.index + 1,
-                            stringResource(contextTitleRes(result.spec.type)),
+                            // The fork names context types inline rather than through string
+                            // resources, so the label comes straight from the enum.
+                            contextTypeLabel(result.spec.type),
                         ),
                         style = MaterialTheme.typography.titleSmall,
                     )
@@ -269,4 +272,14 @@ private fun SyntheticContextCard(result: SyntheticContextResult) {
             }
         }
     }
+}
+
+private fun contextTypeLabel(type: ContextType): String = when (type) {
+    ContextType.APPLICATION -> "Application"
+    ContextType.TIME -> "Time"
+    ContextType.DAY -> "Day"
+    ContextType.LOCATION -> "Location"
+    ContextType.STATE -> "Device state"
+    ContextType.EVENT -> "Event"
+    ContextType.PLUGIN -> "Plugin condition"
 }
