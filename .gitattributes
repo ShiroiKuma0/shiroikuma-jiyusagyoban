@@ -20,3 +20,11 @@
 *.so binary
 *.zip binary
 *.gz binary
+
+# --- shiroikuma fork ---------------------------------------------------------
+# GNSS captures are BYTES, not text. `current_yuma.alm` from NavCen and the IAC's
+# `MCCT_*.agl` arrive with CRLF, and these fixtures exist to be exactly what those servers send —
+# a fixture normalised to LF is testing something the pipeline will never receive. `text=auto`
+# classifies them as text because they happen to be ASCII, so they are pinned here instead.
+*.alm -text
+*.agl -text
