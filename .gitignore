@@ -24,6 +24,10 @@ work/
 *.class
 release/
 
+# EXCEPTION: the share-relay stub's prebuilt dex is a committed fixture (see app/src/relay/REGENERATE.md),
+# not a build output — it ships in the APK as an asset the on-device relay generator reuses verbatim.
+!app/src/main/assets/relay/classes.dex
+
 # Keystores (NEVER commit)
 *.jks
 *.keystore
@@ -32,10 +36,8 @@ keystore.properties
 # Kotlin
 .kotlin/
 
-# Local agent working notes (never commit)
-CLAUDE.md
+# Local agent working notes
 CODEX_CHANGELOG.md
-.claude/
 *.bak
 AUDIT_COMPLETE.md
 PHASE_5_CHECKPOINT.md
@@ -45,26 +47,13 @@ build_output.txt
 build_*.bat
 build.sh
 
-# Markdown files local-only (except README and the changelog).
-# ROADMAP.md and RESEARCH.md were tracked for a while despite this rule; they are untracked
-# now so working-tree churn stops being published.
-# The negations are rooted with a leading slash on purpose: a bare `!README.md` matches at any
-# depth, which is how docs/archive/ui-snapshots/README.md ended up tracked while every file it
-# described stayed ignored.
-*.md
-!/README.md
-!/CHANGELOG.md
-!/CONTRIBUTING.md
+# shiroikuma fork: CLAUDE.md, .claude/skills, .md docs and hand-off.md ARE committed, so
+# upstream's blanket `*.md` rule — and the `docs/` rule that came with it — are deliberately NOT
+# taken: our documentation is the fork's working memory and belongs in the history. Only
+# host-specific local Claude settings stay out.
+.claude/settings.local.json
 
-# The local documentation tree is working notes, not published material. Publishing it is a
-# separate, deliberate decision; until then only the files README.md links to are tracked.
-# This has to exclude the directory's *contents* rather than the directory itself: git cannot
-# re-include a file whose parent directory is excluded, so `docs/` plus a negation would leave
-# EXTERNAL_INTENTS.md ignored and the README link broken on github.com.
-docs/*
-!/docs/EXTERNAL_INTENTS.md
-
-# AI config
+# AI config for tools this fork does not use.
 AGENTS.md
 .codex/
 .ai/
@@ -72,6 +61,11 @@ PROJECT_CONTEXT.md
 CONTINUATION_PROMPT.md
 
 # Signing material stays outside the repository.
+#
+# Our fork used to carry `!app/dev_keystore.jks`, an exception keeping upstream's tracked self-host
+# identity. Upstream rewrote its entire history at v0.2.93 to purge that key because it was publicly
+# available, so the exception is gone with it. Nothing of ours was ever signed with it: our release
+# signing comes from the gitignored keystore.properties, pointing at a keystore outside the tree.
 *.jks
 *.keystore
 *.p12
@@ -81,3 +75,10 @@ signing.properties
 # rendered images remain local build output and must not become review noise.
 app/src/screenshotTest*/actual/
 app/src/screenshotTest*/diff/
+
+# Claude's scratch space: generator/demo/sim scripts and their JSON output live here
+# (never in ~/tmp — that's 白い熊's). Pushed to the device's /sdcard/tmp/ from here.
+.scratch/
+app/src/main/assets/ocr/
+__pycache__/
+app/src/test/resources/huawei/walk-real.bin

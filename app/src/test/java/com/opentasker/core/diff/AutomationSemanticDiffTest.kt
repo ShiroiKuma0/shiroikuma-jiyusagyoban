@@ -98,8 +98,8 @@ class AutomationSemanticDiffTest {
         val importedTask = Task(id = 1, name = "Start", actions = listOf(ActionSpec(type = "notify.show")))
         val existingProfile = Profile(id = 201, name = "Home", enabled = false, requiresRiskAcknowledgement = true, enterTaskId = 101)
         val importedProfile = Profile(id = 2, name = "Home", enabled = true, enterTaskId = 1)
-        val existingVariable = Variable(name = "api_token", value = "old", isGlobal = true)
-        val importedVariable = Variable(name = "api_token", value = "new", isGlobal = true)
+        val existingVariable = Variable(name = "api_token", value = "old")
+        val importedVariable = Variable(name = "api_token", value = "new")
         val document = AutomationSemanticDiff.compareBundle(
             bundle = OpenTaskerBundle(
                 appVersion = "test",

@@ -32,29 +32,7 @@ class ExecutionSemanticsContractTest {
         assertEquals("Production run paths must use executeAndLogTask", emptyList<String>(), directRunnerConstruction)
     }
 
-    @Test
-    fun actionReorderUsesOneTransactionAndSnapshotsThePreviousOrder() {
-        // Scanned across the screens package: the contract is that the reorder path is one
-        // transaction, not that it stays in a particular filename.
-        val screensRoot = sourceRoot.resolve("com/opentasker/ui/screens")
-        val owner = Files.list(screensRoot).use { paths ->
-            paths.filter { it.fileName.toString().endsWith(".kt") }
-                .filter { it.readText().contains("fun moveTaskAction(") }
-                .toList()
-        }
-        assertEquals("Expected exactly one declaration of moveTaskAction", 1, owner.size)
-        val source = owner.single().readText()
-        // Stop at the next member declaration whatever modifiers it carries; keying on a bare
-        // `fun ` let the slice silently swallow the rest of the class.
-        val body = source.substringAfter("fun moveTaskAction(")
-        val method = Regex("""\n    (?:private |internal |public )?(?:suspend )?fun """)
-            .find(body)
-            ?.let { body.substring(0, it.range.first) }
-            ?: body
-
-        assertTrue(method.contains("db.withTransaction"))
-        assertTrue(method.contains("previousJson = StorageJson.encodeToString(decoded.value)"))
-        assertTrue(method.contains("nextJson = StorageJson.encodeToString(updated)"))
-        assertTrue(method.contains("db.taskDao().update(updated.toEntity())"))
-    }
+    // RETIRED: upstream's transactional `moveTaskAction` snapshot contract. The fork reorders actions
+    // through its own multi-select / clone / cut / paste editor path, not upstream's move-up/down card
+    // controls, so this source-text assertion no longer describes our ViewModel.
 }

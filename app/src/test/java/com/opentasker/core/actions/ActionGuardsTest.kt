@@ -13,6 +13,8 @@ import java.net.URL
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -507,7 +509,8 @@ class ActionGuardsTest {
         val action = VibrateAction()
         val result = action.run(ctx(), emptyMap())
         assertTrue("missing vibration duration should fail", result is ActionResult.Failure)
-        assertEquals("missing millis", (result as ActionResult.Failure).message)
+        // The fork's vibrate also accepts a `pattern`, so the message names both ways to supply one.
+        assertEquals("missing millis (or pattern)", (result as ActionResult.Failure).message)
     }
 
     @Test
@@ -677,18 +680,23 @@ class ActionGuardsTest {
     }
 
     @Test
-    fun airplaneModeFailsClosedWithoutShizuku() = runBlocking {
+    /**
+     * Upstream refused elevated actions outright ("never ships a privileged transport"). This fork DOES
+     * ship one, so the honest failure without Shizuku is "needs Shizuku", not "restricted" — the action
+     * is genuinely available once Shizuku is running and granted.
+     */
+    fun airplaneModeFailsHonestlyWithoutShizuku() = runBlocking {
         val action = AirplaneModeAction()
         val result = action.run(ctx(), mapOf("state" to "on"))
-        assertTrue("airplane mode should fail", result is ActionResult.Failure)
+        assertTrue("airplane mode should fail without Shizuku", result is ActionResult.Failure)
         assertTrue((result as ActionResult.Failure).message.contains("Shizuku"))
     }
 
     @Test
-    fun mobileDataFailsClosedWithoutShizuku() = runBlocking {
+    fun mobileDataFailsHonestlyWithoutShizuku() = runBlocking {
         val action = MobileDataAction()
         val result = action.run(ctx(), mapOf("state" to "on"))
-        assertTrue("mobile data should fail", result is ActionResult.Failure)
+        assertTrue("mobile data should fail without Shizuku", result is ActionResult.Failure)
         assertTrue((result as ActionResult.Failure).message.contains("Shizuku"))
     }
 
@@ -761,7 +769,31 @@ class ActionGuardsTest {
     }
 
     @Test
-    fun persistVariablePromotesExplicitLowercaseTargetAndRoundTrips() = runBlocking {
+    fun persistVariableRoundTripsThroughAnAllCapsTarget() = runBlocking {
+        val variables = VariableStore()
+        variables.pushScope()
+        variables.set("temp", "hello")
+
+        val result = PersistVariableAction().run(
+            ActionContext(ContextWrapper(null), variables),
+            mapOf("name" to "%temp", "global_name" to "%GREETING"),
+        )
+        variables.popScope()
+
+        assertTrue("persist should succeed", result is ActionResult.Success)
+        assertEquals("hello", variables.globalSnapshot()["GREETING"])
+        assertEquals("hello", variables.get("GREETING"))
+    }
+
+    /**
+     * A documented sharp edge, asserted so it cannot change unnoticed. `promoteToGlobal` capitalises a
+     * lowercase target (`%greeting` → `Greeting`), but a MixedCase name is **project**-scoped — and an
+     * unfiled task has no project, so [VariableStore]'s guard keeps it task-local rather than writing a
+     * dead shadow-copy into the super bucket. The value resolves for the rest of the run and is NOT
+     * durable; only an ALL-CAPS target persists from a task with no project.
+     */
+    @Test
+    fun persistVariableToAMixedCaseTargetStaysTaskLocalWithoutAProject() = runBlocking {
         val variables = VariableStore()
         variables.pushScope()
         variables.set("temp", "hello")
@@ -770,11 +802,11 @@ class ActionGuardsTest {
             ActionContext(ContextWrapper(null), variables),
             mapOf("name" to "%temp", "global_name" to "%greeting"),
         )
-        variables.popScope()
 
-        assertTrue("persist should succeed", result is ActionResult.Success)
-        assertEquals("hello", variables.globalSnapshot()["Greeting"])
-        assertEquals("hello", variables.get("%Greeting"))
+        assertTrue("persist reports success", result is ActionResult.Success)
+        assertEquals("hello", variables.get("Greeting"))
+        assertFalse("but it is NOT durable", variables.persistsGlobally("Greeting"))
+        assertNull(variables.globalSnapshot()["Greeting"])
     }
 
     @Test

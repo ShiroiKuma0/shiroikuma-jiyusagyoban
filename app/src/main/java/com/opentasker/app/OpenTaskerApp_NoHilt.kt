@@ -9,16 +9,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
-import com.opentasker.core.storage.AppDatabaseProvider
-import com.opentasker.core.storage.ConfigurationSnapshotWorker
-import com.opentasker.core.updates.UpdateCheckWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
-import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
-import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.engine.RunLogPruneWorker
@@ -111,7 +107,13 @@ class OpenTaskerApp_NoHilt : Application() {
         super.onTerminate()
     }
 
-    /** Initializes credential-protected runtime state after the user has unlocked the device. */
+    /**
+     * Initializes credential-protected runtime state after the user has unlocked the device.
+     *
+     * Upstream's Direct Boot split: before first unlock nothing here may run, because Room, the
+     * secret store and every DataStore live in credential-protected storage. BootReceiver calls
+     * back into this once ACTION_USER_UNLOCKED arrives.
+     */
     fun initializeAfterUnlock() {
         if (!DirectBootTriggerStore.isUserUnlocked(this)) return
         synchronized(this) {
@@ -121,6 +123,15 @@ class OpenTaskerApp_NoHilt : Application() {
             AdvancedProtectionReader.start(this)
             AppVisibilityTracker.register(this)
             ShizukuPowerBackend.initialize(this)
+            // Seed the black-yellow appearance defaults before any Compose code reads the theme.
+            ThemeStore.init(this)
+            com.opentasker.core.icons.TaskIconStore.init(this)
+            com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
+            com.opentasker.core.bubbles.FlashBubbleStore.init(this)
+            com.opentasker.core.share.ShareRelayStore.init(this)
+            com.opentasker.widget.TemplateStore.init(this)
+            com.opentasker.core.storage.ListSortStore.init(this)
+            com.opentasker.core.storage.RunLogSeenStore.init(this)
             registerActionMetadata()
             registerCoreRuntime()
 
@@ -130,6 +141,13 @@ class OpenTaskerApp_NoHilt : Application() {
                 } finally {
                     databaseReady.countDown()
                 }
+
+                // Warm the persistent-variable cache (super- and project-globals) before any task
+                // runs, and expose the running build as %APPVER so a task can flash it (catch stale
+                // installs). Both moved inside this coroutine when upstream took database
+                // preparation off the main thread: out in initializeAfterUnlock, _db is still null.
+                com.opentasker.core.engine.variables.PersistentGlobalScope.init(requireNotNull(_db).variableDao())
+                com.opentasker.core.engine.variables.PersistentGlobalScope.set(0L, "APPVER", com.opentasker.app.BuildConfig.VERSION_NAME)
 
                 runCatching {
                     val recovery = reconcileExecutionJournal(db, processStartedAtMs = processStartedAtMs)
@@ -151,8 +169,13 @@ class OpenTaskerApp_NoHilt : Application() {
             }
 
             RunLogPruneWorker.enqueue(this)
-            ConfigurationSnapshotWorker.enqueueIfEnabled(this)
-            UpdateCheckWorker.enqueueIfEnabled(this)
+            // Upstream's scheduled configuration snapshots are not wired in: this fork removed the
+            // UI that sets the policy, so enqueueIfEnabled could only ever read a disabled policy
+            // and cancel work that was never scheduled. See the note in PermissionOnboardingScreen.
+            // Upstream's opt-in release check polls SysAdminDoc/OpenTasker and compares its tag to
+            // appVersionName. This fork ships its own build tail on top of that name, so upstream's
+            // newest tag is never the newest 自由作業盤 — the check is not wired in here.
+            com.opentasker.core.engine.BandPruneWorker.enqueue(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }
@@ -170,22 +193,18 @@ class OpenTaskerApp_NoHilt : Application() {
             PendingRestoreApplyResult.NoPending -> Unit
         }
 
-        val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
+        // Plain, unencrypted Room: the fork does not take upstream's SQLCipher database (see
+        // DatabaseSecurity's fork note), and it registers every migration manually, having never
+        // used AutoMigration. Upstream's fresh-install Default-project seed is not taken either —
+        // the fork's projects table has different columns and its projectId is nullable, so an
+        // unfiled workspace is the fork's own valid starting state.
         _db = Room.databaseBuilder(
             this,
             AppDatabase::class.java,
             DatabaseBackupManager.DATABASE_NAME,
         )
-            .addMigrations(*DatabaseMigrations.getManualMigrations())
-            .addCallback(object : RoomDatabase.Callback() {
-                override fun onCreate(db: SupportSQLiteDatabase) {
-                    // Fresh installs skip every migration, so the default workspace has to
-                    // be seeded here as well as in MIGRATION_8_9.
-                    db.execSQL(DatabaseMigrations.SEED_DEFAULT_PROJECT)
-                }
-            })
-            .openHelperFactory(SupportOpenHelperFactory(databaseKey.copyOf()))
-            .build().also(AppDatabaseProvider::publish)
+            .addMigrations(*DatabaseMigrations.getAllMigrations())
+            .build()
     }
 
     /**
