@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- The F-Droid metadata gate no longer fails on a stale store-screenshot version
+  stamp. The v0.2.93 bump left it recording the previous release's code.
+
+### Changed
+
+- Every text file is now stored with LF endings, so a small edit to the
+  changelog diffs as a small edit.
+
 ## v0.2.93
 
 ### Security
