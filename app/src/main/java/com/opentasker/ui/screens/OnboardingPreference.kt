@@ -22,6 +22,13 @@ object OnboardingPreference {
             prefs[KEY_COMPLETED] = true
         }
     }
+
+    /** Lets someone run the guided first-launch flow again from Settings. */
+    suspend fun reset(context: Context) {
+        context.onboardingDataStore.edit { prefs ->
+            prefs[KEY_COMPLETED] = false
+        }
+    }
 }
 
 internal enum class OnboardingExit {
@@ -30,8 +37,13 @@ internal enum class OnboardingExit {
     InstalledTemplate,
 }
 
+/**
+ * Dismissing is not a decision. Tapping outside the first-launch dialog, or backing out of it,
+ * used to mark onboarding finished forever, which left a new install with no route to Setup and no
+ * way to see the flow again. Only an explicit skip or a finished template counts as completing it.
+ */
 internal fun shouldCompleteOnboarding(exit: OnboardingExit): Boolean = when (exit) {
-    OnboardingExit.Dismissed,
+    OnboardingExit.Dismissed -> false
     OnboardingExit.Skipped,
     OnboardingExit.InstalledTemplate,
     -> true

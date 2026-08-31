@@ -141,6 +141,9 @@
     <string name="settings_title">Settings</string>
     <string name="settings_body">Manage appearance, recovery, background behavior, integrations, and other app-wide preferences.</string>
     <string name="settings_section_general">General</string>
+    <string name="settings_run_onboarding_title">Run onboarding again</string>
+    <string name="settings_run_onboarding_body">Reopen the starter templates you were offered on first launch.</string>
+    <string name="settings_run_onboarding_action">Show templates</string>
     <string name="settings_section_data_recovery">Data and recovery</string>
     <string name="settings_section_integrations">Integrations</string>
     <string name="scenes_search_hint">Search scenes</string>

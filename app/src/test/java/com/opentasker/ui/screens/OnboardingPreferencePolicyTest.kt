@@ -6,8 +6,10 @@ import org.junit.Test
 
 class OnboardingPreferencePolicyTest {
     @Test
-    fun backOrOutsideDismissalCompletesOnboarding() {
-        assertTrue(shouldCompleteOnboarding(OnboardingExit.Dismissed))
+    fun backOrOutsideDismissalDoesNotCompleteOnboarding() {
+        // Tapping outside the dialog is not a decision to skip. Treating it as completion left a
+        // fresh install with onboarding permanently finished and no route back to it.
+        assertFalse(shouldCompleteOnboarding(OnboardingExit.Dismissed))
     }
 
     @Test

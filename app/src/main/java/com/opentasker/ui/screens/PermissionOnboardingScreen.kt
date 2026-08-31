@@ -349,6 +349,7 @@ fun PermissionOnboardingScreen(
     globalFallbackTaskId: Long? = null,
     onGlobalFallbackTaskChange: (Long?) -> Unit = {},
     settingsOnly: Boolean = false,
+    onRunOnboardingAgain: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val viewModelFactory = remember(context) {
@@ -505,6 +506,9 @@ fun PermissionOnboardingScreen(
                     enabled = directBootEnabled,
                     onEnabledChange = setupViewModel::setDirectBootEnabled,
                 )
+            }
+            onRunOnboardingAgain?.let { runAgain ->
+                item { RunOnboardingAgainCard(onRunAgain = runAgain) }
             }
             if (advancedProtectionEnabled) {
                 item {
@@ -1090,6 +1094,35 @@ private fun ThemeSetupCard(
                         )
                     }
                 }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    }
+}
+
+@Composable
+private fun RunOnboardingAgainCard(onRunAgain: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(R.string.settings_run_onboarding_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.settings_run_onboarding_body),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            OutlinedButton(onClick = onRunAgain) {
+                Text(stringResource(R.string.settings_run_onboarding_action))
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))

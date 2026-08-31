@@ -679,6 +679,15 @@ fun ActiveAutomationUi(
                 globalFallbackTaskId = globalFallbackTaskId,
                 onGlobalFallbackTaskChange = viewModel::updateGlobalFallbackTask,
                 settingsOnly = settingsOnly,
+                onRunOnboardingAgain = if (settingsOnly) {
+                    {
+                        scope.launch { OnboardingPreference.reset(context) }
+                        showTemplateDialog = true
+                        onboardingTemplateFlow = true
+                    }
+                } else {
+                    null
+                },
             )
         }
         Row(Modifier.fillMaxSize()) {
