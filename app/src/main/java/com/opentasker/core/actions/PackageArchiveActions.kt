@@ -40,7 +40,6 @@ internal enum class PackageArchiveMode(val verb: String) {
 }
 
 internal object PackageArchiveActionSupport {
-    @Suppress("NewApi")
     suspend fun run(
         ctx: ActionContext,
         args: Map<String, String>,
@@ -56,6 +55,12 @@ internal object PackageArchiveActionSupport {
         }
         if (packageName == ctx.app.packageName) {
             return ActionResult.Failure("refusing to ${mode.verb} OpenTasker itself")
+        }
+        // The sdkInt above is injected so the version gate stays unit-testable on the JVM, where
+        // Build.VERSION.SDK_INT is always 0. This is the platform check lint can actually prove
+        // before the API 35 requestArchive/requestUnarchive call below.
+        if (Build.VERSION.SDK_INT < ANDROID_15_API) {
+            return ActionResult.Failure("${mode.verb} requires Android 15 (API 35) or newer")
         }
 
         val operationId = UUID.randomUUID().toString()
@@ -127,7 +132,6 @@ internal object PackageArchiveActionSupport {
  * True when Android is asking the user to approve the request rather than reporting an outcome.
  * Archive uses the generic installer status; unarchive has its own dedicated code.
  */
-@Suppress("NewApi")
 internal fun Int.needsUserConfirmation(mode: String): Boolean =
     if (mode == PackageArchiveMode.UNARCHIVE.name) {
         this == PackageInstaller.UNARCHIVAL_ERROR_USER_ACTION_NEEDED || this == PackageInstaller.STATUS_PENDING_USER_ACTION
@@ -161,7 +165,6 @@ internal object PackageArchiveOperations {
     }
 }
 
-@Suppress("NewApi")
 class PackageArchiveStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val operationId = intent.getStringExtra(EXTRA_OPERATION_ID) ?: return

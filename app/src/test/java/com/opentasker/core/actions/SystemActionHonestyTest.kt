@@ -23,14 +23,18 @@ class SystemActionHonestyTest {
     }
 
     @Test
-    fun packageArchiveNewApiSuppressIsScopedToTheApi35CallPath() {
+    fun packageArchiveGuardsTheApi35CallInsteadOfSuppressingNewApi() {
         val source = sourceRoot.resolve("core/actions/PackageArchiveActions.kt").readText()
+        // A suppression cannot tell a real API-level mismatch from an accepted one, so the API 35
+        // call is gated on a check lint can prove rather than silenced.
         assertFalse(
-            "Do not suppress NewApi on the whole PackageArchiveActionSupport object",
-            source.contains("@Suppress(\"NewApi\")\r\ninternal object PackageArchiveActionSupport") ||
-                source.contains("@Suppress(\"NewApi\")\ninternal object PackageArchiveActionSupport"),
+            "PackageArchiveActions must not suppress NewApi anywhere",
+            source.contains("@Suppress(\"NewApi\")"),
         )
         assertTrue(source.contains("@RequiresApi(35)"))
-        assertTrue(source.contains("@Suppress(\"NewApi\")"))
+        assertTrue(
+            "The API 35 request must sit behind a platform SDK_INT guard",
+            source.contains("if (Build.VERSION.SDK_INT < ANDROID_15_API)"),
+        )
     }
 }
