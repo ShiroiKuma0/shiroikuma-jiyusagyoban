@@ -339,6 +339,15 @@ ksp {
 }
 
 dependencies {
+    // Gradle resolves the highest stdlib any dependency asks for, so a single transitive bump
+    // would silently move off the verified 2.4.10 without touching the catalog or the dependency
+    // verification file. `strictly` turns that into a resolution failure instead.
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
+            version { strictly(libs.versions.kotlin.get()) }
+            because("The stdlib must match the pinned Kotlin version and its recorded checksum.")
+        }
+    }
     implementation(project(":core:common"))
     implementation(project(":core:model"))
     implementation(project(":core:storage"))
