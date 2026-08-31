@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Security
+
+- A release build that is meant to be signed now fails when the signing
+  variables are missing, instead of quietly producing an unsigned APK. Staging
+  a release asset also verifies the APK really carries a signature, so an
+  unsigned build cannot reach a release page under the published filename.
+
 ### Fixed
 
 - The F-Droid metadata gate no longer fails on a stale store-screenshot version

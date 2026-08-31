@@ -1,5 +1,6 @@
 import java.net.URLEncoder
 import java.io.File
+import java.io.RandomAccessFile
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import org.gradle.api.DefaultTask
@@ -222,6 +223,16 @@ val hasReleaseSigning = listOf(
     releaseKeyAlias,
     releaseKeyPassword
 ).all { !it.isNullOrBlank() }
+/**
+ * Opt out of the packaging-time signing guard for a build whose APK is thrown away, which is what
+ * the local gate's Play lane does when it only wants the merged manifest checked. This never
+ * reaches a release page: `stageReleaseAsset` verifies the artifact really is signed and has no
+ * corresponding opt-out.
+ */
+val allowUnsignedRelease = providers.gradleProperty("openTaskerAllowUnsignedRelease")
+    .orElse("false")
+    .get()
+    .toBoolean()
 
 android {
     namespace = "com.opentasker.app"
@@ -1267,10 +1278,25 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     @get:Input
     abstract val versionName: Property<String>
 
+    /** False only for the F-Droid distribution, which is unsigned because F-Droid signs it. */
+    @get:Input
+    abstract val requireSignature: Property<Boolean>
+
     @TaskAction
     fun stage() {
         val source = sourceApk.get().asFile
         check(source.isFile) { "Release APK is missing: ${source.absolutePath}" }
+        // The staging copy renames whatever it is given to the published asset name, so an
+        // unsigned APK would otherwise arrive on a release page wearing the right filename. The
+        // name check downstream cannot see this: it only reads the name this task chose.
+        if (requireSignature.get()) {
+            check(apkIsSigned(source)) {
+                "Release APK ${source.name} carries no APK signing block and no v1 signature, so it " +
+                    "is unsigned. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
+                    "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
+                    "OPEN_TASKER_RELEASE_KEY_PASSWORD and rebuild before staging anything."
+            }
+        }
         val destinationDirectory = stagingDirectory.get().asFile
         check(!destinationDirectory.exists() || destinationDirectory.deleteRecursively()) {
             "Could not clear stale release assets from ${destinationDirectory.absolutePath}"
@@ -1279,6 +1305,69 @@ abstract class StageReleaseAssetTask : DefaultTask() {
             "Could not create release asset directory ${destinationDirectory.absolutePath}"
         }
         source.copyTo(destinationDirectory.resolve("OpenTasker-v${versionName.get()}.apk"), overwrite = true)
+    }
+
+    /**
+     * True when the APK carries an APK Signing Block (v2/v3/v3.1) or a v1 JAR signature. Reading
+     * the container directly keeps this independent of where the SDK put apksigner on this host.
+     */
+    private fun apkIsSigned(apk: File): Boolean = hasApkSigningBlock(apk) || hasJarSignature(apk)
+
+    private fun hasApkSigningBlock(apk: File): Boolean {
+        RandomAccessFile(apk, "r").use { file ->
+            val length = file.length()
+            // The end-of-central-directory record sits within the last 22 bytes plus a comment of
+            // at most 65,535 bytes, so this window always contains it.
+            val windowLength = minOf(length, MAX_EOCD_SEARCH_BYTES).toInt()
+            if (windowLength < EOCD_MIN_BYTES) return false
+            val window = ByteArray(windowLength)
+            file.seek(length - windowLength)
+            file.readFully(window)
+
+            var eocd = -1
+            for (candidate in windowLength - EOCD_MIN_BYTES downTo 0) {
+                if (window[candidate] == 0x50.toByte() &&
+                    window[candidate + 1] == 0x4B.toByte() &&
+                    window[candidate + 2] == 0x05.toByte() &&
+                    window[candidate + 3] == 0x06.toByte()
+                ) {
+                    eocd = candidate
+                    break
+                }
+            }
+            if (eocd < 0) return false
+
+            val centralDirectoryOffset = readLittleEndianInt(window, eocd + EOCD_CENTRAL_DIRECTORY_OFFSET)
+            if (centralDirectoryOffset < APK_SIG_BLOCK_MAGIC.size || centralDirectoryOffset > length) {
+                return false
+            }
+            // The signing block ends with its magic immediately before the central directory.
+            val magic = ByteArray(APK_SIG_BLOCK_MAGIC.size)
+            file.seek(centralDirectoryOffset - APK_SIG_BLOCK_MAGIC.size)
+            file.readFully(magic)
+            return magic.contentEquals(APK_SIG_BLOCK_MAGIC)
+        }
+    }
+
+    private fun hasJarSignature(apk: File): Boolean = ZipFile(apk).use { archive ->
+        archive.entries().asSequence().any { entry ->
+            val name = entry.name.uppercase()
+            name.startsWith("META-INF/") &&
+                (name.endsWith(".RSA") || name.endsWith(".DSA") || name.endsWith(".EC"))
+        }
+    }
+
+    private fun readLittleEndianInt(buffer: ByteArray, at: Int): Long =
+        (buffer[at].toLong() and 0xFF) or
+            ((buffer[at + 1].toLong() and 0xFF) shl 8) or
+            ((buffer[at + 2].toLong() and 0xFF) shl 16) or
+            ((buffer[at + 3].toLong() and 0xFF) shl 24)
+
+    private companion object {
+        val APK_SIG_BLOCK_MAGIC = "APK Sig Block 42".toByteArray(Charsets.US_ASCII)
+        const val MAX_EOCD_SEARCH_BYTES = 66_000L
+        const val EOCD_MIN_BYTES = 22
+        const val EOCD_CENTRAL_DIRECTORY_OFFSET = 16
     }
 }
 
@@ -1703,6 +1792,29 @@ val stageReleaseAsset = tasks.register<StageReleaseAssetTask>("stageReleaseAsset
     sourceApk.set(rootProject.layout.projectDirectory.file(expectedReleaseApkPath))
     stagingDirectory.set(releaseAssetStagingDirectory)
     versionName.set(appVersionName)
+    requireSignature.set(!releaseBuildIsUnsigned)
+}
+
+/**
+ * Removing the in-repo keystore in v0.2.93 made an unsigned build a silent outcome: with any of the
+ * four signing variables missing, `signingConfigs.findByName("release")` returns null and AGP
+ * packages `app-release-unsigned.apk` for a distribution that is supposed to be signed. Only the
+ * F-Droid distribution is unsigned on purpose. Fail the packaging step rather than let a release
+ * lane discover this later as a confusing missing-artifact error.
+ */
+tasks.matching { it.name == "packageRelease" }.configureEach {
+    val signingRequired = !releaseBuildIsUnsigned && !allowUnsignedRelease
+    val signingConfigured = hasReleaseSigning
+    val distribution = selectedDistribution
+    doFirst {
+        check(!signingRequired || signingConfigured) {
+            "Release signing is not configured for distribution=$distribution, so this build would " +
+                "produce an unsigned APK. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
+                "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
+                "OPEN_TASKER_RELEASE_KEY_PASSWORD, or build the F-Droid profile with " +
+                "-PopenTaskerDistribution=fdroid, which is unsigned because F-Droid signs it."
+        }
+    }
 }
 
 val verifyReleaseAssetName = tasks.register<VerifyReleaseAssetNameTask>("verifyReleaseAssetName") {
