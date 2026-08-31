@@ -16,6 +16,10 @@
 
 ### Changed
 
+- Updated OkHttp to 5.5.0, which stops the hostname verifier accepting hosts
+  that fail IP canonicalisation and applies HTTP/1 timeouts while a request body
+  is still being flushed. Both sit under the HTTP Request and Home Assistant
+  actions. This also moves Okio to 3.18.1.
 - Every text file is now stored with LF endings, so a small edit to the
   changelog diffs as a small edit.
 - The install instructions and the store changelog now explain that v0.2.93 is
