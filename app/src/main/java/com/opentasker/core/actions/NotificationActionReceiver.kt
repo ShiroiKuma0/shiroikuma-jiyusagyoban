@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.AutomationService
+import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.logging.AppLogger
 
 class NotificationActionReceiver : BroadcastReceiver() {
@@ -17,6 +18,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val buttonLabel = intent.getStringExtra(EXTRA_BUTTON_LABEL)
             ?: legacyTaskName
             ?: "Task ${taskId ?: "unknown"}"
+        // A leftover notification's button must not restart a stopped app.
+        if (EngineShutdown.refuse(context, "notification button “$buttonLabel”")) return
 
         // Hand the run to the already-foreground AutomationService and return immediately: the
         // receiver's ~10 s window is far too short for tasks that can wait up to 30 minutes, and a

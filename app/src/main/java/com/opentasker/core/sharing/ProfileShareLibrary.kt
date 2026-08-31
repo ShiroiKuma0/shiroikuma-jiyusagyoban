@@ -129,7 +129,7 @@ object ProfileShareLibrary {
             contextCount = bundle.profiles.sumOf { it.contexts.size },
             variableCount = bundle.variables.size,
             sceneCount = bundle.scenes.size,
-            blueprintCount = bundle.blueprints.size,
+            // blueprintCount stays at its default 0: this fork's bundle carries no blueprints.
             screenshotCount = draft.screenshots.size,
             capabilityRequirements = capabilityRequirements,
             findings = findings,
