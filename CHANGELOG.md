@@ -8,6 +8,32 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-08-31.19-12.gbb75f812+002 — 2026-08-31
+
+A second sync onto 0.2.93 — six upstream commits, no version bump, so the build tail kept counting.
+
+### Upstream
+
+- **OkHttp 5.5.0.** The old hostname verifier accepted hosts that fail IP canonicalisation, and
+  HTTP/1 timeouts were not applied while a request body was still being flushed. It sits under the
+  HTTP Request and Home Assistant actions — and under this fork's satellite fetcher, which is all
+  OkHttp. Okio moves to 3.18.1 with it.
+- A release meant to be signed now **fails rather than quietly producing an unsigned APK**, and
+  staging verifies the APK really carries a signature.
+- Every text file is re-stored with **LF endings**, under a new `.gitattributes`. This is why the
+  upstream diff looked enormous — `VariableStore.kt` showed 690 changed lines and `AppActions.kt`
+  346, and ignoring CR both are 0/0. No logic moved.
+
+### This fork
+
+- **The LF policy would have corrupted two test fixtures**, and they are pinned against it.
+  `e2e-yuma.alm` and `e2e-glonass.agl` are byte-captures of what NavCen and the Russian IAC serve,
+  which is CRLF; `text=auto` calls them text because they are ASCII. `*.alm` and `*.agl` are now
+  `-text`.
+- Our `CHANGELOG`, `README`, `AppActions.kt` and `VariableStore.kt` are kept — upstream's only
+  change to the last two was line endings, so nothing was given up — while OkHttp's bump is taken
+  and the `onnxruntime` pin kept beside it.
+
 ## 0.2.93+2026-08-30.06-19.g0ce851e3+001 — 2026-08-31
 
 Rebased onto upstream **0.2.93**, which took three releases and a rewritten history.
