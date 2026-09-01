@@ -7,9 +7,10 @@ alternative. There is no text renderer and no font on the band, so a kanji clock
 pictures. This paints them, in 勘亭流 — the brush lettering of sumo banners — and rewrites
 MZ DIGICOLOR's layout to point at them.
 
-Three lines: the hour, the minute, and the date as 八月三十一日月. A seconds line lived where the
-date is now and was dropped for it — seconds on a watch face are read by nobody and cost the row
-that carries the only information the clock could not otherwise show.
+Four lines and a footer: the hour, the minute, the second, the date, and a steps count with the
+weekday beside it. The seconds were dropped once to make room for the date and came back when the
+hour went from one full-width glyph to two half ones — a single glyph needs 239 px of row and a
+pair needs 146, and the ninety pixels that frees is the seconds line (白い熊, 2026-09-01).
 
 ## The glyphs are painted, not knocked out
 
@@ -39,18 +40,19 @@ is what makes the round tens work: cell 1's tens glyph paints over its units dig
 "分 alone" tile paints over "<units>分". Carrying 分 inside the units glyph rather than in a third
 slot is what keeps the string from opening a hole when the units digit is zero.
 
-## The hour is one glyph and a corner mark
+## The hour is two cells
 
-The hour reads at a glance, so it gets the whole width as a single character rather than two half
-ones — 一 through 九 and 十, each centred and as large as the row allows. Eleven and twelve cannot
-be one character, so the tens slot becomes a small 十 in the top-left corner: the hour's own glyph
-stays full size and the mark says "and ten more". Both hour layers are TRANSPARENT rather than
-opaque, so the mark adds to the glyph instead of covering it — the opposite of the minute cells,
-and the reason the two lines are built differently.
+一時 through 九時, then 十時, 十一, 十二 — two characters wide, in the same two cells the minutes
+use, and by the same override: the units tile first, the tens tile painted over it, both OPAQUE so
+the later one replaces. Cell two carries 時 at index zero and the numeral at one and two, and for
+hours one to nine the tens tile paints 時 over whatever cell two holds, so only its first three
+images are ever seen.
 
-Ten is 十 in the units slot, at full size like every other hour. It was 時 for a while, nudged
-aside to dodge the corner mark; 十 needs no nudge, because its bar sits at mid-height and its
-stroke runs down the centre, leaving the corner clear.
+**A previous version made the hour ONE full-width glyph**, with a small 十 in the top-left corner
+for eleven and twelve, and its two layers transparent so the mark ADDED instead of covering. It read
+beautifully at 242 px and it is recorded here because the trade is worth knowing rather than
+rediscovering: a single glyph needs a 239 px row, a pair needs 146, and that difference is a whole
+line. The seconds were worth more than the size.
 
 The band counts 1–12, not 0–11. That was not assumed: the face showed 十 at 12:50, and the only way
 to settle it was to stand the band's clock at noon with `huawei.time` and read it. It said 十二.
@@ -125,26 +127,19 @@ DY = 24                           # how far the top row and the widgets move dow
 # so it is 11 — used between every pair, which keeps the stack even.
 # Asymmetric hour cells, and no padding anywhere it can be avoided.
 #
-# The hour's two layers ADD rather than cover — the tiles are transparent with only the glyph
-# painted — so the units digit survives the tens digit instead of being painted over by it. That is
-# what makes eleven and twelve correct at last: ten paints 十 over nothing, eleven paints 十 and 一
-# side by side. It costs the symmetry, because the tens cell only ever holds 十 and can be narrow
-# while the units cell takes the rest.
-# The slack redistributed. 31 px were going spare — 26 below the steps and 5 above the hour — and it is
-# split across all three lines rather than banked into the hour alone, so every glyph grows by about a
-# tenth. The hour keeps the largest share because it is the line being read from across a room. The
-# three lines and the steps now fill the face exactly, 78 to 482.
+# v3: the hour is TWO cells again, so its row needs only the height of one 143 px cell instead of
+# 239 px for a single full-width glyph. That frees about ninety pixels, which is what buys the
+# seconds line back (白い熊, 2026-09-01).
 #
-# The minutes took another 8 px when the seconds became the date, which needs less height than
-# it does width. That put the minute line at its own ceiling — see DATE_H below.
-HOUR_Y, HOUR_H = 78, 239
-MARK_X, MARK_Y, MARK_W = 2, 2, 70
-# 70, down from 75, and the line does not shrink: the minutes are limited by their WIDTH —
-# two characters in a 143 px cell — from 69 px of height upwards. The 5 px above that were
-# doing nothing, so they went to the date when the weekday left it.
-MIN_Y, MIN_H = HOUR_Y + HOUR_H, 70
+# Every line now sits at its WIDTH ceiling, so the leftover height is spacing rather than size:
+# the hour caps at 143 px per glyph (two across 286), the minutes and seconds at 65 (two cells of
+# two characters), the date at 40 (seven characters). Giving any of them more height changes
+# nothing, which is why the remainder is spent on the gaps between them instead.
+HOUR_Y, HOUR_H = 78, 146
+GAP = 14
 CELL_W = 143                      # two cells, side by side, spanning the whole 286
 CELL1_X, CELL2_X = 0, 143
+MIN_Y, MIN_H = HOUR_Y + HOUR_H + GAP, 69
 
 # ── the date row, where the seconds used to be ────────────────────────────────────────────────
 #
@@ -171,7 +166,9 @@ CELL1_X, CELL2_X = 0, 143
 # across 286 — so any height past the point where the glyph stops growing is wasted. The 8 px
 # that frees go to the minutes, which is the last of them: at 75 the minute glyph reaches
 # 71 px, and 71 is half of the 143 its cell has. The line cannot use another pixel of height.
-DATE_Y, DATE_H = MIN_Y + MIN_H, 46
+SEC_Y, SEC_H = MIN_Y + MIN_H + GAP, 52     # deliberately below the minutes: a
+                                           # seconds line that matches them competes
+DATE_Y, DATE_H = SEC_Y + SEC_H + GAP, 46
 DATE_U = 40                       # one character width; 7 of them, centred in the 286
 DATE_X = (286 - DATE_U * 7) // 2
 MONTH_X, MONTH_W = DATE_X, DATE_U * 3
@@ -201,7 +198,7 @@ INK = (255, 255, 0, 255)          # 時間's own yellow
 # it out grows the glyphs by 0.4 %. The size never came from the character set. Every
 # line is limited by the HEIGHT of its own tile — the hour's width would allow 274 px
 # and its tile only allowed 220 — so the real gain is below, in the layout.
-REPERTOIRE = "〇一二三四五六七八九十分"
+REPERTOIRE = "〇一二三四五六七八九十時分秒"
 
 # The date is measured in its OWN frame. Sharing the clock's would drag every hour and
 # minute glyph down to fit 曜日 characters they never draw.
@@ -345,27 +342,35 @@ def glyphs():
     hh = HOUR_H
     mw, mh = CELL_W, MIN_H
 
-    # ── the hour: one big centred glyph, with 十 as a small mark over its top-left corner ──
+    # ── the hour: two cells, 一時 … 十時, 十一, 十二 ──
     #
-    # Additive, so nothing covers anything: the mark is painted on top of the digit and both stay
-    # legible. The units digit is zero only at ten, and that image carries 時 — so ten reads 十時,
-    # eleven 十一, twelve 十二, and one to nine are a single character filling the face.
-    # Ten's units digit is zero, and that image carries 十 — the hour's own character, full size and
-    # centred like every other hour's. It was 時 for a while, nudged right to dodge the corner mark,
-    # because 時 has ink in its own top-left. 十 does not: its bar sits at mid-height and its stroke
-    # runs down the centre, so the mark has clear space and the glyph can stay where it belongs.
-    out["h1_units_0"] = render("十", 286, hh, "centre", chars=1, solid=False)
-    for u in range(1, 10):
-        out[f"h1_units_{u}"] = render(DIG[u], 286, hh, "centre", chars=1, solid=False)
-    out["h1_tens_0"] = clear(MARK_W, MARK_W)
-    for t in (1, 2):
-        out[f"h1_tens_{t}"] = render("十", MARK_W, MARK_W, "centre", chars=1, solid=False, vpad=2)
-
-    # The second hour pair is retired — two layers are all this needs.
+    # A glyph that depends on BOTH digits cannot come from either binding alone, so each cell holds
+    # the units-bound tile with the tens-bound one painted over it. The tiles are OPAQUE here, so
+    # the later one REPLACES rather than adds — the opposite of the single-glyph hour v2 used, and
+    # the reason that one needed a corner mark while this one does not.
+    #
+    #     hour    cell 1                        cell 2
+    #     1-9     units 一…九                   tens 時, opaque      ->  三時
+    #     10      tens  十, opaque              units 時             ->  十時
+    #     11-12   tens  十, opaque              units 一 / 二        ->  十一, 十二
+    #
+    # Cell 2's units tile carries 時 at zero and the numeral at one and two; for hours one to nine
+    # the tens tile paints 時 straight over whatever it holds, so only indices 0-2 are ever seen.
+    hw = CELL_W
     for u in range(10):
-        out[f"h2_units_{u}"] = clear(1, 1)
-    for t in range(3):
-        out[f"h2_tens_{t}"] = clear(1, 1)
+        out[f"h1_units_{u}"] = render(DIG[u], hw, hh, "centre", pad=0, chars=1)
+    out["h1_tens_0"] = clear(hw, hh)
+    for t in (1, 2):
+        out[f"h1_tens_{t}"] = render("十", hw, hh, "centre", pad=0, chars=1)
+
+    out["h2_units_0"] = render("時", hw, hh, "centre", pad=0, chars=1)   # ten
+    out["h2_units_1"] = render("一", hw, hh, "centre", pad=0, chars=1)   # eleven
+    out["h2_units_2"] = render("二", hw, hh, "centre", pad=0, chars=1)   # twelve
+    for u in range(3, 10):
+        out[f"h2_units_{u}"] = clear(hw, hh)                              # always covered
+    out["h2_tens_0"] = render("時", hw, hh, "centre", pad=0, chars=1)    # hours one to nine
+    for t in (1, 2):
+        out[f"h2_tens_{t}"] = clear(hw, hh)
 
     # ── minutes, cell 1: the units numeral, or the tens word painted over it ──
     for u in range(10):
@@ -384,6 +389,19 @@ def glyphs():
     # The date row is retired by pointing every one of its images at nothing. Kept at the sizes
     # the elements actually had, rather than one shared 1x1, in case the band sizes anything
     # from the resource header rather than from the element.
+    # ── seconds: the minutes' two-cell scheme again, ending in 秒 ──
+    sw, sh = CELL_W, SEC_H
+    for u in range(10):
+        out[f"s1_units_{u}"] = render(DIG[u], sw, sh, "right", chars=2)
+    out["s1_tens_0"] = clear(sw, sh)
+    for t in range(1, 6):
+        out[f"s1_tens_{t}"] = render(TENS[t], sw, sh, "right", chars=2)
+    for u in range(10):
+        out[f"s2_units_{u}"] = render(("" if u == 0 else DIG[u]) + "秒", sw, sh, "left", chars=2)
+    out["s2_tens_0"] = render("秒", sw, sh, "left", chars=2)
+    for t in range(1, 6):
+        out[f"s2_tens_{t}"] = clear(sw, sh)
+
     # ── the date: 八月三十一日月, four bindings across eight character widths ──
     #
     # The day uses the minutes' two-cell override, unchanged: cell 1 draws the units digit and the
@@ -496,8 +514,8 @@ HOUR_UNITS, HOUR_TENS = 60, 59
 MIN_UNITS, MIN_TENS = 62, 61
 
 PLAN = {
-    8:  ("h1_units", HOUR_UNITS, (0, HOUR_Y), 10),
-    9:  ("h1_tens",  HOUR_TENS,  (MARK_X, HOUR_Y + MARK_Y), 3),
+    8:  ("h1_units", HOUR_UNITS, (CELL1_X, HOUR_Y), 10),
+    9:  ("h1_tens",  HOUR_TENS,  (CELL1_X, HOUR_Y), 3),
     10: ("h2_units", HOUR_UNITS, (CELL2_X, HOUR_Y), 10),
     11: ("h2_tens",  HOUR_TENS,  (CELL2_X, HOUR_Y), 3),
     0:  ("m1_units", MIN_UNITS,  (CELL1_X, MIN_Y), 10),
@@ -516,8 +534,13 @@ PLAN = {
 #
 # Draw order is load-bearing in the day's two cells exactly as it is in the minutes': units first,
 # tens over it.
+SEC_UNITS, SEC_TENS = 64, 63
 MONTH, DAY_UNITS, DAY_TENS, WEEKDAY = 51, 71, 70, 52
 NEW = [
+    ("s1_units", SEC_UNITS, (CELL1_X, SEC_Y), 10),
+    ("s1_tens",  SEC_TENS,  (CELL1_X, SEC_Y), 6),
+    ("s2_units", SEC_UNITS, (CELL2_X, SEC_Y), 10),
+    ("s2_tens",  SEC_TENS,  (CELL2_X, SEC_Y), 6),
     ("month",    MONTH,     (MONTH_X, DATE_Y), 13),
     ("d1_units", DAY_UNITS, (DAY1_X, DATE_Y), 10),
     ("d1_tens",  DAY_TENS,  (DAY1_X, DATE_Y), 4),
