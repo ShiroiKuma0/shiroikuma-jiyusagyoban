@@ -1,14 +1,34 @@
 #!/usr/bin/env python3
-"""Composite the built glyph tiles into a picture of the face, at chosen times.
+"""Composite the built glyph tiles into a picture of the face.
+
+Two outputs, for two different readers:
+
+  (default)          a sheet of four sample times side by side — the iteration tool, for judging a
+                     change without spending a three-minute pack-upload-photograph cycle
+  --library          ONE face at 290x494, which is the preview every archived version carries and
+                     the only shape the band's face picker can display. Ours shipped the sheet for
+                     a while, and the picker letterboxed a 1244x528 strip into a sliver a
+                     centimetre tall (白い熊, 2026-09-01)
+  --refresh-archives regenerate that preview for EVERY archived version, each rendered by its own
+                     scripts out of its own ZIP
+
+The last one matters because the versions do not share a layout — v1 has no date row, v2 has no
+seconds, v3 has both — so a single renderer cannot draw them all. The archives were built to stand
+alone; this is the thing that relies on it.
 
 This exists because the only other way to see the clock is to pack it, upload it over Bluetooth and
 photograph the band — a three-minute loop for a change worth one glance. It draws what the band
 draws: the hour's two layers ADD (the tens mark over the units glyph, both transparent), while the
 minute and second cells COVER (opaque tiles, so an override truly replaces rather than intersects).
 """
+import argparse
 import datetime
 import importlib.util
+import inspect
+import io
 import pathlib
+import shutil
+import zipfile
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
@@ -91,8 +111,71 @@ def sheet(out):
     return out
 
 
+# The band's own library ships 290x494 for every captured face, and every stock face shows 10:08 —
+# so ours do too, and the cards read as native beside them.
+LIB_W, LIB_H = 290, 494
+LIB_WHEN = datetime.datetime(2026, 10, 18, 10, 8, 36)
+LIBRARY = pathlib.Path.home() / "〇/[979] バックアップ/[979][60792][921] 白い熊 自由作業盤 Huawei Band 11 Pro"
+
+
+def library_preview(out, panel_fn=None, glyphs=None):
+    """One face on a 290x494 ground — what the picker actually shows."""
+    face = (panel_fn or panel)(glyphs if glyphs is not None else B.glyphs(), LIB_WHEN, 76, 7645)
+    img = Image.new("RGB", (LIB_W, LIB_H), (0, 0, 0))
+    img.paste(face, ((LIB_W - face.width) // 2, (LIB_H - face.height) // 2), face)
+    img.save(out)
+    return out
+
+
+def refresh_archives(library=LIBRARY):
+    """Rewrite preview.png in every archived version, using that version's OWN scripts.
+
+    A version's `panel` signature is not stable — v1 took hour/minute/second separately, later ones
+    take a datetime — so it is inspected rather than assumed.
+    """
+    done = []
+    for z in sorted(pathlib.Path(library).glob("相撲字時計*.zip")):
+        work = pathlib.Path("/tmp/sumoji-archive-preview") / z.stem
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir(parents=True)
+        with zipfile.ZipFile(z) as zf:
+            for name in ("sumoji-build.py", "sumoji-preview.py"):
+                (work / name).write_bytes(zf.read(name))
+        spec = importlib.util.spec_from_file_location(f"v{abs(hash(z))}", work / "sumoji-preview.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        g = mod.B.glyphs()
+        if "when" in inspect.signature(mod.panel).parameters:
+            face = mod.panel(g, LIB_WHEN, 76, 7645)
+        else:
+            face = mod.panel(g, LIB_WHEN.hour, LIB_WHEN.minute, LIB_WHEN.second, 76, 7645)
+        img = Image.new("RGB", (LIB_W, LIB_H), (0, 0, 0))
+        img.paste(face, ((LIB_W - face.width) // 2, (LIB_H - face.height) // 2), face)
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        tmp = z.with_suffix(".zip.new")
+        with zipfile.ZipFile(z) as src, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as dst:
+            for item in src.infolist():
+                dst.writestr(item, buf.getvalue() if item.filename == "preview.png"
+                             else src.read(item.filename))
+        tmp.replace(z)
+        done.append(z.stem)
+    return done
+
+
 if __name__ == "__main__":
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    out = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else \
-        pathlib.Path.home() / f"tmp/sumoji-preview_{stamp}.png"
-    print(sheet(out))
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("out", nargs="?", help="where to write; defaults into ~/tmp with a stamp")
+    ap.add_argument("--library", action="store_true", help="one face at 290x494, picker-shaped")
+    ap.add_argument("--refresh-archives", action="store_true",
+                    help="rewrite preview.png in every archived version, from its own scripts")
+    a = ap.parse_args()
+    if a.refresh_archives:
+        for name in refresh_archives():
+            print(f"  refreshed {name}")
+    else:
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        kind = "library" if a.library else "sheet"
+        out = pathlib.Path(a.out) if a.out else \
+            pathlib.Path.home() / f"tmp/sumoji-{kind}_{stamp}.png"
+        print(library_preview(out) if a.library else sheet(out))
