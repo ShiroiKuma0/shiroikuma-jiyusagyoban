@@ -897,6 +897,7 @@ fun ActiveAutomationUi(
                 onRefresh = viewModel::refreshRunLogPage,
                 retentionPolicy = runLogRetentionPolicy,
                 onRetentionPolicyChange = viewModel::requestRunLogRetention,
+                onClearRunLog = viewModel::clearRunLog,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 onExportJson = {
                     exportAllRunLogs = false

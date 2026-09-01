@@ -50,6 +50,32 @@ class RunLogDaoInstrumentedTest {
     }
 
     @Test
+    fun clearUnpinnedKeepsPinnedAndHeldRows() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.runLogDao()
+            dao.insert(run(taskId = 1, timestamp = 1_000L, held = true))
+            dao.insert(run(taskId = 2, timestamp = 2_000L, starred = true))
+            dao.insert(run(taskId = 3, timestamp = 3_000L, held = true, starred = true))
+            dao.insert(run(taskId = 4, timestamp = 4_000L))
+            dao.insert(run(taskId = 5, timestamp = 5_000L))
+
+            // A clear has no Undo, so the rows a user cannot recreate have to survive it: ones
+            // they pinned, and held ones still carrying a replayable payload.
+            assertEquals(2, dao.clearUnpinned())
+            assertEquals(3, dao.count())
+            assertEquals(listOf(3L, 2L, 1L), dao.getRecent().map { it.taskId })
+            // Clearing again removes nothing, so the count reported to the user stays honest.
+            assertEquals(0, dao.clearUnpinned())
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun pruneRetentionNeverDeletesHeldOrStarredRows() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)

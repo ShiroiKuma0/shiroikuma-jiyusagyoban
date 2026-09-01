@@ -22,6 +22,9 @@
 
 ### Fixed
 
+- The run log can be cleared on demand from the retention card. Pinned runs and
+  held runs waiting to be replayed are kept, and it asks first because a purge
+  cannot be undone.
 - Variables and Flow no longer flash their empty state for a moment on a cold
   start before stored data arrives, which read as data loss.
 - The Variables tab's empty state offers a "New variable" button and explains

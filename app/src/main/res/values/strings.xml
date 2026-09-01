@@ -72,6 +72,10 @@
     <string name="action_create">Create</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_stop">Stop</string>
+    <string name="run_log_clear_action">Clear the run log now</string>
+    <string name="run_log_clear_body">Retention is the only thing that shrinks this log. Clear it yourself before starting a fresh test.</string>
+    <string name="run_log_clear_confirm_body">This deletes the run history. Pinned runs and held runs waiting to be replayed are kept, and this cannot be undone.</string>
+    <string name="run_log_cleared">Cleared %1$d run log entries</string>
     <string name="transfer_stage_preflight">Checking the file</string>
     <string name="transfer_stage_decode">Reading it</string>
     <string name="transfer_stage_plan">Working out what changes</string>

@@ -36,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,6 +84,7 @@ import java.util.Date
 import java.util.Locale
 
 internal const val RUN_LOG_LIST_TAG = "run_log_list"
+internal const val RUN_LOG_CLEAR_TAG = "run_log_clear"
 
 // The export/refresh controls sit in a LazyRow, so the ones past the right edge are never
 // composed on a narrow device and cannot be reached without scrolling the row itself.
@@ -93,6 +96,7 @@ internal fun RunLogScreenContent(
     tasks: List<Task>,
     retentionPolicy: RunLogRetentionPolicy,
     onRetentionPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    onClearRunLog: (() -> Unit)? = null,
     onShareDiagnostic: () -> Unit,
     contentPadding: PaddingValues,
     totalCount: Int = logs.size,
@@ -205,6 +209,7 @@ internal fun RunLogScreenContent(
             RunLogRetentionCard(
                 policy = retentionPolicy,
                 onPolicyChange = onRetentionPolicyChange,
+                onClearRunLog = onClearRunLog,
             )
         }
     }
@@ -214,8 +219,10 @@ internal fun RunLogScreenContent(
 private fun RunLogRetentionCard(
     policy: RunLogRetentionPolicy,
     onPolicyChange: (RunLogRetentionPolicy) -> Unit,
+    onClearRunLog: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var confirmClear by rememberSaveable { mutableStateOf(false) }
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -294,8 +301,50 @@ private fun RunLogRetentionCard(
                         }
                     }
                 }
+                if (onClearRunLog != null) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                    Text(
+                        stringResource(R.string.run_log_clear_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(
+                        onClick = { confirmClear = true },
+                        modifier = Modifier.testTag(RUN_LOG_CLEAR_TAG),
+                    ) {
+                        Text(
+                            stringResource(R.string.run_log_clear_action),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
         }
+    }
+
+    if (confirmClear && onClearRunLog != null) {
+        // A log purge cannot offer Undo, so this is the confirmation instead. Pinned and held rows
+        // survive, and the dialog says so rather than implying everything goes.
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.run_log_clear_action)) },
+            text = { Text(stringResource(R.string.run_log_clear_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmClear = false
+                        onClearRunLog()
+                    },
+                ) {
+                    Text(stringResource(R.string.run_log_clear_action), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }
 

@@ -154,6 +154,14 @@ interface RunLogDao {
     )
     suspend fun pruneHeldRetention(maxHeldEntries: Int, minimumTimestamp: Long): Int
 
+    /**
+     * Deletes ordinary history on request, keeping what the user cannot get back: starred rows
+     * they pinned deliberately, and held rows that still carry a replayable payload. Retention was
+     * the only way the log could shrink, so there was no way to clear it before a repro.
+     */
+    @Query("DELETE FROM run_logs WHERE held = 0 AND starred = 0")
+    suspend fun clearUnpinned(): Int
+
     /** Clears the held marker and its payload once a replay has been admitted. */
     @Query("UPDATE run_logs SET held = 0, heldPayload = NULL WHERE id = :id AND held = 1")
     suspend fun clearHeld(id: Long): Int

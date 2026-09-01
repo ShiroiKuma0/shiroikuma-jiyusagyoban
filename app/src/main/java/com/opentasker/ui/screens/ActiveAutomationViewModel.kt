@@ -1639,6 +1639,23 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * Deletes ordinary run history on request. Pinned rows and held rows waiting to be replayed
+     * survive, because a log purge has no Undo and those are the rows a user cannot recreate.
+     */
+    fun clearRunLog() {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { db.runLogDao().clearUnpinned() }
+            }
+                .onSuccess { deleted ->
+                    refreshRunLogPage()
+                    events.send(message(R.string.run_log_cleared, deleted))
+                }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
+        }
+    }
+
     fun updateGlobalFallbackTask(taskId: Long?) {
         val normalized = taskId?.takeIf { it > 0L }
         fallbackTaskSettings.saveTaskId(normalized)
