@@ -23,22 +23,24 @@ W, H = 286, 482
 # of the year (十二月三十一日, the only case that needs all eight character widths), the shortest
 # (一月一日, where the day sits centred on its seam with a gap either side), and a round ten.
 SAMPLES = [
-    (datetime.datetime(2026, 8, 31, 9, 13), 76, 1220),
-    (datetime.datetime(2026, 12, 31, 10, 0), 76, 1220),
-    (datetime.datetime(2026, 1, 1, 11, 34), 60, 999),
-    (datetime.datetime(2026, 11, 10, 12, 59), 30, 5012),
+    (datetime.datetime(2026, 9, 1, 3, 13, 7), 76, 1220),
+    (datetime.datetime(2026, 12, 31, 10, 0, 0), 76, 1220),
+    (datetime.datetime(2026, 1, 1, 11, 34, 45), 60, 999),
+    (datetime.datetime(2026, 11, 10, 12, 59, 59), 30, 5012),
 ]
 
 
 def panel(g, when, batt, steps):
     hour, minute = when.hour, when.minute
     im = Image.new("RGBA", (W, H), (0, 0, 0, 255))
+    # The hour is two cells again in v3, units-under-tens in each, exactly like the minutes.
     h12 = hour % 12 or 12                      # the band counts 1..12, confirmed against its own clock
     ht, hu = divmod(h12, 10)
-    im.alpha_composite(g[f"h1_units_{hu}"], (0, B.HOUR_Y))
-    if ht:
-        im.alpha_composite(g[f"h1_tens_{ht}"], (B.MARK_X, B.HOUR_Y + B.MARK_Y))
-    for y, tens, units, lo, hi in ((B.MIN_Y, *divmod(minute, 10), "m1", "m2"),):
+    for x, cell in ((B.CELL1_X, "h1"), (B.CELL2_X, "h2")):
+        im.alpha_composite(g[f"{cell}_units_{hu}"], (x, B.HOUR_Y))
+        im.alpha_composite(g[f"{cell}_tens_{ht}"], (x, B.HOUR_Y))
+    for y, tens, units, lo, hi in ((B.MIN_Y, *divmod(minute, 10), "m1", "m2"),
+                                   (B.SEC_Y, *divmod(when.second, 10), "s1", "s2")):
         # Units first, tens second. These tiles are OPAQUE, so the later one wins, and that is the
         # whole trick of the two-cell line: cell 1 draws the units digit and the tens glyph paints
         # over it when there is one; cell 2 draws "<units>分" and the 分-alone tile covers it when
