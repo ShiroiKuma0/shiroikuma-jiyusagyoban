@@ -113,6 +113,24 @@ object HuaweiWalkLibrary {
          * one already did once — so a disagreement here is a finding, not a number to reconcile.
          */
         val chizu: ChizuReading?,
+        /**
+         * 白い熊's own words about this walk, and how many times they stopped on it.
+         *
+         * **Authored, not measured** — and that is why they live in `walk.json` beside the band's
+         * figures rather than in a preferences file keyed by walk id. A walk is a directory on
+         * 白い熊's own archive (`[666][147] tracks`); keeping the annotation inside it means the note
+         * travels with the walk when the tree is copied or restored, and survives the app's data
+         * being cleared. The two writers below both carry them forward explicitly, so a
+         * re-download from the band and a fresh map from 地図 leave them untouched.
+         *
+         * The stop count is deliberately not derived from the track's stationary gaps, though the
+         * gaps are there in the data: the band pauses and resumes on its own, so a gap is the
+         * RECORDER stopping and not necessarily 白い熊 (a real walk here spanned 2 h 08 m of wall
+         * clock for 29 m of recording). This number is the walker's answer, and it is allowed to
+         * disagree with the recorder's.
+         */
+        val note: String? = null,
+        val stops: Int? = null,
     ) {
         val id: String get() = dir.name
         val gpx: File get() = File(dir, "track.gpx")
@@ -169,6 +187,8 @@ object HuaweiWalkLibrary {
                 descentMetres = num("chizuDescentMetres"),
                 detail = str("chizuMapDetail"),
             ).takeIf { !it.isEmpty },
+            note = str("note"),
+            stops = long("stops")?.toInt(),
         )
     }
 
@@ -212,6 +232,10 @@ object HuaweiWalkLibrary {
                 kept?.thumbPath?.let { put("thumbPath", it) }
                 kept?.mapPath?.let { put("mapPath", it) }
                 kept?.chizu?.let { putChizu(it) }
+                // The band can re-supply every figure above; it cannot re-supply these. A walk
+                // fetched a second time must not arrive stripped of what 白い熊 wrote on it.
+                kept?.note?.let { put("note", it) }
+                kept?.stops?.let { put("stops", it) }
             },
         )
         return requireNotNull(read(dir))
@@ -244,6 +268,42 @@ object HuaweiWalkLibrary {
                 (thumbPath ?: walk.thumbPath)?.let { put("thumbPath", it) }
                 (mapPath ?: walk.mapPath)?.let { put("mapPath", it) }
                 (chizu?.takeIf { !it.isEmpty } ?: walk.chizu)?.let { putChizu(it) }
+                walk.note?.let { put("note", it) }
+                walk.stops?.let { put("stops", it) }
+            },
+        )
+        return read(walk.dir) ?: walk
+    }
+
+    /**
+     * File 白い熊's own annotation on a walk, leaving everything measured untouched.
+     *
+     * Both values are passed WHOLE rather than patched: null means "there is none", which is how a
+     * note is deleted (blank text) and how a stop count is withdrawn (tapping the number on file).
+     * The caller therefore always states the annotation it wants the walk to end up with, and there
+     * is no "leave this one alone" case to get wrong.
+     */
+    fun annotate(walk: Walk, note: String?, stops: Int?): Walk {
+        if (!File(walk.dir, "walk.json").isFile) return walk
+        val cleanNote = note?.trim()?.takeIf { it.isNotEmpty() }
+        save(
+            walk.dir,
+            buildJsonObject {
+                put("number", walk.number)
+                put("startSeconds", walk.startSeconds)
+                walk.endSeconds?.let { put("endSeconds", it) }
+                walk.distanceMetres?.let { put("distanceMetres", it) }
+                walk.steps?.let { put("steps", it) }
+                walk.calories?.let { put("calories", it) }
+                walk.elevationGainDm?.let { put("elevationGainDm", it) }
+                put("kind", walk.kind)
+                put("points", walk.points)
+                walk.trackId?.let { put("trackId", it) }
+                walk.thumbPath?.let { put("thumbPath", it) }
+                walk.mapPath?.let { put("mapPath", it) }
+                walk.chizu?.let { putChizu(it) }
+                cleanNote?.let { put("note", it) }
+                stops?.let { put("stops", it) }
             },
         )
         return read(walk.dir) ?: walk

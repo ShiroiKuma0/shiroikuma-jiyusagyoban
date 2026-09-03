@@ -71,6 +71,27 @@ object RecoveryReference {
     }
 
     /**
+     * Blood oxygen → 1–5, on the clinical pulse-oximetry ranges, best first.
+     *
+     * 95 % and above is the normal room-air range in every clinical reference; 94 % is the
+     * borderline that prompts a second look; 91–93 % is low; below 91 % is hypoxaemia. The ladder is
+     * one-sided by nature — there is no such thing as too much saturation.
+     *
+     * **Caveat, and it is a large one:** a wrist oximeter's error is about twice the day–night swing
+     * it is measuring (which is why blood oxygen is excluded from the recovery counting rule and
+     * always will be). So this colour says where the READING sits on the clinical ladder, not how
+     * confident anyone should be that the reading is the truth. It is shown because 白い熊 asked for
+     * every column to carry its colour (2026-09-03), and the ⓘ panel states the caveat beside it.
+     */
+    fun spo2Step(percent: Double): Int = when {
+        percent >= 96 -> 1
+        percent >= 95 -> 2
+        percent >= 93 -> 3
+        percent >= 90 -> 4
+        else -> 5
+    }
+
+    /**
      * Nocturnal heart rate → 1–5, on Jensen's resting-rate decades, best first.
      *
      * Below 50 through 80-and-over, one step per decade. Monotone by construction, because the risk
@@ -83,4 +104,15 @@ object RecoveryReference {
         bpm < 80 -> 4
         else -> 5
     }
+
+    /**
+     * The night's LOWEST heart rate → 1–5, on the same decades as [nocturnalHrStep].
+     *
+     * The same ladder deliberately, not a shifted one. Jensen's categories are the only published
+     * cut points for a resting rate, and inventing a "sleeping floor" ladder by subtracting a few
+     * beats would be a scale nobody measured dressed as a reference. What it means is stated instead:
+     * the floor of a night necessarily sits below its level, so a green low is a weaker claim than a
+     * green nocturnal rate, and the two columns are NOT to be read as agreeing or disagreeing.
+     */
+    fun lowestHrStep(bpm: Double): Int = nocturnalHrStep(bpm)
 }
