@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.93+2026-08-31.19-12.gbb75f812+002`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.93+2026-09-01.00-11.g29d06ff7+016`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -23,7 +23,7 @@
 
 It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind **triggers** to **tasks**, tasks run **actions**, all persisted in Room, no Hilt, no native code. Built on OpenTasker and extended into a markedly more capable tool than OpenTasker — and, in everyday use, than Tasker itself. It installs **side-by-side** with upstream (application id `shiroikuma.jiyusagyoban`), so both can coexist.
 
-> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, a complete **HUAWEI Band 11 Pro** stack spoken over RFCOMM with **no Huawei account** (history, sleep including the band's daytime naps, walks with GPS, watch faces, weather, band language — plus a twin-track **「バンド比較」** that never pools the two bands) (with a **回復** card that counts rather than scores, and a 1–5 colour scale measured against red-green colour blindness before it was drawn), **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), **remapped physical volume keys** (short / long / double / triple / hold-to-repeat, working screen-off — either key opens the camera on a double press and video on a triple, and a hold zooms), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), sub-minute triggers, and a black-and-yellow theme.
+> A fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions: a generic **Send Intent** action, cross-app **protected contacts** (content-free notifications for private senders), a screen-off **notification wakedance**, **app freeze/unfreeze + launcher-task generation**, a fully app-driven **kanji clock**, **projects + foldable groups + scoped variables**, full **drag-to-reorder** (tasks, projects, project-tabs), a **Review Import** workflow, a **capability-aware action editor**, **home-screen task shortcuts with custom icons**, **Desktop re-freeze bubbles**, home-screen **widgets + a template library**, **living scene overlays** (a charging fire on the battery line, a **natively-rendered, music-reactive, tempo-locked** music edge-light — all screen-off gated), **per-app share-sheet tiles** (each generated as its own signed relay APK, on-device), a **backup-guarded system language switch**, a full **Hume Band V2 health decoder + 「健康」 charts**, a complete **HUAWEI Band 11 Pro** stack spoken over RFCOMM with **no Huawei account** (history, sleep including the band's daytime naps, walks with GPS, watch faces, weather, band language — plus a twin-track **「バンド比較」** that never pools the two bands) (with a **回復** card that counts rather than scores, a 1–5 colour scale measured against red-green colour blindness before it was drawn, **a written note on every morning and every walk**, and **機能訓練** — the rehab exercises ticked off a calendar a day at a time), **「文字認識」 offline OCR** (share a screenshot, get its text — PP-OCRv5 on-device, six languages, no network, models supplied rather than shipped), **live-wallpaper switching without the picker** (Shizuku sets the component outright), a **full app-state Export/Import** (everything settable as one category ZIP — including every health rating, note, rehab tick and band reading, with a gate that fails the build if a new store is not in it), **one-tap backup of every sister app** (a plan → run → report window: pick apps and items, watch two live panes, repair what failed without leaving it), a headless **adb automation bridge** (workspace export/import broadcasts), **remapped physical volume keys** (short / long / double / triple / hold-to-repeat, working screen-off — either key opens the camera on a double press and video on a triple, and a hold zooms), **per-SIM speed testing** (real throughput and a real round-trip ping on each SIM and over WiFi, with root-free data-SIM switching), sub-minute triggers, and a black-and-yellow theme.
 
 ---
 
@@ -91,6 +91,46 @@ No readiness percentage, deliberately. Not one commercial readiness composite ha
 Behind it, 運動と回復 keeps every night and every rating: a calendar of the last month and a half, and a table of the lot. The calendar is a **fixed window that scrolls** — seven Monday-aligned weeks in a card of fixed height, opening at the bottom on today — so the screen below it stops moving as the weeks accumulate, and every month opens with a yellow rule carrying its name. In Japanese that name is the **imperial year in kanji numerals** — 令和八年 八月, 元年 for the first year of an era — the same rendering the sister calendar fork prints. Because the rule carries the year, the lines beneath it no longer have to, which is exactly the width the date column needed on a folded panel. The measured columns are graded twice over and never conflated — 実睡眠 and 夜間心拍 against **published reference ranges** (the NSF/AASM sleep consensus; Jensen's resting-rate decades), 皮膚温 against **your own nights only**, because a wrist sensor correlates with the room at r = 0.961 and an absolute threshold would be grading your bedroom. Tap the ⓘ and every rung is there: the exact cut points that land a night on it, and the paper that put them there. **Every night there is editable** — a tile or a table line opens a picker that names the night in full and files the 1–5 against it, so a morning away from the phone is a hole that can still be filled and a step tapped wrong can be corrected. A rating entered three weeks late counts exactly like one entered that morning; a night with nothing measured on it still has a tile to tap.
 
 **The 1–5 scale itself was measured before it was drawn.** 白い熊 is red-green colour-blind, so a ladder separated by hue is a ladder they cannot read — and the first attempt was exactly that. The replacement runs **1 = best … 5 = worst** in yellow, emerald, blue, orange-red and dark red, chosen over six rounds against an on-device port of the Machado–Oliveira–Fernandes CVD transforms, with every candidate's separation computed before anything was rendered. What that ruled out is recorded in the source, because it is the part that would otherwise be re-proposed: pure green cannot sit beside pure yellow (ΔE 3.5 under deuteranopia), violet cannot sit beside blue, and a light red collides with the *green*, not the red. The worst two steps are one colour getting darker rather than two hues, so the bad end is read by lightness — which no colour deficiency touches — and the 健康指数's component bars are banded on the index's own cut points in the same five colours, so a bar, a table cell and a calendar tile saying the same thing look the same.
+
+### 📝 A note on every day, and 機能訓練
+
+A 1–5 says a night was bad; it cannot say **why**, and by the time the reason matters — a month
+later, reading a run of 4s in the grid — it is gone. So every morning takes a written note beside its
+rating, reachable from the report, from any calendar tile and from any table line, and every walk
+takes one too, along with a **stop count** in a black pill with a yellow number. The walk's note
+lives inside `walk.json` in 白い熊's own tracks archive rather than in app data, so it survives the
+app being cleared; the day's note lives in its own preferences file keyed by the same morning the
+rating is. Blank saves delete, one pill either way — the pattern comes over unchanged from 白い熊
+応用管理 and 白い熊 考直, because a control learned once should not have to be learned again.
+
+**機能訓練** sits directly under the morning rating, because both are things only 白い熊 can answer
+and both are worth nothing if the day passes unanswered. It is a tick per calendar day on a
+calendar, not a counter: what matters about rehab is the **run**, and a number cannot show a gap.
+The card is a two-week cut-out of exactly the calendar its own page draws — one record, sliced twice,
+so the two can never disagree — and the appearance was chosen from ten rendered options rather than
+argued about: every day a filled cell, the done ones bright, the weekend given real air either side
+of its rule. There is deliberately **no red**; a missed day is a gap, not an error.
+
+### 🌙 The night table, and what a colour is allowed to mean
+
+Nine columns now — date, how you woke, night HR, asleep, **deep**, **deep+REM**, **lowest HR**,
+**HRV (RMSSD)** and **SpO₂** — in one horizontal scroll, every cell one line, sized against the
+device's real font scale rather than the default. Temperature is gone: this band has none, so the
+column was a dash on every line.
+
+**HRV is the reason the Huawei experiment happened.** The Hume band reported an "HRV" that turned out
+to be a device-state index and never sent a beat-to-beat interval in its life; this band records a
+~56-second analysis window every few minutes, and its RMSSD is checked against the band's own
+per-beat series. Only the windows Huawei Health itself would publish are used.
+
+Every column carries a colour, and **not all against the same thing** — the ⓘ panel says which is
+which. The low and the blood oxygen ride published ladders, with their caveats stated where they can
+be read: a sleeping floor necessarily sits below a daytime resting rate, and a wrist oximeter's error
+is about twice the swing it measures. Deep, deep+REM and RMSSD are banded **within-person**, because
+no published ladder fits them — this band's "deep" runs 30–40 % of sleep where the literature's N3 is
+13–23 %, so an absolute scale would call every night ever recorded extreme. And none of the five is
+**counted**: the headline still counts three markers, and a colour says where a value sits, never
+that the night was adverse.
 
 ### 🔔 通知明滅 — the notification wakedance
 A per-app coloured **edge-light** for incoming notifications. Screen-on, a frame blinks in the app's colour. **Screen-off, it wakes the device *over the lockscreen* and rotates through every unread app** (colour + sender + preview), then sleeps — repeating on a sub-minute timer. It survives EMUI's aggressive service-reaping with a `SCREEN_BRIGHT` wakelock, draw-before-wake, an opaque show-when-locked Activity, and a clean self-sleep. Powered by new engine primitives: a **`sec_tick`** sub-minute trigger, `state.get screen`, and `wake` / `screen.off`.
