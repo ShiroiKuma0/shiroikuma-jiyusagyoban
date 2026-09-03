@@ -300,7 +300,7 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | Compile SDK | 37 |
 | Target SDK | 37 |
 | Room | 2.8.4 |
-| Compose BOM | 2026.06.01 |
+| Compose BOM | 2026.08.00 |
 | WorkManager | 2.11.2 |
 
 All dependency versions are centralized in `gradle/libs.versions.toml`.

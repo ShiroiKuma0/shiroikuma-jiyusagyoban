@@ -48,6 +48,10 @@
 
 ### Changed
 
+- Taps now play the standard Android click sound, which arrived with the Compose
+  update underneath. If you have touch sounds turned off in your phone's Sound
+  settings, you will not hear them; OpenTasker follows that setting rather than
+  overriding it.
 - Dropped the Navigation Compose library. The app has always moved between its
   top-level screens on its own, so the library was being packaged and listed in
   the bill of materials without a single line of code using it.

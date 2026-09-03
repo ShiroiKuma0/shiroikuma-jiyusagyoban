@@ -19,7 +19,7 @@
                          "agp":  "9.3.2",
                          "ksp":  "2.3.11",
                          "room":  "2.8.4",
-                         "composeBom":  "2026.06.01",
+                         "composeBom":  "2026.08.00",
                          "work":  "2.11.2"
                      },
     "capabilities":  {

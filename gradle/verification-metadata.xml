@@ -3052,6 +3052,14 @@
             <sha256 value="fd29e4a223b9118b1f6dc78ab7d11536086be9d64b5b7b0b9657bbaf27056dcf" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
+      <component group="androidx.transition" name="transition" version="1.2.0">
+         <artifact name="transition-1.2.0.aar">
+            <sha256 value="a1e059b3bc0b43a58dec0efecdcaa89c82d2bca552ea5bacf6656c46e853157e" origin="OpenTasker: Google Maven direct artifact SHA-256 (no upstream .sha256/.asc)" />
+         </artifact>
+         <artifact name="transition-1.2.0.pom">
+            <sha256 value="247f12757acabd706b069445fd31c83c016cc7fe67b0468c582d043ea7d20de1" origin="OpenTasker: Google Maven direct artifact SHA-256 (no upstream .sha256/.asc)" />
+         </artifact>
+      </component>
       <component group="androidx.transition" name="transition" version="1.6.0">
          <artifact name="transition-1.6.0.aar">
             <sha256 value="248c45e1254d31181d2047b0b01394f09a2e539a5d9e89b773d53c62c96860f6" origin="OpenTasker: Google Maven published .sha256" />
