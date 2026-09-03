@@ -1,6 +1,7 @@
 package com.opentasker.core.actions
 
 import android.content.ContextWrapper
+import com.opentasker.ProductionSources
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
@@ -10,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,9 +25,12 @@ import org.junit.Test
  */
 class HttpNetworkConstraintTest {
 
-    private val wifi = ActiveTransport(connected = true, wifi = true, unmetered = true)
-    private val meteredWifi = ActiveTransport(connected = true, wifi = true, unmetered = false)
-    private val cellular = ActiveTransport(connected = true, cellular = true, unmetered = false)
+    private val wifi = ActiveTransport(connected = true, wifi = true, unmetered = true, internet = true)
+    private val meteredWifi = ActiveTransport(connected = true, wifi = true, unmetered = false, internet = true)
+    private val cellular = ActiveTransport(connected = true, cellular = true, unmetered = false, internet = true)
+
+    /** A router with no WAN, a captive portal, or a plain device-to-device LAN. */
+    private val lanOnlyWifi = ActiveTransport(connected = true, wifi = true, unmetered = true, internet = false)
 
     @Test
     fun `an unset or unrecognised constraint means no constraint`() {
@@ -62,6 +67,49 @@ class HttpNetworkConstraintTest {
         assertNull(httpNetworkDenial(HttpNetworkConstraint.UNMETERED, wifi))
         assertDenied(httpNetworkDenial(HttpNetworkConstraint.UNMETERED, meteredWifi), "metered Wi-Fi")
         assertDenied(httpNetworkDenial(HttpNetworkConstraint.UNMETERED, cellular), "cellular")
+    }
+
+    /**
+     * A Wi-Fi network with no route to the internet is still Wi-Fi.
+     *
+     * Reaching a printer or a home server on the local network is exactly what the action's
+     * `allow_http` private-LAN rule exists for, so treating "no internet" as "offline" would make
+     * the constraint refuse the requests it was added to protect.
+     */
+    @Test
+    fun `a wifi-only request is allowed on a network with no internet access`() {
+        assertNull(httpNetworkDenial(HttpNetworkConstraint.WIFI, lanOnlyWifi))
+        assertNull(httpNetworkDenial(HttpNetworkConstraint.ANY, lanOnlyWifi))
+        assertNull(httpNetworkDenial(HttpNetworkConstraint.UNMETERED, lanOnlyWifi))
+        // Still the wrong transport, and the message says why rather than claiming it is offline.
+        assertDenied(httpNetworkDenial(HttpNetworkConstraint.CELLULAR, lanOnlyWifi), "no internet access")
+    }
+
+    /**
+     * The policy test above cannot see the reader, and the reader is where this went wrong.
+     *
+     * `readActiveTransport` needs a real ConnectivityManager, so the mapping is pinned at the
+     * source instead: `connected` must not be derived from NET_CAPABILITY_INTERNET, which is what
+     * made a LAN-only network report as offline.
+     */
+    @Test
+    fun `the reader does not decide connectivity from internet reachability`() {
+        val source = ProductionSources.read("com/opentasker/core/actions/NetworkActions.kt")
+        val open = source.indexOf("fun readActiveTransport(")
+        assertTrue("readActiveTransport must exist", open >= 0)
+        val close = source.indexOf("\n}", open)
+        assertTrue("readActiveTransport must have a body", close > open)
+        val body = source.substring(open, close)
+
+        assertTrue("the reader must report an active network as connected", "connected = true," in body)
+        assertTrue(
+            "internet reachability belongs on its own field, not on connected",
+            "internet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)" in body,
+        )
+        assertFalse(
+            "connected must not be derived from NET_CAPABILITY_INTERNET",
+            "connected = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)" in body,
+        )
     }
 
     @Test

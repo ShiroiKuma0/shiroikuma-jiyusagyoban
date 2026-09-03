@@ -51,6 +51,12 @@
 
 ### Fixed
 
+- An HTTP Request restricted to Wi-Fi is no longer refused on a Wi-Fi network
+  that has no route to the internet. A router with its uplink down, a captive
+  portal, or a plain local network between two devices all counted as "offline"
+  before, which blocked exactly the local-network requests the restriction was
+  meant to allow. When some other restriction does refuse a request, the message
+  now says the connection has no internet access instead of leaving you to guess.
 - The notification shown while a scene overlay is on screen now uses the
   OpenTasker glyph. It was still showing Android's stock compass icon, which
   made it look like it came from another app. The home screen widget was doing

@@ -256,12 +256,18 @@ enum class HttpNetworkConstraint(val wireValue: String) {
  *
  * [connected] false means there is no active network at all. A null [ActiveTransport] elsewhere
  * means the answer could not be read, which is treated differently: see [httpNetworkDenial].
+ *
+ * [internet] is deliberately separate from [connected]. A Wi-Fi network with no route to the
+ * internet is still a Wi-Fi network, and reaching a device on it is the whole point of the
+ * action's `allow_http` private-LAN rule, so it must satisfy a `wifi` constraint. Internet
+ * reachability only colours the message when some other constraint is unsatisfied.
  */
 data class ActiveTransport(
     val connected: Boolean,
     val wifi: Boolean = false,
     val cellular: Boolean = false,
     val unmetered: Boolean = false,
+    val internet: Boolean = false,
 ) {
     companion object {
         val NONE = ActiveTransport(connected = false)
@@ -299,13 +305,18 @@ internal fun httpNetworkDenial(
     )
 }
 
-private fun ActiveTransport.describe(): String = when {
-    !connected -> "offline"
-    wifi && unmetered -> "unmetered Wi-Fi"
-    wifi -> "metered Wi-Fi"
-    cellular -> "cellular"
-    unmetered -> "another unmetered connection"
-    else -> "another metered connection"
+private fun ActiveTransport.describe(): String {
+    val kind = when {
+        !connected -> return "offline"
+        wifi && unmetered -> "unmetered Wi-Fi"
+        wifi -> "metered Wi-Fi"
+        cellular -> "cellular"
+        unmetered -> "another unmetered connection"
+        else -> "another metered connection"
+    }
+    // Worth saying, because a local-only network is the case people are most likely to be
+    // surprised by, and it explains why a constraint they expected to match did not.
+    return if (internet) kind else "$kind with no internet access"
 }
 
 /** Reads the live transport. Returns null when the answer cannot be read at all. */
@@ -322,9 +333,14 @@ fun readActiveTransport(context: android.content.Context): ActiveTransport? {
     val network = manager.activeNetwork ?: return ActiveTransport.NONE
     val capabilities = manager.getNetworkCapabilities(network) ?: return null
     return ActiveTransport(
-        connected = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+        // There is an active network with readable capabilities, so we are connected to something.
+        // Deriving this from NET_CAPABILITY_INTERNET instead would report a LAN with no WAN, a
+        // captive portal, or a router that is down as "offline", and refuse a wifi-restricted
+        // request aimed at a device on that very LAN.
+        connected = true,
         wifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI),
         cellular = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR),
         unmetered = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+        internet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
     )
 }
