@@ -1896,7 +1896,7 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            if (_runActionBusy.value) return@launch
+            if (_runActionBusy.value) { events.send(message(R.string.ui_message_run_busy)); return@launch }
             _runActionBusy.value = true
             runCatching {
                 writeSettingsGuard.requireWriteSettingsReady(task.actions)
@@ -1936,7 +1936,7 @@ class ActiveAutomationViewModel(
      */
     fun runActionNow(task: Task, index: Int) {
         viewModelScope.launch {
-            if (_runActionBusy.value) return@launch
+            if (_runActionBusy.value) { events.send(message(R.string.ui_message_run_busy)); return@launch }
             val single = SingleActionRun.taskFor(task, index) ?: return@launch
             val action = single.actions.first()
             val label = action.label
@@ -1972,7 +1972,7 @@ class ActiveAutomationViewModel(
 
     fun replayHeldRun(entry: RunLogEntry) {
         viewModelScope.launch {
-            if (_runActionBusy.value) return@launch
+            if (_runActionBusy.value) { events.send(message(R.string.ui_message_run_busy)); return@launch }
             _runActionBusy.value = true
             runCatching {
                 replayHeldExecution(

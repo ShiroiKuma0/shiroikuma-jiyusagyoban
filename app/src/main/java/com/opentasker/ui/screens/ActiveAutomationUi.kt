@@ -221,6 +221,7 @@ fun ActiveAutomationUi(
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState(); val contentLoaded by viewModel.contentLoaded.collectAsState(); val historyAvailability by viewModel.historyAvailability.collectAsState()
+    val runBusy by viewModel.runActionBusy.collectAsState()
     val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val projects by viewModel.projects.collectAsState()
@@ -818,6 +819,7 @@ fun ActiveAutomationUi(
                     viewModel.moveTaskAction(task.id, fromIndex, toIndex)
                 },
                 onRunAction = { task, index -> viewModel.runActionNow(task, index) },
+                runBusy = runBusy,
                 contentPadding = innerPadding, contentLoaded = contentLoaded, historyAvailability = historyAvailability,
             )
 

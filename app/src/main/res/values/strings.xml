@@ -431,6 +431,8 @@
     <string name="setup_overlay_access_title">Overlay access</string>
     <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI</string>
+    <string name="ui_message_run_busy">Something is already running. Wait for it to finish.</string>
+    <string name="action_run_alone_busy">Running…</string>
     <string name="device_admin_label">Lock screen</string>
     <string name="device_admin_description">Lets a task lock the screen. This is the only thing OpenTasker asks for here.</string>
     <string name="setup_device_admin_title">Lock screen admin</string>

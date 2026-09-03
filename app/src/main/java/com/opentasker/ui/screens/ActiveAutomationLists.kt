@@ -480,6 +480,7 @@ internal fun TasksScreen(
     onMoveAction: (Task, Int, Int) -> Unit,
     onRunAction: (Task, Int) -> Unit,
     contentPadding: PaddingValues,
+    runBusy: Boolean = false,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
 ) {
@@ -557,6 +558,7 @@ internal fun TasksScreen(
                 onDeleteAction = { index -> onDeleteAction(task, index) },
                 onMoveAction = { fromIndex, toIndex -> onMoveAction(task, fromIndex, toIndex) },
                 onRunAction = { index -> onRunAction(task, index) },
+                runBusy = runBusy,
             )
         }
     }
@@ -581,6 +583,7 @@ private fun TaskCard(
     onDeleteAction: (Int) -> Unit,
     onMoveAction: (Int, Int) -> Unit,
     onRunAction: (Int) -> Unit,
+    runBusy: Boolean,
 ) {
     var expanded by rememberSaveable(task.id) { mutableStateOf(initiallyExpanded) }
     val runDescription = stringResource(R.string.a11y_run_task, task.name)
@@ -679,6 +682,7 @@ private fun TaskCard(
                         onEdit = { onEditAction(index, action) },
                         onDelete = { onDeleteAction(index) },
                         onRun = { onRunAction(index) },
+                        runBusy = runBusy,
                     )
                 }
             }
@@ -834,6 +838,7 @@ private fun ActionRow(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onRun: () -> Unit,
+    runBusy: Boolean,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val resources = LocalContext.current.resources
@@ -933,9 +938,18 @@ private fun ActionRow(
                     // has no meaning on its own, so offering it greyed out would only invite
                     // the question of why.
                     if (SingleActionRun.isRunnableAlone(action)) {
+                        // Only one run happens at a time, and a second tap used to be swallowed
+                        // with no sign anything had happened. Say which state the option is in.
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_run_alone)) },
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (runBusy) R.string.action_run_alone_busy else R.string.action_run_alone,
+                                    ),
+                                )
+                            },
                             onClick = { menuExpanded = false; onRun() },
+                            enabled = !runBusy,
                             leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = runDescription) },
                         )
                     }

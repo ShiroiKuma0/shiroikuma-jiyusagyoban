@@ -51,6 +51,11 @@
 
 ### Fixed
 
+- Asking for a run while one is already going now says so. Run task, Run this
+  action, and replaying a held run all refused a second request silently, so a
+  tap did nothing with no explanation, for up to five minutes if the earlier run
+  was waiting its turn. The overflow menu also shows "Running…" instead of
+  offering an option that would be ignored.
 - Lock device works. It has been in the action list for a long time while always
   failing, because Android only lets an app lock the screen through a device
   admin and OpenTasker had none. Setup now has a Lock screen admin row that turns
