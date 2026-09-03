@@ -1363,6 +1363,10 @@
     <string name="action_option_http_delete">DELETE</string>
     <string name="action_option_http_options">OPTIONS</string>
     <string name="action_option_same_origin">Same origin</string>
+    <string name="action_option_network_any">Any connection</string>
+    <string name="action_option_network_wifi">Wi-Fi</string>
+    <string name="action_option_network_cellular">Mobile data</string>
+    <string name="action_option_network_unmetered">Unmetered connections</string>
 
     <!-- Secondary-surface localization -->
     <string name="nav_more">More</string>

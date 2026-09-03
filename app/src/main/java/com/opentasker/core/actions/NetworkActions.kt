@@ -2,6 +2,8 @@ package com.opentasker.core.actions
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.ActionContext
@@ -226,3 +228,103 @@ internal fun localNetworkPermissionDenial(sdkInt: Int, granted: Boolean): Action
     )
 }
 
+
+/**
+ * Which kind of connection an HTTP Request is willing to use.
+ *
+ * Metered-aware requests are a common ask, and without this a user has to wrap the action in a
+ * `flow.if` on a connectivity state variable, which races the request it is guarding.
+ */
+enum class HttpNetworkConstraint(val wireValue: String) {
+    ANY("any"),
+    WIFI("wifi"),
+    CELLULAR("cellular"),
+    UNMETERED("unmetered"),
+    ;
+
+    companion object {
+        /** Anything blank, absent or unrecognised means no constraint, so an old bundle still runs. */
+        fun parse(raw: String?): HttpNetworkConstraint {
+            val value = raw?.trim()?.lowercase().orEmpty()
+            return entries.firstOrNull { it.wireValue == value } ?: ANY
+        }
+    }
+}
+
+/**
+ * What the device is connected through right now, as far as [HttpNetworkConstraint] cares.
+ *
+ * [connected] false means there is no active network at all. A null [ActiveTransport] elsewhere
+ * means the answer could not be read, which is treated differently: see [httpNetworkDenial].
+ */
+data class ActiveTransport(
+    val connected: Boolean,
+    val wifi: Boolean = false,
+    val cellular: Boolean = false,
+    val unmetered: Boolean = false,
+) {
+    companion object {
+        val NONE = ActiveTransport(connected = false)
+    }
+}
+
+/**
+ * Pure constraint policy, so the wifi/cellular/metered decision is unit-testable without a device.
+ *
+ * Fails closed on an unreadable transport: sending a request that was explicitly restricted, over
+ * a connection nobody could identify, is the one outcome the setting exists to prevent.
+ */
+internal fun httpNetworkDenial(
+    constraint: HttpNetworkConstraint,
+    transport: ActiveTransport?,
+): ActionResult? {
+    if (constraint == HttpNetworkConstraint.ANY) return null
+    if (transport == null) {
+        return ActionResult.Failure(
+            "this request is limited to ${constraint.wireValue}, and the current connection could not be identified",
+        )
+    }
+    if (!transport.connected) {
+        return ActionResult.Failure("this request is limited to ${constraint.wireValue}, and the device is offline")
+    }
+    val satisfied = when (constraint) {
+        HttpNetworkConstraint.ANY -> true
+        HttpNetworkConstraint.WIFI -> transport.wifi
+        HttpNetworkConstraint.CELLULAR -> transport.cellular
+        HttpNetworkConstraint.UNMETERED -> transport.unmetered
+    }
+    if (satisfied) return null
+    return ActionResult.Failure(
+        "this request is limited to ${constraint.wireValue}, and the current connection is ${transport.describe()}",
+    )
+}
+
+private fun ActiveTransport.describe(): String = when {
+    !connected -> "offline"
+    wifi && unmetered -> "unmetered Wi-Fi"
+    wifi -> "metered Wi-Fi"
+    cellular -> "cellular"
+    unmetered -> "another unmetered connection"
+    else -> "another metered connection"
+}
+
+/** Reads the live transport. Returns null when the answer cannot be read at all. */
+internal fun activeTransport(ctx: ActionContext): ActiveTransport? = readActiveTransport(ctx.app)
+
+/**
+ * The live transport, read from a plain [android.content.Context].
+ *
+ * [activeTransport] takes an [ActionContext] because that is what an action has; the preflight
+ * preview has only the application context, and both need the same answer.
+ */
+fun readActiveTransport(context: android.content.Context): ActiveTransport? {
+    val manager = context.getSystemService(ConnectivityManager::class.java) ?: return null
+    val network = manager.activeNetwork ?: return ActiveTransport.NONE
+    val capabilities = manager.getNetworkCapabilities(network) ?: return null
+    return ActiveTransport(
+        connected = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+        wifi = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI),
+        cellular = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR),
+        unmetered = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+    )
+}

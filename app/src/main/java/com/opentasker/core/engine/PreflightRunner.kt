@@ -1,6 +1,9 @@
 package com.opentasker.core.engine
 
 import com.opentasker.core.actions.ActionArgumentSensitivity
+import com.opentasker.core.actions.ActiveTransport
+import com.opentasker.core.actions.HttpNetworkConstraint
+import com.opentasker.core.actions.httpNetworkDenial
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.SetupRequirement
@@ -21,6 +24,11 @@ data class PreflightInputs(
     val globalVariables: Map<String, String> = emptyMap(),
     val secretGlobalNames: Set<String> = emptySet(),
     val grantedSetupRequirements: Set<SetupRequirement> = emptySet(),
+    /**
+     * What the device is connected through, when the caller knows. Null means unknown, and an
+     * unknown transport never blocks: a preview must not invent a connection failure.
+     */
+    val activeTransport: ActiveTransport? = null,
 )
 
 enum class PreflightStepStatus {
@@ -306,12 +314,17 @@ object PreflightRunner {
                 else -> PreflightStepStatus.SIMULATED
             }
             if (capability.level == CapabilityLevel.RequiresSetup) stepWarnings += capability.reason
+            // A request restricted to Wi-Fi is not going to run on cellular, and the point of a
+            // preview is to say so before the user waits for a failure.
+            val networkBlock = httpNetworkBlock(spec.type, expansion.rawValues, input.activeTransport)
+            if (networkBlock != null) stepWarnings += networkBlock
+            val effectiveStatus = if (networkBlock != null) PreflightStepStatus.BLOCKED else status
             val step = PreflightStep(
                 taskPath = taskPath,
                 actionIndex = pc,
                 actionType = spec.type,
                 label = spec.label ?: spec.type,
-                status = status,
+                status = effectiveStatus,
                 expandedArguments = expansion.values,
                 condition = conditionResult?.display,
                 branchDecision = conditionResult?.let { "condition -> true" },
@@ -322,7 +335,7 @@ object PreflightRunner {
             recordStep(steps, step)
             warnings += step.warnings
 
-            if (status != PreflightStepStatus.BLOCKED) {
+            if (effectiveStatus != PreflightStepStatus.BLOCKED) {
                 simulateVariableWrite(spec, expansion.rawValues, variables)
                 if (spec.type == SUB_TASK_ACTION_ID) {
                     val reference = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { expansion.rawValues[it]?.trim()?.takeIf(String::isNotBlank) }
@@ -595,4 +608,20 @@ object PreflightRunner {
             profiles = listOf(profile.copy(enabled = true, requiresRiskAcknowledgement = false)),
             tasks = tasks,
         )
+}
+
+/**
+ * The blocker text for a connection-restricted HTTP Request that the live transport cannot satisfy,
+ * or null when there is nothing to say. Shares [httpNetworkDenial] with the action itself, so the
+ * preview cannot describe a rule the runner does not apply.
+ */
+private fun httpNetworkBlock(
+    actionType: String,
+    args: Map<String, String>,
+    transport: ActiveTransport?,
+): String? {
+    if (actionType != "http.request" || transport == null) return null
+    val constraint = HttpNetworkConstraint.parse(args["network"])
+    val denial = httpNetworkDenial(constraint, transport) as? ActionResult.Failure ?: return null
+    return denial.message
 }

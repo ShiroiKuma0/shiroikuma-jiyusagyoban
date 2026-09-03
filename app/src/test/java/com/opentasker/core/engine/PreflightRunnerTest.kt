@@ -4,6 +4,7 @@ import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.SetupRequirement
+import com.opentasker.core.actions.ActiveTransport
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
@@ -20,6 +21,43 @@ class PreflightRunnerTest {
     fun setUp() {
         registerActionMetadata()
         registerCoreRuntime()
+    }
+
+    @Test
+    fun preflightBlocksAConnectionRestrictedRequestTheCurrentNetworkCannotSatisfy() {
+        val task = Task(
+            id = 9,
+            name = "Sync over Wi-Fi",
+            actions = listOf(
+                ActionSpec(
+                    type = "http.request",
+                    args = mapOf("url" to "https://example.test/sync", "network" to "wifi"),
+                ),
+            ),
+        )
+
+        val onCellular = PreflightRunner.preflightTask(
+            task = task,
+            inputs = PreflightInputs(
+                activeTransport = ActiveTransport(connected = true, cellular = true),
+            ),
+        )
+        val blocked = onCellular.tasks.single().steps.single()
+        assertEquals(PreflightStepStatus.BLOCKED, blocked.status)
+        assertTrue(blocked.warnings.toString(), blocked.warnings.any { "limited to wifi" in it })
+        assertFalse(onCellular.canPreflight)
+
+        val onWifi = PreflightRunner.preflightTask(
+            task = task,
+            inputs = PreflightInputs(
+                activeTransport = ActiveTransport(connected = true, wifi = true, unmetered = true),
+            ),
+        )
+        assertEquals(PreflightStepStatus.SIMULATED, onWifi.tasks.single().steps.single().status)
+
+        // An unknown transport is the default, and a preview must not invent a network failure.
+        val unknown = PreflightRunner.preflightTask(task = task, inputs = PreflightInputs())
+        assertEquals(PreflightStepStatus.SIMULATED, unknown.tasks.single().steps.single().status)
     }
 
     @Test

@@ -14,6 +14,11 @@
 
 ### Added
 
+- The HTTP Request action can be restricted to a kind of connection: Wi-Fi,
+  mobile data, or anything unmetered. A restricted request is refused before
+  anything is sent, with a message naming what the connection actually is, and
+  the task preview says so too. It used to take a flow-control branch on a
+  connectivity variable, which raced the request it was guarding.
 - The overflow menu on any action in a task now offers "Run this action". It
   runs that one action on its own, so tuning an HTTP call or a variable no
   longer means running everything above it first. The run appears in the run log

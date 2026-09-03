@@ -29,6 +29,7 @@ import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.actions.readActiveTransport
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.ExecutionEnvelope
@@ -2014,7 +2015,7 @@ class ActiveAutomationViewModel(
         val current = _preflightReview.value ?: return
         startPreflight(
             target = current.target,
-            inputs = current.inputs.copy(eventVariables = eventVariables),
+            requested = current.inputs.copy(eventVariables = eventVariables),
         )
     }
 
@@ -2022,9 +2023,13 @@ class ActiveAutomationViewModel(
         if (!preflightBusy.value) _preflightReview.value = null
     }
 
-    private fun startPreflight(target: PreflightTarget, inputs: PreflightInputs) {
+    private fun startPreflight(target: PreflightTarget, requested: PreflightInputs) {
         preflightTransfer.launch { reportStage ->
             runCatching {
+                // Read the live connection here rather than in the runner: the preview is pure
+                // and stays that way, and an HTTP Request limited to Wi-Fi should say so while
+                // the user is looking at it.
+                val inputs = requested.copy(activeTransport = readActiveTransport(appContext))
                 withContext(Dispatchers.Default) {
                     reportStage(TransferStage.Plan)
                     val availableTasks = tasks.value.toList()

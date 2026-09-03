@@ -31,6 +31,7 @@ import okhttp3.Response
 class HttpRequestAction(
     private val baseClient: OkHttpClient = DEFAULT_HTTP_CLIENT,
     private val localNetworkGuard: (ActionContext) -> ActionResult? = ::checkLocalNetworkPermission,
+    private val transportReader: (ActionContext) -> ActiveTransport? = ::activeTransport,
 ) : DeclaredAction(ActionCatalog.require(ID)) {
 
     override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety = when (
@@ -46,6 +47,12 @@ class HttpRequestAction(
         } catch (error: IllegalArgumentException) {
             return ActionResult.Failure(error.message ?: "invalid HTTP request")
         }
+
+        // Before anything reaches the network: a request restricted to Wi-Fi must not go out over
+        // cellular even once, so this sits ahead of the request loop rather than inside it.
+        val constraint = HttpNetworkConstraint.parse(args["network"])
+        httpNetworkDenial(constraint, if (constraint == HttpNetworkConstraint.ANY) null else transportReader(ctx))
+            ?.let { return it }
 
         var url = config.url
         var method = config.method

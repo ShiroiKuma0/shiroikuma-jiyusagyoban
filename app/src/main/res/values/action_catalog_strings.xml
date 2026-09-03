@@ -442,6 +442,8 @@
     <string name="catalog_action_http_request_field_max_response_bytes_hint" formatted="false">Up to 1 MiB for a variable or 50 MiB for a file</string>
     <string name="catalog_action_http_request_field_redirects_label" formatted="false">Redirect policy</string>
     <string name="catalog_action_http_request_field_redirects_hint" formatted="false">none (default) or same_origin; cross-origin redirects are never followed</string>
+    <string name="catalog_action_http_request_field_network_label" formatted="false">Only over</string>
+    <string name="catalog_action_http_request_field_network_hint" formatted="false">Refuse to send the request unless the device is on the chosen kind of connection</string>
     <string name="catalog_action_http_request_field_allow_http_label" formatted="false">Allow HTTP</string>
     <string name="catalog_action_http_request_field_allow_http_hint" formatted="false">Allow plain HTTP only when every resolved address is private/LAN</string>
     <string name="catalog_action_http_request_field_timeout_label" formatted="false">Default timeout (seconds)</string>
