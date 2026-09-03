@@ -78,6 +78,7 @@ import com.opentasker.core.capabilities.AutomationLintReport
 import com.opentasker.core.capabilities.AutomationLintSeverity
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.capabilities.AutomationInvariantStore
+import com.opentasker.core.contexts.BroadcastContextEvents
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -1040,13 +1041,28 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         } else {
             context.getString(R.string.inspector_setup_calendar_missing)
         }
+        // The broadcast receiver's state is not a permission, it is a live registration, and the
+        // question people actually have is whether anything is listening yet.
+        val listening = BroadcastContextEvents.listeningActions()
+        val broadcastDetail = if (listening.isEmpty()) {
+            context.getString(R.string.inspector_broadcast_idle)
+        } else {
+            context.getString(
+                R.string.inspector_broadcast_listening,
+                listening.size,
+                listening.sorted().joinToString(", "),
+            )
+        }
         ContextSourceSetup(
             ready = true,
-            detail = if (notificationReady) {
-                context.getString(R.string.inspector_setup_event_ready, calendarDetail)
-            } else {
-                context.getString(R.string.inspector_setup_event_notification_missing, calendarDetail)
-            },
+            detail = listOf(
+                if (notificationReady) {
+                    context.getString(R.string.inspector_setup_event_ready, calendarDetail)
+                } else {
+                    context.getString(R.string.inspector_setup_event_notification_missing, calendarDetail)
+                },
+                broadcastDetail,
+            ).joinToString(" "),
         )
     }
     "location" -> {

@@ -914,6 +914,18 @@
     <string name="context_presets">Presets</string>
     <string name="context_field_event_sender_label">Sender</string>
     <string name="context_field_event_sender_hint">Optional sender or originating address filter</string>
+    <string name="context_field_event_action_label">Broadcast action</string>
+    <string name="context_field_event_action_hint">The intent action to listen for, for example com.example.PING</string>
+    <string name="context_field_event_extra_key_label">Extra name</string>
+    <string name="context_field_event_extra_key_hint">Optional. Fire only when the broadcast carries this extra</string>
+    <string name="context_field_event_extra_value_label">Extra value</string>
+    <string name="context_field_event_extra_value_hint">Optional. Fire only when that extra contains this text</string>
+    <string name="context_preset_broadcast_received">Received broadcast</string>
+    <string name="context_broadcast_platform_action_note">This looks like a system action. Apps cannot send those, so a profile on one may never fire. OpenTasker has purpose-built triggers for the common system events.</string>
+    <string name="context_broadcast_sender_unavailable_note">Android 13 and older never report who sent a broadcast, so this filter will not match anything on this device.</string>
+    <string name="context_broadcast_sender_optin_note">Android names the sender only when the sending app opts in to sharing its identity. Most apps do not, and neither does adb. A broadcast whose sender is unknown is refused by this filter, so leave it blank unless you know your sender shares its identity.</string>
+    <string name="inspector_broadcast_listening">Listening for %1$d broadcast action(s): %2$s</string>
+    <string name="inspector_broadcast_idle">No enabled profile is waiting for a broadcast.</string>
     <string name="context_sms_received_android_17_note">On Android 17+, standard SMS messages containing OTPs may be withheld for up to three hours for non-default-SMS apps. Connected-device and other exempt apps can receive them sooner; use SMS Retriever or User Consent when OTP timing matters.</string>
     <string name="context_sms_received_unavailable_note">The SMS/MMS trigger is omitted from Play builds. Use a standard or F-Droid build for this event.</string>
 

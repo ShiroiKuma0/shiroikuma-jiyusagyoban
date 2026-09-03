@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
  *   - "tile_clicked": Quick Settings tile toggled
  *   - "push": authenticated UnifiedPush distributor delivery
  *   - "share": sanitized Android Sharesheet text, URI, or file delivery
+ *   - "broadcast": a named intent from another app, with bounded string extras
  */
 class EventContextSourceImpl : EventDemandContextSource {
     override val type = "event"
@@ -69,5 +70,6 @@ class EventContextSourceImpl : EventDemandContextSource {
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
         ShareContextEvents.events,
+        BroadcastContextEvents.events,
     )
 }

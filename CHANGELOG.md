@@ -14,6 +14,15 @@
 
 ### Added
 
+- A profile can now trigger on a broadcast another app sends. Name the intent
+  action, and OpenTasker listens for that one action while the profile is
+  enabled and stops the moment you disable it. Extras come through as bounded
+  text, so a task can read `broadcast_extra_msg` the way it reads any other
+  variable, and anything too big or too complex to carry safely is dropped with
+  a note rather than half-copied. You can also filter on an extra's name or
+  value. Filtering on the sender is offered but rarely useful: Android only
+  names the sender when the sending app opts in to sharing its identity, and
+  almost nothing does, so the editor says as much where you type it.
 - The HTTP Request action can be restricted to a kind of connection: Wi-Fi,
   mobile data, or anything unmetered. A restricted request is refused before
   anything is sent, with a message naming what the connection actually is, and

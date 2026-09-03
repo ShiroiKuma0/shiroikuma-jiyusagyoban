@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.os.Build
 import android.annotation.SuppressLint
 import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
@@ -59,6 +60,8 @@ import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.ApplicationContextEvents
 import com.opentasker.core.contexts.ApplicationComponentMatcher
 import com.opentasker.core.contexts.BluetoothEventPresets
+import com.opentasker.core.contexts.BroadcastContextEvents
+import com.opentasker.core.contexts.BroadcastEventPresets
 import com.opentasker.core.contexts.DaySchedule
 import com.opentasker.core.contexts.EventContextPreset
 import com.opentasker.core.contexts.NfcTagWriteSession
@@ -295,9 +298,46 @@ internal fun ContextConfigDialog(
                             )
                         }
                     }
+                    if (state.type == ContextType.EVENT &&
+                        config["event"].equals(BroadcastContextEvents.EVENT_BROADCAST, ignoreCase = true)
+                    ) {
+                        // Warn rather than refuse. A runtime receiver genuinely can hear some
+                        // platform actions, so a hard block would be wrong; a profile that waits
+                        // forever with no explanation is the failure worth preventing.
+                        BroadcastContextEvents.normalizeAction(config["action"])
+                            ?.takeIf(BroadcastContextEvents::isPlatformAction)
+                            ?.let {
+                                item("broadcast-platform-action-note") {
+                                    Text(
+                                        text = stringResource(R.string.context_broadcast_platform_action_note),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        if (config["sender"].orEmpty().isNotBlank()) {
+                            // Two different truths. Below API 34 there is no sender to read at all,
+                            // and above it there is one only when the sender chose to share it,
+                            // which almost nothing does. Either way the filter refuses an unknown
+                            // sender, so saying only "needs Android 14" would mislead.
+                            val senderNote = if (Build.VERSION.SDK_INT < BroadcastContextEvents.SENDER_IDENTITY_API) {
+                                R.string.context_broadcast_sender_unavailable_note
+                            } else {
+                                R.string.context_broadcast_sender_optin_note
+                            }
+                            item("broadcast-sender-note") {
+                                Text(
+                                    text = stringResource(senderNote),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
                     val eventPresets = if (state.type == ContextType.EVENT) {
                         CalendarSunEventPresets.presetsFor(config["event"].orEmpty()) +
                             BluetoothEventPresets.allPresets() +
+                            BroadcastEventPresets.allPresets() +
                             ScreenRecordingEventPresets.presetsFor(config["event"].orEmpty())
                     } else {
                         emptyList()
@@ -408,6 +448,9 @@ private fun contextFields(type: ContextType): List<ActionField> = when (type) {
         ActionField("beforeMinutes", R.string.context_field_event_before_label, FieldType.NUMBER, hintRes = R.string.context_field_event_before_hint),
         ActionField("package", R.string.context_field_event_package_label, FieldType.APP, hintRes = R.string.context_field_event_package_hint),
         ActionField("sender", R.string.context_field_event_sender_label, hintRes = R.string.context_field_event_sender_hint),
+        ActionField("action", R.string.context_field_event_action_label, hintRes = R.string.context_field_event_action_hint),
+        ActionField("extraKey", R.string.context_field_event_extra_key_label, hintRes = R.string.context_field_event_extra_key_hint),
+        ActionField("extraValue", R.string.context_field_event_extra_value_label, hintRes = R.string.context_field_event_extra_value_hint),
         ActionField("tagId", R.string.context_field_event_tag_label, hintRes = R.string.context_field_event_tag_hint),
         ActionField("latitude", R.string.context_field_event_latitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_latitude_hint),
         ActionField("longitude", R.string.context_field_event_longitude_label, FieldType.NUMBER, hintRes = R.string.context_field_event_longitude_hint),

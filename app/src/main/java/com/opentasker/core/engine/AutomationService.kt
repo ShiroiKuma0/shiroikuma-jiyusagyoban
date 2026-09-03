@@ -38,6 +38,8 @@ import com.opentasker.core.contexts.BluetoothContextEvents
 import com.opentasker.core.contexts.BootContextEvents
 import com.opentasker.core.contexts.CameraMicContextEvents
 import com.opentasker.core.contexts.ContextEvent
+import com.opentasker.core.contexts.BroadcastContextEvents
+import com.opentasker.core.contexts.declaredBroadcastActions
 import com.opentasker.core.contexts.PackageContextEvents
 import com.opentasker.core.contexts.PluginConditionSubscription
 import com.opentasker.core.contexts.PluginConditionSubscriptions
@@ -354,6 +356,7 @@ class AutomationService : Service() {
         PluginConditionSubscriptions.clear()
         job.cancel()
         logContextMonitorTransition(contextMonitorLifecycle.stopAll())
+        BroadcastContextEvents.sync(this, emptySet())
         super.onDestroy()
     }
 
@@ -449,6 +452,10 @@ class AutomationService : Service() {
             AppLogger.warn(TAG, "Context monitor subscription barrier timed out; starting required sources in degraded mode")
         }
         logContextMonitorTransition(contextMonitorLifecycle.reconcile(profiles))
+        // Not a ContextMonitor: the broadcast receiver's filter is per-profile configuration, so
+        // it has to follow the declared action set, which changes without any monitor starting or
+        // stopping. sync() is a no-op when the set is unchanged and unregisters on an empty set.
+        BroadcastContextEvents.sync(this, declaredBroadcastActions(profiles.flatMap { it.contexts }))
         engineLoaded = true
     }
 
@@ -792,6 +799,19 @@ class AutomationService : Service() {
     }
 
     private fun eventVariables(event: ContextEvent?): Map<String, String> {
+        if (event?.metadata?.get("event") == BroadcastContextEvents.EVENT_BROADCAST) {
+            return buildMap {
+                put("broadcast_action", event.metadata["broadcast_action"].orEmpty())
+                put("broadcast_sender", event.metadata["broadcast_sender"].orEmpty())
+                put("broadcast_extra_count", event.metadata["broadcast_extra_count"].orEmpty())
+                put("broadcast_extras_lossy", event.metadata["broadcast_extras_lossy"] ?: "false")
+                // Already bounded and string-only when the event was built, so forwarding them
+                // wholesale cannot introduce anything the sanitiser refused.
+                event.metadata.forEach { (key, value) ->
+                    if (key.startsWith("broadcast_extra_") && key != "broadcast_extra_count") put(key, value)
+                }
+            }
+        }
         if (event?.metadata?.get("event") != "share") return emptyMap()
         return buildMap {
             put("share_event", "true")
