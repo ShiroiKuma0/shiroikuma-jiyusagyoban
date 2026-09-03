@@ -290,7 +290,7 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 | Property | Value |
 |----------|-------|
 | Kotlin | 2.4.10 |
-| Gradle | 9.7.0 |
+| Gradle | 9.7.1 |
 | AGP | 9.3.2 |
 | KSP | 2.3.11 |
 | Build Tools | 36.0.0 |

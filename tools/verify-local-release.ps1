@@ -17,8 +17,8 @@ $SbomPath = Join-Path $ReportDirectory "sbom.cdx.json"
 $OsvReportPath = Join-Path $ReportDirectory "osv-advisories.json"
 $SummaryPath = Join-Path $ReportDirectory "local-release-gate.json"
 $JvmTestReportPath = Join-Path $ReportDirectory "jvm-test-count.json"
-$ExpectedGradleVersion = "9.7.0"
-$ExpectedGradleDistributionSha256 = "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae"
+$ExpectedGradleVersion = "9.7.1"
+$ExpectedGradleDistributionSha256 = "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
 $ExpectedGradleWrapperJarSha256 = "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
 
 function Resolve-GitSafeDirectory {
