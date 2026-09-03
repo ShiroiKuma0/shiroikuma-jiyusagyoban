@@ -364,6 +364,57 @@
             <sha256 value="7efb95ca27fac90be4c2b40d7b552c6a5e25eb675b0fa34274fabdc6cb8b87c6" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
+      <component group="androidx.baselineprofile" name="androidx.baselineprofile.gradle.plugin" version="1.5.0-rc02">
+         <artifact name="androidx.baselineprofile.gradle.plugin-1.5.0-rc02.pom">
+            <pgp value="0E225917414670F4442C250DFD533C07C264648F" />
+            <sha256 value="5d0ebcfd84470b69962fc9a05bd906f02480d146310f11e47489a0194d071217" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-baseline-profile-gradle-plugin" version="1.5.0-rc02">
+         <artifact name="benchmark-baseline-profile-gradle-plugin-1.5.0-rc02.jar">
+            <sha256 value="e9044df73c24c164d960c480927481402746c64b6796d8c29cfa0f9330cad699" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="benchmark-baseline-profile-gradle-plugin-1.5.0-rc02.module">
+            <sha256 value="cb471a4575df5522c85ad0e1cde0e274c4302648bbc0524cc403d23816ceb9fb" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-common" version="1.5.0-rc02">
+         <artifact name="benchmark-common-1.5.0-rc02.aar">
+            <sha256 value="543c8ee6d6caefbf4766e1a308686799005a583aff81e63c0133aef07639c0ce" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="benchmark-common-1.5.0-rc02.module">
+            <sha256 value="256559ccce6a7f65546d1da7e830a5b1bc016d63f8cfe4c60197299b9e89e963" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-macro" version="1.5.0-rc02">
+         <artifact name="benchmark-macro-1.5.0-rc02.aar">
+            <sha256 value="496c189d43208ca2e6aaacecbd10197bc0155758ff274ecd03dec6f1776b165c" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="benchmark-macro-1.5.0-rc02.module">
+            <sha256 value="462f892d7c16ba5a4cd90749d3a2d8d13cc828daf8f2bf5d6aa2d39888e6cf88" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-macro-junit4" version="1.5.0-rc02">
+         <artifact name="benchmark-macro-junit4-1.5.0-rc02.aar">
+            <sha256 value="f9119ae0a403636b39774e6a3129f8d0e13264933858e31748cd29753ad02b59" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="benchmark-macro-junit4-1.5.0-rc02.module">
+            <sha256 value="61bc7f061e81dbb4a700db919aa206870f51daa59b2248b619117fb99cd53d2b" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-traceprocessor" version="1.5.0-rc02">
+         <artifact name="benchmark-traceprocessor-1.5.0-rc02.module">
+            <sha256 value="b06084e7ef20b2166871a1c27ca9936715db78398be5ae18170d4d05772c650a" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.benchmark" name="benchmark-traceprocessor-android" version="1.5.0-rc02">
+         <artifact name="benchmark-traceprocessor-android-1.5.0-rc02.module">
+            <sha256 value="bfebfea270fdbc4316eb176279da44e1ba0bca72d44937f93e61273d564cdcd8" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+         <artifact name="benchmark-traceprocessor-android-1.5.0-rc02.aar">
+            <sha256 value="06ce1274ab53c1e42fe7bc6dccbabdbb526a8cc46e66f69e55ba124e223d21d9" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
       <component group="androidx.cardview" name="cardview" version="1.0.0">
          <artifact name="cardview-1.0.0.aar">
             <sha256 value="1193c04c22a3d6b5946dae9f4e8c59d6adde6a71b6bd5d87fb99d82dda1afec7" origin="OpenTasker: Google Maven direct artifact SHA-256 (no upstream .sha256/.asc)" />
