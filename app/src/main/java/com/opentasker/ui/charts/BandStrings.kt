@@ -279,10 +279,34 @@ object BandText {
     // Column headings, printed once. The values under them keep their own colour. Prefixed because
     // the day-table further down already owns the bare col* names for a different set of columns.
     val regColDate = Loc("Date", "日付")
-    val regColFelt = Loc("How you woke", "目覚め")
+    val regColFelt = Loc("Woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
     val regColSleep = Loc("Asleep", "実睡眠")
+    // Dropped from the night table on 2026-09-03 — this band measures no temperature, so the column
+    // was a dash on every line. The string stays for the Hume report, which does measure it.
     val regColTemp = Loc("Temp °C", "体温 ℃")
+    val regColDeep = Loc("Deep", "深い")
+    val regColDeepRem = Loc("Deep+REM", "深＋レム")
+    val regColLowHr = Loc("Low HR", "最低心拍")
+    val regColHrv = Loc("HRV", "心拍変動")
+    val regColSpo2 = Loc("SpO₂", "血中酸素")
+
+    /**
+     * The night table's headings, in the order the columns are drawn.
+     *
+     * A list rather than nine call sites, because the header row and the value row have to stay the
+     * same length and the same order, and two hand-maintained sequences of nine drift the first time
+     * one is edited.
+     *
+     * **Every label is short on purpose.** The columns share ONE width and each heading gets ONE
+     * line (白い熊, 2026-09-03), so `How you woke` became `Woke`, `Lowest HR` became `Low HR`, and
+     * `HRV (RMSSD)` became `HRV` — RMSSD is named in the ⓘ panel, which is where a unit belongs when
+     * the column cannot spell it.
+     */
+    val registerColumns = listOf(
+        regColDate, regColFelt, regColHr, regColSleep,
+        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColSpo2,
+    )
     val registerNightsEmpty = Loc(
         "No nights recorded yet. A sleep session has to sync from the band before anything appears here.",
         "まだ夜の記録がない。バンドから睡眠が同期されるまでここには何も出ない。",
