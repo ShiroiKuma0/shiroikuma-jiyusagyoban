@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -39,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import com.opentasker.core.huawei.HuaweiWalkLibrary
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.ui.charts.CountPill
+import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
@@ -213,6 +217,27 @@ private fun WalkCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+
+        // 白い熊's own annotation, so the grid answers "which walks did I write on" by looking —
+        // the same question the calendar's note dots answer for the mornings.
+        //
+        // The row's height is RESERVED whether or not there is anything in it. A vertical
+        // `LazyVerticalGrid` sizes each row to its tallest cell, so a line that appears only on
+        // annotated walks would leave every cell beside them padded with empty space, which is
+        // exactly the ragged grid this screen was built not to be.
+        //
+        // Read-only here: the cell already opens the walk, and the editors are on the walk's own
+        // screen, where there is room to name what is being answered.
+        Row(
+            Modifier.fillMaxWidth().height(30.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            walk.stops?.let { CountPill(count = it) }
+            if (!walk.note.isNullOrBlank()) {
+                NotePill(note = walk.note, modifier = Modifier.weight(1f), compact = true)
+            }
+        }
 
         // Always one button, so every cell is the same height. It no longer offers to SEND the
         // walk to 地図: walks are drawn here now, over a map shared by the whole area, and sending

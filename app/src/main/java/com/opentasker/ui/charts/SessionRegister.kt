@@ -80,6 +80,39 @@ object SessionRegister {
         /** Reported but never counted, exactly as on the card — see [Recovery] for why. */
         val temperature: MarkerReading,
         val adverseCount: Int,
+        /**
+         * The five readings the night table prints beside the two banded markers, and the 1–5 step
+         * each is coloured with.
+         *
+         * ## Two different references, because there is no single honest one
+         *
+         * 白い熊 asked for every column to carry a colour (2026-09-03). Each is given the best
+         * reference that actually exists for that quantity, and the ⓘ panel names which is which:
+         *
+         *  * **The low and the blood oxygen are PUBLISHED** — Jensen's resting-rate decades and the
+         *    clinical pulse-oximetry ranges. See [RecoveryReference], including the caveats: a
+         *    sleeping floor sits below a daytime resting rate, and a wrist oximeter's error is about
+         *    twice the swing it measures.
+         *  * **Deep, deep+REM and RMSSD are WITHIN-PERSON**, banded against the nights before them,
+         *    because no population ladder fits them. This band's "deep" is not polysomnography's N3
+         *    — 白い熊's nights run 30–40 % of sleep where the literature's N3 is 13–23 %, so an
+         *    absolute ladder would score every night he has ever recorded as extreme. RMSSD norms
+         *    are so age-dependent that a population mean would paint the whole column one colour.
+         *
+         * **None of the five is COUNTED.** [adverseCount] is still the three markers it always was;
+         * a colour here says where a value sits, never that the night was adverse. The standing
+         * ruling that deep/REM and blood oxygen are excluded from the counting rule is untouched —
+         * showing a value and scoring a night are different acts.
+         */
+        val deepMinutes: Double? = null,
+        val deepRemShare: Double? = null,
+        val lowestHr: Double? = null,
+        val spo2: Double? = null,
+        val hrvMs: Double? = null,
+        /** The within-person steps for the three that have no published ladder. */
+        val deepStep: Int? = null,
+        val deepRemStep: Int? = null,
+        val hrvStep: Int? = null,
     )
 
     /** One square of the grid. */
@@ -91,6 +124,14 @@ object SessionRegister {
         val adverseCount: Int?,
         /** The 1–5 rating for that night, so the grid shows the score itself and not only a count. */
         val felt: Int?,
+        /**
+         * Whether that morning carries a written note — see `DayNotes`.
+         *
+         * A flag rather than the text: a tile is a seventh of a phone's width and could not show a
+         * sentence if it had one. What the grid has to answer is "which days did I write something
+         * about", so the tile is marked and the note itself is read in the editor behind it.
+         */
+        val hasNote: Boolean = false,
     )
 
     /**
@@ -108,6 +149,14 @@ object SessionRegister {
         val night: NightReading?,
         /** Straight from the store, so a rating with no night still shows its score. */
         val felt: Int?,
+        /**
+         * That morning's written note, whole — the table has a full row's width to print it in.
+         *
+         * A note with neither a night nor a rating still gets a line, by the same argument the
+         * ratings won one: something 白い熊 authored that the table does not list is stored and
+         * invisible, which is the one state this row type exists to make impossible.
+         */
+        val note: String? = null,
     )
 
     /** Nights after a session against nights after none. */
@@ -175,6 +224,26 @@ object SessionRegister {
             // Three, not four: temperature is reported and never counted, so the register's count and
             // the card's headline can never disagree about the same night.
             adverseCount = listOf(hr, sleep, felt).count { it.adverse },
+            deepMinutes = night.deepMinutes,
+            deepRemShare = night.deepRemShare,
+            lowestHr = night.lowestHr,
+            spo2 = night.spo2,
+            hrvMs = night.hrvMs,
+            // Banded against this night's own past, exactly as the counted markers are — the same
+            // function, the same confidence ladder — but taken only as far as `scaleStep`, which is
+            // a colour. Nothing here reaches `adverseCount`.
+            deepStep = Recovery.band(
+                RecoveryMarker.DEEP, night.deepMinutes, prior.mapNotNull { it.deepMinutes },
+                Recovery.DEEP_MEANINGFUL_MIN, confidence, counted = false,
+            ).scaleStep,
+            deepRemStep = Recovery.band(
+                RecoveryMarker.DEEP_REM, night.deepRemShare, prior.mapNotNull { it.deepRemShare },
+                Recovery.DEEP_REM_MEANINGFUL_SHARE, confidence, counted = false,
+            ).scaleStep,
+            hrvStep = Recovery.band(
+                RecoveryMarker.HRV, night.hrvMs, prior.mapNotNull { it.hrvMs },
+                Recovery.HRV_MEANINGFUL_MS, confidence, counted = false,
+            ).scaleStep,
         )
     }
 
@@ -188,6 +257,14 @@ object SessionRegister {
         toEpochDay: Long,
         /** Every stored rating, so one filed against a date with no night is still listed. */
         ratings: Map<Long, Int> = emptyMap(),
+        /**
+         * Every written note, `yyyyMMdd` → text, keyed exactly as the ratings are.
+         *
+         * Unioned into the rows for the same reason the ratings are: a morning 白い熊 wrote about but
+         * did not score, on a date the band recorded nothing for, would otherwise be stored and
+         * unreachable.
+         */
+        notes: Map<Long, String> = emptyMap(),
         /** An instant → its `yyyyMMdd` local date. Applied to a night's END, which names it. */
         dateOfNight: (Long) -> Long = { 0L },
     ): Register {
@@ -226,14 +303,17 @@ object SessionRegister {
         // fallback, and a tile means one thing either way: the rating filed for the morning of that
         // day — the night that ended on it, recorded or not.
         val ratingByDay = ratings.mapNotNull { (date, r) -> epochDayOf(date)?.let { it to r } }.toMap()
+        // Notes are keyed by the same morning as the ratings, so they cross into grid days by exactly
+        // the same conversion — never by the night's start, which is a day earlier for most nights.
+        val notedDays = notes.keys.mapNotNull(::epochDayOf).toSet()
         val days = (fromEpochDay..toEpochDay).map { d ->
-            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d])
+            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d], d in notedDays)
         }
 
         // The union, so a rating whose date the band never recorded is still a line. Newest first.
         val nightByDate = nights.associateBy { dateOfNight(it.endMs) }
-        val rows = (nightByDate.keys + ratings.keys).sortedDescending().map { date ->
-            NightRow(date, nightByDate[date], ratings[date])
+        val rows = (nightByDate.keys + ratings.keys + notes.keys).sortedDescending().map { date ->
+            NightRow(date, nightByDate[date], ratings[date], notes[date])
         }
 
         // Which nights followed a session, by the same pairing rule the entries use.

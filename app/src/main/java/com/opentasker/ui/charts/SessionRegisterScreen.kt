@@ -20,11 +20,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.opentasker.ui.theme.isNarrowScreen
 import java.time.Instant
@@ -78,6 +83,8 @@ fun SessionRegisterScreen(
     contentPadding: PaddingValues,
     /** `yyyyMMdd` of the night, then the 1–5 step. Re-tapping the step on file withdraws it. */
     onRate: (Long, Int) -> Unit,
+    /** `yyyyMMdd` of the morning, then its note. Empty text deletes it — see `DayNotes`. */
+    onNote: (Long, String) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
@@ -89,6 +96,12 @@ fun SessionRegisterScreen(
     // so a tile and a table line cannot open two different editors. Saveable because a rotation with
     // the dialog open must not silently drop the night 白い熊 had chosen.
     var rating by rememberSaveable { mutableStateOf<Long?>(null) }
+    // The morning whose NOTE is open, which is a second, stacked editor rather than a field inside
+    // the first. The rating dialog's whole contract is that one tap files a score and closes it —
+    // a text field in there would give it an Apply step and a second chance to file the wrong thing.
+    // So the note pill inside it opens this instead, and dismissing this returns to the dialog
+    // underneath with the night still chosen.
+    var noting by rememberSaveable { mutableStateOf<Long?>(null) }
 
     Column(
         Modifier
@@ -122,7 +135,27 @@ fun SessionRegisterScreen(
             register?.let { r ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Grid(r.days, zone, onRate = { rating = SessionRegister.dateKeyOf(it) })
+                        // The shared calendar — 機能訓練 draws the same one. This screen decides
+                        // what a day LOOKS like and hands over squares; the grid knows nothing about
+                        // nights or ratings, which is what stops the two calendars drifting apart.
+                        val maxLoad = r.days.mapNotNull { it.sessionLoad }.maxOrNull()
+                            ?.takeIf { it > 0 } ?: 1.0
+                        DayGrid(
+                            days = r.days.map { cell ->
+                                val skin = scaleSkin(cell.felt, style.grid, sectionNote)
+                                DayGridCell(
+                                    epochDay = cell.epochDay,
+                                    fill = skin.fill,
+                                    ink = skin.ink,
+                                    label = cell.felt?.toString()
+                                        ?: if (cell.adverseCount != null) "·" else "",
+                                    hasNote = cell.hasNote,
+                                    bar = cell.sessionLoad?.let { (it / maxLoad).toFloat() },
+                                )
+                            },
+                            zone = zone,
+                            onTap = { rating = SessionRegister.dateKeyOf(it) },
+                        )
                         RateHint()
                         Text(
                             BandText.registerLegend[lang],
@@ -134,9 +167,11 @@ fun SessionRegisterScreen(
 
                 NightsCard(r.rows, onRate = { rating = it })
 
-                rating?.let { key ->
+                rating?.takeIf { noting == null }?.let { key ->
                     RateNightDialog(
                         dateKey = key,
+                        note = r.rows.firstOrNull { it.dateKey == key }?.note,
+                        onEditNote = { noting = key },
                         // Straight from the store's own row, never from the night's banded marker: the
                         // dialog offers back the number 白い熊 typed, so tapping it again withdraws it
                         // rather than re-writing something adjacent to it. A day with neither a night
@@ -147,6 +182,19 @@ fun SessionRegisterScreen(
                             rating = null
                         },
                         onDismiss = { rating = null },
+                    )
+                }
+
+                noting?.let { key ->
+                    NoteDialog(
+                        title = BandText.morningOfNight[lang]
+                            .format(nightDateFull(key, lang), nightSpanLabel(key)),
+                        note = r.rows.firstOrNull { it.dateKey == key }?.note,
+                        onSave = { text ->
+                            onNote(key, text)
+                            noting = null
+                        },
+                        onDismiss = { noting = null },
                     )
                 }
 
@@ -184,237 +232,6 @@ fun SessionRegisterScreen(
     }
 }
 
-/**
- * Five weeks, Monday first, each day a tile carrying that night's rating.
- *
- * The tile is filled with [feltColor] and prints the 1–5, so a run of good nights and a run of bad
- * ones are different shapes on the page — which is the only thing a five-week grid is actually good
- * at, and the reason it exists at all. It replaced three anonymous dots that said the same thing for
- * a night rated 3 and a night never rated: a count of markers is not a reading, and 白い熊 could not
- * tell one from the other (2026-08-11). The session load survives as the bar beneath. The marker count
- * does not survive here at all: it rang the tile in the tile's own ink, which meant a yellow border on
- * every 3 and a white one on every 5, and once today had a border of its own that was three borders
- * saying three things in one grid (白い熊, 2026-08-16). It is on every line of the table below instead,
- * beside the values it counts — which is where a count belongs when the tile is already a reading.
- *
- * **Every tile is a button.** A tile is the smallest thing on the screen that names one night, so it
- * is the natural place to reach for when a night is wrong — and unlike the table below it, the grid
- * has a square for a day the band recorded nothing at all, which is precisely the day a rating is
- * most likely to be missing from. Ratings on such days reach [SessionRegister.DayCell.felt] straight
- * from the store, so a tap fills a blank tile in rather than appearing to do nothing.
- */
-@Composable
-private fun Grid(
-    days: List<SessionRegister.DayCell>,
-    zone: ZoneId,
-    /** The tapped tile's epoch day. */
-    onRate: (Long) -> Unit,
-) {
-    val style = LocalChartStyle.current
-    // Today, marked wherever it lands. Five weeks of squares are five weeks of squares: without a
-    // fixed point 白い熊 has to count columns to find the morning being asked about, and the tile most
-    // likely to be tapped is exactly the one hardest to locate. (白い熊, 2026-08-16.)
-    val todayEpochDay = remember(zone) { LocalDate.now(zone).toEpochDay() }
-    val maxLoad = days.mapNotNull { it.sessionLoad }.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-    val labels = remember(zone) { DateTimeFormatter.ofPattern("d").withZone(zone) }
-
-    // Pad the head so the first column really is Monday.
-    val first = days.firstOrNull() ?: return
-    val firstDow = Instant.ofEpochMilli(first.epochDay * 86_400_000L).atZone(zone).dayOfWeek.value // 1=Mon
-    val cells: List<SessionRegister.DayCell?> = List(firstDow - 1) { null } + days
-
-    val lang = LocalBandLanguage.current
-    val heads = if (lang == BandLanguage.EN) {
-        listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    } else {
-        listOf("月", "火", "水", "木", "金", "土", "日")
-    }
-
-    // The rows are a fixed window that SCROLLS, not a list that grows: the register reaches a month
-    // and a half back (see [RecoveryBuild.gridStart]) while the card stays the height it is today, so
-    // the screen below it does not move as the weeks accumulate. It opens at the BOTTOM — today's
-    // week — because that is the row every other row is read relative to, and scrolling back through
-    // the months is the gesture this window exists for. (白い熊, 2026-08-18.)
-    //
-    // Derived from the type rather than hardcoded: everything in a week row is a fixed dp except the
-    // date label, which grows with the font-scale preference, and a viewport pinned at a literal 370
-    // would clip the last row the moment 白い熊 moved that slider.
-    val density = LocalDensity.current
-    val lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
-    val dateLine = if (lineHeight.isSp) with(density) { lineHeight.toDp() } else 21.dp
-    // vertical padding + date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load bar
-    val weekRow = 6.dp + dateLine + 2.dp + 39.dp + 2.dp + 4.dp
-    val headLine = MaterialTheme.typography.titleMedium.lineHeight
-    val monthRule = (if (headLine.isSp) with(density) { headLine.toDp() } else 22.dp) + 12.dp
-    val viewport = weekRow * VISIBLE_WEEKS + monthRule
-
-    val weeks = cells.chunked(7)
-    val scroll = rememberScrollState()
-    var openedAtToday by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(scroll.maxValue) {
-        if (!openedAtToday && scroll.maxValue > 0) {
-            scroll.scrollTo(scroll.maxValue)
-            openedAtToday = true
-        }
-    }
-
-    // No gap between the rows: the weekend rule has to run unbroken down the grid, and a segment
-    // cannot cover space that belongs to the parent's arrangement. The breathing room moved inside
-    // each day cell instead, where the rule spans it too. (白い熊, 2026-08-11: "make it a full line".)
-    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        // Outside the scrolling box, so the column a square sits in is still nameable after scrolling
-        // back six weeks — a weekday header that scrolls away is a header that is never there when
-        // it is wanted.
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.height(IntrinsicSize.Min),
-        ) {
-            for (i in 0 until 7) {
-                Box(
-                    Modifier.weight(1f).padding(bottom = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(heads[i], style = MaterialTheme.typography.bodyMedium, color = style.axisText)
-                }
-                // The week splits after Friday: the weekend is the part of a row that is remembered
-                // differently from the rest of it, so it gets a rule rather than more spacing.
-                if (i == 4) Box(Modifier.width(1.5.dp).fillMaxHeight().background(sectionInk))
-            }
-        }
-        Column(Modifier.height(viewport).verticalScroll(scroll)) {
-        weeks.forEachIndexed { wi, week ->
-            // Which month this row opens, if any: the one whose 1st it contains — and for the first
-            // row in the window, simply the month it starts in, so the top of the grid is labelled
-            // too rather than only the boundaries below it.
-            monthOpenedBy(week, wi == 0)?.let { ym ->
-                MonthDivider(ym, topPadding = if (wi == 0) 0.dp else 6.dp)
-            }
-            // Only where the rule actually separates two days. On the last row the grid runs out
-            // mid-week, and a line hanging past the final date divides nothing.
-            val ruleHere = week.getOrNull(4) != null && week.getOrNull(5) != null
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.height(IntrinsicSize.Min),
-            ) {
-                for (i in 0 until 7) {
-                    val cell = week.getOrNull(i)
-                    Column(
-                        Modifier.weight(1f).padding(vertical = 3.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        if (cell == null) {
-                            Spacer(Modifier.height(38.dp))
-                        } else {
-                            Text(
-                                labels.format(Instant.ofEpochMilli(cell.epochDay * 86_400_000L)),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = sectionNote,
-                            )
-                            // The tile: the rating, in its own colour. A ring means at least one
-                            // marker was outside usual that night — a qualifier on the score, never
-                            // a substitute for it.
-                            val felt = cell.felt
-                            val skin = scaleSkin(felt, style.grid, sectionNote)
-                            // A border on a tile means TODAY, and means nothing else.
-                            //
-                            // The marker count used to ring the tile in its own ink, which put a
-                            // yellow border on every 3 and a white one on every 5 — so the moment
-                            // today got a border of its own there were three different borders in one
-                            // grid and a 3 two weeks ago looked exactly like this morning. The ring is
-                            // gone rather than recoloured: the fills have been solid and unbordered by
-                            // 白い熊's own decision since 2026-08-12, and any ring at all is a border
-                            // on a solid fill. (白い熊, 2026-08-16: "remove the yellow border from
-                            // ordinary 3s and the white border from 5s".) The count it carried is on
-                            // every line of the table below, beside the values that produced it.
-                            //
-                            // Outside the tile with a gap, not on its edge, so the fill stays exactly
-                            // the solid rectangle the scale specifies.
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .then(
-                                        if (cell.epochDay == todayEpochDay) {
-                                            Modifier
-                                                .border(1.5.dp, sectionInk, RoundedCornerShape(8.dp))
-                                                .padding(2.5.dp)
-                                        } else {
-                                            Modifier.padding(2.5.dp)
-                                        },
-                                    ),
-                            ) {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(5.dp))
-                                    .background(skin.fill)
-                                    // The whole tile, not the digit inside it: these squares are a
-                                    // seventh of a phone's width, and a hit area any smaller than the
-                                    // paint would be a target 白い熊 has to aim at.
-                                    .clickable { onRate(cell.epochDay) },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    felt?.toString() ?: if (cell.adverseCount != null) "·" else "",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = skin.ink,
-                                )
-                            }
-                            }
-                            // Session load, only when there was one — an empty track on every rest
-                            // day is noise on a grid whose subject is the nights. Width carries the
-                            // magnitude, so the bar still says how much and not merely whether.
-                            Box(Modifier.fillMaxWidth().height(4.dp), contentAlignment = Alignment.Center) {
-                                cell.sessionLoad?.takeIf { it > 0 }?.let { load ->
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth((load / maxLoad).coerceIn(0.15, 1.0).toFloat())
-                                            .height(4.dp)
-                                            .clip(RoundedCornerShape(2.dp))
-                                            .background(ChartPalette.HEART_RATE),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    // The width is reserved either way, so the columns stay aligned on the row that
-                    // does not draw it.
-                    if (i == 4) {
-                        Box(
-                            Modifier
-                                .width(1.5.dp)
-                                .fillMaxHeight()
-                                .background(if (ruleHere) sectionInk else Color.Transparent),
-                        )
-                    }
-                }
-            }
-        }
-        }
-    }
-}
-
-/** How many week rows the calendar shows at once; the rest of the window scrolls into view. */
-private const val VISIBLE_WEEKS = 5
-
-/**
- * The month a grid row opens, or null when it opens none.
- *
- * A month boundary almost never falls on a Monday, so the rule cannot be drawn between two rows and
- * be honest about where the month starts. It is drawn above the row that CONTAINS the 1st instead:
- * that row is the first one with any of the new month in it, which is what "the beginning of the
- * month" means to someone scrolling. [isFirst] labels the top row whatever its dates, because the
- * top of the window has no preceding rule to inherit a month from.
- */
-private fun monthOpenedBy(week: List<SessionRegister.DayCell?>, isFirst: Boolean): java.time.YearMonth? {
-    val days = week.filterNotNull()
-    if (days.isEmpty()) return null
-    days.firstOrNull { LocalDate.ofEpochDay(it.epochDay).dayOfMonth == 1 }
-        ?.let { return BandMonths.ofEpochDay(it.epochDay) }
-    return if (isFirst) BandMonths.ofEpochDay(days.first().epochDay) else null
-}
 
 /**
  * Every night, printed with the values actually stored for it.
@@ -458,15 +275,26 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                 RateHint()
                 // The field names appear ONCE, as column headings. Repeating them on every line was
                 // four labels a night of pure noise, and it buried the numbers they were labelling.
-                val cols = nightColumns()
+                //
+                // ## Fixed widths inside ONE horizontal scroll
+                //
+                // The table used to divide the screen's width between five weighted columns, which
+                // is the right answer for five and impossible for nine: the folded panel offers
+                // 413 dp, and nine shares of it are 45 dp each — narrower than "9h40". So every
+                // column is a fixed dp instead, the whole table is as wide as it needs to be, and a
+                // narrow screen scrolls it sideways (白い熊, 2026-09-03).
+                //
+                // The heading row and every line share ONE scroll state, and they must: a header
+                // that does not travel with its column is a header that labels the wrong number the
+                // moment anyone scrolls, which is worse than no header at all. That is also why the
+                // scroll wraps the whole block rather than each row — independent per-row scrolls
+                // would let two lines disagree about which column you are looking at.
+                val tableScroll = rememberScrollState()
+                Column(Modifier.horizontalScroll(tableScroll)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    HeadCell(BandText.regColDate[lang], cols.date)
-                    HeadCell(BandText.regColFelt[lang], cols.felt)
-                    HeadCell(BandText.regColHr[lang], cols.hr)
-                    HeadCell(BandText.regColSleep[lang], cols.sleep)
-                    HeadCell(BandText.regColTemp[lang], cols.temp)
+                    for (heading in BandText.registerColumns) HeadCell(heading[lang])
                 }
-                Box(Modifier.fillMaxWidth().height(1.dp).background(style.grid))
+                Box(Modifier.width(NightColumns.TOTAL).height(1.dp).background(style.grid))
                 // Week rules, drawn BELOW the row that ends a week reading downwards: the list runs
                 // newest first, so a Monday is followed by the Sunday before it, and a Saturday by
                 // the Friday before it. Weeks are how a run of nights is actually remembered — "that
@@ -481,9 +309,15 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                     val ym = BandMonths.ofDateKey(row.dateKey)
                     val previous = if (i == 0) null else BandMonths.ofDateKey(rows[i - 1].dateKey)
                     if (ym != null && ym != previous) {
-                        MonthDivider(ym, topPadding = if (i == 0) 2.dp else 10.dp)
+                        // Given the table's width explicitly: it is inside the horizontal scroll, and
+                        // a divider that filled the VIEWPORT would end in the middle of the table.
+                        MonthDivider(
+                            ym,
+                            modifier = Modifier.width(NightColumns.TOTAL),
+                            topPadding = if (i == 0) 2.dp else 10.dp,
+                        )
                     }
-                    NightTableRow(row, cols, onRate = { onRate(row.dateKey) })
+                    NightTableRow(row, onRate = { onRate(row.dateKey) })
                     // Never under the last line of a month: the month rule below it says the same
                     // thing louder, and two rules three pixels apart read as a rendering fault.
                     val opensAMonth = i < rows.lastIndex &&
@@ -494,9 +328,10 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                             java.time.DayOfWeek.SATURDAY -> 1.dp
                             else -> null
                         }?.let { thickness ->
-                            Box(Modifier.fillMaxWidth().height(thickness).background(sectionInk))
+                            Box(Modifier.width(NightColumns.TOTAL).height(thickness).background(sectionInk))
                         }
                     }
+                }
                 }
                 Text(
                     BandText.registerNightsNote[lang],
@@ -716,12 +551,24 @@ private fun BandRung(step: Int, range: String, why: String? = null) {
 }
 
 @Composable
-private fun RowScope.HeadCell(text: String, weight: Float) {
+private fun HeadCell(text: String) {
     Text(
         text,
-        Modifier.weight(weight),
-        style = MaterialTheme.typography.bodyMedium,
+        Modifier.width(NightColumns.CELL).padding(end = 4.dp),
+        // A heading is a label, not a reading, so it gives up the size first when something has to.
+        // At 白い熊's font scale of 1.3, `Deep+REM` at body size overran its column and ran into
+        // `Low HR` beside it — the columns stayed 96 dp, which keeps the whole table inside the
+        // unfolded panel, and the labels came down a step instead.
+        style = MaterialTheme.typography.bodySmall,
         color = sectionNote,
+        // ONE line, like every cell under it. A heading that wraps makes the header row twice the
+        // height of a data row and stops the two reading as one grid; the labels were shortened
+        // instead, which is the cheaper half of that trade (白い熊, 2026-09-03).
+        maxLines = 1,
+        softWrap = false,
+        // Ellipsis rather than the default overflow: a heading too long for its column has to be
+        // VISIBLY cut, so it gets fixed. Bleeding into the neighbour is the failure that hides.
+        overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -733,99 +580,142 @@ private fun RowScope.HeadCell(text: String, weight: Float) {
  * than a gap, because an absence is itself a fact about the night.
  */
 /**
- * How wide each column of the night table is, as a share of the line.
+ * How wide each column of the night table is — a fixed dp, never a share of the line.
  *
- * Two sets, because the same five columns cannot be laid out the same way on a 916 dp unfolded panel
- * and a 413 dp folded one. On the narrow set the date gives up more than half its share — it prints
- * `08-18` over `Tue` instead of `2026-08-18 (Tue)` on one line — and hands it to the three value
- * columns, which had been squeezing `36.4` onto two lines. (白い熊, 2026-08-18: the folded screenshots.)
+ * Shares were right while there were five columns and wrong the moment there were nine: the folded
+ * panel offers 413 dp, and a ninth of it is 45 dp, which will not hold `9h40`. Fixed widths let the
+ * table be as wide as its content needs and the SCREEN decide how much of it is visible — the card
+ * scrolls it sideways when it does not fit and simply shows all of it when it does. Every width here
+ * is the widest real value that column can carry, plus the 4 dp gutter each cell adds itself.
+ *
+ * There is deliberately no narrow variant any more. The stacked date (`09-03` over `Thu`) and the
+ * stacked rating (the step over its word) were the narrow layout's two ideas, and both are simply
+ * better: they were adopted for every width rather than kept as a special case, which is one layout
+ * to reason about instead of two that drift.
  */
-private class NightColumns(
-    val date: Float,
-    val felt: Float,
-    val hr: Float,
-    val sleep: Float,
-    val temp: Float,
-)
+private object NightColumns {
+    /**
+     * ONE width, for every column (白い熊, 2026-09-03: "all cells are one-line, same width").
+     *
+     * Per-column widths were a false economy: they buy a few dp on the narrow columns and cost the
+     * eye its grid, because nothing lines up vertically between one row and the next when a row's
+     * cells are nine different sizes. A single width is also the only way to be sure every cell fits
+     * on ONE LINE — with nine different ones, each is a separate thing to check and a separate thing
+     * to get wrong, which is exactly how `13h34` came to render as `13h3` over `4`.
+     *
+     * 96 dp is set by the widest real content at 白い熊's own font scale of **1.3**, which is where
+     * the previous sizing went wrong — it was chosen against the default 1.0 and every value then had
+     * 30 % more type to fit than the width allowed. The binding cases are `84 +17` in the heart-rate
+     * column and the `Night HR` / `Deep+REM` headings; the previews render at 1.3 so they are checked
+     * rather than estimated.
+     */
+    val CELL = 96.dp
 
-@Composable
-private fun nightColumns(): NightColumns = if (isNarrowScreen()) {
-    NightColumns(date = 0.16f, felt = 0.26f, hr = 0.19f, sleep = 0.20f, temp = 0.19f)
-} else {
-    NightColumns(date = 0.28f, felt = 0.24f, hr = 0.16f, sleep = 0.18f, temp = 0.14f)
+    /** What the rules and dividers inside the scrolling block span. */
+    val TOTAL = CELL * 9
 }
 
 @Composable
-private fun NightTableRow(row: SessionRegister.NightRow, cols: NightColumns, onRate: () -> Unit) {
+private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
     val lang = LocalBandLanguage.current
-    val narrow = isNarrowScreen()
     val n = row.night
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    // A Column so a written note can sit UNDER the five columns rather than inside one of them.
+    // There is no width for it up there — the table is five weighted cells on a phone — and a note is
+    // a sentence, not a value: it belongs across the row it annotates, in the ink the rest of this
+    // screen uses for explanation.
+    Column(
         // clickable OUTSIDE the padding, so the gap between two lines belongs to one of them rather
         // than to neither — the rows are 3 dp apart and a dead strip there would be most of the misses.
+        // It wraps the note line too, so tapping the note opens the same editor the row does.
         modifier = Modifier.clickable(onClick = onRate).padding(vertical = 3.dp),
     ) {
-        if (narrow) {
-            // The weekday under the date rather than in brackets after it: it is the shorter of the
-            // two lines either way, so stacking costs no width at all and buys the whole bracket.
-            val (day, weekday) = nightDateParts(row.dateKey, lang)
-            Column(Modifier.weight(cols.date)) {
-                Text(
-                    day,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = sectionInk,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-                Text(
-                    weekday,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = sectionNote,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
-        } else {
-            Text(
-                nightDateFull(row.dateKey, lang),
-                Modifier.weight(cols.date),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = sectionInk,
-            )
-        }
-        // Narrow: the step on its own line and the word under it, so "Below par" stops breaking
-        // across three lines and dragging the whole row's height with it.
-        ValueCell(
-            text = if (narrow) {
-                row.felt?.toString() ?: BandText.registerNightUnrated[lang]
-            } else {
-                row.felt?.let { "$it  ${feltLabel(it)[lang]}" } ?: BandText.registerNightUnrated[lang]
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // ONE line: the day bold, the weekday after it at label size in the note ink. It was two
+        // lines, which made the date cell taller than every cell beside it and the row taller than
+        // it needed to be — and a row's height is paid on all 33 of them.
+        val (day, weekday) = nightDateParts(row.dateKey, lang)
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = sectionInk)) { append(day) }
+                append(" ")
+                withStyle(SpanStyle(color = sectionNote, fontSize = 12.sp)) { append(weekday) }
             },
-            step = row.felt,
-            weight = cols.felt,
-            sub = if (narrow) row.felt?.let { feltLabel(it)[lang] } else null,
+            Modifier.width(NightColumns.CELL).padding(end = 4.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            softWrap = false,
         )
-        // Heart rate and sleep are graded against the published reference ranges, NOT against 白い熊's
-        // own median: a within-person scale can only call a six-hour habit "usual", never short.
-        // Temperature keeps the within-person step, because a wrist sensor that tracks the room at
-        // r = 0.961 has no absolute band worth having. See [RecoveryReference].
+        // The step ALONE — no word. "Below par" cannot share one line with its number at any width
+        // this table can afford, and the legend directly above the table names all five in full, so
+        // the cell can be the thing the legend is a key TO rather than a second copy of it.
+        ValueCell(
+            text = row.felt?.toString() ?: BandText.registerNightUnrated[lang],
+            step = row.felt,
+        )
+        // ## Every column carries a colour, and not every colour means the same thing
+        //
+        // Heart rate, the low, sleep and blood oxygen are graded against PUBLISHED ranges — see
+        // [RecoveryReference], which also carries the two caveats worth knowing (a sleeping floor
+        // sits under a daytime resting rate; a wrist oximeter's error is about twice the swing it
+        // measures). Deep, deep+REM and RMSSD are graded WITHIN-PERSON, against the nights before
+        // them, because no published ladder fits a consumer band's staging or an age-dependent
+        // RMSSD — [SessionRegister.NightReading] sets out why at length, and the ⓘ panel says which
+        // is which on screen. None of the five is counted; a colour is not a verdict on the night.
         ValueCell(
             n?.nocturnalHr?.value?.let {
                 "${it.roundToInt()}" +
                     (n.nocturnalHr.delta?.let { d -> " %+d".format(d.roundToInt()) } ?: "")
             },
             n?.nocturnalHr?.value?.let { RecoveryReference.nocturnalHrStep(it) },
-            cols.hr,
         )
         ValueCell(
-            n?.sleep?.value?.let { "${(it / 60).toInt()}h${"%02d".format((it % 60).roundToInt())}" },
+            n?.sleep?.value?.let { hoursAndMinutes(it) },
             n?.sleep?.value?.let { RecoveryReference.sleepStep(it) },
-            cols.sleep,
         )
-        ValueCell(n?.temperature?.value?.let { "%.1f".format(it) }, n?.temperature?.scaleStep, cols.temp)
+        ValueCell(n?.deepMinutes?.let { hoursAndMinutes(it) }, n?.deepStep)
+        ValueCell(n?.deepRemShare?.let { "${(it * 100).roundToInt()}%" }, n?.deepRemStep)
+        ValueCell(
+            n?.lowestHr?.let { "${it.roundToInt()}" },
+            n?.lowestHr?.let { RecoveryReference.lowestHrStep(it) },
+        )
+        // RMSSD, in the milliseconds it is measured in — the unit is part of the reading, and a bare
+        // "38" in a table of heart rates would be read as a heart rate.
+        ValueCell(n?.hrvMs?.let { "${it.roundToInt()} ms" }, n?.hrvStep)
+        ValueCell(
+            n?.spo2?.let { "${it.roundToInt()}%" },
+            n?.spo2?.let { RecoveryReference.spo2Step(it) },
+        )
+    }
+    row.note?.takeIf { it.isNotBlank() }?.let { note ->
+        Row(
+            // The table's own width, not the viewport's: inside a horizontal scroll `fillMaxWidth`
+            // has nothing to fill, and a note is worth the whole line it annotates.
+            Modifier.width(NightColumns.TOTAL).padding(top = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Icon(
+                Icons.Filled.EditNote,
+                contentDescription = null,
+                // The annotation yellow, not the explanation cyan: this line is not the screen
+                // telling 白い熊 something, it is 白い熊's own words being read back.
+                tint = ANNOTATION_INK,
+                modifier = Modifier.size(18.dp),
+            )
+            // ONE LINE, ellipsized. A note may be a paragraph, and a table whose row heights depend
+            // on how much was typed that morning stops being a table. The whole of it is in the
+            // editor a tap away — the same rule the sister apps' rows follow.
+            Text(
+                note.trim().lineSequence().first(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ANNOTATION_INK,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
     }
 }
 
@@ -837,35 +727,41 @@ private fun NightTableRow(row: SessionRegister.NightRow, cols: NightColumns, onR
  * same box cell display for the bottom table".)
  */
 @Composable
-private fun RowScope.ValueCell(text: String?, step: Int?, weight: Float, sub: String? = null) {
+private fun ValueCell(text: String?, step: Int?) {
     val skin = scaleSkin(step, Color.Transparent, sectionNote)
     Box(
         Modifier
-            .weight(weight)
+            .width(NightColumns.CELL)
             .padding(end = 4.dp)
             .clip(RoundedCornerShape(5.dp))
             .background(skin.fill)
             .padding(horizontal = 5.dp, vertical = 5.dp),
     ) {
-        Column {
-            Text(
-                text ?: "—",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
-                color = skin.ink,
-            )
-            // Same ink as the number above it, not the note ink: it is inside a filled step chip, and
-            // the chip's fill is chosen to carry exactly one foreground.
-            sub?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = skin.ink,
-                )
-            }
-        }
+        Text(
+            text ?: "—",
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
+            color = skin.ink,
+            // One line, never wrapped and never shrunk to fit: a value that does not fit its column
+            // is a COLUMN that is too narrow, and the honest response is to widen [NightColumns.CELL]
+            // rather than to let `13h34` render as `13h3` over `4` (白い熊, 2026-09-03). `softWrap`
+            // off means an over-long value is clipped, which is visible and gets fixed, where a wrap
+            // is quietly wrong.
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
+
+/**
+ * Minutes as `9h40` — the table's one duration format, used by asleep and by deep alike.
+ *
+ * Shared so the two columns cannot drift into saying the same quantity two ways, which is exactly
+ * what happens when a second duration is added beside a first and formatted where it is printed.
+ */
+private fun hoursAndMinutes(minutes: Double): String =
+    "${(minutes / 60).toInt()}h${"%02d".format((minutes % 60).roundToInt())}"
 
 /**
  * That the nights can be tapped, said out loud — on both cards, in the same words.
@@ -907,6 +803,9 @@ private fun RateHint() {
 private fun RateNightDialog(
     dateKey: Long,
     current: Int?,
+    /** That morning's note, shown on a pill that opens its own editor. */
+    note: String? = null,
+    onEditNote: () -> Unit = {},
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -973,6 +872,11 @@ private fun RateNightDialog(
                     }
                 }
             }
+            // The note for this same night, one tap away. It is the editor behind every tile and
+            // every table line, so it is also the only place a note can be reached for a morning the
+            // band recorded nothing on — which is exactly the morning most likely to need a sentence
+            // rather than a number.
+            NotePill(note = note, onClick = onEditNote)
             NoteText(BandText.rateClearHint[lang])
             NoteText(BandText.rateLateNote[lang])
             Text(

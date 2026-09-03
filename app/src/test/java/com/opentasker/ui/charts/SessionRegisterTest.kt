@@ -323,4 +323,59 @@ class SessionRegisterTest {
         assertEquals(37.6, last.temperature.value!!, 0.001)
         assertEquals("but it is not one of the three counted", 0, last.adverseCount)
     }
+
+    /**
+     * A note reaches its tile and its line, and it does so by the MORNING key.
+     *
+     * The failure this pins down is the one the ratings already met: notes are keyed by the morning
+     * 白い熊 woke on, while the grid counts in epoch days, so a conversion that used the night's
+     * start instead would mark the tile one square to the left — a dot on a morning nothing was
+     * written about, and none on the morning that was.
+     */
+    @Test
+    fun `a note lands on the morning tile and on that morning's row`() {
+        val morning = dateKey(night(2, 0.0).endMs)
+        val r = SessionRegister.build(
+            sessions = emptyList(),
+            nights = listOf(night(2, 60.0), night(3, 61.0)),
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 6,
+            ratings = mapOf(morning to 2),
+            notes = mapOf(morning to "woke at 03:00\nand did not get back down"),
+            dateOfNight = ::dateKey,
+        )
+        val marked = r.days.filter { it.hasNote }
+        assertEquals("exactly one tile carries the mark", 1, marked.size)
+        assertEquals(
+            "and it is the morning the note is filed under",
+            morning,
+            SessionRegister.dateKeyOf(marked.single().epochDay),
+        )
+        val row = r.rows.first { it.dateKey == morning }
+        assertTrue("the row carries the note WHOLE, newlines and all", row.note!!.contains("\n"))
+        assertEquals("the rating beside it is untouched", 2, row.felt)
+    }
+
+    /**
+     * A morning that was written about but never scored is still a line.
+     *
+     * The same argument the night-less rating won, one value along: something 白い熊 authored that
+     * the table does not list is stored and invisible, and a note is no less authored than a score.
+     */
+    @Test
+    fun `a note with neither a night nor a rating is still listed`() {
+        val orphan = dateKey(base + 6 * day)
+        val r = SessionRegister.build(
+            sessions = emptyList(),
+            nights = listOf(night(2, 60.0)),
+            spotPoints = emptyList(), restingHr = 58.0, zoneOffsetMs = 0L,
+            fromEpochDay = base / day, toEpochDay = base / day + 6,
+            notes = mapOf(orphan to "no band that night"),
+            dateOfNight = ::dateKey,
+        )
+        val row = r.rows.first { it.dateKey == orphan }
+        assertNull("no night", row.night)
+        assertNull("no score", row.felt)
+        assertEquals("but the words are there", "no band that night", row.note)
+    }
 }

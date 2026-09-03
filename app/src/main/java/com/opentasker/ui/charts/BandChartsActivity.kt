@@ -114,6 +114,7 @@ class BandChartsActivity : ComponentActivity() {
                                 register = state.register,
                                 contentPadding = insets,
                                 onRate = model::setFelt,
+                                onNote = model::setNote,
                                 onBack = { selected = null },
                                 onSwitchLanguage = { switchLanguage(model) },
                             )

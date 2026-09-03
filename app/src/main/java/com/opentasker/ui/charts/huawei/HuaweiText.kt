@@ -25,6 +25,22 @@ object HuaweiText {
     val title = Loc("Huawei Band", "健康（Huawei）")
     val back = Loc("Back", "戻る")
 
+    // --- 機能訓練 ------------------------------------------------------------------------------
+    val rehabTitle = Loc("Rehab", "機能訓練")
+    val rehabSummary = Loc("Done on %d of the last %d days", "直近 %2\$d 日のうち %1\$d 日")
+    val rehabHint = Loc(
+        "Tap any day to tick it off, or to take the tick back.",
+        "どの日でも押せば付けられる。押し直せば取り消せる。",
+    )
+    val rehabLegend = Loc(
+        "A yellow square is a day the exercises were done. Everything else is simply a day with no "
+            + "record — a gap is not a failure, it is a gap.",
+        "黄色の升はした日。それ以外は記録の無い日というだけで、空きは失敗ではなく空きである。",
+    )
+    val rehabOpen = Loc("Every day on record", "すべての記録")
+    val rehabDone = Loc("Done", "した")
+    val rehabNotDone = Loc("Not done", "していない")
+
     // --- the about card ------------------------------------------------------------------------
     val facesTitle = Loc("Watch faces", "文字盤")
     val facesInstall = Loc("Install", "入れる")

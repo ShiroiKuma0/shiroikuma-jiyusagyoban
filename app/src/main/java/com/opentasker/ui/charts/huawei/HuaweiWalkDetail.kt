@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,8 +35,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import com.opentasker.core.huawei.HuaweiWalkLibrary
+import com.opentasker.ui.charts.AnnotationText
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.ui.charts.CountPickerDialog
+import com.opentasker.ui.charts.CountPill
+import com.opentasker.ui.charts.NoteDialog
+import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
@@ -69,9 +75,21 @@ fun HuaweiWalkDetailScreen(
     walkRoot: java.io.File = java.io.File(HuaweiWalkLibrary.DEFAULT_DIR),
     /** Ask 地図 for the base map of this walk's area, once, for every walk that will follow. */
     onFetchMap: () -> Unit = {},
+    /**
+     * File the walk's annotation — 白い熊's note and stop count, both stated whole.
+     *
+     * Null means "there is none": a blank note deletes, and re-tapping the stop count on file
+     * withdraws it. The screen always sends the annotation it wants the walk to end up with, so
+     * there is no partial update for a caller to get wrong.
+     */
+    onAnnotate: (note: String?, stops: Int?) -> Unit = { _, _ -> },
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
+    // Both editors live at the screen's level, not inside the card: the card is one item of a
+    // LazyColumn and would take its own dialog down with it the moment it scrolled out of view.
+    var editingNote by remember(walk.id) { mutableStateOf(false) }
+    var editingStops by remember(walk.id) { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -149,6 +167,30 @@ fun HuaweiWalkDetailScreen(
             }
         }
 
+        // What 白い熊 made of the walk, as opposed to what the band measured of it. Its own card,
+        // directly under the figures, because it is the only thing on this screen that is an answer
+        // rather than a reading — and the only thing here that does not exist unless it is given.
+        item {
+            SectionCard(accent = ChartPalette.STEPS) {
+                SectionTitle(AnnotationText.own[lang], ChartPalette.STEPS)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        AnnotationText.stops[lang],
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Black pill, yellow number, yellow border — 白い熊's own words for it
+                    // (2026-09-02). Labelled, because a bare digit beside a distance and a duration
+                    // would be a third measurement rather than an answer to a question.
+                    CountPill(count = walk.stops, onClick = { editingStops = true })
+                }
+                NotePill(note = walk.note, onClick = { editingNote = true })
+            }
+        }
+
         // 地図's own arithmetic over the same GPX, shown beside the band's and never blended with
         // it. Two independent readings of one route are what catches a decoder that has the format
         // slightly wrong — which is not hypothetical here — so a disagreement is worth seeing.
@@ -200,7 +242,44 @@ fun HuaweiWalkDetailScreen(
             }
         }
     }
+
+    if (editingNote) {
+        NoteDialog(
+            title = walkWhen(walk),
+            note = walk.note,
+            onSave = { text ->
+                onAnnotate(text, walk.stops)
+                editingNote = false
+            },
+            onDismiss = { editingNote = false },
+        )
+    }
+    if (editingStops) {
+        CountPickerDialog(
+            title = AnnotationText.stopsAsk[lang],
+            current = walk.stops,
+            range = STOPS_RANGE,
+            onPick = { n ->
+                // Re-tapping the number on file withdraws it, exactly as re-tapping a 1–5 rating
+                // does. A count you can change but never take back turns a stray tap into data
+                // 白い熊 did not author.
+                onAnnotate(walk.note, if (walk.stops == n) null else n)
+                editingStops = false
+            },
+            onDismiss = { editingStops = false },
+        )
+    }
 }
+
+/**
+ * How many stops the picker offers.
+ *
+ * Zero is a real answer — "I did not stop" is a different statement from "I have not said" — so the
+ * range starts there, and the absence of any value is what "not answered" means. The top is a round
+ * ten: the longest walk on file paused twice, and a picker that needs scrolling to reach the number
+ * you want is a picker that gets the wrong number tapped.
+ */
+private val STOPS_RANGE = 0..9
 
 /** The ordinary source: the large picture 地図 last drew for this walk. */
 internal fun mapFromDisk(walk: HuaweiWalkLibrary.Walk): ImageBitmap? =
