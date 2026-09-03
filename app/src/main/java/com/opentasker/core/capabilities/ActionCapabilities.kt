@@ -129,7 +129,7 @@ object ActionCapabilityRegistry {
         "media.mute" to volumeCapability("Mutes a stream. May be blocked by Do Not Disturb policy."),
         "tts.speak" to audioOutputCapability("Uses Android TTS engine to speak text aloud."),
         "reboot" to elevatedUnsupported("reboot", "Reboot requires privileged device-owner or system app access.", R.string.capability_reboot_unsupported),
-        "lock" to ActionCapability(CapabilityLevel.Unsupported, "Device lock requires configured device-admin support.", R.string.capability_lock_unsupported),
+        "lock" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires the Lock screen device admin, activated from Setup.", R.string.capability_lock_setup),
         "tile.set" to ActionCapability(CapabilityLevel.Supported, "Updates a configured OpenTasker Quick Settings tile.", R.string.capability_tile_ready),
         "state.temporary" to ActionCapability(CapabilityLevel.Supported, "Applies a reversible setting and schedules a durable restore.", R.string.capability_temporary_state_ready),
         "ime.info" to ActionCapability(CapabilityLevel.Supported, "Reports the current and enabled input methods.", R.string.capability_ime_info_ready),

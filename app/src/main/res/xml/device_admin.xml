@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    force-lock only.
+
+    Every other device-admin policy (wipe-data, reset-password, expire-password, encrypted-storage,
+    disable-camera, watch-login, limit-password) is deliberately absent. The lock action needs
+    DevicePolicyManager.lockNow and nothing else, and an admin that asks for more than it uses is a
+    capability a user cannot audit.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

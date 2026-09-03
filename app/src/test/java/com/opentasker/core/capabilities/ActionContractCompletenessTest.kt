@@ -137,7 +137,11 @@ class ActionContractCompletenessTest {
 
     @Test
     fun permanentlyBlockedActionsStayUnsupportedAndShizukuActionsRequireSetup() {
-        listOf("app.kill", "wifi.toggle", "lock")
+        // "lock" used to be listed here. It is not permanently blocked: DevicePolicyManager.lockNow
+        // works for any app with an active device admin, no root, Shizuku, or accessibility service
+        // involved. It is now covered by the special-access test below, which is a stricter
+        // assertion than this one was.
+        listOf("app.kill", "wifi.toggle")
             .forEach { actionId ->
                 assertEquals(
                     "$actionId must be Unsupported",
@@ -176,6 +180,65 @@ class ActionContractCompletenessTest {
             "Setup must expose a working Modify system settings grant path",
             "Settings.ACTION_MANAGE_WRITE_SETTINGS" in setup && "Settings.System.canWrite(context)" in setup,
         )
+    }
+
+    /**
+     * The lock action, end to end.
+     *
+     * It shipped for months as an unconditional failure with no receiver behind it, so this pins
+     * every link in the chain rather than the capability level alone: the admin component, the
+     * force-lock-only policy, the manifest registration, and the Setup row that turns it on and
+     * back off again.
+     */
+    @Test
+    fun lockDeclaresTheDeviceAdminItNeedsAndTheAppCanActivateAndRemoveIt() {
+        assertEquals(
+            "lock is one grant away, not permanently blocked",
+            CapabilityLevel.RequiresSetup,
+            ActionCapabilityRegistry.get("lock").level,
+        )
+
+        // Read the declared policies only. Scanning the whole file would also match a comment that
+        // names a policy in order to say it is deliberately absent, which is a false failure.
+        val policyFile = repoRoot.resolve("app/src/main/res/xml/device_admin.xml").readText()
+        val open = policyFile.indexOf("<uses-policies>")
+        assertTrue("device_admin.xml must declare its policies", open >= 0)
+        val close = policyFile.indexOf("</uses-policies>", open)
+        assertTrue("the policy block must be closed", close > open)
+        val declared = policyFile.substring(open, close)
+
+        assertTrue("the admin must ask for force-lock", "<force-lock />" in declared)
+        listOf("wipe-data", "reset-password", "expire-password", "encrypted-storage", "disable-camera", "limit-password", "watch-login")
+            .forEach { forbidden ->
+                assertFalse("the lock admin must not ask for $forbidden", forbidden in declared)
+            }
+
+        val manifest = repoRoot.resolve("app/src/main/AndroidManifest.xml").readText()
+        assertTrue(
+            "the admin receiver must be registered or activation can never succeed",
+            "com.opentasker.core.platform.LockDeviceAdminReceiver" in manifest,
+        )
+        assertTrue(
+            "only the system may bind a device admin receiver",
+            "android.permission.BIND_DEVICE_ADMIN" in manifest,
+        )
+        assertTrue("the policy resource must be attached", "@xml/device_admin" in manifest)
+
+        val action = repoRoot.resolve("app/src/main/java/com/opentasker/core/actions/SystemActions.kt").readText()
+        assertTrue("the action must actually lock", "manager.lockNow()" in action)
+        assertTrue(
+            "an inactive admin must be reported, not attempted",
+            "LockDeviceAdminReceiver.isActive(ctx.app)" in action,
+        )
+
+        val setup = repoRoot.resolve("app/src/main/java/com/opentasker/ui/screens/PermissionOnboardingScreen.kt").readText()
+        assertTrue(
+            "Setup must offer activation",
+            "DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN" in setup,
+        )
+        // Without removal the user cannot uninstall the app, because Android blocks uninstalling
+        // while a device admin is active and offers no intent that lands on our admin's page.
+        assertTrue("Setup must offer removal", "removeActiveAdmin" in setup)
     }
 
     @Test

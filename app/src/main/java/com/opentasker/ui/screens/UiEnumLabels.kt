@@ -52,6 +52,7 @@ internal fun setupRequirementLabelRes(requirement: SetupRequirement): Int = when
     SetupRequirement.CALENDAR -> R.string.setup_calendar_access_title
     SetupRequirement.OVERLAY -> R.string.setup_overlay_access_title
     SetupRequirement.WRITE_SETTINGS -> R.string.setup_write_settings_title
+    SetupRequirement.DEVICE_ADMIN -> R.string.setup_device_admin_title
     SetupRequirement.FOREGROUND_LOCATION -> R.string.setup_foreground_location_title
     SetupRequirement.BACKGROUND_LOCATION -> R.string.setup_background_location_title
     SetupRequirement.NEARBY_WIFI -> R.string.setup_nearby_wifi_title

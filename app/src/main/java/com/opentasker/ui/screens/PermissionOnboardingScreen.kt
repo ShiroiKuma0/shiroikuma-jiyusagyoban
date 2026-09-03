@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
+import android.app.admin.DevicePolicyManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -116,6 +117,7 @@ import com.opentasker.core.scripting.TermuxScriptState
 import androidx.compose.ui.platform.testTag
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
+import com.opentasker.core.platform.LockDeviceAdminReceiver
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
 import com.opentasker.core.contexts.PushTriggerTokenStore
 import com.opentasker.core.contexts.UnifiedPushConnector
@@ -189,6 +191,9 @@ private sealed interface PermissionAction {
     data class RuntimePermission(val permission: String) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
     data object ShizukuPermission : PermissionAction
+
+    /** Turning the lock admin back off, which Android offers no direct settings intent for. */
+    data object RemoveDeviceAdmin : PermissionAction
     data class ShizukuKillSwitch(val enabled: Boolean) : PermissionAction
     /** Try each OEM settings component in order, falling back to a web guide URL. */
     data class OemSettings(
@@ -378,6 +383,8 @@ fun PermissionOnboardingScreen(
     val shizukuPermissionRequestedMessage = stringResource(R.string.setup_shizuku_permission_requested)
     val shizukuPermissionFailedMessage = stringResource(R.string.setup_shizuku_permission_failed)
     val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
+    val deviceAdminRemovedMessage = stringResource(R.string.setup_device_admin_removed)
+    val deviceAdminRemoveFailedMessage = stringResource(R.string.setup_device_admin_remove_failed)
     val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
     val pushDistributorSelectedMessage = stringResource(R.string.setup_push_distributor_selected)
     val pushDistributorUnavailableMessage = stringResource(R.string.setup_push_distributor_unavailable)
@@ -664,6 +671,17 @@ fun PermissionOnboardingScreen(
                                 if (action.enabled) shizukuModeDisabledMessage
                                 else shizukuModeEnabledMessage,
                             )
+                            setupViewModel.refresh()
+                        }
+                        PermissionAction.RemoveDeviceAdmin -> {
+                            // Android has no "open my admin's page" intent, so removal has to
+                            // happen here. Uninstalling is blocked while an admin is active, so
+                            // leaving the user only a route into system settings would be a trap.
+                            val removed = runCatching {
+                                context.getSystemService(DevicePolicyManager::class.java)
+                                    ?.removeActiveAdmin(LockDeviceAdminReceiver.component(context))
+                            }.isSuccess
+                            onMessage(if (removed) deviceAdminRemovedMessage else deviceAdminRemoveFailedMessage)
                             setupViewModel.refresh()
                         }
                             }
@@ -1767,6 +1785,35 @@ private fun buildPermissionItems(
             optional = true,
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.WRITE_SETTINGS),
+        ),
+        PermissionSetupItem(
+            title = context.getString(R.string.setup_device_admin_title),
+            body = context.getString(R.string.setup_device_admin_body),
+            granted = LockDeviceAdminReceiver.isActive(context),
+            actionLabel = if (LockDeviceAdminReceiver.isActive(context)) {
+                context.getString(R.string.setup_device_admin_turn_off)
+            } else {
+                context.getString(R.string.setup_device_admin_turn_on)
+            },
+            action = if (LockDeviceAdminReceiver.isActive(context)) {
+                PermissionAction.RemoveDeviceAdmin
+            } else {
+                PermissionAction.SettingsIntent(
+                    Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                        .putExtra(
+                            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                            LockDeviceAdminReceiver.component(context),
+                        )
+                        .putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            context.getString(R.string.setup_device_admin_explanation),
+                        ),
+                )
+            },
+            requiredFor = context.getString(R.string.setup_device_admin_required_for),
+            optional = true,
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.DEVICE_ADMIN),
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_foreground_location_title),

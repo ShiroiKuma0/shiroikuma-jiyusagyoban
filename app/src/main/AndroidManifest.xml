@@ -213,6 +213,24 @@
             </intent-filter>
         </service>
 
+        <!--
+            Exported because DEVICE_ADMIN_ENABLED is delivered by the system, and guarded by
+            BIND_DEVICE_ADMIN, which only the system holds. Its policy set is force-lock alone.
+        -->
+        <receiver
+            android:name="com.opentasker.core.platform.LockDeviceAdminReceiver"
+            android:description="@string/device_admin_description"
+            android:label="@string/device_admin_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.opentasker.core.engine.BootReceiver"
             android:directBootAware="true"

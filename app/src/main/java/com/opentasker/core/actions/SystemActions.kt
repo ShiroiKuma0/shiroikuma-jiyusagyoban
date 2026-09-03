@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
@@ -7,6 +8,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.platform.LockDeviceAdminReceiver
 
 /**
  * Vibrate device.
@@ -62,12 +64,31 @@ class RebootAction : DeclaredAction(ActionCatalog.require("reboot")) {
 
 /**
  * Lock device (secure lock).
+ *
+ * Uses `DevicePolicyManager.lockNow`, which needs an active device admin and nothing else. That is
+ * the only route a normal app has: it needs no root, no Shizuku, and no accessibility service, so
+ * it keeps working under Android 17 Advanced Protection.
  */
 class LockDeviceAction : DeclaredAction(ActionCatalog.require("lock")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         ctx.logger("Lock device")
-        return ActionResult.Failure("Device lock requires a configured DevicePolicyManager admin")
+        if (!LockDeviceAdminReceiver.isActive(ctx.app)) {
+            // Named rather than generic: the user can act on this one, and the row is one tap away.
+            return ActionResult.Failure(
+                "device lock needs the Lock screen admin turned on in Setup"
+            )
+        }
+        val manager = ctx.app.getSystemService(DevicePolicyManager::class.java)
+            ?: return ActionResult.Failure("device policy service is unavailable")
+        return runCatching {
+            manager.lockNow()
+            ActionResult.Success
+        }.getOrElse { error ->
+            // The admin can be deactivated between the check above and this call, and a
+            // SecurityException here is exactly that race rather than a bug.
+            ActionResult.Failure("device lock failed: ${error.message}")
+        }
     }
 }
 

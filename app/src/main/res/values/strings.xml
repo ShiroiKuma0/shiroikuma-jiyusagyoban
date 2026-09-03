@@ -431,6 +431,16 @@
     <string name="setup_overlay_access_title">Overlay access</string>
     <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI</string>
+    <string name="device_admin_label">Lock screen</string>
+    <string name="device_admin_description">Lets a task lock the screen. This is the only thing OpenTasker asks for here.</string>
+    <string name="setup_device_admin_title">Lock screen admin</string>
+    <string name="setup_device_admin_body">Android only lets an app lock the screen if you make it a device admin. OpenTasker asks for one permission in that role, force-lock, and for nothing else. It cannot wipe your device, set a password policy, or read anything. One catch worth knowing before you turn it on: Android will not let you uninstall OpenTasker until you turn this back off, and you can do that here.</string>
+    <string name="setup_device_admin_explanation">OpenTasker uses this to lock the screen when a task asks it to. It requests no other admin permission.</string>
+    <string name="setup_device_admin_required_for">Lock device</string>
+    <string name="setup_device_admin_turn_on">Turn on</string>
+    <string name="setup_device_admin_turn_off">Turn off</string>
+    <string name="setup_device_admin_removed">Lock screen admin turned off</string>
+    <string name="setup_device_admin_remove_failed">Could not turn the lock screen admin off</string>
     <string name="setup_write_settings_title">Modify system settings</string>
     <string name="setup_write_settings_body">Special access that lets tasks change screen brightness and the screen timeout. Without it, both actions refuse to run rather than half-work.</string>
     <string name="setup_write_settings_required_for">Set brightness, Set screen timeout</string>

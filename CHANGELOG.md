@@ -51,6 +51,13 @@
 
 ### Fixed
 
+- Lock device works. It has been in the action list for a long time while always
+  failing, because Android only lets an app lock the screen through a device
+  admin and OpenTasker had none. Setup now has a Lock screen admin row that turns
+  one on. It asks for the single force-lock permission, so it cannot wipe your
+  device, set a password policy, or read anything, and the same row turns it back
+  off. Worth knowing before you turn it on: Android will not let you uninstall an
+  app while its device admin is active.
 - An HTTP Request restricted to Wi-Fi is no longer refused on a Wi-Fi network
   that has no route to the internet. A router with its uplink down, a captive
   portal, or a plain local network between two devices all counted as "offline"

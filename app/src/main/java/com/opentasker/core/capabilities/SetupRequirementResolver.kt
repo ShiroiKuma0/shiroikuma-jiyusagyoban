@@ -18,6 +18,7 @@ enum class SetupRequirement {
     CALENDAR,
     OVERLAY,
     WRITE_SETTINGS,
+    DEVICE_ADMIN,
     FOREGROUND_LOCATION,
     BACKGROUND_LOCATION,
     NEARBY_WIFI,
@@ -123,6 +124,7 @@ object SetupRequirementResolver {
     private fun actionRequirements(type: String): Set<SetupRequirement> = buildSet {
         when (type) {
             "brightness.set", "screen.timeout" -> add(SetupRequirement.WRITE_SETTINGS)
+            "lock" -> add(SetupRequirement.DEVICE_ADMIN)
             "sms.send" -> add(SetupRequirement.SMS)
             "contacts.lookup" -> add(SetupRequirement.CONTACTS)
             "dnd.set", "zen.rule.set", "zen.rule.clear", "ringer.set", "volume.set", "media.mute" -> add(SetupRequirement.DND)

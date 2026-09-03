@@ -170,7 +170,7 @@
     <string name="capability_mobile_data_unsupported" formatted="false">Mobile data changes require Shizuku permission and its privileged user-service transport.</string>
     <string name="capability_screenshot_unsupported" formatted="false">Screenshots require Shizuku permission and its privileged user-service transport.</string>
     <string name="capability_reboot_unsupported" formatted="false">Reboot requires Shizuku permission and its privileged user-service transport.</string>
-    <string name="capability_lock_unsupported" formatted="false">Device lock requires configured device-admin support.</string>
+    <string name="capability_lock_setup" formatted="false">Requires the Lock screen device admin, which you turn on in Setup.</string>
     <string name="capability_tile_ready" formatted="false">Updates a configured OpenTasker Quick Settings tile.</string>
     <string name="capability_temporary_state_ready" formatted="false">Applies a reversible setting and schedules a durable restore.</string>
     <string name="capability_ime_info_ready" formatted="false">Reports the current and enabled input methods.</string>
