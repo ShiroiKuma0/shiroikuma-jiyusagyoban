@@ -280,6 +280,7 @@ class BandDashboardModel(
             metrics = metrics,
             sessions = sleep.sessions,
             ratings = RecoveryLog.all(appContext),
+            notes = com.opentasker.core.band.DayNotes.RECOVERY.all(appContext),
             sessions_ = TrainingSessions.all(appContext),
             sessionOpen = TrainingSessions.openStart(appContext) != null,
             localDateOf = { ms -> localDateKeyOf(ms, zone) },
@@ -412,6 +413,19 @@ class BandDashboardModel(
         } else {
             RecoveryLog.setRating(appContext, dateKey, rating)
         }
+        refresh()
+    }
+
+    /**
+     * Write — or, on blank text, delete — one morning's note.
+     *
+     * The same store the Huawei report writes to, under the same key, for the reason the ratings
+     * share one: what 白い熊 wrote about a morning is a statement about the morning, not about which
+     * band happened to be on the wrist. Two stores would show a note on one screen and a hole on the
+     * other.
+     */
+    fun setNote(dateKey: Long, text: String) {
+        com.opentasker.core.band.DayNotes.RECOVERY.setNote(appContext, dateKey, text)
         refresh()
     }
 
