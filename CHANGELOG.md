@@ -8,6 +8,98 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-01.00-11.g29d06ff7+016 — 2026-09-03
+
+A third sync onto 0.2.93 — fourteen upstream commits, still no version bump — and the session that
+gave 健康 a voice: a written note on every day and every walk, five more columns on the night table,
+機能訓練, and the discovery that none of that was in the backup.
+
+### Upstream
+
+- **The run log can be cleared without waiting for retention**, and a template freshly installed is
+  sent straight to the grants it is waiting on rather than leaving Setup filtered down to them.
+- **A running import, export or preview can be stopped** — the two lanes got a cancellable
+  coordinator underneath.
+- **Variables and Flow stop flashing empty**, and Variables gained a way in.
+- Onboarding no longer treats a dismissal as finished, so it can be re-entered.
+- SQLCipher 4.18.0, AGP 9.3.2, kotlin-stdlib pinned strictly to the catalog, jsoup's unpatched XML
+  parser gated out of production, and the dependency policy gate now fails when the release graph
+  does not resolve.
+
+### 健康 — a note on every day, and every walk
+
+- **Free-text notes**, ported from 白い熊 応用管理 and 白い熊 考直 rather than invented: one pill
+  either way, the note's first line inside it, and **saving a blank note deletes it**. Reachable from
+  the morning card, from any calendar tile and from any line of the night table. Every annotation is
+  the app's own yellow — a note was taking the colour of whatever card it sat on, so the one thing
+  白い熊 had written looked like a different object in each place.
+- **Walks take a note and a stop count** — a black pill with a yellow number, the outline being what
+  separates a counted fact from a graded rating. Both live inside `walk.json`, in 白い熊's own tracks
+  archive, so they survive the app's data being cleared; both writers carry them forward by name,
+  which three tests pin, because a field nobody lists there is dropped on the next re-download.
+
+### 健康 — 機能訓練
+
+- A **tick per calendar day** with its own note, directly under the morning rating. A calendar rather
+  than a counter: what matters is the run, and a number cannot show a gap. Seeded with today once,
+  behind a flag — "is the store empty" is also true the moment the only day there is gets un-ticked.
+- The card is a **two-week cut-out of the same calendar** the full page draws, cut from one record.
+  That calendar was extracted from the register's own grid so the two cannot drift; it takes dumb
+  squares and knows nothing about nights or ticks.
+- Its appearance was **chosen from ten rendered options**: every day a filled cell, the done ones
+  bright, the weekend given eight dp of gutter either side of its rule. No red — a missed day is a
+  gap, not an error.
+
+### 健康 — the night table
+
+- **Temperature is gone**: this band decodes six per-minute fields and none is a temperature, so the
+  column was a dash on every line. In its place **deep, deep+REM, lowest HR, HRV (RMSSD) and SpO₂**.
+- **HRV is real here in a way it never was on the Hume band** — `rri_f5`, RMSSD computed by the band
+  from its own beat-to-beat intervals and checked against them, filtered to the windows Huawei Health
+  itself would publish.
+- Nine columns of **one width in one horizontal scroll**, one line per cell, sized against 白い熊's
+  own font scale of 1.3 rather than the default — a width checked at 1.0 has thirty per cent less
+  type in it than the real thing, which is how `13h34` came to render as `13h3` over `4`.
+- Every column carries a colour and **not all against the same thing**. The low and SpO₂ ride
+  published ladders; deep, deep+REM and RMSSD are banded within-person, because this band's "deep"
+  runs 30–40 % of sleep where the literature's N3 is 13–23 %. **None of the five is counted** — the
+  headline still counts three markers, and a test fails if one ever reaches the count. The ⓘ panel
+  states all of it, including the two caveats worth knowing.
+
+### The backup carried none of it
+
+- 健康's entire record — every rating, note, tick, marked session and band reading — lived in
+  preferences files and tables **no exporter had ever been told about**. A "clear app data" took the
+  lot. Two categories now cover it, both ticked by default.
+- The measurement dump reads its columns **from the cursor**, never from a field list, and writes
+  NDJSON a page at a time so a quarter of a million samples never land in memory at once.
+- **`HealthExportCoverageTest` holds no second list.** It reads the sources: every preferences file
+  the health code opens and every `tableName` the entities declare must appear in the exporter, and
+  nothing may be listed that is not a real table. It also pins that a row never contains a newline.
+- That gate exists because both failures shipped first. The table names were written from the entity
+  CLASS names — `band_syncs` and `huawei_syncs` are plural — and the export died on `no such table:
+  band_sync`, taking the whole backup with it. Then the rows went through the settings encoder,
+  which pretty-prints, so every record spread over seven lines, nothing parsed, and the restore
+  would have been **silently empty**. The reader now accumulates lines until they parse, so archives
+  written either way still restore. Verified against a real export: 116 283 rows, every line a whole
+  record.
+
+### 場 — scenes and panels
+
+- **An overlay window asks for the card's real size** instead of WRAP_CONTENT. A 380 dp scene came up
+  as a 320 dp card: `ViewRootImpl` measures a WRAP_CONTENT window against `config_prefDialogWidth`
+  first and keeps that width unless the view reports `MEASURED_STATE_TOO_SMALL`, which a ComposeView
+  never does. Width only, which is why the card looked right vertically and squeezed horizontally.
+- **A tap on a tap-through panel's empty area closes it**, as it looks like it should. That window is
+  routinely far larger than anything it draws, and every tap in the invisible margin was swallowed.
+- **「すべて選択 / 解除」 is a pill**, not another row in the list — it is the one control that acts on
+  all of them, so it takes the shape this panel already uses for a control.
+
+### 面
+
+- Two cells for the hour on the band's own face, which buys the seconds line back, and previews the
+  watch-face picker can actually show.
+
 ## 0.2.93+2026-08-31.19-12.gbb75f812+002 — 2026-08-31
 
 A second sync onto 0.2.93 — six upstream commits, no version bump, so the build tail kept counting.
