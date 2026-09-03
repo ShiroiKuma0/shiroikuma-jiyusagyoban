@@ -126,6 +126,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1770,12 +1771,22 @@ class ActiveAutomationViewModel(
      * Runs one backup, export, or restore-staging step with the Setup card held busy.
      *
      * Unlike the import/export lanes this one is deliberately **not** cancellable, and the Setup
-     * card offers no Stop for it. Every local write already stages into a temporary file, validates
-     * it, and publishes it atomically, so a stopped write would gain nothing over a finished one.
-     * The write that leaves app-private storage is the SAF export, and a document provider gives
-     * no way to put back what opening the destination for writing already truncated. The defect
-     * this lane actually had was a UI that stayed busy forever when an operation ended early, which
-     * the `finally` below fixes. See `docs/DECISIONS.md` and `BackupCancellationContractTest`.
+     * card offers no Stop for it. Every local write stages into a temporary file, validates it, and
+     * publishes it atomically, and the handler that removes the staged copy on failure catches
+     * cancellation too, so a stopped write would gain nothing over a finished one.
+     *
+     * Two writes leave app-private storage: this lane's Export button and the scheduled snapshot
+     * worker, both into a user-chosen SAF destination. Opening such a destination for writing
+     * truncates it before the first byte, and a provider gives no way to put back what was there,
+     * so stopping partway is strictly worse than finishing. The snapshot worker at least deletes
+     * the archive it created; Export writes into a document the user picked and cannot.
+     *
+     * The defect this lane actually had was a UI that stayed busy forever when an operation ended
+     * early. The `finally` below fixes that, and it refreshes under [NonCancellable] because a
+     * cancelled coroutine cannot enter a plain `withContext`, which would have left the busy flag
+     * set for exactly the case the `finally` exists to cover.
+     *
+     * See `docs/DECISIONS.md` and `BackupCancellationContractTest`.
      */
     private fun launchBackupOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
@@ -1783,7 +1794,7 @@ class ActiveAutomationViewModel(
             try {
                 block()
             } finally {
-                refreshBackupSetupState(busy = false)
+                withContext(NonCancellable) { refreshBackupSetupState(busy = false) }
             }
         }
     }

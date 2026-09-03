@@ -93,19 +93,31 @@ class LauncherIconContractTest {
     }
 
     @Test
-    fun `no notification borrows a framework drawable for its small icon`() {
-        // The manifest scan above missed SceneOverlayService, which built its foreground
-        // notification in code and shipped the stock compass glyph until 2026-09-03.
-        val offenders = ProductionSources.allKotlinFiles()
-            .map { path -> path to path.readText() }
-            .filter { (_, source) -> Regex("""setSmallIcon\(\s*android\.R\.drawable\.""") in source }
-            .map { (path, _) -> ProductionSources.repoRoot.relativize(path).toString() }
+    fun `no production surface borrows a framework drawable`() {
+        // The manifest scan above missed two of these: SceneOverlayService built its foreground
+        // notification in code and passed the stock compass, and the task widget's layout used
+        // the stock media-play triangle. Matching only the call that broke first would have kept
+        // missing the second, so this bans the reference outright. There are legitimately zero of
+        // them, and the app ships its own glyph for every surface that needs one.
+        val kotlinOffenders = ProductionSources.allKotlinFiles()
+            .filter { path -> "android.R.drawable" in path.readText() }
+            .map(::relative)
+
+        val resourceOffenders = Files.walk(file("app/src/main/res")).use { paths ->
+            paths.filter { path -> Files.isRegularFile(path) && path.toString().endsWith(".xml") }
+                .filter { path -> "@android:drawable/" in path.readText() }
+                .map(::relative)
+                .toList()
+        }
 
         assertTrue(
-            "Notifications must use the app glyph, not a framework drawable: $offenders",
-            offenders.isEmpty(),
+            "Every icon must come from this app, not the framework: ${kotlinOffenders + resourceOffenders}",
+            (kotlinOffenders + resourceOffenders).isEmpty(),
         )
     }
+
+    private fun relative(path: Path): String =
+        ProductionSources.repoRoot.relativize(path).toString().replace('\\', '/')
 
     private fun file(relative: String): Path = repoRoot.resolve(relative)
 

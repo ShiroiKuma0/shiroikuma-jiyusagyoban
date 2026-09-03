@@ -57,7 +57,12 @@ class DatabaseBackupManager(
                 validateDatabaseFile(tempFile)
                 publishValidatedBackup(context, tempFile, backupFile)
             } catch (error: Exception) {
+                // Validation opens the staged copy, so SQLite leaves -wal/-shm beside it. The
+                // success path deletes those in publishValidatedBackup; the failure path used to
+                // delete only the .tmp itself, leaving a pair of orphans per failed backup that
+                // listBackups() cannot see and no retention pass ever collects.
                 tempFile.delete()
+                deleteDatabaseSidecars(tempFile)
                 throw error
             }
             AppLogger.info(tag, "Database backed up to ${backupFile.absolutePath}")
@@ -149,6 +154,7 @@ class DatabaseBackupManager(
                     replaceFileAtomically(temp, pending, "pending encrypted restore")
                 } catch (error: Throwable) {
                     temp.delete()
+                    deleteDatabaseSidecars(temp)
                     throw error
                 }
                 AppLogger.warn(tag, "Encrypted restore staged; restart OpenTasker to apply it")
@@ -272,6 +278,7 @@ class DatabaseBackupManager(
             replaceFileAtomically(temp, destination, description)
         } catch (error: Exception) {
             temp.delete()
+            deleteDatabaseSidecars(temp)
             throw error
         }
     }
@@ -393,6 +400,7 @@ class DatabaseBackupManager(
             replaceFileAtomically(temp, pending, "pending restore")
         } catch (error: Exception) {
             temp.delete()
+            deleteDatabaseSidecars(temp)
             throw error
         }
         AppLogger.warn(tag, "Restore staged at ${pending.absolutePath}; restart OpenTasker to apply it")
@@ -486,15 +494,24 @@ class DatabaseBackupManager(
             } catch (error: Exception) {
                 temp?.delete()
                 rollback?.takeIf { replacementPublished && it.exists() }?.let { previous ->
-                    runCatching {
-                        val rollbackTemp = File(requireNotNull(dbFile.parentFile), "$databaseName.rollback.tmp")
-                        previous.inputStream().use { source ->
-                            FileOutputStream(rollbackTemp).use { output ->
-                                source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
-                                output.fd.sync()
+                    // A database-sized staging copy, in the databases directory, written on the
+                    // path where something has already gone wrong. If the rename below fails the
+                    // runCatching swallows it, so without this finally the orphan stays forever
+                    // and nothing ever looks for it.
+                    val rollbackTemp = File(requireNotNull(dbFile.parentFile), "$databaseName.rollback.tmp")
+                    try {
+                        runCatching {
+                            previous.inputStream().use { source ->
+                                FileOutputStream(rollbackTemp).use { output ->
+                                    source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
+                                    output.fd.sync()
+                                }
                             }
+                            replaceFileAtomically(rollbackTemp, dbFile, "restore rollback")
                         }
-                        replaceFileAtomically(rollbackTemp, dbFile, "restore rollback")
+                    } finally {
+                        rollbackTemp.delete()
+                        deleteDatabaseSidecars(rollbackTemp)
                     }
                 }
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")

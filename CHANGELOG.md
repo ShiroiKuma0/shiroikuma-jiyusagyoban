@@ -24,7 +24,16 @@
 
 - The notification shown while a scene overlay is on screen now uses the
   OpenTasker glyph. It was still showing Android's stock compass icon, which
-  made it look like it came from another app.
+  made it look like it came from another app. The home screen widget was doing
+  the same thing with Android's media-play triangle.
+- A backup that fails while being written no longer leaves two hidden SQLite
+  side files behind. One pair was orphaned per failed backup, and nothing ever
+  cleaned them up because the backup list cannot see them.
+- A scheduled snapshot whose upload does not finish now says so in the log if
+  the partial file could not be removed from your folder, instead of leaving it
+  there silently.
+- Leaving the Setup screen mid-backup no longer leaves the backup card stuck on
+  "Working".
 - The run log can be cleared on demand from the retention card. Pinned runs and
   held runs waiting to be replayed are kept, and it asks first because a purge
   cannot be undone.

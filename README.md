@@ -232,7 +232,12 @@ and RTL case.
 
 Release builds require `OPEN_TASKER_RELEASE_KEYSTORE`,
 `OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD`, `OPEN_TASKER_RELEASE_KEY_ALIAS`, and
-`OPEN_TASKER_RELEASE_KEY_PASSWORD`. The key file stays outside this repository.
+`OPEN_TASKER_RELEASE_KEY_PASSWORD`. The key file stays outside this repository,
+and it has to: Android ties an app's identity to its signing key, so a key that
+leaks or gets lost costs every installed copy an uninstall before it can
+upgrade. That has happened twice here. `SigningMaterialCustodyTest` fails the
+build if a keystore, a `.p12`, or a `signing.properties` ever gets tracked,
+including through `git add -f`.
 
 ```bash
 ./gradlew :app:assembleRelease

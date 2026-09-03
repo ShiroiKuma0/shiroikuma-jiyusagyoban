@@ -51,7 +51,18 @@ class ConfigurationSnapshotWorker(
                 try {
                     manager.exportEncryptedBackup(managedBackup, archiveUri, passphrase).getOrThrow()
                 } catch (error: Throwable) {
-                    runCatching { archiveStore.deleteArchive(treeUri, archiveUri) }
+                    // An export that stops partway leaves a truncated .otbackup in the user's
+                    // folder, so the archive this run created has to go. The provider can refuse,
+                    // and it used to refuse silently: both the exception and a false return were
+                    // discarded, so a leftover partial file looked exactly like a clean failure.
+                    val removed = runCatching { archiveStore.deleteArchive(treeUri, archiveUri) }
+                    if (!removed.getOrDefault(false)) {
+                        AppLogger.warn(
+                            TAG,
+                            "Could not remove the partial snapshot archive at $archiveUri; delete it by hand",
+                            removed.exceptionOrNull(),
+                        )
+                    }
                     throw error
                 }
                 archiveStore.enforceRetention(treeUri, policy, now)

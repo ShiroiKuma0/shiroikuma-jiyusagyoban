@@ -56,36 +56,61 @@ class BackupCancellationContractTest {
     @Test
     fun theSnapshotWorkerRemovesAnArchiveItsExportDidNotFinishWriting() {
         // Runs inside core:storage, so the file it inspects is a sibling of the test.
-        val source = Path.of("src/main/kotlin/com/opentasker/core/storage/ConfigurationSnapshotWorker.kt")
-            .readText()
+        val source = read("ConfigurationSnapshotWorker.kt")
 
         val createArchive = source.indexOf("archiveStore.createArchive(")
-        val export = source.indexOf("exportEncryptedBackup(", createArchive)
-        // Throwable, not Exception: a cancelled export must clean up like a failed one.
-        val catchThrowable = source.indexOf("catch (error: Throwable)", export)
-        val deleteArchive = source.indexOf("archiveStore.deleteArchive(", catchThrowable)
-        val rethrow = source.indexOf("throw error", deleteArchive)
-
         assertTrue("snapshot worker no longer creates the archive first", createArchive >= 0)
+        val export = source.indexOf("exportEncryptedBackup(", createArchive)
         assertTrue("the export no longer follows archive creation", export > createArchive)
-        assertTrue("the export is no longer guarded against every throwable", catchThrowable > export)
-        assertTrue("a stopped export no longer deletes its archive", deleteArchive > catchThrowable)
-        assertTrue("the stop reason is no longer rethrown", rethrow > deleteArchive)
+
+        // Throwable, not Exception: a cancelled export must clean up like a failed one.
+        val handler = blockAfter(
+            source = source,
+            start = "catch (error: Throwable)",
+            end = "archiveStore.enforceRetention(",
+            from = export,
+        )
+        assertTrue("a stopped export no longer deletes its archive", "archiveStore.deleteArchive(" in handler)
+        assertTrue("the stop reason is no longer rethrown", "throw error" in handler)
     }
 
     @Test
-    fun aFailedBackupCopyRemovesItsTemporaryFile() {
-        val source = Path.of("src/main/kotlin/com/opentasker/core/storage/DatabaseBackupManager.kt")
-            .readText()
+    fun aFailedBackupCopyRemovesItsTemporaryFileAndTheSidecarsValidationLeftBehind() {
+        val source = read("DatabaseBackupManager.kt")
 
-        val tempCreated = source.indexOf("val tempFile = File(backupDir,")
-        val publish = source.indexOf("publishValidatedBackup(context, tempFile, backupFile)", tempCreated)
-        val catchBlock = source.indexOf("catch (error: Exception)", publish)
-        val tempDeleted = source.indexOf("tempFile.delete()", catchBlock)
+        val publish = source.indexOf("publishValidatedBackup(context, tempFile, backupFile)")
+        assertTrue("backup no longer publishes the validated copy", publish >= 0)
 
-        assertTrue("backup no longer stages through a temporary file", tempCreated >= 0)
-        assertTrue("backup no longer publishes the validated copy", publish > tempCreated)
-        assertTrue("the staged copy is no longer guarded", catchBlock > publish)
-        assertTrue("an abandoned staged copy is no longer deleted", tempDeleted > catchBlock)
+        val handler = blockAfter(
+            source = source,
+            start = "catch (error: Exception)",
+            end = "AppLogger.info(tag, \"Database backed up to",
+            from = publish,
+        )
+        assertTrue("an abandoned staged copy is no longer deleted", "tempFile.delete()" in handler)
+        // Validating the staged copy opens it, so SQLite leaves -wal/-shm next to a .tmp whose
+        // name carries a timestamp. Nothing enumerates those, so one failed backup used to cost
+        // two files that no retention pass could ever reach.
+        assertTrue("the staged copy's sidecars are no longer deleted", "deleteDatabaseSidecars(tempFile)" in handler)
+        assertTrue("the failure is no longer rethrown", "throw error" in handler)
+    }
+
+    private fun read(fileName: String): String =
+        Path.of("src/main/kotlin/com/opentasker/core/storage/$fileName").readText()
+
+    /**
+     * The text between [start] and the first [end] after it, searching from [from].
+     *
+     * Ordered `indexOf` calls are not enough on their own: an assertion that some later occurrence
+     * of `throw error` or `tempFile.delete()` exists is satisfied by an unrelated one elsewhere in
+     * the file, so deleting the real handler leaves the test green. Both of these files have such a
+     * decoy, and both of these tests passed against a mutant before this was bounded.
+     */
+    private fun blockAfter(source: String, start: String, end: String, from: Int): String {
+        val open = source.indexOf(start, from)
+        assertTrue("no '$start' after offset $from", open >= 0)
+        val close = source.indexOf(end, open)
+        assertTrue("no '$end' closing the block that starts at $open", close > open)
+        return source.substring(open, close)
     }
 }
