@@ -102,6 +102,8 @@ private fun walk(
     metres: Int,
     points: Int,
     mapped: Boolean,
+    note: String? = null,
+    stops: Int? = null,
 ) = HuaweiWalkLibrary.Walk(
     dir = File("/walks/walk-$number-$start"),
     number = number,
@@ -127,14 +129,22 @@ private fun walk(
         // so the honest render of it today is the route over nothing.
         detail = if (number == 8) "basemap" else "map",
     ),
+    note = note,
+    stops = stops,
 )
 
 // The real one first: 白い熊's walk of 2026-08-23 — 1763 fixes, 2.34 km, 29 minutes, Prague.
 private val WALKS = listOf(
-    walk(8, 1_787_502_496L, 29, 2_340, 1_763, mapped = true),
+    // Annotated, un-annotated, note-without-count and count-without-note, one of each — the four
+    // states the cell's reserved row has to hold WITHOUT the grid going ragged, which is the whole
+    // reason that row's height is fixed rather than conditional.
+    walk(
+        8, 1_787_502_496L, 29, 2_340, 1_763, mapped = true,
+        note = "stopped at the bakery, then again on the bridge to watch the boats", stops = 2,
+    ),
     walk(7, 1_787_400_000L, 52, 4_180, 3_090, mapped = false),
-    walk(6, 1_787_320_000L, 14, 1_020, 812, mapped = true),
-    walk(5, 1_787_210_000L, 71, 5_640, 4_255, mapped = false),
+    walk(6, 1_787_320_000L, 14, 1_020, 812, mapped = true, note = "rain"),
+    walk(5, 1_787_210_000L, 71, 5_640, 4_255, mapped = false, stops = 4),
 )
 
 private fun previewFor(w: HuaweiWalkLibrary.Walk): ImageBitmap? = when (w.number) {
@@ -241,5 +251,50 @@ fun HuaweiWalkUnsentPreview() {
 fun HuaweiWalkNoAnswerPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
         Detail(WALKS[3], message = "地図 did not answer")
+    }
+}
+
+/**
+ * The two editors a walk carries, drawn as they open.
+ *
+ * A dialog is the one part of this feature 白い熊 cannot see any other way — it exists for a moment,
+ * over a locked phone, and by the time it could be described it has been dismissed. The stop picker
+ * in particular is a colour decision ("black pill, yellow number, yellow border") that has to be
+ * looked at rather than read.
+ */
+@PreviewTest
+@Preview(name = "Walk — note editor", widthDp = 413, heightDp = 420, showBackground = true)
+@Composable
+fun HuaweiWalkNoteDialogPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        OpenTaskerTheme {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                NoteDialog(
+                    title = "2026-08-23 (日) 18:28",
+                    note = WALKS[0].note,
+                    onSave = {},
+                    onDismiss = {},
+                )
+            }
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Walk — stops picker 日本語", widthDp = 413, heightDp = 380, showBackground = true)
+@Composable
+fun HuaweiWalkStopsDialogPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        OpenTaskerTheme {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                CountPickerDialog(
+                    title = AnnotationText.stopsAsk[BandLanguage.JA],
+                    current = 2,
+                    range = 0..9,
+                    onPick = {},
+                    onDismiss = {},
+                )
+            }
+        }
     }
 }
