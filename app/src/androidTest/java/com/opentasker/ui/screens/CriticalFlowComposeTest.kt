@@ -318,6 +318,7 @@ class CriticalFlowComposeTest {
                     onAddAction = {},
                     onEditAction = { _, _, _ -> },
                     onDeleteAction = { _, _ -> },
+                    onRunAction = { _, _ -> },
                     onMoveAction = { _, fromIndex, toIndex -> moved = fromIndex to toIndex },
                     contentPadding = PaddingValues(0.dp),
                 )

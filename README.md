@@ -217,9 +217,13 @@ Releases tagged `v0.1.0`, `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. All four car
 ```bash
 git clone https://github.com/SysAdminDoc/OpenTasker
 cd OpenTasker
-./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+`compileDebugAndroidTestKotlin` is in that line on purpose. The instrumented tests only run when a
+device is attached, so without a compile step the everyday build will happily go green while the
+instrumented sources no longer build against the code you just changed.
 
 The external-decoder fuzzer is opt-in and is not part of the release or local quality gates. Run
 `./gradlew :app:fuzzExternalDecoders -PfuzzSeconds=30` for a bounded coverage-guided pass, or
