@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -1680,6 +1682,28 @@ class ActiveAutomationViewModel(
 
     private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
         db.runLogDao().applyRetention(policy, System.currentTimeMillis())
+
+    /**
+     * Puts the same redacted report Share sends onto the clipboard.
+     *
+     * Share opens a chooser, which is the wrong shape for pasting into a bug report, so issue
+     * reports arrived as screenshots of this screen instead of its text.
+     */
+    fun copyDiagnosticReport() {
+        viewModelScope.launch {
+            try {
+                val report = DiagnosticExport.buildReport(appContext, db)
+                val clipboard = appContext.getSystemService(ClipboardManager::class.java)
+                    ?: throw IllegalStateException("Clipboard service is unavailable")
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText(appContext.getString(R.string.diagnostics_copy), report),
+                )
+                events.send(message(R.string.ui_message_diagnostics_copied))
+            } catch (ex: Exception) {
+                events.send(errorMessage(ex, R.string.ui_error_copy_diagnostics))
+            }
+        }
+    }
 
     fun shareDiagnosticReport() {
         viewModelScope.launch {

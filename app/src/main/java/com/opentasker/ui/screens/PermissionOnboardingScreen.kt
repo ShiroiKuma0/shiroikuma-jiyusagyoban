@@ -111,6 +111,7 @@ import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.power.ShizukuPowerState
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scripting.TermuxScriptBackend
+import com.opentasker.core.support.ProjectLinks
 import com.opentasker.core.scripting.TermuxScriptState
 import androidx.compose.ui.platform.testTag
 import com.opentasker.core.capabilities.SetupRequirement
@@ -618,6 +619,14 @@ fun PermissionOnboardingScreen(
                     onRevoke = setupViewModel::revokeLocaleGrant,
                 )
             }
+            item { SettingsSectionLabel(stringResource(R.string.settings_section_about)) }
+            item {
+                AboutCard(
+                    onOpenLink = { url ->
+                        openSettingsIntent(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)), onMessage)
+                    },
+                )
+            }
         }
 
         if (!settingsOnly) SetupSection.entries.forEach { section ->
@@ -684,6 +693,90 @@ private fun SettingsIntroCard() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/**
+ * Version, licence, and the three links the project had nowhere in the app.
+ *
+ * "Report a problem" opens a new issue with the build and device already in the body. Issue #14
+ * came in as screenshots because there was no route from the app to the tracker and nothing said
+ * what a useful report contains.
+ */
+@Composable
+private fun AboutCard(onOpenLink: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.46f)),
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(
+                        R.string.about_version,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE,
+                        BuildConfig.DISTRIBUTION,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    stringResource(R.string.about_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { onOpenLink(ProjectLinks.REPOSITORY_URL) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                ) {
+                    Text(stringResource(R.string.about_source), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton(
+                    onClick = { onOpenLink(ProjectLinks.RELEASES_URL) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+                ) {
+                    Text(stringResource(R.string.about_releases), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            TextButton(
+                onClick = { onOpenLink(ProjectLinks.LICENSE_URL) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(stringResource(R.string.about_license))
+            }
+            Text(
+                stringResource(R.string.about_report_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = {
+                    onOpenLink(
+                        ProjectLinks.reportProblemUrl(
+                            appVersion = BuildConfig.VERSION_NAME,
+                            versionCode = BuildConfig.VERSION_CODE,
+                            distribution = BuildConfig.DISTRIBUTION,
+                            androidRelease = Build.VERSION.RELEASE.orEmpty(),
+                            sdkInt = Build.VERSION.SDK_INT,
+                            device = "${Build.MANUFACTURER} ${Build.MODEL}",
+                        ),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(stringResource(R.string.about_report))
+            }
         }
     }
 }

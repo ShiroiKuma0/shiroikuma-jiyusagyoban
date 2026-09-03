@@ -11,6 +11,13 @@
 
 ### Added
 
+- Settings has an About section: the version and build you are running, links to
+  the source, the release notes and the licence, and a "Report a problem" button
+  that opens a new issue with your app version, Android version and device
+  already filled in.
+- The Diagnostics screen can copy its redacted report to the clipboard. Sharing
+  it opened a chooser, which is awkward when what you want is to paste it into a
+  bug report.
 - A running import, export, or preview can be stopped. The review dialog's
   button becomes Stop while work is in progress and says which step it is on,
   instead of going grey and refusing to close.

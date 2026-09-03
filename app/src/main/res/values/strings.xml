@@ -157,6 +157,14 @@
     <string name="settings_run_onboarding_action">Show templates</string>
     <string name="settings_section_data_recovery">Data and recovery</string>
     <string name="settings_section_integrations">Integrations</string>
+    <string name="settings_section_about">About OpenTasker</string>
+    <string name="about_version">Version %1$s (build %2$d, %3$s)</string>
+    <string name="about_body">Free and open source, MIT licensed. Everything runs on this device; there is no account and nothing is uploaded.</string>
+    <string name="about_source">Source code</string>
+    <string name="about_releases">Release notes</string>
+    <string name="about_license">Read the licence</string>
+    <string name="about_report">Report a problem</string>
+    <string name="about_report_body">Opens a new issue with your app version, Android version, and device already filled in. Add the diagnostic report from the Diagnostics screen if you can.</string>
     <string name="scenes_search_hint">Search scenes</string>
     <string name="scenes_no_matches_title">No matching scenes</string>
     <string name="scenes_no_matches_body">Try another search or clear the current query.</string>
@@ -1192,6 +1200,7 @@
     <string name="diagnostics_status_attention">Needs attention</string>
     <string name="diagnostics_refresh">Refresh diagnostics</string>
     <string name="diagnostics_share">Share redacted report</string>
+    <string name="diagnostics_copy">Copy redacted report</string>
     <string name="diagnostics_engine_health">Engine health</string>
     <string name="diagnostics_admission_title">Execution admission</string>
     <string name="diagnostics_admission_status">Admission controller</string>
@@ -1417,6 +1426,7 @@
     <string name="ui_error_retention_preview">Retention preview failed</string>
     <string name="ui_error_retention_update">Run log retention update failed</string>
     <string name="ui_error_share_diagnostics">Failed to share diagnostic report</string>
+    <string name="ui_error_copy_diagnostics">Failed to copy diagnostic report</string>
     <string name="diagnostics_share_subject">OpenTasker diagnostic report</string>
     <string name="diagnostics_share_chooser">Share diagnostic report</string>
     <string name="import_document_tasker_xml">Tasker XML file</string>
@@ -1495,6 +1505,7 @@
     <string name="ui_message_shortcut_unsupported">Launcher does not support pinned shortcuts</string>
     <string name="ui_message_shortcut_pinning">Pinning "%1$s" to home screen</string>
     <string name="ui_message_shortcut_failed">Failed to pin shortcut</string>
+    <string name="ui_message_diagnostics_copied">Redacted diagnostic report copied</string>
     <string name="ui_message_backup_created">Backup created: %1$s</string>
     <string name="ui_message_backup_exported">Backup exported: %1$s</string>
     <string name="ui_message_snapshots_enabled">Automatic snapshots on: up to %1$d kept for %2$d days</string>

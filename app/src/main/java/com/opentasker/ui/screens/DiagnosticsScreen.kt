@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
@@ -65,6 +66,7 @@ fun DiagnosticsScreen(
     contentPadding: PaddingValues,
     onRefresh: () -> Unit,
     onShare: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
     val health = state.health
@@ -83,6 +85,7 @@ fun DiagnosticsScreen(
                 reason = health?.assessment?.reason,
                 onRefresh = onRefresh,
                 onShare = onShare,
+                onCopy = onCopy,
             )
         }
         item {
@@ -129,6 +132,7 @@ private fun DiagnosticSummaryCard(
     reason: String?,
     onRefresh: () -> Unit,
     onShare: () -> Unit,
+    onCopy: () -> Unit,
 ) {
     val statusColor = if (healthy) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
     val statusLabel = stringResource(
@@ -166,6 +170,11 @@ private fun DiagnosticSummaryCard(
             }
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
+            }
+            // Share opens a chooser, which is a poor fit for pasting into a bug report. #14 came in
+            // as screenshots partly because there was no way to get this text out as text.
+            IconButton(onClick = onCopy) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.diagnostics_copy))
             }
             IconButton(onClick = onShare) {
                 Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.diagnostics_share))

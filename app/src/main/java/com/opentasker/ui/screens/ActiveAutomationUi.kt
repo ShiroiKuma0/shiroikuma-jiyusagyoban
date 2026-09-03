@@ -919,6 +919,7 @@ fun ActiveAutomationUi(
                 contentPadding = innerPadding,
                 onRefresh = viewModel::refreshDiagnostics,
                 onShare = viewModel::shareDiagnosticReport,
+                onCopy = viewModel::copyDiagnosticReport,
             )
         }
             }
