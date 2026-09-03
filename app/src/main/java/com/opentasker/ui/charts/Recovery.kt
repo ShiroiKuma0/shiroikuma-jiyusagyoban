@@ -53,7 +53,17 @@ import kotlin.math.max
  */
 
 /** One thing measured about a night, and how unusual it was. */
-enum class RecoveryMarker { NOCTURNAL_HR, SLEEP, FELT, TEMPERATURE }
+/**
+ * Every quantity that can be banded against 白い熊's own past.
+ *
+ * The last three are **display-only**: they colour a cell of the night table and reach no counting
+ * rule, no headline and no card. [SessionRegister.NightReading] says why they are banded
+ * within-person rather than against a published range — the short version is that this band's
+ * "deep" is not polysomnography's N3 (白い熊's nights run 30–40 % of sleep where the literature's
+ * N3 is 13–23 %), and RMSSD norms are so age-dependent that a population ladder would paint every
+ * night of a 40-year-old the same colour.
+ */
+enum class RecoveryMarker { NOCTURNAL_HR, SLEEP, FELT, TEMPERATURE, DEEP, DEEP_REM, HRV }
 
 /** Which side of usual a marker landed on. */
 enum class RecoveryBand { LOW, USUAL, HIGH, UNKNOWN }
@@ -90,6 +100,12 @@ data class MarkerReading(
             // this one-word change honest: history is on the new scale too, not half on each.
             RecoveryMarker.FELT -> band == RecoveryBand.HIGH
             RecoveryMarker.TEMPERATURE -> band == RecoveryBand.HIGH
+            // The display-only three are never adverse, whatever they do. They colour a cell of the
+            // night table and reach no count — `counted` is false for all of them, so this could
+            // only ever be read by mistake, and `false` is the answer that makes the mistake
+            // harmless rather than the one that quietly adds a fourth marker to a rule built on
+            // three (≥2 of 3 → 92 % PPV; a rule of five is a different rule with no evidence).
+            RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM, RecoveryMarker.HRV -> false
         }
 
     /**
@@ -119,7 +135,10 @@ data class MarkerReading(
             val worse = when (marker) {
                 RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE, RecoveryMarker.FELT ->
                     deviations > 0
-                RecoveryMarker.SLEEP -> deviations < 0
+                // More is better for all four: time asleep, time in deep, the restorative share, and
+                // the beat-to-beat variability. A night BELOW the baseline is the worse night.
+                RecoveryMarker.SLEEP, RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM,
+                RecoveryMarker.HRV -> deviations < 0
             }
             val far = kotlin.math.abs(deviations) >= 2.0
             if (!worse && marker == RecoveryMarker.TEMPERATURE) return 3
@@ -220,6 +239,24 @@ object Recovery {
     const val SLEEP_MEANINGFUL_MIN = 30.0
     const val FELT_MEANINGFUL_STEPS = 1.0
     const val TEMP_MEANINGFUL_C = 0.3
+
+    /**
+     * Floors under the usual-band half-width for the three DISPLAY-ONLY markers.
+     *
+     * **These are not smallest-worthwhile-changes and must never be used as if they were.** Every
+     * threshold in the counting rule is a published figure (see the file header); no such figure
+     * exists for a consumer band's "deep" minutes, for a restorative share computed from it, or for
+     * a nightly RMSSD median. What these do is stop a short history from manufacturing colour: while
+     * confidence is PROVISIONAL there is no dispersion estimate, so the half-width IS this number,
+     * and a night differing by less than it stays the middle step. Once ESTABLISHED, `sigma × 1.5`
+     * exceeds them and they stop binding at all.
+     *
+     * Each is the coarsest difference that is plainly not noise in its own unit: a quarter-hour of
+     * deep sleep, five percentage points of the night, and five milliseconds of RMSSD.
+     */
+    const val DEEP_MEANINGFUL_MIN = 15.0
+    const val DEEP_REM_MEANINGFUL_SHARE = 0.05
+    const val HRV_MEANINGFUL_MS = 5.0
 
     const val MIN_NIGHTS_FOR_ANY = 5
     const val MIN_NIGHTS_FOR_Z = 14
