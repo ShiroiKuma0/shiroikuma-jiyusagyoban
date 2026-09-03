@@ -36,6 +36,9 @@
 
 ### Changed
 
+- Dropped the Navigation Compose library. The app has always moved between its
+  top-level screens on its own, so the library was being packaged and listed in
+  the bill of materials without a single line of code using it.
 - Updated SQLCipher to 4.18.0, which carries SQLite 3.53.4. This also moves
   androidx.sqlite to 2.7.0 underneath Room.
 - Updated OkHttp to 5.5.0, which stops the hostname verifier accepting hosts

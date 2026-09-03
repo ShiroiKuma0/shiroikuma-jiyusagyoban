@@ -45,7 +45,6 @@
             <trusting group="androidx.core" />
             <trusting group="androidx.databinding" />
             <trusting group="androidx.lifecycle" />
-            <trusting group="androidx.navigation" />
             <trusting group="androidx.navigationevent" />
             <trusting group="androidx.room" />
             <trusting group="androidx.savedstate" />
@@ -2503,69 +2502,6 @@
          </artifact>
          <artifact name="localbroadcastmanager-1.0.0.pom">
             <sha256 value="a000041f5a1f79283c5175e1bb60cf3683780f401c6a9d34fbe9751253fa6ff9" origin="OpenTasker: Google Maven direct artifact SHA-256 (no upstream .sha256/.asc)" reason="Artifact is not signed" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-common" version="2.9.8">
-         <artifact name="navigation-common-2.9.8.module">
-            <sha256 value="adab1425bc91fbd981aa5772954da88fb190124ec69f6ca9104ff2f41489e1f5" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-common-android" version="2.9.8">
-         <artifact name="navigation-common-android-2.9.8.module">
-            <sha256 value="5411f8e2d7272ff88c3ef940bf0ddec86d76c3a0d102731caae10948a47062e1" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-common-release.aar">
-            <sha256 value="d43832772012afa0d5c71d03153aef764f1c5f683fe7605f0db77cada8515102" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-common-jvmstubs" version="2.9.8">
-         <artifact name="navigation-common-jvmstubs-2.9.8.jar">
-            <sha256 value="bae2ec95b8c2be2b412e60773ba966d8fae97e1ae580efc5e1e7ae2c91900922" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-common-jvmstubs-2.9.8.module">
-            <sha256 value="62625991fad1d02f921863c1befb999f3099849beb7f73a6beec49d077114c28" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-compose" version="2.9.8">
-         <artifact name="navigation-compose-2.9.8.module">
-            <sha256 value="3eecf2891baf677f6afbbaf34e78a251ed45391b1a2ef26cb232847c44d84241" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-compose-android" version="2.9.8">
-         <artifact name="navigation-compose-android-2.9.8.module">
-            <sha256 value="80b58c8979a7102e9892dfb6535f15d975680293d907ce4e29c3d51272ea3bfb" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-compose-release.aar">
-            <sha256 value="53dccc442276cde3898751f53fcc869f335340fd677fb1ca5c6c0abc0575d180" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-compose-jvmstubs" version="2.9.8">
-         <artifact name="navigation-compose-jvmstubs-2.9.8.jar">
-            <sha256 value="92daf3247dc07817f4eb028bec8196d4a2e9759487570724b941f265ef172f25" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-compose-jvmstubs-2.9.8.module">
-            <sha256 value="f883d58d73cfa273a6f31ece38bf227fd9846929cea5f6c70e5d36c0514e178b" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-runtime" version="2.9.8">
-         <artifact name="navigation-runtime-2.9.8.module">
-            <sha256 value="e8756d7ffc74540a11c46da3b54fd87c273d48b5ccf7d195cf0b658599335fe4" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-runtime-android" version="2.9.8">
-         <artifact name="navigation-runtime-android-2.9.8.module">
-            <sha256 value="b789db6133677bb7ab0ba138336194dde0de4815a1fff0e7c66130a0377fdd4d" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-runtime-release.aar">
-            <sha256 value="7d741a3b0a299a8c8990712009c63bfca8d52d060afe8f5ad9c200619f113237" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-      </component>
-      <component group="androidx.navigation" name="navigation-runtime-jvmstubs" version="2.9.8">
-         <artifact name="navigation-runtime-jvmstubs-2.9.8.jar">
-            <sha256 value="28a68c1219cd2111f34700784b89f8e652cdb655893b7217474685b57538e4e8" origin="OpenTasker: Google Maven published .sha256" />
-         </artifact>
-         <artifact name="navigation-runtime-jvmstubs-2.9.8.module">
-            <sha256 value="9b5857ecd804271709ac5ba23e2604fe82fc6067c3b8f21751e2110247fe8a88" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.navigationevent" name="navigationevent" version="1.0.0">
