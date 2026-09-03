@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.charts.PaletteCheck
 import com.opentasker.ui.charts.LocalBandLanguage
+import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.NoteText
 
 /** 1 is best, 5 is worst — settled 2026-08-12 and never re-ordered. */
@@ -57,6 +58,9 @@ fun HuaweiMorningCard(
     felt: Int?,
     nightLabel: String?,
     onFelt: (Int) -> Unit,
+    /** This morning's written note, and the way to open its editor. See [NotePill]. */
+    note: String? = null,
+    onNote: (() -> Unit)? = null,
     /** Nights on record and how many are rated — the register, folded into this same pill. */
     nights: Int = 0,
     rated: Int = 0,
@@ -129,6 +133,18 @@ fun HuaweiMorningCard(
             }
         }
         NoteText(HuaweiText.morningScale[lang])
+
+        // The sentence the digit cannot hold (白い熊, 2026-09-02). Inside this card rather than
+        // anywhere else on the page because it answers the same question at the same moment: by the
+        // time the reason for a bad night is worth having written down, it has already been
+        // forgotten. It sits UNDER the scale hint, not between the numbers and their explanation,
+        // so the rating still reads as one uninterrupted control.
+        //
+        // Faded and optional by design — see [NotePill]. The rating is what must be answered every
+        // morning; this is what may be.
+        if (onNote != null) {
+            NotePill(note = note, onClick = onNote)
+        }
 
         // 「あらゆる夜と運動」 lives inside this pill (白い熊, 2026-08-23) — the register is the
         // ledger this rating is filed into, so the question and the record it answers into are one

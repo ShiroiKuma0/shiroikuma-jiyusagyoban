@@ -36,6 +36,19 @@ class BandStringsTest {
         }
         SleepShape.ROWS.forEach { add("stage.$it" to SleepShape.labelOf(it)) }
         add("stage.unknown" to SleepShape.labelOf('4'))
+        // The annotation chrome is shared by both reports and by the walks window, so it is walked
+        // here rather than three times over.
+        listOf(
+            "annotation.note" to AnnotationText.note,
+            "annotation.noteAdd" to AnnotationText.noteAdd,
+            "annotation.noteBlankDeletes" to AnnotationText.noteBlankDeletes,
+            "annotation.save" to AnnotationText.save,
+            "annotation.cancel" to AnnotationText.cancel,
+            "annotation.own" to AnnotationText.own,
+            "annotation.stops" to AnnotationText.stops,
+            "annotation.stopsAsk" to AnnotationText.stopsAsk,
+            "annotation.stopsClear" to AnnotationText.stopsClear,
+        ).forEach(::add)
     }
 
     @Test
