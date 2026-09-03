@@ -259,17 +259,36 @@ object SceneOverlayManager {
                 // (mis)reported content area on some foldables (Huawei folded), leaving a gap under the
                 // status bar. Pinning TOP|START at the real size covers the whole screen, edge to edge.
                 val real = realMetrics(wm)
+                // The card's own size in pixels — asked for EXPLICITLY, never WRAP_CONTENT.
+                //
+                // A WRAP_CONTENT window is not measured at the screen width: ViewRootImpl.measureHierarchy
+                // first measures the content against `config_prefDialogWidth` (320dp on this device, the
+                // AOSP default) so a dialog does not stretch across a wide screen, and keeps that width
+                // unless the view reports MEASURED_STATE_TOO_SMALL. A ComposeView never sets that bit —
+                // `Modifier.size()` silently COERCES into the constraints it is handed — so the trial
+                // measurement always "fits" and the window stays 320dp wide, whatever the scene asks for.
+                // The 380dp 衛星予測 画面 therefore came up as a 320dp card on a 413dp screen: the title
+                // sat off-centre, the Generate/Close buttons ran off the right edge, and the WebView's
+                // right-aligned progress count (2193/3500) was cut in half by the card's own clip
+                // (白い熊, 2026-09-02). The height was never affected — the heuristic is width-only.
+                //
+                // Every non-modal branch below draws a card of a KNOWN size, so there is nothing to wrap:
+                // fullWidth/widthFraction fix the width and keep `heightDp`, heightFraction fixes the
+                // height and keeps `widthDp`, and the plain HUD is `Modifier.size(widthDp, heightDp)`.
+                val density = app.resources.displayMetrics.density
+                val cardW = (scene.widthDp.coerceAtLeast(1) * density).toInt()
+                val cardH = (scene.heightDp.coerceAtLeast(1) * density).toInt()
                 WindowManager.LayoutParams(
                     when {
                         fullscreen -> real.widthPixels
                         fullWidth -> WindowManager.LayoutParams.MATCH_PARENT
                         widthFraction > 0f -> (widthFraction * real.widthPixels).toInt()
-                        else -> WindowManager.LayoutParams.WRAP_CONTENT
+                        else -> cardW
                     },
                     when {
                         fullscreen -> real.heightPixels
                         heightFraction > 0f -> (heightFraction * real.heightPixels).toInt()
-                        else -> WindowManager.LayoutParams.WRAP_CONTENT
+                        else -> cardH
                     },
                     type,
                     // On the accessibility overlay the bottom bar stays NOT_FOCUSABLE (it captures the
