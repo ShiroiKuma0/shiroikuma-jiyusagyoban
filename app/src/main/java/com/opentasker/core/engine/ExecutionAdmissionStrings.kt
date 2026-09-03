@@ -100,16 +100,22 @@ private object EnglishExecutionAdmissionStrings : ExecutionAdmissionStrings {
 
     override fun tripReason(reason: String): String = "Trip reason: $reason"
 
-    override fun globalActive(limit: String): String = "Global execution limit reached ($limit active)."
+    // Kept in step with the admission_reason_* resources. These are the values the run log
+    // interpolates into "Held because: ...", so when the label was rewritten in plain language
+    // and these were not, the user read a plain sentence ending in engine vocabulary.
 
-    override fun profileActive(limit: String): String = "Profile execution limit reached ($limit active)."
+    override fun globalActive(limit: String): String =
+        "The app-wide limit on runs at once is full ($limit running)."
 
-    override fun globalBurst(): String = "Burst limit exceeded (the global window)."
+    override fun profileActive(limit: String): String =
+        "This profile is already running as many times as it may ($limit)."
 
-    override fun profileBurst(): String = "Burst limit exceeded (the per-profile window)."
+    override fun globalBurst(): String = "Too many runs started at once, app-wide."
+
+    override fun profileBurst(): String = "Too many runs of this profile started at once."
 
     override fun globalAndProfileBurst(): String =
-        "Burst limit exceeded (global and per-profile windows)."
+        "Too many runs started at once, both app-wide and for this profile."
 
     override fun counts(
         activeGlobal: Int,
@@ -120,10 +126,10 @@ private object EnglishExecutionAdmissionStrings : ExecutionAdmissionStrings {
         globalBurstLimit: String,
         profileBurst: Int,
         profileBurstLimit: String,
-    ): String = "Counts: active global=$activeGlobal/$globalActiveLimit, " +
-        "profile=$activeProfile/$profileActiveLimit; " +
-        "burst global=$globalBurst/$globalBurstLimit, " +
-        "profile=$profileBurst/$profileBurstLimit."
+    ): String = "Running now: $activeGlobal of $globalActiveLimit app-wide, " +
+        "$activeProfile of $profileActiveLimit for this profile. " +
+        "Started at once: $globalBurst of $globalBurstLimit app-wide, " +
+        "$profileBurst of $profileBurstLimit for this profile."
 
-    override fun previewAvailable(): String = "Admission budget is available (preview only)."
+    override fun previewAvailable(): String = "There is room to run right now (preview only)."
 }

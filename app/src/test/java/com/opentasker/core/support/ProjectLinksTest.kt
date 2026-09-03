@@ -89,7 +89,12 @@ class ProjectLinksTest {
     fun `settings reaches the about card and the about card reaches these links`() {
         val settings = ProductionSources.read("com/opentasker/ui/screens/PermissionOnboardingScreen.kt")
 
-        val settingsOnlyBranch = settings.substringAfter("if (settingsOnly) {")
+        // Bounded at the sibling branch. Reading to end of file swept in AboutCard's own
+        // declaration, so the assertion passed even with the call site deleted: exactly the
+        // "link nothing opens" failure it is here to catch.
+        val settingsOnlyBranch = settings
+            .substringAfter("if (settingsOnly) {")
+            .substringBefore("if (!settingsOnly)")
         assertTrue("Settings must list the About card", "AboutCard(" in settingsOnlyBranch)
         assertTrue(
             "About must offer the repository, releases and licence links",

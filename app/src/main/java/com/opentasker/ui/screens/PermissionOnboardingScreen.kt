@@ -621,11 +621,7 @@ fun PermissionOnboardingScreen(
             }
             item { SettingsSectionLabel(stringResource(R.string.settings_section_about)) }
             item {
-                AboutCard(
-                    onOpenLink = { url ->
-                        openSettingsIntent(context, Intent(Intent.ACTION_VIEW, Uri.parse(url)), onMessage)
-                    },
-                )
+                AboutCard(onOpenLink = { url -> openExternalLink(context, url, onMessage) })
             }
         }
 
@@ -1988,6 +1984,25 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/**
+ * Opens a public project link in a browser.
+ *
+ * Deliberately not [openSettingsIntent]: that reports a missing handler as "Settings screen is
+ * unavailable on this device", which is the wrong sentence entirely when what failed was a link
+ * to the repository.
+ */
+private fun openExternalLink(context: Context, url: String, onMessage: (String) -> Unit) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (ex: ActivityNotFoundException) {
+        AppLogger.warn("OpenTasker.Setup", "No activity can open an external link", ex)
+        onMessage(context.getString(R.string.setup_link_unavailable))
+    } catch (ex: SecurityException) {
+        AppLogger.warn("OpenTasker.Setup", "Opening an external link was denied", ex)
+        onMessage(context.getString(R.string.setup_link_unavailable))
+    }
 }
 
 private fun openSettingsIntent(context: Context, intent: Intent, onMessage: (String) -> Unit) {

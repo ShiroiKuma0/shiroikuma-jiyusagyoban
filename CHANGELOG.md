@@ -19,9 +19,9 @@
   longer means running everything above it first. The run appears in the run log
   under its own name. Flow-control markers are not offered, because an "if"
   without its "end if" is not a smaller task.
-- Settings has an About section: the version and build you are running, links to
-  the source, the release notes and the licence, and a "Report a problem" button
-  that opens a new issue with your app version, Android version and device
+- Settings has an About section. It shows the version and build you are running,
+  links out to the source, the release notes and the licence, and offers a
+  "Report a problem" button that opens a new issue with your build and device
   already filled in.
 - The Diagnostics screen can copy its redacted report to the clipboard. Sharing
   it opened a chooser, which is awkward when what you want is to paste it into a

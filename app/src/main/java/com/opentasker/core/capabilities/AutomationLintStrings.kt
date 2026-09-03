@@ -212,8 +212,11 @@ private object EnglishAutomationLintStrings : AutomationLintStrings {
         profileNames: String,
         forbiddenWriteKey: String,
     ): AutomationLintCopy = AutomationLintCopy(
-        title = "Invariant violation",
-        detail = "Invariant $invariantName ($guard) may be violated by $profileNames writing $forbiddenWriteKey.",
-        suggestedFix = "Disable or constrain the violating profile, or revise the invariant if the write is intentional.",
+        // Kept in step with automation_lint_invariant_violation_* in strings.xml. Two copies of
+        // the same user-facing copy drifted apart once already: the 2026-09-03 plain-language
+        // pass rewrote the resources and left this default serving the old jargon.
+        title = "A watched setting could be changed",
+        detail = "Your rule $invariantName ($guard) watches a setting that $profileNames may change by writing $forbiddenWriteKey.",
+        suggestedFix = "Turn that profile off or narrow when it runs. If the change is deliberate, edit the rule instead.",
     )
 }

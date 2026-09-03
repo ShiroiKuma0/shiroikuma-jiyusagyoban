@@ -173,7 +173,8 @@ class ExecutionAdmissionControllerTest {
         val preview = controller.preview(profileId = 7L)
 
         assertFalse(preview.accepted)
-        assertTrue(preview.reason.orEmpty().contains("Profile execution limit"))
+        // Moved to the new spelling by the 2026-09-03 plain-language pass, not loosened.
+        assertTrue(preview.reason.orEmpty().contains("This profile is already running as many times as it may"))
         lease?.release()
     }
 
@@ -193,7 +194,7 @@ class ExecutionAdmissionControllerTest {
         assertFalse(activeRejected.accepted)
         assertEquals(ExecutionAdmissionRejectionKind.PROFILE_ACTIVE, activeRejected.rejection?.kind)
         assertEquals(1, activeRejected.rejection?.counts?.activeProfile)
-        assertTrue(activeRejected.reason.orEmpty().contains("active global=1/2"))
+        assertTrue(activeRejected.reason.orEmpty().contains("Running now: 1 of 2 app-wide"))
         first.lease?.release()
 
         repeat(1) {
@@ -205,7 +206,8 @@ class ExecutionAdmissionControllerTest {
         assertFalse(burstRejected.accepted)
         assertEquals(ExecutionAdmissionRejectionKind.PROFILE_BURST, burstRejected.rejection?.kind)
         assertEquals(2, burstRejected.rejection?.counts?.profileBurst)
-        assertTrue(burstRejected.reason.orEmpty().contains("profile=2/2"))
+        val burstReason = burstRejected.reason.orEmpty()
+        assertTrue(burstReason, burstReason.substringAfter("Started at once: ").contains("2 of 2 for this profile"))
     }
 
     @Test
@@ -227,7 +229,7 @@ class ExecutionAdmissionControllerTest {
         val state = controller.snapshot().circuits[7L]
         assertNotNull(state)
         assertTrue(state!!.openUntilMs > clock.now())
-        assertTrue(state.lastReason.orEmpty().contains("per-profile"))
+        assertTrue(state.lastReason.orEmpty().contains("Too many runs of this profile started at once"))
         assertEquals(2, state.strikeCount)
     }
 }
