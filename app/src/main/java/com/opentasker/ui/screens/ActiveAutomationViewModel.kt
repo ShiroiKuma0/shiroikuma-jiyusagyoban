@@ -1766,6 +1766,17 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * Runs one backup, export, or restore-staging step with the Setup card held busy.
+     *
+     * Unlike the import/export lanes this one is deliberately **not** cancellable, and the Setup
+     * card offers no Stop for it. Every local write already stages into a temporary file, validates
+     * it, and publishes it atomically, so a stopped write would gain nothing over a finished one.
+     * The write that leaves app-private storage is the SAF export, and a document provider gives
+     * no way to put back what opening the destination for writing already truncated. The defect
+     * this lane actually had was a UI that stayed busy forever when an operation ended early, which
+     * the `finally` below fixes. See `docs/DECISIONS.md` and `BackupCancellationContractTest`.
+     */
     private fun launchBackupOperation(block: suspend () -> Unit) {
         viewModelScope.launch {
             _backupSetupState.value = _backupSetupState.value.copy(busy = true)
