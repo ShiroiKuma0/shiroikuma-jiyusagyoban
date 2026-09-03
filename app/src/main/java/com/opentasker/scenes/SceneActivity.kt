@@ -352,7 +352,20 @@ internal fun SceneOverlay(
             }
         }
     } else {
-        SceneCard(scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen, fillHeight = fillHeight, fillWidth = fillWidth, onRunTask = onRunTask, onSetVar = onSetVar)
+        SceneCard(
+            scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen,
+            fillHeight = fillHeight, fillWidth = fillWidth,
+            // A tap-through panel's WINDOW is routinely far larger than anything it draws: fullWidth
+            // stretches it to the whole screen (音量パネル's five sliders are right-anchored inside it,
+            // so most of that width is empty), fillHeight/fillWidth to a screen fraction, and a HUD's
+            // card background is normally fully transparent anyway. The window is touchable, so every
+            // tap in that invisible margin was swallowed — it neither dismissed the panel nor reached
+            // the app underneath, and the panel then sat there until its timeout. Only a tap that
+            // missed the window entirely ever arrived, as ACTION_OUTSIDE.
+            // So a tap the elements did not take counts as the outside tap it looks like.
+            onBackgroundTap = onDismiss.takeIf { dismissOnOutside },
+            onRunTask = onRunTask, onSetVar = onSetVar,
+        )
     }
 }
 
@@ -365,6 +378,7 @@ private fun SceneCard(
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
     fillWidth: Boolean = false,
+    onBackgroundTap: (() -> Unit)? = null,
     onRunTask: (String) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
 ) {
@@ -372,6 +386,7 @@ private fun SceneCard(
     val sh = scene.heightDp.coerceAtLeast(1)
     val shape = RoundedCornerShape((scene.cornerRadiusDp.coerceAtLeast(0) * scale).dp)
     val borderW = scene.borderWidth.coerceAtLeast(0)
+    val backgroundInteraction = remember { MutableInteractionSource() }
     Box(
         Modifier
             // fullscreen (e.g. the music edge-light): cover the whole screen. fullWidth: span the
@@ -390,7 +405,16 @@ private fun SceneCard(
             .background(sceneColor(scene.bgColor) ?: MaterialTheme.colorScheme.background)
             .then(if (borderW > 0) Modifier.border((borderW * scale).dp, sceneColor(scene.borderColor) ?: MaterialTheme.colorScheme.outline, shape) else Modifier)
             // Modal: absorb taps so tapping the card (not the scrim) doesn't dismiss.
-            .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier),
+            .then(if (absorbTaps) Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {} else Modifier)
+            // Tap-through panel with "Tap outside closes": the card's own empty area is outside the
+            // panel as far as the eye is concerned. An element that handles the touch consumes it
+            // first (children are offered the main pass before their parent), so this fires only
+            // where nothing was hit — never on a slider, a button or a text cell.
+            .then(
+                if (onBackgroundTap != null)
+                    Modifier.clickable(interactionSource = backgroundInteraction, indication = null) { onBackgroundTap() }
+                else Modifier,
+            ),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val cardWidthDp = maxWidth.value  // the card's actual width in dp (= the real screen width when fullWidth)
