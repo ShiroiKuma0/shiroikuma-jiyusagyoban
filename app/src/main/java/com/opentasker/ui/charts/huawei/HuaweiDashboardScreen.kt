@@ -71,6 +71,14 @@ import java.time.format.DateTimeFormatter
 /** The key the sleep card opens under — it has no MetricSpec of its own. */
 const val SLEEP_KEY = "hw:sleep"
 
+/**
+ * The 機能訓練 page's own key in the same `selected` slot the metric detail screens use.
+ *
+ * Prefixed like every other Huawei key so a deep link can name it and it cannot collide with a Hume
+ * one — see `HuaweiKeys` for why that prefix is permanent.
+ */
+const val REHAB_KEY = "hw:rehab"
+
 @Composable
 fun HuaweiDashboardScreen(
     state: HuaweiDashboardState,
@@ -79,7 +87,12 @@ fun HuaweiDashboardScreen(
     onSync: () -> Unit,
     onOpenMetric: (String) -> Unit,
     onFelt: (Int) -> Unit = {},
+    /** Open the note editor for the morning the card is asking about. */
+    onNote: () -> Unit = {},
     onOpenRegister: () -> Unit = {},
+    /** 機能訓練: tick a day of the cut-out, or open the full calendar. */
+    onTapRehabDay: (Long) -> Unit = {},
+    onOpenRehab: () -> Unit = {},
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -108,6 +121,8 @@ fun HuaweiDashboardScreen(
                     felt = state.felt,
                     nightLabel = state.feltMorning?.toString(),
                     onFelt = onFelt,
+                    note = state.feltNote,
+                    onNote = onNote,
                     // Both counts from the SAME list, so the share can never exceed the whole.
                     nights = state.nights.size,
                     rated = state.register?.rows?.count { it.felt != null } ?: 0,
@@ -115,6 +130,27 @@ fun HuaweiDashboardScreen(
                     onOpenRegister = onOpenRegister,
                 )
             }
+        }
+
+        // 機能訓練, directly under the morning rating (白い熊, 2026-09-03). The two belong together:
+        // both are things only 白い熊 can answer, both are answered once a day, and both are worth
+        // nothing if the day passes unanswered. Everything below them is what the band measured.
+        item("rehab") {
+            val zone = remember { java.time.ZoneId.systemDefault() }
+            val today = remember(zone) { java.time.LocalDate.now(zone) }
+            val from = remember(today) { rehabCutoutStart(today).toEpochDay() }
+            val to = remember(today) { today.toEpochDay() }
+            HuaweiRehabCard(
+                days = rehabCells(from, to, state.rehabDays, state.rehabNotes),
+                zone = zone,
+                doneCount = (from..to).count {
+                    com.opentasker.core.band.RehabLog.dateKeyOf(java.time.LocalDate.ofEpochDay(it)) in
+                        state.rehabDays
+                },
+                totalDays = (to - from + 1).toInt(),
+                onTapDay = onTapRehabDay,
+                onOpen = onOpenRehab,
+            )
         }
 
         state.recovery?.let { rec ->
