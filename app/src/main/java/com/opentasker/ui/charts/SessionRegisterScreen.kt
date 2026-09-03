@@ -484,6 +484,25 @@ private fun ReferenceBandsPanel() {
             InfoBody(BandText.bandsHrCaveat[lang])
         }
 
+        // The night table's other four graded columns. Two are published ladders with real caveats
+        // worth stating, and three share one reason for being within-person instead — so the panel
+        // is arranged by the ARGUMENT rather than one section per column, which would have repeated
+        // that reason three times.
+        BandSection(BandText.bandsLowTitle[lang]) {
+            InfoBody(BandText.bandsLowWhy[lang])
+            InfoBody(BandText.bandsLowCaveat[lang])
+        }
+
+        BandSection(BandText.bandsSpo2Title[lang]) {
+            InfoBody(BandText.bandsSpo2Why[lang])
+            InfoBody(BandText.bandsSpo2Caveat[lang])
+        }
+
+        BandSection(BandText.bandsWithinTitle[lang]) {
+            InfoBody(BandText.bandsWithinWhy[lang])
+            InfoBody(BandText.bandsNotCounted[lang], bold = true)
+        }
+
         BandSection(BandText.bandsTempTitle[lang]) {
             InfoBody(BandText.bandsTempNoBand[lang], bold = true)
             InfoBody(BandText.bandsTempWhy[lang])
