@@ -152,7 +152,7 @@
          <trusted-key id="E7DC75FC24FB3C8DFE8086AD3D5839A2262CBBFB" group="org.jetbrains.kotlinx" />
          <trusted-key id="EB1B3DE71713C9EC2E87CC26EE92349AD86DE446" group="com.google.j2objc" name="j2objc-annotations" version="2.8" />
          <trusted-key id="EE0CA873074092F806F59B65D364ABAA39A47320" group="com.google.errorprone" />
-         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9" group="org.jsoup" name="jsoup" version="1.23.1" />
+         <trusted-key id="F3184BCD55F4D016E30D4C9BF42E87F9665015C9" group="org.jsoup" name="jsoup" version="1.23.2" />
          <trusted-key id="FA77DCFEF2EE6EB2DEBEDD2C012579464D01C06A" group="org.apache" name="apache" />
          <trusted-key id="FA7929F83AD44C4590F6CC6815C71C0A4E0B8EDD" group="net.java.dev.jna" />
          <trusted-key id="FAABC3738B1F58DA2D776FA2EB380DC13C39F675" group="com.intellij" name="annotations" version="12.0" />
@@ -7853,12 +7853,12 @@
             <sha256 value="54fab990a0ef56297088c252213fa83394fafcefa516059044c09e3a8e05e552" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
-      <component group="org.jsoup" name="jsoup" version="1.23.1">
-         <artifact name="jsoup-1.23.1.jar">
-            <sha256 value="8b15e2b28eeb1e0a88a9b7dab4dc0c23524491c56959785dea22f7846897b668" origin="OpenTasker: Maven Central published .sha256" />
+      <component group="org.jsoup" name="jsoup" version="1.23.2">
+         <artifact name="jsoup-1.23.2.jar">
+            <sha256 value="e9d8c856856680427f096d156f02a414289985c930998fcb519ce5be39b42003" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
-         <artifact name="jsoup-1.23.1.pom">
-            <sha256 value="10faba526d66760cf3a57176636976cc78865935e94faddbf1637f3cce64c21b" origin="OpenTasker: Maven Central published .sha256" />
+         <artifact name="jsoup-1.23.2.pom">
+            <sha256 value="3ff28beafd484e9c345e0749d697d2aa31f29ace54b5d4da4e8375e6d8fe1802" origin="OpenTasker: Maven Central published .sha256" />
          </artifact>
       </component>
       <component group="org.jspecify" name="jspecify" version="1.0.0">
