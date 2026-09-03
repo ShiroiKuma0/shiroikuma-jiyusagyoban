@@ -347,6 +347,14 @@ dependencies {
             version { strictly(libs.versions.kotlin.get()) }
             because("The stdlib must match the pinned Kotlin version and its recorded checksum.")
         }
+        // Compose UI 1.11.4 depended on androidx.transition and pulled the instrumentation graph
+        // up to 1.6.0. Compose 1.12.0 dropped that dependency, so the only remaining requester is
+        // an old accessibility-test-framework chain asking for 1.2.0 - a 2019 artifact published
+        // before Google Maven signed or checksummed anything. Hold the graph where it already was.
+        androidTestImplementation(libs.androidx.transition) {
+            version { require(libs.versions.androidxTransition.get()) }
+            because("Instrumentation must not silently fall back to an unsigned 2019 transition build.")
+        }
     }
     implementation(project(":core:common"))
     implementation(project(":core:model"))

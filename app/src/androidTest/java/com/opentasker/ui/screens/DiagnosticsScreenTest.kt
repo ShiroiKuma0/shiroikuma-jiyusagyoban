@@ -25,8 +25,9 @@ class DiagnosticsScreenTest {
     val composeTestRule = createAccessibilityComposeRule()
 
     @Test
-    fun healthCrashesLogsAndShareActionAreReachable() {
+    fun healthCrashesLogsAndTheShareAndCopyActionsAreReachable() {
         val shared = AtomicBoolean(false)
+        val copied = AtomicBoolean(false)
         val state = DiagnosticsUiState(
             health = EngineHealthStatus(
                 serviceRunning = true,
@@ -50,6 +51,7 @@ class DiagnosticsScreenTest {
                     contentPadding = PaddingValues(0.dp),
                     onRefresh = {},
                     onShare = { shared.set(true) },
+                    onCopy = { copied.set(true) },
                 )
             }
         }
@@ -58,6 +60,8 @@ class DiagnosticsScreenTest {
         composeTestRule.onNodeWithText("Engine healthy").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Share redacted report").performClick()
         assertTrue(shared.get())
+        composeTestRule.onNodeWithContentDescription("Copy redacted report").performClick()
+        assertTrue(copied.get())
         composeTestRule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText("crash-test.txt", substring = true))
         composeTestRule.onNodeWithText("crash-test.txt", substring = true).assertIsDisplayed()

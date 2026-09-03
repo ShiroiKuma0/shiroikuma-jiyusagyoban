@@ -43,6 +43,9 @@ class ReleaseTruthContractTest {
         assertTableValue(readme, "Room", catalogVersion(versions, "room"))
         assertTableValue(readme, "Compose BOM", catalogVersion(versions, "composeBom"))
         assertTableValue(readme, "WorkManager", catalogVersion(versions, "work"))
+        // The Macrobenchmark row was asserted by nothing until 2026-09-03, so the rc01 to rc02
+        // bump could have shipped a stale README claim in silence.
+        assertTableValue(readme, "Macrobenchmark", catalogVersion(versions, "benchmark"))
 
         val dependencyDoc = optionalCurrentDoc("docs/DEPENDENCY_MODERNIZATION.md", "## Batch Log")
         if (dependencyDoc != null) {

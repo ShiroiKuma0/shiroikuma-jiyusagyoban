@@ -4,6 +4,9 @@
 
 ### Security
 
+- Updated jsoup to 1.23.2, which fixes a denial of service in its XML parser
+  (CVE-2026-75140). OpenTasker only ever fed that library HTML, so nothing here
+  could reach the affected code, and a build check keeps it that way.
 - A release build that is meant to be signed now fails when the signing
   variables are missing, instead of quietly producing an unsigned APK. Staging
   a release asset also verifies the APK really carries a signature, so an
