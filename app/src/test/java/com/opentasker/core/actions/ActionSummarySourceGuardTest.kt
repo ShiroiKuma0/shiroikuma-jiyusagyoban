@@ -68,9 +68,11 @@ class ActionSummarySourceGuardTest {
             .findAll(metadata)
             .map { it.groupValues[1] }
             .toList()
-        val declaration = metadata
-            .substringAfter("private fun declaredActionSummaryRes")
-            .substringBefore("else -> error")
+        val declaration = ProductionSources.block(
+            "com/opentasker/core/actions/ActionMetadata.kt",
+            "private fun declaredActionSummaryRes",
+            "else -> error",
+        )
 
         assertEquals("Built-in action IDs must be unique", actionIds.size, actionIds.toSet().size)
         val missing = actionIds.filterNot { id -> "\"$id\"" in declaration }

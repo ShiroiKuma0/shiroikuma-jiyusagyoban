@@ -84,18 +84,22 @@ class SingleActionRunTest {
      */
     @Test
     fun `the action menu offers the run option only for runnable actions`() {
-        val lists = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationLists.kt")
-
-        val guarded = lists.substringAfter("if (SingleActionRun.isRunnableAlone(action)) {")
-            .substringBefore("DropdownMenuItem(\n                        text = { Text(stringResource(R.string.action_delete)) }")
+        val guarded = ProductionSources.block(
+            "com/opentasker/ui/screens/ActiveAutomationLists.kt",
+            "if (SingleActionRun.isRunnableAlone(action)) {",
+            "DropdownMenuItem(\n                        text = { Text(stringResource(R.string.action_delete)) }",
+        )
         assertTrue("the run option must sit behind the runnable check", "R.string.action_run_alone" in guarded)
         assertTrue("the run option must call back", "onRun()" in guarded)
     }
 
     @Test
     fun `running one action goes through the same execution path as a whole task`() {
-        val viewModel = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
-        val body = viewModel.substringAfter("fun runActionNow(").substringBefore("fun replayHeldRun(")
+        val body = ProductionSources.block(
+            "com/opentasker/ui/screens/ActiveAutomationViewModel.kt",
+            "fun runActionNow(",
+            "fun replayHeldRun(",
+        )
 
         assertTrue("must refuse a stale or flow-control index", "SingleActionRun.taskFor(task, index) ?: return@launch" in body)
         assertTrue("must use the live admission controller", "ExecutionAdmissionRegistry.current(appContext)" in body)

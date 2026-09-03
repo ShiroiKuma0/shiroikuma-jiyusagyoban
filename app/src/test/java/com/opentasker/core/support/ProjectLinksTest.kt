@@ -92,9 +92,11 @@ class ProjectLinksTest {
         // Bounded at the sibling branch. Reading to end of file swept in AboutCard's own
         // declaration, so the assertion passed even with the call site deleted: exactly the
         // "link nothing opens" failure it is here to catch.
-        val settingsOnlyBranch = settings
-            .substringAfter("if (settingsOnly) {")
-            .substringBefore("if (!settingsOnly)")
+        val settingsOnlyBranch = ProductionSources.block(
+            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
+            "if (settingsOnly) {",
+            "if (!settingsOnly)",
+        )
         assertTrue("Settings must list the About card", "AboutCard(" in settingsOnlyBranch)
         assertTrue(
             "About must offer the repository, releases and licence links",
@@ -125,7 +127,11 @@ class ProjectLinksTest {
         assertTrue("Diagnostics must show a copy control", "IconButton(onClick = onCopy)" in screen)
         assertTrue("the copy control must be wired", "onCopy = viewModel::copyDiagnosticReport" in shell)
 
-        val body = viewModel.substringAfter("fun copyDiagnosticReport()").substringBefore("fun shareDiagnosticReport()")
+        val body = ProductionSources.block(
+            "com/opentasker/ui/screens/ActiveAutomationViewModel.kt",
+            "fun copyDiagnosticReport()",
+            "fun shareDiagnosticReport()",
+        )
         assertTrue("copy must build the same redacted report Share sends", "DiagnosticExport.buildReport(" in body)
         assertTrue("copy must reach the clipboard", "setPrimaryClip(" in body)
         assertTrue("copy must confirm to the user", "R.string.ui_message_diagnostics_copied" in body)

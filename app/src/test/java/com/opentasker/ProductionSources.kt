@@ -32,6 +32,27 @@ object ProductionSources {
 
     fun read(packagePath: String): String = path(packagePath).readText()
 
+    /**
+     * The region of a production source between two markers, or a failure naming the missing one.
+     *
+     * `substringAfter` returns the whole receiver when its delimiter is absent, so a gate written
+     * as `read(x).substringAfter(guard).contains(token)` still passes after the guard is deleted:
+     * the slice widens to the entire file and the token is found somewhere else in it. Such a gate
+     * cannot fail on the regression it exists to catch, which is worse than having no gate, because
+     * it reads green. Slice with this instead and the missing marker is the failure.
+     *
+     * [end] is searched from [start] onward, so a marker that also appears earlier in the file
+     * cannot silently invert the region.
+     */
+    fun block(packagePath: String, start: String, end: String): String {
+        val source = read(packagePath)
+        val open = source.indexOf(start)
+        require(open >= 0) { "$packagePath no longer contains the opening marker: $start" }
+        val close = source.indexOf(end, open + start.length)
+        require(close > open) { "$packagePath has no closing marker after the opening one: $end" }
+        return source.substring(open, close)
+    }
+
     /** Every production `.kt` file across all source roots. */
     fun allKotlinFiles(): List<Path> = roots.flatMap { root ->
         Files.walk(root).use { paths ->

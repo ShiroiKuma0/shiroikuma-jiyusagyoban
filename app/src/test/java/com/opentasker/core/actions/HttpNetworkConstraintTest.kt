@@ -94,12 +94,11 @@ class HttpNetworkConstraintTest {
      */
     @Test
     fun `the reader does not decide connectivity from internet reachability`() {
-        val source = ProductionSources.read("com/opentasker/core/actions/NetworkActions.kt")
-        val open = source.indexOf("fun readActiveTransport(")
-        assertTrue("readActiveTransport must exist", open >= 0)
-        val close = source.indexOf("\n}", open)
-        assertTrue("readActiveTransport must have a body", close > open)
-        val body = source.substring(open, close)
+        val body = ProductionSources.block(
+            "com/opentasker/core/actions/NetworkActions.kt",
+            "fun readActiveTransport(",
+            "\n}",
+        )
 
         assertTrue("the reader must report an active network as connected", "connected = true," in body)
         assertTrue(

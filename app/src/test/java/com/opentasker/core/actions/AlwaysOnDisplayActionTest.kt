@@ -45,8 +45,11 @@ class AlwaysOnDisplayActionTest {
     fun aBuildThatIgnoresTheKeyIsReportedAsAFailure() {
         // The behaviour needs a device, so this pins the shape that makes it honest: the value is
         // read before and after, and a value that did not move is a Failure.
-        val source = ProductionSources.read("com/opentasker/core/actions/SettingsActions.kt")
-        val action = source.substringAfter("class AlwaysOnDisplayAction")
+        val action = ProductionSources.block(
+            "com/opentasker/core/actions/SettingsActions.kt",
+            "class AlwaysOnDisplayAction",
+            "internal const val ALWAYS_ON_DISPLAY_KEY",
+        )
 
         assertTrue("The action must read the current value", "readAlwaysOnDisplay(ctx)" in action)
         assertTrue(
