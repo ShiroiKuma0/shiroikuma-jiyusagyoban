@@ -238,6 +238,7 @@ fun ActiveAutomationUi(
     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val unsupportedActionTypeMessage = stringResource(R.string.ui_error_action_type_unsupported)
     val scope = rememberCoroutineScope()
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
     var selectedProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -806,9 +807,7 @@ fun ActiveAutomationUi(
                         // Unknown/unsupported action types (e.g. from an import on a build that
                         // lacks the action) have no editor; tell the user instead of dead-tapping.
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                "This action type isn't supported on this build - remove it or re-import.",
-                            )
+                            snackbarHostState.showSnackbar(unsupportedActionTypeMessage)
                         }
                     }
                 },

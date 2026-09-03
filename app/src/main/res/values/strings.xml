@@ -3,7 +3,7 @@
     <string name="app_name">OpenTasker</string>
     <string name="qs_tile_subtitle_default">Tap to run task</string>
     <string name="qs_tile_config_title">Configure Quick Settings tile</string>
-    <string name="qs_tile_config_subtitle">Bind a task, label, subtitle, and icon for tile slot %1$d.</string>
+    <string name="qs_tile_config_subtitle">Choose the task this tile runs, and how it looks. This is tile %1$d.</string>
     <string name="qs_tile_choose_task">Task</string>
     <string name="qs_tile_task_id">Task ID %1$d</string>
     <string name="qs_tile_no_tasks">Create a task before binding this tile.</string>
@@ -224,11 +224,11 @@
     <string name="profile_max_active_label">Active execution limit</string>
     <string name="profile_max_active_helper">Optional per-profile cap from 1 to 8. Leave blank to inherit the engine default.</string>
     <string name="profile_max_active_invalid">Enter a whole number from 1 to 8, or leave blank.</string>
-    <string name="profile_burst_limit_label">Burst start limit</string>
-    <string name="profile_burst_limit_helper">Optional starts allowed during the burst window, from 1 to 32. Leave blank to inherit.</string>
+    <string name="profile_burst_limit_label">Limit rapid repeats</string>
+    <string name="profile_burst_limit_helper">How many times this profile may start in quick succession, from 1 to 32. Leave blank to use the app-wide setting.</string>
     <string name="profile_burst_limit_invalid">Enter a whole number from 1 to 32, or leave blank.</string>
     <string name="profile_concurrency_inherit_hint">Inherited default</string>
-    <string name="profile_overflow_policy_label">Admission overflow</string>
+    <string name="profile_overflow_policy_label">When the limit is reached</string>
     <string name="profile_overflow_log_title">Log and hold</string>
     <string name="profile_overflow_log_body">Record rejected runs in the Run Log so they can be replayed after capacity returns.</string>
     <string name="profile_overflow_silent_title">Skip silently</string>
@@ -337,8 +337,8 @@
     <string name="setup_item_already_ready">%1$s is already ready.</string>
     <string name="setup_theme_helper_full">Choose the display mode used across navigation, setup, and runtime review surfaces.</string>
     <string name="setup_direct_boot_title">Pre-unlock time triggers</string>
-    <string name="setup_direct_boot_body">Optional and off by default. When enabled, OpenTasker arms only its app-owned minute time trigger before first unlock and queues one time pulse in device-protected storage. Profiles, tasks, your saved data, secrets, and every other trigger family wait until you unlock the device.</string>
-    <string name="setup_direct_boot_enabled">Enabled: one time pulse may be queued before unlock.</string>
+    <string name="setup_direct_boot_body">Optional and off by default. When it is on, the only thing OpenTasker starts before you first unlock the phone is its own once-a-minute clock, and it remembers a single tick in storage the lock screen can reach. Your profiles, tasks, saved data, secrets, and every other kind of trigger wait until you unlock.</string>
+    <string name="setup_direct_boot_enabled">On: one clock tick may be remembered before you unlock.</string>
     <string name="setup_direct_boot_disabled">Disabled: all triggers wait until unlock.</string>
     <string name="setup_backup_helper_full">Create a local database backup, export a copy, or keep encrypted snapshots in a folder you control. Secret variable values remain device-bound and must be re-entered after a transfer.</string>
     <string name="setup_backup_working">Working…</string>
@@ -431,7 +431,7 @@
     <string name="setup_overlay_access_body">Needed for scene overlays and controls displayed over other apps.</string>
     <string name="setup_overlay_access_required_for">Scenes, overlay UI</string>
     <string name="setup_write_settings_title">Modify system settings</string>
-    <string name="setup_write_settings_body">Special access that lets tasks change screen brightness and the screen timeout. Without it both actions fail closed.</string>
+    <string name="setup_write_settings_body">Special access that lets tasks change screen brightness and the screen timeout. Without it, both actions refuse to run rather than half-work.</string>
     <string name="setup_write_settings_required_for">Set brightness, Set screen timeout</string>
     <string name="setup_foreground_location_title">Foreground location</string>
     <string name="setup_foreground_location_body">Needed for live Location contexts and Wi-Fi SSID visibility on modern Android. Approximate access can emit lower-precision fixes; background precision cannot exceed the foreground precision the user grants.</string>
@@ -473,7 +473,7 @@
     <string name="setup_shizuku_status_disabled">Shizuku power mode is disabled by the persisted kill switch.</string>
     <string name="setup_shizuku_status_manager_stopped">Shizuku manager is installed but the service is not running.</string>
     <string name="setup_shizuku_status_permission_needed">Shizuku is running but OpenTasker needs permission.</string>
-    <string name="setup_shizuku_status_transport_unavailable">Shizuku permission is granted, but the privileged user-service transport is unavailable. Elevated actions will fail closed until it returns.</string>
+    <string name="setup_shizuku_status_transport_unavailable">Shizuku has given permission, but OpenTasker cannot reach its helper service. Actions that need elevated access refuse to run until that connection comes back.</string>
     <string name="setup_shizuku_status_ready">Shizuku is active, permission is granted, and a privileged transport is available.</string>
     <string name="setup_termux_title">Termux script bridge</string>
     <string name="setup_termux_status_missing">Termux is not installed.</string>
@@ -495,7 +495,7 @@
     <string name="setup_termux_script_revoked">Approved script removed.</string>
     <string name="setup_termux_script_delete_a11y">Remove approved script %1$s</string>
     <string name="setup_termux_script_hash_value">SHA-256: %1$s</string>
-    <string name="setup_termux_allowlist_empty">No scripts are approved. Script actions fail closed.</string>
+    <string name="setup_termux_allowlist_empty">No scripts are approved yet, so script actions refuse to run.</string>
     <string name="setup_termux_allowlist_full">The 64-script allowlist is full. Remove an entry before adding another.</string>
     <string name="setup_app_visibility_title">App visibility</string>
     <string name="setup_app_visibility_body">Android package visibility limits app lookup. If app selection fails, review app-info permissions and future query filters.</string>
@@ -553,7 +553,7 @@
     <string name="run_log_star">Keep</string>
     <string name="run_log_unstar">Unkeep</string>
     <string name="run_log_kept">Kept</string>
-    <string name="run_log_held_policy">Admission policy: %1$s</string>
+    <string name="run_log_held_policy">Held because: %1$s</string>
     <string name="run_log_export_json">Export JSON</string>
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
@@ -640,21 +640,21 @@
     <string name="automation_lint_action_revert_pair_title">Action/revert pair</string>
     <string name="automation_lint_action_revert_pair_detail">%1$s writes %2$s in both its enter and exit tasks.</string>
     <string name="automation_lint_action_revert_pair_fix">Verify that the exit task restores the intended previous state instead of repeating the enter action.</string>
-    <string name="automation_lint_invariant_violation_title">Invariant violation</string>
-    <string name="automation_lint_invariant_violation_detail">Invariant %1$s (%2$s) may be violated by %3$s writing %4$s.</string>
-    <string name="automation_lint_invariant_violation_fix">Disable or constrain the violating profile, or revise the invariant if the write is intentional.</string>
-    <string name="automation_invariant_panel_title">Device-state invariants</string>
-    <string name="automation_invariant_panel_body">Declare state that enabled profiles must preserve. Diagnostics checks these rules away from the automation engine.</string>
-    <string name="automation_invariant_empty">No invariants declared yet.</string>
-    <string name="automation_invariant_add">Add invariant</string>
-    <string name="automation_invariant_edit">Edit invariant</string>
-    <string name="automation_invariant_delete">Delete invariant</string>
+    <string name="automation_lint_invariant_violation_title">A protected setting could be changed</string>
+    <string name="automation_lint_invariant_violation_detail">Your rule %1$s (%2$s) protects a setting that %3$s changes by writing %4$s.</string>
+    <string name="automation_lint_invariant_violation_fix">Turn that profile off or narrow when it runs. If the change is deliberate, edit the rule instead.</string>
+    <string name="automation_invariant_panel_title">Settings your automations must not change</string>
+    <string name="automation_invariant_panel_body">List the device settings your enabled profiles are not allowed to touch. Diagnostics checks these rules separately, so a mistake shows up as a warning rather than as a surprise.</string>
+    <string name="automation_invariant_empty">No protected settings yet.</string>
+    <string name="automation_invariant_add">Protect a setting</string>
+    <string name="automation_invariant_edit">Edit protected setting</string>
+    <string name="automation_invariant_delete">Stop protecting this setting</string>
     <string name="automation_invariant_guard">Guard: %1$s %2$s %3$s</string>
     <string name="automation_invariant_forbidden_write">Forbidden write: %1$s</string>
-    <string name="automation_invariant_add_title">Add device-state invariant</string>
-    <string name="automation_invariant_edit_title">Edit device-state invariant</string>
+    <string name="automation_invariant_add_title">Protect a device setting</string>
+    <string name="automation_invariant_edit_title">Edit a protected device setting</string>
     <string name="automation_invariant_editor_body">When the guard is true, the selected setting write is reported as a policy violation.</string>
-    <string name="automation_invariant_name_label">Invariant name</string>
+    <string name="automation_invariant_name_label">Name this rule</string>
     <string name="automation_invariant_guard_key_label">Guard state key</string>
     <string name="automation_invariant_operator_value">Operator: %1$s</string>
     <string name="automation_invariant_guard_value_label">Guard value</string>
@@ -664,8 +664,8 @@
     <string name="automation_invariant_validation_guard_key">Use a letter followed by letters, numbers, dots, underscores, colons, or hyphens.</string>
     <string name="automation_invariant_validation_guard_value">Enter a value of at most 96 characters.</string>
     <string name="automation_invariant_validation_write_key">Enter a valid setting key.</string>
-    <string name="automation_invariant_validation_generic">Complete all invariant fields with valid values.</string>
-    <string name="automation_invariant_save">Save invariant</string>
+    <string name="automation_invariant_validation_generic">Fill in every field with a valid value.</string>
+    <string name="automation_invariant_save">Save rule</string>
     <string name="automation_invariant_cancel">Cancel</string>
     <string name="automation_invariant_operator_equals">equals (=)</string>
     <string name="automation_invariant_operator_not_equals">does not equal (!=)</string>
@@ -693,7 +693,7 @@
     <string name="inspector_profile_selector">Profile</string>
     <string name="inspector_profile_selector_content_description">Choose profile</string>
     <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
-    <string name="inspector_profile_concurrency">Active %1$s · Burst %2$s · Overflow: %3$s</string>
+    <string name="inspector_profile_concurrency">Running at once %1$s · Rapid starts %2$s · Over the limit: %3$s</string>
     <string name="profile_concurrency_default">default</string>
     <string name="inspector_profile_expiry">Expires after %1$s</string>
     <string name="inspector_profile_suppressed_title">Profile suppressed</string>
@@ -728,7 +728,7 @@
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
     <string name="import_count_scenes">Scenes</string>
-    <string name="import_count_blueprints">Blueprints</string>
+    <string name="import_count_blueprints">Templates</string>
     <string name="import_count_contexts">Contexts</string>
     <string name="import_count_setup_notes">Setup notes</string>
     <string name="import_count_warnings">Warnings</string>
@@ -892,7 +892,7 @@
     <string name="label_profile_priority">Profile priority %1$d</string>
     <string name="label_profile_grace_seconds">%1$ds grace</string>
     <string name="label_profile_active_limit">Active ≤ %1$d</string>
-    <string name="label_profile_burst_limit">Burst ≤ %1$d</string>
+    <string name="label_profile_burst_limit">Max %1$d rapid starts</string>
     <string name="label_profile_overflow_silent">Overflow silent</string>
     <string name="label_profile_expiry_date">Until %1$s</string>
     <string name="label_more_count">%1$d more</string>
@@ -1003,7 +1003,7 @@
     <string name="flow_accessibility_summary">%1$s: %2$d context(s), %3$d action(s), enter task %4$s, exit task %5$s, %6$s.</string>
     <string name="flow_no_exit_task">no exit task</string>
 
-    <string name="semantic_diff_title">Review semantic changes</string>
+    <string name="semantic_diff_title">Review what actually changed</string>
     <string name="semantic_diff_summary">%1$s across %2$s</string>
     <plurals name="semantic_diff_summary_changes">
         <item quantity="one">%1$d change</item>
@@ -1013,7 +1013,7 @@
         <item quantity="one">%1$d profile</item>
         <item quantity="other">%1$d profiles</item>
     </plurals>
-    <string name="semantic_diff_no_changes">No semantic changes detected.</string>
+    <string name="semantic_diff_no_changes">Nothing that affects how this runs has changed.</string>
     <plurals name="semantic_diff_flow_note">
         <item quantity="one">%1$d flow node is highlighted in Flow.</item>
         <item quantity="other">%1$d flow nodes are highlighted in Flow.</item>
@@ -1047,7 +1047,7 @@
     <string name="semantic_diff_path_lifetime">Lifetime</string>
     <string name="semantic_diff_path_expiry">Expiry</string>
     <string name="semantic_diff_path_maximum_active">Maximum active executions</string>
-    <string name="semantic_diff_path_burst_limit">Burst limit</string>
+    <string name="semantic_diff_path_burst_limit">Rapid-repeat limit</string>
     <string name="semantic_diff_path_overflow_policy">Overflow policy</string>
     <string name="semantic_diff_path_fallback_task">Fallback task</string>
     <string name="semantic_diff_path_action">Action</string>
@@ -1133,11 +1133,11 @@
     <string name="blueprint_input_bounds">%1$s · allowed range %2$s</string>
     <string name="blueprint_section_collapse">Collapse %1$s</string>
     <string name="blueprint_section_expand">Expand %1$s</string>
-    <string name="blueprint_update_review">Blueprint updates are review-only; existing profiles and tasks are never overwritten.</string>
+    <string name="blueprint_update_review">A newer template is only ever shown to you for review. Nothing you already have is overwritten.</string>
     <string name="blueprint_update_versions">%1$s · installed v%2$d → incoming v%3$d</string>
-    <string name="blueprint_update_no_changes">The newer definition produces no semantic changes for this instance.</string>
+    <string name="blueprint_update_no_changes">The newer template would not change anything about how this one runs.</string>
     <string name="blueprint_update_unavailable">This installed instance cannot be compared: %1$s</string>
-    <string name="blueprint_update_changes">Changes from the newer blueprint</string>
+    <string name="blueprint_update_changes">What the newer template would change</string>
     <string name="task_priority_invalid">Enter a value from 0 to 10.</string>
     <string name="profile_enable_after_save_helper">Leave off until contexts and actions are reviewed.</string>
     <string name="profile_cooldown_invalid">Enter seconds as a whole number.</string>
@@ -1202,12 +1202,12 @@
     <string name="diagnostics_share">Share redacted report</string>
     <string name="diagnostics_copy">Copy redacted report</string>
     <string name="diagnostics_engine_health">Engine health</string>
-    <string name="diagnostics_admission_title">Execution admission</string>
-    <string name="diagnostics_admission_status">Admission controller</string>
-    <string name="diagnostics_admission_active">Global active executions</string>
-    <string name="diagnostics_admission_burst">Global burst starts</string>
+    <string name="diagnostics_admission_title">Run limits</string>
+    <string name="diagnostics_admission_status">Limit checks</string>
+    <string name="diagnostics_admission_active">Running now, app-wide</string>
+    <string name="diagnostics_admission_burst">Rapid starts, app-wide</string>
     <string name="diagnostics_admission_count">%1$d / %2$d</string>
-    <string name="diagnostics_admission_profile_active">%1$s active executions</string>
+    <string name="diagnostics_admission_profile_active">%1$s running now</string>
     <string name="diagnostics_admission_circuits">Circuit breakers</string>
     <string name="diagnostics_admission_no_circuits">No tripped circuit state recorded.</string>
     <string name="diagnostics_admission_global">Global circuit</string>
@@ -1230,7 +1230,7 @@
     <string name="admission_reason_profile_burst">Burst limit exceeded (the per-profile window).</string>
     <string name="admission_reason_global_and_profile_burst">Burst limit exceeded (global and per-profile windows).</string>
     <string name="admission_reason_counts">Counts: active global=%1$d/%2$s, profile=%3$d/%4$s; burst global=%5$d/%6$s, profile=%7$d/%8$s.</string>
-    <string name="admission_reason_preview_available">Admission budget is available (preview only).</string>
+    <string name="admission_reason_preview_available">There is room to run right now (preview only).</string>
     <string name="diagnostics_service">Automation service</string>
     <string name="diagnostics_service_running">Running</string>
     <string name="diagnostics_service_stopped">Stopped or heartbeat stale</string>
@@ -1254,10 +1254,10 @@
     <string name="diagnostics_scheduled_work_header">Scheduled work</string>
     <string name="diagnostics_scheduled_work_none">No run recorded yet</string>
     <string name="diagnostics_worker_engine_watchdog">Engine watchdog</string>
-    <string name="diagnostics_worker_run_log_prune">Run log prune</string>
-    <string name="diagnostics_worker_configuration_snapshot">Configuration snapshot</string>
+    <string name="diagnostics_worker_run_log_prune">Run log cleanup</string>
+    <string name="diagnostics_worker_configuration_snapshot">Scheduled backup</string>
     <string name="diagnostics_worker_update_check">Release check</string>
-    <string name="diagnostics_worker_temporary_state_revert">Temporary state revert</string>
+    <string name="diagnostics_worker_temporary_state_revert">Undo temporary changes</string>
     <string name="diagnostics_work_outcome_completed">Finished normally</string>
     <string name="diagnostics_work_outcome_retrying">Failed and will retry</string>
     <string name="diagnostics_work_outcome_failed">Failed and gave up</string>
@@ -1419,12 +1419,13 @@
         <item quantity="one">Cooldown has %1$d second remaining.</item>
         <item quantity="other">Cooldown has %1$d seconds remaining.</item>
     </plurals>
-    <string name="synthetic_trigger_admission_rejected">Admission rejected this run.</string>
+    <string name="synthetic_trigger_admission_rejected">A run limit would have stopped this one.</string>
     <string name="ui_error_bundle_not_recognized">That does not look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code.</string>
     <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
     <string name="ui_error_retention_preview">Retention preview failed</string>
     <string name="ui_error_retention_update">Run log retention update failed</string>
+    <string name="ui_error_action_type_unsupported">This build has no editor for that action. Remove it, or import it again on a build that supports it.</string>
     <string name="ui_error_share_diagnostics">Failed to share diagnostic report</string>
     <string name="ui_error_copy_diagnostics">Failed to copy diagnostic report</string>
     <string name="diagnostics_share_subject">OpenTasker diagnostic report</string>
@@ -1718,7 +1719,7 @@
     <string name="synthetic_trigger_passed">Would match</string>
     <string name="synthetic_trigger_blocked">Blocked</string>
     <string name="synthetic_trigger_cooldown">Cooldown</string>
-    <string name="synthetic_trigger_admission">Admission</string>
+    <string name="synthetic_trigger_admission">Run limits</string>
     <string name="synthetic_trigger_available">Available</string>
     <string name="synthetic_trigger_contexts">Contexts (%1$d)</string>
     <string name="synthetic_trigger_pinned_event">Pinned synthetic event</string>

@@ -58,6 +58,11 @@
 
 ### Changed
 
+- Reworded the parts of the interface that were written in the engine's own
+  vocabulary. Run limits, protected device settings, direct boot, templates, and
+  the background job names now say what they do. "Burst start limit" is "Limit
+  rapid repeats", "Admission overflow" is "When the limit is reached", and three
+  screens that said an action would "fail closed" now say it refuses to run.
 - Taps now play the standard Android click sound, which arrived with the Compose
   update underneath. If you have touch sounds turned off in your phone's Sound
   settings, you will not hear them; OpenTasker follows that setting rather than

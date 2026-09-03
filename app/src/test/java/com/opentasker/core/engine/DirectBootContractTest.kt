@@ -68,18 +68,25 @@ class DirectBootContractTest {
         val strings = repoFile("src/main/res/values/strings.xml").readText()
 
         assertTrue("Setup must expose the direct-boot toggle", "DirectBootSetupCard" in setup)
+        // These pin the disclosure, not the engine's vocabulary. The 2026-09-03 plain-language
+        // pass rewrote the copy: "app-owned minute time trigger" became "its own once-a-minute
+        // clock" and "trigger family" became "kind of trigger". Each assertion moved to the new
+        // spelling rather than being loosened to something both versions would satisfy.
         assertTrue(
-            "Setup must say that only the app-owned minute trigger is covered",
-            "only its app-owned minute time trigger" in strings,
+            "Setup must say that only the app's own minute trigger is covered",
+            "the only thing OpenTasker starts before you first unlock the phone is its own once-a-minute clock" in strings,
         )
-        // Asserts the disclosure, not the library name: users are told "your saved data",
-        // because "Room" is an implementation term that means nothing to them.
+        // Users are told "saved data" because "Room" is an implementation term that means nothing
+        // to them.
         assertTrue(
             "Setup must disclose that saved data waits for unlock",
-            "your saved data" in strings,
+            "saved data, secrets" in strings,
         )
         assertTrue("Setup must disclose that secrets wait for unlock", "secrets" in strings)
-        assertTrue("Setup must say other trigger families wait", "every other trigger family wait" in strings)
+        assertTrue(
+            "Setup must say every other kind of trigger waits",
+            "every other kind of trigger wait until you unlock" in strings,
+        )
     }
 
     private fun repoFile(path: String): File =
