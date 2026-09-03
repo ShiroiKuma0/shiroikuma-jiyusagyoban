@@ -278,6 +278,59 @@ object BandText {
     )
     // Column headings, printed once. The values under them keep their own colour. Prefixed because
     // the day-table further down already owns the bare col* names for a different set of columns.
+    // --- the ⓘ panel's entries for the five columns added 2026-09-03 --------------------------
+    val bandsLowTitle = Loc("Lowest HR", "最低心拍")
+    val bandsLowWhy = Loc(
+        "The lowest per-minute rate recorded between falling asleep and waking — the floor of the "
+            + "night, where Night HR is its level over four hours after onset. Two questions, two "
+            + "numbers.",
+        "寝入ってから起きるまでに記録された毎分の最低値 — 夜の底であり、夜間心拍は寝入って四時間の水準である。"
+            + "問いが二つ、数字も二つ。",
+    )
+    val bandsLowCaveat = Loc(
+        "It rides the SAME published decades as Night HR, deliberately unshifted — inventing a "
+            + "\"sleeping floor\" ladder by subtracting a few beats would be a scale nobody measured. "
+            + "So a green low is a WEAKER claim than a green Night HR: a floor necessarily sits below "
+            + "a level, and the two columns are not to be read as agreeing or disagreeing.",
+        "夜間心拍と同じ公表された十年区分に乗せてある。数拍引いた「睡眠時の底」の尺度を作れば、誰も測っていない"
+            + "物差しになるからである。よって緑の最低心拍は緑の夜間心拍より弱い主張である。底は必ず水準の下にあり、"
+            + "二つの欄は一致・不一致として読むものではない。",
+    )
+    val bandsSpo2Title = Loc("SpO₂", "血中酸素")
+    val bandsSpo2Why = Loc(
+        "The clinical room-air ranges: 96 % and above is normal, 95 % borderline, 91–93 % low, "
+            + "below 91 % hypoxaemia. The median of what the band recorded inside the sleep window.",
+        "臨床の室内気の範囲。96 % 以上が正常、95 % が境界、91–93 % が低い、91 % 未満が低酸素。"
+            + "睡眠時間帯にバンドが記録した値の中央値である。",
+    )
+    val bandsSpo2Caveat = Loc(
+        "A wrist oximeter's error is about TWICE the day–night swing it is measuring, which is why "
+            + "blood oxygen is excluded from the recovery count and always will be. The colour says "
+            + "where the READING sits on the clinical ladder — not how sure anyone should be that the "
+            + "reading is the truth.",
+        "手首の酸素計の誤差は、測っている昼夜差のおよそ二倍ある。血中酸素が回復の数え上げから外されている理由で"
+            + "あり、今後も外れ続ける。色が言うのは読み値が臨床の尺度のどこに乗るかであって、その読み値が真実だと"
+            + "どれだけ確信してよいかではない。",
+    )
+    val bandsWithinTitle = Loc("Deep · Deep+REM · HRV", "深い・深＋レム・心拍変動")
+    val bandsWithinWhy = Loc(
+        "These three are banded against YOUR OWN preceding nights, not against a population range, "
+            + "because no published ladder fits them. This band's \"deep\" is not polysomnography's "
+            + "N3 — these nights run 30–40 % of sleep where the literature is 13–23 % — so an absolute "
+            + "ladder would score every night ever recorded as extreme. RMSSD norms are so "
+            + "age-dependent that a population mean would paint the whole column one colour.",
+        "この三つは公表された範囲ではなく、自分自身の直前の夜に対して段を付けてある。当てはまる公表尺度が無いから"
+            + "である。このバンドの「深い」は睡眠ポリグラフの N3 ではない — ここでの夜は睡眠の 30〜40 % を占め、"
+            + "文献は 13〜23 % である — ので、絶対尺度に掛ければ記録した全ての夜が極端と出る。RMSSD の基準値は"
+            + "年齢依存が強く、母集団平均では欄全体が一色になる。",
+    )
+    val bandsNotCounted = Loc(
+        "None of the five is COUNTED. The headline still counts three markers; a colour here says "
+            + "where a value sits, never that the night was adverse.",
+        "この五つはいずれも数えていない。見出しが数えるのは今も三つの指標である。ここの色は値の位置を言うのみで、"
+            + "その夜が悪かったとは言わない。",
+    )
+
     val regColDate = Loc("Date", "日付")
     val regColFelt = Loc("Woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
