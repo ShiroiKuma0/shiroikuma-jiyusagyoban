@@ -91,6 +91,17 @@ object RecoveryBuild {
         metrics: List<MetricChart>,
         sessions: List<SleepSession>,
         ratings: Map<Long, Int>,
+        /** The written notes, keyed exactly as [ratings] are. Carried straight to the register. */
+        notes: Map<Long, String>,
+        /**
+         * RMSSD windows, already filtered to the ones the band itself would publish.
+         *
+         * A parameter rather than another entry in [metrics] because it is not a charted series and
+         * has no [MetricSpec]: it arrives from the Huawei sample table by storage key. The Hume side
+         * passes nothing and is right to — that band reported a device-state index it CALLED HRV and
+         * never sent a beat-to-beat interval in its life.
+         */
+        hrvPoints: List<ChartPoint> = emptyList(),
         sessions_: List<TrainingSessions.Session>,
         sessionOpen: Boolean,
         localDateOf: (Long) -> Long,
@@ -121,7 +132,9 @@ object RecoveryBuild {
 
         val restingSpot = RecoverySource.restingSpotHr(spotPoints)
         val gridFrom = gridStart(todayEpochDay)
-        val history = nights.map { RecoverySource.metricsFor(it, hrPoints, tempPoints) }
+        val history = nights.map {
+            RecoverySource.metricsFor(it, hrPoints, tempPoints, spo2Points, hrvPoints)
+        }
         // By the night's END: the morning it is filed under. See [ratableMorning].
         val feltFor = { m: RecoverySource.NightMetrics -> ratings[localDateOf(m.endMs)]?.toDouble() }
         val register = SessionRegister.build(
@@ -133,6 +146,7 @@ object RecoveryBuild {
             fromEpochDay = gridFrom,
             toEpochDay = todayEpochDay,
             ratings = ratings,
+            notes = notes,
             dateOfNight = localDateOf,
         )
 
