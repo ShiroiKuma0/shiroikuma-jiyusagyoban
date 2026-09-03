@@ -1,5 +1,6 @@
 package com.opentasker.ui
 
+import com.opentasker.ProductionSources
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.imageio.ImageIO
@@ -89,6 +90,21 @@ class LauncherIconContractTest {
         val manifest = read("app/src/main/AndroidManifest.xml")
         assertFalse("@android:drawable/ic_menu_compass" in manifest)
         assertEquals(4, Regex("android:icon=\"@drawable/ic_notification\"").findAll(manifest).count())
+    }
+
+    @Test
+    fun `no notification borrows a framework drawable for its small icon`() {
+        // The manifest scan above missed SceneOverlayService, which built its foreground
+        // notification in code and shipped the stock compass glyph until 2026-09-03.
+        val offenders = ProductionSources.allKotlinFiles()
+            .map { path -> path to path.readText() }
+            .filter { (_, source) -> Regex("""setSmallIcon\(\s*android\.R\.drawable\.""") in source }
+            .map { (path, _) -> ProductionSources.repoRoot.relativize(path).toString() }
+
+        assertTrue(
+            "Notifications must use the app glyph, not a framework drawable: $offenders",
+            offenders.isEmpty(),
+        )
     }
 
     private fun file(relative: String): Path = repoRoot.resolve(relative)
