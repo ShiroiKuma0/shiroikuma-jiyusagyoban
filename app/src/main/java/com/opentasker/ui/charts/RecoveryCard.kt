@@ -509,6 +509,12 @@ fun markerLabel(m: RecoveryMarker): Loc = when (m) {
     RecoveryMarker.SLEEP -> BandText.markerSleep
     RecoveryMarker.FELT -> BandText.markerFelt
     RecoveryMarker.TEMPERATURE -> BandText.markerTemperature
+    // The display-only three never appear on this card — they exist to colour a night-table cell.
+    // Named here rather than dismissed with an `else` so that a marker added later cannot slip
+    // through unlabelled, which is what an `else` branch in a label function is for.
+    RecoveryMarker.DEEP -> BandText.regColDeep
+    RecoveryMarker.DEEP_REM -> BandText.regColDeepRem
+    RecoveryMarker.HRV -> BandText.regColHrv
 }
 
 fun loadBandLabel(b: LoadBand): Loc = when (b) {
@@ -680,6 +686,15 @@ private fun format(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: 
         }
         RecoveryMarker.TEMPERATURE -> if (unit) String.format("%.1f °C", v) else String.format("%.1f", v)
         RecoveryMarker.FELT -> if (unit) feltLabel(v.roundToInt())[lang] else String.format("%.1f", v)
+        // Deep is a duration like sleep, the restorative share is a percentage, and RMSSD is
+        // milliseconds. Each in the unit it is measured in, for the same reason the others are.
+        RecoveryMarker.DEEP -> {
+            val h = (abs(v) / 60).toInt()
+            val m = (abs(v) % 60).roundToInt()
+            if (lang == BandLanguage.EN) "${h}h ${m.toString().padStart(2, '0')}m" else "${h}時間${m}分"
+        }
+        RecoveryMarker.DEEP_REM -> "${(v * 100).roundToInt()}%"
+        RecoveryMarker.HRV -> if (unit) "${v.roundToInt()} ms" else "${v.roundToInt()}"
     }
 
 /** Same measured-not-guessed column trick as the health index — see `labelColumnWidth` there. */

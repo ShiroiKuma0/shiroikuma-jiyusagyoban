@@ -39,6 +39,25 @@ object RecoverySource {
         val nocturnalHr: Double?,
         val sleepMinutes: Double?,
         val skinTemp: Double?,
+        /**
+         * The band's own staging, and three readings taken over the sleep window.
+         *
+         * **Reported, never scored.** [sleepMinutes] carries the argument at length: consumer
+         * staging runs κ 0.20–0.53 against polysomnography and the single-night limits of agreement
+         * on deep sleep exceed the physiological range of the quantity, so no marker is banded on
+         * these and none ever should be. They are here because 白い熊 asked to see what the band
+         * recorded (2026-09-03), and seeing a figure is not the same as being graded by it.
+         *
+         * [hrvMs] is the exception in kind: RMSSD is a real, standard measure, computed by the band
+         * from its own beat-to-beat intervals and checked against them (see `HuaweiRri`). It is
+         * still not banded, because a within-person HRV baseline needs a stretch of nights this
+         * record does not have yet.
+         */
+        val deepMinutes: Double? = null,
+        val deepRemShare: Double? = null,
+        val lowestHr: Double? = null,
+        val spo2: Double? = null,
+        val hrvMs: Double? = null,
     )
 
     /**
@@ -126,13 +145,44 @@ object RecoverySource {
         session: SleepSession,
         hrPoints: List<ChartPoint>,
         tempPoints: List<ChartPoint>,
+        spo2Points: List<ChartPoint> = emptyList(),
+        /** RMSSD windows — already filtered to the ones the band itself considers publishable. */
+        hrvPoints: List<ChartPoint> = emptyList(),
     ): NightMetrics = NightMetrics(
         startMs = session.startMs,
         endMs = session.endMs,
         nocturnalHr = nocturnalHr(session, hrPoints),
         sleepMinutes = sleepMinutes(session),
         skinTemp = skinTemp(session, tempPoints),
+        // A session with no runs at all has no staging to report, and 0 minutes of deep sleep is a
+        // very different claim from "this night was never staged".
+        deepMinutes = session.deep.toDouble().takeIf { session.totalMinutes > 0 },
+        deepRemShare = session.deepRemShare,
+        lowestHr = lowestHr(session, hrPoints),
+        spo2 = nightMedian(session, spo2Points),
+        hrvMs = nightMedian(session, hrvPoints),
     )
+
+    /**
+     * The lowest per-minute heart rate recorded between sleep onset and waking.
+     *
+     * The whole session, awake runs included — the floor is the floor, and a low minute is no less
+     * real for falling in a stretch the band called awake. It is deliberately the MINIMUM of what
+     * was recorded rather than a low percentile: every point here is already the band's own
+     * per-minute figure, so there is no single stray beat for the minimum to land on, and a
+     * percentile would be a number nobody measured.
+     *
+     * A different fact from [nocturnalHr], which averages a fixed four-hour window after onset: that
+     * one answers "what was the night's level", this one "how far down did it get".
+     */
+    fun lowestHr(session: SleepSession, hrPoints: List<ChartPoint>): Double? =
+        hrPoints.filter { it.tMs in session.startMs..session.endMs }.minOfOrNull { it.value }
+
+    /** The median of whatever was recorded inside the sleep window, or null when nothing was. */
+    private fun nightMedian(session: SleepSession, points: List<ChartPoint>): Double? =
+        HealthIndexSource.median(
+            points.filter { it.tMs in session.startMs..session.endMs }.map { it.value },
+        )
 
     /**
      * Minutes between the end of the last moderate-cadence effort and sleep onset, or null if there

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.huawei.HuaweiFrom
+import com.opentasker.core.huawei.HuaweiRriKeys
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSleep
 import com.opentasker.core.huawei.HuaweiStatus
@@ -77,6 +78,23 @@ data class HuaweiDashboardState(
     val felt: Int? = null,
     val feltMorning: Long? = null,
     val feltEnabled: Boolean = true,
+    /**
+     * This morning's written note, from the same key the rating is filed under.
+     *
+     * Beside the rating rather than inside it: the digit is answered every morning and the sentence
+     * is not, so they are two independent values about one morning — and a note without a rating is
+     * a perfectly ordinary thing to have written.
+     */
+    val feltNote: String? = null,
+    /**
+     * 機能訓練 — the days the rehab was done, and what was written about them.
+     *
+     * Two plain collections rather than a built list of squares: the card shows two weeks and the
+     * page the whole history, and the two must be cut from ONE record. Deciding the span here would
+     * mean the model choosing for both, so it hands over the record and each screen takes its slice.
+     */
+    val rehabDays: Set<Long> = emptySet(),
+    val rehabNotes: Map<Long, String> = emptyMap(),
 )
 
 /**
@@ -102,7 +120,13 @@ class HuaweiDashboardModel(
 
     val progress = HuaweiSyncState.progress
 
-    init { refresh() }
+    init {
+        // Today, marked, on the very first open and never again — 白い熊 asked the history to start
+        // there (2026-09-03). See [RehabLog.seedTodayOnce] for why it is flagged rather than
+        // conditioned on the store being empty.
+        com.opentasker.core.band.RehabLog.seedTodayOnce(appContext)
+        refresh()
+    }
 
     fun refresh() {
         viewModelScope.launch {
@@ -126,6 +150,10 @@ class HuaweiDashboardModel(
             return HuaweiDashboardState(
                 loading = false, status = status, bound = bound, sleep = sleep,
                 message = if (bound) HuaweiText.noData else HuaweiText.notPaired,
+                // 機能訓練 is 白い熊's own record and owes the band nothing — it has to be there on a
+                // report that has no samples at all, which is exactly the state a new install is in.
+                rehabDays = com.opentasker.core.band.RehabLog.all(appContext),
+                rehabNotes = com.opentasker.core.band.DayNotes.REHAB.all(appContext),
             )
         }
         val fromMs = oldest * 1000L
@@ -187,6 +215,9 @@ class HuaweiDashboardModel(
             cutoverMs = cutoverMs,
             felt = com.opentasker.core.band.RecoveryLog.rating(appContext, morningKey),
             feltMorning = morningKey,
+            feltNote = com.opentasker.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
+            rehabDays = com.opentasker.core.band.RehabLog.all(appContext),
+            rehabNotes = com.opentasker.core.band.DayNotes.REHAB.all(appContext),
             feltEnabled = com.opentasker.core.band.RecoveryLog.enabled(appContext),
             status = status,
             bound = bound,
@@ -265,8 +296,10 @@ class HuaweiDashboardModel(
 
         val assembled = com.opentasker.ui.charts.RecoveryBuild.build(
             metrics = rekeyed,
+            hrvPoints = publishableRmssd(),
             sessions = nights,
             ratings = com.opentasker.core.band.RecoveryLog.all(appContext),
+            notes = com.opentasker.core.band.DayNotes.RECOVERY.all(appContext),
             sessions_ = com.opentasker.core.band.TrainingSessions.all(appContext),
             sessionOpen = com.opentasker.core.band.TrainingSessions.openStart(appContext) != null,
             // yyyyMMdd of an instant, the key every rating and every register row is filed under.
@@ -328,6 +361,36 @@ class HuaweiDashboardModel(
     )
 
     /** The Hume band's nights, for the era before this band existed. */
+    /**
+     * Every RMSSD window the band itself would publish, as points.
+     *
+     * ## Why the filter is not ours to skip
+     *
+     * Each `rrisqi` window carries the number of beat-to-beat intervals it accepted, and Huawei
+     * Health publishes a window only at roughly 17 or more — a clean 9-for-9 split across the
+     * records it listed and omitted on 白い熊's own wrist. A window the vendor's own app discards is
+     * one the band considers too sparse to mean anything, and a night's median computed over the
+     * sparse ones would be a number with no measurement behind it. Everything is still STORED
+     * unfiltered (see `HuaweiSyncRunner.storeRri`) — the threshold is applied here, where it can be
+     * revisited, rather than at ingest, where it could not.
+     *
+     * The two series are joined on the window's start second, which is the key both are written
+     * under: one row per field per window, so a count and its RMSSD share an instant exactly.
+     */
+    private suspend fun publishableRmssd(): List<ChartPoint> {
+        val dao = db.huaweiSampleDao()
+        val from = 0L
+        val to = Long.MAX_VALUE / 2
+        val counts = runCatching { dao.range(HuaweiRriKeys.COUNT, from, to) }.getOrNull().orEmpty()
+        val publishable = counts
+            .filter { it.value >= com.opentasker.core.huawei.HuaweiRri.MIN_VALID_INTERVALS }
+            .mapTo(HashSet()) { it.epochSeconds }
+        if (publishable.isEmpty()) return emptyList()
+        return runCatching { dao.range(HuaweiRriKeys.metricFor(5), from, to) }.getOrNull().orEmpty()
+            .filter { it.epochSeconds in publishable }
+            .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+    }
+
     private suspend fun loadHumeSessions(zone: java.time.ZoneId): List<com.opentasker.ui.charts.SleepSession> {
         val rows = runCatching { db.bandSleepDao().recent(400) }.getOrDefault(emptyList())
         if (rows.isEmpty()) return emptyList()
@@ -374,6 +437,36 @@ class HuaweiDashboardModel(
         }
         refresh()
     }
+
+    /**
+     * Write — or, on blank text, delete — the note for ONE named morning.
+     *
+     * Deliberately keyed like [setFeltFor] rather than like [setFelt]: the note editor is reachable
+     * from the morning card, from a grid tile and from a table line, and all three name the morning
+     * they mean. One writer for all of them is what stops a note from the card landing on a
+     * different key than a note from the calendar.
+     */
+    fun setNoteFor(morningKey: Long, text: String) {
+        com.opentasker.core.band.DayNotes.RECOVERY.setNote(appContext, morningKey, text)
+        refresh()
+    }
+
+    /** Tick or un-tick one day of 機能訓練. */
+    fun setRehab(dateKey: Long, done: Boolean) {
+        com.opentasker.core.band.RehabLog.setDone(appContext, dateKey, done)
+        refresh()
+    }
+
+    /** Write — or, on blank text, delete — one day's 機能訓練 note. Its own store; see `DayNotes`. */
+    fun setRehabNote(dateKey: Long, text: String) {
+        com.opentasker.core.band.DayNotes.REHAB.setNote(appContext, dateKey, text)
+        refresh()
+    }
+
+    /** The morning the card's own note belongs to — the same one [setFelt] rates. */
+    fun morningKeyNow(): Long = com.opentasker.ui.charts.RecoveryBuild.ratableMorning(
+        java.time.LocalDateTime.now(java.time.ZoneId.systemDefault()),
+    )
 
     private suspend fun buildChart(
         spec: MetricSpec,
