@@ -817,6 +817,7 @@ fun ActiveAutomationUi(
                 onMoveAction = { task, fromIndex, toIndex ->
                     viewModel.moveTaskAction(task.id, fromIndex, toIndex)
                 },
+                onRunAction = { task, index -> viewModel.runActionNow(task, index) },
                 contentPadding = innerPadding, contentLoaded = contentLoaded, historyAvailability = historyAvailability,
             )
 

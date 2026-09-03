@@ -1108,6 +1108,7 @@ private fun runLogTaskOptions(logs: List<RunLogEntry>, tasks: List<Task>): List<
 private fun runLogSourceName(key: String): String = stringResource(
     when (key) {
         RunLogSource.PROFILE -> R.string.run_log_source_profile
+        RunLogSource.SINGLE_ACTION -> R.string.run_log_source_single_action
         RunLogSource.EXTERNAL_INTENT -> R.string.run_log_source_external_intent
         RunLogSource.QUICK_SETTINGS_TILE -> R.string.run_log_source_quick_settings_tile
         RunLogSource.MANUAL_RUN -> R.string.run_log_source_manual_run

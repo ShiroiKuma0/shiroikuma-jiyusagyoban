@@ -81,6 +81,7 @@
     <string name="transfer_stage_plan">Working out what changes</string>
     <string name="transfer_stage_write">Saving</string>
     <string name="action_save">Save</string>
+    <string name="action_run_alone">Run this action</string>
     <string name="action_delete">Delete</string>
     <string name="action_dismiss">Dismiss</string>
     <string name="action_import">Import</string>
@@ -867,6 +868,7 @@
     <string name="a11y_duplicate_scene">More actions for scene %1$s</string>
     <string name="a11y_edit_action">Edit action %1$d, %2$s</string>
     <string name="a11y_delete_action">Delete action %1$d, %2$s</string>
+    <string name="a11y_run_action">Run action %1$d, %2$s, on its own</string>
     <string name="a11y_edit_context">Edit context %1$d, %2$s</string>
     <string name="a11y_delete_context">Delete context %1$d, %2$s</string>
     <string name="a11y_expression_details">Expression details for %1$s</string>
@@ -1421,6 +1423,7 @@
     </plurals>
     <string name="synthetic_trigger_admission_rejected">A run limit would have stopped this one.</string>
     <string name="ui_error_bundle_not_recognized">That does not look like an OpenTasker bundle. Paste the JSON exported from OpenTasker, or scan its QR code.</string>
+    <string name="ui_error_run_action">That action could not be run</string>
     <string name="ui_error_run_task">Task could not be run</string>
     <string name="ui_error_run_log_replay">Held run could not be replayed</string>
     <string name="ui_error_retention_preview">Retention preview failed</string>
@@ -1440,6 +1443,7 @@
     <string name="run_log_source_external_intent">External intent</string>
     <string name="run_log_source_quick_settings_tile">Quick Settings tile</string>
     <string name="run_log_source_manual_run">Manual run</string>
+    <string name="run_log_source_single_action">Single action</string>
     <string name="run_log_source_notification_action">Notification action</string>
     <string name="run_log_source_widget">Widget</string>
     <string name="run_log_source_shortcut">Shortcut</string>
@@ -1517,6 +1521,7 @@
     <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
     <string name="ui_message_run_status">%1$s %2$s (%3$dms)</string>
+    <string name="ui_message_action_run_status">%1$s %2$s (%3$dms)</string>
     <string name="ui_message_run_replayed">Replayed %1$s: %2$s (%3$dms)</string>
     <string name="ui_run_status_held">held</string>
     <string name="ui_run_status_skipped">skipped</string>

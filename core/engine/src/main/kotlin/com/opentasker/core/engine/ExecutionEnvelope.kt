@@ -31,6 +31,8 @@ enum class ExecutionProducer(val wireValue: String) {
                 value.startsWith("Profile:", ignoreCase = true) -> PROFILE
                 value.startsWith("Quick Settings Tile:", ignoreCase = true) -> QUICK_SETTINGS
                 value.equals("Manual run", ignoreCase = true) || value.equals("Manual", ignoreCase = true) -> MANUAL
+                // Running one action from the task editor is a manual run with a narrower scope.
+                value.startsWith("Single action", ignoreCase = true) -> MANUAL
                 value.equals("Widget", ignoreCase = true) -> WIDGET
                 value.equals("Shortcut", ignoreCase = true) -> SHORTCUT
                 value.equals("Notification action", ignoreCase = true) -> NOTIFICATION

@@ -13,6 +13,7 @@ object RunLogSource {
     const val EXTERNAL_INTENT = "external_intent"
     const val QUICK_SETTINGS_TILE = "quick_settings_tile"
     const val MANUAL_RUN = "manual_run"
+    const val SINGLE_ACTION = "single_action"
     const val NOTIFICATION_ACTION = "notification_action"
     const val WIDGET = "widget"
     const val SHORTCUT = "shortcut"
@@ -35,6 +36,11 @@ object RunLogSource {
                 Classified(EXTERNAL_INTENT, null)
             trimmed.equals("Manual run", ignoreCase = true) ->
                 Classified(MANUAL_RUN, null)
+            // Checked before the bare form so "Single action: Set volume" keeps its label.
+            trimmed.startsWith("Single action:", ignoreCase = true) ->
+                Classified(SINGLE_ACTION, trimmed.afterColon())
+            trimmed.equals("Single action", ignoreCase = true) ->
+                Classified(SINGLE_ACTION, null)
             trimmed.equals("Notification action", ignoreCase = true) ->
                 Classified(NOTIFICATION_ACTION, null)
             trimmed.equals("Widget", ignoreCase = true) ->
@@ -62,6 +68,7 @@ object RunLogSource {
         EXTERNAL_INTENT -> "External intent"
         QUICK_SETTINGS_TILE -> "Quick Settings tile"
         MANUAL_RUN -> "Manual run"
+        SINGLE_ACTION -> "Single action"
         NOTIFICATION_ACTION -> "Notification action"
         WIDGET -> "Widget"
         SHORTCUT -> "Shortcut"

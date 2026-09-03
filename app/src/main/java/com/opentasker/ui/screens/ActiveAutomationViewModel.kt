@@ -28,6 +28,7 @@ import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.diagnostics.RunLogExporter
+import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.ExecutionEnvelope
@@ -36,6 +37,7 @@ import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.engine.PreflightInputs
 import com.opentasker.core.engine.PreflightReport
 import com.opentasker.core.engine.PreflightRunner
+import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.replayHeldExecution
 import com.opentasker.core.location.LocationDwellStateStore
@@ -1918,6 +1920,51 @@ class ActiveAutomationViewModel(
                 // A manual run can be held, which adds a row the run-log page should show.
                 refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_task)) }
+            _runActionBusy.value = false
+        }
+    }
+
+    /**
+     * Runs one action of [task] on its own, so tuning an HTTP call or a variable write does not
+     * mean re-running everything before it.
+     *
+     * It goes through the same execution path as a whole-task manual run, against the engine's
+     * live admission controller, so limits, the collision policy and the run log all behave as
+     * they do for a real run. Flow-control markers are refused: the UI does not offer them, and
+     * [SingleActionRun.taskFor] refuses them again in case a stale index arrives.
+     */
+    fun runActionNow(task: Task, index: Int) {
+        viewModelScope.launch {
+            if (_runActionBusy.value) return@launch
+            val single = SingleActionRun.taskFor(task, index) ?: return@launch
+            val action = single.actions.first()
+            val label = action.label
+                ?: ActionMetadataRegistry.get(action.type)?.let { appContext.getString(it.nameRes) }
+                ?: action.type
+            val source = SingleActionRun.sourceFor(label)
+            _runActionBusy.value = true
+            runCatching {
+                writeSettingsGuard.requireWriteSettingsReady(single.actions)
+                executeAndLogTask(
+                    appContext = appContext,
+                    db = db,
+                    task = single,
+                    source = source,
+                    admissionController = ExecutionAdmissionRegistry.current(appContext),
+                    execution = ExecutionEnvelope.create(single, source),
+                )
+            }.onSuccess { result ->
+                val status = when {
+                    result.held -> appContext.getString(R.string.ui_run_status_held)
+                    result.skippedReason != null -> appContext.getString(R.string.ui_run_status_skipped)
+                    result.report.success -> appContext.getString(R.string.ui_run_status_succeeded)
+                    else -> appContext.getString(R.string.ui_run_status_failed)
+                }
+                // The label comes from the action's own name or its metadata, never from its
+                // arguments, so a credential in an argument cannot reach this snackbar.
+                events.send(message(R.string.ui_message_action_run_status, label, status, result.report.durationMs))
+                refreshRunLogPage()
+            }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_action)) }
             _runActionBusy.value = false
         }
     }

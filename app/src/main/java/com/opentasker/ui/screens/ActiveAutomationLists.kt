@@ -74,6 +74,7 @@ import com.opentasker.core.actions.ActionSummaryFormatter
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.contexts.contextConfigSummary
+import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.Profile
@@ -477,6 +478,7 @@ internal fun TasksScreen(
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
     onMoveAction: (Task, Int, Int) -> Unit,
+    onRunAction: (Task, Int) -> Unit,
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
@@ -554,6 +556,7 @@ internal fun TasksScreen(
                 onEditAction = { index, action -> onEditAction(task, index, action) },
                 onDeleteAction = { index -> onDeleteAction(task, index) },
                 onMoveAction = { fromIndex, toIndex -> onMoveAction(task, fromIndex, toIndex) },
+                onRunAction = { index -> onRunAction(task, index) },
             )
         }
     }
@@ -577,6 +580,7 @@ private fun TaskCard(
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
     onMoveAction: (Int, Int) -> Unit,
+    onRunAction: (Int) -> Unit,
 ) {
     var expanded by rememberSaveable(task.id) { mutableStateOf(initiallyExpanded) }
     val runDescription = stringResource(R.string.a11y_run_task, task.name)
@@ -674,6 +678,7 @@ private fun TaskCard(
                         onMoveDown = { onMoveAction(index, index + 1) },
                         onEdit = { onEditAction(index, action) },
                         onDelete = { onDeleteAction(index) },
+                        onRun = { onRunAction(index) },
                     )
                 }
             }
@@ -828,6 +833,7 @@ private fun ActionRow(
     onMoveDown: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onRun: () -> Unit,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val resources = LocalContext.current.resources
@@ -838,6 +844,7 @@ private fun ActionRow(
     val actionLabel = action.label ?: metadataName ?: stringResource(R.string.action_unknown_name)
     val editDescription = stringResource(R.string.a11y_edit_action, index + 1, actionLabel)
     val deleteDescription = stringResource(R.string.a11y_delete_action, index + 1, actionLabel)
+    val runDescription = stringResource(R.string.a11y_run_action, index + 1, actionLabel)
     val moveUpDescription = stringResource(R.string.a11y_move_action_up, index + 1, actionLabel)
     val moveDownDescription = stringResource(R.string.a11y_move_action_down, index + 1, actionLabel)
     Column(Modifier.fillMaxWidth()) {
@@ -922,6 +929,16 @@ private fun ActionRow(
                         enabled = canMoveDown,
                         modifier = Modifier.semantics { contentDescription = moveDownDescription },
                     )
+                    // Flow-control markers are omitted rather than disabled: "Run this if"
+                    // has no meaning on its own, so offering it greyed out would only invite
+                    // the question of why.
+                    if (SingleActionRun.isRunnableAlone(action)) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_run_alone)) },
+                            onClick = { menuExpanded = false; onRun() },
+                            leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = runDescription) },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_delete)) },
                         onClick = { menuExpanded = false; onDelete() },

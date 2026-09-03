@@ -14,6 +14,11 @@
 
 ### Added
 
+- The overflow menu on any action in a task now offers "Run this action". It
+  runs that one action on its own, so tuning an HTTP call or a variable no
+  longer means running everything above it first. The run appears in the run log
+  under its own name. Flow-control markers are not offered, because an "if"
+  without its "end if" is not a smaller task.
 - Settings has an About section: the version and build you are running, links to
   the source, the release notes and the licence, and a "Report a problem" button
   that opens a new issue with your app version, Android version and device
