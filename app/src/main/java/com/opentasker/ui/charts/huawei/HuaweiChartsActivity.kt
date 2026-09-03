@@ -84,9 +84,18 @@ class HuaweiChartsActivity : ComponentActivity() {
                         val state by model.state.collectAsState()
                         val progress by model.progress.collectAsState()
                         var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
+                        // The morning card's note editor. Held here rather than inside the card so
+                        // it survives the card scrolling out of the LazyColumn while it is open.
+                        var notingMorning by rememberSaveable { mutableStateOf<Long?>(null) }
+                        // 機能訓練: the day whose tick is open, and the day whose note is. Two states
+                        // rather than one, for the register's reason — the note editor stacks OVER
+                        // the day dialog and returns to it, so the day must stay chosen underneath.
+                        var rehabDay by rememberSaveable { mutableStateOf<Long?>(null) }
+                        var notingRehab by rememberSaveable { mutableStateOf<Long?>(null) }
 
                         val chart = state.metrics.firstOrNull { it.spec.key == selected }
                         val registerOpen = selected == com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
+                        val rehabOpen = selected == REHAB_KEY
                         val sleepOpen = selected == SLEEP_KEY
                         if (sleepOpen) {
                             HuaweiSleepDetailScreen(
@@ -106,6 +115,31 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 register = state.register,
                                 contentPadding = insets,
                                 onRate = { night, step -> model.setFeltFor(night, step) },
+                                onNote = { morning, text -> model.setNoteFor(morning, text) },
+                                onBack = { selected = null },
+                            )
+                        } else if (rehabOpen) {
+                            val zone = java.time.ZoneId.systemDefault()
+                            val today = java.time.LocalDate.now(zone)
+                            // The whole record, and never less than the register's own window — so
+                            // the two calendars cover at least the same weeks and a day marked in
+                            // one is findable in the other.
+                            val earliest = (state.rehabDays + state.rehabNotes.keys)
+                                .mapNotNull { com.opentasker.ui.charts.SessionRegister.epochDayOf(it) }
+                                .minOrNull()
+                            val from = minOf(
+                                com.opentasker.ui.charts.RecoveryBuild.gridStart(today.toEpochDay()),
+                                earliest ?: Long.MAX_VALUE,
+                            )
+                            val to = today.toEpochDay()
+                            HuaweiRehabScreen(
+                                days = rehabCells(from, to, state.rehabDays, state.rehabNotes),
+                                zone = zone,
+                                doneCount = state.rehabDays.size,
+                                totalDays = (to - from + 1).toInt(),
+                                contentPadding = insets,
+                                onTapDay = { rehabDay = com.opentasker.core.band.RehabLog
+                                    .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
                                 onBack = { selected = null },
                             )
                         } else if (chart == null) {
@@ -116,6 +150,10 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 onSync = model::sync,
                                 onOpenMetric = { selected = it },
                                 onFelt = model::setFelt,
+                                onNote = { notingMorning = state.feltMorning ?: model.morningKeyNow() },
+                                onTapRehabDay = { rehabDay = com.opentasker.core.band.RehabLog
+                                    .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
+                                onOpenRehab = { selected = REHAB_KEY },
                                 // The register opens the Hume side's own screen: it is one record
                                 // of 白い熊's nights and ratings, not a per-band one, and two
                                 // registers would disagree the first time a rating was filed from
@@ -128,6 +166,51 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onBack = { selected = null },
                                 bounds = state.bounds,
+                            )
+                        }
+
+                        // The 機能訓練 day editor, and its note stacked over it — the same two-state
+                        // dance the register does, so dismissing the note returns to the day rather
+                        // than closing both.
+                        rehabDay?.takeIf { notingRehab == null }?.let { key ->
+                            HuaweiRehabDayDialog(
+                                dateKey = key,
+                                done = key in state.rehabDays,
+                                note = state.rehabNotes[key],
+                                onPick = { done ->
+                                    model.setRehab(key, done)
+                                    rehabDay = null
+                                },
+                                onEditNote = { notingRehab = key },
+                                onDismiss = { rehabDay = null },
+                            )
+                        }
+                        notingRehab?.let { key ->
+                            com.opentasker.ui.charts.NoteDialog(
+                                title = com.opentasker.ui.charts.nightDateFull(key, lang),
+                                note = state.rehabNotes[key],
+                                onSave = { text ->
+                                    model.setRehabNote(key, text)
+                                    notingRehab = null
+                                },
+                                onDismiss = { notingRehab = null },
+                            )
+                        }
+
+                        // Outside the branch above, so the editor opened from the morning card is
+                        // not torn down by whatever the screen behind it decides to show next.
+                        notingMorning?.let { key ->
+                            com.opentasker.ui.charts.NoteDialog(
+                                title = com.opentasker.ui.charts.BandText.morningOfNight[lang].format(
+                                    com.opentasker.ui.charts.nightDateFull(key, lang),
+                                    com.opentasker.ui.charts.nightSpanLabel(key),
+                                ),
+                                note = state.feltNote,
+                                onSave = { text ->
+                                    model.setNoteFor(key, text)
+                                    notingMorning = null
+                                },
+                                onDismiss = { notingMorning = null },
                             )
                         }
                     }
