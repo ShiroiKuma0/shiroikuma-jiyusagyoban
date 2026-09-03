@@ -145,6 +145,18 @@ class HuaweiWalksActivity : ComponentActivity() {
                                 },
                                 onBack = { open = null },
                                 walkRoot = root,
+                                // On the runner's scope, like every other write here: the file is
+                                // small and the write is milliseconds, but a note lost because the
+                                // window was closed as it was saved would be a note 白い熊 believes
+                                // is on file. The reload afterwards is what puts it back on screen.
+                                onAnnotate = { note, stops ->
+                                    HuaweiSyncRunner.scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            HuaweiWalkLibrary.annotate(opened, note, stops)
+                                        }
+                                        scope.launch { reload() }
+                                    }
+                                },
                                 onFetchMap = {
                                     if (state.busy) return@HuaweiWalkDetailScreen
                                     state = state.copy(sharing = opened.id, message = null)
