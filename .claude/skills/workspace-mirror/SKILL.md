@@ -35,7 +35,20 @@ adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.
 adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
   -a shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
   --es shiroikuma.jiyusagyoban.extra.PATH '<file>.json'"
+
+# RUN a task by NAME (PROJECT optional — required when the name is not unique). This is how the 71
+# reload task gets run after a settings import, and how a scene is put on screen to be inspected.
+adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+  -a shiroikuma.jiyusagyoban.action.RUN_TASK --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
+  --es shiroikuma.jiyusagyoban.extra.TASK '<task name>' \
+  --es shiroikuma.jiyusagyoban.extra.PROJECT '<project name>'"
 ```
+
+**Every extra is namespaced and the PROTOCOL one is mandatory.** `--es task …` (the bare name) is not
+read, and a call without `--ei …extra.PROTOCOL 1` is dropped by the receiver's first line — in both
+cases `am` prints a bare `result=0` with no `data=`, which looks exactly like a dead bridge rather than
+a malformed call (cost half an hour, 2026-09-02). A reply that reaches the receiver always carries a
+`data=` message, success or failure.
 
 So the standard dev cycle is fully hands-off:
 1. **Cycle start:** EXPORT_WORKSPACE → `adb pull` into `.scratch/` → explode + commit (baseline below).
