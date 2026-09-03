@@ -1083,29 +1083,41 @@ private fun AppIcon(pkg: String, size: Dp) {
 /** The "everything / nothing" line that heads the list and each unfolded app. */
 @Composable
 private fun ToggleLine(label: String, indent: Dp, rowHeight: Dp, textScale: Float, onClick: () -> Unit) {
+    // A PILL, hugging its own words (白い熊, 2026-09-03), not a full-width row.
+    //
+    // It sat in a list of checkbox rows and looked like one of them — a line of text at the top of
+    // the column, indistinguishable from the apps below it except by reading it. It is not a row:
+    // it is the one control that acts on ALL of them, so it takes the shape this panel already uses
+    // for a control (the 保存先 pill) rather than the shape it uses for a list entry.
+    //
+    // The outer Row keeps [rowHeight], so the list's own metrics are untouched and nothing below
+    // shifts; only the thing drawn inside it changed.
     Row(
-        Modifier
-            .fillMaxWidth()
-            .height(rowHeight)
-            .padding(start = indent)
-            .clickable { onClick() }
-            .padding(horizontal = 6.dp),
+        Modifier.fillMaxWidth().height(rowHeight).padding(start = indent, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "⇄",
-            color = Accent,
-            fontSize = 14f.times(textScale).sp,
-            modifier = Modifier.width(18.dp * textScale),
-        )
-        Text(
-            text = label,
-            color = Accent,
-            fontSize = 13f.times(textScale).sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            Modifier
+                .border(2.dp, Accent, RoundedCornerShape(999.dp))
+                .clickable { onClick() }
+                .padding(horizontal = 12.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "⇄",
+                color = Accent,
+                fontSize = 14f.times(textScale).sp,
+            )
+            Text(
+                text = label,
+                color = Accent,
+                fontSize = 13f.times(textScale).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
