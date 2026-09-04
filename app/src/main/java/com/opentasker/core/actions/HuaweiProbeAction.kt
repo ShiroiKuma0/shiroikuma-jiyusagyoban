@@ -10,6 +10,7 @@ import com.opentasker.core.huawei.HuaweiProtocol
 import com.opentasker.core.huawei.HuaweiRecords
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncRunner
+import com.opentasker.core.huawei.HuaweiWorkout
 import java.io.File
 
 /**
@@ -437,6 +438,119 @@ class HuaweiProbeAction : Action {
             // `warmup=0102,0103,0137,1a05` sends four, `warmup=all` sends the lot. Every one is a
             // command Health issues on every ordinary connect, and none writes a setting, a clock,
             // a language or any wizard state. provision() is deliberately NOT reachable from here.
+            // === what a workout actually contains ===
+            //
+            // Everything in the workout service was written from published descriptions while the
+            // band had never recorded one, and only three of its commands have ever been proven:
+            // the list, the summary, and the GPS file. `parseSummary` decodes NINE tags and drops
+            // every other one the container holds without a word, and `WORKOUT_SAMPLES` — the
+            // per-sample stream where heart rate lives — has never been sent at all.
+            //
+            // 白い熊 recorded a strength-training session on 2026-09-03 and asked for "maximum data
+            // we can get" from it, plus the heart rate, calories and cooldown for walks. That is a
+            // question about what the band HOLDS, and the band is the only thing that can answer
+            // it. So: list the window, dump every summary tag raw rather than the nine we know,
+            // and try the sample and pace streams with each payload shape they might take. What
+            // answers with data decides the decoder; nothing here is written to the band.
+            run {
+                val days = args["workout_days"]?.trim()?.toIntOrNull()?.coerceIn(1, 90) ?: 14
+                val from = now - days * 24L * 3600
+                line()
+                line("=== workouts, last $days d ===")
+
+                // Values, not only shapes: a two-byte tag is almost always a number, and reading
+                // "1382" instead of "0566" is the difference between recognising a calorie count
+                // and staring at hex. Both are printed — the hex is the ground truth.
+                //
+                // The per-sample stream is printed WHOLE. The first pass truncated every value at
+                // 128 hex characters, which is fine for a scalar and useless for a 544-byte heart
+                // rate curve: it showed enough to prove the stream exists and not enough to work
+                // out its record layout, so the band had to be asked twice.
+                fun show(t: HuaweiProtocol.Tlv, indent: String, whole: Boolean = false) {
+                    val hex = HuaweiCrypto.upperHex(t.value)
+                    val n = if (t.value.size in 1..4) " = ${HuaweiProtocol.bytesToInt(t.value)}" else ""
+                    line("$indent tag 0x%02X (%d B) %s%s".format(
+                        t.tag, t.value.size, if (whole) hex else hex.take(128), n,
+                    ))
+                }
+                fun dumpAll(tlvs: List<HuaweiProtocol.Tlv>, indent: String, whole: Boolean = false) {
+                    for (t in tlvs) {
+                        show(t, indent, whole)
+                        if (t.tag and 0x80 != 0 && t.value.size > 2) {
+                            runCatching { dumpAll(HuaweiProtocol.parseTlvs(t.value), "$indent  ", whole) }
+                        }
+                    }
+                }
+
+                val listReply = runCatching {
+                    session.decrypt(
+                        session.request(
+                            HuaweiCommands.SVC_WORKOUT, HuaweiCommands.WORKOUT_LIST,
+                            HuaweiCommands.workoutList(from, now), timeoutMs = 8_000,
+                        ),
+                    )
+                }.getOrElse {
+                    line("list failed: ${it::class.java.simpleName}: ${it.message}")
+                    emptyList()
+                }
+                if (listReply.isNotEmpty()) {
+                    line("  list reply (raw):")
+                    dumpAll(listReply, "   ")
+                }
+                val entries = runCatching { HuaweiWorkout.parseList(listReply) }.getOrDefault(emptyList())
+                line("  ${entries.size} workout(s) parsed")
+
+                for (entry in entries) {
+                    line()
+                    line("  --- workout ${entry.number}: track=${entry.hasTrack} " +
+                        "sampleBlocks=${entry.sampleBlocks} paceBlocks=${entry.paceBlocks} ---")
+
+                    runCatching {
+                        val tlvs = session.decrypt(
+                            session.request(
+                                HuaweiCommands.SVC_WORKOUT, HuaweiCommands.WORKOUT_TOTALS,
+                                HuaweiCommands.workoutTotals(entry.number), timeoutMs = 8_000,
+                            ),
+                        )
+                        line("   summary — EVERY tag, ${resultOf(tlvs)}:")
+                        dumpAll(tlvs, "    ", whole = true)
+                        HuaweiWorkout.parseSummary(tlvs)?.let {
+                            line("   we currently read: type=${it.type} (${it.kind}) " +
+                                "dur=${it.durationSeconds} dist=${it.distanceMetres} " +
+                                "kcal=${it.calories} steps=${it.steps}")
+                        }
+                    }.onFailure { line("   summary failed: ${it.message}") }
+
+                    // The list says how many blocks each stream has, and the first pass proved the
+                    // band answers a bare workout number with block 0. What it did not settle is
+                    // whether a block can be ASKED for — a three-block walk whose blocks cannot be
+                    // addressed is a walk we can only ever see the first third of. So every block
+                    // is requested by index, and block 0 is requested BOTH ways: if the index is
+                    // being ignored, the replies will be identical and say so.
+                    val no = HuaweiProtocol.intBytes(entry.number, 2)
+                    suspend fun ask(cmd: Int, what: String, blocks: Int) {
+                        if (blocks <= 0) {
+                            line("   $what — none")
+                            return
+                        }
+                        for (i in 0 until blocks) {
+                            val payload = HuaweiProtocol.tlv(
+                                0x81, HuaweiProtocol.tlv(2, no) + HuaweiProtocol.tlv(3, i, 2),
+                            )
+                            runCatching {
+                                val tlvs = session.decrypt(
+                                    session.request(HuaweiCommands.SVC_WORKOUT, cmd, payload, timeoutMs = 8_000),
+                                )
+                                line("   $what block $i — ${resultOf(tlvs)}, ${tlvs.sumOf { t -> t.value.size }} B")
+                                dumpAll(tlvs, "    ", whole = true)
+                            }.onFailure { line("   $what block $i — ${it::class.java.simpleName}: ${it.message}") }
+                        }
+                    }
+                    ask(HuaweiCommands.WORKOUT_SAMPLES, "samples (0x0A)", entry.sampleBlocks)
+                    ask(HuaweiCommands.WORKOUT_PACE, "pace (0x0C)", entry.paceBlocks)
+                }
+            }
+
             args[WARMUP_ARG]?.trim()?.lowercase()?.ifEmpty { null }?.let { spec ->
                 val want = if (spec == "all") listOf("0107", "0105", "0102", "0103", "0137", "1a05")
                     else spec.split(',').map { it.trim() }.filter { it.isNotEmpty() }
