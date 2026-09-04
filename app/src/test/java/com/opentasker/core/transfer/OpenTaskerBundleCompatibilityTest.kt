@@ -129,37 +129,57 @@ class OpenTaskerBundleCompatibilityTest {
     }
 
     /**
-     * `docs/OPEN_JSON_BUNDLE.md` is the published contract. If the codec's accepted range moves and
-     * the document does not, importers written against the document are wrong.
+     * The codec has to accept exactly the range it declares. This half needs no document, so it
+     * runs everywhere, including a fresh clone where the format guide is not published.
      */
     @Test
-    fun theDocumentedSupportedRangeMatchesTheCodec() {
-        val doc = Files.readString(repositoryRoot().resolve("docs/OPEN_JSON_BUNDLE.md"))
-        val declared = Regex("""Supported for import: `(\d+)\.\.(\d+)`""").find(doc)
-            ?: error("docs/OPEN_JSON_BUNDLE.md no longer declares a supported import range")
-        val first = declared.groupValues[1].toInt()
-        val last = declared.groupValues[2].toInt()
+    fun theCodecAcceptsExactlyTheRangeItDeclares() {
+        val first = MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION
+        val last = OPEN_TASKER_BUNDLE_SCHEMA_VERSION
 
-        assertTrue("the documented range must include the current version", OPEN_TASKER_BUNDLE_SCHEMA_VERSION in first..last)
-        assertTrue(
-            "docs/OPEN_JSON_BUNDLE.md must state the current version as `$OPEN_TASKER_BUNDLE_SCHEMA_VERSION`",
-            doc.contains("Current value: `$OPEN_TASKER_BUNDLE_SCHEMA_VERSION`"),
-        )
-        // Every version the document promises must actually import, and the first one outside it
-        // must not - that is what makes this a check on the codec rather than on the prose.
         (first..last).forEach { version ->
             val document = """{"schemaVersion":$version,"appVersion":"x","exportedAtEpochMs":0}"""
             assertTrue(
-                "the document promises schema $version imports, but the codec rejects it",
+                "the codec declares schema $version supported but rejects it",
                 runCatching { OpenTaskerBundleCodec.decode(document) }.isSuccess,
             )
         }
         val beyond = """{"schemaVersion":${last + 1},"appVersion":"x","exportedAtEpochMs":0}"""
         assertTrue(
-            "the codec accepts schema ${last + 1}, which the document does not promise",
+            "the codec accepts schema ${last + 1}, which is outside the range it declares",
             runCatching { OpenTaskerBundleCodec.decode(beyond) }.isFailure,
         )
     }
+
+    /**
+     * `docs/OPEN_JSON_BUNDLE.md` is the published contract. If the codec's accepted range moves and
+     * the document does not, importers written against the document are wrong.
+     *
+     * Everything under the docs directory is gitignored, so the guide only exists in a working
+     * tree that has written it. This used to be an unconditional read, which made the whole JVM
+     * suite fail on a clean clone before a single assertion ran.
+     */
+    @Test
+    fun theDocumentedSupportedRangeMatchesTheCodec() {
+        val doc = optionalFormatDocument() ?: return
+        val declared = Regex("""Supported for import: `(\d+)\.\.(\d+)`""").find(doc)
+            ?: error("docs/OPEN_JSON_BUNDLE.md no longer declares a supported import range")
+        val first = declared.groupValues[1].toInt()
+        val last = declared.groupValues[2].toInt()
+
+        assertEquals(
+            "the documented range must be the range the codec declares",
+            MIN_SUPPORTED_OPEN_TASKER_BUNDLE_SCHEMA_VERSION..OPEN_TASKER_BUNDLE_SCHEMA_VERSION,
+            first..last,
+        )
+        assertTrue(
+            "docs/OPEN_JSON_BUNDLE.md must state the current version as `$OPEN_TASKER_BUNDLE_SCHEMA_VERSION`",
+            doc.contains("Current value: `$OPEN_TASKER_BUNDLE_SCHEMA_VERSION`"),
+        )
+    }
+
+    private fun optionalFormatDocument(): String? =
+        repositoryRoot().resolve("docs/OPEN_JSON_BUNDLE.md").takeIf(Files::exists)?.let(Files::readString)
 
     private fun fixture(name: String): String =
         checkNotNull(javaClass.classLoader?.getResource("bundles/$name")) { "Missing fixture $name" }

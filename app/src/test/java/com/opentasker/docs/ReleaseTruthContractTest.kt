@@ -153,11 +153,14 @@ class ReleaseTruthContractTest {
             "$minimumBundleSchema..$currentBundleSchema",
             jsonValue(truth, "bundleSupportedSchemaVersions"),
         )
-        assertTrue(
-            "docs/OPEN_JSON_BUNDLE.md must publish the same supported import range",
-            read("docs/OPEN_JSON_BUNDLE.md")
-                .contains("Supported for import: `$minimumBundleSchema..$currentBundleSchema`"),
-        )
+        // Gitignored like everything else under the docs directory, so it is only checked where it
+        // exists. An unconditional read here failed the whole suite on a clean clone.
+        optionalDoc("docs/OPEN_JSON_BUNDLE.md")?.let { formatDoc ->
+            assertTrue(
+                "docs/OPEN_JSON_BUNDLE.md must publish the same supported import range",
+                formatDoc.contains("Supported for import: `$minimumBundleSchema..$currentBundleSchema`"),
+            )
+        }
         assertEquals(
             Regex("(?m)^\\s*define\\(\\\"").findAll(actionCatalog).count().toString(),
             jsonValue(truth, "registeredActions"),
