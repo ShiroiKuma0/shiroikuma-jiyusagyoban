@@ -29,8 +29,10 @@ import kotlin.math.min
  */
 object MapCutouts {
 
-    /** The sub-folder of the walk root. Leading underscore so it sorts away from `walk-*`. */
-    const val DIR = "_maps"
+    // The cutouts used to be PNGs in a `_maps` folder beside the walks. They are rows now — one
+    // per area, keyed by the same string that used to be the file name — so a Cutout is a
+    // transform and nothing else: it says which tiles at which zoom, and the bytes live in the
+    // database under [Cutout.id].
 
     /**
      * How much bigger than the track a cutout is cut.
@@ -59,9 +61,8 @@ object MapCutouts {
         val tileY: Int,
         val tilesW: Int,
         val tilesH: Int,
-        val file: File,
     ) {
-        /** The file name, which carries the whole transform and is therefore the identity. */
+        /** The whole transform in one string — the identity, and the database key. */
         val id: String get() = name(zoom, tileX, tileY, tilesW, tilesH)
 
         /** Does this cover the box, with no margin demanded? Edges count as covered. */
@@ -126,24 +127,23 @@ object MapCutouts {
         "z${zoom}_x${tileX}_y${tileY}_${tilesW}x$tilesH.png"
 
     /** Parse one back, or null if the name is not ours. */
-    fun parse(file: File): Cutout? {
-        val m = NAME.matchEntire(file.name) ?: return null
+    fun parse(key: String): Cutout? {
+        val m = NAME.matchEntire(key) ?: return null
         val (z, x, y, w, h) = m.destructured
-        return Cutout(z.toInt(), x.toInt(), y.toInt(), w.toInt(), h.toInt(), file)
+        return Cutout(z.toInt(), x.toInt(), y.toInt(), w.toInt(), h.toInt())
     }
 
     /** Every cutout on disk, newest-looking first is irrelevant — order is by area, smallest first. */
-    fun all(walkRoot: File): List<Cutout> =
-        File(walkRoot, DIR).listFiles()?.mapNotNull { parse(it) }
-            ?.filter { it.file.length() > 0 }
-            // Smallest first, so a walk that fits a tight cutout is drawn at the tightest scale
+    /** Every cutout we hold, from the keys the store lists. */
+    fun all(keys: List<String>): List<Cutout> = keys.mapNotNull { parse(it) }
+
             // available rather than on whichever wide one happened to be listed first.
             ?.sortedBy { it.tilesW * it.tilesH }
             ?: emptyList()
 
     /** The best cached cutout containing [box], or null when this is somewhere new. */
-    fun cover(walkRoot: File, box: Box): Cutout? =
-        all(walkRoot).firstOrNull { it.covers(box) }
+    fun cover(keys: List<String>, box: Box): Cutout? =
+        all(keys).firstOrNull { it.covers(box) }
 
     /**
      * The cutout that SHOULD exist for a box — what to ask 地図 for when [cover] found nothing.
@@ -152,7 +152,7 @@ object MapCutouts {
      * neighbourhood rather than a route. If that would exceed [MAX_TILES] the zoom is stepped down
      * until it fits: a coarser map of the right place beats a refusal.
      */
-    fun needed(walkRoot: File, box: Box, preferredZoom: Int): Cutout {
+    fun needed(box: Box, preferredZoom: Int): Cutout {
         var zoom = preferredZoom.coerceIn(1, 19)
         while (true) {
             val x0 = floor(Mercator.tileX(box.west, zoom)).toInt() - MARGIN_TILES
@@ -164,15 +164,12 @@ object MapCutouts {
             if ((w <= MAX_TILES && h <= MAX_TILES) || zoom <= 1) {
                 return Cutout(
                     zoom, x0, y0, w.coerceAtLeast(1), h.coerceAtLeast(1),
-                    File(File(walkRoot, DIR), name(zoom, x0, y0, w.coerceAtLeast(1), h.coerceAtLeast(1))),
                 )
             }
             zoom--
         }
     }
 
-    /** Where a new cutout's file goes, creating the folder. */
-    fun dir(walkRoot: File): File = File(walkRoot, DIR).apply { mkdirs() }
 
     private val NAME = Regex("""z(\d+)_x(-?\d+)_y(-?\d+)_(\d+)x(\d+)\.png""")
 }

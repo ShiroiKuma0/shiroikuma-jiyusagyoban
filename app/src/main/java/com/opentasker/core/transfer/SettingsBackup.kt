@@ -101,7 +101,18 @@ object SettingsBackup {
          * "large, derived AND re-creatable" and this fails the third test: a band holds days in its
          * ring buffer, not months, so anything older than that is gone the moment the table is.
          */
-        HEALTH_DATA("health_data", "健康 measurements — every sample, sleep and sync row");
+        HEALTH_DATA("health_data", "健康 measurements — every sample, sleep, sync and workout row"),
+
+        /**
+         * The base maps 地図 drew, one per AREA rather than per walk.
+         *
+         * Its own category because it is the only thing in the archive that is large, derived AND
+         * re-creatable: about a megabyte per neighbourhood, and 地図 can draw it again. That last
+         * word carries a qualification worth stating — 地図 must be installed and not frozen at the
+         * moment it is asked, which on this phone is not a safe assumption — so it ships SELECTED
+         * and 白い熊 gets to untick it, rather than being quietly left out of their own backup.
+         */
+        MAPS("maps", "健康 base maps — the cutouts 地図 drew, one per area");
 
         companion object {
             fun byId(id: String): Cat? = entries.firstOrNull { it.id == id }
@@ -138,7 +149,21 @@ object SettingsBackup {
     private val HEALTH_TABLES = listOf(
         "band_samples", "band_daily", "band_sleep", "band_syncs",
         "huawei_samples", "huawei_sleep", "huawei_syncs",
+        // The workouts, and the band's own bytes behind them — the GPS file, the summary container
+        // and each block of the heart-rate stream. Small: 288 KB for ten workouts, which is why
+        // they ride in the NDJSON as base64 rather than earning their own file-per-blob path.
+        "huawei_workouts", "huawei_workout_blobs",
     )
+
+    /**
+     * The cutouts, whose blob is a megabyte and is already compressed.
+     *
+     * NOT in [HEALTH_TABLES]: base64 would add a third again to a PNG and leave the ZIP nothing to
+     * squeeze, so the pixels go in as real files and the row carries their name. This is also why
+     * it is its own category — the size is the reason 白い熊 might want to leave it out.
+     */
+    private const val MAPS_TABLE = "huawei_map_cutouts"
+    private const val MAPS_DIR = "map_cutouts"
 
     /** Rows per read and per insert. Bounded so a table of a quarter-million rows never lands whole in memory. */
     private const val PAGE = 2_000
@@ -261,6 +286,7 @@ object SettingsBackup {
                     }
                     Cat.TASK_ICONS -> exportDirFiles(zip, File(context.filesDir, "task_icons"), ICONS_DIR)
                     Cat.HEALTH_DATA -> exportTables(zip, db, isCancelled)
+                    Cat.MAPS -> exportCutouts(zip, db, isCancelled)
                     else -> {
                         writeEntry(zip, "${cat.id}.json", exportPrefs(context, PREF_FILES.getValue(cat)))
                         if (cat == Cat.APPEARANCE) exportDirFiles(zip, File(context.filesDir, "fonts"), FONTS_DIR)
@@ -332,6 +358,24 @@ object SettingsBackup {
                                         put(name, JsonPrimitive(c.getLong(i)))
                                     android.database.Cursor.FIELD_TYPE_FLOAT ->
                                         put(name, JsonPrimitive(c.getDouble(i)))
+                                    // A blob becomes an OBJECT, not a prefixed string: a text
+                                    // column is allowed to contain any prefix anyone might pick as
+                                    // a marker, and a restore that guessed wrong would turn a note
+                                    // into bytes. `{"b64": …}` cannot be mistaken for a string.
+                                    android.database.Cursor.FIELD_TYPE_BLOB ->
+                                        put(
+                                            name,
+                                            buildJsonObject {
+                                                put(
+                                                    "b64",
+                                                    JsonPrimitive(
+                                                        android.util.Base64.encodeToString(
+                                                            c.getBlob(i), android.util.Base64.NO_WRAP,
+                                                        ),
+                                                    ),
+                                                )
+                                            },
+                                        )
                                     else -> put(name, JsonPrimitive(c.getString(i)))
                                 }
                             }
@@ -347,6 +391,97 @@ object SettingsBackup {
             }
             zip.closeEntry()
         }
+    }
+
+    /**
+     * The base maps, with the pixels as real files in the archive.
+     *
+     * A cutout is about a megabyte of already-compressed PNG. Base64 in the NDJSON would add a
+     * third to it and leave the ZIP nothing left to squeeze, so the row goes in as JSON without its
+     * blob and the bytes go in beside it under the row's own key. The key IS the whole transform
+     * (`z17_x70783_y44438_5x5`), so a file can never be matched to the wrong row.
+     */
+    private suspend fun exportCutouts(
+        zip: ZipOutputStream,
+        db: AppDatabase,
+        isCancelled: (() -> Boolean)?,
+    ) {
+        val sql = db.openHelper.writableDatabase
+        val present = HashSet<String>().apply {
+            sql.query("SELECT name FROM sqlite_master WHERE type='table'").use { c ->
+                while (c.moveToNext()) add(c.getString(0))
+            }
+        }
+        if (MAPS_TABLE !in present) return
+
+        val index = StringBuilder()
+        val pngs = LinkedHashMap<String, ByteArray>()
+        sql.query("SELECT * FROM `$MAPS_TABLE`").use { c ->
+            while (c.moveToNext()) {
+                if (isCancelled?.invoke() == true) throw ExportCancelledException()
+                var key: String? = null
+                var png: ByteArray? = null
+                val row = buildJsonObject {
+                    for (i in 0 until c.columnCount) {
+                        val name = c.getColumnName(i)
+                        when {
+                            name == "png" -> png = c.getBlob(i)
+                            c.getType(i) == android.database.Cursor.FIELD_TYPE_NULL -> {}
+                            c.getType(i) == android.database.Cursor.FIELD_TYPE_INTEGER ->
+                                put(name, JsonPrimitive(c.getLong(i)))
+                            c.getType(i) == android.database.Cursor.FIELD_TYPE_FLOAT ->
+                                put(name, JsonPrimitive(c.getDouble(i)))
+                            else -> {
+                                val text = c.getString(i)
+                                if (name == "key") key = text
+                                put(name, JsonPrimitive(text))
+                            }
+                        }
+                    }
+                }
+                val id = key ?: continue
+                index.append(ndjsonLine(row)).append('\n')
+                png?.let { pngs[id] = it }
+            }
+        }
+        if (index.isEmpty()) return
+        writeEntry(zip, "$MAPS_DIR/index.ndjson", index.toString().toByteArray())
+        for ((id, bytes) in pngs) writeEntry(zip, "$MAPS_DIR/$id.png", bytes)
+    }
+
+    /** Put the base maps back — the row from the index, the pixels from the file beside it. */
+    private fun importCutouts(entries: Map<String, ByteArray>, db: AppDatabase): Int {
+        val raw = entries["$MAPS_DIR/index.ndjson"] ?: return 0
+        val sql = db.openHelper.writableDatabase
+        var count = 0
+        sql.beginTransaction()
+        try {
+            for (line in raw.toString(Charsets.UTF_8).lineSequence()) {
+                if (line.isBlank()) continue
+                val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull() ?: continue
+                val key = row["key"]?.jsonPrimitive?.contentOrNull ?: continue
+                // A row whose picture did not come with it is skipped, not written blank: an empty
+                // cutout would draw as a hole under every walk in the area, and a missing row makes
+                // the app ask 地図 for it again.
+                val png = entries["$MAPS_DIR/$key.png"] ?: continue
+                val cols = row.keys.toList() + "png"
+                val stmt = "INSERT OR REPLACE INTO `$MAPS_TABLE` (" +
+                    cols.joinToString(",") { "`$it`" } + ") VALUES (" +
+                    cols.joinToString(",") { "?" } + ")"
+                val args = arrayOfNulls<Any>(cols.size)
+                row.keys.forEachIndexed { i, name ->
+                    val p = row.getValue(name).jsonPrimitive
+                    args[i] = if (p.isString) p.content else p.content.toLongOrNull() ?: p.content
+                }
+                args[cols.size - 1] = png
+                sql.execSQL(stmt, args)
+                count++
+            }
+            sql.setTransactionSuccessful()
+        } finally {
+            sql.endTransaction()
+        }
+        return count
     }
 
     /**
@@ -395,7 +530,17 @@ object SettingsBackup {
                     // only thing that knows which this one was.
                     val args = arrayOfNulls<Any>(cols.size)
                     cols.forEachIndexed { i, name ->
-                        val p = row.getValue(name).jsonPrimitive
+                        val value = row.getValue(name)
+                        // A blob came out as `{"b64": …}`, and only ever as that. Anything else is
+                        // read as the scalar it was written as.
+                        val blob = (value as? JsonObject)?.get("b64")?.jsonPrimitive?.contentOrNull
+                        if (blob != null) {
+                            args[i] = runCatching {
+                                android.util.Base64.decode(blob, android.util.Base64.NO_WRAP)
+                            }.getOrNull()
+                            return@forEachIndexed
+                        }
+                        val p = value.jsonPrimitive
                         args[i] = when {
                             p.isString -> p.content
                             p.content == "true" -> 1L
@@ -470,6 +615,10 @@ object SettingsBackup {
                 Cat.WORKSPACE -> WORKSPACE_ENTRY in entries
                 Cat.TASK_ICONS -> entries.keys.any { it.startsWith("$ICONS_DIR/") }
                 Cat.HEALTH_DATA -> entries.keys.any { it.startsWith("$HEALTH_DIR/") }
+                // Detected by its directory, like the other two that are not a prefs file. Left in
+                // the `else` branch it would look for `maps.json`, which nothing ever writes, so an
+                // archive with base maps in it would restore everything except them — silently.
+                Cat.MAPS -> entries.keys.any { it.startsWith("$MAPS_DIR/") }
                 else -> "${cat.id}.json" in entries
             }
         }.toSet()
@@ -502,6 +651,10 @@ object SettingsBackup {
                 Cat.HEALTH_DATA -> {
                     val n = importTables(entries, db)
                     if (n > 0) lines += "${cat.label}: $n rows"
+                }
+                Cat.MAPS -> {
+                    val n = importCutouts(entries, db)
+                    if (n > 0) lines += "${cat.label}: $n"
                 }
                 else -> {
                     val raw = entries["${cat.id}.json"] ?: continue
