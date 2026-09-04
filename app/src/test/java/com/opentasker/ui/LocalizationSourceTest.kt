@@ -349,6 +349,22 @@ class LocalizationSourceTest {
             "the blocked prefix must name what is blocked: ${strings["automation_lint_blocked_prefix"]}",
             strings["automation_lint_blocked_prefix"].orEmpty().contains("enabl", ignoreCase = true),
         )
+        // Pinning the id alone let the wording move underneath it: renaming the resource, or
+        // pointing the Inspector at a new one whose value is "Blocked:", would have passed.
+        assertFalse(
+            "the Inspector's prefix must not claim anything is blocked: " +
+                "${strings["automation_lint_conflict_prefix"]}",
+            strings["automation_lint_conflict_prefix"].orEmpty().contains("block", ignoreCase = true),
+        )
+        val inspectorPrefixes = Regex("""R\.string\.(automation_lint_\w+)""").findAll(inspector)
+            .map { it.groupValues[1] }
+            .toSet()
+        inspectorPrefixes.forEach { name ->
+            assertFalse(
+                "the Inspector renders $name, which reads \"${strings[name]}\"",
+                strings[name].orEmpty().contains("block", ignoreCase = true),
+            )
+        }
     }
 
     @Test
