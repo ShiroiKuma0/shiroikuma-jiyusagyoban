@@ -287,20 +287,26 @@ object OpenTaskerBundleCodec {
     /**
      * Redacts a free-text action field that holds no argument semantics.
      *
-     * Matching on secret *values* only, like `TaskerXmlExport`: a guard that names a secret
-     * (`%ApiKey == is_set`) leaks nothing, because the bundle already carries that variable's
-     * name with its value deliberately omitted, and redacting it would break a working guard.
+     * Matching on a literal secret *value* only. A guard that names a secret (`%ApiKey == is_set`)
+     * leaks nothing, because the bundle already carries that variable's name with its value
+     * deliberately omitted, and redacting it would break a working guard. Running these fields
+     * through the full `redactText` was worse than doing nothing: its URL, Authorization and
+     * `key=value` patterns fire with no secrets configured at all, so an ordinary label like
+     * "Set config key=abc123" was mangled and the export warned about a secret nobody had.
      */
     private fun redactExportedText(
         value: String?,
         context: ExportRedactionPolicy.Context,
     ): ExportedText {
         if (value.isNullOrBlank()) return ExportedText(value, wasRedacted = false)
-        val redacted = ExportRedactionPolicy.redactText(value, context.secretValues)
-        if (redacted == value) return ExportedText(value, wasRedacted = false)
-        // Keep the surrounding text: `%Pin == [REDACTED]` still says what the guard was for, and
-        // it cannot match, whereas a bare placeholder loses the shape of the comparison.
-        return ExportedText(redacted, wasRedacted = true)
+        val carriesSecret = context.secretValues.any { it.isNotEmpty() && value.contains(it) }
+        if (!carriesSecret) return ExportedText(value, wasRedacted = false)
+        // The whole field goes, not just the secret inside it. Substituting in place looked
+        // friendlier and was unsafe: `%Pin != 4321` would have become `%Pin != [REDACTED]`, which
+        // is true for every value %Pin can realistically hold, so an action that was guarded on
+        // export would run unguarded after import. A bare placeholder parses as no comparison at
+        // all, falls through to toBoolean(), and is false whatever operator was there.
+        return ExportedText(ExportRedactionPolicy.REDACTED, wasRedacted = true)
     }
 
     @Throws(SerializationException::class, IllegalArgumentException::class)

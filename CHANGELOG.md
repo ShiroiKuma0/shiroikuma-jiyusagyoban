@@ -58,8 +58,9 @@
 - Exporting a bundle no longer writes a secret you typed into a "Run only if"
   guard or an action label. Only action arguments were cleaned, so a guard like
   `%Pin == 4321` carried the value into the exported file, the paste text, and a
-  shared profile. The secret is replaced, the rest of the guard is kept so you
-  can see what to re-enter, and the export warns that something was removed.
+  shared profile. The whole guard is replaced rather than just the secret inside
+  it, so an action that was guarded before export cannot come back unguarded,
+  and the export warns you that something needs re-entering.
 - A Wi-Fi profile no longer goes deaf after an unrelated edit. Wi-Fi and
   internet state shared one slot, so a matcher rebuilt by any profile change saw
   only whichever of the two had spoken last. A profile on "connected to Home"

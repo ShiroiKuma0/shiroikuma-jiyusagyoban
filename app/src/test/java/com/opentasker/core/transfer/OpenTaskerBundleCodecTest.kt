@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.AutomationPower
 import com.opentasker.core.diagnostics.ExportRedactionPolicy
+import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextBooleanOperator
@@ -669,12 +670,85 @@ class OpenTaskerBundleCodecTest {
             "the label must not carry the secret's plaintext",
             action.label.orEmpty().contains("sk-live-abc123"),
         )
-        assertTrue(
-            "the guard should keep its shape so the user can see what to re-enter",
-            action.condition.orEmpty().startsWith("%Pin =="),
+        assertEquals(
+            "a redacted guard must not stay a comparison; see the != case below",
+            ExportRedactionPolicy.REDACTED,
+            action.condition,
         )
         assertTrue(
             "a redacted field must raise the export warning",
+            sanitized.metadata.warnings.contains(ExportRedactionPolicy.SENSITIVE_ACTION_WARNING),
+        )
+    }
+
+    /**
+     * A redacted guard has to be false, not merely different.
+     *
+     * Substituting the secret in place kept the comparison, so `%Pin != 4321` became
+     * `%Pin != [REDACTED]`, which is true for every value %Pin can realistically hold: an action
+     * that was guarded before export would have run unguarded after import.
+     */
+    @Test
+    fun aRedactedNotEqualsGuardCannotTurnIntoAnAlwaysTrueCondition() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "Unlock",
+                    actions = listOf(
+                        ActionSpec(type = "log", args = mapOf("message" to "ok"), condition = "%Pin != 4321"),
+                    ),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val sanitized = OpenTaskerBundleCodec.sanitizeForExport(
+            bundle,
+            secretVariableNames = setOf("Pin"),
+            secretVariableValues = setOf("4321"),
+        )
+
+        val guard = sanitized.tasks.single().actions.single().condition
+        assertEquals(ExportRedactionPolicy.REDACTED, guard)
+        // The engine reads an unparseable condition as false, so the action is skipped rather
+        // than running with no guard at all.
+        assertFalse(
+            "a redacted guard must not evaluate true",
+            VariableStore().evaluateCondition(guard.orEmpty()),
+        )
+    }
+
+    /** A user with no secrets must not have ordinary labels rewritten by the credential patterns. */
+    @Test
+    fun exportLeavesAnOrdinaryLabelAloneWhenNoSecretIsConfigured() {
+        val label = "Set config key=abc123 via http://192.168.1.5/api"
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "Publish",
+                    actions = listOf(ActionSpec(type = "log", label = label, args = mapOf("message" to "ok"))),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val sanitized = OpenTaskerBundleCodec.sanitizeForExport(bundle)
+
+        assertEquals(label, sanitized.tasks.single().actions.single().label)
+        assertFalse(
+            "nothing was redacted, so the export must not warn about secrets",
             sanitized.metadata.warnings.contains(ExportRedactionPolicy.SENSITIVE_ACTION_WARNING),
         )
     }
