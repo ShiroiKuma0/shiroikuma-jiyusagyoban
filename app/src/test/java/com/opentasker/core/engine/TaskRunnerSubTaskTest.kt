@@ -7,6 +7,7 @@ import com.opentasker.core.model.Task
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -88,6 +89,48 @@ class TaskRunnerSubTaskTest {
             "true",
             variables.get("PARENT_CONTINUED"),
         )
+    }
+
+    /**
+     * The other half of the same contract: isolating the sub-task's job must not detach it. When
+     * the caller is cancelled, from the Live screen or by its own profile, the sub-task still has
+     * to stop with it.
+     */
+    @Test
+    fun cancellingTheCallerStillStopsItsSubTask() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val nestedStopped = CompletableDeferred<Unit>()
+        ActionRegistry.register(object : Action {
+            override val id = "test.sub.observed"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                try {
+                    started.complete(Unit)
+                    awaitCancellation()
+                } finally {
+                    nestedStopped.complete(Unit)
+                }
+            }
+        })
+        val nested = Task(
+            id = 9,
+            name = "Observed",
+            collisionMode = CollisionMode.ABORT_EXISTING,
+            actions = listOf(ActionSpec(type = "test.sub.observed")),
+        )
+        val caller = async {
+            TaskRunner(
+                ActionContext(ContextWrapper(null), VariableStore()),
+                resolveTask = { ref -> nested.takeIf { ref == "Observed" } },
+                collisionCoordinator = TaskCollisionCoordinator(),
+            ).run(Task(name = "Parent", actions = listOf(ActionSpec(type = "task.run", args = mapOf("task" to "Observed")))))
+        }
+        started.await()
+
+        caller.cancelAndJoin()
+
+        withTimeout(5_000) { nestedStopped.await() }
+        assertTrue("the caller's cancellation must reach its sub-task", caller.isCancelled)
     }
 
     @Test

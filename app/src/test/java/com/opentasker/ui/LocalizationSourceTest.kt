@@ -295,9 +295,21 @@ class LocalizationSourceTest {
                 .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".xml") }
                 .toList()
         }.flatMap { file ->
-            stringResourceValues(file).entries
-                .filter { (_, value) -> "%%" in value && !Regex("""%\d+\$""").containsMatchIn(value) }
-                .map { (name, _) -> "${file.fileName}/$name" }
+            // <string> and every <item> under <plurals> or <string-array>: a quantity string is
+            // read with pluralStringResource and has exactly the same escaping rule.
+            val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
+            listOf("string", "item").flatMap { tag ->
+                val nodes = document.getElementsByTagName(tag)
+                (0 until nodes.length).map { index -> nodes.item(index) }
+            }.filter { node ->
+                val value = node.textContent.trim()
+                "%%" in value && !Regex("""%\d+\$""").containsMatchIn(value)
+            }.map { node ->
+                val name = node.attributes?.getNamedItem("name")?.nodeValue
+                    ?: node.parentNode?.attributes?.getNamedItem("name")?.nodeValue
+                    ?: node.nodeName
+                "${file.fileName}/$name"
+            }
         }
 
         assertEquals(
