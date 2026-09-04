@@ -51,6 +51,12 @@
 
 ### Fixed
 
+- Starting a task set to "abort existing" no longer cancels an unrelated task
+  that happened to be running it as a step. The two shared an identity, so the
+  caller was stopped and its run log said it had been replaced, when nothing had
+  replaced it. The step now fails on its own and the calling task carries on.
+  "Abort new" had the mirror image of the same bug: a task could refuse to start
+  because another task was running it as a step.
 - Global variables set by a run that was cancelled or that failed are now saved.
   Only a run that finished normally saved them, so a profile set to restart on
   every trigger lost the values on every restart but the last, and the run log

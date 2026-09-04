@@ -6,7 +6,9 @@ import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,6 +31,64 @@ class TaskRunnerSubTaskTest {
 
     private fun runner(variables: VariableStore, resolve: SubTaskResolver?) =
         TaskRunner(ActionContext(ContextWrapper(null), variables), resolveTask = resolve)
+
+    /**
+     * The collision coordinator identifies a run by its Job, and a sub-task used to run in the
+     * caller's own coroutine. Aborting the sub-task therefore aborted the entire caller, which had
+     * no collision of its own and was logged as "Replaced by a newer run".
+     */
+    @Test
+    fun abortExistingOnANestedSubTaskLeavesTheCallerRunning() = runBlocking {
+        registerRecorderAction("test.sub.recorder")
+        val started = CompletableDeferred<Unit>()
+        ActionRegistry.register(object : Action {
+            override val id = "test.sub.blocks"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                started.complete(Unit)
+                awaitCancellation()
+            }
+        })
+        val coordinator = TaskCollisionCoordinator()
+        val nested = Task(
+            id = 7,
+            name = "Nested",
+            collisionMode = CollisionMode.ABORT_EXISTING,
+            actions = listOf(ActionSpec(type = "test.sub.blocks")),
+        )
+        val variables = VariableStore()
+        val caller = async {
+            TaskRunner(
+                ActionContext(ContextWrapper(null), variables),
+                resolveTask = { ref -> nested.takeIf { ref == "Nested" } },
+                collisionCoordinator = coordinator,
+            ).run(
+                Task(
+                    name = "Parent",
+                    actions = listOf(
+                        ActionSpec(
+                            type = "task.run",
+                            args = mapOf("task" to "Nested"),
+                            continueOnError = true,
+                        ),
+                        ActionSpec(type = "test.sub.recorder", args = mapOf("key" to "PARENT_CONTINUED")),
+                    ),
+                ),
+            )
+        }
+        started.await()
+
+        val replacement = coordinator.execute(nested) { "replacement" }
+
+        withTimeout(5_000) { caller.await() }
+        assertTrue("the replacement must be admitted", replacement is TaskCollisionOutcome.Executed)
+        assertFalse("the caller must not be cancelled with its sub-task", caller.isCancelled)
+        assertEquals(
+            "the caller must carry on past the sub-task that was replaced",
+            "true",
+            variables.get("PARENT_CONTINUED"),
+        )
+    }
 
     @Test
     fun runsResolvedSubTask() = runBlocking {

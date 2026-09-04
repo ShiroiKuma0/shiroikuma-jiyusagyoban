@@ -21,7 +21,11 @@ class ExecutionSemanticsContractTest {
         val runner = engineRoot.resolve("TaskRunner.kt").readText()
         assertTrue(helper.contains("TaskCollisionCoordinator.Default"))
         assertTrue(helper.contains("collisionCoordinator.execute(task)"))
-        assertTrue(runner.contains("collisionCoordinator?.execute(target)"))
+        // The nested call moved into runNestedUnderItsOwnJob so the coordinator registers the
+        // sub-task's own Job rather than the caller's. The invariant is unchanged: a sub-task is
+        // still admitted by the coordinator, and the null case still runs it directly.
+        assertTrue(runner.contains("coordinator.execute(target)"))
+        assertTrue(runner.contains("runNestedUnderItsOwnJob(coordinator, target, child)"))
 
         // Scanned across every production root: the engine primitives moved into core:engine, and
         // a walk limited to app/ would no longer see a direct TaskRunner there.

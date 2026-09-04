@@ -12,7 +12,10 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 
 /** Resolves a sub-task by id or name for the `task.run` action. */
@@ -702,10 +705,15 @@ class TaskRunner(
                     ctx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
                 }
             }
-            when (val collision = collisionCoordinator?.execute(target) { child.run(target) }) {
-                null -> child.run(target)
-                is TaskCollisionOutcome.Executed -> collision.value
-                is TaskCollisionOutcome.Skipped -> return fail(collision.reason)
+            val coordinator = collisionCoordinator
+            val outcome = if (coordinator == null) {
+                TaskCollisionOutcome.Executed(child.run(target))
+            } else {
+                runNestedUnderItsOwnJob(coordinator, target, child)
+            }
+            when (outcome) {
+                is TaskCollisionOutcome.Executed -> outcome.value
+                is TaskCollisionOutcome.Skipped -> return fail(outcome.reason)
             }
         } finally {
             ctx.variables.popScope()
@@ -719,6 +727,35 @@ class TaskRunner(
             )
         }
         return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /**
+     * Runs a sub-task in a coroutine of its own so the collision coordinator registers *it*.
+     *
+     * The coordinator identifies a running invocation by the current Job. A sub-task used to run
+     * directly in the caller's coroutine, so the Job it registered for the sub-task was the
+     * caller's whole execution: a later Abort existing run of the sub-task cancelled the caller,
+     * which had no collision of its own and was logged as "Replaced by a newer run", and an Abort
+     * new run of the sub-task was refused because the caller looked like a run of it.
+     *
+     * `supervisorScope` keeps that cancellation from reaching the caller, so the sub-task step
+     * fails and the caller's own `continueOnError` decides what happens next. A cancellation of
+     * the caller itself still propagates, which is what `ensureActive` distinguishes.
+     */
+    private suspend fun runNestedUnderItsOwnJob(
+        coordinator: TaskCollisionCoordinator,
+        target: Task,
+        child: TaskRunner,
+    ): TaskCollisionOutcome<TaskRunReport> = supervisorScope {
+        val nested = async { coordinator.execute(target) { child.run(target) } }
+        try {
+            nested.await()
+        } catch (cancelled: CancellationException) {
+            coroutineContext.ensureActive()
+            TaskCollisionOutcome.Skipped(
+                cancelled.message ?: "The sub-task was replaced by a newer run.",
+            )
+        }
     }
 
     private fun shouldRun(spec: ActionSpec): Boolean {
