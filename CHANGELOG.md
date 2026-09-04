@@ -83,6 +83,10 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
+- Another app can no longer stop OpenTasker by sending it a malformed push or
+  Locale message. Both of those entry points are open to any app by design, and
+  reading a value the sending app deliberately made unreadable took the whole
+  automation service down with it. Such a message is now discarded and noted.
 - Tapping a notification button, or triggering a task from another app, now
   starts the automation engine properly when OpenTasker was not already running.
   It used to run that one task and then sit there looking healthy while no

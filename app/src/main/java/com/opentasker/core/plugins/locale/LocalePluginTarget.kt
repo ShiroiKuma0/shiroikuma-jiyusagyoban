@@ -52,10 +52,22 @@ class LocaleSettingFireReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != LocalePluginContract.ACTION_FIRE_SETTING) return
 
-        val bundle = intent.getBundleExtra(LocalePluginContract.EXTRA_BUNDLE)
-        val taskId = LocalePluginTarget.parseTaskId(bundle)
-        val taskName = LocalePluginTarget.parseTaskName(bundle) ?: "unknown"
-        val grant = LocalePluginTarget.parseGrant(bundle)
+        // Exported, so the sender chooses what is in this bundle. Reading a value unparcels it,
+        // and a class this process does not have throws where an uncaught exception would take
+        // down the automation engine. A bundle that cannot be read is not a bundle we can trust,
+        // so it is discarded rather than partially parsed.
+        val bundle = runCatching {
+            intent.getBundleExtra(LocalePluginContract.EXTRA_BUNDLE)
+        }.getOrElse { error ->
+            AppLogger.warn("LocaleSettingFireReceiver", "Discarded an unreadable Locale bundle", error)
+            return
+        }
+        val taskId = runCatching { LocalePluginTarget.parseTaskId(bundle) }.getOrElse { error ->
+            AppLogger.warn("LocaleSettingFireReceiver", "Discarded an unreadable Locale bundle", error)
+            return
+        }
+        val taskName = runCatching { LocalePluginTarget.parseTaskName(bundle) }.getOrNull() ?: "unknown"
+        val grant = runCatching { LocalePluginTarget.parseGrant(bundle) }.getOrNull()
 
         if (taskId == null) {
             AppLogger.warn("LocaleSettingFireReceiver", "Missing or invalid task ID in Locale bundle")

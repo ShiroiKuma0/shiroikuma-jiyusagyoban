@@ -241,7 +241,7 @@ object PushContextEvents {
             eventId = firstExtraString(EXTRA_EVENT_ID, NTFY_EXTRA_ID),
             title = firstExtraString(EXTRA_TITLE, NTFY_EXTRA_TITLE),
             message = firstExtraString(EXTRA_MESSAGE, NTFY_EXTRA_MESSAGE),
-            messageBytes = extras?.get(NTFY_EXTRA_MESSAGE_BYTES).byteCount(),
+            messageBytes = runCatching { extras?.get(NTFY_EXTRA_MESSAGE_BYTES) }.getOrNull().byteCount(),
             baseUrl = firstExtraString(NTFY_EXTRA_BASE_URL),
             muted = firstExtraString(NTFY_EXTRA_MUTED),
             mutedString = firstExtraString(NTFY_EXTRA_MUTED_STRING),
@@ -258,9 +258,15 @@ object PushContextEvents {
         )
     }
 
+    /**
+     * Every read is guarded individually: a sender can poison one key and leave the rest readable,
+     * and the delivery is still worth parsing from what does read. `extras` itself can throw.
+     */
     private fun Intent.firstExtraString(vararg names: String): String =
         names.asSequence()
-            .mapNotNull { name -> extras?.get(name).extraString()?.takeIf(String::isNotBlank) }
+            .mapNotNull { name ->
+                runCatching { extras?.get(name) }.getOrNull().extraString()?.takeIf(String::isNotBlank)
+            }
             .firstOrNull()
             .orEmpty()
 
