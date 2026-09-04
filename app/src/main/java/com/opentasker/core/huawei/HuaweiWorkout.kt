@@ -105,6 +105,11 @@ object HuaweiWorkout {
                 // a heart rate between 86 and 134. Every other code above came from a published
                 // description; this one came from the band.
                 STRENGTH -> "strength"
+                // The band calls this one **Free exercise** — its catch-all for an activity with
+                // no sport of its own, which is what 0xFF says. 白い熊 uses it for 機能訓練, so that
+                // is what this app calls it; the band's own name is recorded here so the mapping
+                // is visible rather than mysterious.
+                FREE_EXERCISE -> "rehab"
                 null -> "unknown"
                 else -> "type $type"
             }
@@ -114,10 +119,26 @@ object HuaweiWorkout {
 
         /** Lifting. Its own screen, because it shares nothing with a walk but the heart rate. */
         val isStrength: Boolean get() = type == STRENGTH
+
+        /** 機能訓練. The band's Free exercise, which is what 白い熊 records rehab under. */
+        val isRehab: Boolean get() = type == FREE_EXERCISE
+
+        /** Neither of the trackless kinds is a walk, and none of them has a route. */
+        val hasRoute: Boolean get() = !isStrength && !isRehab
     }
 
     /** The sport code the band puts on a strength-training session. */
     const val STRENGTH = 140
+
+    /**
+     * The band's **Free exercise** — measured on workout 23, 2026-09-04.
+     *
+     * `0xFF` is a sentinel rather than a sport, which is exactly what "free exercise" means: an
+     * activity the band declines to classify. It records the same things a strength session does —
+     * twenty minutes, no distance, 64 kcal, a five-second heart rate from 82 to 113 and a recovery
+     * curve — so nothing in the decoder needed changing to read it.
+     */
+    const val FREE_EXERCISE = 255
 
     /**
      * Parse the reply to a workout-list request.
