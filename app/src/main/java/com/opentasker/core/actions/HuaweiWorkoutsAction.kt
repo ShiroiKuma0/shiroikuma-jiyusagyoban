@@ -37,18 +37,22 @@ class HuaweiWorkoutsAction : Action {
         args["chizu_token"]?.trim()?.ifEmpty { null }
             ?.let { com.opentasker.core.huawei.HuaweiSettings.setChizuToken(ctx.app, it) }
 
-        // Which workouts the window is for. `kind=strength` opens 「重量挙げ」; anything else, or
-        // nothing, opens 「運動」. Not a second action id, because the fetch, the library and the
+        // Which workouts the window is for: `strength` opens 「重量挙げ」, `rehab` opens 「機能訓練」,
+        // anything else opens 「運動」. Not three action ids, because the fetch, the store and the
         // screen are all the same — only what is drawn differs.
-        val strength = args["kind"]?.trim().equals("strength", ignoreCase = true)
+        val kind = args["kind"]?.trim()?.lowercase()
+            ?.let { name ->
+                com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.entries.firstOrNull { it.label == name }
+            }
+            ?: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK
 
         // `browse` opens the window instead of asking the band. Same job seen from the other end —
         // 白い熊 looking at the workouts rather than a task fetching them — and it does not deserve
         // a second action id. Its value used to be the directory they lived in; there is no such
         // directory now, so any non-empty value means "open it".
         args["browse"]?.trim()?.ifEmpty { null }?.let {
-            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, days, strength)
-            ctx.variables.set("${prefix}Summary", if (strength) "opened the lifts" else "opened the walks")
+            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, days, kind)
+            ctx.variables.set("${prefix}Summary", "opened the ${kind.label} window")
             return ActionResult.Success
         }
 
