@@ -75,23 +75,31 @@ class HealthExportCoverageTest {
      */
     @Test
     fun `the measurement dump names every band table and no others`() {
-        val declared = listOf("BandDao.kt", "HuaweiDao.kt").flatMap { file ->
+        val declared = listOf("BandDao.kt", "HuaweiDao.kt", "HuaweiWorkoutDao.kt").flatMap { file ->
             Regex("tableName\\s*=\\s*\"([a-z_]+)\"")
                 .findAll(ProductionSources.read("com/opentasker/core/storage/$file"))
                 .map { it.groupValues[1] }
                 .toList()
         }.toSet()
-        assertEquals("expected seven band tables in the schema", 7, declared.size)
+        assertEquals("expected ten band tables in the schema", 10, declared.size)
 
         val listed = Regex("HEALTH_TABLES = listOf\\(([^)]*)\\)", RegexOption.DOT_MATCHES_ALL)
             .find(backup)!!
             .groupValues[1]
             .let { Regex("\"([a-z_]+)\"").findAll(it).map { m -> m.groupValues[1] }.toSet() }
 
+        // The cutouts are the ONE band table deliberately outside the measurement dump: a megabyte
+        // of already-compressed PNG per area, which base64 would inflate by a third for nothing, so
+        // it has its own category and its own file-per-picture path. Named here rather than
+        // subtracted silently, so removing that path makes this fail instead of passing quietly.
+        val maps = Regex("MAPS_TABLE = \"([a-z_]+)\"").find(backup)!!.groupValues[1]
+        assertTrue("the maps table must exist in the schema", maps in declared)
+        assertTrue("the maps category must exist", backup.contains("MAPS(\"maps\""))
+
         assertEquals(
-            "tables in the schema but not in the dump: ${declared - listed}; " +
+            "tables in the schema but not exported anywhere: ${declared - listed - maps}; " +
                 "names in the dump that are not tables: ${listed - declared}",
-            declared,
+            declared - maps,
             listed,
         )
     }
