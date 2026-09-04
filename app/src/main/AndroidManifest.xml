@@ -116,6 +116,10 @@
         <!-- Sister apps: token-gated automation intents driven by the Send Intent action. -->
         <package android:name="shiroikuma.jami" />
         <package android:name="shiroikuma.renrakusaki" />
+        <!-- 白い熊 応用管理: backs this app up and restores it through the automation provider.
+             Named explicitly because the reply broadcast's setPackage fails SILENTLY on Android 11+
+             without visibility — the export would run, write correctly, and never be heard of. -->
+        <package android:name="shiroikuma.oyokanri" />
         <!-- 白い熊 地図 (OsmAnd fork): a speed-test history row opens its fix with
              VIEW geo:<lat>,<lon>, handled by net.osmand.plus.activities.search.GeoIntentActivity. -->
         <package android:name="shiroikuma.chizu" />
@@ -829,6 +833,42 @@
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
+
+        <!--
+          The automation data door.
+
+          Exported on purpose and with no android:permission, because the gate is not a permission
+          and is not a token: ContentProvider.getCallingPackage() tells the app who is calling, and
+          AutomationCallers checks that name against an exact list AND a pinned signing certificate.
+          A permission would have to be `normal` (any app may hold it) or `signature` (impossible —
+          every app in this family has its own keystore), so neither buys anything here.
+        -->
+        <provider
+            android:name="com.opentasker.core.automation.AutomationProvider"
+            android:authorities="${applicationId}.automation"
+            android:exported="true" />
+
+        <service
+            android:name="com.opentasker.core.automation.AutomationDataService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Automation data export/import — writes this app's backup into a descriptor supplied by 白い熊 応用管理" />
+        </service>
+
+        <!--
+          What this app can do, readable WITHOUT waking it.
+
+          応用管理 builds its list across every installed package at once, and a frozen app cannot be
+          asked anything — reading the manifest is the only way to answer "can this app be backed
+          up" for an app 白い熊 has disabled. `min_format` is what lets a restore be refused before
+          any bytes are streamed: old data into a newer app is fine because apps migrate their own
+          storage, but newer data into an older app is not.
+        -->
+        <meta-data android:name="shiroikuma.automation.contract" android:value="2" />
+        <meta-data android:name="shiroikuma.automation.format" android:value="1" />
+        <meta-data android:name="shiroikuma.automation.min_format" android:value="1" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -325,6 +325,7 @@ fun UiCustomizationScreen(
 
     // Automation intent surface (StateExportReceiver): master switch + shared secret.
     var automationEnabled by remember { mutableStateOf(AutomationAuth.enabled(context)) }
+    var automationRequireToken by remember { mutableStateOf(AutomationAuth.requireToken(context)) }
     var automationToken by remember { mutableStateOf(AutomationAuth.token(context)) }
 
     // Export/Import (Kōjiki-style): the settable backup directory + its latest export, re-queried
@@ -430,7 +431,9 @@ fun UiCustomizationScreen(
                 SwitchRow(
                     level = 1,
                     label = "Automation export",
-                    description = "Let sister-app tasks trigger this export via the token-gated EXPORT_STATE intent.",
+                    description = "Let sister apps trigger this export, and back this app's data up " +
+                        "and restore it. On by default — 白い熊 応用管理 needs it to reach a freshly " +
+                        "installed copy on a clean phone.",
                     checked = automationEnabled,
                     onCheckedChange = {
                         automationEnabled = it
@@ -439,6 +442,22 @@ fun UiCustomizationScreen(
                 )
             }
             item {
+                SwitchRow(
+                    level = 1,
+                    label = "Use authorization token?",
+                    description = "Off: any sister app may drive the automation. On: a caller must " +
+                        "also present the token below. The data door checks the caller's identity " +
+                        "and signature either way, so this is extra, not the gate.",
+                    checked = automationRequireToken,
+                    onCheckedChange = {
+                        automationRequireToken = it
+                        AutomationAuth.setRequireToken(context, it)
+                    },
+                )
+            }
+            // The token row appears only when it is being asked for. A 48-character secret sitting
+            // under a switch that is off invites 白い熊 to paste it somewhere it will do nothing.
+            if (automationRequireToken) item {
                 val clipboard = LocalClipboardManager.current
                 RowScaffold(1, onClick = {
                     clipboard.setText(AnnotatedString(automationToken))
