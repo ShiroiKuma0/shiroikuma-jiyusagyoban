@@ -20,6 +20,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -27,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,13 +38,15 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
-import com.opentasker.core.huawei.HuaweiWalkLibrary
+import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.ui.charts.AnnotationText
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
 import com.opentasker.ui.charts.CountPickerDialog
 import com.opentasker.ui.charts.CountPill
+import com.opentasker.ui.charts.ActionPill
 import com.opentasker.ui.charts.NoteDialog
+import com.opentasker.ui.charts.NoteField
 import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.NoteText
@@ -48,6 +54,7 @@ import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -59,22 +66,35 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 fun HuaweiWalkDetailScreen(
-    walk: HuaweiWalkLibrary.Walk,
+    walk: HuaweiWorkoutStore.Workout,
     sharing: Boolean,
     busy: Boolean,
     message: String?,
     /** Heart rate over this walk's window, from the synced samples. Null when none were stored. */
     heart: com.opentasker.core.storage.HuaweiSampleStats? = null,
+    /**
+     * The band's own five-second stream, decoded from the sample blobs by whoever opened this.
+     *
+     * Passed in rather than loaded here, and that is deliberate: the screenshot engine renders one
+     * frame and never runs a `produceState`, so a screen that fetched its own data would preview as
+     * an empty card and stop being evidence of anything.
+     */
+    effort: HuaweiWorkoutStore.Effort? = null,
+    /** The route and the cutout under it, resolved by the caller for the same reason. */
+    plot: com.opentasker.core.huawei.maps.WalkPlot? = null,
+    /** The cutout's own pixels, decoded once and shared by every walk that crosses it. */
+    base: androidx.compose.ui.graphics.ImageBitmap? = null,
     contentPadding: PaddingValues,
     onShare: () -> Unit,
     onOpenInChizu: () -> Unit,
     onBack: () -> Unit,
-    /** Where the map comes from — the same seam as the grid, synchronous when supplied. */
-    plotOf: ((HuaweiWalkLibrary.Walk) -> com.opentasker.core.huawei.maps.WalkPlot?)? = null,
-    /** Where the cutouts live — the walk root. */
-    walkRoot: java.io.File = java.io.File(HuaweiWalkLibrary.DEFAULT_DIR),
     /** Ask 地図 for the base map of this walk's area, once, for every walk that will follow. */
     onFetchMap: () -> Unit = {},
+    /** Write the heart rate out as JSON, and the route out as GPX. Both report where they landed. */
+    onExportHeart: () -> Unit = {},
+    onExportGpx: () -> Unit = {},
+    /** What the last export wrote, shown under the buttons. A file nobody can find is not an export. */
+    exported: String? = null,
     /**
      * File the walk's annotation — 白い熊's note and stop count, both stated whole.
      *
@@ -116,6 +136,14 @@ fun HuaweiWalkDetailScreen(
                     NoteText("${HuaweiText.walksHeartFromSamples[lang]} · ${hr.n}")
                 }
 
+                // Everything below is the route, and a lift has none: no track file, nothing to
+                // draw over a cutout, nothing to hand to 地図, and no map to go and fetch. Left in
+                // place it would offer 白い熊 a base map for a session that happened indoors.
+                if (walk.isStrength) {
+                    message?.let { NoteText(it) }
+                    return@SectionCard
+                }
+
                 // The route, drawn over whatever cutout covers this area. No PNG is kept per
                 // walk any more — see WalkMap for why that was twenty times the size of the walk.
                 var needsMap by remember(walk.id) { mutableStateOf(false) }
@@ -129,17 +157,19 @@ fun HuaweiWalkDetailScreen(
                 ) {
                     WalkMap.Picture(
                         walk = walk,
-                        walkRoot = walkRoot,
+                        plot = plot,
+                        base = base,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
-                        plotOf = plotOf,
                         empty = { NoteText(HuaweiText.walksNoMap[lang]) },
                         needsMap = {
-                            NoteText(HuaweiText.walksNeedMap[lang])
+                            NoteText(HuaweiText.walksAskingMap[lang])
                             LaunchedEffect(walk.id) { needsMap = true }
                         },
                     )
                 }
-                // Somewhere new: one request, for the AREA, and every future walk here is free.
+                // The window asks for a missing area by itself. This button is the RETRY — for an
+                // area 地図 had no data for, or a request that failed — which is why it is worded
+                // as fetching rather than as the only way to get one.
                 if (needsMap) {
                     Button(
                         onClick = onFetchMap,
@@ -167,10 +197,31 @@ fun HuaweiWalkDetailScreen(
             }
         }
 
+        // The band's own five-second heart rate, its energy figure, and the recovery afterwards.
+        // Directly under the summary because for a lift it IS the summary: a strength session has
+        // no distance and no steps, so the card above it is a clock and a calorie count.
+        if (effort != null) item { EffortCard(walk, effort) }
+
         // What 白い熊 made of the walk, as opposed to what the band measured of it. Its own card,
         // directly under the figures, because it is the only thing on this screen that is an answer
         // rather than a reading — and the only thing here that does not exist unless it is given.
         item {
+            // A lift has ONE authored answer, so the card is that answer: titled 「覚え書き」 rather
+            // than "your own record", no stop count, and the note editable where it sits instead of
+            // behind a dialog (白い熊, 2026-09-03). A walk keeps the fuller card — it has a stop
+            // count to carry, and the dialog is what names which of the two is being answered.
+            if (walk.isStrength) {
+                SectionCard(accent = ChartPalette.HEART_RATE) {
+                    SectionTitle(AnnotationText.note[lang], ChartPalette.HEART_RATE)
+                    NoteField(
+                        note = walk.note,
+                        onSave = { text -> onAnnotate(text.trim().ifEmpty { null }, walk.stops) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                return@item
+            }
+
             SectionCard(accent = ChartPalette.STEPS) {
                 SectionTitle(AnnotationText.own[lang], ChartPalette.STEPS)
                 Row(
@@ -230,15 +281,55 @@ fun HuaweiWalkDetailScreen(
             }
         }
 
+        // Not "Files" any more, because there are none. Everything the band sent is a row in the
+        // database and travels in the app's own export; this card is the door OUT of it, for when
+        // 白い熊 wants a copy somewhere else. Both write to `/sdcard/tmp` and say where they landed
+        // — a file nobody can find has not been exported.
         item {
             SectionCard(accent = ChartPalette.AXIS_TEXT) {
-                SectionTitle(HuaweiText.walksFilesTitle[lang], ChartPalette.AXIS_TEXT)
-                // The raw file is named on purpose. It is the thing that can be re-decoded when the
-                // format turns out to be understood slightly wrongly — which has already happened
-                // once, and is why it is kept at all.
-                NoteText(HuaweiText.walksFilesNote[lang])
-                NoteText(walk.gpx.absolutePath)
-                NoteText(walk.raw.absolutePath)
+                SectionTitle(HuaweiText.walksExportTitle[lang], ChartPalette.AXIS_TEXT)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (walk.hasHeart) {
+                        ActionPill(
+                            label = AnnotationText.exportHeart[lang],
+                            icon = Icons.Filled.Download,
+                            enabled = !busy,
+                            onClick = onExportHeart,
+                        )
+                    }
+                    // A GPX is generated from the band's own track file on the way out. Nothing
+                    // keeps one: it is a lossy rendering under an earth radius and a datum that are
+                    // both still unproven, so a stored copy could only go stale against a decoder
+                    // that later turns out to have been wrong.
+                    if (walk.hasTrack) {
+                        ActionPill(
+                            label = AnnotationText.exportGpx[lang],
+                            icon = Icons.Filled.Download,
+                            enabled = !busy,
+                            onClick = onExportGpx,
+                        )
+                    }
+                }
+                // Hand the route to 白い熊 地図, for looking at it there with the zoom and the layers
+                // a picture cannot have.
+                //
+                // Not automatic, and never again by default: sending every walk over is what filled
+                // 地図's library with dozens of near-identical routes down the same streets. The
+                // grid's own picture needs nothing from 地図 but the shared base map, which the
+                // window fetches by itself — so this is for when 白い熊 actually wants the walk in
+                // 地図, which is a different question from wanting to see it.
+                if (walk.hasTrack) {
+                    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ActionPill(
+                            label = HuaweiText.walksSend[lang],
+                            icon = Icons.Filled.Share,
+                            enabled = !busy,
+                            onClick = onShare,
+                        )
+                        if (sharing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    }
+                }
+                exported?.let { NoteText(it) }
             }
         }
     }
@@ -281,6 +372,3 @@ fun HuaweiWalkDetailScreen(
  */
 private val STOPS_RANGE = 0..9
 
-/** The ordinary source: the large picture 地図 last drew for this walk. */
-internal fun mapFromDisk(walk: HuaweiWalkLibrary.Walk): ImageBitmap? =
-    walk.mapPath?.let { BitmapFactory.decodeFile(it)?.asImageBitmap() }

@@ -1,12 +1,13 @@
 package com.opentasker.ui.charts.huawei
 
+import com.opentasker.ui.charts.BandLanguage
 import android.content.Context
 import android.content.Intent
 import com.opentasker.core.actions.IntentReplyBridge
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.maps.MapCutouts
 import com.opentasker.core.huawei.maps.Mercator
-import com.opentasker.core.huawei.HuaweiWalkLibrary
+import com.opentasker.core.huawei.HuaweiWorkoutStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -69,7 +70,26 @@ object HuaweiChizu {
      * practice, but a reply that lands outside this window arrives as an unmatched id — silently
      * discarded, and indistinguishable from a failure. Waiting is the cheaper mistake.
      */
-    private const val TIMEOUT_MS = 300_000L
+    /**
+     * How long a 地図 round trip may take, and therefore how long our URI grant lives.
+     *
+     * 300 s was arithmetic done in our own favour: it subtracted 地図's 180 s initialization
+     * ceiling and left ~120 s, but there is a second ceiling behind it — the rasterizer's own
+     * `RENDER_TIMEOUT_MS` of 120 s. Stacked, the worst case is exactly 300 s and the margin is
+     * zero (地図 chat, 2026-09-04). Neither ceiling is typical, and a warm app renders a block in
+     * seconds; but a cold start over an area never rendered before is precisely where both run
+     * long, and that is the first thing this contract will be asked to do.
+     *
+     * The cost of being too generous is a longer wait when 地図 is genuinely dead. The cost of
+     * being too tight is a failure that looks like the URI plumbing and is not.
+     *
+     * **The signature of this being too short is specific, and it does not look like a timeout.**
+     * 地図 keeps working after our window closes, so what is seen is SILENCE — no `ERROR:`, no
+     * reply — and then, seconds later, the walk quietly appears in 地図's tracks folder after all.
+     * A file that lands with no reply means the request succeeded and we stopped listening; this
+     * constant is the dial, and nothing in the contract is at fault (地図 chat, 2026-09-04).
+     */
+    private const val TIMEOUT_MS = 420_000L
 
     /**
      * Above this, the track is handed over as a path rather than inline.
@@ -102,80 +122,119 @@ object HuaweiChizu {
     data class Outcome(val ok: Boolean, val message: String)
 
     /**
+     * The two refusals a 地図 that predates the URI contract gives, word for word.
+     *
+     * Worth naming rather than passing through. Both are thrown before 地図 writes anything, so
+     * nothing is created and nothing is half-written — but shown raw they read as a fault in THIS
+     * app, and "no gpx: pass gpx_data or gpx_path" is a particularly bad thing to put in front of
+     * 白い熊 when the truth is that the other app has not been rebuilt yet. Supplied by the 地図
+     * chat on 2026-09-04; both strings disappear the moment its build lands, which is exactly what
+     * makes them safe to match on.
+     */
+    private val OLD_BUILD = setOf(
+        "ERROR:no gpx: pass gpx_data or gpx_path",
+        "ERROR:no out_path",
+    )
+
+    private fun refusal(result: String, lang: BandLanguage): String =
+        if (result.trim() in OLD_BUILD) HuaweiText.chizuNeedsRebuild[lang] else result
+
+
+    /**
      * Send one walk. Returns what happened, in words fit to show 白い熊.
      *
      * Never throws: a sister app that is missing, frozen or refusing is an ordinary state here, and
      * the caller's job is to say so on the card rather than to crash the window.
      */
-    suspend fun share(context: Context, walk: HuaweiWalkLibrary.Walk): Outcome {
-        if (!walk.gpx.isFile) return Outcome(false, "no track file for this walk")
+    suspend fun share(
+        context: Context,
+        walk: HuaweiWorkoutStore.Workout,
+        gpx: String,
+        dao: com.opentasker.core.storage.HuaweiWorkoutDao,
+        lang: BandLanguage = BandLanguage.EN,
+    ): Outcome {
+        if (gpx.isBlank()) return Outcome(false, "no track to send for this workout")
         val token = HuaweiSettings.chizuToken(context)
         if (token.isNullOrBlank()) return Outcome(false, "no 地図 token — set %Huawei_ChizuToken")
 
-        val intent = request(ACTION_IMPORT_TRACK, token).apply {
-            // Both, always: 地図 prefers the inline copy when it is there, and the path stays as the
-            // thing that still works when it is not.
-            putExtra("gpx_path", walk.gpx.absolutePath)
-            if (walk.gpx.length() <= INLINE_MAX_BYTES) {
-                runCatching { walk.gpx.readText() }.getOrNull()?.let { putExtra("gpx_data", it) }
+        // The GPX exists for one round trip and nowhere else. It is regenerated from the band's own
+        // track file each time, so there is no copy to go stale and none to back up.
+        val handover = Handover.stage(
+            context, "walk-${walk.number}-${walk.startSeconds}.gpx", gpx.toByteArray(),
+        ) ?: return Outcome(false, "could not stage the track for 地図")
+        try {
+            val uri = Handover.uriFor(context, handover)
+            Handover.grant(context, uri, write = false)
+            val intent = request(ACTION_IMPORT_TRACK, token).apply {
+                putExtra("gpx_uri", uri.toString())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra("name", "${walk.kind} ${walkWhen(walk)}")
+                // No `thumb_out_uri` and no `map_out_uri`, so 地図 renders no pictures at all. A
+                // per-walk PNG was a megabyte of a street the shared cutout already covers, and
+                // asking for one made 地図 spend a second drawing something nothing reads.
+                //
+                // `out_dir` is a transitional GUARD, not a request. A 地図 that does not yet know
+                // `gpx_uri` falls through to its own default out_dir — which is the archive
+                // directory this whole change exists to retire — and would recreate it on the spot.
+                // Pointing it somewhere harmless costs nothing, and a new 地図 ignores it entirely
+                // in URI mode. Remove once the URI build is confirmed on the phone.
+                putExtra("out_dir", "/sdcard/tmp/chizu-out")
+                // Sending back the id we were given makes a re-share overwrite in place. Without it
+                // a walk shared twice becomes two tracks in 地図, and the second is not a new walk.
+                walk.trackId?.let { putExtra("track_id", it) }
+                putExtra("night", "day")
             }
-            putExtra("name", "${walk.kind} ${walkWhen(walk)}")
-            putExtra("out_dir", walk.dir.absolutePath)
-            // Sending back the id we were given makes a re-share overwrite in place. Without it a
-            // walk shared twice becomes two tracks in 地図, and the second one is not a new walk.
-            walk.trackId?.let { putExtra("track_id", it) }
-            putExtra("thumb_w", THUMB_W.toString())
-            putExtra("thumb_h", THUMB_H.toString())
-            putExtra("map_w", MAP_W.toString())
-            putExtra("map_h", MAP_H.toString())
-            // Pinned rather than left on `auto`. A grid whose pictures were drawn under whichever
-            // theme happened to be current reads as broken, and these images are kept for years.
-            putExtra("night", "day")
+
+            val reply = roundTrip(context, intent) ?: return Outcome(false, "地図 did not answer")
+            if (!reply.result.startsWith("OK:")) return Outcome(false, refusal(reply.result, lang))
+
+            // The packed summary's field order, which is 地図's to define and has changed once
+            // already. Named extras are read first and this is only the fallback, but a fallback
+            // that silently returns the wrong field is worse than none, so it is written down here.
+            val packed = reply.result.removePrefix("OK:").split('|')
+            val slots = listOf("track_id", "gpx", "thumb", "map", "distance_m", "duration_s")
+            // The positional fallback is used ONLY when the reply has exactly the fields this list
+            // names. In URI mode with no pictures asked for, three of the six come back empty —
+            // `OK:<id>||||<distance>|<duration>` — and any reply whose count disagrees with the
+            // slots means the shape has moved. Reading it anyway would not fail; it would put the
+            // duration where the distance goes and show two plausible wrong numbers beside the
+            // band's own figures, on the card that exists precisely to catch a disagreement.
+            // Named extras carry all of this and are read first regardless.
+            val positional = packed.takeIf { it.size == slots.size }
+            fun field(name: String): String? =
+                reply.extras[name]?.takeIf { it.isNotBlank() }
+                    ?: positional?.getOrNull(slots.indexOf(name))?.trim()?.takeIf { it.isNotBlank() }
+
+            HuaweiWorkoutStore.recordMap(
+                dao = dao,
+                workout = walk,
+                trackId = field("track_id"),
+                // 地図's own arithmetic over the same route, kept beside the band's and never merged
+                // with it. Two independent measurements of one route is exactly the instrument that
+                // catches a decoder reading a format slightly wrongly — which has happened here
+                // once already, and was only caught because a number looked wrong.
+                chizu = HuaweiWorkoutStore.ChizuReading(
+                    distanceMetres = field("distance_m")?.toDoubleOrNull(),
+                    durationSeconds = field("duration_s")?.toLongOrNull(),
+                    movingSeconds = field("moving_time_s")?.toLongOrNull(),
+                    activeSeconds = field("active_time_s")?.toLongOrNull(),
+                    climbMetres = field("ascent_m")?.toDoubleOrNull(),
+                    descentMetres = field("descent_m")?.toDoubleOrNull(),
+                    // Empty in URI mode when no picture is asked for — there is no render to derive
+                    // it from — and empty is the honest answer rather than a stale one.
+                    detail = field("map_detail"),
+                ),
+                cutoutKey = null,
+            )
+            return Outcome(true, "sent to 地図")
+        } finally {
+            // Held until the reply lands. 地図 waits up to three minutes for its own initialization
+            // before it opens the stream, so a grant revoked on a short timer is the one thing that
+            // would make this fail intermittently and look like a 地図 bug.
+            Handover.release(context, handover)
         }
-
-        val reply = roundTrip(context, intent) ?: return Outcome(false, "地図 did not answer")
-        if (!reply.result.startsWith("OK:")) return Outcome(false, reply.result)
-
-        // The packed summary's field order, which is 地図's to define and has changed once already.
-        // Named extras are read first and this is only the fallback, but a fallback that silently
-        // returns the wrong field is worse than no fallback, so the order is written down here.
-        val packed = reply.result.removePrefix("OK:").split('|')
-        val slots = listOf("track_id", "gpx_path", "thumb_path", "map_path", "distance_m", "duration_s")
-        fun field(name: String): String? =
-            reply.extras[name]?.takeIf { it.isNotBlank() }
-                ?: packed.getOrNull(slots.indexOf(name))?.trim()?.takeIf { it.isNotBlank() }
-
-        val thumb = field("thumb_path")?.let { copyInto(it, File(walk.dir, "map-thumb.png")) }
-        val map = field("map_path")?.let { copyInto(it, File(walk.dir, "map.png")) }
-        HuaweiWalkLibrary.recordMap(
-            walk = walk,
-            trackId = field("track_id"),
-            thumbPath = thumb,
-            mapPath = map,
-            // 地図's own arithmetic over the GPX, kept beside the band's own figures and never merged
-            // with them. Two independent measurements of one route is exactly the instrument that
-            // catches a decoder reading the format slightly wrongly — which has happened once here
-            // already, and was only caught because a number looked wrong.
-            chizu = HuaweiWalkLibrary.ChizuReading(
-                distanceMetres = field("distance_m")?.toDoubleOrNull(),
-                durationSeconds = field("duration_s")?.toLongOrNull(),
-                movingSeconds = reply.extras["moving_time_s"]?.toLongOrNull(),
-                activeSeconds = reply.extras["active_time_s"]?.toLongOrNull(),
-                climbMetres = reply.extras["elevation_up"]?.toDoubleOrNull(),
-                descentMetres = reply.extras["elevation_down"]?.toDoubleOrNull(),
-                // `map` = real streets, `basemap` = only the bundled world map was underneath,
-                // `none` = the plain fallback. Recorded because it is the difference between a
-                // picture worth keeping and one worth drawing again later, and nothing else on
-                // this side can tell them apart — both are a route on a pale ground.
-                detail = reply.extras["map_detail"],
-            ),
-        )
-        return Outcome(true, when (reply.extras["map_detail"]) {
-            "map" -> "地図 drew the map"
-            "basemap", "none" -> "saved — but no map covers this walk yet"
-            else -> if (map != null) "地図 drew the map" else "saved to 地図"
-        })
     }
+
 
     /** 地図 5.4.x+: render a BASE map for a tile block, with no track and no library entry. */
     const val ACTION_EXPORT_BASEMAP = "shiroikuma.chizu.action.EXPORT_BASEMAP"
@@ -199,31 +258,84 @@ object HuaweiChizu {
      * them, costs 地図 nothing to keep, and leaves its library to the tracks 白い熊 actually put
      * there on purpose.
      */
-    suspend fun basemap(context: Context, cutout: MapCutouts.Cutout): Outcome {
+    suspend fun basemap(
+        context: Context,
+        cutout: MapCutouts.Cutout,
+        dao: com.opentasker.core.storage.HuaweiWorkoutDao,
+        lang: BandLanguage = BandLanguage.EN,
+    ): Outcome {
         val token = HuaweiSettings.chizuToken(context)
         if (token.isNullOrBlank()) return Outcome(false, "no 地図 token — set %Huawei_ChizuToken")
-        cutout.file.parentFile?.mkdirs()
-        val intent = request(ACTION_EXPORT_BASEMAP, token).apply {
-            putExtra("zoom", cutout.zoom.toString())
-            putExtra("tile_x", cutout.tileX.toString())
-            putExtra("tile_y", cutout.tileY.toString())
-            putExtra("tiles_w", cutout.tilesW.toString())
-            putExtra("tiles_h", cutout.tilesH.toString())
-            putExtra("tile_px", Mercator.TILE_PX.toString())
-            putExtra("out_path", cutout.file.absolutePath)
-            putExtra("night", "day")
+
+        // 地図 renders straight into the stream, so what is at this URI is whole only once the reply
+        // says OK. That is why it is a scratch file of ours and not the row itself: the bytes reach
+        // the database in one move, after the answer, or not at all. A half-written PNG here would
+        // not merely blank the area — it would be exported and restored months later.
+        val handover = Handover.stage(context, "cutout-${cutout.id}.png", ByteArray(0))
+            ?: return Outcome(false, "could not stage the map for 地図")
+        try {
+            val uri = Handover.uriFor(context, handover)
+            Handover.grant(context, uri, write = true)
+            val intent = request(ACTION_EXPORT_BASEMAP, token).apply {
+                putExtra("zoom", cutout.zoom.toString())
+                putExtra("tile_x", cutout.tileX.toString())
+                putExtra("tile_y", cutout.tileY.toString())
+                putExtra("tiles_w", cutout.tilesW.toString())
+                putExtra("tiles_h", cutout.tilesH.toString())
+                putExtra("tile_px", Mercator.TILE_PX.toString())
+                putExtra("out_uri", uri.toString())
+                addFlags(
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                putExtra("night", "day")
+            }
+            val reply = roundTrip(context, intent)
+                ?: return Outcome(false, "地図 did not answer")
+            if (!reply.result.startsWith("OK:")) return Outcome(false, refusal(reply.result, lang))
+
+            // `map_detail` is the ONLY thing that says whether there is a map in the picture.
+            //
+            // Every failure inside 地図's renderer — its render timeout, an interrupted draw, no
+            // map data installed for the area — falls back to painting the block plain black and
+            // still replies `OK:`. That fallback is right for a walk picture, where a route on
+            // black still shows the route; for a bare cutout it is a megabyte of nothing that
+            // looks exactly like a success (地図 chat, 2026-09-04, correcting its own earlier
+            // "map_detail is ignorable" — which was true only for a track import drawing no
+            // picture).
+            //
+            // Caching one would be worse here than anywhere else: a cutout is a row in an export
+            // category 白い熊 can restore from months later, so a black neighbourhood would be
+            // backed up and come back. Same hazard as a half-written file, arriving through a
+            // reply that says OK.
+            val packed = reply.result.removePrefix("OK:").split('|')
+            val detail = (reply.extras["map_detail"]?.takeIf { it.isNotBlank() }
+                ?: packed.getOrNull(3)?.trim())?.lowercase()
+            if (detail != "map") {
+                return Outcome(
+                    false,
+                    when (detail) {
+                        // The mini world basemap. At the zoom a walk is drawn at, that is an empty
+                        // picture with a coastline somewhere off the edge of it.
+                        "basemap" -> HuaweiText.chizuNoDetail[lang]
+                        "none", null, "" -> HuaweiText.chizuNothingDrawn[lang]
+                        else -> "地図: $detail"
+                    },
+                )
+            }
+            val png = runCatching { handover.readBytes() }.getOrNull()
+            if (png == null || png.size < 1024) return Outcome(false, "地図 answered but wrote no map")
+            HuaweiWorkoutStore.putCutout(
+                dao = dao, key = cutout.id, zoom = cutout.zoom,
+                tileX = cutout.tileX, tileY = cutout.tileY,
+                tilesW = cutout.tilesW, tilesH = cutout.tilesH,
+                tilePx = Mercator.TILE_PX, png = png,
+            )
+            return Outcome(true, "map cached for this area")
+        } finally {
+            Handover.release(context, handover)
         }
-        val reply = roundTrip(context, intent)
-            ?: return Outcome(false, "地図 did not answer — it may not have EXPORT_BASEMAP yet")
-        if (!reply.result.startsWith("OK:")) return Outcome(false, reply.result)
-        // Trust the file, not the reply. A reply saying OK over a missing or empty file would leave
-        // every walk in the area silently blank, and the cheapest place to catch that is here.
-        if (!cutout.file.isFile || cutout.file.length() < 1024) {
-            cutout.file.delete()
-            return Outcome(false, "地図 answered but wrote no map")
-        }
-        return Outcome(true, "map cached for this area")
     }
+
 
     /**
      * Open the walk in 地図 itself — the button for looking at a route properly, with the zoom and
@@ -246,7 +358,7 @@ object HuaweiChizu {
      * [showViaBroadcast] remains for a 地図 older than that, and only for the window between this
      * build being installed and that one.
      */
-    suspend fun show(context: Context, walk: HuaweiWalkLibrary.Walk): Outcome {
+    suspend fun show(context: Context, walk: HuaweiWorkoutStore.Workout): Outcome {
         val trackId = walk.trackId ?: return Outcome(false, "not sent to 地図 yet")
 
         // The good path: one intent, from our own foreground. Nothing in it can be refused, nothing

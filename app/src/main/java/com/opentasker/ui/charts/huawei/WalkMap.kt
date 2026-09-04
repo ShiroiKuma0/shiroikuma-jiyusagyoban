@@ -21,7 +21,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.opentasker.core.huawei.HuaweiWalkLibrary
+import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.core.huawei.maps.WalkPlot
 import com.opentasker.core.huawei.maps.WalkTrack
 import com.opentasker.core.huawei.maps.MapCutouts
@@ -119,7 +119,10 @@ object WalkMap {
         line: Color = Color(0xFFFF3B30),
         base: ImageBitmap? = null,
     ) {
-        val image = base ?: bitmapOf(cutout.file)
+        // The cutout's bytes come from the database now, decoded by the caller — there is no file
+        // to read here and no path to be wrong about. Without one the route still draws, projected
+        // onto the cutout's own transform, which is the "somewhere new" state rather than a fault.
+        val image = base
         Canvas(modifier) {
             val bw = image?.width ?: (cutout.tilesW * 256)
             val bh = image?.height ?: (cutout.tilesH * 256)
@@ -159,29 +162,23 @@ object WalkMap {
      */
     @Composable
     fun Picture(
-        walk: HuaweiWalkLibrary.Walk,
-        walkRoot: File,
+        walk: HuaweiWorkoutStore.Workout,
+        /** The route and the cutout under it. Null while it is still being resolved, or if there is none. */
+        plot: WalkPlot?,
+        /** The cutout's pixels, decoded once per cutout and shared by every walk that crosses it. */
+        base: ImageBitmap?,
         modifier: Modifier = Modifier,
         thinTo: Int = 600,
-        plotOf: ((HuaweiWalkLibrary.Walk) -> WalkPlot?)? = null,
         empty: @Composable () -> Unit = {},
         needsMap: @Composable () -> Unit = {},
     ) {
-        val supplied = plotOf
-        val plot = if (supplied != null) {
-            remember(walk.id) { supplied(walk) }
-        } else {
-            val loaded by produceState<WalkPlot?>(null, walk.id) {
-                value = withContext(Dispatchers.IO) { WalkTrack.plot(walkRoot, walk.gpx) }
-            }
-            loaded
-        }
         when {
             plot == null || !plot.hasTrack -> empty()
             plot.cutout == null -> needsMap()
             else -> Route(
                 cutout = plot.cutout,
                 points = remember(walk.id, thinTo) { WalkTrack.thin(plot.points, thinTo) },
+                base = base,
                 modifier = modifier,
             )
         }
