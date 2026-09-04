@@ -34,8 +34,9 @@ class TimeEventReceiver : BroadcastReceiver() {
             TimeEventAction.TIME_TICK -> {
                 ExpectedTriggerLedger(context).markDelivered(System.currentTimeMillis())
                 val scheduler = TimeEventScheduler(context)
-                runCatching { scheduler.scheduleNextMinute() }
+                val rearmed = runCatching { scheduler.scheduleNextMinute() }
                     .onFailure { AppLogger.error(TAG, "Could not re-arm the next time tick", it) }
+                    .isSuccess
                 runCatching {
                     ContextCompat.startForegroundService(
                         context,
@@ -45,7 +46,10 @@ class TimeEventReceiver : BroadcastReceiver() {
                 }.onSuccess {
                     AppLogger.debug(TAG, "Delivered alarm-backed time tick to the engine")
                 }.onFailure { error ->
-                    if (isBackgroundStartRefusal(error)) {
+                    // Only skip the recovery when the ordinary tick was re-armed. If that failed
+                    // too, the recovery alarm is the one thing left that can restart the chain,
+                    // and skipping it here would leave time triggers dead until a reboot.
+                    if (rearmed && isBackgroundStartRefusal(error)) {
                         // Android refused a foreground-service start from the background, and it
                         // will refuse the retry for the same reason. The recovery alarm is five
                         // seconds out on the same PendingIntent, so scheduling one here produced a
@@ -89,7 +93,24 @@ class TimeEventReceiver : BroadcastReceiver() {
  * arrives wrapped when the start goes through a helper.
  */
 internal fun isBackgroundStartRefusal(error: Throwable): Boolean =
-    namesBackgroundStartRefusal(causeChainClassNames(error))
+    namesBackgroundStartRefusal(causeChainClassNames(error)) ||
+        generateSequence(error, Throwable::cause)
+            .take(MAX_CAUSE_DEPTH)
+            .any { readsAsBackgroundStartRefusal(it.message) }
+
+/**
+ * The same refusal below API 31, where the dedicated exception class does not exist yet.
+ *
+ * `startForegroundService` from the background throws a plain `IllegalStateException` there, so a
+ * class-name check alone left the retry storm live on Android 8 to 11. Matching a message is
+ * fuzzy, and deliberately safe to get wrong in this direction: a false positive only skips a
+ * five-second retry, and the ordinary minute tick has already been re-armed by then.
+ */
+internal fun readsAsBackgroundStartRefusal(message: String?): Boolean {
+    val text = message?.lowercase() ?: return false
+    return "not allowed to start service" in text ||
+        ("background" in text && "start" in text && "service" in text)
+}
 
 /** The class names of a throwable and its causes, outermost first. */
 internal fun causeChainClassNames(error: Throwable): List<String> =

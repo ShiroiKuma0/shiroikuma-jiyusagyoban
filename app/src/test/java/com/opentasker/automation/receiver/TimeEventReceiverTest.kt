@@ -78,12 +78,52 @@ class TimeEventReceiverTest {
     }
 
     /**
-     * A message that merely mentions the refusal is not the refusal: the check reads class names,
-     * so this stays false even though the text matches.
+     * Below API 31 the dedicated exception class does not exist, and the same refusal arrives as a
+     * plain IllegalStateException. Matching only the class name left the retry storm live on
+     * Android 8 to 11, which is most of the devices this app's minSdk exists for.
      */
     @Test
-    fun aLookalikeMessageIsNotTreatedAsTheRefusal() {
-        assertFalse(isBackgroundStartRefusal(RuntimeException(REFUSAL)))
+    fun theSameRefusalIsRecognisedFromItsMessageOnOlderAndroid() {
+        assertTrue(
+            isBackgroundStartRefusal(
+                IllegalStateException(
+                    "Not allowed to start service Intent { cmp=com.opentasker.app/.Service }: " +
+                        "app is in background uid UidRecord{1234}",
+                ),
+            ),
+        )
+        assertTrue(readsAsBackgroundStartRefusal("Not allowed to start service Intent"))
+        assertFalse(readsAsBackgroundStartRefusal(null))
+        assertFalse(readsAsBackgroundStartRefusal("database is locked"))
+        assertFalse(
+            "an unrelated failure must still book a recovery",
+            isBackgroundStartRefusal(IllegalStateException("service died")),
+        )
+    }
+
+    /**
+     * Skipping the recovery is only safe once the ordinary tick is re-armed.
+     *
+     * Both are attempted independently, so if the re-arm also failed, the recovery alarm is the
+     * only thing that can restart the chain. Skipping it in that case leaves time triggers dead
+     * until a reboot, which is worse than the retry storm the skip exists to prevent.
+     */
+    @Test
+    fun theRecoveryIsOnlySkippedWhenTheNextTickIsAlreadyArmed() {
+        val source = com.opentasker.ProductionSources.block(
+            "com/opentasker/automation/receiver/TimeEventReceiver.kt",
+            "TimeEventAction.TIME_TICK ->",
+            "TimeEventAction.EXACT_ALARM_PERMISSION_CHANGED ->",
+        )
+
+        assertTrue(
+            "the re-arm result must gate the skip",
+            "if (rearmed && isBackgroundStartRefusal(error))" in source,
+        )
+        assertTrue(
+            "and it must be the result of scheduling the next tick",
+            "val rearmed = runCatching { scheduler.scheduleNextMinute() }" in source,
+        )
     }
 
     private companion object {
