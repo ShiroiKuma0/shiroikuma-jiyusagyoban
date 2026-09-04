@@ -85,6 +85,8 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -2297,6 +2299,13 @@ private fun SnapshotRecoveryPassphraseDialog(
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(R.string.setup_snapshots_passphrase_label)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    // Masking is not enough on its own: without a password keyboard type the IME
+                    // keeps autocorrect and its personal dictionary on, learns the passphrase and
+                    // can offer it as a suggestion in another app later.
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        autoCorrectEnabled = false,
+                    ),
                     singleLine = true,
                     isError = passphrase.isNotEmpty() && !longEnough,
                 )
@@ -2305,6 +2314,10 @@ private fun SnapshotRecoveryPassphraseDialog(
                     onValueChange = { confirmation = it },
                     label = { Text(stringResource(R.string.setup_snapshots_passphrase_confirm)) },
                     visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        autoCorrectEnabled = false,
+                    ),
                     singleLine = true,
                     isError = confirmation.isNotEmpty() && !matches,
                 )

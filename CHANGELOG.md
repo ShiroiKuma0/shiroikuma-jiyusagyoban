@@ -83,6 +83,10 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
+- Secret variable values and the backup passphrase now use the password keyboard.
+  They were masked on screen but typed as ordinary text, so the keyboard's
+  autocorrect and personal dictionary could learn them and offer them as a
+  suggestion in another app later.
 - Another app can no longer stop OpenTasker by sending it a malformed push or
   Locale message. Both of those entry points are open to any app by design, and
   reading a value the sending app deliberately made unreadable took the whole

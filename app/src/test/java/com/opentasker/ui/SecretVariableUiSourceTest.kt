@@ -11,6 +11,33 @@ import org.junit.Test
 class SecretVariableUiSourceTest {
 
 
+    /**
+     * Masking a field is only half of hiding it.
+     *
+     * Without `KeyboardType.Password` the IME treats the input as ordinary text: autocorrect and
+     * the personal dictionary stay on, so the keyboard can learn a secret variable's value or a
+     * backup passphrase and offer it as a suggestion in another app later. The masking makes it
+     * look handled, which is what makes the omission easy to miss.
+     */
+    @Test
+    fun everyMaskedFieldAlsoAsksForThePasswordKeyboard() {
+        val surfaces = listOf(
+            "com/opentasker/ui/screens/VariablesScreen.kt",
+            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
+        )
+
+        surfaces.forEach { path ->
+            val source = ProductionSources.read(path)
+            val masked = Regex("PasswordVisualTransformation\\(\\)").findAll(source).count()
+            val passwordKeyboards = Regex("KeyboardType\\.Password").findAll(source).count()
+
+            assertTrue(
+                "$path masks $masked field(s) but asks for the password keyboard $passwordKeyboards time(s)",
+                passwordKeyboards >= masked,
+            )
+        }
+    }
+
     @Test
     fun variableVaultUsesExplicitSecretStateAndDeliberateReveal() {
         val source = ProductionSources.path("com/opentasker/ui/screens/VariablesScreen.kt").readText()

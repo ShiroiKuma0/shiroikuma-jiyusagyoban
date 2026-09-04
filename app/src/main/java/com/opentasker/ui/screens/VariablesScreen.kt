@@ -43,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.res.stringResource
@@ -436,6 +438,14 @@ private fun VariableEditorDialog(
                         )
                     },
                     visualTransformation = if (isSecret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
+                    // A secret needs the password keyboard type, not just the masking. Without it
+                    // the IME keeps autocorrect and its personal dictionary on and can learn the
+                    // value, then offer it as a suggestion in another app.
+                    keyboardOptions = if (isSecret) {
+                        KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
+                    } else {
+                        KeyboardOptions.Default
+                    },
                     trailingIcon = if (isSecret) {
                         {
                             IconButton(onClick = { revealed = !revealed }) {
