@@ -72,7 +72,8 @@ import java.time.ZoneId
  * the calendar has to read as a block of days of which some are done, never as a scattering of
  * yellow on nothing.
  */
-private val REST_FILL = Color(0xFF2A2A2A)
+/** The unfilled ground of a calendar tile, shared by every kind's calendar. */
+internal val REST_FILL = Color(0xFF2A2A2A)
 
 /** The two full weeks ending on today's — always exactly two rows, whatever weekday it is. */
 fun rehabCutoutStart(today: LocalDate): LocalDate =

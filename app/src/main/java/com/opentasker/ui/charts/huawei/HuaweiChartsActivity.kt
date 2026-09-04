@@ -153,7 +153,13 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 onNote = { notingMorning = state.feltMorning ?: model.morningKeyNow() },
                                 onTapRehabDay = { rehabDay = com.opentasker.core.band.RehabLog
                                     .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
-                                onOpenRehab = { selected = REHAB_KEY },
+                                // Each pill opens the workout window it names. A separate
+                                // activity, so the report is still underneath when it closes.
+                                onOpenWorkouts = { kind ->
+                                    com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(
+                                        applicationContext, 30, kind,
+                                    )
+                                },
                                 // The register opens the Hume side's own screen: it is one record
                                 // of 白い熊's nights and ratings, not a per-band one, and two
                                 // registers would disagree the first time a rating was filed from

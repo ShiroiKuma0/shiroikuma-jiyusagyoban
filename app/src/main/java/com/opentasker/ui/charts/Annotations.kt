@@ -206,6 +206,15 @@ fun ActionPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /**
+     * A pill that is the point of its card rather than one option among several.
+     *
+     * 白い熊 asked for the 機能訓練 calendar to be bigger (2026-09-04), and it is the only way to a
+     * whole page — everything else an action pill does is write a file. Size is what says so; the
+     * colour is pure yellow either way, because that is the annotation language's ink and a second
+     * colour would mean something it does not.
+     */
+    large: Boolean = false,
 ) {
     val ink = if (enabled) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
     Row(
@@ -213,13 +222,29 @@ fun ActionPill(
             .clip(RoundedCornerShape(100.dp))
             .border(1.5.dp, ink, RoundedCornerShape(100.dp))
             // Padding BEFORE clickable, or the touch target shrinks to the glyph.
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(
+                horizontal = if (large) 14.dp else 10.dp,
+                vertical = if (large) 7.dp else 4.dp,
+            )
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (large) 8.dp else 6.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = ink, modifier = Modifier.size(20.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge, color = ink)
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = ink,
+            modifier = Modifier.size(if (large) 26.dp else 20.dp),
+        )
+        Text(
+            label,
+            style = if (large) {
+                MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            } else {
+                MaterialTheme.typography.bodyLarge
+            },
+            color = ink,
+        )
     }
 }
 
