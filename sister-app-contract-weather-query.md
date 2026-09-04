@@ -1,5 +1,22 @@
 # Contract — asking 白い熊 天気 for weather
 
+> ## ⚠ The token became OPTIONAL in v2 (2026-09-04)
+>
+> This contract was written when every automation intent had to carry a token. It no longer does:
+> each app now ships with automation **on** and 「Use authorization token?」 **off**, and a token
+> sent to an app that does not require one is **ignored rather than refused**.
+>
+> **Nothing here has to change to keep working.** A caller that still sends `token` is served either
+> way — that idempotence is exactly what it is for. A caller that sends none is served too, unless
+> 白い熊 has turned the token back on for that app.
+>
+> The authoritative wording is §2 of
+> `sister-app-contract-backup-automation-hand-off.md`, which also carries §2a — the new data door,
+> where a caller is identified by package name and pinned signing certificate rather than by a
+> shared secret.
+
+
+
 **Between:** `shiroikuma.jiyusagyoban` (白い熊 自由作業盤) and `shiroikuma.tenki` (白い熊 天気).
 **Agreed:** 2026-08-23, between the two repos' chats, with 白い熊 directing.
 **Status:** both halves are built. 自由作業盤's shipped first; 天気's landed in `6.2.1+062` after
