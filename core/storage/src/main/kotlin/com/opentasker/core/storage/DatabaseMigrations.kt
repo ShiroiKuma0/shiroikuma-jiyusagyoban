@@ -481,6 +481,81 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * The band's workouts move off shared storage and into the database.
+     *
+     * Purely additive — three new tables, nothing existing altered — which is the only kind of
+     * migration that cannot lose a row. The data that was in `[666][147] tracks` is read in by the
+     * app on first run rather than here: it lives in files this SQL cannot reach, and a migration
+     * that silently half-imported would be worse than one that does not try.
+     */
+    val MIGRATION_29_30 = object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_workouts` (
+                    `startSeconds` INTEGER NOT NULL,
+                    `number` INTEGER NOT NULL,
+                    `endSeconds` INTEGER,
+                    `durationSeconds` INTEGER,
+                    `sportType` INTEGER,
+                    `kind` TEXT NOT NULL,
+                    `distanceMetres` INTEGER,
+                    `steps` INTEGER,
+                    `calories` INTEGER,
+                    `elevationGainDm` INTEGER,
+                    `meanSpeedDmS` INTEGER,
+                    `intervalSeconds` INTEGER NOT NULL,
+                    `sampleCount` INTEGER NOT NULL,
+                    `trackPoints` INTEGER NOT NULL,
+                    `recovery` BLOB,
+                    `splitsJson` TEXT,
+                    `note` TEXT,
+                    `stops` INTEGER,
+                    `trackId` TEXT,
+                    `chizuJson` TEXT,
+                    `cutoutKey` TEXT,
+                    PRIMARY KEY(`startSeconds`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_huawei_workouts_sportType` " +
+                    "ON `huawei_workouts` (`sportType`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_huawei_workouts_number` " +
+                    "ON `huawei_workouts` (`number`)",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_workout_blobs` (
+                    `startSeconds` INTEGER NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `payload` BLOB NOT NULL,
+                    PRIMARY KEY(`startSeconds`, `name`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `huawei_map_cutouts` (
+                    `key` TEXT NOT NULL,
+                    `zoom` INTEGER NOT NULL,
+                    `tileX` INTEGER NOT NULL,
+                    `tileY` INTEGER NOT NULL,
+                    `tilesW` INTEGER NOT NULL,
+                    `tilesH` INTEGER NOT NULL,
+                    `tilePx` INTEGER NOT NULL,
+                    `png` BLOB NOT NULL,
+                    `fetchedAtSeconds` INTEGER NOT NULL,
+                    PRIMARY KEY(`key`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -511,6 +586,7 @@ object DatabaseMigrations {
             MIGRATION_26_27,
             MIGRATION_27_28,
             MIGRATION_28_29,
+            MIGRATION_29_30,
         )
     }
 }

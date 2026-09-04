@@ -3,6 +3,9 @@ package com.opentasker.ui.charts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,13 +26,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,6 +90,137 @@ object AnnotationText {
     val stops = Loc("Stops", "休憩")
     val stopsAsk = Loc("How many stops?", "何回休みましたか。")
     val stopsClear = Loc("Tap the number on file to withdraw it.", "記録した数字をもう一度押すと取り消せます。")
+    val exportHeart = Loc("Heart rate as JSON", "心拍を JSON で")
+    val exportGpx = Loc("Track as GPX", "経路を GPX で")
+}
+
+/**
+ * The note, editable where it sits — tap the pill and type into it.
+ *
+ * ## Why this one is not the dialog
+ *
+ * Everywhere else a note is a pill that opens [NoteDialog], and that is right where the note is one
+ * of several answers on a card: the dialog names what is being answered and has room for the
+ * "blank deletes" rule. A lifting session has only this one answer — no stops, no map, nothing else
+ * authored — so the dialog was a modal in front of a card whose entire content was the thing being
+ * edited (白い熊, 2026-09-03: *"enable direct click inside to input the note text directly"*).
+ *
+ * ## Saving
+ *
+ * On losing focus and on the keyboard's Done, never per keystroke: a note is written in sentences,
+ * and a save per character would rewrite `walk.json` a hundred times for one line. Blank still
+ * deletes, which is the same contract the dialog carries — and [DisposableEffect] commits on the
+ * way out, so leaving the screen mid-sentence keeps what was typed rather than discarding it.
+ */
+@Composable
+fun NoteField(
+    note: String?,
+    onSave: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lang = LocalBandLanguage.current
+    val focus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    var typed by rememberSaveable(note) { mutableStateOf(note.orEmpty()) }
+    var editing by rememberSaveable(note) { mutableStateOf(false) }
+    val has = typed.isNotBlank()
+
+    // Read through a live handle: the effect below runs at disposal, long after the composition
+    // that captured them, and a stale `typed` there would save the note as it was on first draw.
+    val latest by rememberUpdatedState(typed)
+    val original by rememberUpdatedState(note.orEmpty())
+    val save by rememberUpdatedState(onSave)
+    DisposableEffect(Unit) {
+        onDispose { if (latest.trim() != original.trim()) save(latest) }
+    }
+
+    val ink = if (has || editing) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
+    Row(
+        modifier
+            .clip(RoundedCornerShape(100.dp))
+            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            // Tapping anywhere in the pill puts the caret in it, not only the text itself: the
+            // border is what reads as the target, and a 6 dp glyph that is the only live part of a
+            // full-width control is the touch-target trap the morning card already carries a note
+            // about.
+            .clickable { focus.requestFocus() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            if (has) Icons.Filled.EditNote else Icons.AutoMirrored.Filled.NoteAdd,
+            contentDescription = (if (has) AnnotationText.note else AnnotationText.noteAdd)[lang],
+            tint = ink,
+            modifier = Modifier.size(if (has) 22.dp else 20.dp),
+        )
+        BasicTextField(
+            value = typed,
+            onValueChange = { typed = it },
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focus)
+                .onFocusChanged { s ->
+                    if (s.isFocused) {
+                        editing = true
+                    } else if (editing) {
+                        editing = false
+                        if (typed.trim() != note.orEmpty().trim()) onSave(typed)
+                    }
+                },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = ANNOTATION_INK),
+            cursorBrush = SolidColor(ANNOTATION_INK),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            decorationBox = { field ->
+                // The invitation, shown only while there is nothing to read — never behind text.
+                if (!has && !editing) {
+                    Text(
+                        AnnotationText.noteAdd[lang],
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = ANNOTATION_INK.copy(alpha = ADD_ALPHA),
+                    )
+                }
+                field()
+            },
+        )
+    }
+}
+
+/**
+ * A pill that DOES something, rather than holding something.
+ *
+ * Same shape and same yellow as the note and the count, because it sits among them and a control
+ * that looked different would read as belonging to a different screen. What separates it is the
+ * glyph and the fact that its label never changes: a note pill's text is the note, a count pill's
+ * text is the count, and this one always says what pressing it will do.
+ *
+ * It goes inert while it is working. A file being written to shared storage takes long enough on a
+ * cold card to be pressed twice, and two writes racing on one path is a truncated file rather than
+ * two files.
+ */
+@Composable
+fun ActionPill(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val ink = if (enabled) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
+    Row(
+        modifier
+            .clip(RoundedCornerShape(100.dp))
+            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            // Padding BEFORE clickable, or the touch target shrinks to the glyph.
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, contentDescription = label, tint = ink, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = ink)
+    }
 }
 
 /** Opacity of an "add" affordance: present, but reading as an invitation rather than as content. */
