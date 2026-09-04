@@ -51,6 +51,12 @@
 
 ### Fixed
 
+- A Wi-Fi profile no longer goes deaf after an unrelated edit. Wi-Fi and
+  internet state shared one slot, so a matcher rebuilt by any profile change saw
+  only whichever of the two had spoken last. A profile on "connected to Home"
+  could stop matching until the next time you actually joined or left a network,
+  and because OpenTasker still believed it was active, the exit task did not run
+  when you did leave.
 - Asking for a run while one is already going now says so. Run task, Run this
   action, and replaying a held run all refused a second request silently, so a
   tap did nothing with no explanation, for up to five minutes if the earlier run

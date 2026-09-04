@@ -1,27 +1,41 @@
 package com.opentasker.core.contexts
 
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
+/**
+ * Wi-Fi and connectivity facts, published by their monitors and read by every STATE matcher.
+ *
+ * What is exposed is the *merged* state of both families, not the most recent patch. The two
+ * families used to share one replay slot, so a matcher created after both had published saw only
+ * whichever spoke last. That is not a rare case: every profile edit, enable, or disable rebuilds
+ * all matchers, and both monitors suppress repeats, so a rebuilt `wifi=Home` matcher could read
+ * `wifi_connected` as absent and stay unmatched until the next real Wi-Fi transition. Because the
+ * engine still believed the profile was matched, the following disconnect produced no exit event
+ * and the exit task never ran.
+ */
 object DeviceStateEvents {
-    private val statePatches = MutableSharedFlow<Map<String, String>>(
-        replay = 1,
-        extraBufferCapacity = 16,
-    )
+    private val state = MutableStateFlow<Map<String, String>>(emptyMap())
 
-    val events: SharedFlow<Map<String, String>> = statePatches.asSharedFlow()
+    /** Everything published so far, so a late collector starts with the full picture. */
+    val events: StateFlow<Map<String, String>> = state.asStateFlow()
 
     fun publishWifi(
         ssid: String,
         connected: Boolean,
-    ): Boolean = statePatches.tryEmit(wifiPatch(ssid, connected))
+    ) = publish(wifiPatch(ssid, connected))
 
     fun publishConnectivity(
         internet: Boolean,
         networkType: String,
         vpn: Boolean,
-    ): Boolean = statePatches.tryEmit(connectivityPatch(internet, networkType, vpn))
+    ) = publish(connectivityPatch(internet, networkType, vpn))
+
+    private fun publish(patch: Map<String, String>) {
+        state.update { current -> current + patch }
+    }
 
     internal fun wifiPatch(
         ssid: String,
