@@ -87,11 +87,13 @@ class HuaweiWalksActivity : ComponentActivity() {
 
     private fun renderFrom(intent: Intent?) {
         val days = intent?.getIntExtra(EXTRA_DAYS, 0)?.takeIf { it > 0 } ?: 7
-        // Which half of the library this window is for. One activity rather than two, because a
-        // lift and a walk differ in what is drawn, not in how they are fetched, listed, opened,
-        // annotated or stored — and a second copy of this file would have to be kept in step with
-        // the first for ever.
-        val strength = intent?.getBooleanExtra(EXTRA_STRENGTH, false) ?: false
+        // Which third of the library this window is for. One activity rather than three, because
+        // a lift, a rehab session and a walk differ in what is DRAWN and in nothing else — not in
+        // how they are fetched, listed, opened, annotated or stored — and three copies of this
+        // file would have to be kept in step with each other for ever.
+        val kind = intent?.getStringExtra(EXTRA_KIND)
+            ?.let { name -> HuaweiWorkoutStore.Kind.entries.firstOrNull { it.label == name } }
+            ?: HuaweiWorkoutStore.Kind.WALK
         val lang = BandLanguage.parse(HuaweiSettings.language(applicationContext))
 
         setContent {
@@ -103,8 +105,13 @@ class HuaweiWalksActivity : ComponentActivity() {
                     LocalChartStyle provides chartStyle,
                 ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        var state by remember { mutableStateOf(HuaweiWalksState(strength = strength)) }
+                        var state by remember { mutableStateOf(HuaweiWalksState(kind = kind)) }
                         var open by remember { mutableStateOf<String?>(null) }
+                        // The calendar is a view of this same window's list, not another activity:
+                        // that is what lets a tile open the session behind it in one step.
+                        var calendar by remember { mutableStateOf(false) }
+                        // 機能訓練 only — a day done without the band, marked by hand.
+                        var tickDay by remember { mutableStateOf<Long?>(null) }
                         val scope = rememberCoroutineScope()
                         val dao = remember { OpenTaskerApp_NoHilt.db.huaweiWorkoutDao() }
 
@@ -122,7 +129,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                                 // Filtered here rather than in the store: the store holds every
                                 // workout the band recorded, and which of them a window shows is
                                 // the window's business.
-                                val walks = HuaweiWorkoutStore.ofKind(dao, strength)
+                                val walks = HuaweiWorkoutStore.ofKind(dao, kind)
                                 val efforts = walks.mapNotNull { w ->
                                     HuaweiWorkoutStore.effortOf(dao, w)?.let { w.id to it }
                                 }.toMap()
@@ -240,7 +247,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                         // The one-time move of the old on-disk archive into the database runs
                         // here, before the first list: it is where a workout window is opened, and
                         // it must not need 白い熊 to press anything for their history to survive.
-                        LaunchedEffect(strength) {
+                        LaunchedEffect(kind) {
                             withContext(Dispatchers.IO) {
                                 HuaweiWorkoutImport.runOnce(
                                     applicationContext, dao, File(HuaweiWorkoutImport.LEGACY_DIR),
@@ -272,7 +279,55 @@ class HuaweiWalksActivity : ComponentActivity() {
                             )
                         }
 
-                        if (opened != null) {
+                        if (calendar) {
+                            val zone = remember { java.time.ZoneId.systemDefault() }
+                            HuaweiWorkoutCalendarScreen(
+                                kind = kind,
+                                workouts = state.walks,
+                                // Only 機能訓練 has anything authored to show. The other two are
+                                // whatever the band recorded, and nothing else can be true of them.
+                                ticked = if (kind == HuaweiWorkoutStore.Kind.REHAB) {
+                                    com.opentasker.core.band.RehabLog.all(applicationContext)
+                                } else {
+                                    emptySet()
+                                },
+                                notes = if (kind == HuaweiWorkoutStore.Kind.REHAB) {
+                                    com.opentasker.core.band.DayNotes.REHAB.all(applicationContext)
+                                } else {
+                                    emptyMap()
+                                },
+                                zone = zone,
+                                contentPadding = insets,
+                                // A filled tile is the way to its session, which is what makes this
+                                // an index rather than only a record.
+                                onOpenSession = { w ->
+                                    open = w.id
+                                    calendar = false
+                                },
+                                onTapEmptyDay = { day ->
+                                    if (kind == HuaweiWorkoutStore.Kind.REHAB) {
+                                        tickDay = com.opentasker.core.band.RehabLog
+                                            .dateKeyOf(java.time.LocalDate.ofEpochDay(day))
+                                    }
+                                },
+                                onBack = { calendar = false },
+                            )
+                            tickDay?.let { key ->
+                                HuaweiRehabDayDialog(
+                                    dateKey = key,
+                                    done = com.opentasker.core.band.RehabLog.done(applicationContext, key),
+                                    note = com.opentasker.core.band.DayNotes.REHAB
+                                        .note(applicationContext, key),
+                                    onPick = { done ->
+                                        com.opentasker.core.band.RehabLog
+                                            .setDone(applicationContext, key, done)
+                                        tickDay = null
+                                    },
+                                    onEditNote = {},
+                                    onDismiss = { tickDay = null },
+                                )
+                            }
+                        } else if (opened != null) {
                             HuaweiWalkDetailScreen(
                                 walk = opened,
                                 sharing = state.sharing == opened.id,
@@ -394,14 +449,13 @@ class HuaweiWalksActivity : ComponentActivity() {
                                                 // both windows fetch everything and each reports
                                                 // only its own. Anything else would tell 白い熊
                                                 // that 「重量挙げ」 had just downloaded nine walks.
-                                                val walks = fetched.filter { it.summary.isStrength == strength }
+                                                val walks = fetched.filter { kind.matches(it.summary.type) }
                                                 // Not `kind` per walk: every one of them is a
                                                 // "walk", so that printed "walk · walk · walk · …"
                                                 // and told 白い熊 nothing (2026-08-30). What is
                                                 // actually wanted is how many arrived and when.
                                                 if (walks.isEmpty()) {
-                                                    (if (strength) HuaweiText.liftNoneFound
-                                                    else HuaweiText.walksNoneFound)[lang]
+                                                    HuaweiText.noneFoundFor(kind)[lang]
                                                 }
                                                 else {
                                                     val fmt = java.text.SimpleDateFormat(
@@ -438,6 +492,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                                     run(walk) { HuaweiChizu.show(applicationContext, it) }
                                 },
                                 onOpen = { open = it.id },
+                                onOpenCalendar = { calendar = true },
                             )
                         }
                     }
@@ -448,17 +503,21 @@ class HuaweiWalksActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_DAYS = "shiroikuma.jiyusagyoban.extra.HUAWEI_WALK_DAYS"
-        const val EXTRA_STRENGTH = "shiroikuma.jiyusagyoban.extra.HUAWEI_STRENGTH"
+        const val EXTRA_KIND = "shiroikuma.jiyusagyoban.extra.HUAWEI_WORKOUT_KIND"
 
-        fun open(context: Context, days: Int?, strength: Boolean = false) {
+        fun open(
+            context: Context,
+            days: Int?,
+            kind: HuaweiWorkoutStore.Kind = HuaweiWorkoutStore.Kind.WALK,
+        ) {
             context.startActivity(
                 Intent(context, HuaweiWalksActivity::class.java).apply {
-                    // CLEAR_TOP with two modes would hand 「重量挙げ」 the walks window that is
+                    // CLEAR_TOP with three modes would hand 「重量挙げ」 the walks window that is
                     // already open and re-render it as itself; the intent carries the mode and
-                    // onNewIntent re-reads it, so the same instance serves both.
+                    // onNewIntent re-reads it, so one instance serves all three.
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     days?.takeIf { it > 0 }?.let { putExtra(EXTRA_DAYS, it) }
-                    if (strength) putExtra(EXTRA_STRENGTH, true)
+                    putExtra(EXTRA_KIND, kind.label)
                 },
             )
         }
