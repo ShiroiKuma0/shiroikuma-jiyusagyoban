@@ -44,8 +44,14 @@ class BootReceiverServiceStartContractTest {
         )
         assertTrue(
             "ensureEngineLoaded must reload only when the engine is not already loaded",
-            "if (!engineLoaded) reloadProfiles()" in source,
+            "if (engineLoaded) return" in source,
         )
+        // The run has to survive a reload that fails: it resolves itself from the database and
+        // used to happen without touching the matchers at all.
+        val helper = source.substringAfter("private suspend fun ensureEngineLoaded()")
+            .substringBefore("private suspend fun reloadProfiles()")
+        assertTrue("a failed reload must not swallow the run", "catch (error: Exception)" in helper)
+        assertTrue("but cancellation must still propagate", "throw cancellation" in helper)
     }
 
     @Test

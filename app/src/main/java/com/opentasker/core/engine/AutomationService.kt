@@ -378,7 +378,18 @@ class AutomationService : Service() {
      * Doze window without them. The watchdog saw a current heartbeat and had nothing to report.
      */
     private suspend fun ensureEngineLoaded() {
-        if (!engineLoaded) reloadProfiles()
+        if (engineLoaded) return
+        try {
+            reloadProfiles()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            // The run still happens. This start exists to run one task, that task resolves itself
+            // from the database, and it used to run without touching the matchers at all. Letting
+            // a reload failure reach the scope's handler would silently drop a run that previously
+            // succeeded, which is a worse trade than starting with stale matchers.
+            AppLogger.error(TAG, "Could not load profiles before the requested run", error)
+        }
     }
 
     private suspend fun reloadProfiles() = profileReloadMutex.withLock {
