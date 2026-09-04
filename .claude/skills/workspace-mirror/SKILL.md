@@ -44,6 +44,21 @@ adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.
   --es shiroikuma.jiyusagyoban.extra.PROJECT '<project name>'"
 ```
 
+**Quote the whole `am` line for the DEVICE shell, not just for bash.** `adb shell a b c` joins its
+arguments with spaces and hands the result to the phone's shell, so one level of quoting is lost —
+and every task name in this workspace ends in ` -- [NNN]`, which `am` then reads as its own `--`
+separator followed by a package name. The reply is `result=1, data="no such task: <name without the
+suffix>"` and the intent dump shows `pkg=[727]`, which reads as a renamed task rather than as
+mangled quoting (2026-09-03). Pass the whole command as ONE double-quoted argument with the task
+name single-quoted inside it:
+
+```bash
+adb shell "am broadcast -a shiroikuma.jiyusagyoban.action.RUN_TASK \
+  -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+  --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
+  --es shiroikuma.jiyusagyoban.extra.TASK '運動（Huawei） -- [727]'"
+```
+
 **Every extra is namespaced and the PROTOCOL one is mandatory.** `--es task …` (the bare name) is not
 read, and a call without `--ei …extra.PROTOCOL 1` is dropped by the receiver's first line — in both
 cases `am` prints a bare `result=0` with no `data=`, which looks exactly like a dead bridge rather than
