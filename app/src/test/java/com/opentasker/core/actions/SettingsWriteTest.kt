@@ -121,6 +121,15 @@ class SettingsWriteTest {
             "voice_recognition_service",
             "autofill_service",
             "nfc_payment_default_component",
+            // Traffic redirection and lifting the platform's own restrictions on private APIs.
+            "hidden_api_blacklist_exemptions",
+            "global_http_proxy_host",
+            "http_proxy",
+            "private_dns_specifier",
+            "private_dns_mode",
+            "captive_portal_server",
+            "trust_agent_configuration",
+            "lock_screen_allow_trust_agent_to_unlock",
         ).forEach { key ->
             SettingsTable.entries.forEach { table ->
                 val parsed = parseSettingsWrite(

@@ -157,6 +157,13 @@ object AutomationSensitivityRegistry {
         "file.delete",
         "download",
         "reboot",
+        // Writes a named Android setting. Listed here rather than only as device control because
+        // the access behind it is granted once over a cable and then persists, so an imported
+        // profile inherits it. The action refuses the settings that hand another app a role or a
+        // privilege, but that list is a denylist and a denylist is never provably complete, so an
+        // import carrying this deserves to be called out on its own rather than folded into the
+        // same acknowledgement as changing the screen brightness.
+        "settings.write",
     )
 
     private val explicitActionIds = localOnlyActionIds +

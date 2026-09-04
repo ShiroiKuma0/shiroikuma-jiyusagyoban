@@ -552,8 +552,17 @@ private val PROTECTED_SETTING_FRAGMENTS = listOf(
     "unknown_sources",
     "lock_pattern",
     "lockscreen",
+    "trust_agent",
     "location_providers_allowed",
     "vpn",
+    // The third family: values that redirect other apps' traffic, or lift the platform's own
+    // restrictions on what code may call. hidden_api_blacklist_exemptions takes package prefixes
+    // that are then allowed to call blocked private APIs; the proxy and DNS names point every
+    // other app's traffic wherever the value says.
+    "hidden_api",
+    "http_proxy",
+    "private_dns",
+    "captive_portal",
 )
 
 /**
