@@ -260,7 +260,16 @@ object OpenTaskerBundleCodec {
                 actions = task.actions.map { action ->
                     val sanitized = ExportRedactionPolicy.sanitizeActionArguments(action.type, action.args, context)
                     redactedFieldCount += sanitized.redactedFields.size
-                    action.copy(args = sanitized.args)
+                    // A run-only-if guard is user text like `%Pin == 4321`, so it can hold a
+                    // literal copy of a secret exactly the way an argument can. Only args were
+                    // sanitized here, while the Tasker XML exporter - the same policy - already
+                    // refused to write such a guard. A redacted guard can no longer match, so the
+                    // action is skipped after import rather than running unguarded.
+                    val guard = redactExportedText(action.condition, context)
+                    val label = redactExportedText(action.label, context)
+                    if (guard.wasRedacted) redactedFieldCount++
+                    if (label.wasRedacted) redactedFieldCount++
+                    action.copy(args = sanitized.args, condition = guard.value, label = label.value)
                 },
             )
         }
@@ -271,6 +280,27 @@ object OpenTaskerBundleCodec {
                 warnings = bundle.metadata.warnings + ExportRedactionPolicy.SENSITIVE_ACTION_WARNING,
             ),
         )
+    }
+
+    private class ExportedText(val value: String?, val wasRedacted: Boolean)
+
+    /**
+     * Redacts a free-text action field that holds no argument semantics.
+     *
+     * Matching on secret *values* only, like `TaskerXmlExport`: a guard that names a secret
+     * (`%ApiKey == is_set`) leaks nothing, because the bundle already carries that variable's
+     * name with its value deliberately omitted, and redacting it would break a working guard.
+     */
+    private fun redactExportedText(
+        value: String?,
+        context: ExportRedactionPolicy.Context,
+    ): ExportedText {
+        if (value.isNullOrBlank()) return ExportedText(value, wasRedacted = false)
+        val redacted = ExportRedactionPolicy.redactText(value, context.secretValues)
+        if (redacted == value) return ExportedText(value, wasRedacted = false)
+        // Keep the surrounding text: `%Pin == [REDACTED]` still says what the guard was for, and
+        // it cannot match, whereas a bare placeholder loses the shape of the comparison.
+        return ExportedText(redacted, wasRedacted = true)
     }
 
     @Throws(SerializationException::class, IllegalArgumentException::class)

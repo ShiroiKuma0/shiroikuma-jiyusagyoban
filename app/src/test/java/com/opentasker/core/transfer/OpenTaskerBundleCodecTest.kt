@@ -2,6 +2,7 @@ package com.opentasker.core.transfer
 
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.AutomationPower
+import com.opentasker.core.diagnostics.ExportRedactionPolicy
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextBooleanOperator
@@ -623,4 +624,88 @@ class OpenTaskerBundleCodecTest {
         )
     }
 
+    /**
+     * The guard and the label are user text too. Only `args` was sanitized, so a run-only-if that
+     * compared a secret against its literal value carried that value into the bundle, the paste
+     * text, and a shared profile, while the Tasker XML exporter refused to write the same guard.
+     */
+    @Test
+    fun jsonExportRedactsASecretValueInAGuardAndALabel() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "Unlock",
+                    actions = listOf(
+                        ActionSpec(
+                            type = "log",
+                            label = "check sk-live-abc123",
+                            args = mapOf("message" to "ok"),
+                            condition = "%Pin == sk-live-abc123",
+                        ),
+                    ),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val sanitized = OpenTaskerBundleCodec.sanitizeForExport(
+            bundle,
+            secretVariableNames = setOf("Pin"),
+            secretVariableValues = setOf("sk-live-abc123"),
+        )
+
+        val action = sanitized.tasks.single().actions.single()
+        assertFalse(
+            "the guard must not carry the secret's plaintext",
+            action.condition.orEmpty().contains("sk-live-abc123"),
+        )
+        assertFalse(
+            "the label must not carry the secret's plaintext",
+            action.label.orEmpty().contains("sk-live-abc123"),
+        )
+        assertTrue(
+            "the guard should keep its shape so the user can see what to re-enter",
+            action.condition.orEmpty().startsWith("%Pin =="),
+        )
+        assertTrue(
+            "a redacted field must raise the export warning",
+            sanitized.metadata.warnings.contains(ExportRedactionPolicy.SENSITIVE_ACTION_WARNING),
+        )
+    }
+
+    /** A guard that only names a secret leaks nothing, and redacting it would break the profile. */
+    @Test
+    fun jsonExportKeepsAGuardThatOnlyNamesASecret() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "Unlock",
+                    actions = listOf(
+                        ActionSpec(type = "log", args = mapOf("message" to "ok"), condition = "%Pin == is_set"),
+                    ),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val sanitized = OpenTaskerBundleCodec.sanitizeForExport(
+            bundle,
+            secretVariableNames = setOf("Pin"),
+            secretVariableValues = setOf("sk-live-abc123"),
+        )
+
+        assertEquals("%Pin == is_set", sanitized.tasks.single().actions.single().condition)
+    }
 }
