@@ -139,6 +139,10 @@ data class HuaweiBoardState(
 val BOARD_TILES = listOf(
     BoardTile("sync", "同期（Huawei） -- [727]", Loc("Sync", "同期")),
     BoardTile("report", "健康（Huawei） -- [727]", Loc("Report", "健康")),
+    // Between the report and the walks, where 白い熊 put it: the three "look at what was recorded"
+    // cards sit together, and lifting is nearer the report than the walks are — it has no route,
+    // so what it holds is the same heart rate and energy the report is made of.
+    BoardTile("lift", "重量挙げ（Huawei） -- [727]", Loc("Lifting", "重量挙げ")),
     BoardTile("walks", "運動（Huawei） -- [727]", Loc("Walks", "運動")),
     BoardTile("faces", "バンド文字盤（Huawei） -- [727]", Loc("Watch faces", "文字盤")),
     BoardTile("sat", "衛星予測（Huawei） -- [727]", Loc("Satellites", "衛星"),

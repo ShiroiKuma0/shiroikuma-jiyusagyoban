@@ -27,7 +27,6 @@ import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.huawei.HuaweiFaceLibrary
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncRunner
-import com.opentasker.core.huawei.HuaweiWalkLibrary
 import com.opentasker.ui.charts.BandLanguage
 import com.opentasker.ui.charts.ChartStyle
 import com.opentasker.ui.charts.Loc
@@ -298,15 +297,20 @@ class HuaweiBoardActivity : ComponentActivity() {
     }.getOrNull()
 
     /**
-     * A piece of a real walk's map — the middle of it, where the route is.
+     * A piece of a real base map — the middle of one, where the walking is.
      *
-     * Cropped rather than scaled: the maps are tall and mostly ground, and a whole one shrunk into a
-     * 4:3 card is a green rectangle. The centre crop is where 地図 draws the track.
+     * Cropped rather than scaled: a cutout is five tiles by five and mostly ground, and a whole one
+     * shrunk into a 4:3 card is a green rectangle. The centre is where the streets 白い熊 actually
+     * walks are.
+     *
+     * Any cutout will do. They are shared by area rather than kept per walk, so the first one is a
+     * picture of the neighbourhood, which is exactly what the card wants to be.
      */
-    private fun walkCutout(): ByteArray? = runCatching {
-        val walk = HuaweiWalkLibrary.list(File(HuaweiWalkLibrary.DEFAULT_DIR))
-            .firstOrNull { it.hasMap && !it.mapIsBlank } ?: return null
-        val src = BitmapFactory.decodeFile(walk.mapPath ?: return null) ?: return null
+    private suspend fun walkCutout(): ByteArray? = runCatching {
+        val dao = OpenTaskerApp_NoHilt.db.huaweiWorkoutDao()
+        val key = dao.cutoutKeys().firstOrNull() ?: return null
+        val png = dao.cutout(key) ?: return null
+        val src = BitmapFactory.decodeByteArray(png, 0, png.size) ?: return null
         val w = src.width
         val h = (w * 3f / 4f).toInt().coerceAtMost(src.height)
         val crop = Bitmap.createBitmap(src, 0, ((src.height - h) / 2).coerceAtLeast(0), w, h)
