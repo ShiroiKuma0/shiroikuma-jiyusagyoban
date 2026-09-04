@@ -99,6 +99,8 @@ import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.storage.RestoreCandidate
 import androidx.compose.runtime.collectAsState
+import com.opentasker.core.actions.hasWriteSecureSettings
+import com.opentasker.core.actions.secureSettingsGrantCommand
 import com.opentasker.core.permissions.OemBatteryGuidance
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
 import com.opentasker.core.permissions.RuntimePermissionOutcome
@@ -194,6 +196,15 @@ private sealed interface PermissionAction {
 
     /** Turning the lock admin back off, which Android offers no direct settings intent for. */
     data object RemoveDeviceAdmin : PermissionAction
+
+    /**
+     * Puts a command on the clipboard.
+     *
+     * `WRITE_SECURE_SETTINGS` has no settings page and no runtime dialog. The only way to grant it
+     * is to run one command from a computer, so the row's job is to hand over that exact command
+     * rather than open something.
+     */
+    data class CopyText(val label: String, val text: String) : PermissionAction
     data class ShizukuKillSwitch(val enabled: Boolean) : PermissionAction
     /** Try each OEM settings component in order, falling back to a web guide URL. */
     data class OemSettings(
@@ -384,6 +395,7 @@ fun PermissionOnboardingScreen(
     val shizukuPermissionFailedMessage = stringResource(R.string.setup_shizuku_permission_failed)
     val shizukuModeDisabledMessage = stringResource(R.string.setup_shizuku_mode_disabled)
     val deviceAdminRemovedMessage = stringResource(R.string.setup_device_admin_removed)
+    val grantCommandCopiedMessage = stringResource(R.string.setup_secure_settings_copied)
     val deviceAdminRemoveFailedMessage = stringResource(R.string.setup_device_admin_remove_failed)
     val shizukuModeEnabledMessage = stringResource(R.string.setup_shizuku_mode_enabled)
     val pushDistributorSelectedMessage = stringResource(R.string.setup_push_distributor_selected)
@@ -672,6 +684,11 @@ fun PermissionOnboardingScreen(
                                 else shizukuModeEnabledMessage,
                             )
                             setupViewModel.refresh()
+                        }
+                        is PermissionAction.CopyText -> {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            clipboard?.setPrimaryClip(ClipData.newPlainText(action.label, action.text))
+                            onMessage(grantCommandCopiedMessage)
                         }
                         PermissionAction.RemoveDeviceAdmin -> {
                             // Android has no "open my admin's page" intent, so removal has to
@@ -1933,6 +1950,27 @@ private fun buildPermissionItems(
             requiredFor = context.getString(R.string.setup_dnd_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.DND),
+        ),
+        PermissionSetupItem(
+            title = context.getString(R.string.setup_secure_settings_title),
+            body = context.getString(
+                R.string.setup_secure_settings_body,
+                secureSettingsGrantCommand(context.packageName),
+            ),
+            granted = hasWriteSecureSettings(context),
+            // There is nothing to open: no settings page exposes this, and no runtime dialog can
+            // ask for it. Handing over the exact command is the whole of what this row can do.
+            actionLabel = context.getString(R.string.setup_secure_settings_copy),
+            action = PermissionAction.CopyText(
+                context.getString(R.string.setup_secure_settings_title),
+                secureSettingsGrantCommand(context.packageName),
+            ),
+            requiredFor = context.getString(R.string.setup_secure_settings_required_for),
+            optional = true,
+            // No allowActionWhenGranted: the granted row renders a chevron labelled "Review app
+            // settings", which is true for Shizuku and Termux and wrong here, and a command to
+            // grant something already granted is not worth offering.
+            section = SetupSection.OPTIONAL,
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_shizuku_title),

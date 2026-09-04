@@ -131,6 +131,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "aod.set",
     "wifi.scan",
     "screen.timeout",
+    "settings.write",
     "dnd.set",
     "ringer.set",
     "torch.set",
@@ -185,6 +186,12 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
 }
 
 private fun option(value: String, @StringRes labelRes: Int) = ActionFieldOption(value, labelRes)
+
+private val settingsTableOptions = listOf(
+    option("global", R.string.catalog_action_settings_write_table_global),
+    option("secure", R.string.catalog_action_settings_write_table_secure),
+    option("system", R.string.catalog_action_settings_write_table_system),
+)
 
 private val toggleOptions = listOf(
     option("on", R.string.label_on),
@@ -726,6 +733,40 @@ fun registerActionMetadata() {
             categoryRes = R.string.catalog_category_settings,
             fields = listOf(
                 ActionField("state", R.string.catalog_action_aod_set_field_state_label, FieldType.DROPDOWN, required = true, hintRes = R.string.catalog_action_aod_set_field_state_hint, options = toggleOptions),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "settings.write",
+            nameRes = R.string.catalog_action_settings_write_name,
+            descriptionRes = R.string.catalog_action_settings_write_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField(
+                    "table",
+                    R.string.catalog_action_settings_write_field_table_label,
+                    FieldType.DROPDOWN,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_write_field_table_hint,
+                    options = settingsTableOptions,
+                ),
+                ActionField(
+                    "key",
+                    R.string.catalog_action_settings_write_field_key_label,
+                    FieldType.TEXT,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_write_field_key_hint,
+                    sensitive = false,
+                ),
+                ActionField(
+                    "value",
+                    R.string.catalog_action_settings_write_field_value_label,
+                    FieldType.TEXT,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_write_field_value_hint,
+                ),
             )
         )
     )

@@ -105,6 +105,13 @@ object ActionCapabilityRegistry {
         "bluetooth.toggle" to bluetoothCapability(),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
         "screen.timeout" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", R.string.capability_write_settings),
+        // RequiresSetup, not Unsupported: unlike the elevated actions this one has a route a user
+        // can actually take without root or Shizuku, a single ADB grant that then persists.
+        "settings.write" to ActionCapability(
+            CapabilityLevel.RequiresSetup,
+            "Global and Secure need WRITE_SECURE_SETTINGS, granted once over ADB; System uses Write Settings.",
+            R.string.capability_settings_write_setup,
+        ),
         "app.kill" to ActionCapability(CapabilityLevel.Unsupported, "Force-stopping another app requires privileged app-management access that no normal app can hold.", R.string.capability_app_kill_unsupported),
         "app.archive" to packageArchiveCapability("Archive installed packages while retaining their user data."),
         "app.unarchive" to packageArchiveCapability("Request restoration of an archived package through its responsible installer."),

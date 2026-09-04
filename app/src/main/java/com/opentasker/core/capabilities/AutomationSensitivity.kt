@@ -112,6 +112,7 @@ object AutomationSensitivityRegistry {
         "wifi.scan",
         "mobile.toggle",
         "screen.timeout",
+        "settings.write",
         "dnd.set",
         "zen.rule.set",
         "zen.rule.clear",

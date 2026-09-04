@@ -157,6 +157,7 @@
     <string name="capability_bluetooth_unsupported" formatted="false">Android 13+ blocks direct Bluetooth enable/disable for normal apps.</string>
     <string name="capability_bluetooth_permission" formatted="false">Requires Bluetooth permission.</string>
     <string name="capability_write_settings" formatted="false">Requires Write Settings special access.</string>
+    <string name="capability_settings_write_setup" formatted="false">Writing a Global or Secure setting needs one-time access granted from a computer over a cable, set up in Setup. The System table uses Modify system settings instead.</string>
     <string name="capability_app_kill_unsupported" formatted="false">Force-stopping another app requires privileged app-management access that no normal app can hold.</string>
     <string name="capability_app_archive_ready" formatted="false">Uses Android 15+ PackageInstaller archive requests. OpenTasker is not the installer of record, so Android asks you to confirm each request on screen; run this action with OpenTasker open.</string>
     <string name="capability_app_archive_unsupported" formatted="false">Package archive requests require Android 15 (API 35) or newer.</string>

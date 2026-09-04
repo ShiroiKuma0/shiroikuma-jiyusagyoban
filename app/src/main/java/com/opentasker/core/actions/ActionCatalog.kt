@@ -74,6 +74,8 @@ object ActionCatalog {
         // NEVER, not IDEMPOTENT: "toggle" recomputes from the live value, so a retry flips back.
         define("aod.set", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::AlwaysOnDisplayAction),
         define("screen.timeout", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ScreenTimeoutAction),
+        // IDEMPOTENT: the same name and value written twice leaves the same setting.
+        define("settings.write", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsWriteAction),
         define("dnd.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::DoNotDisturbAction),
         define("zen.rule.set", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::ZenRuleSetAction),
         define("zen.rule.clear", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ZenRuleClearAction),

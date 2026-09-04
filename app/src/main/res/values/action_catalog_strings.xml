@@ -320,6 +320,17 @@
     <string name="catalog_action_screen_timeout_description" formatted="false">Set screen sleep timeout duration</string>
     <string name="catalog_action_screen_timeout_field_millis_label" formatted="false">Timeout (ms)</string>
     <string name="catalog_action_screen_timeout_field_millis_hint" formatted="false">1000, 30000, etc.</string>
+    <string name="catalog_action_settings_write_name" formatted="false">Write Setting</string>
+    <string name="catalog_action_settings_write_description" formatted="false">Change one Android setting by name. Global and Secure need one-time access granted from a computer; System uses Modify system settings.</string>
+    <string name="catalog_action_settings_write_field_table_label" formatted="false">Table</string>
+    <string name="catalog_action_settings_write_field_table_hint" formatted="false">Where the setting lives. Most are Secure or Global.</string>
+    <string name="catalog_action_settings_write_table_global" formatted="false">Global (all users)</string>
+    <string name="catalog_action_settings_write_table_secure" formatted="false">Secure (this user)</string>
+    <string name="catalog_action_settings_write_table_system" formatted="false">System (display and sound)</string>
+    <string name="catalog_action_settings_write_field_key_label" formatted="false">Setting name</string>
+    <string name="catalog_action_settings_write_field_key_hint" formatted="false">location_mode, screen_off_timeout, etc.</string>
+    <string name="catalog_action_settings_write_field_value_label" formatted="false">Value</string>
+    <string name="catalog_action_settings_write_field_value_hint" formatted="false">Read back after writing, so a value Android ignores reports a failure.</string>
     <string name="catalog_action_dnd_set_name" formatted="false">Set Do Not Disturb</string>
     <string name="catalog_action_dnd_set_description" formatted="false">Set DND interruption filter mode</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">Mode</string>

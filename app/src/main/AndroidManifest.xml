@@ -71,6 +71,17 @@
         anything (issue #4).
     -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!--
+        Never granted by installing, and no dialog can ask for it: a user grants it once over a
+        cable with `adb shell pm grant`, which is exactly the route Tasker documents. The
+        declaration is what makes that command possible at all - `pm grant` refuses a permission
+        the package does not declare - so without this line the Setup row would hand out a command
+        that always fails. Only the settings.write action uses it, and only for the Global and
+        Secure tables.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
     <uses-feature

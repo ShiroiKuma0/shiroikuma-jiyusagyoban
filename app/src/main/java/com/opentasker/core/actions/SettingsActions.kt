@@ -496,3 +496,122 @@ class AlwaysOnDisplayAction : DeclaredAction(ActionCatalog.require("aod.set")) {
         internal const val ALWAYS_ON_DISPLAY_KEY = "doze_always_on"
     }
 }
+
+/** The Settings tables a write can target, named as the user picks them. */
+internal enum class SettingsTable(val wireValue: String) {
+    GLOBAL("global"),
+    SECURE("secure"),
+    SYSTEM("system"),
+}
+
+internal sealed interface SettingsWriteRequest {
+    data class Valid(val table: SettingsTable, val key: String, val value: String) : SettingsWriteRequest
+
+    data class Rejected(val message: String) : SettingsWriteRequest
+}
+
+internal const val MAX_SETTINGS_VALUE_CHARS = 256
+
+private val SETTINGS_KEY_PATTERN = Regex("[a-z0-9_.]{1,64}")
+
+/**
+ * The one command that turns the Global and Secure tables on.
+ *
+ * `WRITE_SECURE_SETTINGS` cannot be requested at runtime and no dialog can grant it, so this is
+ * built from the installed package name rather than hard-coded: a debug build carries a different
+ * one, and a command naming the wrong package fails with a message that does not say why.
+ */
+internal fun secureSettingsGrantCommand(packageName: String): String =
+    "adb shell pm grant $packageName android.permission.WRITE_SECURE_SETTINGS"
+
+internal fun hasWriteSecureSettings(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) ==
+        PackageManager.PERMISSION_GRANTED
+
+/** Validates the arguments before anything touches a Settings table. */
+internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest {
+    val requestedTable = args["table"]?.trim()?.lowercase().orEmpty()
+    val table = SettingsTable.entries.firstOrNull { it.wireValue == requestedTable }
+        ?: return SettingsWriteRequest.Rejected(
+            "Choose the table to write: global, secure, or system.",
+        )
+    val key = args["key"]?.trim().orEmpty()
+    if (!SETTINGS_KEY_PATTERN.matches(key)) {
+        return SettingsWriteRequest.Rejected(
+            "A setting name is up to 64 characters of a-z, 0-9, underscore or dot.",
+        )
+    }
+    val value = args["value"]
+        ?: return SettingsWriteRequest.Rejected("This action needs a value to write.")
+    if (value.length > MAX_SETTINGS_VALUE_CHARS) {
+        return SettingsWriteRequest.Rejected(
+            "The value is longer than $MAX_SETTINGS_VALUE_CHARS characters.",
+        )
+    }
+    return SettingsWriteRequest.Valid(table, key, value)
+}
+
+/**
+ * Writes one Android setting, the way Tasker's Custom Setting action does.
+ *
+ * Global and Secure need `WRITE_SECURE_SETTINGS`, which no app can ask for at runtime; it is
+ * granted once over a cable and then persists. System uses the ordinary Modify system settings
+ * access the brightness and screen-timeout actions already use.
+ *
+ * The value is read back afterwards. Android accepts a write to a name it does not know, and
+ * silently normalises or discards values it does not like, so without the read-back the action
+ * would report success for a setting that never changed.
+ */
+class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val request = when (val parsed = parseSettingsWrite(args)) {
+            is SettingsWriteRequest.Rejected -> return ActionResult.Failure(parsed.message)
+            is SettingsWriteRequest.Valid -> parsed
+        }
+        val resolver = ctx.app.contentResolver
+        val target = "${request.table.wireValue}/${request.key}"
+
+        if (request.table == SettingsTable.SYSTEM) {
+            if (!Settings.System.canWrite(ctx.app)) {
+                return ActionResult.Failure(
+                    "Writing $target needs Modify system settings, which you grant from Setup.",
+                )
+            }
+        } else if (!hasWriteSecureSettings(ctx.app)) {
+            return ActionResult.Failure(
+                "Writing $target needs secure settings access. Grant it once from a computer: " +
+                    secureSettingsGrantCommand(ctx.app.packageName),
+            )
+        }
+
+        val accepted = runCatching {
+            when (request.table) {
+                SettingsTable.GLOBAL -> Settings.Global.putString(resolver, request.key, request.value)
+                SettingsTable.SECURE -> Settings.Secure.putString(resolver, request.key, request.value)
+                SettingsTable.SYSTEM -> Settings.System.putString(resolver, request.key, request.value)
+            }
+        }.getOrElse { error ->
+            return ActionResult.Failure(
+                "$target could not be written: ${error.message ?: "Android refused it"}",
+            )
+        }
+        if (!accepted) return ActionResult.Failure("Android refused to write $target.")
+
+        val readBack = runCatching {
+            when (request.table) {
+                SettingsTable.GLOBAL -> Settings.Global.getString(resolver, request.key)
+                SettingsTable.SECURE -> Settings.Secure.getString(resolver, request.key)
+                SettingsTable.SYSTEM -> Settings.System.getString(resolver, request.key)
+            }
+        }.getOrNull()
+        if (readBack != request.value) {
+            return ActionResult.Failure(
+                "$target still reads ${readBack ?: "nothing"} after the write, so Android ignored it.",
+            )
+        }
+
+        ctx.logger("Setting $target = ${request.value}")
+        return ActionResult.Success
+    }
+}

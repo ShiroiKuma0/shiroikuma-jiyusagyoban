@@ -14,6 +14,13 @@
 
 ### Added
 
+- **Write Setting**, a new action that changes one Android setting by name, the way
+  Tasker's Custom Setting does. The Global and Secure tables need access that no app can
+  ask for and no settings screen offers: you grant it once from a computer, and a new
+  Setup row hands you the exact command, with the MIUI caveat noted. The System table
+  uses the Modify system settings access you may already have. Whatever you write is read
+  back afterwards, so a value Android quietly ignores is reported as a failure instead of
+  a success, and without the access the action refuses with the command in the message.
 - A profile can now trigger on a broadcast another app sends. Name the intent
   action, and OpenTasker listens for that one action while the profile is
   enabled and stops the moment you disable it. Extras come through as bounded
