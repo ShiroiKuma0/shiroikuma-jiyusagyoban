@@ -152,7 +152,17 @@ class HuaweiDashboardModel(
                 message = if (bound) HuaweiText.noData else HuaweiText.notPaired,
                 // 機能訓練 is 白い熊's own record and owes the band nothing — it has to be there on a
                 // report that has no samples at all, which is exactly the state a new install is in.
-                rehabDays = com.opentasker.core.band.RehabLog.all(appContext),
+                // The band's own rehab sessions AND anything 白い熊 ticked by hand.
+                //
+                // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
+                // filled dates from the pulled rehab sessions automatically"*). A recorded session
+                // marks its day without anyone remembering to; the manual tick stays for a day the
+                // band did not record, and it is the half nothing else can re-supply.
+                rehabDays = com.opentasker.core.band.RehabLog.all(appContext) +
+                    com.opentasker.core.huawei.HuaweiWorkoutStore.rehabDays(
+                        com.opentasker.app.OpenTaskerApp_NoHilt.db.huaweiWorkoutDao(),
+                        java.time.ZoneId.systemDefault(),
+                    ),
                 rehabNotes = com.opentasker.core.band.DayNotes.REHAB.all(appContext),
             )
         }
@@ -216,7 +226,17 @@ class HuaweiDashboardModel(
             felt = com.opentasker.core.band.RecoveryLog.rating(appContext, morningKey),
             feltMorning = morningKey,
             feltNote = com.opentasker.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
-            rehabDays = com.opentasker.core.band.RehabLog.all(appContext),
+            // The band's own rehab sessions AND anything 白い熊 ticked by hand.
+                //
+                // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
+                // filled dates from the pulled rehab sessions automatically"*). A recorded session
+                // marks its day without anyone remembering to; the manual tick stays for a day the
+                // band did not record, and it is the half nothing else can re-supply.
+                rehabDays = com.opentasker.core.band.RehabLog.all(appContext) +
+                    com.opentasker.core.huawei.HuaweiWorkoutStore.rehabDays(
+                        com.opentasker.app.OpenTaskerApp_NoHilt.db.huaweiWorkoutDao(),
+                        java.time.ZoneId.systemDefault(),
+                    ),
             rehabNotes = com.opentasker.core.band.DayNotes.REHAB.all(appContext),
             feltEnabled = com.opentasker.core.band.RecoveryLog.enabled(appContext),
             status = status,
