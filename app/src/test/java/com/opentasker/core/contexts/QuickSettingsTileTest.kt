@@ -41,4 +41,34 @@ class QuickSettingsTileTest {
         assertEquals("true", event.metadata["tileActive"])
         assertEquals("42", event.metadata["observedAtEpochMs"])
     }
+
+    /**
+     * A tile is reachable from the lock screen, and the task behind one can send an SMS, run a
+     * Termux script or post to a webhook. Anyone holding the phone could run it without unlocking.
+     *
+     * A source gate because `onClick` needs a bound TileService and a locked device, which is an
+     * instrumented concern; what is checkable here is that the run is not reachable without
+     * passing through the lock check.
+     */
+    @Test
+    fun aTileRunIsDeferredUntilTheDeviceIsUnlocked() {
+        val source = com.opentasker.ProductionSources.block(
+            "com/opentasker/core/contexts/QuickSettingsTileService.kt",
+            "override fun onClick()",
+            "private fun updateTile(",
+        )
+
+        assertTrue(
+            "the bound task must run through the lock check",
+            "if (isLocked) unlockAndRun(runBoundTask) else runBoundTask.run()" in source,
+        )
+        assertTrue(
+            "the broadcast that starts the task must sit inside the deferred block",
+            source.indexOf("val runBoundTask") < source.indexOf("internalRunTaskIntent"),
+        )
+        assertTrue(
+            "and nothing may start it before the check",
+            source.indexOf("internalRunTaskIntent") < source.indexOf("if (isLocked)"),
+        )
+    }
 }

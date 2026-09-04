@@ -41,17 +41,26 @@ open class QuickSettingsTileService : TileService() {
             }
             return
         }
-        val updated = store.setState(slot, active = !config.active)
-        updateTile(updated)
-        QuickSettingsTileContextEvents.publishTileClicked(updated.active, slot)
-        sendBroadcast(
-            AutomationTargetContract.internalRunTaskIntent(
-                context = applicationContext,
-                taskId = requireNotNull(config.taskId),
-                source = InternalTaskRunSource.QUICK_SETTINGS_TILE,
-                variables = mapOf("tile_slot" to slot.toString(), "tile_active" to updated.active.toString()),
-            ),
-        )
+        val runBoundTask = Runnable {
+            val updated = store.setState(slot, active = !config.active)
+            updateTile(updated)
+            QuickSettingsTileContextEvents.publishTileClicked(updated.active, slot)
+            sendBroadcast(
+                AutomationTargetContract.internalRunTaskIntent(
+                    context = applicationContext,
+                    taskId = requireNotNull(config.taskId),
+                    source = InternalTaskRunSource.QUICK_SETTINGS_TILE,
+                    variables = mapOf("tile_slot" to slot.toString(), "tile_active" to updated.active.toString()),
+                ),
+            )
+        }
+
+        // Quick Settings tiles are reachable from the lock screen, so without this anyone holding
+        // the phone could run whatever task is bound to one: send an SMS, run a Termux script,
+        // post to a webhook. The task is not refused, only deferred, so a tile still does what it
+        // is for the moment the device is unlocked. On a device with no lock set, isLocked is
+        // false and nothing changes.
+        if (isLocked) unlockAndRun(runBoundTask) else runBoundTask.run()
     }
 
     private fun updateTile(config: QuickSettingsTileConfig = store.load(slot)) {

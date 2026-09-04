@@ -83,7 +83,11 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
-- Secret variable values and the backup passphrase now use the password keyboard.
+- A Quick Settings tile no longer runs its task straight from the lock screen.
+  Anyone holding your phone could tap one and run whatever it was bound to, which
+  might send a message or run a script. The tap now waits for you to unlock and
+  then runs, so nothing is lost except the shortcut for someone who should not
+  have it. Devices with no lock set are unaffected.- Secret variable values and the backup passphrase now use the password keyboard.
   They were masked on screen but typed as ordinary text, so the keyboard's
   autocorrect and personal dictionary could learn them and offer them as a
   suggestion in another app later.
