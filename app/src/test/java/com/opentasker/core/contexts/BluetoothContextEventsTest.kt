@@ -126,5 +126,23 @@ class BluetoothContextEventsTest {
         assertTrue(BluetoothContextEvents.supportsSecurityTriggers(36))
     }
 
+    /**
+     * The receiver is unregistered while no Bluetooth profile is enabled, so anything that
+     * disconnects in that window is never seen. Carrying the old set into the next registration
+     * made the first connect report no "some connected" transition and the following disconnect
+     * report no "all disconnected" one, for the life of the process.
+     */
+    @Test
+    fun trackerStartsFromNothingWhenTheReceiverIsRegisteredAgain() {
+        val tracker = BluetoothConnectionTracker()
+        assertTrue(tracker.onConnected("headset"))
+
+        tracker.reset()
+
+        assertEquals(0, tracker.connectedCount())
+        assertTrue("the first connect after a restart is a transition again", tracker.onConnected("headset"))
+        assertTrue("and the last disconnect still reports one", tracker.onDisconnected("headset"))
+    }
+
     private fun STATE() = BluetoothContextEvents.STATE_CONNECTED
 }

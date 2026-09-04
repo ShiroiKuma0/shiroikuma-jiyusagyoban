@@ -50,6 +50,14 @@ object BluetoothContextEvents {
 
     private val connectionTracker = BluetoothConnectionTracker()
 
+    /**
+     * Drops the tracked connections, which the engine calls when it starts the Bluetooth receiver.
+     *
+     * Devices disconnect while the receiver is unregistered and nothing tells us, so carrying the
+     * old set into a fresh registration reports the aggregate transitions wrongly from then on.
+     */
+    fun resetConnections() = connectionTracker.reset()
+
     val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (Build.VERSION.SDK_INT >= ANDROID_16_API && isApi36SecurityAction(intent.action)) {

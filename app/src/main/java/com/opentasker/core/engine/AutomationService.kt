@@ -150,6 +150,9 @@ class AutomationService : Service() {
                 ),
                 ContextMonitor.BLUETOOTH_EVENTS to ContextMonitorHandle(
                     start = {
+                        // Anything that disconnected while the receiver was unregistered was never
+                        // seen, so start from nothing rather than from a stale set.
+                        BluetoothContextEvents.resetConnections()
                         ContextCompat.registerReceiver(
                             this,
                             BluetoothContextEvents.receiver,

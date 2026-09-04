@@ -19,4 +19,16 @@ internal class BluetoothConnectionTracker {
     }
 
     fun connectedCount(): Int = connectedDevices.size
+
+    /**
+     * Forgets everything, for when the receiver stops and starts again.
+     *
+     * While no Bluetooth profile is enabled the receiver is unregistered, so disconnects happen
+     * unseen. Keeping the old set meant the first connect after re-enabling reported no
+     * "some connected" transition (the set was never empty) and the following disconnect reported
+     * no "all disconnected" one, for the life of the process.
+     */
+    fun reset() {
+        connectedDevices.clear()
+    }
 }
