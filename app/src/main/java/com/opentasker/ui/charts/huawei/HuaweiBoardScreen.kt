@@ -143,6 +143,7 @@ val BOARD_TILES = listOf(
     // cards sit together, and lifting is nearer the report than the walks are — it has no route,
     // so what it holds is the same heart rate and energy the report is made of.
     BoardTile("lift", "重量挙げ（Huawei） -- [727]", Loc("Lifting", "重量挙げ")),
+    BoardTile("rehab", "機能訓練（Huawei） -- [727]", Loc("Rehab", "機能訓練")),
     BoardTile("walks", "運動（Huawei） -- [727]", Loc("Walks", "運動")),
     BoardTile("faces", "バンド文字盤（Huawei） -- [727]", Loc("Watch faces", "文字盤")),
     BoardTile("sat", "衛星予測（Huawei） -- [727]", Loc("Satellites", "衛星"),

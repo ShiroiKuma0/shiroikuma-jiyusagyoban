@@ -14,6 +14,7 @@ import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.core.huawei.HuaweiWorkout
 import com.opentasker.ui.charts.huawei.HuaweiWalkDetailScreen
 import com.opentasker.ui.charts.huawei.HuaweiWalksScreen
+import com.opentasker.ui.charts.huawei.HuaweiWorkoutCalendarScreen
 import com.opentasker.ui.charts.huawei.HuaweiWalksState
 import com.opentasker.ui.theme.OpenTaskerTheme
 import java.io.File
@@ -219,13 +220,109 @@ fun HuaweiLiftGridPreview() {
         Frame {
             HuaweiWalksScreen(
                 state = HuaweiWalksState(
-                    walks = LIFTS, efforts = LIFT_EFFORTS, loading = false, strength = true,
+                    walks = LIFTS, efforts = LIFT_EFFORTS, loading = false, kind = HuaweiWorkoutStore.Kind.STRENGTH,
                 ),
                 contentPadding = PaddingValues(10.dp),
                 onDownload = {},
                 onShare = {},
                 onOpenInChizu = {},
                 onOpen = {},
+            )
+        }
+    }
+}
+
+/**
+ * 「機能訓練」 — the band's Free exercise, which is what 白い熊 records rehab under.
+ *
+ * Built from the same window as the walks and the lifts, told which third of the library it shows.
+ * The session is real: workout 23 of 2026-09-04, twenty minutes, 64 kcal, a heart rate between 82
+ * and 113. What this checks is that the third mode reads as its own screen rather than as a lifting
+ * screen with the title changed — and that the calendar pill, which is now the only way to the
+ * record of which days were done, is on it.
+ */
+private val REHAB = HuaweiWorkoutStore.Workout(
+    number = 23,
+    startSeconds = 1_788_505_560L,
+    endSeconds = 1_788_506_768L,
+    distanceMetres = 0,
+    steps = 0,
+    calories = 64,
+    kind = "rehab",
+    sportType = HuaweiWorkout.FREE_EXERCISE,
+    intervalSeconds = 5,
+    sampleCount = 241,
+    recovery = BandSeries.ints(BandSeries.LIFT_RECOVERY),
+    trackPoints = 0,
+)
+
+@PreviewTest
+@Preview(name = "Rehab — grid", widthDp = 413, heightDp = 900, fontScale = 1.3f, showBackground = true)
+@Composable
+fun HuaweiRehabGridPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        Frame {
+            HuaweiWalksScreen(
+                state = HuaweiWalksState(
+                    walks = listOf(
+                        REHAB,
+                        // A second session, and one with no heart rate — the state the empty frame
+                        // exists for, which must not read as a missing MAP on a kind that has none.
+                        REHAB.copy(
+                            number = 19,
+                            startSeconds = 1_788_330_000L,
+                            endSeconds = 1_788_331_400L,
+                            calories = 71,
+                        ),
+                    ),
+                    efforts = mapOf(REHAB.id to LIFT_EFFORT),
+                    loading = false,
+                    kind = HuaweiWorkoutStore.Kind.REHAB,
+                ),
+                contentPadding = PaddingValues(10.dp),
+                onDownload = {},
+                onShare = {},
+                onOpenInChizu = {},
+                onOpen = {},
+            )
+        }
+    }
+}
+
+/**
+ * The calendar, on the kind whose colour is not the one it was built for.
+ *
+ * 機能訓練 had this page first and it was yellow throughout. Walking gets the same page in blue, and
+ * what this checks is that the tiles still read — a filled day against `REST_FILL` — when the bright
+ * colour is not the annotation ink the grid was drawn against.
+ */
+@PreviewTest
+@Preview(name = "Calendar — walks", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiWalkCalendarPreview() {
+    val zone = java.time.ZoneId.of("Europe/Prague")
+    val day = 24L * 3600
+    val base = 1_788_000_000L
+    val walks = (0..9).map { i ->
+        WALK_WITH_EFFORT.copy(
+            number = 30 - i,
+            startSeconds = base - i * day * (if (i % 3 == 0) 2 else 1),
+        )
+        // Two on one day, which is 白い熊's ordinary Saturday: the tile has to offer both rather
+        // than quietly keep whichever the map happened to hold.
+    } + WALK_WITH_EFFORT.copy(number = 31, startSeconds = base + 11 * 3600)
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Frame {
+            HuaweiWorkoutCalendarScreen(
+                kind = HuaweiWorkoutStore.Kind.WALK,
+                workouts = walks,
+                ticked = emptySet(),
+                notes = emptyMap(),
+                zone = zone,
+                contentPadding = PaddingValues(0.dp),
+                onOpenSession = {},
+                onTapEmptyDay = {},
+                onBack = {},
             )
         }
     }
@@ -239,7 +336,7 @@ fun HuaweiLiftEmptyPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
         Frame {
             HuaweiWalksScreen(
-                state = HuaweiWalksState(walks = emptyList(), loading = false, strength = true),
+                state = HuaweiWalksState(walks = emptyList(), loading = false, kind = HuaweiWorkoutStore.Kind.STRENGTH),
                 contentPadding = PaddingValues(10.dp),
                 onDownload = {},
                 onShare = {},

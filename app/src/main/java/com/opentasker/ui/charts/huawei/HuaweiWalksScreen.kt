@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.sp
 import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import com.opentasker.ui.charts.ActionPill
 import com.opentasker.ui.charts.CountPill
 import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.LocalBandLanguage
@@ -65,14 +68,15 @@ data class HuaweiWalksState(
     /** Heart rate over the open walk's window, read from the synced samples when it is opened. */
     val heart: com.opentasker.core.storage.HuaweiSampleStats? = null,
     /**
-     * Whether this window is showing lifting rather than walking.
+     * Which third of the library this window is showing.
      *
-     * One window, told which workouts it is for, rather than two screens that would drift apart the
-     * first time either gained a figure. The band numbers a lift and a walk in the same sequence
-     * and stores them in the same library; the only real differences are that a lift has no route
-     * to draw and nothing to hand to 地図, and both fall out of this one flag.
+     * One window, told which workouts it is for, rather than three screens that would drift apart
+     * the first time any of them gained a figure. The band numbers a walk, a lift and a rehab
+     * session in one sequence and stores them in one table; the only real differences are that the
+     * trackless kinds have no route to draw and nothing to hand to 地図, and all of that falls out
+     * of this one value.
      */
-    val strength: Boolean = false,
+    val kind: HuaweiWorkoutStore.Kind = HuaweiWorkoutStore.Kind.WALK,
     /**
      * What each workout cost, keyed by [HuaweiWorkoutStore.Workout.id].
      *
@@ -112,6 +116,8 @@ fun HuaweiWalksScreen(
     onShare: (HuaweiWorkoutStore.Workout) -> Unit,
     onOpenInChizu: (HuaweiWorkoutStore.Workout) -> Unit,
     onOpen: (HuaweiWorkoutStore.Workout) -> Unit,
+    /** Open the calendar of which days this kind was recorded on. */
+    onOpenCalendar: () -> Unit = {},
     /**
      * Where a cell's picture comes from, for callers that are not reading a real archive — today the
      * screenshot previews, which is the only way this layout can be looked at at all, since 白い熊's
@@ -132,13 +138,10 @@ fun HuaweiWalksScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            val accent = if (state.strength) ChartPalette.HEART_RATE else ChartPalette.STEPS
+            val accent = HuaweiText.accentFor(state.kind)
             SectionCard(accent = accent) {
-                SectionTitle(
-                    (if (state.strength) HuaweiText.liftTitle else HuaweiText.walksTitle)[lang],
-                    accent,
-                )
-                BodyText((if (state.strength) HuaweiText.liftAbout else HuaweiText.walksAbout)[lang])
+                SectionTitle(HuaweiText.titleFor(state.kind)[lang], accent)
+                BodyText(HuaweiText.aboutFor(state.kind)[lang])
                 state.message?.let { NoteText(it) }
                 Button(
                     onClick = onDownload,
@@ -147,7 +150,20 @@ fun HuaweiWalksScreen(
                     shape = RoundedCornerShape(10.dp),
                 ) {
                     if (state.downloading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text((if (state.strength) HuaweiText.liftDownload else HuaweiText.walksDownload)[lang])
+                    else Text(HuaweiText.downloadFor(state.kind)[lang])
+                }
+                // Which days this kind was recorded on — and the way to any one of them, since a
+                // filled tile opens that day's session. Every kind has one: a gap in walking is the
+                // same finding as a gap in rehab, and a grid of dates is the fastest route to
+                // "what did I do on the 29th" (白い熊, 2026-09-04).
+                run {
+                    ActionPill(
+                        label = HuaweiText.rehabCalendar[lang],
+                        icon = Icons.Filled.CalendarMonth,
+                        onClick = onOpenCalendar,
+                        modifier = Modifier.padding(top = 8.dp),
+                        large = true,
+                    )
                 }
             }
         }
@@ -155,7 +171,7 @@ fun HuaweiWalksScreen(
         if (state.walks.isEmpty() && !state.loading) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionCard(accent = ChartPalette.AXIS_TEXT) {
-                    BodyText((if (state.strength) HuaweiText.liftEmpty else HuaweiText.walksEmpty)[lang])
+                    BodyText(HuaweiText.emptyFor(state.kind)[lang])
                 }
             }
         }
@@ -163,7 +179,7 @@ fun HuaweiWalksScreen(
         items(state.walks, key = { it.id }) { walk ->
             WalkCell(
                 walk = walk,
-                strength = state.strength,
+                kind = state.kind,
                 effort = state.efforts[walk.id],
                 plot = state.plots[walk.id],
                 base = state.plots[walk.id]?.cutout?.id?.let { state.bases[it] },
@@ -180,7 +196,7 @@ fun HuaweiWalksScreen(
 @Composable
 private fun WalkCell(
     walk: HuaweiWorkoutStore.Workout,
-    strength: Boolean,
+    kind: HuaweiWorkoutStore.Kind,
     effort: HuaweiWorkoutStore.Effort?,
     plot: com.opentasker.core.huawei.maps.WalkPlot?,
     base: androidx.compose.ui.graphics.ImageBitmap?,
@@ -195,7 +211,7 @@ private fun WalkCell(
     // grid of unequal cards is what 白い熊 asked this not to be, and `fillMaxHeight()` cannot deliver
     // it here: a vertical `LazyVerticalGrid` measures its items with an unbounded height and then
     // sizes the row to the tallest, so a cell asking to fill has nothing to fill.
-    SectionCard(accent = if (strength) ChartPalette.HEART_RATE else ChartPalette.STEPS, onClick = onOpen) {
+    SectionCard(accent = HuaweiText.accentFor(kind), onClick = onOpen) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -205,7 +221,7 @@ private fun WalkCell(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(
                     1.dp,
-                    (if (strength) ChartPalette.HEART_RATE else ChartPalette.STEPS).copy(alpha = 0.4f),
+                    (HuaweiText.accentFor(kind)).copy(alpha = 0.4f),
                     RoundedCornerShape(12.dp),
                 ),
             contentAlignment = Alignment.Center,
@@ -213,10 +229,13 @@ private fun WalkCell(
             // A lift has no route, so the frame that holds a map holds the heart rate instead —
             // the same 4:3 box in the same place, because what makes this a grid rather than a
             // pile is that every cell is built identically.
-            if (strength) {
+            if (kind.trackless) {
                 effort?.takeIf { it.heart.size >= 4 }?.let { e ->
                     HeartTrace(e, Modifier.fillMaxSize().padding(8.dp))
-                } ?: NoteText(HuaweiText.walksNoMap[lang])
+                    // "no map yet" is what a WALK says when 地図 has not drawn its area. A lift or
+                    // a rehab session has no area and never will, so the empty frame has to say
+                    // what is actually missing — the heart rate that is the whole content of one.
+                } ?: NoteText(HuaweiText.noHeart[lang])
                 return@Box
             }
             // Drawn, not loaded. Every walk used to carry its own rendered PNG — 2.5 MB for a
@@ -250,7 +269,7 @@ private fun WalkCell(
         // Two lines whether the stats need two or not: one cell wrapping and its neighbour not is
         // the whole difference between a grid and a ragged pile.
         Text(
-            if (strength) effortStats(walk, effort, lang) else walkStats(walk, lang),
+            if (kind.trackless) effortStats(walk, effort, lang) else walkStats(walk, lang),
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.5.sp, lineHeight = 19.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -286,14 +305,14 @@ private fun WalkCell(
         // walk that was sent in the past can still be opened there; one that was not opens our own
         // detail, which is where a missing map is fetched.
         Button(
-            onClick = if (!strength && walk.trackId != null) onOpenInChizu else onOpen,
+            onClick = if (!kind.trackless && walk.trackId != null) onOpenInChizu else onOpen,
             enabled = !busy,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(10.dp),
         ) {
             if (sharing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
             else Text(
-                if (!strength && walk.trackId != null) HuaweiText.walksOpenIn[lang]
+                if (!kind.trackless && walk.trackId != null) HuaweiText.walksOpenIn[lang]
                 else HuaweiText.walksOpen[lang],
             )
         }
