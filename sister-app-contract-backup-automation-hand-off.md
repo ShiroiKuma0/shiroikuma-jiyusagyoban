@@ -488,7 +488,8 @@ exists. A broadcast round trip per app to fill a list is the wrong shape.
 <provider
     android:name=".automation.AutomationProvider"
     android:authorities="${applicationId}.automation"
-    android:exported="true" />
+    android:exported="true"
+    tools:ignore="ExportedContentProvider" />
 ```
 
 No `android:permission`, and this time for a real reason rather than v1's: a custom permission would
@@ -1074,7 +1075,8 @@ lives behind the provider in §2a, which knows who is calling.
 <provider
     android:name=".automation.AutomationProvider"
     android:authorities="${applicationId}.automation"
-    android:exported="true" />
+    android:exported="true"
+    tools:ignore="ExportedContentProvider" />
 
 <service
     android:name=".automation.AutomationDataService"
