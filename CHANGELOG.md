@@ -83,6 +83,10 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
+- Setup counts what it shows you. The progress line counted by section while the
+  rows were marked required or optional by a different rule, so a fresh install
+  read "1 of 3 ready" above four rows marked Required. The sentence under it no
+  longer cuts off mid-word either.
 - A Quick Settings tile no longer runs its task straight from the lock screen.
   Anyone holding your phone could tap one and run whatever it was bound to, which
   might send a message or run a script. The tap now waits for you to unlock and

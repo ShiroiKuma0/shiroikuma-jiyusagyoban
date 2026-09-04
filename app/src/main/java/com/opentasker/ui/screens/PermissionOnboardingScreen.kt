@@ -453,9 +453,11 @@ fun PermissionOnboardingScreen(
                 .sortedWith(compareBy<PermissionSetupItem> { it.granted }.thenBy { it.title })
         }
     }
-    val requiredItems = remember(visibleItems) {
-        visibleItems.filter { it.section == SetupSection.ENGINE || it.section == SetupSection.NEEDED }
-    }
+    // Counted by the same flag the row's own icon reads, not by section. Counting sections meant
+    // "1 of 3 ready" sat above four rows marked Required, because Battery optimization is required
+    // but lives under Reliability, while "Modify system settings" is optional and lives under
+    // Needed. Two definitions of required, disagreeing on screen.
+    val requiredItems = remember(visibleItems) { visibleItems.filterNot { it.optional } }
     val grantedCount = requiredItems.count { it.granted }
     val pendingCount = requiredItems.size - grantedCount
     val progress = if (requiredItems.isEmpty()) 0f else grantedCount.toFloat() / requiredItems.size.toFloat()
@@ -503,8 +505,9 @@ fun PermissionOnboardingScreen(
                                 stringResource(R.string.setup_checklist_body),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
+                                // No line cap: at two lines this sentence cut off mid-word on a
+                                // 411dp phone, so the one line explaining what an incomplete
+                                // setup actually costs you ended at "until setup is co...".
                             )
                             Spacer(Modifier.height(6.dp))
                             PermissionStatusPill(
