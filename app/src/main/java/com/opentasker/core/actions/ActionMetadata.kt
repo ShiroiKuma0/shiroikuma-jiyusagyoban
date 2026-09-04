@@ -1274,16 +1274,17 @@ fun registerActionMetadata() {
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "huawei.workouts",
-            name = "Huawei Band walks",
-            description = "Read the walks the band recorded and download their GPS tracks. A workout is not part of the ordinary sync — it is an object the band numbered, with its own summary and, if it saw satellites, a track stored as a file. Two things about that file's decoding are unproven, so the raw bytes are always kept beside the GPX",
+            name = "Huawei Band workouts",
+            description = "Read the workouts the band recorded — walks with their GPS tracks, and strength sessions, which have none. A workout is not part of the ordinary sync: it is an object the band numbered, with its own summary, its own five-second heart rate stream and the recovery curve it takes afterwards. Two things about a track file's decoding are unproven, so the raw bytes are always kept beside the GPX",
             category = "Health",
             fields = listOf(
                 ActionField("chizu_token", "白い熊 地図 token", FieldType.TEXT, hint = "from 地図 → Export / Import. Kept once given, because the window's Send button runs long after this action has finished"),
-                ActionField("browse", "Or open the walks", FieldType.TEXT, hint = "a directory of walks — opens the grid instead of asking the band. Blank = ask the band for new walks"),
+                ActionField("browse", "Or open the window", FieldType.TEXT, hint = "a directory of workouts — opens the grid instead of asking the band. Blank = ask the band for new ones"),
+                ActionField("kind", "Which workouts", FieldType.TEXT, hint = "strength = 「重量挙げ」, the lifting sessions. Blank = 「運動」, the walks. The band is always asked for the whole window either way; this decides what the window shows"),
                 ActionField("days", "How far back (days)", FieldType.NUMBER, hint = "default 7, coerced to 1..30. The band discards older tracks, so a long window mostly costs round trips"),
                 ActionField("out", "Keep walks in", FieldType.TEXT, hint = "one directory per walk, holding the route as GPX, the raw bytes off the band, and the map 地図 draws. The raw file is kept because a format understood slightly wrongly can only be corrected by re-reading it — which has already happened once"),
                 ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
-                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Workouts, <prefix>Tracks, <prefix>Gpx (the newest track's path) and <prefix>Summary"),
+                ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_ — writes <prefix>Workouts, <prefix>Tracks, <prefix>Lifts, <prefix>Gpx (the newest track's path) and <prefix>Summary"),
                 ActionField("store", "Store the summary in", FieldType.TEXT, hint = "a variable name to receive the one-line result"),
             ),
         ),

@@ -44,12 +44,18 @@ object WalkTrack {
         return out
     }
 
-    /** Everything drawing one walk needs, resolved against what is cached. */
-    fun plot(walkRoot: File, gpx: File, viewPixels: Int = 720): WalkPlot {
-        val points = read(gpx)
-        val box = MapCutouts.Box.of(points)
-            ?: return WalkPlot(points, null, null)
-        return WalkPlot(points, box, MapCutouts.cover(walkRoot, box))
+    /**
+     * Everything drawing one walk needs, resolved against the cutouts we hold.
+     *
+     * Takes the coordinates rather than a file: the route comes from the band's own `track.bin`,
+     * decoded on the way out of the database, and no GPX is kept anywhere to read.
+     */
+    fun plot(
+        points: List<Pair<Double, Double>>,
+        cutoutKeys: List<String>,
+    ): WalkPlot {
+        val box = MapCutouts.Box.of(points) ?: return WalkPlot(points, null, null)
+        return WalkPlot(points, box, MapCutouts.cover(cutoutKeys, box))
     }
 
     /** The zoom a walk of this size deserves, for asking 地図 for a cutout. */
