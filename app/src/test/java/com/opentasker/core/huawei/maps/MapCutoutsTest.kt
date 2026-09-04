@@ -46,49 +46,44 @@ class MapCutoutsTest {
 
     @Test
     fun theNameCarriesTheWholeTransform() {
-        val c = MapCutouts.Cutout(16, 35396, 22204, 3, 2, File("x"))
+        val c = MapCutouts.Cutout(16, 35396, 22204, 3, 2)
         assertEquals("z16_x35396_y22204_3x2.png", c.id)
-        val back = MapCutouts.parse(File(c.id))
-        assertNotNull(back)
-        assertEquals(c.copy(file = back!!.file), back)
+        // The key round-trips whole: it IS the transform, which is why it can be a database key
+        // and why a picture can never be matched to the wrong row.
+        assertEquals(c, MapCutouts.parse(c.id))
     }
 
     @Test
     fun aWalkFindsTheCutoutItFitsInAndNotOneItDoesNot() {
-        val root = temp.newFolder()
         val walk = MapCutouts.Box(50.070, 14.430, 50.080, 14.445)
-        // Nothing on disk: this is somewhere new, and saying so is the whole trigger.
-        assertNull(MapCutouts.cover(root, walk))
+        // Nothing held: this is somewhere new, and saying so is the whole trigger.
+        assertNull(MapCutouts.cover(emptyList(), walk))
 
-        val wanted = MapCutouts.needed(root, walk, preferredZoom = 16)
-        MapCutouts.dir(root)
-        wanted.file.writeBytes(byteArrayOf(1))
-        val found = MapCutouts.cover(root, walk)
+        val wanted = MapCutouts.needed(walk, preferredZoom = 16)
+        val held = listOf(wanted.id)
+        val found = MapCutouts.cover(held, walk)
         assertNotNull("the cutout we just cut must cover the walk that asked for it", found)
         assertEquals(wanted.id, found!!.id)
 
         // Somewhere else entirely is not covered by it.
-        assertNull(MapCutouts.cover(root, MapCutouts.Box(35.68, 139.76, 35.69, 139.77)))
+        assertNull(MapCutouts.cover(held, MapCutouts.Box(35.68, 139.76, 35.69, 139.77)))
     }
 
     @Test
     fun theMarginMakesOneCutoutServeTheNextWalkToo() {
-        val root = temp.newFolder()
-        MapCutouts.dir(root)
         val first = MapCutouts.Box(50.0740, 14.4360, 50.0760, 14.4400)
-        MapCutouts.needed(root, first, 16).file.writeBytes(byteArrayOf(1))
+        val held = listOf(MapCutouts.needed(first, 16).id)
         // A second walk from the same door, a few streets further — the point of the margin is that
         // this does NOT send us back to 地図.
         val second = MapCutouts.Box(50.0735, 14.4340, 50.0775, 14.4425)
-        assertNotNull(MapCutouts.cover(root, second))
+        assertNotNull(MapCutouts.cover(held, second))
     }
 
     @Test
     fun aSprawlingBoxIsAnsweredAtACoarserZoomRatherThanRefused() {
-        val root = temp.newFolder()
         // Prague to Brno: no cutout at z16 could hold this without thousands of tiles.
         val huge = MapCutouts.Box(49.19, 14.43, 50.08, 16.61)
-        val c = MapCutouts.needed(root, huge, preferredZoom = 16)
+        val c = MapCutouts.needed(huge, preferredZoom = 16)
         assertTrue("zoom must have been stepped down", c.zoom < 16)
         assertTrue("and the block kept small", c.tilesW <= MapCutouts.MAX_TILES)
         assertTrue(c.tilesH <= MapCutouts.MAX_TILES)
@@ -97,7 +92,7 @@ class MapCutoutsTest {
 
     @Test
     fun pixelsLandWhereTheyShouldInsideTheImage() {
-        val c = MapCutouts.Cutout(16, 35396, 22204, 2, 2, File("x"))
+        val c = MapCutouts.Cutout(16, 35396, 22204, 2, 2)
         val w = 2 * Mercator.TILE_PX
         val h = 2 * Mercator.TILE_PX
         // The cutout's own top-left corner is pixel 0,0 by definition.

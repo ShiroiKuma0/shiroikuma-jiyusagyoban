@@ -31,31 +31,41 @@ class HuaweiWorkoutsAction : Action {
         val store = args["store"]?.trim()?.ifEmpty { null }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val days = args["days"]?.trim()?.toIntOrNull()?.coerceIn(1, 30) ?: 7
-        val outDir = args["out"]?.trim()?.ifEmpty { null }
-            ?: com.opentasker.core.huawei.HuaweiWalkLibrary.DEFAULT_DIR
 
         // The 地図 token is carried by the task and kept, because the window's Send button runs
         // long after the action has finished and has no arguments of its own to read.
         args["chizu_token"]?.trim()?.ifEmpty { null }
             ?.let { com.opentasker.core.huawei.HuaweiSettings.setChizuToken(ctx.app, it) }
 
-        // A directory instead of a fetch opens the walks window. Same reasoning as the watch-face
-        // action's browse: it is the same job seen from the other end — 白い熊 looking at the walks
-        // rather than a task asking for them — and it does not deserve a second action id.
-        args["browse"]?.trim()?.ifEmpty { null }?.let { dir ->
-            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, dir, days)
-            ctx.variables.set("${prefix}Summary", "opened the walks")
+        // Which workouts the window is for. `kind=strength` opens 「重量挙げ」; anything else, or
+        // nothing, opens 「運動」. Not a second action id, because the fetch, the library and the
+        // screen are all the same — only what is drawn differs.
+        val strength = args["kind"]?.trim().equals("strength", ignoreCase = true)
+
+        // `browse` opens the window instead of asking the band. Same job seen from the other end —
+        // 白い熊 looking at the workouts rather than a task fetching them — and it does not deserve
+        // a second action id. Its value used to be the directory they lived in; there is no such
+        // directory now, so any non-empty value means "open it".
+        args["browse"]?.trim()?.ifEmpty { null }?.let {
+            com.opentasker.ui.charts.huawei.HuaweiWalksActivity.open(ctx.app, days, strength)
+            ctx.variables.set("${prefix}Summary", if (strength) "opened the lifts" else "opened the walks")
             return ActionResult.Success
         }
 
         val now = System.currentTimeMillis() / 1000
         val from = now - days * 86_400L
 
-        val result = HuaweiSyncRunner.fetchWorkouts(ctx.app, address, from, now, File(outDir))
+        val result = HuaweiSyncRunner.fetchWorkouts(
+            ctx.app, address, from, now,
+            com.opentasker.app.OpenTaskerApp_NoHilt.db.huaweiWorkoutDao(),
+        )
         return result.fold(
             onSuccess = { walks ->
                 ctx.variables.set("${prefix}Workouts", walks.size.toString())
                 ctx.variables.set("${prefix}Tracks", walks.count { it.gpxPath != null }.toString())
+                // Counted separately because it is the one figure that used to be structurally
+                // zero: a workout with no track was fetched, summarised and then never written.
+                ctx.variables.set("${prefix}Lifts", walks.count { it.summary.isStrength }.toString())
                 // The newest track's path, because a task that wants to hand one to a map wants the
                 // one just walked, and reaching into a list is more machinery than that deserves.
                 walks.lastOrNull { it.gpxPath != null }?.let {
@@ -65,9 +75,18 @@ class HuaweiWorkoutsAction : Action {
                     "no workouts in the last $days days"
                 } else {
                     walks.joinToString(" · ") { w ->
-                        val km = w.summary.distanceMetres?.let { "%.2f km".format(it / 1000.0) } ?: "—"
-                        val pts = if (w.trackPoints > 0) "${w.trackPoints} points" else (w.note ?: "no track")
-                        "${w.summary.kind} $km ($pts)"
+                        val km = w.summary.distanceMetres?.takeIf { it > 0 }
+                            ?.let { "%.2f km".format(it / 1000.0) }
+                        val kcal = w.summary.calories?.let { "$it kcal" }
+                        // "no track" is a fact about a walk and a definition of a lift, so it is
+                        // no longer reported as if something had gone wrong.
+                        val pts = when {
+                            w.trackPoints > 0 -> "${w.trackPoints} points"
+                            w.note != null -> w.note
+                            else -> null
+                        }
+                        val what = listOfNotNull(km ?: kcal, pts).joinToString(", ")
+                        "${w.summary.kind}${if (what.isEmpty()) "" else " ($what)"}"
                     }
                 }
                 ctx.variables.set("${prefix}Summary", text)
