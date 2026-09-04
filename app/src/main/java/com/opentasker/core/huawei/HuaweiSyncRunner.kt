@@ -273,57 +273,91 @@ object HuaweiSyncRunner {
         address: String,
         fromSeconds: Long,
         toSeconds: Long,
-        outDir: java.io.File?,
+        /** Where workouts are stored. Null runs the fetch without keeping anything — tests only. */
+        dao: com.opentasker.core.storage.HuaweiWorkoutDao?,
     ): Result<List<Walk>> = withSession(context, address) { session, _ ->
         val cfg = HuaweiCommands
-        val listed = HuaweiWorkout.parseList(
-            session.decrypt(
-                session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_LIST, cfg.workoutList(fromSeconds, toSeconds)),
-            ),
+        val listReply = session.decrypt(
+            session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_LIST, cfg.workoutList(fromSeconds, toSeconds)),
         )
-        outDir?.mkdirs()
+        val listed = HuaweiWorkout.parseList(listReply)
         listed.map { entry ->
-            val summary = runCatching {
-                HuaweiWorkout.parseSummary(
-                    session.decrypt(
-                        session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_TOTALS, cfg.workoutTotals(entry.number)),
-                    ),
-                )
-            }.getOrNull() ?: HuaweiWorkout.Summary(entry.number)
-
-            if (!entry.hasTrack) return@map Walk(summary, 0, null, "no track recorded")
-
-            val file = runCatching {
-                HuaweiFileClient(session).fetch(
-                    cfg.gpsTrackName(entry.number), HuaweiFileClient.GPS_TYPE, 0, 0,
+            // The summary's whole container, kept as it arrived. Thirty-one tags, twelve understood;
+            // the parse below reads those twelve and the bytes stay for the other nineteen.
+            val summaryReply = runCatching {
+                session.decrypt(
+                    session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_TOTALS, cfg.workoutTotals(entry.number)),
                 )
             }.getOrNull()
-            if (file !is HuaweiFileClient.Result.Data) {
-                return@map Walk(summary, 0, null, "the band would not send the track")
-            }
-            val track = HuaweiGpsTrack.decode(file.bytes)
-                ?: return@map Walk(summary, 0, null, "${file.bytes.size} B of track that did not decode")
+            val summaryRaw = summaryReply?.firstOrNull { it.tag == 0x81 }?.value
+            val summary = summaryReply?.let { HuaweiWorkout.parseSummary(it) }
+                ?: HuaweiWorkout.Summary(entry.number)
 
-            // One directory per walk, holding the raw bytes as well as the route. Keeping the raw
-            // file is what made the header off-by-one fixable in an afternoon: a GPX regenerated
-            // from a bad decode is a walk that never happened, and only the .bin can be re-read.
-            val stored = outDir?.let { root ->
-                HuaweiWalkLibrary.write(
-                    root = root,
-                    number = entry.number,
-                    startSeconds = summary.startSeconds ?: track.startSeconds,
-                    endSeconds = summary.endSeconds,
-                    distanceMetres = summary.distanceMetres,
-                    steps = summary.steps,
-                    calories = summary.calories,
-                    elevationGainDm = summary.elevationGainDm,
-                    kind = summary.kind,
-                    points = track.points.size,
-                    raw = file.bytes,
-                    gpx = HuaweiGpsTrack.toGpx(track, "${summary.kind} ${entry.number}"),
+            // The heart rate, block by block. The band caps a block at 136 records, so a
+            // forty-minute walk is four requests and asking only for the workout number would
+            // return its first eleven minutes — which is why the index is not optional.
+            val sampleRaw = ArrayList<ByteArray>(entry.sampleBlocks)
+            val blocks = (0 until entry.sampleBlocks).mapNotNull { i ->
+                runCatching {
+                    val reply = session.decrypt(
+                        session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_SAMPLES, cfg.workoutSamples(entry.number, i)),
+                    )
+                    reply.firstOrNull { it.tag == 0x81 }?.value?.let { sampleRaw += it }
+                    HuaweiWorkout.parseSamples(reply)
+                }.getOrNull()
+            }
+            val splits = if (entry.paceBlocks > 0) {
+                runCatching {
+                    HuaweiWorkout.parsePace(
+                        session.decrypt(
+                            session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_PACE, cfg.workoutPace(entry.number, 0)),
+                        ),
+                    )
+                }.getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+
+            // A workout with no track is still a workout. This used to return early with
+            // "no track recorded" and write NOTHING, so every strength session the band had ever
+            // recorded was fetched, summarised and thrown away (白い熊, 2026-09-03).
+            val file = if (entry.hasTrack) {
+                runCatching {
+                    HuaweiFileClient(session).fetch(
+                        cfg.gpsTrackName(entry.number), HuaweiFileClient.GPS_TYPE, 0, 0,
+                    )
+                }.getOrNull()
+            } else {
+                null
+            }
+            val trackRaw = (file as? HuaweiFileClient.Result.Data)?.bytes
+            val track = trackRaw?.let { HuaweiGpsTrack.decode(it) }
+            val why = when {
+                !entry.hasTrack -> null                      // not a failure: this kind has no route
+                trackRaw == null -> "the band would not send the track"
+                track == null -> "${trackRaw.size} B of track that did not decode"
+                else -> null
+            }
+
+            // The raw bytes are what is stored; everything shown is decoded from them. No GPX is
+            // written anywhere — it is a lossy rendering under two unproven constants, and cheap to
+            // regenerate whenever something actually asks for a route.
+            val start = summary.startSeconds ?: track?.startSeconds
+            if (start != null && start > 0 && dao != null) {
+                HuaweiWorkoutStore.put(
+                    dao = dao,
+                    summary = summary,
+                    startSeconds = start,
+                    sampleBlocks = sampleRaw,
+                    splits = splits,
+                    summaryRaw = summaryRaw,
+                    trackRaw = trackRaw,
+                    trackPoints = track?.points?.size ?: 0,
+                    sampleCount = blocks.sumOf { it.heart.size },
+                    intervalSeconds = blocks.firstOrNull()?.intervalSeconds ?: 0,
                 )
             }
-            Walk(summary, track.points.size, stored?.gpx?.absolutePath)
+            Walk(summary, track?.points?.size ?: 0, null, why)
         }
     }
 
