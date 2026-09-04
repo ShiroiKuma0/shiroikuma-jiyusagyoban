@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -63,6 +65,14 @@ data class DayGridCell(
     /** Whether [label] is bold. The rating grids want it; a plain date does not. */
     val bold: Boolean = true,
     val hasNote: Boolean = false,
+    /**
+     * How many sessions the day holds, when that is more than one.
+     *
+     * Null on every ordinary day, so the mark appears only where it means something. A calendar
+     * tile is a seventh of a phone's width and already carries a date; a badge on all of them
+     * would be a badge that says nothing on most of them.
+     */
+    val count: Int? = null,
     /** The bar under the tile, as a fraction of the cell's width. Null draws none. */
     val bar: Float? = null,
 )
@@ -331,6 +341,36 @@ fun DayGrid(
                                     fontWeight = if (cell.bold) FontWeight.Bold else FontWeight.Normal,
                                     color = skin.ink,
                                 )
+                                // How many sessions the day holds, when that is more than one —
+                                // in the tile, ringed, in the tile's own ink.
+                                //
+                                // Small enough to clear the date beside it: a 12 dp ring in the
+                                // corner of a 34 dp square leaves the centred numeral alone, where
+                                // a 15 dp one sat on the 9 of "29". The ring is what separates it
+                                // from the date — a numeral beside a numeral reads as part of it.
+                                cell.count?.takeIf { it > 1 }?.let { many ->
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopEnd)
+                                            // Inset from both edges, so the ring sits INSIDE the
+                                            // tile rather than running along its corner
+                                            // (白い熊, 2026-09-04).
+                                            .padding(top = 3.dp, end = 3.dp)
+                                            .size(17.dp)
+                                            .border(1.5.dp, skin.ink, CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            many.toString(),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontSize = 11.sp,
+                                                lineHeight = 11.sp,
+                                            ),
+                                            fontWeight = FontWeight.Bold,
+                                            color = skin.ink,
+                                        )
+                                    }
+                                }
                             }
                             }
                             // UNDER the tile, in both calendars — never inside it.
