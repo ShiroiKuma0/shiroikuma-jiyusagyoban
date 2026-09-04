@@ -8,6 +8,91 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-01.00-11.g29d06ff7+042 — 2026-09-04
+
+Built on upstream `0.2.93` (`g29d06ff7`, 2026-09-01), unchanged from the previous release — the whole
+of this one is fork work. Three sessions: the band's workout service decoded from real bytes, the
+workout archive moved off shared storage into the database, and automation v2 rolled out to
+forty-one sister apps.
+
+### The band's workouts
+
+- **Strength sessions, 機能訓練 and walks all arrive with everything the band holds.** The workout
+  service was written from published descriptions while the band had never recorded a workout, and
+  the sample and pace streams had never been requested at all. Decoded against ten real workouts:
+  the summary carries thirty-one tags, of which two mattered — `0x0A` is mean speed in decimetres per
+  second, checked against distance ÷ duration on all nine walks, and `0x66` is a twenty-five point
+  heart-rate curve the band records **after** the workout ends, which is where the cooldown drop
+  comes from.
+- **Free exercise is sport `255`** — a sentinel rather than a sport, which is precisely what the
+  name means. 白い熊 records 機能訓練 under it, so that is what this app calls it; the band's own
+  name is written down beside the mapping rather than left mysterious.
+- **重量挙げ and 機能訓練 are windows of their own**, beside 散歩, each showing the maximum the band
+  will give: heart rate, energy, the recovery curve, and no map where there is no route.
+- **A calendar on all three windows.** Clicking a date opens that day's session; a day holding more
+  than one is marked with a ringed counter and offers a picker.
+
+### The workout archive moved into the database
+
+- **Nothing is written to shared storage any more.** `[666][147] tracks` existed because 白い熊 地図
+  must read a GPX and neither app can reach the other's private storage — but that covered the GPX
+  and nothing else, so the raw track, the summary, the heart rate and 白い熊's own notes all went out
+  there with it, and **none of it was in the export**. A "clear app data" took the authored record
+  while the backup reported success. Measured before the move: 5,246 KB on disk, 288 KB of it
+  irreplaceable.
+- **Schema 30**, with the band's reusable workout number replaced as the key by the start second, and
+  blobs in a table of their own so a 2 MB `CursorWindow` cannot truncate a read.
+- **地図 receives the GPX by share rather than by file**, so the temporary directory is gone.
+  Cutouts are stored and exported as their own category — already-compressed PNG that base64 would
+  inflate by a third for nothing.
+- **Every store 健康 writes to is now in the export, and a test keeps it true** by reading the
+  sources rather than holding a second list: add a store and forget the export, and it fails with
+  the store's name in the message.
+
+### Automation v2 — the token becomes optional
+
+- **The authorization token is now opt-in.** The master switch defaults **on**, a new 「Use
+  authorization token?」 defaults **off**, and both checks live in one function. **A token sent to an
+  app that does not require one is ignored, never refused** — tokens outlive the settings they were
+  pasted for.
+- **All three flag writes are synchronous.** With the default flipped on, a write that never reaches
+  disk does not fall back to "off", it falls back to **on** — and the caller force-stops with a
+  `SIGKILL`, which leaves an in-flight asynchronous write nowhere to land. Turning an app off is the
+  one action that shuts a sister app out, and it is the action most likely to be running near a
+  force-stop.
+- **A new data door: a `ContentProvider` offering `describe` / `export` / `import` / `cancel`.** The
+  caller is identified by the framework and checked three ways — exact package name, a uid
+  cross-check, and a pinned signing certificate. A prefix is not an identity, so no prefix is
+  accepted.
+- **The payload crosses as a file descriptor the caller supplies**, never a path. A descriptor is a
+  capability that expires when it is closed, the callee never resolves a path, and
+  `MANAGE_EXTERNAL_STORAGE` stops being required for the automation route — which matters most on a
+  freshly wiped phone, where all-files access has not been granted and the old path-based export
+  would fail on the very device the restore is for.
+- **Import exists only on the provider.** An ungated exported receiver that overwrites app data
+  would let any app on the phone wipe any sister app.
+- **Capability discovery is manifest metadata**, readable without waking a frozen app — which
+  matters, because 270 packages are frozen on the phone this runs on.
+
+### Fixes found by rolling v2 out to forty-one sister apps
+
+The contract gained about a dozen corrections, every one credited in place to the repo that found it.
+Four generalise well beyond this project:
+
+- **Go foreground as the first statement of `onStartCommand`**, before any decision that can return.
+  Once `startForegroundService` has been called the platform requires it regardless, so a caller
+  retrying with a stale job id **crashes the app it is backing up**. This was live in nine ports.
+- **Flush synchronously before reporting an import successful** — and grep the restore path for
+  `.edit {` and for asynchronous writes, not for `apply()`. Several apps had no `apply()` at all and
+  were still losing a whole category, silently, because the failure only appears when the caller
+  force-stops fast enough — which is what the restore does on purpose and a hand-run import never
+  does.
+- **A liveness or completion check must fail towards "still running".** A check that fails towards
+  "dead" makes a caller retry work that is already in flight.
+- **Audit package visibility by grepping the caller names, never by looking for the `<queries>`
+  element.** Seven apps failed that check five different ways, and three more looked healthy only
+  because something unrelated was granting visibility.
+
 ## 0.2.93+2026-09-01.00-11.g29d06ff7+016 — 2026-09-03
 
 A third sync onto 0.2.93 — fourteen upstream commits, still no version bump — and the session that
