@@ -21,6 +21,11 @@
   uses the Modify system settings access you may already have. Whatever you write is read
   back afterwards, so a value Android quietly ignores is reported as a failure instead of
   a success, and without the access the action refuses with the command in the message.
+  Settings that control what other apps are allowed to do are refused outright, whatever
+  the table: accessibility services, notification access, the keyboard, the package
+  verifier, installs from unknown sources and USB debugging among them. That access is
+  granted once and then stays, so a profile you import later must not be able to reach
+  those through it.
 - A profile can now trigger on a broadcast another app sends. Name the intent
   action, and OpenTasker listens for that one action while the profile is
   enabled and stops the moment you disable it. Extras come through as bounded

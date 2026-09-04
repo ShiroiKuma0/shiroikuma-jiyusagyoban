@@ -86,6 +86,56 @@ class SettingsWriteTest {
     }
 
     /**
+     * The escalation this action must not become.
+     *
+     * WRITE_SECURE_SETTINGS is granted once, for one reason, and then persists. A profile imported
+     * afterwards reaches this action behind a single generic device-control acknowledgement, which
+     * is nowhere near consent for handing an arbitrary package accessibility privileges, turning
+     * off the package verifier, or allowing installs from unknown sources. Android shows no dialog
+     * for any of those when the setting is written directly.
+     */
+    @Test
+    fun namesThatControlWhatOtherAppsMayDoAreRefused() {
+        listOf(
+            "enabled_accessibility_services",
+            "accessibility_enabled",
+            "enabled_notification_listeners",
+            "enabled_notification_policy_access_packages",
+            "default_input_method",
+            "enabled_input_methods",
+            "package_verifier_enable",
+            "verifier_verify_adb_installs",
+            "adb_enabled",
+            "development_settings_enabled",
+            "install_non_market_apps",
+            "device_provisioned",
+            "user_setup_complete",
+            "lock_pattern_autolock",
+            "lockscreen.disabled",
+            "location_providers_allowed",
+            "always_on_vpn_lockdown",
+        ).forEach { key ->
+            SettingsTable.entries.forEach { table ->
+                val parsed = parseSettingsWrite(
+                    args("table" to table.wireValue, "key" to key, "value" to "1"),
+                )
+                assertTrue(
+                    "\"$key\" must not be writable through ${table.wireValue}, got $parsed",
+                    parsed is SettingsWriteRequest.Rejected,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun anOrdinarySettingIsStillWritable() {
+        listOf("location_mode", "screen_off_timeout", "screen_brightness", "font_scale")
+            .forEach { key ->
+                assertEquals(key, valid("table" to "secure", "key" to key, "value" to "1").key)
+            }
+    }
+
+    /**
      * The refusal has to carry the command, because there is no other way to grant this: no
      * runtime dialog exists, and a user who only sees "permission denied" has nowhere to go.
      */

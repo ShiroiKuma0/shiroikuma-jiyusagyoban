@@ -1,9 +1,18 @@
 package com.opentasker.core.contexts
 
-/** Tracks ACL-connected device identities and reports only the transition to zero devices. */
+/**
+ * Tracks ACL-connected device identities and reports only the transition to zero devices.
+ *
+ * Every method is synchronized because the two callers are on different threads: the broadcast
+ * receiver delivers connects and disconnects on the main thread, while the engine clears the
+ * tracker from `reloadProfiles` on a background dispatcher. An unguarded `HashSet` mutated from
+ * both is a data race, and the visible symptom would be a lost or duplicated aggregate event
+ * rather than an obvious crash.
+ */
 internal class BluetoothConnectionTracker {
     private val connectedDevices = mutableSetOf<String>()
 
+    @Synchronized
     fun onConnected(identity: String): Boolean {
         if (identity.isBlank()) return false
         val wasEmpty = connectedDevices.isEmpty()
@@ -11,6 +20,7 @@ internal class BluetoothConnectionTracker {
         return wasEmpty
     }
 
+    @Synchronized
     fun onDisconnected(identity: String): Boolean {
         if (identity.isBlank()) return false
         val wasNonEmpty = connectedDevices.isNotEmpty()
@@ -18,6 +28,7 @@ internal class BluetoothConnectionTracker {
         return wasNonEmpty && connectedDevices.isEmpty()
     }
 
+    @Synchronized
     fun connectedCount(): Int = connectedDevices.size
 
     /**
@@ -28,6 +39,7 @@ internal class BluetoothConnectionTracker {
      * "some connected" transition (the set was never empty) and the following disconnect reported
      * no "all disconnected" one, for the life of the process.
      */
+    @Synchronized
     fun reset() {
         connectedDevices.clear()
     }

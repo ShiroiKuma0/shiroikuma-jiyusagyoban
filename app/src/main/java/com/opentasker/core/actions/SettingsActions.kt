@@ -515,6 +515,38 @@ internal const val MAX_SETTINGS_VALUE_CHARS = 256
 private val SETTINGS_KEY_PATTERN = Regex("[a-z0-9_.]{1,64}")
 
 /**
+ * Setting names this action refuses to write, whatever the table.
+ *
+ * `WRITE_SECURE_SETTINGS` is granted once, for one reason, and then persists. Without this list a
+ * profile imported afterwards could write `enabled_accessibility_services` and hand an arbitrary
+ * package full accessibility privileges with no system dialog, or turn off the package verifier,
+ * or allow installs from unknown sources. An imported profile reaches this action behind one
+ * generic device-control acknowledgement, which is nowhere near consent for that.
+ *
+ * These are matched as fragments rather than exact names because the same control appears under
+ * several spellings across versions and OEM builds. The cost is refusing a few harmless names that
+ * happen to contain one; that is the right side to be wrong on, and the refusal says why.
+ */
+private val PROTECTED_SETTING_FRAGMENTS = listOf(
+    "accessibility",
+    "notification_listener",
+    "notification_policy",
+    "input_method",
+    "verifier",
+    "adb",
+    "development_settings",
+    "device_admin",
+    "device_provisioned",
+    "user_setup_complete",
+    "install_non_market",
+    "unknown_sources",
+    "lock_pattern",
+    "lockscreen",
+    "location_providers_allowed",
+    "vpn",
+)
+
+/**
  * The one command that turns the Global and Secure tables on.
  *
  * `WRITE_SECURE_SETTINGS` cannot be requested at runtime and no dialog can grant it, so this is
@@ -539,6 +571,12 @@ internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest
     if (!SETTINGS_KEY_PATTERN.matches(key)) {
         return SettingsWriteRequest.Rejected(
             "A setting name is up to 64 characters of a-z, 0-9, underscore or dot.",
+        )
+    }
+    PROTECTED_SETTING_FRAGMENTS.firstOrNull { it in key }?.let { fragment ->
+        return SettingsWriteRequest.Rejected(
+            "\"$key\" controls what other apps are allowed to do, so this action will not write " +
+                "it. Names containing \"$fragment\" are refused.",
         )
     }
     val value = args["value"]
@@ -606,8 +644,11 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
             }
         }.getOrNull()
         if (readBack != request.value) {
+            // Deliberately not "Android ignored it": the value may also have been accepted and then
+            // normalised or clamped by whatever owns that setting. What is certain is that the
+            // setting does not hold what was asked for, so report that and nothing more.
             return ActionResult.Failure(
-                "$target still reads ${readBack ?: "nothing"} after the write, so Android ignored it.",
+                "$target reads ${readBack ?: "nothing"} after the write, not ${request.value}.",
             )
         }
 
