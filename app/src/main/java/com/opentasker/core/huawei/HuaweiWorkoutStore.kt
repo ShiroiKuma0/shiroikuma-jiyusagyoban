@@ -55,6 +55,32 @@ object HuaweiWorkoutStore {
     const val BLOB_TRACK = "track"
     fun blobSamples(block: Int) = "samples/$block"
 
+    /**
+     * Which half — now third — of the library a window is showing.
+     *
+     * A boolean did for two. Three is where a boolean starts lying: `strength = false` would have
+     * to mean "walks OR rehab", and every call site would need to know which. The sport code is
+     * what decides, never the [Workout.kind] string, so a code we have no name for lands in WALK
+     * and is visible rather than silently reclassified.
+     */
+    enum class Kind(val label: String) {
+        WALK("walk"),
+        STRENGTH("strength"),
+        REHAB("rehab"),
+        ;
+
+        fun matches(sportType: Int?): Boolean = when (this) {
+            STRENGTH -> sportType == HuaweiWorkout.STRENGTH
+            REHAB -> sportType == HuaweiWorkout.FREE_EXERCISE
+            // Everything else, deliberately: a walk is the default, so a sport the band starts
+            // reporting shows up somewhere rather than nowhere.
+            WALK -> sportType != HuaweiWorkout.STRENGTH && sportType != HuaweiWorkout.FREE_EXERCISE
+        }
+
+        /** No route to draw, so no map, no cutout and nothing to hand to 地図. */
+        val trackless: Boolean get() = this != WALK
+    }
+
     /** 地図's own arithmetic over the same route — kept beside ours, never merged into it. */
     data class ChizuReading(
         val distanceMetres: Double? = null,
@@ -138,6 +164,17 @@ object HuaweiWorkoutStore {
         /** Stable across a re-fetch and across a restore, unlike the band's own workout number. */
         val id: String get() = startSeconds.toString()
         val isStrength: Boolean get() = sportType == HuaweiWorkout.STRENGTH
+        val isRehab: Boolean get() = sportType == HuaweiWorkout.FREE_EXERCISE
+        val kindOf: Kind get() = Kind.entries.first { it.matches(sportType) }
+
+        /**
+         * This SPORT never has a route — as opposed to a walk that happens to have no track yet.
+         *
+         * The difference matters on the detail screen: a walk with no track keeps its map frame and
+         * its "fetch the area" button, because one may still arrive. A lift or a rehab session
+         * never will, and showing them an empty map box is showing them a thing that cannot happen.
+         */
+        val trackless: Boolean get() = kindOf.trackless
         val hasTrack: Boolean get() = trackPoints > 0
         val durationSeconds: Long? get() = storedDuration ?: endSeconds?.let { it - startSeconds }
         /** How far the heart fell after the work stopped — from the curve alone, no blob needed. */
@@ -150,9 +187,27 @@ object HuaweiWorkoutStore {
 
     suspend fun all(dao: HuaweiWorkoutDao): List<Workout> = dao.all().map { it.toWorkout() }
 
-    /** Walks, or lifts. The filter is the sport code, never the kind string. */
-    suspend fun ofKind(dao: HuaweiWorkoutDao, strength: Boolean): List<Workout> =
-        dao.all().map { it.toWorkout() }.filter { it.isStrength == strength }
+    /** One window's workouts. The filter is the sport code, never the kind string. */
+    suspend fun ofKind(dao: HuaweiWorkoutDao, kind: Kind): List<Workout> =
+        dao.all().map { it.toWorkout() }.filter { kind.matches(it.sportType) }
+
+    /**
+     * The days a rehab session was recorded on, as `yyyyMMdd`.
+     *
+     * What fills the 機能訓練 calendar now. 白い熊, 2026-09-04: *"the calendar will now get filled
+     * dates from the pulled rehab sessions automatically"* — so a day the band recorded is a day
+     * that is done, without anyone having to remember to tick it.
+     */
+    suspend fun rehabDays(dao: HuaweiWorkoutDao, zone: java.time.ZoneId): Set<Long> =
+        dao.all()
+            .filter { Kind.REHAB.matches(it.sportType) }
+            .mapTo(HashSet()) {
+                // The same `yyyyMMdd` key the manual log uses, so the two are one set at the point
+                // of use and the calendar never has to know which of them marked a day.
+                com.opentasker.core.band.RehabLog.dateKeyOf(
+                    java.time.Instant.ofEpochSecond(it.startSeconds).atZone(zone).toLocalDate(),
+                )
+            }
 
     suspend fun byId(dao: HuaweiWorkoutDao, id: String): Workout? =
         id.toLongOrNull()?.let { dao.byStart(it)?.toWorkout() }

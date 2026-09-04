@@ -136,10 +136,13 @@ fun HuaweiWalkDetailScreen(
                     NoteText("${HuaweiText.walksHeartFromSamples[lang]} · ${hr.n}")
                 }
 
-                // Everything below is the route, and a lift has none: no track file, nothing to
-                // draw over a cutout, nothing to hand to 地図, and no map to go and fetch. Left in
-                // place it would offer 白い熊 a base map for a session that happened indoors.
-                if (walk.isStrength) {
+                // Everything below is the route, and the trackless sports have none: no track
+                // file, nothing to draw over a cutout, nothing to hand to 地図, and no map to go
+                // and fetch. Left in place it offers 白い熊 a base map for a session that happened
+                // indoors — which it did, for 機能訓練, because this asked whether the workout was
+                // a LIFT rather than whether it has a route (白い熊, 2026-09-04). Sport 255 is not
+                // sport 140, and the question was never which one it is.
+                if (walk.trackless) {
                     message?.let { NoteText(it) }
                     return@SectionCard
                 }
