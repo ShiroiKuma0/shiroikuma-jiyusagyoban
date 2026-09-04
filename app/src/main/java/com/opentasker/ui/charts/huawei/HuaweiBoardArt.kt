@@ -419,6 +419,29 @@ fun BoardArt(key: String, modifier: Modifier = Modifier) {
                 }
             }
 
+            // A band on a wrist and the pulse it is taking: 機能訓練 has no equipment and no
+            // route, so what stands for it is the measuring itself.
+            //
+            // Separable by SHAPE — a ring with a line through it — rather than by hue, which is
+            // what makes it tell apart from the lifting tile beside it in greyscale as well as in
+            // colour.
+            "rehab" -> {
+                sky(Color(0xFF0E2A24), Color(0xFF17493C))
+                glow(Offset(w * 0.5f, h * 0.52f), w * 0.5f, Color(0xFF26A69A))
+                // The strap, drawn as an open ring so the pulse can pass through it.
+                arcOf(
+                    Rect(Offset(w * 0.22f, h * 0.18f), Size(w * 0.56f, h * 0.64f)),
+                    35f, 290f, Color(0xFFB2DFDB), h * 0.075f,
+                )
+                polyline(
+                    listOf(0.02f to 0.52f, 0.24f to 0.52f, 0.33f to 0.30f, 0.42f to 0.74f,
+                        0.50f to 0.40f, 0.58f to 0.58f, 0.68f to 0.52f, 0.98f to 0.52f)
+                        .map { (x, y) -> Offset(w * x, h * y) },
+                    Ink, h * 0.055f,
+                )
+                drawCircle(Color(0xFFFFF59D), h * 0.045f, Offset(w * 0.42f, h * 0.74f))
+            }
+
             // A path across country: the fallback when no walk has a map yet.
             "walks" -> {
                 sky(Color(0xFF13331B), Color(0xFF1E5B2E))
