@@ -285,7 +285,7 @@
     <string name="action_label_hint">Shown in task steps and run log entries.</string>
     <string name="action_unknown_name">Unknown action</string>
     <string name="action_condition_label">Run only if</string>
-    <string name="action_condition_helper">Optional variable condition, for example %%armed == true. A false or invalid condition skips this action.</string>
+    <string name="action_condition_helper" formatted="false">Optional. Runs this action only when a variable check passes, for example %armed == true. If the check is false or cannot be read, the action is skipped.</string>
     <string name="action_variable_picker_label">Insert a variable</string>
     <string name="action_variable_chip_step">Step %1$d: %2$s</string>
     <string name="action_variable_chip_event">Event: %1$s</string>

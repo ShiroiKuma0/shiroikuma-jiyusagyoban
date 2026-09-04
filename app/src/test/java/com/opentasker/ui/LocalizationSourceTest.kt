@@ -282,6 +282,32 @@ class LocalizationSourceTest {
         assertTrue("Setup must localize dynamic Termux status", "setup_termux_status_permission_needed" in setup)
     }
 
+    /**
+     * `%%` collapses to one `%` only when the string goes through `String.format`. A string with
+     * no placeholder is read with the no-argument `stringResource(id)`, which returns the raw
+     * text, so the user sees the escape. That is how the "Run only if" helper came to tell people
+     * to type `%%armed == true`, which is exactly the syntax that does not work.
+     */
+    @Test
+    fun anEscapedPercentOnlyAppearsInAStringThatIsActuallyFormatted() {
+        val offenders = Files.list(resRoot.resolve("values")).use { paths ->
+            paths
+                .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".xml") }
+                .toList()
+        }.flatMap { file ->
+            stringResourceValues(file).entries
+                .filter { (_, value) -> "%%" in value && !Regex("""%\d+\$""").containsMatchIn(value) }
+                .map { (name, _) -> "${file.fileName}/$name" }
+        }
+
+        assertEquals(
+            "These strings escape a percent but take no format argument, so the user sees %%. " +
+                "Use a single % with formatted=\"false\", or give the string a placeholder.",
+            emptyList<String>(),
+            offenders,
+        )
+    }
+
     @Test
     fun debugBuildGeneratesAndroidPseudoLocales() {
         val buildFile = moduleRoot.resolve("build.gradle.kts").readText()
