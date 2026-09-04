@@ -170,11 +170,23 @@ class SharedPreferencesExpectedTriggerStateStore(context: Context) : ExpectedTri
         deferredOverdue = readTrigger(KEY_DEFERRED_AT, KEY_DEFERRED_KIND, KEY_DEFERRED_DELIVERED, KEY_DEFERRED_REPORTED),
     )
 
+    /**
+     * `apply()`, not `commit()`.
+     *
+     * Every minute tick writes this ledger twice, both times on the main thread: once from
+     * `TimeEventReceiver.onReceive` and once from `TimeEventScheduler.scheduleAt` during
+     * `AutomationService.onStartCommand`. `commit()` made those synchronous disk writes, which
+     * StrictMode reported on a device as disk-write violations on the main thread. The ledger is
+     * advisory - it exists to notice a tick that never arrived, and the next tick re-derives it -
+     * so an in-memory update that reaches disk shortly afterwards is what it needs. Android also
+     * flushes pending `apply()` work before a receiver or a service callback is considered
+     * finished, so a process death right after a tick cannot lose it.
+     */
     override fun save(state: ExpectedTriggerLedgerState) {
         preferences.edit()
             .writeTrigger(KEY_CURRENT_AT, KEY_CURRENT_KIND, KEY_CURRENT_DELIVERED, KEY_CURRENT_REPORTED, state.current)
             .writeTrigger(KEY_DEFERRED_AT, KEY_DEFERRED_KIND, KEY_DEFERRED_DELIVERED, KEY_DEFERRED_REPORTED, state.deferredOverdue)
-            .commit()
+            .apply()
     }
 
     private fun readTrigger(
