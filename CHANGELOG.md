@@ -51,6 +51,10 @@
 
 ### Fixed
 
+- The "all Bluetooth devices disconnected" and "some connected" triggers recover
+  after you turn your Bluetooth profiles off and on again. OpenTasker stops
+  listening while none are enabled, so anything that disconnected in the meantime
+  went unnoticed, and both triggers then stayed wrong until the app restarted.
 - Starting a task set to "abort existing" no longer cancels an unrelated task
   that happened to be running it as a step. The two shared an identity, so the
   caller was stopped and its run log said it had been replaced, when nothing had
