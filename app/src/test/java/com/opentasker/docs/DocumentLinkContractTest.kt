@@ -32,11 +32,16 @@ class DocumentLinkContractTest {
 
         val unpublished = USER_FACING_SURFACES.flatMap { relative ->
             val text = repoRoot.resolve(relative).readText()
-            DOCUMENT_REFERENCE.findAll(text)
-                .map { match -> match.value }
+            // In markdown, only a real link is followable. A backticked path in a changelog entry
+            // is a record of which file changed, and rewriting years of history to avoid naming a
+            // local document would be worse than leaving it. Everywhere else there is no link
+            // syntax, so any mention is the pointer.
+            val pattern = if (relative.endsWith(".md")) MARKDOWN_LINK else DOCUMENT_REFERENCE
+            pattern.findAll(text)
+                .map { match -> match.groupValues.last() }
                 .distinct()
                 .filterNot { it in trackedDocuments }
-                .map { "$relative links $it, which is not tracked" }
+                .map { "$relative points at $it, which is not tracked" }
                 .toList()
         }
 
@@ -67,11 +72,16 @@ class DocumentLinkContractTest {
     private companion object {
         val USER_FACING_SURFACES = listOf(
             "README.md",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
             "app/src/main/res/values/strings.xml",
             "app/src/main/res/values/dynamic_surface_strings.xml",
             "app/src/main/res/values/action_catalog_strings.xml",
             "app/src/main/java/com/opentasker/core/support/ProjectLinks.kt",
         )
-        val DOCUMENT_REFERENCE = Regex("""docs/[A-Za-z0-9_/-]+\.md""")
+        val DOCUMENT_REFERENCE = Regex("""(docs/[A-Za-z0-9_/-]+\.md)""")
+
+        /** `[label](docs/NAME.md)`, including the form inside a full github.com blob URL. */
+        val MARKDOWN_LINK = Regex("""]\((?:https?://[^)]*?/)?(docs/[A-Za-z0-9_/-]+\.md)\)""")
     }
 }
