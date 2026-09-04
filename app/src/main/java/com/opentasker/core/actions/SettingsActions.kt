@@ -532,6 +532,16 @@ private val PROTECTED_SETTING_FRAGMENTS = listOf(
     "notification_listener",
     "notification_policy",
     "input_method",
+    // The second family, and the same harm by a different route: these name the app that gets a
+    // role. Becoming the default SMS application grants the SMS permissions outright, with no
+    // dialog; the assistant, autofill and voice-interaction services see what the user types and
+    // what is on screen; the NFC payment default receives taps.
+    "default_application",
+    "assistant",
+    "autofill_service",
+    "voice_interaction",
+    "voice_recognition",
+    "nfc_payment",
     "verifier",
     "adb",
     "development_settings",

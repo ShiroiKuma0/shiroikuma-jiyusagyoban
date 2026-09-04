@@ -114,6 +114,13 @@ class SettingsWriteTest {
             "lockscreen.disabled",
             "location_providers_allowed",
             "always_on_vpn_lockdown",
+            // Roles: naming the app that holds one is the same escalation by another route.
+            "sms_default_application",
+            "assistant",
+            "voice_interaction_service",
+            "voice_recognition_service",
+            "autofill_service",
+            "nfc_payment_default_component",
         ).forEach { key ->
             SettingsTable.entries.forEach { table ->
                 val parsed = parseSettingsWrite(
