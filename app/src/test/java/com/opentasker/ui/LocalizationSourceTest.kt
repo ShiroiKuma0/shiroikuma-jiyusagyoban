@@ -320,6 +320,37 @@ class LocalizationSourceTest {
         )
     }
 
+    /**
+     * "Blocked" is a promise that something was refused, so only the screen that refuses may say it.
+     *
+     * The Inspector lists lint findings for profiles that already exist and already run: nothing
+     * there is withheld, and one screen over the invariant panel reads "Nothing is blocked". The
+     * imported-profile review is the screen that really does withhold the enable button.
+     */
+    @Test
+    fun onlyTheScreenThatWithholdsAnEnableSaysSomethingIsBlocked() {
+        val inspector = sourceRoot.resolve("com/opentasker/ui/screens/ContextInspectorScreen.kt").readText()
+        val importReview = sourceRoot.resolve("com/opentasker/ui/screens/ImportedProfileRiskDialog.kt").readText()
+        val strings = stringResourceValues(resRoot.resolve("values/strings.xml"))
+
+        assertFalse(
+            "the Inspector refuses nothing, so it must not use the blocked prefix",
+            "automation_lint_blocked_prefix" in inspector,
+        )
+        assertTrue(
+            "a blocking finding still has to outrank a warning in the Inspector",
+            "automation_lint_conflict_prefix" in inspector,
+        )
+        assertTrue(
+            "the imported-profile review does withhold the enable button, so it keeps the prefix",
+            "automation_lint_blocked_prefix" in importReview,
+        )
+        assertTrue(
+            "the blocked prefix must name what is blocked: ${strings["automation_lint_blocked_prefix"]}",
+            strings["automation_lint_blocked_prefix"].orEmpty().contains("enabl", ignoreCase = true),
+        )
+    }
+
     @Test
     fun debugBuildGeneratesAndroidPseudoLocales() {
         val buildFile = moduleRoot.resolve("build.gradle.kts").readText()

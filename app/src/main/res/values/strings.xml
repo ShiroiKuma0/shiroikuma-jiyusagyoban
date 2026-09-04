@@ -634,7 +634,14 @@
     <string name="imported_profile_missing_task_reference">missing task #%1$d</string>
     <string name="imported_profile_no_tasks">No resolvable tasks.</string>
     <string name="automation_lint_title">Automation lint</string>
-    <string name="automation_lint_blocked_prefix">Blocked:</string>
+    <!--
+        Used only where enabling really is refused, which is the imported-profile review. The
+        Inspector lists the same findings for a profile that is already running and refuses
+        nothing, so it uses the conflict prefix below: saying "Blocked" there contradicted the
+        panel one screen over, which reads "Nothing is blocked".
+    -->
+    <string name="automation_lint_blocked_prefix">Blocks enabling:</string>
+    <string name="automation_lint_conflict_prefix">Conflicts:</string>
     <string name="automation_lint_warning_prefix">Warning:</string>
     <string name="automation_lint_finding">%1$s: %2$s %3$s</string>
     <string name="automation_lint_missing_reversal_title">Missing reversal</string>

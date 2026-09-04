@@ -78,6 +78,11 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
+- The Inspector no longer says a profile is "Blocked" when nothing is being
+  refused. Those findings now read "Conflicts", which is what they are for a
+  profile that already exists and already runs. The word is kept for the imported
+  profile review, which genuinely withholds the enable button, and now says
+  "Blocks enabling" so it names what it stops.
 - A Wi-Fi profile no longer goes deaf after an unrelated edit. Wi-Fi and
   internet state shared one slot, so a matcher rebuilt by any profile change saw
   only whichever of the two had spoken last. A profile on "connected to Home"

@@ -654,7 +654,10 @@ private fun ProfileInspectorCard(
                     }
                 }
             }
-            val blockedPrefix = stringResource(R.string.automation_lint_blocked_prefix)
+            // Not the "Blocks enabling" prefix: this list describes profiles that already exist
+            // and are already running, so nothing here is being refused. That prefix belongs to
+            // the imported-profile review, which really does withhold the enable button.
+            val conflictPrefix = stringResource(R.string.automation_lint_conflict_prefix)
             val warningPrefix = stringResource(R.string.automation_lint_warning_prefix)
             if (lintFindings.isNotEmpty()) {
                 val lintColor = if (lintFindings.any { it.severity == AutomationLintSeverity.BLOCKING }) {
@@ -702,7 +705,7 @@ private fun ProfileInspectorCard(
                             Text(
                                 lintFindings.joinToString("\n") { finding ->
                                     val prefix = if (finding.severity == AutomationLintSeverity.BLOCKING) {
-                                        blockedPrefix
+                                        conflictPrefix
                                     } else {
                                         warningPrefix
                                     }
