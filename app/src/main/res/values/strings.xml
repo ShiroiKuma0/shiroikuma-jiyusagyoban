@@ -443,7 +443,7 @@
     <string name="setup_device_admin_turn_off">Turn off</string>
     <string name="setup_device_admin_removed">Lock screen admin turned off</string>
     <string name="setup_secure_settings_title">Secure settings access</string>
-    <string name="setup_secure_settings_body">Lets Write Setting change the Global and Secure tables. Android has no screen for this and no app can ask for it, so you grant it once from a computer with the phone plugged in and USB debugging on. Run:\n\n%1$s\n\nIt survives reboots but not an uninstall. On Xiaomi and other MIUI builds you also need "USB debugging (Security settings)" turned on, which is a second switch next to the usual one.</string>
+    <string name="setup_secure_settings_body">Lets Write Setting change the Global and Secure tables. Android has no screen for this and no app can ask for it, so you grant it once from a computer with the phone plugged in and USB debugging on. Run:\n\n%1$s\n\nIt survives reboots but not an uninstall. On Xiaomi and other MIUI builds you also need "USB debugging (Security settings)" turned on, which is a second switch next to the usual one.\n\nThis does not cover airplane mode. Writing that setting only moves a flag: the radios stay on unless the system receives a broadcast no ordinary app is allowed to send, so airplane mode still needs Shizuku.</string>
     <string name="setup_secure_settings_copy">Copy command</string>
     <string name="setup_secure_settings_copied">Grant command copied</string>
     <string name="setup_secure_settings_required_for">Writing a Global or Secure setting with the Write Setting action</string>
