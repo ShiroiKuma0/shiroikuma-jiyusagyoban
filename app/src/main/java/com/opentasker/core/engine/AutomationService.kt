@@ -271,7 +271,10 @@ class AutomationService : Service() {
             val reference = taskId?.let { NotificationTaskReference.Id(it) }
                 ?: legacyName?.let { NotificationTaskReference.LegacyName(it) }
             if (reference != null) {
-                scope.launch { runNotificationTask(reference, buttonLabel) }
+                scope.launch {
+                    ensureEngineLoaded()
+                    runNotificationTask(reference, buttonLabel)
+                }
             }
             return START_STICKY
         }
@@ -290,6 +293,7 @@ class AutomationService : Service() {
             val parentExecutionId = intent.getStringExtra(AutomationTargetContract.EXTRA_PARENT_EXECUTION_ID)
             if (executionId != null && taskId != null) {
                 scope.launch {
+                    ensureEngineLoaded()
                     runExternalTask(
                         executionId = executionId,
                         taskId = taskId,
@@ -361,6 +365,20 @@ class AutomationService : Service() {
         logContextMonitorTransition(contextMonitorLifecycle.stopAll())
         BroadcastContextEvents.sync(this, emptySet())
         super.onDestroy()
+    }
+
+    /**
+     * Loads the matchers if this start did not already.
+     *
+     * A notification button and an external RUN_TASK both return before the general path that
+     * reloads profiles, which is right for the run itself but leaves a freshly started process
+     * matching nothing. After an OEM kill or a swipe away, tapping a notification button brought
+     * the service up, recorded a healthy heartbeat and showed "running" while no trigger worked,
+     * until the next minute tick happened to reload it: up to a minute with exact alarms, and a
+     * Doze window without them. The watchdog saw a current heartbeat and had nothing to report.
+     */
+    private suspend fun ensureEngineLoaded() {
+        if (!engineLoaded) reloadProfiles()
     }
 
     private suspend fun reloadProfiles() = profileReloadMutex.withLock {

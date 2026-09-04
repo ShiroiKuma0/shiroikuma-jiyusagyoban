@@ -83,6 +83,10 @@
   shared profile. The whole guard is replaced rather than just the secret inside
   it, so an action that was guarded before export cannot come back unguarded,
   and the export warns you that something needs re-entering.
+- Tapping a notification button, or triggering a task from another app, now
+  starts the automation engine properly when OpenTasker was not already running.
+  It used to run that one task and then sit there looking healthy while no
+  trigger worked, until the next minute tick woke it up.
 - The Inspector no longer says a profile is "Blocked" when nothing is being
   refused. Those findings now read "Conflicts", which is what they are for a
   profile that already exists and already runs. The word is kept for the imported

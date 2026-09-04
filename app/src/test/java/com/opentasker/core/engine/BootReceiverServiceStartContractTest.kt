@@ -17,6 +17,37 @@ class BootReceiverServiceStartContractTest {
         )
     }
 
+    /**
+     * A run that arrives before the engine has loaded still has to load it.
+     *
+     * The notification-button and external RUN_TASK branches return before the general path that
+     * reloads profiles. On a freshly started process that left the service running, heartbeat
+     * current and matching nothing until the next minute tick, which the watchdog cannot see
+     * because the heartbeat is healthy.
+     */
+    @Test
+    fun aRunThatArrivesOnAColdProcessLoadsTheEngineFirst() {
+        val source = repoFile("src/main/java/com/opentasker/core/engine/AutomationService.kt").readText()
+
+        val notificationBranch = source.substringAfter("if (intent?.action == ACTION_RUN_NOTIFICATION_TASK)")
+            .substringBefore("return START_STICKY")
+        val externalBranch = source.substringAfter("if (intent?.action == ACTION_RUN_EXTERNAL_TASK)")
+            .substringBefore("return START_STICKY")
+
+        assertTrue(
+            "a notification-button run must load the engine before running",
+            "ensureEngineLoaded()" in notificationBranch,
+        )
+        assertTrue(
+            "an external run must load the engine before running",
+            "ensureEngineLoaded()" in externalBranch,
+        )
+        assertTrue(
+            "ensureEngineLoaded must reload only when the engine is not already loaded",
+            "if (!engineLoaded) reloadProfiles()" in source,
+        )
+    }
+
     @Test
     fun automationServicePublishesBootEventAfterReloadingProfiles() {
         val source = repoFile("src/main/java/com/opentasker/core/engine/AutomationService.kt").readText()
