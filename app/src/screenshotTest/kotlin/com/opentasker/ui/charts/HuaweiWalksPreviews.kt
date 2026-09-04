@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
-import com.opentasker.core.huawei.HuaweiWalkLibrary
+import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.ui.charts.huawei.HuaweiWalkDetailScreen
 import com.opentasker.core.huawei.maps.MapCutouts
 import com.opentasker.core.huawei.maps.WalkPlot
@@ -32,7 +32,7 @@ import java.io.File
  * identifier alone is enough to project — which is exactly what the grid does before 地図 has been
  * asked for the area, so the preview is also the check that that state looks deliberate.
  */
-private fun plotFor(walk: HuaweiWalkLibrary.Walk): WalkPlot? {
+private fun plotFor(walk: HuaweiWorkoutStore.Workout): WalkPlot? {
     // One walk of each state, deterministically. Left to a modulo of the real timestamps the grid
     // came out showing the same state in three cells of four, which checks a third of the screen.
     val seed = walk.startSeconds.toInt()
@@ -48,7 +48,7 @@ private fun plotFor(walk: HuaweiWalkLibrary.Walk): WalkPlot? {
     val box = MapCutouts.Box.of(pts)!!
     // Every third walk is somewhere with no cutout yet — the invitation state, not an error.
     if (state == 1) return WalkPlot(pts, box, null)
-    return WalkPlot(pts, box, MapCutouts.needed(java.io.File("/tmp"), box, 15))
+    return WalkPlot(pts, box, MapCutouts.needed(box, 15))
 }
 
 /**
@@ -104,18 +104,15 @@ private fun walk(
     mapped: Boolean,
     note: String? = null,
     stops: Int? = null,
-) = HuaweiWalkLibrary.Walk(
-    dir = File("/walks/walk-$number-$start"),
+) = HuaweiWorkoutStore.Workout(
     number = number,
     startSeconds = start,
     endSeconds = start + minutes * 60L,
     distanceMetres = metres,
     kind = "walk",
-    points = points,
-    thumbPath = if (mapped) "/walks/walk-$number-$start/map-thumb.png" else null,
-    mapPath = if (mapped) "/walks/walk-$number-$start/map.png" else null,
+    trackPoints = points,
     trackId = if (mapped) "自由作業盤/walk_$number.gpx" else null,
-    chizu = if (!mapped) null else HuaweiWalkLibrary.ChizuReading(
+    chizu = if (!mapped) null else HuaweiWorkoutStore.ChizuReading(
         distanceMetres = metres + 12.0,
         durationSeconds = minutes * 60L,
         movingSeconds = minutes * 55L,
@@ -147,24 +144,33 @@ private val WALKS = listOf(
     walk(5, 1_787_210_000L, 71, 5_640, 4_255, mapped = false, stops = 4),
 )
 
-private fun previewFor(w: HuaweiWalkLibrary.Walk): ImageBitmap? = when (w.number) {
+private fun previewFor(w: HuaweiWorkoutStore.Workout): ImageBitmap? = when (w.number) {
     8 -> route(3, android.graphics.Color.rgb(232, 232, 226))
     6 -> route(7, android.graphics.Color.rgb(226, 231, 232))
     else -> null
 }
+
+/**
+ * The routes, resolved the way the window resolves them — up front, and handed to the screen.
+ *
+ * The seam used to be a `plotOf` function the cell called. It is a map now, because the real window
+ * decodes every track once when the list loads: the cells never fetch anything, which is what keeps
+ * a preview honest (the screenshot engine renders one frame and runs no effects, so a cell that
+ * loaded its own data would draw empty here and prove nothing).
+ */
+private val PLOTS = WALKS.mapNotNull { w -> plotFor(w)?.let { w.id to it } }.toMap()
 
 @Composable
 private fun Grid(state: HuaweiWalksState) {
     OpenTaskerTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             HuaweiWalksScreen(
-                state = state,
+                state = state.copy(plots = PLOTS),
                 contentPadding = PaddingValues(10.dp),
                 onDownload = {},
                 onShare = {},
                 onOpenInChizu = {},
                 onOpen = {},
-                plotOf = ::plotFor,
             )
         }
     }
@@ -200,14 +206,13 @@ fun HuaweiWalksEmptyPreview() {
             HuaweiWalksState(
                 walks = emptyList(),
                 loading = false,
-                dir = "/sdcard/〇/…/Huawei Band 11 Pro/walks",
             ),
         )
     }
 }
 
 @Composable
-private fun Detail(walk: HuaweiWalkLibrary.Walk, sharing: Boolean = false, message: String? = null) {
+private fun Detail(walk: HuaweiWorkoutStore.Workout, sharing: Boolean = false, message: String? = null) {
     OpenTaskerTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             HuaweiWalkDetailScreen(
@@ -219,7 +224,7 @@ private fun Detail(walk: HuaweiWalkLibrary.Walk, sharing: Boolean = false, messa
                 onShare = {},
                 onOpenInChizu = {},
                 onBack = {},
-                plotOf = ::plotFor,
+                plot = plotFor(walk),
             )
         }
     }

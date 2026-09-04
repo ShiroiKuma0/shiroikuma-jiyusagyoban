@@ -380,6 +380,45 @@ fun BoardArt(key: String, modifier: Modifier = Modifier) {
                 drawCircle(Ink, h * 0.03f, Offset(w * 0.5f, h * 0.5f))
             }
 
+            // A loaded bar, over the heart rate the session is actually made of.
+            //
+            // Read in greyscale it is still a bar: two dark discs, a light shaft, a line behind.
+            // Nothing here asks a red thing to be told from a green one — the amber shaft against
+            // the violet ground carries the whole picture, and the trace is a shape, not a hue.
+            "lift" -> {
+                sky(Color(0xFF1B1233), Color(0xFF3A1F4E))
+                glow(Offset(w * 0.5f, h * 0.5f), w * 0.55f, Color(0xFF7C4DFF))
+                // The pulse behind it, drawn first so the bar sits in front of its own reason.
+                polyline(
+                    listOf(0.04f to 0.70f, 0.16f to 0.66f, 0.24f to 0.80f, 0.32f to 0.52f,
+                        0.42f to 0.72f, 0.56f to 0.68f, 0.66f to 0.78f, 0.76f to 0.58f,
+                        0.86f to 0.72f, 0.98f to 0.68f).map { (x, y) -> Offset(w * x, h * y) },
+                    Color(0xFFFF8A80).copy(alpha = 0.75f), h * 0.03f,
+                )
+                // The shaft, then the plates: a big one and a small one at each end, which is what
+                // says "loaded" rather than "a stick".
+                polyline(
+                    listOf(Offset(w * 0.10f, h * 0.42f), Offset(w * 0.90f, h * 0.42f)),
+                    Ink, h * 0.055f,
+                )
+                listOf(0.22f, 0.78f).forEach { x ->
+                    drawRoundRect(
+                        color = Color(0xFF9FA8DA),
+                        topLeft = Offset(w * x - w * 0.035f, h * 0.42f - h * 0.20f),
+                        size = Size(w * 0.07f, h * 0.40f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.02f),
+                    )
+                }
+                listOf(0.32f, 0.68f).forEach { x ->
+                    drawRoundRect(
+                        color = Color(0xFFE8EAF6),
+                        topLeft = Offset(w * x - w * 0.026f, h * 0.42f - h * 0.13f),
+                        size = Size(w * 0.052f, h * 0.26f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.015f),
+                    )
+                }
+            }
+
             // A path across country: the fallback when no walk has a map yet.
             "walks" -> {
                 sky(Color(0xFF13331B), Color(0xFF1E5B2E))

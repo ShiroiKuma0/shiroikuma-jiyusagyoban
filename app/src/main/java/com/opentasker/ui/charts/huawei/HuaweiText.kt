@@ -53,9 +53,16 @@ object HuaweiText {
     val facesActivate = Loc("Show on band", "盤面にする")
     val facesActivating = Loc("bringing it to the front…", "前に出しています…")
     val walksOpen = Loc("Open", "開く")
-    val walksNeedMap = Loc(
-        "No map cached for this area yet",
-        "この辺りの地図はまだありません",
+    /**
+     * What a cell says while the area's base map is being fetched.
+     *
+     * It used to read "No map cached for this area yet", which states a fact and asks 白い熊 to do
+     * something about it — and was read, correctly, as the feature being broken (白い熊,
+     * 2026-09-04). The screen knows what is missing and who to ask, so it asks; this says so.
+     */
+    val walksAskingMap = Loc(
+        "Asking 白い熊 地図 for this area…",
+        "白い熊 地図 にこの辺りの地図を頼んでいます…",
     )
     val walksGetMap = Loc("Get the map for this area", "この辺りの地図を取る")
     val walksMapShared = Loc(
@@ -206,6 +213,58 @@ object HuaweiText {
     val walksCalories = Loc("kcal", "kcal")
     val walksClimb = Loc("climb", "上り")
     val walksBandFigures = Loc("The band's own figures", "バンド自身の集計")
+
+    // 「重量挙げ」 — lifting, and the effort figures both it and the walks now carry.
+    val liftTitle = Loc("Lifting", "重量挙げ")
+    val liftAbout = Loc(
+        "The strength sessions the band recorded. No route and no map — a lift has neither — so " +
+            "what is here is the clock, the energy, and the heart rate the band took every five " +
+            "seconds while you worked.",
+        "バンドが記録した筋トレ。経路も地図も無い — 重量挙げには無いもの — ので、ここにあるのは" +
+            "時刻と消費、そしてバンドが五秒ごとに測った心拍。",
+    )
+    val liftEmpty = Loc(
+        "No lifting sessions yet. Start one on the band's own Workout app; it needs no satellites, " +
+            "so it records anywhere.",
+        "筋トレの記録はまだ無い。バンドの運動アプリで始める。衛星は要らないので、どこでも記録される。",
+    )
+    val liftDownload = Loc("Ask the band for new sessions", "新しい記録を取りに行く")
+    val liftNoneFound = Loc("The band had no new sessions.", "バンドに新しい記録は無かった。")
+
+    val effortTitle = Loc("Heart rate", "心拍")
+    val effortMean = Loc("mean", "平均")
+    val effortFromBand = Loc(
+        "the band's own reading, taken while the workout ran",
+        "運動中にバンド自身が測った値",
+    )
+    val effortRecovery = Loc("recovery", "回復")
+    val effortRecoveryNote = Loc(
+        "How far the heart fell once the work stopped — twenty-five readings the band takes after " +
+            "the workout ends. It does not say how far apart they are, so neither do we.",
+        "動きを止めた後に心拍がどこまで下がったか — 運動終了後にバンドが取る二十五回の計測。" +
+            "その間隔はバンドが言わないので、こちらも言わない。",
+    )
+    val effortSplits = Loc("Per kilometre", "1キロごと")
+    val walksExportTitle = Loc("Export", "書き出し")
+    val chizuNoDetail = Loc(
+        "白い熊 地図 has no map data for this area — only its world basemap, which at this zoom is " +
+            "an empty picture. Nothing was cached.",
+        "白い熊 地図 にこの辺りの地図が入っていない — 世界地図だけで、この倍率では白紙。" +
+            "何も保存していない。",
+    )
+    val chizuNothingDrawn = Loc(
+        "白い熊 地図 answered but drew nothing — the picture would have been solid black. " +
+            "Nothing was cached; try again.",
+        "白い熊 地図 は答えたが何も描かれなかった — 真っ黒な絵になるところだった。" +
+            "何も保存していない。もう一度。",
+    )
+    val chizuNeedsRebuild = Loc(
+        "白い熊 地図 has not been rebuilt for the new hand-over yet. Nothing was sent and nothing " +
+            "was lost — opening a walk already in 地図 still works.",
+        "白い熊 地図 がまだ新しい受け渡しに対応していない。何も送られず、何も失われていない — " +
+            "すでに 地図 にある散歩を開くのは今でも動く。",
+    )
+    val walksExportFailed = Loc("could not write the file", "書き出せなかった")
     /** Said plainly: this one is OURS, averaged from the synced samples, not the band's own number. */
     val walksHeartFromSamples = Loc(
         "mean heart rate over this window, averaged from the synced samples — not the band's own figure",
@@ -230,13 +289,6 @@ object HuaweiText {
             "絵が返ってきて、それをここに置く。",
     )
     val walksFilesTitle = Loc("Files", "書類")
-    val walksFilesNote = Loc(
-        "The route as GPX, and the raw bytes off the band beside it. The raw file is kept because a " +
-            "format understood slightly wrongly can only be corrected by re-reading it — which has " +
-            "already happened once.",
-        "GPX の軌跡と、バンドから来た生の書類。生のほうを残すのは、読み方が少し違っていたとき" +
-            "読み直せる唯一の道だから — 実際に一度そうなった。",
-    )
     val walksSharedNote = Loc(
         "The map comes from 白い熊 地図. It keeps the track; this keeps a copy of the picture, so the " +
             "grid draws without asking another app anything.",
