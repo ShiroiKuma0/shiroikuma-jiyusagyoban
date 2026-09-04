@@ -214,6 +214,93 @@ object HuaweiText {
     val walksClimb = Loc("climb", "上り")
     val walksBandFigures = Loc("The band's own figures", "バンド自身の集計")
 
+    // 「機能訓練」 — the band's Free exercise, which is what 白い熊 records rehab under.
+    val rehabAbout = Loc(
+        "The rehab sessions the band recorded, under its own Free exercise. No route and no map — " +
+            "what is here is the clock, the energy, and the heart rate the band took every five " +
+            "seconds. The calendar of which days were done is filled from these.",
+        "バンドが「フリー運動」として記録した機能訓練。経路も地図も無い。あるのは時刻と消費、" +
+            "そしてバンドが五秒ごとに測った心拍。やった日の暦はこれで埋まる。",
+    )
+    val rehabEmpty = Loc(
+        "No rehab sessions yet. Record one on the band with Free exercise — it needs no satellites, " +
+            "so it works indoors.",
+        "機能訓練の記録はまだ無い。バンドの「フリー運動」で記録する。衛星は要らないので室内でも動く。",
+    )
+    val rehabCalendar = Loc("Calendar", "暦")
+    val windowsTitle = Loc("What the band recorded", "バンドが記録したもの")
+    val noHeart = Loc("no heart rate recorded", "心拍の記録が無い")
+    val calendarTapNote = Loc(
+        "Tap a filled day to open that session.",
+        "埋まっている日を押すと、その日の記録が開く。",
+    )
+    private val calendarAboutRehab = Loc(
+        "Filled from the sessions the band recorded. A day done without the band can still be " +
+            "marked by hand — tap an empty one.",
+        "バンドが記録した分で埋まる。バンドを付けずにやった日は、空いている日を押せば手で印を付けられる。",
+    )
+    private val calendarAboutRecorded = Loc(
+        "Filled from what the band recorded.",
+        "バンドが記録した分で埋まる。",
+    )
+
+    fun calendarAbout(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) =
+        if (kind == com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB) calendarAboutRehab
+        else calendarAboutRecorded
+
+    /**
+     * One place where a window's words are decided, rather than a conditional at each of them.
+     *
+     * With two kinds an `if` at every call site was tolerable. With three it is the shape that
+     * quietly leaves one of them reading "Walks" because a branch was missed.
+     */
+    fun titleFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) = when (kind) {
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK -> walksTitle
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.STRENGTH -> liftTitle
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB -> rehabTitle
+    }
+
+    fun aboutFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) = when (kind) {
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK -> walksAbout
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.STRENGTH -> liftAbout
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB -> rehabAbout
+    }
+
+    fun emptyFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) = when (kind) {
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK -> walksEmpty
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.STRENGTH -> liftEmpty
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB -> rehabEmpty
+    }
+
+    fun downloadFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) =
+        if (kind == com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK) walksDownload
+        else liftDownload
+
+    fun noneFoundFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) =
+        if (kind == com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK) walksNoneFound
+        else liftNoneFound
+
+    /**
+     * Blue for a walk, red for lifting, **yellow for 機能訓練**.
+     *
+     * The yellow is not a new choice. 機能訓練 has been the annotation ink everywhere it appears
+     * since the calendar was built — the card, the page, the tiles — so a window titled 機能訓練 in
+     * heart-rate red was the odd one out rather than the consistent one (白い熊, 2026-09-04: *"make
+     * it yellow — the name and the pill"*).
+     *
+     * Never the only thing separating the three — the title says which window this is — because
+     * 白い熊 is red-green colour blind and a screen that could only be told apart by its accent
+     * would be a screen they cannot tell apart.
+     */
+    fun accentFor(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) = when (kind) {
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.WALK ->
+            com.opentasker.ui.charts.ChartPalette.STEPS
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.STRENGTH ->
+            com.opentasker.ui.charts.ChartPalette.HEART_RATE
+        com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB ->
+            com.opentasker.ui.charts.ANNOTATION_INK
+    }
+
     // 「重量挙げ」 — lifting, and the effort figures both it and the walks now carry.
     val liftTitle = Loc("Lifting", "重量挙げ")
     val liftAbout = Loc(
