@@ -791,10 +791,10 @@ object HuaweiCommands {
     // own service, its own numbering, and — for an outdoor one — a GPS track that is not a record
     // at all but a FILE, pulled over the same 0x2C channel as sleep and the RR intervals.
     //
-    // Everything here is unproven against 白い熊's band, because the band has never recorded a
-    // workout: its own log says `"GPSTrack":{"Count":0}` and Huawei Health's every request for the
-    // workout list came back empty. Written from published protocol descriptions, to be confirmed
-    // the first time a walk exists.
+    // Proven against 白い熊's band on 2026-09-03, over ten recorded workouts. The list, the summary
+    // and the GPS file had been confirmed by the first walk; the sample and pace streams below had
+    // never been sent at all, and both answer to the same shape the summary takes — the workout
+    // number in tag 2 inside an 0x81 container, plus a block index in tag 3.
 
     const val WORKOUT_LIST = 0x07       // which workouts exist in a time range
     const val WORKOUT_TOTALS = 0x08     // one workout's summary
@@ -809,6 +809,19 @@ object HuaweiCommands {
     /** One workout's summary, by the number the list gave it. */
     fun workoutTotals(number: Int): ByteArray =
         tlv(0x81, tlv(2, HuaweiProtocol.intBytes(number, 2)))
+
+    /**
+     * One block of a workout's per-sample stream — heart rate, and for a walk speed and steps.
+     *
+     * The block index is not optional dressing: the band caps a block at 136 records, so a
+     * forty-minute walk is four blocks and asking only for the workout number returns the first
+     * five hundred seconds of it. `parseList` says how many there are.
+     */
+    fun workoutSamples(number: Int, block: Int): ByteArray =
+        tlv(0x81, tlv(2, HuaweiProtocol.intBytes(number, 2)) + tlv(3, HuaweiProtocol.intBytes(block, 2)))
+
+    /** One block of a workout's pace table, by the same numbering. */
+    fun workoutPace(number: Int, block: Int): ByteArray = workoutSamples(number, block)
 
     /**
      * A workout's GPS track, as a file name.
