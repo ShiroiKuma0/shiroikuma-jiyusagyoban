@@ -66,13 +66,10 @@ class StateExportReceiver : BroadcastReceiver() {
             })
         }
 
-        // Gate first, and report "disabled" and "bad token" distinctly (renrakusaki convention).
-        if (!AutomationAuth.enabled(app)) {
-            reply("ERROR:automation disabled")
-            return
-        }
-        if (!AutomationAuth.isTokenValid(app, token)) {
-            reply("ERROR:bad token")
+        // One gate, asked in one place. A token sent to an app that does not require one is
+        // ignored rather than refused — see AutomationAuth.refuse.
+        AutomationAuth.refuse(app, token)?.let {
+            reply(it)
             return
         }
 
