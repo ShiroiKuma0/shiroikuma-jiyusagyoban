@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.93+2026-09-01.00-11.g29d06ff7+016`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.93+2026-09-01.00-11.g29d06ff7+042`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -233,8 +233,10 @@ Robustness the batch learned the hard way: a **frozen** app is thawed, exported,
 (a `pm disable-user` app cannot receive broadcasts at all, and used to cost the full 600 s timeout in
 silence); a `LIST_CATEGORIES` pre-flight fails a dead app in 20 s; and the watchdog judges **progress,
 not noise** — an app whose reports stop *changing* is given up on, which catches one that heartbeats
-while hung. Every request is gated by a per-app automation token (24 random bytes, constant-time
-compared, never included in any backup), off by default.
+while hung. Every request passes the target app's own gate: automation is **on by default**, and a
+24-byte token is **opt-in** behind a second switch — sent tokens are ignored rather than refused by an
+app that does not ask for one, so turning the requirement off never breaks a caller mid-batch. The
+token, when used, is compared in constant time and never travels in any backup.
 
 **「保存項目一括選択」 — deciding once what each app backs up.** A sweep asks every app in the roster
 what it can export right now (frozen ones thawed and re-frozen, 中止 available, one progress row each),
@@ -254,8 +256,19 @@ per-app wrapper task, and files both alphabetically — because a task can now *
 tasks**. `task.addaction` inserts an action into another task only if it isn't already there
 (identity = action type + `name` arg) and, in `sorted` mode, re-sorts the whole matched block by a
 regex-captured key; `task.exists` lets a task check for a sub-task before calling it; `tasks.sort`
-alphabetises a group that grows a generated task per app. All that's left for you is pasting the
-app's token.
+alphabetises a group that grows a generated task per app. **Since automation v2 there is nothing left
+to paste** — the token is opt-in and off by default, so a newly ticked app is reachable immediately.
+
+**And the backup now reaches app data, not just settings.** Every sister app exposes a
+`ContentProvider` door — `describe` / `export` / `import` / `cancel` — whose caller is checked by
+**exact package name, a uid cross-check, and a pinned signing certificate**; a prefix is not an
+identity, so no prefix is accepted. The archive crosses as a **file descriptor the caller opens**,
+never a path: a descriptor is a capability that expires when it is closed, the callee never resolves
+a filesystem location, and the automation route needs no storage permission at all — which is the
+point, because on a freshly wiped phone all-files access has not been granted yet and a path-based
+export would fail on the very device the restore is for. **Import exists only on that door**, never
+as a broadcast, since an ungated exported receiver that overwrites app data would let anything on the
+phone wipe any sister app.
 
 ### 📶 接続 — what each SIM is actually doing
 Speed varies by where you are, and this phone carries two SIMs. **Speed Test** measures real download
