@@ -3,6 +3,7 @@ package com.opentasker.ui
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import com.opentasker.ProductionSources
@@ -26,16 +27,30 @@ class SecretVariableUiSourceTest {
             "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
         )
 
-        surfaces.forEach { path ->
-            val source = ProductionSources.read(path)
+        // Anywhere in production that masks a field, not a list that a new screen can be added
+        // outside of. A count comparison per file is coarse, but the surfaces are found rather
+        // than named, so a masked field on a screen nobody thought of still has to pair up.
+        val maskingSources = ProductionSources.allKotlinFiles()
+            .filter { "PasswordVisualTransformation()" in it.readText() }
+        assertTrue("expected to find the masked fields; the marker may have been renamed", maskingSources.isNotEmpty())
+
+        maskingSources.forEach { file ->
+            val source = file.readText()
             val masked = Regex("PasswordVisualTransformation\\(\\)").findAll(source).count()
             val passwordKeyboards = Regex("KeyboardType\\.Password").findAll(source).count()
 
-            assertTrue(
-                "$path masks $masked field(s) but asks for the password keyboard $passwordKeyboards time(s)",
-                passwordKeyboards >= masked,
+            assertEquals(
+                "${file.fileName} masks $masked field(s) and asks for the password keyboard " +
+                    "$passwordKeyboards time(s); every masked field needs exactly one",
+                masked,
+                passwordKeyboards,
             )
         }
+        // Named so the check cannot silently become vacuous if the two screens are renamed.
+        assertTrue(
+            "the known masked surfaces must still be among them: $maskingSources",
+            surfaces.all { known -> maskingSources.any { it.toString().replace('\\', '/').endsWith(known) } },
+        )
     }
 
     @Test

@@ -81,7 +81,13 @@ class DocumentLinkContractTest {
         )
         val DOCUMENT_REFERENCE = Regex("""(docs/[A-Za-z0-9_/-]+\.md)""")
 
-        /** `[label](docs/NAME.md)`, including the form inside a full github.com blob URL. */
-        val MARKDOWN_LINK = Regex("""]\((?:https?://[^)]*?/)?(docs/[A-Za-z0-9_/-]+\.md)\)""")
+        /**
+         * Every form a markdown document can make a document followable: the inline link, the
+         * same inside a full github.com blob URL, a reference definition, and a raw HTML anchor.
+         * Matching only the inline form would have left three ways to link an unpublished guide.
+         */
+        val MARKDOWN_LINK = Regex(
+            """(?:]\(|]:\s*|href=["'])(?:https?://[^)"'\s]*?/)?(docs/[A-Za-z0-9_/-]+\.md)""",
+        )
     }
 }

@@ -52,6 +52,14 @@ class BootReceiverServiceStartContractTest {
             .substringBefore("private suspend fun reloadProfiles()")
         assertTrue("a failed reload must not swallow the run", "catch (error: Exception)" in helper)
         assertTrue("but cancellation must still propagate", "throw cancellation" in helper)
+        // Order is the whole invariant: CancellationException is an Exception, so a generic catch
+        // placed first would swallow it and leave the coroutine running inside a cancelled scope.
+        // Asserting both clauses exist without asserting which comes first proves nothing.
+        assertTrue(
+            "the cancellation catch must come before the general one",
+            helper.indexOf("catch (cancellation: CancellationException)") <
+                helper.indexOf("catch (error: Exception)"),
+        )
     }
 
     @Test
