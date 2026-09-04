@@ -48,6 +48,11 @@ import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.DailySummaryCard
 import com.opentasker.ui.charts.HealthIndexCard
 import com.opentasker.ui.charts.RecoveryCard
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import com.opentasker.core.huawei.HuaweiWorkoutStore
+import com.opentasker.ui.charts.ActionPill
 import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
 import com.opentasker.ui.charts.SubHeading
@@ -92,7 +97,8 @@ fun HuaweiDashboardScreen(
     onOpenRegister: () -> Unit = {},
     /** 機能訓練: tick a day of the cut-out, or open the full calendar. */
     onTapRehabDay: (Long) -> Unit = {},
-    onOpenRehab: () -> Unit = {},
+    /** Open one of the three workout windows — 運動, 重量挙げ, 機能訓練. */
+    onOpenWorkouts: (HuaweiWorkoutStore.Kind) -> Unit = {},
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -135,22 +141,27 @@ fun HuaweiDashboardScreen(
         // 機能訓練, directly under the morning rating (白い熊, 2026-09-03). The two belong together:
         // both are things only 白い熊 can answer, both are answered once a day, and both are worth
         // nothing if the day passes unanswered. Everything below them is what the band measured.
-        item("rehab") {
-            val zone = remember { java.time.ZoneId.systemDefault() }
-            val today = remember(zone) { java.time.LocalDate.now(zone) }
-            val from = remember(today) { rehabCutoutStart(today).toEpochDay() }
-            val to = remember(today) { today.toEpochDay() }
-            HuaweiRehabCard(
-                days = rehabCells(from, to, state.rehabDays, state.rehabNotes),
-                zone = zone,
-                doneCount = (from..to).count {
-                    com.opentasker.core.band.RehabLog.dateKeyOf(java.time.LocalDate.ofEpochDay(it)) in
-                        state.rehabDays
-                },
-                totalDays = (to - from + 1).toInt(),
-                onTapDay = onTapRehabDay,
-                onOpen = onOpenRehab,
-            )
+        // The three windows the band's own recordings live in.
+        //
+        // This was the 機能訓練 calendar cut-out. It moved to the 機能訓練 window, where the sessions
+        // that now fill it are (白い熊, 2026-09-04) — a two-week calendar on the report was
+        // answering "which days did I do it", which is a question about rehab rather than about
+        // this morning, and it sat between two cards that ARE about this morning.
+        //
+        // What replaces it is the way through: one pill per window, in the order they cost effort.
+        item("windows") {
+            SectionCard(accent = ChartPalette.HEART_RATE) {
+                SectionTitle(HuaweiText.windowsTitle[lang], ChartPalette.HEART_RATE)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (kind in HuaweiWorkoutStore.Kind.entries) {
+                        ActionPill(
+                            label = HuaweiText.titleFor(kind)[lang],
+                            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            onClick = { onOpenWorkouts(kind) },
+                        )
+                    }
+                }
+            }
         }
 
         state.recovery?.let { rec ->
