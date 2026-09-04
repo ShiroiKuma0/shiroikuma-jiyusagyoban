@@ -175,6 +175,19 @@ suspend fun executeAndLogTask(
     // Baseline after seeding + event vars, so only globals actually changed during the run persist.
     val baselineGlobals = variables.globalSnapshot()
     val baselineSensitiveGlobals = variables.globalSensitiveSnapshot()
+    // Every way this run can end has to commit the globals it set. Only the report path did, so a
+    // cancelled or crashed run silently discarded them, and RESTART mode cancels the in-flight run
+    // on every re-trigger.
+    suspend fun commitGlobals(): List<String> = persistChangedGlobals(
+        variableRepository,
+        persistedBaseline,
+        baselineGlobals,
+        variables.globalSnapshot(),
+        baselineSensitiveGlobals,
+        variables.globalSensitiveSnapshot(),
+        logTag,
+        projectId = task.projectId,
+    )
     val audioEligibility = AudioRuntimeEligibility(
         appVisible = visibleActivity,
         foregroundService = audioForegroundService,
@@ -227,6 +240,7 @@ suspend fun executeAndLogTask(
         // suspending write here would be dropped and the run would vanish without a trace.
         withContext(NonCancellable) {
             executionId?.let(ActiveExecutionRegistry::unregister)
+            val commitMetadata = commitGlobals()
             val terminalReason = ExecutionTerminalReason(
                 ExecutionTerminalReasonCode.CANCELLED,
                 cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
@@ -256,7 +270,7 @@ suspend fun executeAndLogTask(
                             reason = cancellation.message ?: ActiveExecutionRegistry.CANCELLED_BY_USER,
                             execution = execution,
                             terminalReason = terminalReason,
-                            metadata = metadata,
+                            metadata = metadata + commitMetadata,
                         ),
                         source = RunLogSource.classify(execution.source).key,
                         sourceLabel = RunLogSource.classify(execution.source).label,
@@ -271,6 +285,7 @@ suspend fun executeAndLogTask(
     } catch (error: Exception) {
         withContext(NonCancellable) {
             executionId?.let(ActiveExecutionRegistry::unregister)
+            val commitMetadata = commitGlobals()
             val terminalReason = ExecutionTerminalReason(
                 ExecutionTerminalReasonCode.TASK_FAILED,
                 error.message ?: "Execution failed before a task report was produced.",
@@ -301,7 +316,7 @@ suspend fun executeAndLogTask(
                             terminalReason = terminalReason,
                             metadata = listOf(
                                 "Failure message: ${(error.message ?: "unknown error").take(256)}",
-                            ) + metadata,
+                            ) + metadata + commitMetadata,
                         ),
                         source = RunLogSource.classify(execution.source).key,
                         sourceLabel = RunLogSource.classify(execution.source).label,
@@ -350,16 +365,7 @@ suspend fun executeAndLogTask(
             )
         }
     }
-    val globalCommitMetadata = persistChangedGlobals(
-        variableRepository,
-        persistedBaseline,
-        baselineGlobals,
-        variables.globalSnapshot(),
-        baselineSensitiveGlobals,
-        variables.globalSensitiveSnapshot(),
-        logTag,
-        projectId = task.projectId,
-    )
+    val globalCommitMetadata = commitGlobals()
     val fallback = if (allowFallback && !report.success && report.structuredError != null) {
         // The failed task no longer owns an active slot while its recovery task runs. Otherwise a
         // profile with maxActiveExecutions=1 would reject the very fallback intended to diagnose it.

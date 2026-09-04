@@ -51,6 +51,10 @@
 
 ### Fixed
 
+- Global variables set by a run that was cancelled or that failed are now saved.
+  Only a run that finished normally saved them, so a profile set to restart on
+  every trigger lost the values on every restart but the last, and the run log
+  still showed the write that had been thrown away.
 - Exporting a bundle no longer writes a secret you typed into a "Run only if"
   guard or an action label. Only action arguments were cleaned, so a guard like
   `%Pin == 4321` carried the value into the exported file, the paste text, and a

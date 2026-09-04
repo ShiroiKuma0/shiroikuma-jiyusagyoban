@@ -32,6 +32,43 @@ class ExecutionSemanticsContractTest {
         assertEquals("Production run paths must use executeAndLogTask", emptyList<String>(), directRunnerConstruction)
     }
 
+    /**
+     * Every exit from a run has to commit the globals it set.
+     *
+     * Only the report path did, so a cancelled or crashed run discarded them, and a profile in
+     * RESTART mode cancels the in-flight run on every re-trigger. This is a source gate because
+     * `executeAndLogTask` needs a Room database, which this suite has no JVM harness for; the
+     * commit mechanics themselves are covered by DurableGlobalsTest.
+     */
+    @Test
+    fun everyRunExitCommitsChangedGlobals() {
+        val helperPath = "com/opentasker/core/engine/TaskExecutionHelper.kt"
+        val cancelled = ProductionSources.block(
+            helperPath,
+            "catch (cancellation: CancellationException) {",
+            "throw cancellation",
+        )
+        val failed = ProductionSources.block(
+            helperPath,
+            "catch (error: Exception) {",
+            "throw error",
+        )
+
+        assertTrue(
+            "a cancelled run must still persist the globals it set",
+            cancelled.contains("commitGlobals()"),
+        )
+        assertTrue(
+            "a run that ended in an exception must still persist the globals it set",
+            failed.contains("commitGlobals()"),
+        )
+        // The commit has to survive the cancellation that is already in flight.
+        assertTrue(
+            "the cancelled commit must run inside the NonCancellable block",
+            cancelled.indexOf("withContext(NonCancellable)") < cancelled.indexOf("commitGlobals()"),
+        )
+    }
+
     @Test
     fun actionReorderUsesOneTransactionAndSnapshotsThePreviousOrder() {
         // Scanned across the screens package: the contract is that the reorder path is one
