@@ -149,6 +149,8 @@ object AutomationSensitivityRegistry {
         "task.exists",
         "tasks.sort",
         "tasks.launchers",
+        "tasks.freezebubbles",
+        "backup.export",
         "var.add",
         "var.clear",
         "var.convert",
