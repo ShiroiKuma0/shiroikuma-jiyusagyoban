@@ -269,6 +269,59 @@ class OpenTaskerBundleCodecTest {
     // below apply here exactly as they do upstream.
 
     /**
+     * The export is this workspace's BACKUP, so nothing may be dropped on the way out.
+     *
+     * The 保存復元 wrappers pass a token's VARIABLE NAME through `param:token` / `param:token_var`, and
+     * on 2026-09-05 a sync composed upstream's sanitizeForExport() into encode(). That policy redacts
+     * by argument-key NAME, so 69 tasks exported as "[REDACTED]" in one run — into the mirror, and
+     * into the app-state ZIP, which is the only copy. Restoring one would have written the placeholder
+     * back into every wrapper.
+     *
+     * Redaction belongs to callers that SHARE a bundle. encode() is the backup path and stays lossless;
+     * a secret VARIABLE is refused outright instead, which the test below this one covers.
+     */
+    @Test
+    fun encodeIsLosslessForArgumentsThatMerelyLookSensitive() {
+        val bundle = OpenTaskerBundleCodec.build(
+            appVersion = "0.0.0",
+            exportedAtEpochMs = 0L,
+            profiles = emptyList(),
+            tasks = listOf(
+                Task(
+                    id = 1,
+                    name = "保存 ⇨ shiroikuma.anki",
+                    actions = listOf(
+                        ActionSpec(
+                            type = "task.run",
+                            args = mapOf(
+                                "task" to "保存中核",
+                                "param:token" to "%BR_Token_Anki",
+                                "param:token_var" to "BR_Token_Anki",
+                                "param:password" to "%BR_Pass",
+                                "authorization" to "%BR_Auth",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            variables = emptyList(),
+            scenes = emptyList(),
+            projects = emptyList(),
+        )
+
+        val encoded = OpenTaskerBundleCodec.encode(bundle)
+
+        assertFalse("the backup must carry no placeholders", encoded.contains("REDACTED"))
+        listOf("%BR_Token_Anki", "BR_Token_Anki", "%BR_Pass", "%BR_Auth").forEach { value ->
+            assertTrue("$value must survive the export verbatim", encoded.contains(value))
+        }
+        assertFalse(
+            "a lossless export must not claim anything was omitted",
+            encoded.contains(ExportRedactionPolicy.SENSITIVE_ACTION_WARNING),
+        )
+    }
+
+    /**
      * The guard and the label are user text too. Only `args` was sanitized, so a run-only-if that
      * compared a secret against its literal value carried that value into the bundle, the paste
      * text, and a shared profile, while the Tasker XML exporter refused to write the same guard.

@@ -21,6 +21,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.policy.AppFreeze
 import com.opentasker.core.shizuku.ShizukuShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -165,8 +166,14 @@ internal fun maskPhoneNumber(number: String): String {
 }
 
 /**
- * Freeze (disable) an app so it can't run — `pm disable-user`. The app vanishes from the launcher
- * until unfrozen. Needs Shizuku (app-management is privileged; there is no non-privileged equivalent).
+ * Freeze an app so it cannot run, as hard as this phone allows.
+ *
+ * Prefers the **device-policy suspension** — filed under 白い熊 雫's admin, and liftable only by the
+ * owner or another delegate, so no shell command can undo it. Falls back to the old
+ * `pm disable-user` over Shizuku when the delegation is not held. The log line says which happened,
+ * because that is the first thing anyone wants when a later defrost misbehaves.
+ *
+ * Three packages are refused outright — see [AppFreeze.PROTECTED].
  *
  * Args:
  *   - "package": package name (an installed-apps picker fills it; a %var also works)
@@ -178,17 +185,36 @@ class FreezeAppAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"]?.trim().orEmpty()
         if (pkg.isEmpty()) return ActionResult.Failure("missing package")
-        if (!ShizukuShell.available()) return ActionResult.Failure("Freeze needs Shizuku")
-        val ok = runCatching {
-            withContext(Dispatchers.IO) { ShizukuShell.exec("pm disable-user --user 0 $pkg").exitCode == 0 }
-        }.getOrDefault(false)
-        ctx.logger(if (ok) "Froze $pkg" else "Freeze failed: $pkg")
-        return if (ok) ActionResult.Success else ActionResult.Failure("could not freeze $pkg")
+        AppFreeze.protectedReason(pkg)?.let { reason ->
+            ctx.logger("Refused to freeze $pkg — $reason")
+            return ActionResult.Failure("$pkg must never be frozen: $reason")
+        }
+        val method = withContext(Dispatchers.IO) { AppFreeze.freeze(ctx.app, pkg) }
+        return when (method) {
+            AppFreeze.FreezeMethod.POLICY -> {
+                ctx.logger("Froze $pkg (policy)")
+                ActionResult.Success
+            }
+            AppFreeze.FreezeMethod.DISABLE -> {
+                ctx.logger("Froze $pkg (disabled)")
+                ActionResult.Success
+            }
+            AppFreeze.FreezeMethod.NONE -> {
+                ctx.logger("Freeze failed: $pkg")
+                ActionResult.Failure("could not freeze $pkg — needs the device-policy delegation or Shizuku")
+            }
+        }
     }
 }
 
 /**
- * Unfreeze (re-enable) a frozen app — `pm enable`. Needs Shizuku.
+ * Thaw an app, clearing **every** lock that could be holding it.
+ *
+ * "Frozen" covers three independent slots and an app stays held while any one survives, so this does
+ * not branch on how it was frozen — it cannot know, and with two delegates under one admin whatever
+ * either app suspended the other must be able to lift. Success is re-read from the platform
+ * afterwards, never inferred from an exit code: the incident this fixes had `pm enable` exiting 0
+ * and reporting success against an app that stayed suspended.
  *
  * Args:
  *   - "package": package name
@@ -200,12 +226,13 @@ class UnfreezeAppAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"]?.trim().orEmpty()
         if (pkg.isEmpty()) return ActionResult.Failure("missing package")
-        if (!ShizukuShell.available()) return ActionResult.Failure("Unfreeze needs Shizuku")
-        val ok = runCatching {
-            withContext(Dispatchers.IO) { ShizukuShell.exec("pm enable $pkg").exitCode == 0 }
-        }.getOrDefault(false)
-        ctx.logger(if (ok) "Unfroze $pkg" else "Unfreeze failed: $pkg")
-        return if (ok) ActionResult.Success else ActionResult.Failure("could not unfreeze $pkg")
+        val thawed = withContext(Dispatchers.IO) { AppFreeze.thaw(ctx.app, pkg) }
+        ctx.logger(if (thawed) "Unfroze $pkg" else "Unfreeze failed: $pkg")
+        return if (thawed) {
+            ActionResult.Success
+        } else {
+            ActionResult.Failure("could not unfreeze $pkg — a lock is still held")
+        }
     }
 }
 
@@ -213,11 +240,15 @@ class UnfreezeAppAction : Action {
  * Is an app frozen right now? Stores "true" / "false" into [store] (default `%frozen`); an app that
  * isn't installed stores "" and fails.
  *
- * The pre-flight for anything that talks to another app: a `pm disable-user` package cannot receive
- * broadcasts at all — its manifest receivers stop resolving — so a token-gated request to a frozen
- * sister app is never delivered and the caller sits out its whole reply timeout in silence. Read the
- * state, thaw it, do the work, and re-freeze exactly what was frozen. Needs no Shizuku (this is a
- * plain PackageManager read); only the thaw/re-freeze does.
+ * The pre-flight for anything that talks to another app: a frozen package cannot receive broadcasts
+ * at all, so a token-gated request to a frozen sister app is never delivered and the caller sits out
+ * its whole reply timeout in silence. Read the state, thaw it, do the work, and re-freeze exactly
+ * what was frozen.
+ *
+ * **Frozen means disabled OR suspended.** Until 2026-09-05 this read only the enabled state, so an
+ * app suspended by device policy answered "false" — and 保存中核's thaw-work-refreeze then skipped
+ * the thaw and blamed the sister app for the silence that followed. Both are readable with no
+ * privilege at all, and this action keeps needing none.
  *
  * Args:
  *   - "package": package name
@@ -231,25 +262,20 @@ class AppFrozenAction : Action {
         val pkg = args["package"]?.trim().orEmpty()
         if (pkg.isEmpty()) return ActionResult.Failure("missing package")
         val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "frozen"
-        val pm = ctx.app.packageManager
-        val info = runCatching {
-            pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS)
-        }.getOrNull()
-        if (info == null) {
+        val state = withContext(Dispatchers.IO) { AppFreeze.read(ctx.app, pkg) }
+        if (!state.installed) {
             ctx.variables.set(store, "")
             return ActionResult.Failure("app not installed: $pkg")
         }
-        val frozen = when (runCatching { pm.getApplicationEnabledSetting(pkg) }.getOrNull()) {
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED,
-            -> true
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> false
-            // DEFAULT (and an unreadable setting): fall back to the effective flag from the manifest.
-            else -> !info.enabled
+        ctx.variables.set(store, state.frozen.toString())
+        // Which lock, not just whether: a defrost that fails reads very differently for the two.
+        val how = when {
+            state.disabled && state.suspended -> " (disabled+suspended)"
+            state.disabled -> " (disabled)"
+            state.suspended -> " (suspended)"
+            else -> ""
         }
-        ctx.variables.set(store, frozen.toString())
-        ctx.logger("$pkg frozen=$frozen → %$store")
+        ctx.logger("$pkg frozen=${state.frozen}$how → %$store")
         return ActionResult.Success
     }
 }
