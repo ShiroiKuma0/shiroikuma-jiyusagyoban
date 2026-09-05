@@ -8,6 +8,38 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-01.00-11.g29d06ff7+052 — 2026-09-05
+
+### 健康 — 「バンドの時計」 becomes a dialog
+
+- The window is now **floating, centred and bordered**. As a page, one switch, one dial and a button
+  left the dial stranded at the top of a field of black and read as a stray widget rather than as a
+  thing being set (白い熊, 2026-09-05). The theme it uses sets a minimum width on purpose: a floating
+  window otherwise takes the platform's dialog width, and the clock dial wants 256dp before its
+  padding.
+- **The date is a pill**, the same shape as the 丁度 and 半 shortcuts under the dial, instead of a
+  label, a value and a Change button spread across a row.
+- **The calendar has a yellow border too.** Both surfaces are black on a page dimmed to black, so
+  without a drawn edge neither has one.
+
+## 0.2.93+2026-09-01.00-11.g29d06ff7+051 — 2026-09-05
+
+### 健康 — the band's clock gets a window
+
+- **`huawei.time` learns a date.** `at` now takes `YYYY-MM-DD HH:MM` (a `T` between them is fine), a
+  date on its own for midnight of it, and still `HH:MM` for today or `now`/blank for the phone's
+  time. The two halves are told apart by what is in them rather than by position — a `-` makes a
+  date and a `:` a time — so either may be left out and every task already carrying `at=15:00` means
+  exactly what it did.
+- **`pick` opens 「バンドの時計」**, a window with a calendar, a dial to drag, 丁度 and 半 shortcuts,
+  and a switch for the phone's own time. That switch is why setting and resetting are one task
+  rather than two: a task carrying a written-in time answers one question once, and looking at a
+  watch face means asking a different one each time. The seconds are always sent as zero, because a
+  face is judged at the top of a minute.
+- Neither is destructive, and could hardly be: every session announces the phone's time to the band,
+  so the real one comes back by itself on the next connection. The window says so on its face, along
+  with the one real cost — a jump across midnight can disturb the band's own daily counters.
+
 ## 0.2.93+2026-09-01.00-11.g29d06ff7+050 — 2026-09-05
 
 ### 保存復元 — the roster goes through the door
