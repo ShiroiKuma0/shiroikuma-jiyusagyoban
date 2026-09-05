@@ -264,7 +264,7 @@ class ArticleToHtmlAction : Action {
                 NotificationManagerCompat.from(ctx.app).notify(
                     ID,
                     NotificationCompat.Builder(ctx.app, CHANNEL)
-                        .setSmallIcon(android.R.drawable.ic_menu_upload)
+                        .setSmallIcon(com.opentasker.app.R.drawable.ic_notification)
                         .setContentTitle(if (pages > 1) "記事を読み取り中 ($pages ページ)" else "記事を読み取り中")
                         .setContentText(phase)
                         .setProgress(100, percent.coerceIn(0, 100), false)

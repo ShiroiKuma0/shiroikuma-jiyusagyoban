@@ -72,6 +72,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope

@@ -85,57 +85,14 @@ class ProjectLinksTest {
      * A link nothing opens is the defect this item existed to fix, so pin the route as well as the
      * URL builder. Compose rendering itself needs a device and is not asserted here.
      */
-    @Test
-    fun `settings reaches the about card and the about card reaches these links`() {
-        val settings = ProductionSources.read("com/opentasker/ui/screens/PermissionOnboardingScreen.kt")
+    // RETIRED: upstream's `settings reaches the about card and the about card reaches these links`.
+    // It slices PermissionOnboardingScreen.kt on upstream's `if (settingsOnly)` split into a Settings
+    // and a Setup half, with an About card in the first. The fork's Setup screen is one screen with
+    // neither, so there is no branch to read and no card to find.
 
-        // Bounded at the sibling branch. Reading to end of file swept in AboutCard's own
-        // declaration, so the assertion passed even with the call site deleted: exactly the
-        // "link nothing opens" failure it is here to catch.
-        val settingsOnlyBranch = ProductionSources.block(
-            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
-            "if (settingsOnly) {",
-            "if (!settingsOnly)",
-        )
-        assertTrue("Settings must list the About card", "AboutCard(" in settingsOnlyBranch)
-        assertTrue(
-            "About must offer the repository, releases and licence links",
-            listOf(
-                "ProjectLinks.REPOSITORY_URL",
-                "ProjectLinks.RELEASES_URL",
-                "ProjectLinks.LICENSE_URL",
-            ).all { link -> link in settings },
-        )
-        assertTrue(
-            "Report a problem must carry the real build and device, not placeholders",
-            listOf(
-                "ProjectLinks.reportProblemUrl(",
-                "appVersion = BuildConfig.VERSION_NAME",
-                "versionCode = BuildConfig.VERSION_CODE",
-                "androidRelease = Build.VERSION.RELEASE",
-                "sdkInt = Build.VERSION.SDK_INT",
-            ).all { fragment -> fragment in settings },
-        )
-    }
-
-    @Test
-    fun `the diagnostics copy button reaches the clipboard`() {
-        val screen = ProductionSources.read("com/opentasker/ui/screens/DiagnosticsScreen.kt")
-        val shell = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationUi.kt")
-        val viewModel = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
-
-        assertTrue("Diagnostics must show a copy control", "IconButton(onClick = onCopy)" in screen)
-        assertTrue("the copy control must be wired", "onCopy = viewModel::copyDiagnosticReport" in shell)
-
-        val body = ProductionSources.block(
-            "com/opentasker/ui/screens/ActiveAutomationViewModel.kt",
-            "fun copyDiagnosticReport()",
-            "fun shareDiagnosticReport()",
-        )
-        assertTrue("copy must build the same redacted report Share sends", "DiagnosticExport.buildReport(" in body)
-        assertTrue("copy must reach the clipboard", "setPrimaryClip(" in body)
-        assertTrue("copy must confirm to the user", "R.string.ui_message_diagnostics_copied" in body)
-    }
+    // RETIRED: upstream's `the diagnostics copy button reaches the clipboard`. It reads
+    // DiagnosticsScreen.kt, which this fork deleted outright, and pins the UiMessage resource ids
+    // the fork's plain-string snackbar channel does not use. copyDiagnosticReport() itself is kept.
 
     private fun decodedBody(url: String): String =
         URLDecoder.decode(url.substringAfter("?body="), Charsets.UTF_8.name())

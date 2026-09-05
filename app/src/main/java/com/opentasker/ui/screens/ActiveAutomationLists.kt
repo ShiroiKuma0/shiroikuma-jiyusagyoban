@@ -138,6 +138,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.engine.outcome
 /**
  * Increments every time the activity resumes — remember() permission/Shizuku checks against this so
@@ -840,6 +841,7 @@ internal fun TasksScreen(
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
     onDeleteAction: (Task, Int) -> Unit,
+    onRunAction: (Task, Int) -> Unit,
     onApplyActions: (Task, List<ActionSpec>) -> Unit,
     onPickTaskIcon: (Task) -> Unit,
     contentPadding: PaddingValues,
@@ -934,6 +936,7 @@ internal fun TasksScreen(
                     onAddAction = { onAddAction(task) },
                     onEditAction = { index, action -> onEditAction(task, index, action) },
                     onDeleteAction = { index -> onDeleteAction(task, index) },
+                    onRunAction = { index -> onRunAction(task, index) },
                     onApplyActions = { newActions -> onApplyActions(task, newActions) },
                     onPickIcon = { onPickTaskIcon(task) },
                 )
@@ -1076,6 +1079,7 @@ private fun TaskCard(
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
     onDeleteAction: (Int) -> Unit,
+    onRunAction: (Int) -> Unit,
     onApplyActions: (List<ActionSpec>) -> Unit,
     onPickIcon: () -> Unit,
 ) {
@@ -1513,6 +1517,18 @@ private fun ActionRow(
             // Long-press menu — Clone/Copy/Cut/Delete act on the whole selection; Paste drops the
             // clipboard relative to this action (shown only when something has been copied/cut).
             ThemedDropdownMenu(expanded = menuExpanded, onDismissRequest = onMenuDismiss) {
+                // Run this one action on its own (upstream 0.2.93), to tune an HTTP call or a
+                // variable write without re-running everything before it. Flow-control markers are
+                // excluded: an `if` without its `end if` is not a smaller program, it is a broken one.
+                if (SingleActionRun.isRunnableAlone(action)) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(stringResource(if (runBusy) R.string.action_run_alone_busy else R.string.action_run_alone))
+                        },
+                        enabled = !runBusy,
+                        onClick = { onMenuDismiss(); onRun() },
+                    )
+                }
                 DropdownMenuItem(text = { Text("Clone") }, onClick = onClone)
                 DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy)
                 DropdownMenuItem(text = { Text("Cut") }, onClick = onCut)

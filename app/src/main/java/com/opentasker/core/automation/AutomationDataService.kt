@@ -197,7 +197,7 @@ class AutomationDataService : Service() {
         }
         return Notification.Builder(this, CHANNEL)
             .setContentTitle(if (importing) "データを戻しています" else "データを書き出しています")
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(com.opentasker.app.R.drawable.ic_notification)
             .setOngoing(true)
             .build()
     }
