@@ -454,6 +454,38 @@ object ProgressPanelManager {
         }
     }
 
+    /**
+     * Open the battery-optimisation exemption page for one app — the fix for the reserved
+     * `ERROR:no-foreground-start` key, where a sister app's export could not start its foreground
+     * service because a broadcast is a **background start** on API 31+.
+     *
+     * The exemption is one of the allowances that sets `mAllowStartForeground`, so granting it is
+     * the repair, and the panel stays up behind: grant → back → 保存し直す.
+     *
+     * **The key is reserved for the exemption-fixable case only** (`shiroikuma-handyrss`). The same
+     * call site can also fail with a missing `FOREGROUND_SERVICE` permission, or — on this phone —
+     * with EMUI's アプリ起動管理 set to 自動管理, which **no app can change for itself**. Those must
+     * keep a descriptive `ERROR:` line instead, because a button that does not fix the fault is
+     * worse than no button: 白い熊 presses it, nothing changes, and the row still fails.
+     */
+    fun openBatteryExemption(pkg: String) {
+        val context = appContext ?: return
+        val intents = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            // EMUI keeps the per-app control on the details page rather than the global list.
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                android.net.Uri.parse("package:$pkg"),
+            ),
+        )
+        for (intent in intents) {
+            val ok = runCatching {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.isSuccess
+            if (ok) return
+        }
+    }
+
     internal const val ROW_KEY_PLACEHOLDER = "{key}"
 }
 
@@ -486,6 +518,7 @@ private data class PanelLine(
     val repairIndex: Int = -1,      // ≥ 0 = the repair button row for that outer row
     val repairPackage: String = "", // non-blank = also offer the storage-access grant
     val repairStale: Boolean = false, // the app is wedged on a previous run: offer to stop it first
+    val repairBattery: String = "", // non-blank = also offer the battery-optimisation exemption
     val parentKey: String = "",       // selection mode: tapping this child toggles its mark
     val masterToggle: Boolean = false,   // "select / deselect every app"
     val groupToggleKey: String = "",     // "select / deselect every item of this app"
@@ -508,6 +541,17 @@ private fun isStorageAccessError(detail: String): Boolean {
     return "no-storage-access" in d || "eacces" in d || "permission denied" in d ||
         "open failed" in d || "no-directory" in d
 }
+
+/**
+ * The one error that the battery-optimisation button actually repairs.
+ *
+ * **Matched on the reserved key alone, never on the exception text.** An app that catches
+ * `Throwable` and emits the key unconditionally is the easy implementation and the one that produces
+ * a useless button, so the contract reserves `no-foreground-start` for the exemption-fixable case and
+ * requires every other start failure to carry a descriptive line. (`shiroikuma-handyrss`.)
+ */
+private fun isForegroundStartError(detail: String): Boolean =
+    "no-foreground-start" in detail.lowercase()
 
 @Composable
 internal fun ProgressPanelUi(state: ProgressPanelState) {
@@ -586,6 +630,8 @@ internal fun ProgressPanelUi(state: ProgressPanelState) {
                             repairIndex = index,
                             repairPackage = if (state.icons && isStorageAccessError(why)) row.key else "",
                             repairStale = state.icons && isStaleRunError(why),
+                            repairBattery =
+                                if (state.icons && isForegroundStartError(why)) row.key else "",
                         ),
                     )
                 }
@@ -910,6 +956,15 @@ private fun PanelLineView(
                         label = "全ファイルアクセスを許可",
                         modifier = Modifier.weight(1f),
                         onClick = { ProgressPanelManager.openAllFilesAccess(line.repairPackage) },
+                    )
+                }
+                if (line.repairBattery.isNotEmpty()) {
+                    PanelButton(
+                        label = "電池最適化を除外",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            ProgressPanelManager.openBatteryExemption(line.repairBattery)
+                        },
                     )
                 }
                 if (line.repairStale) {
