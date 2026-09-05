@@ -28,10 +28,6 @@ class ProductionSourceSliceGuardTest {
     private val allowed = mapOf(
         "app/src/test/java/com/opentasker/core/actions/WifiScanActionTest.kt" to
             "asserts a token is absent from the slice, so widening it can only make the test fail",
-        "app/src/test/java/com/opentasker/core/support/ProjectLinksTest.kt" to
-            "pulls a query parameter out of a generated URL, which is field extraction, not a source region",
-        "app/src/test/java/com/opentasker/docs/ReleaseTruthContractTest.kt" to
-            "splits one already-matched line on a colon, which is field extraction, not a source region",
     )
 
     /** This file names the pattern it forbids, so it would otherwise report itself. */
