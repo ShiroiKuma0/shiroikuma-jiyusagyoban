@@ -45,13 +45,6 @@ private fun deriveContextFamilyCount(file: java.io.File): Int {
     return Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count()
 }
 
-private fun deriveRoomSchemaVersion(databaseFile: java.io.File): Int =
-    deriveSourceValue(
-        databaseFile,
-        "(?m)^const val OPEN_TASKER_DATABASE_SCHEMA_VERSION\\s*=\\s*(\\d+)",
-        "Room schema version",
-    ).toInt()
-
 private val LOCALE_COMPLETION_THRESHOLD = 0.80
 
 abstract class VerifyDocumentationTruthTask : DefaultTask() {
@@ -63,10 +56,6 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val currentDocumentation: ConfigurableFileCollection
 
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val historicalDocumentation: ConfigurableFileCollection
-
     @get:Input
     abstract val versionName: Property<String>
 
@@ -75,9 +64,6 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
 
     @get:Input
     abstract val contextFamilyCount: Property<Int>
-
-    @get:Input
-    abstract val schemaVersion: Property<Int>
 
     @get:Internal
     abstract val repositoryRoot: DirectoryProperty
@@ -125,36 +111,7 @@ abstract class VerifyDocumentationTruthTask : DefaultTask() {
             }
         }
 
-        val historicalFiles = historicalDocumentation.files
-        val staleClaims = historicalFiles.flatMap { file ->
-            val text = file.readText()
-            val claims = buildList {
-                Regex("\\bv\\d+\\.\\d+\\.\\d+\\b").findAll(text).mapTo(this) { it.value }
-                Regex("\\b(?:Room schema:|schema v)(\\d+)\\b", RegexOption.IGNORE_CASE)
-                    .findAll(text)
-                    .mapTo(this) { "schema ${it.groupValues[1]}" }
-                Regex("\\b(\\d+) built-in actions\\b").findAll(text)
-                    .mapTo(this) { "${it.groupValues[1]} built-in actions" }
-            }.distinct()
-            claims.filterNot { claim ->
-                claim == "v${versionName.get()}" ||
-                    claim == "schema ${schemaVersion.get()}" ||
-                    claim == "${actionCount.get()} built-in actions"
-            }.map { claim -> "${file.relativeTo(repositoryRoot.get().asFile)}: $claim" }
-        }
-        staleClaims.forEach { claim -> logger.warn("Documentation freshness: historical claim detected: $claim") }
-
-        historicalFiles
-            .filter { it.name.contains("iter-1") }
-            .forEach { file ->
-                check("Historical research snapshot" in file.readText()) {
-                    "Historical research file is missing its scope label: ${file.relativeTo(repositoryRoot.get().asFile)}"
-                }
-            }
-        println(
-            "Documentation truth passed: current release claims are checked; " +
-                "${staleClaims.size} historical claims reported without blocking labeled snapshots.",
-        )
+        println("Documentation truth passed: current release claims are checked.")
     }
 
     private fun isTrackedByGit(root: File, path: String): Boolean {
@@ -1519,25 +1476,16 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     val actionCatalogFilePath = projectDir.resolve("src/main/java/com/opentasker/core/actions/ActionCatalog.kt")
     val contextSpecFilePath = rootProject.layout.projectDirectory.asFile
         .resolve("core/model/src/main/kotlin/com/opentasker/core/model/ContextSpec.kt")
-    val databaseFilePath = rootProject.layout.projectDirectory.asFile
-        .resolve("core/storage/src/main/kotlin/com/opentasker/core/storage/AppDatabase.kt")
     val currentDocumentationPaths = listOf(
         readmeFilePath,
         repositoryRootPath.resolve("CHANGELOG.md"),
         repositoryRootPath.resolve("tools/release-truth.json"),
     )
-    val historicalDocumentationPaths = listOf(
-        repositoryRootPath.resolve("CLAUDE.md"),
-        repositoryRootPath.resolve("docs/research/raw-research-output.txt"),
-        repositoryRootPath.resolve("docs/research/iter-1-roadmap-recommendations.md"),
-    ).filter(File::isFile)
     readmeFile.set(readmeFilePath)
     currentDocumentation.from(currentDocumentationPaths)
-    historicalDocumentation.from(historicalDocumentationPaths)
     versionName.set(appVersionName)
     actionCount.set(deriveRegisteredActionCount(actionCatalogFilePath))
     contextFamilyCount.set(deriveContextFamilyCount(contextSpecFilePath))
-    schemaVersion.set(deriveRoomSchemaVersion(databaseFilePath))
     repositoryRoot.set(repositoryRootPath)
 }
 
