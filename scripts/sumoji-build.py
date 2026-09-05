@@ -23,22 +23,42 @@ intersection — so hour 11, drawn as 十 over 一, rendered as neither. Now eve
 yellow on opaque black and the skins are scrubbed, which costs the recolouring and buys the only
 thing that matters: a later tile genuinely REPLACES an earlier one.
 
-## Sixty minutes out of two slots
+## Sixty minutes out of five tiles
 
-`dt.numkanji` builds a numeral as a tens part plus a units part, dropping `〇十` and collapsing
-`一十` to `十` — exactly two parts, which is exactly what the band offers. The alignment does the
-work: the tens cell is right-aligned and the units cell left-aligned, so the two always meet at the
-seam whichever parts are present.
+The minute line is FIXED-COLUMN: the tens word right-aligned in cell 1, the units word left-aligned
+in cell 2, and nothing ever crosses the seam. :30 is 半 and :00 is 丁度 (白い熊, 2026-09-05).
 
     min 59   [    五十][九分    ]
     min 13   [      十][三分    ]
-    min  3   [        ][三分    ]   tens tile is clear
-    min 30   [    三十][分      ]   units tile covered by the 分-alone tile
+    min  5   [        ][五分    ]   cell 1 blank, so the reading sits half a character right
+    min 10   [      十][分      ]
+    min 30   [        ][半      ]   the whole reading is one glyph
+    min  0   [        ][丁度    ]
 
-Both cells draw units first and tens second, and the tiles are opaque, so the later one wins. That
-is what makes the round tens work: cell 1's tens glyph paints over its units digit, and cell 2's
-"分 alone" tile paints over "<units>分". Carrying 分 inside the units glyph rather than in a third
-slot is what keeps the string from opening a hole when the units digit is zero.
+**The earlier version let the units digit HOP into cell 1** whenever the tens digit was zero, which
+put 五分 in the middle of the row rather than half a character right of it. The hop is also the
+reason :00 could only ever read 〇分, and that is worth writing down because it looks like a missing
+feature rather than an impossibility.
+
+A tile is chosen by ONE value and covers what is under it, so the row is a decision list: at every
+pixel, the topmost opaque tile wins. Ask for 丁度 while the digit still hops, and the column that
+holds 分 at :05 must hold 度 at :00, 分 at :10 and 五 at :15 — dark, lit, lit, dark. That is an
+exclusive-or of the two digits, and no decision list computes one, whatever it is given to work
+with. Take the hop away and the column stops depending on both digits at once; 半 and 丁度 are then
+ordinary alternatives of a tens-bound tile.
+
+Five tiles, drawn in this order:
+
+    cell 1                                    cell 2
+    tens   三十                (drawn)        tens   丁度 / 分 / 半      (drawn)
+    units  black at :x0        (covers)       units  <n>分 at :xn        (covers)
+    tens   十/二十/四十/五十   (covers)
+           blank at t=0 and t=3
+
+Cell 1's middle tile is a black square rather than a glyph: its whole job is to take 三十 away at
+:30 so 半 can stand alone. It fires at :00 as well — a units-bound tile cannot tell :00 from :30 —
+and that costs nothing only because cell 1 is blank at :00 in this layout anyway. Under the old
+centred one it held the 〇, which is the other half of why the hop had to go.
 
 ## The hour is two cells
 
@@ -203,6 +223,15 @@ REPERTOIRE = "〇一二三四五六七八九十時分秒"
 # The date is measured in its OWN frame. Sharing the clock's would drag every hour and
 # minute glyph down to fit 曜日 characters they never draw.
 DATE_REP = "〇一二三四五六七八九十月日火水木金土"
+
+# 丁度 and 半 get a frame of their own for the same reason, and it is worth the two lines because
+# the numbers are so small they look like nothing. 度 overshoots the clock's frame by 7 px at the
+# top and 半 by 4 at both ends, out of 282 — fold them in and EVERY hour, minute and second glyph
+# shrinks by up to 4 % to make room for three characters those lines never draw. They can afford
+# their own frame because nothing stands beside them: 半 IS the reading, and 丁度 shares a frame
+# with itself. The lone 分 of :10 and :20 keeps the clock's frame, so it stays the same size as the
+# 分 of :15 one minute later.
+MIN_REP = REPERTOIRE + "丁度半"
 WDAY = "月火水木金土日"                # index 1 is Monday, proved by the original artwork
 
 
@@ -372,19 +401,32 @@ def glyphs():
     for t in (1, 2):
         out[f"h2_tens_{t}"] = clear(hw, hh)
 
-    # ── minutes, cell 1: the units numeral, or the tens word painted over it ──
-    for u in range(10):
-        out[f"m1_units_{u}"] = render(DIG[u], mw, mh, "right", chars=2)
-    out["m1_tens_0"] = clear(mw, mh)
-    for t in range(1, 6):
-        out[f"m1_tens_{t}"] = render(TENS[t], mw, mh, "right", chars=2)
+    # ── minutes, cell 1: the tens word, and the blank that clears it at :30 ──
+    #
+    # Bottom: 三十, which only :31-:39 ever keep. Middle: an opaque black square at units zero —
+    # the tile that takes 三十 away so 半 can stand alone. Top: the tens word for every other tens
+    # digit, blank at zero, and CLEAR at three so the two tiles below it decide.
+    for t in range(6):
+        out[f"m1a_tens_{t}"] = render(TENS[3], mw, mh, "right", chars=2) if t == 3 \
+            else clear(mw, mh)
+    out["m1b_units_0"] = render("", mw, mh, "right", chars=2)         # opaque black, no glyph
+    for u in range(1, 10):
+        out[f"m1b_units_{u}"] = clear(mw, mh)
+    for t in range(6):
+        out[f"m1c_tens_{t}"] = clear(mw, mh) if t == 3 \
+            else render(TENS[t], mw, mh, "right", chars=2)
 
-    # ── minutes, cell 2: 分, or the units numeral and 分 once the tens digit is set ──
-    for u in range(10):
-        out[f"m2_units_{u}"] = render(("" if u == 0 else DIG[u]) + "分", mw, mh, "left", chars=2)
-    out["m2_tens_0"] = render("分", mw, mh, "left", chars=2)        # cell 1 already carries the numeral
-    for t in range(1, 6):
-        out[f"m2_tens_{t}"] = clear(mw, mh)
+    # ── minutes, cell 2: the units word, and the two readings that replace it ──
+    #
+    # The tens tile carries what a round ten reads as — 丁度 at zero, 半 at thirty, a lone 分
+    # otherwise — and the units tile covers it with "<n>分" the moment the units digit is not zero.
+    for t in range(6):
+        special = {0: "丁度", 3: "半"}.get(t)
+        out[f"m2a_tens_{t}"] = render(special or "分", mw, mh, "left", chars=2,
+                                      rep=MIN_REP if special else None)
+    out["m2b_units_0"] = clear(mw, mh)
+    for u in range(1, 10):
+        out[f"m2b_units_{u}"] = render(DIG[u] + "分", mw, mh, "left", chars=2)
 
     # The date row is retired by pointing every one of its images at nothing. Kept at the sizes
     # the elements actually had, rather than one shared 1x1, in case the band sizes anything
@@ -518,10 +560,10 @@ PLAN = {
     9:  ("h1_tens",  HOUR_TENS,  (CELL1_X, HOUR_Y), 3),
     10: ("h2_units", HOUR_UNITS, (CELL2_X, HOUR_Y), 10),
     11: ("h2_tens",  HOUR_TENS,  (CELL2_X, HOUR_Y), 3),
-    0:  ("m1_units", MIN_UNITS,  (CELL1_X, MIN_Y), 10),
-    1:  ("m1_tens",  MIN_TENS,   (CELL1_X, MIN_Y), 6),
-    2:  ("m2_units", MIN_UNITS,  (CELL2_X, MIN_Y), 10),
-    3:  ("m2_tens",  MIN_TENS,   (CELL2_X, MIN_Y), 6),
+    0:  ("m1a_tens",  MIN_TENS,  (CELL1_X, MIN_Y), 6),
+    1:  ("m1b_units", MIN_UNITS, (CELL1_X, MIN_Y), 10),
+    2:  ("m1c_tens",  MIN_TENS,  (CELL1_X, MIN_Y), 6),
+    3:  ("m2a_tens",  MIN_TENS,  (CELL2_X, MIN_Y), 6),
 }
 
 
@@ -537,6 +579,10 @@ PLAN = {
 SEC_UNITS, SEC_TENS = 64, 63
 MONTH, DAY_UNITS, DAY_TENS, WEEKDAY = 51, 71, 70, 52
 NEW = [
+    # The minute line needs FIVE tiles and the layer only offers four in place, so cell 2's units
+    # tile is appended. It has to be drawn after cell 2's tens tile, and appended elements come
+    # last, which is exactly the order wanted.
+    ("m2b_units", MIN_UNITS, (CELL2_X, MIN_Y), 10),
     ("s1_units", SEC_UNITS, (CELL1_X, SEC_Y), 10),
     ("s1_tens",  SEC_TENS,  (CELL1_X, SEC_Y), 6),
     ("s2_units", SEC_UNITS, (CELL2_X, SEC_Y), 10),
