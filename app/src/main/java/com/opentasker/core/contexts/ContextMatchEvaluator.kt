@@ -177,27 +177,6 @@ object ContextMatchEvaluator {
             }
         }
 
-        if (actualEvent.equals(BroadcastContextEvents.EVENT_BROADCAST, ignoreCase = true)) {
-            // The action is what the receiver registered for, so a mismatch here means two
-            // broadcast profiles are sharing one receiver and this is not the one that fired.
-            val expectedAction = BroadcastContextEvents.normalizeAction(spec.config["action"])
-            if (expectedAction != null && event.metadata["broadcast_action"] != expectedAction) return false
-
-            // Sender identity needs API 34. Below that it arrives empty, and a profile that asked
-            // for a sender must not fire for an unknown one just because the platform is old.
-            val expectedSender = spec.config["sender"]?.trim().orEmpty().lowercase(Locale.US)
-            if (expectedSender.isNotBlank() &&
-                event.metadata["broadcast_sender"].orEmpty().lowercase(Locale.US) != expectedSender
-            ) return false
-
-            val extraKey = spec.config["extraKey"]?.trim().orEmpty()
-            if (extraKey.isNotBlank()) {
-                val actualExtra = event.metadata["broadcast_extra_$extraKey"]
-                    ?: return false
-                val expectedExtra = spec.config["extraValue"]?.trim().orEmpty()
-                if (expectedExtra.isNotBlank() && !textMatches(actualExtra, expectedExtra, regex)) return false
-            }
-        }
 
         if (actualEvent.equals(CallContextEvents.EVENT_INCOMING_CALL, ignoreCase = true)) {
             // Exact on purpose: a caller nobody could check must not read as a stranger, so "unknown"
@@ -296,13 +275,7 @@ object ContextMatchEvaluator {
         }
 
         val senderFilter = firstConfig(spec, "sender", "from", "originatingAddress")
-        // A broadcast's sender is a package name checked exactly in the block above, not an SMS
-        // originating address matched by substring. Without this exclusion the shared filter reads
-        // an always-empty metadata key and rejects every broadcast that names a sender.
-        if (senderFilter.isNotBlank() &&
-            !actualEvent.equals(BroadcastContextEvents.EVENT_BROADCAST, ignoreCase = true) &&
-            !textMatches(event.metadata["sender"].orEmpty(), senderFilter, regex)
-        ) {
+        if (senderFilter.isNotBlank() && !textMatches(event.metadata["sender"].orEmpty(), senderFilter, regex)) {
             return false
         }
 

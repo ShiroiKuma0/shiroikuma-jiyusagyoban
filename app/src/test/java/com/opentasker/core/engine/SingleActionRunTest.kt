@@ -87,7 +87,9 @@ class SingleActionRunTest {
         val guarded = ProductionSources.block(
             "com/opentasker/ui/screens/ActiveAutomationLists.kt",
             "if (SingleActionRun.isRunnableAlone(action)) {",
-            "DropdownMenuItem(\n                        text = { Text(stringResource(R.string.action_delete)) }",
+            // The fork's action menu is its own (Clone/Copy/Cut/Delete on the whole selection), so the
+            // slice ends at ITS delete item rather than upstream's multi-line, resource-backed one.
+            "DropdownMenuItem(text = { Text(\"Clone\") }, onClick = onClone)",
         )
         assertTrue("the run option must sit behind the runnable check", "R.string.action_run_alone" in guarded)
         assertTrue("the run option must call back", "onRun()" in guarded)

@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.app.R
+import com.opentasker.ui.utils.expandCollapseToggle
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.ProjectFilter
 import com.opentasker.core.model.Variable
@@ -308,7 +309,7 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, projects: List<Project
     ) {
         Row(
             modifier = Modifier.fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .expandCollapseToggle(expanded) { expanded = !expanded }
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             // Triangle sits just after the label (not pushed to the far edge), with a wide gap between them.
