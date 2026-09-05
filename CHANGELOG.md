@@ -8,6 +8,45 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+055 — 2026-09-05
+
+### 凍結融解 — the freeze bubbles freeze through device policy
+
+白い熊 雫 is the Device Owner on this phone and now delegates package access to this app, so a freeze
+can be a **real suspension** instead of `pm disable-user`. The bubbles are the freeze path, so they are
+what this is for: tapping one now applies the strongest lock the phone has.
+
+- **"Frozen" is three independent locks**, and a package stays held while any one survives — the
+  enabled state, a suspension filed by the shell, and a suspension filed under the owner's admin. Only
+  the last is beyond every shell command, which is why a defrost ran `pm enable` over five apps,
+  exited 0, logged "Unfroze …" and changed nothing: the launch that followed drew Android's
+  "contact your organization's administrator" dialog instead of the app.
+- **`app.freeze`** prefers the policy suspension and falls back to `pm disable-user`, saying which one
+  it used in the run log. The strong path needs no Shizuku at all — it is the platform's own API.
+- **`app.unfreeze` clears every slot**, unconditionally, in order, with no step short-circuiting the
+  next, and then **re-reads**: success is a fresh look at the package, never an exit code. It does not
+  branch on how the app was frozen, because it cannot know — and with two apps able to suspend under
+  one admin, whatever either froze the other must be able to lift.
+- **`app.frozen` reads disabled *or* suspended**, and still needs no privilege at all. It used to
+  report a suspended app as running, so 保存復元's thaw-work-refreeze skipped the thaw and blamed the
+  sister app for the silence that followed.
+- The share-sheet relay had its own copy of the old check; it now goes through the same code.
+
+### Three apps that can never be frozen
+
+`shiroikuma.shizuku`, `shiroikuma.oyokanri` and `shiroikuma.jiyusagyoban` are refused outright (白い熊):
+the Device Owner, the other way to lift a hard freeze, and the engine that would run the thaw. No
+bubble is ever offered for them either — guarded in the store both callers pass through.
+
+### Fixed — the export is lossless again
+
+The 0.2.93 sync composed upstream's `sanitizeForExport()` into the bundle codec's `encode()`. That
+policy redacts by **argument-key name**, so an export turned every `param:token` and `param:token_var`
+in the 保存復元 wrappers into `[REDACTED]` — 69 tasks in one run, including the ones carrying a variable
+*name* rather than a value. `encode()` is the backup path: the bridge export, the workspace mirror and
+the app-state ZIP's workspace entry all come through it, so anything dropped there is gone from the
+only copy. It is lossless again, and a secret *variable* is still refused outright.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+053 — 2026-09-05
 
 Rebased onto upstream `a1b1f784` — 52 commits past the previous base, `29d06ff7`. Upstream's own
