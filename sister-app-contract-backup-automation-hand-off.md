@@ -1,5 +1,31 @@
 # Sister-app contract v2 — automation, and app data that survives a clean phone
 
+> ## ⟳ REVISION 2026-09-05 08:05 — re-read before quoting this file
+>
+> **This document is corrected in place, several times a day, while sister chats are working from
+> it.** If you read it earlier in your session you are holding a snapshot, and nothing will tell you
+> it has moved. **Before you act on or quote any line here, check this stamp against the one you
+> remember** — `head -3` on the file costs nothing. A chat quoted the pre-correction §7 hours after
+> it was fixed, in good faith, because there was no cheap way to notice. (`shiroikuma-hogu`, which
+> diagnosed this and asked for the stamp.)
+>
+> **Corrections since the rollout began**, newest first — if your copy lacks one, it is stale:
+> - **§1 foreground start** — FOUR start sites, not one (was three); the reserved `ERROR:no-foreground-start`
+>   key and its two emission conditions; the verification traps.
+> - **§2a import must not weaken another surface** — restore a security-relevant preference only
+>   to a value at least as strict as the device's, or leave it and say so.
+> - **§5 `requires_permissions`** — never list `MANAGE_EXTERNAL_STORAGE`; the caller's grant is
+>   runtime-only and throws, refusing the import.
+> - **§5 `requires_permissions`** — a non-empty array means "at least this", not "only this";
+>   a role (default SMS app) can gate a write no permission unlocks.
+> - **§1 storage fallback** — scoped to apps that do NOT declare `MANAGE_EXTERNAL_STORAGE`; a
+>   declaring app must reply the keyed refusal, never fall back.
+> - **§7 never delete a build** — this section once said "superseded copies pruned". **It was
+>   wrong.** Never remove a build artefact anywhere; deleting is 白い熊's to decide, never a chat's.
+> - **§7 naming** — APKs carry a version, **not** a timestamp; only pushed *data files* take the
+>   `yyyy-MM-dd_HH-mm-ss` stamp.
+> - **§5 header** — `size_estimate` is **not** in the spec; do not invent it.
+
 > **v2, 2026-09-04.** Two things changed and one thing is new. **The token is now opt-in** — every
 > app answers automation out of the box, and 「Use authorization token?」 is an extra a caller may
 > be asked for, not the gate. **A data door was added**: a `ContentProvider` that identifies its
@@ -121,6 +147,15 @@ Writing to an arbitrary absolute path needs All-Files-Access (`MANAGE_EXTERNAL_S
 renrakusaki already declares for exactly this reason. If your app holds it, write with plain
 `java.io.File`. If it does not and you should not add it, ignore `path` **only** when you have a
 configured SAF directory, and otherwise reply `ERROR:no-storage-access`.
+
+**That fallback is scoped to apps that do NOT declare the permission. If your app declares it, the
+keyed refusal is the correct behaviour and falling back is a bug.** (`shiroikuma-jinsoningen`, which
+checked before "fixing" it.) The two sentences read against each other otherwise, and the wrong
+reading fails **invisibly**: the row goes green while the archive sits outside the set. The batch
+collects every app's backup into one directory so the files sort and read as a group — an app that
+quietly writes elsewhere looks successful and is not there when 白い熊 restores. **Failing with a
+repairable key beats succeeding in the wrong place**, because `ERROR:no-storage-access` earns a
+「全ファイルアクセスを許可」 button and the whole repair is grant → retry, from the report.
 
 **Check the grant, don't discover it by failing.** Declaring `MANAGE_EXTERNAL_STORAGE` in the manifest
 is not holding it — on Android 11+ it is granted from a Settings page, per app, and 白い熊 may well
@@ -302,6 +337,119 @@ of rows — assume it can't. The receiver then does **nothing but**: check the s
 `items`, and **start a foreground service** with the request's extras, then return immediately. The
 service does the whole export, sends the progress broadcasts, sends the one terminal reply, and stops
 itself.
+
+**And that start MUST be wrapped — an unguarded `startForegroundService` in `onReceive` CRASHES the
+app being backed up.** A broadcast is a **background start** on API 31+, so without a
+foreground-start allowance the call throws `ForegroundServiceStartNotAllowedException`, and an
+exception escaping `onReceive` takes the process down. This is §2a's foreground-first rule applying
+to §1, which nobody checked during the rollout:
+
+```java
+try {
+    context.startForegroundService(service);
+} catch (Exception e) {                       // reply, do not merely swallow
+    sendReply(context, replyAction, replyPackage, replyId, "ERROR:" + e.getMessage());
+}
+```
+
+**There are FOUR start sites, not one. Both services are their own site — guarding the thing that
+starts them does not cover them.** (`shiroikuma-sokki` found sites 2 and 3 after reproducing the
+crash; `shiroikuma-jinsoningen` found site 4.)
+
+1. **The §1 receiver's `startForegroundService`** — the one above.
+2. **The §1 service's own `startForeground` in `onStartCommand`.** It can be refused too, and if it
+   sits *above* the code that reads `reply_action`/`reply_package`/`reply_id` then a refusal has
+   nothing to answer with and dies silently. **Read the extras first, then guard the call, then
+   reply.** This is §2a's foreground-first recipe applying to §1's service.
+3. **The §2a provider's start of that service.** Two shapes exist and **the fix differs — check
+   which you have.** If your provider returns the refusal as the return value of `call()`, it never
+   hands out an `OK:<job_id>` for a job that will not run, and adding a broadcast here would
+   **double-answer**. If it answers `OK` first and the start fails after, you *must* broadcast the
+   terminal reply. (`shiroikuma-jinsoningen`.)
+4. **The §2a data service's own `startForeground`** — and this is the one where the OK has genuinely
+   already been sent. By the time `onStartCommand` runs, the provider has correctly answered
+   `OK:<job_id>`, because `startForegroundService` *succeeded*. If `startForeground` is then refused,
+   the app dies and the caller waits forever on a job id it was rightly given. Read the reply address
+   **before** the call that can fail, answer the refusal with the terminal broadcast carrying
+   `job_id`, then `stopSelf`.
+
+**Sites 2 and 4 collide with the foreground-first rule, and the obvious order breaks one of them.**
+The earlier rule says: go foreground **before any early return**, or a stale request earns
+`ForegroundServiceDidNotStartInTimeException` and kills the app being restored. This rule says: read
+`reply_*` **before** the foreground call, or a refusal has nothing to answer with. Applied naively
+the second undoes the first. **It is three steps, not two:**
+
+1. **Read the extras.** Microseconds, and no early returns here — the five-second window is untouched.
+2. **Post the notification / `startForeground`, guarded.** On refusal: reply `ERROR:`, release the
+   descriptor, `stopSelf`, return.
+3. **Then the early returns** — missing job id, already-consumed descriptor.
+
+**Guard the promotion BEFORE claiming the "already running" flag.** If the flag is set first and the
+`startForeground` is then refused, the flag is stuck: every later request answers
+`ERROR:export already running` until the process is killed — a refusal that costs one run turns into
+one that costs every run. (`shiroikuma-shizuku`.)
+
+**Reading extras and returning early are different acts, and only the second is what the
+five-second rule forbids.** As one recipe — *extras, then guard, then bail* — it is unambiguous; as
+two separate rules it is a trap. (`shiroikuma-tenki`, which hit the collision applying both.)
+
+**Grep for BOTH names — one pattern will not find all four.** `startForegroundService` names sites 1
+and 3; `startForeground(` names sites 2 and 4. A repo that greps only the first fixes the two starts
+and leaves both promotions, which are the sites that die *after* an `OK` has been sent.
+(`shiroikuma-gauguin`.)
+
+**A `finally` is not a `catch`, and at site 4 it looks like one.** Any repo that added descriptor
+cleanup there in the earlier round already has a `try` block at exactly that spot — which is what
+makes the missing `catch` invisible on review. The descriptor gets closed, the code reads as handled,
+and the exception still propagates with nothing replying. (`shiroikuma-jinsoningen`, whose site 4 had
+precisely this shape.)
+
+**Two testing traps, both of which manufacture a convincing false result:**
+- **`am broadcast` does not set `FLAG_INCLUDE_STOPPED_PACKAGES`** (flags `0x400000`), so a
+  force-stopped app never receives it. Use `--include-stopped-packages` (flags become `0x400020`),
+  or you get a silent nothing that looks exactly like this bug with a different cause.
+- **On 白い熊's EMUI phone the cold path cannot be reached from an adb shell at all.** Even with the
+  flag set, 「アプリ起動管理」 refuses the background auto-start, the process is never created, and
+  `dumpsys` just keeps saying `stopped=true`. Only 自由作業盤's own batch reaches it. So "I tested it
+  cold and it passed" is not available here — say the process was warm. (`shiroikuma-tenki`.)
+- **Grep logcat for `Process: <your own package>`, never for the exception text.** With forty-one
+  apps on one phone, a sister app's crash lands in your log and reads as yours — `shiroikuma-tenki`
+  nearly reported `shiroikuma-sokki`'s crash as its own. (It was, usefully, independent confirmation
+  that 速記 was still broken.)
+- **Fire `LIST_CATEGORIES` first as a discriminator.** It starts no service anywhere. If it answers
+  and `EXPORT_STATE` does not, the fault is the foreground start; if neither answers, the service
+  code is not where to look.
+
+**Emit the reserved key only when the button would actually help — TWO conditions, not one.**
+(`shiroikuma-handyrss`.) `ERROR:no-foreground-start` earns 白い熊 a 「電池最適化を除外」 button on the
+failed row, so send it only when **both** hold:
+
+1. the throwable is `ForegroundServiceStartNotAllowedException`, **and**
+2. the app is **not already battery-exempt**.
+
+If the exemption is already held and the start was still refused, the cause is something the button
+cannot touch — アプリ起動管理 on 自動管理 being the likeliest on this phone. "Is the fault the one the
+button fixes" and "is the button still available" are different questions and only the pair gets it
+right. Everything else keeps a descriptive line: `ERROR:cannot start export service: <ClassName>`.
+
+**Match that class by NAME, never `instanceof`.** `ForegroundServiceStartNotAllowedException` is
+API 31; a module with a lower `minSdk` cannot load it to compare against and will fail on older
+devices. An `instanceof` in the catch block is the natural way to write this and it is wrong.
+
+**Catching alone is not the fix.** It converts a crash into a *silent* no-export: the caller waits
+out its whole timeout and reports "no response", which is indistinguishable from an app that never
+implemented the contract. The `ERROR:` reply is what makes it diagnosable — 保存中核 renders such a
+string straight into its failure dialog.
+
+**Why this survived the whole rollout, and the general lesson.** The foreground-start allowance is
+granted when the app has been interacted with recently, so **every hands-on test passes**: open the
+app, run a backup, it works. It throws only when the app is cold — the unattended batch, and the
+clean-phone restore this contract exists for. **The failure is inversely correlated with how closely
+anyone is watching**, which is the worst possible shape for a defect and the reason it must be read
+for rather than tested for. Found 2026-09-04 when `shiroikuma-tenki` crashed on the first cold run
+after being added to 保存復元's roster; an audit of all 42 then found **eight** repos affected
+(`gauguin`, `handyrss`, `jami`, `jinsoningen`, `mise`, `shizuku`, `sokki`, `tenki`) against three
+that already guarded it (`jisho`, `renketsujoka`, `shosekietsuran`).
 
 **Audit this while you are in the file — the v2 rollout found repos still on `goAsync()` that plainly
 cannot be.** `shiroikuma-kuchusen`'s §1 export held the `PendingResult` across a Realm
@@ -750,6 +898,35 @@ Four mechanical rules:
   `shiroikuma-handyrss` ships roughly 3,700 images. Stream the descriptor to a cache file, validate
   there, then apply. The guarantee is unchanged (nothing is written until the whole archive has
   arrived and been checked); only the bound moves from RAM to disk.
+  **Check how far the `byte[]` reaches before you size this work.** It is a local change to the
+  service only if your importer already takes a stream. `shiroikuma-raikidoban` found both
+  `RkbExport.categoriesIn` and `RkbExport.importZip` typed on `byte[]`, so spooling there means
+  adding file-based overloads to the importer itself — a change to the app's own surface, not to the
+  code this contract gave you. Look at your import entry points before estimating, because the cost
+  is set by how that surface was written and nothing in the service reveals it.
+
+### An import must not silently weaken a DIFFERENT surface
+
+**Decided by 白い熊, 2026-09-05.** A restore replays an app's preferences wholesale, and some of those
+preferences are load-bearing for a *different* security surface:
+
+- `shiroikuma-universal-installer`'s import flips `auto_confirm_external_install`.
+- `shiroikuma-simplex`'s can clear `privacyEncryptLocalFiles` — **the very mitigation SimpleX cited
+  to justify leaving its §1 receiver unauthenticated.**
+
+So a restore can disarm the argument another surface's safety rests on, silently, from a file. The
+token decision does not touch this: with the token opt-in and off by default, an archive is the
+weakest thing in the chain rather than the strongest.
+
+**The rule: an import may restore a security-relevant preference only to a value at least as strict
+as the one already on the device, or it must leave it alone and say so in the reply.** Never silently
+loosen. If your app has such a preference, name it in your `describe` `contains` string so 白い熊 can
+see what a restore would touch before choosing to run one. (`shiroikuma-mise` raised the shape;
+白い熊 ruled it a real concern rather than a hypothetical.)
+
+**応用管理 is deliberately NOT a callee.** It has no `.automation` provider and will not get one
+(白い熊, 2026-09-05) — it speaks this contract as a client only. Do not expect a door there, and do
+not write one for it.
 
 ### `describe` runs before your app exists — keep it off the DI graph
 
@@ -784,9 +961,10 @@ that passes no `progress_action` gets nothing, so this is purely additive.
 
 **A throttle is not a heartbeat, and confusing them fails the two-minute rule.** They solve opposite
 problems: the throttle caps a chatty engine at one message per 500 ms; the heartbeat covers an engine
-that is not chatty at all. `shiroikuma-ongakuots`'s export calls back **once per category**, so its
-`downloads` category ticks once and then says nothing for however long several gigabytes take to zip
-— silent well past two minutes, with a correctly-implemented throttle in place. If your engine
+that is not chatty at all. `shiroikuma-ongakuots`'s and `shiroikuma-fairemail`'s exports call back **once per category**, so the latter's
+gigabyte-scale message category ticks once and then says nothing for however long it takes to zip
+— silent well past two minutes, with a correctly-implemented throttle in place. Two independent
+repos hit this, which is why it is a rule rather than an anecdote. If your engine
 reports per category rather than per item, add a separate timer that **re-sends the last true line**
 every 10–30 s. Do not invent a moving number to look busy: a fabricated count is worse than a
 repeated one, because it cannot be distinguished from progress. Several repos judged their own export
@@ -829,8 +1007,33 @@ has been streamed.
 `requires_launch_first` does not describe this, and saying it does would be wrong: launching the app
 is not sufficient either, because what is missing is a **grant**, which only 白い熊 can give. So list
 the permissions your import needs as an array of Android permission names, empty when it needs none.
-応用管理 can then ask for them **before** streaming rather than reporting a failure afterwards. Raised
-by `shiroikuma-renrakusaki`, which flagged it rather than inventing the field unilaterally — the
+応用管理 can then ask for them **before** streaming rather than reporting a failure afterwards.
+
+**A NON-EMPTY array is not a promise that granting it is enough — there is a third case.**
+`shiroikuma-messeji`'s `messages` category writes into the system Telephony provider, so it correctly
+declares `["android.permission.READ_SMS","android.permission.WRITE_SMS"]`. But the operative gate is
+being the **default SMS app**, a *role* 白い熊 assigns — no prompt can grant it. So 応用管理 requesting
+both, succeeding, and streaming would produce exactly the false confidence this field exists to
+prevent. Three cases, not two: grantable (`shiroikuma-renrakusaki`), `[]` because the writes are the
+app's own rows (`shiroikuma-fairemail`, `shiroikuma-yotehyo`), and **declared-but-insufficient**.
+The schema has no way to say "and this app must hold a role"; until it does, **a non-empty array
+means "at least this", never "only this"**, and a caller must treat a post-grant failure as expected
+rather than anomalous. Flagged rather than invented — 白い熊 and 応用管理 rule on the schema.
+
+**NEVER list `MANAGE_EXTERNAL_STORAGE` in `requires_permissions`.** 応用管理 grants each entry with
+`grantRuntimePermission` **before** opening the descriptor, and that call **throws** on a
+`signature|appop` permission — so the import is refused before a byte moves. You do not need it
+anyway: under §2a the payload arrives on 応用管理's own descriptor and no storage permission is
+involved. The field is for **runtime** permissions only. (`shiroikuma-oyokanri`, from its own
+`PermissionCompat.grantPermission`.)
+
+**Derive it from what your restore path actually touches — do not reason from the category name.**
+An empty array must be a checked result, not an assumption. `shiroikuma-fairemail` has a `contacts`
+category and correctly declares `[]`, because those contacts are its own Room `EntityContact` rows
+and the import never goes near `ContactsContract`. The name matches `shiroikuma-renrakusaki`'s
+category exactly, and the two need opposite declarations. Follow the writes.
+
+Raised by `shiroikuma-renrakusaki`, which flagged it rather than inventing the field unilaterally — the
 right call, and the reason it is specified here once instead of four incompatible ways.
 
 **Do not assume it from the app's category.** I first wrote that four repos were affected — contacts,
@@ -896,7 +1099,15 @@ presence check and a contents check are both useless:
 | `shiroikuma-gauguin`, `shiroikuma-sokki`, `shiroikuma-rindenwa` | no `<queries>` element at all | nothing to see |
 | `shiroikuma-handyrss`, `shiroikuma-jisho` | `<package>` for 応用管理 only | the element is there and looks deliberate |
 | `shiroikuma-kxkb`, `shiroikuma-simplex` | an element holding only `<intent>` filters, no package | passes a presence check |
-| `shiroikuma-raikidoban` | an element naming neither caller | passes a presence check |
+| `shiroikuma-raikidoban`, `shiroikuma-fairemail` | an element naming neither caller | passes a presence check |
+
+**And the last row hides something worse than a broken door.** `shiroikuma-fairemail` had shipped
+working §1 replies to 自由作業盤 for months with neither caller declared — they were resting entirely
+on **implicit interaction visibility**, which Android grants for a while after two apps interact and
+then withdraws. So the app was not merely one manifest edit from correct; it was relying on a grant
+nobody chose, which works until it silently stops. **A `<queries>` element that names neither caller
+is worse evidence than no element at all**, because the replies it fails to authorise may keep
+arriving anyway, right up until they do not.
 | `shiroikuma-yotehyo` | **two** elements naming `org.fossify.*` packages only | well-formed, non-empty, deliberate-looking |
 | `shiroikuma-shosekietsuran` | **two** elements (TTS and dictionary), neither naming a caller | looks the healthiest of all |
 
@@ -945,6 +1156,14 @@ You do not implement these; they are stated so you do not fight them.
   undoes the import that just happened**. 応用管理 already had to solve this for itself with
   `Process.killProcess(myPid)` — explicitly not `Runtime.exit`. The guarantee lives on its side so
   that forty-two apps do not each have to remember it.
+- **A signing-identity change makes an in-place update impossible — export BEFORE the resigned build
+  lands.** Android refuses an update across a different certificate, so the only crossing is an
+  uninstall, which takes the app's data with it. 応用管理 will meet a signature mismatch that is
+  **expected, not a contract fault**; the crossing is one-time and later builds update normally. Two
+  apps in the batch needed it (`shiroikuma-jisho`, resigned off a debug key; `shiroikuma-raikidoban`,
+  if 白い熊 chooses to). Note what an export cannot save regardless: an `AppWidgetHost` dies with the
+  app, so **every `appWidgetId` is dead on reinstall** even when the archive is perfect — a launcher
+  must offer a re-bind path or its widgets are re-added by hand (`shiroikuma-raikidoban`).
 - **The order is: install → do NOT launch → import → force-stop.** Many apps write defaults on first
   run and would then merge badly against them. If your app genuinely cannot accept an import before
   it has been launched once, say so with `"requires_launch_first":true` in your header — it should
@@ -1200,9 +1419,16 @@ the paths that break.
 
 Follow this repo's own `CLAUDE.md` for building, delivery, and versioning. Standing rules that always
 apply: no `Co-Authored-By: Claude` or Anthropic attribution in commits; never commit/push unprompted
-(build and deliver, wait for 白い熊's «Push»); every `adb push` goes only to `/sdcard/tmp/` with a
-full `yyyy-MM-dd_HH-mm-ss` stamp in the filename; run `adb` unsandboxed and `adb disconnect` at the
-end of each delivery batch.
+(build and deliver, wait for 白い熊's «Push»); every `adb push` goes only to `/sdcard/tmp/`; run
+`adb` unsandboxed and `adb disconnect` at the end of each delivery batch.
+
+**Two different naming rules — do not apply the wrong one.** A **build artefact** is named
+`<app>_<version>_<abi>.apk`, and its *version* is what identifies it; it carries **no timestamp**. A
+**pushed data file** — a JSON bundle, an export — takes a full `yyyy-MM-dd_HH-mm-ss` stamp so a
+same-day re-push cannot collide. An earlier draft of this section demanded the timestamp of
+everything pushed, which is wrong for APKs and actively dangerous: a session trying to satisfy it
+against versioned files could conclude the versioned ones are the stale copies and delete them.
+(`shiroikuma-hogu`.)
 
 **NEVER delete a build — this line used to say the opposite and it was wrong.** Until 2026-09-04 the
 paragraph above ended "superseded copies pruned", which contradicts a **hard rule in 白い熊's global
