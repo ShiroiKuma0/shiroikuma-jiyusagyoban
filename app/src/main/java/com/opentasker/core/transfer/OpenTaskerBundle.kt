@@ -5,6 +5,7 @@ import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.icons.TaskIconStore
+import com.opentasker.core.diagnostics.ExportRedactionPolicy
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.Scene

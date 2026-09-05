@@ -289,6 +289,8 @@ fun registerActionMetadata() {
                 ActionField("output_file", "Response to file", hint = "Write the response body to this path"),
                 ActionField("max_response_bytes", "Max response bytes", FieldType.NUMBER),
                 ActionField("redirects", "Follow redirects", hint = "true/false"),
+                // Upstream 0.2.93 lets a request be pinned to one transport; the runtime reads this key.
+                ActionField("network", "Network", FieldType.DROPDOWN, hint = "Which transport may carry it (default any)", options = listOf("any", "wifi", "cellular", "unmetered")),
                 ActionField("allow_http", "Allow cleartext HTTP (LAN)", FieldType.CHECKBOX, hint = "Only loopback/private hosts are ever allowed"),
                 ActionField("timeout_sec", "Timeout (s)", FieldType.NUMBER),
                 ActionField("connect_timeout_sec", "Connect timeout (s)", FieldType.NUMBER),

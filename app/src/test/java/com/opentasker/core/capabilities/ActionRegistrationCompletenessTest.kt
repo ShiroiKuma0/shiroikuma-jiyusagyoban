@@ -44,8 +44,6 @@ class ActionRegistrationCompletenessTest {
     @Test
     fun onlyTheDeliberatelyUnsupportedActionsRefuseToImport() {
         val declaredUnsupported = setOf(
-            // Needs configured device-admin support, which this app does not ask for.
-            "lock",
             // Per-task Quick Settings tiles are a planned feature; the action is a placeholder.
             "tile.set",
             // The landing pad for a Tasker action the importer could not map. Unsupported by
