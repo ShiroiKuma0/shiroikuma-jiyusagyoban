@@ -51,6 +51,9 @@ object FreezeBubbleStore {
     /** Add a bubble for [pkg] (dedup — refresh label/icon if it already exists), stacked down the right edge. */
     fun enqueue(pkg: String, label: String, iconPath: String?) {
         if (!::prefs.isInitialized || pkg.isBlank()) return
+        // A bubble is a re-freeze button, so a package that must never be frozen must never get one.
+        // Guarded here rather than at each caller: this is the single point both of them pass through.
+        if (com.opentasker.core.policy.AppFreeze.protectedReason(pkg) != null) return
         val current = _bubbles.value
         val existing = current.firstOrNull { it.pkg == pkg }
         val next = if (existing != null) {
