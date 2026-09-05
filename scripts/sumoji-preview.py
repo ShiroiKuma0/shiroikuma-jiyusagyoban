@@ -44,9 +44,9 @@ W, H = 286, 482
 # (一月一日, where the day sits centred on its seam with a gap either side), and a round ten.
 SAMPLES = [
     (datetime.datetime(2026, 9, 1, 3, 13, 7), 76, 1220),
-    (datetime.datetime(2026, 12, 31, 10, 0, 0), 76, 1220),
-    (datetime.datetime(2026, 1, 1, 11, 34, 45), 60, 999),
-    (datetime.datetime(2026, 11, 10, 12, 59, 59), 30, 5012),
+    (datetime.datetime(2026, 12, 31, 10, 0, 0), 76, 1220),      # 丁度, and the longest date
+    (datetime.datetime(2026, 1, 1, 11, 30, 45), 60, 999),       # 半, and the shortest date
+    (datetime.datetime(2026, 11, 10, 12, 5, 59), 30, 5012),     # a lone units digit, cell 1 blank
 ]
 
 
@@ -59,16 +59,26 @@ def panel(g, when, batt, steps):
     for x, cell in ((B.CELL1_X, "h1"), (B.CELL2_X, "h2")):
         im.alpha_composite(g[f"{cell}_units_{hu}"], (x, B.HOUR_Y))
         im.alpha_composite(g[f"{cell}_tens_{ht}"], (x, B.HOUR_Y))
-    for y, tens, units, lo, hi in ((B.MIN_Y, *divmod(minute, 10), "m1", "m2"),
-                                   (B.SEC_Y, *divmod(when.second, 10), "s1", "s2")):
-        # Units first, tens second. These tiles are OPAQUE, so the later one wins, and that is the
-        # whole trick of the two-cell line: cell 1 draws the units digit and the tens glyph paints
-        # over it when there is one; cell 2 draws "<units>分" and the 分-alone tile covers it when
-        # the minute is a round ten. Drawing them the other way round renders 13 as "三 三分".
-        im.alpha_composite(g[f"{lo}_units_{units}"], (B.CELL1_X, y))
-        im.alpha_composite(g[f"{lo}_tens_{tens}"], (B.CELL1_X, y))
-        im.alpha_composite(g[f"{hi}_units_{units}"], (B.CELL2_X, y))
-        im.alpha_composite(g[f"{hi}_tens_{tens}"], (B.CELL2_X, y))
+    # The minute line is five tiles and its own order — cell 1 is tens, units, tens, and cell 2 is
+    # tens then units. Nothing crosses the seam: the tens word stays in cell 1 and the units word in
+    # cell 2, which is what lets :30 read 半 and :00 read 丁度. Drawing cell 1's三十 last would put
+    # it back at :30; drawing cell 2's units tile first would lose 丁度.
+    mt, mu = divmod(minute, 10)
+    im.alpha_composite(g[f"m1a_tens_{mt}"], (B.CELL1_X, B.MIN_Y))
+    im.alpha_composite(g[f"m1b_units_{mu}"], (B.CELL1_X, B.MIN_Y))
+    im.alpha_composite(g[f"m1c_tens_{mt}"], (B.CELL1_X, B.MIN_Y))
+    im.alpha_composite(g[f"m2a_tens_{mt}"], (B.CELL2_X, B.MIN_Y))
+    im.alpha_composite(g[f"m2b_units_{mu}"], (B.CELL2_X, B.MIN_Y))
+
+    # The seconds keep the older two-cell scheme, where the digit hops into cell 1 when there is no
+    # tens digit so that 七秒 stays centred. Units first, tens second: these tiles are OPAQUE, so
+    # the later one wins — cell 1's tens glyph paints over its units digit, and cell 2's 秒-alone
+    # tile covers "<units>秒" on a round ten. The other order renders 13 as "三 三秒".
+    st, su = divmod(when.second, 10)
+    im.alpha_composite(g[f"s1_units_{su}"], (B.CELL1_X, B.SEC_Y))
+    im.alpha_composite(g[f"s1_tens_{st}"], (B.CELL1_X, B.SEC_Y))
+    im.alpha_composite(g[f"s2_units_{su}"], (B.CELL2_X, B.SEC_Y))
+    im.alpha_composite(g[f"s2_tens_{st}"], (B.CELL2_X, B.SEC_Y))
     # The date row, drawn in the element order the band uses — month, then the day's two cells
     # units-before-tens, then the weekday. Each cell has its OWN x: sharing the minute line's cells
     # put the day under the month, which is what the first render of this did.
