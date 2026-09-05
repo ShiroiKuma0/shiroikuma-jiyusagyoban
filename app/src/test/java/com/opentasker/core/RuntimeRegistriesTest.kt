@@ -97,6 +97,11 @@ class RuntimeRegistriesTest {
         )
         assertFieldKeys("app.pickmulti", "variable", "title", "separator", "include_self", "timeout")
         assertFieldKeys("tasks.launchers", "project", "group", "suffix", "timeout")
+        assertFieldKeys("tasks.freezebubbles", "project", "group", "title", "timeout")
+        assertFieldKeys(
+            "backup.export",
+            "package", "dir", "basename", "path", "items", "token", "progress_action", "timeout", "store", "preempt",
+        )
 
         // Every extra slot can be typed, not just the first — an inconsistent form is its own trap.
         val intentFields = ActionMetadataRegistry.get("intent.send")!!.fields.map { it.key }
