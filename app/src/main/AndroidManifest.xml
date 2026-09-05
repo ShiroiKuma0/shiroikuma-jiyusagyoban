@@ -317,6 +317,17 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The band's clock, as a window: a calendar, a dial and a switch for the phone's own
+             time. Opened by huawei.time with pick=true, so one task both sets and resets. -->
+        <activity
+            android:name="com.opentasker.ui.charts.huawei.HuaweiBandClockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".bandclock"
+            android:label="バンドの時計"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker.Dialog" />
+
         <activity
             android:name="com.opentasker.ui.charts.huawei.HuaweiFacesActivity"
             android:exported="false"
