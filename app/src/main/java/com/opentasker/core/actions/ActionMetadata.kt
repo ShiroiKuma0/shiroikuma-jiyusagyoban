@@ -2383,6 +2383,43 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "backup.export",
+            name = "Backup Through The Door",
+            description = "Export a sister app through its automation provider: we open the file, it writes into our descriptor — so the app needs no storage permission.",
+            category = "App",
+            fields = listOf(
+                ActionField("package", "Package", required = true, hint = "the app to export, e.g. shiroikuma.mise"),
+                ActionField("dir", "Directory", hint = "where to write; the name becomes <basename>_<yyyy-MM-dd_HH-mm-ss>.zip"),
+                ActionField("basename", "File basename", hint = "default: shiroikuma-<last segment of the package>"),
+                ActionField("path", "Full path", hint = "overrides Directory/basename when set"),
+                ActionField("items", "Items", hint = "comma-separated category ids; empty = the app's default set"),
+                ActionField("token", "Token", hint = "only if that app asks for one; passed but ignored when it does not"),
+                ActionField("progress_action", "Progress action", hint = "broadcast action for progress lines, e.g. %BR_PROGRESS"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "default 600"),
+                ActionField("store", "Store prefix", hint = "writes <p>_line, <p>_ok, <p>_path, <p>_bytes, <p>_job (default: bk)"),
+                ActionField("preempt", "Foreground allowance", FieldType.DROPDOWN, options = listOf("", "false"),
+                    hint = "default grants the app a TEMPORARY power allowance so its service may start; false skips it"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "tasks.freezebubbles",
+            name = "Pick Freeze Bubbles",
+            description = "Tick which launcher tasks pop a re-freeze bubble on the Desktop (the ones already on are pre-ticked and shown first).",
+            category = "App",
+            fields = listOf(
+                ActionField("project", "Project", hint = "narrow the list to this project; empty = every project"),
+                ActionField("group", "Group", hint = "narrow it further to this Tasks-tab group; empty = the whole project"),
+                ActionField("title", "Title", hint = "dialog title (default: Freeze bubbles)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "app.pickmulti",
             name = "Pick Apps → Variable",
             description = "Multi-select apps (the variable's current packages pre-ticked and shown first); write the chosen packages back to the variable.",

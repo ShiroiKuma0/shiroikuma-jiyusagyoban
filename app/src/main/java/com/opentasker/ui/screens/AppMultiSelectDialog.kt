@@ -131,7 +131,11 @@ private object AppPickerPrefs {
  *    that no longer resolves would otherwise be impossible to see or untick, yet still be written back.
  *
  * [restrictPackages] non-null limits the grid to exactly those packages (own package included —
- * needed when the caller's list contains this app itself). [singleSelect] turns the grid into a
+ * needed when the caller's list contains this app itself). [showMissingRestricted] extends the
+ * stand-in rule into that restricted grid: a package in the caller's list that the platform cannot
+ * resolve — uninstalled since the task naming it was made — still gets a tile labelled by its id,
+ * because the caller vouched for it and a ticked tile nobody can reach is a setting nobody can
+ * clear. [singleSelect] turns the grid into a
  * one-tap chooser: tapping a tile confirms that single app immediately (no OK button).
  * [includeSelf] keeps THIS app in an unrestricted grid — normally hidden (a task can't sensibly
  * blacklist its own app), but a backup-target list must be able to include 自由作業盤 itself.
@@ -142,6 +146,7 @@ internal fun AppMultiSelectDialog(
     title: String,
     preselected: Set<String> = emptySet(),
     restrictPackages: Set<String>? = null,
+    showMissingRestricted: Boolean = false,
     singleSelect: Boolean = false,
     includeSelf: Boolean = false,
     onConfirm: (List<Pair<String, String>>) -> Unit,
@@ -219,6 +224,15 @@ internal fun AppMultiSelectDialog(
             // as soon as the real entry appears (flipping the system switch reveals many of them).
             extras.removeAll { it.pkg in byPkg }
             selected.keys.forEach { pkg ->
+                if (pkg !in byPkg && extras.none { it.pkg == pkg }) extras.add(PickableApp(pkg, pkg))
+            }
+        } else if (showMissingRestricted) {
+            // Same reasoning, one step earlier: in a restricted grid the caller already named the
+            // packages, so one the platform cannot resolve (uninstalled since its task was written)
+            // is listed by id rather than dropped — otherwise it stays ticked, is written back on OK,
+            // and cannot be reached to untick.
+            extras.removeAll { it.pkg in byPkg }
+            restrictPackages.forEach { pkg ->
                 if (pkg !in byPkg && extras.none { it.pkg == pkg }) extras.add(PickableApp(pkg, pkg))
             }
         }
