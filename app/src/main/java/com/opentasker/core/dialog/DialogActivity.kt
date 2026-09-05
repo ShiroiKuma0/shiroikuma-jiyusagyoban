@@ -106,6 +106,12 @@ class DialogActivity : ComponentActivity() {
                         onPick = { index -> settle(DialogOutcome.Confirmed(items[index], index)) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_APP_MULTISELECT -> AppMultiSelectDialog(title, preselected,
+                        // Absent/blank = the full user-app grid; a list restricts it to exactly those
+                        // packages (tasks.freezebubbles shows its launcher tasks and nothing else).
+                        restrictPackages = intent.getStringExtra(EXTRA_PACKAGES).orEmpty()
+                            .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                            .takeIf { it.isNotEmpty() },
+                        showMissingRestricted = intent.getBooleanExtra(EXTRA_SHOW_MISSING, false),
                         includeSelf = intent.getBooleanExtra(EXTRA_INCLUDE_SELF, false),
                         onConfirm = { picked ->
                             // One app per line, "<package>\t<label>".
@@ -115,8 +121,12 @@ class DialogActivity : ComponentActivity() {
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_APP_SINGLESELECT -> AppMultiSelectDialog(
                         title,
+                        // `takeIf`: an EMPTY packages list means "no restriction" (as app.pick's own
+                        // field hint promises). Passing the empty set through restricted the grid to
+                        // nothing and drew an empty picker.
                         restrictPackages = intent.getStringExtra(EXTRA_PACKAGES).orEmpty()
-                            .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                            .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                            .takeIf { it.isNotEmpty() },
                         singleSelect = true,
                         onConfirm = { picked ->
                             settle(DialogOutcome.Confirmed(picked.firstOrNull()?.first.orEmpty()))
@@ -208,6 +218,7 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_PARENTS = "parents" // optional parent ids parallel to EXTRA_ITEMS ("" = top-level)
         const val EXTRA_PACKAGES = "packages" // newline-joined package restriction for the app pickers
         const val EXTRA_INCLUDE_SELF = "include_self" // keep this app in an unrestricted app grid
+        const val EXTRA_SHOW_MISSING = "show_missing" // restricted grid: tile a package the platform cannot resolve
         const val EXTRA_PRESELECTED = "preselected"
         const val EXTRA_INPUT_TYPE = "input_type"
         const val EXTRA_OK = "ok"

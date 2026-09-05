@@ -161,6 +161,50 @@
         <intent>
             <action android:name="com.twofortyfouram.locale.intent.action.REQUEST_QUERY" />
         </intent>
+        <!-- The 保存復元 roster, named one by one rather than reached through the MAIN/LAUNCHER
+             query above. A FROZEN app (`pm disable-user`, and 270 of them are) matches no intent
+             at all, so an intent-derived view cannot see it — and the batch thaws each app only
+             to find its automation provider still invisible to us: measured 2026-09-05 on
+             人造人間, thawed and resolving its launcher for another process while our own calls
+             answered `Unknown authority` for 30 s. An explicit <package> is not intent-derived,
+             which is the whole point. Mirrors what §2a makes every sister app do for its two
+             callers. -->
+        <package android:name="shiroikuma.raikidoban" />
+        <package android:name="shiroikuma.kabukahyoji" />
+        <package android:name="shiroikuma.hogu" />
+        <package android:name="shiroikuma.mpvkakucho" />
+        <package android:name="shiroikuma.messeji" />
+        <package android:name="shiroikuma.universalinstaller" />
+        <package android:name="shiroikuma.arcanechat" />
+        <package android:name="shiroikuma.kojiki" />
+        <package android:name="shiroikuma.ongaku" />
+        <package android:name="shiroikuma.kakutoku" />
+        <package android:name="shiroikuma.denwa" />
+        <package android:name="shiroikuma.yotehyo" />
+        <package android:name="shiroikuma.shosekietsuran" />
+        <package android:name="shiroikuma.kxkb" />
+        <package android:name="shiroikuma.rindenwa" />
+        <package android:name="shiroikuma.jiyudoga" />
+        <package android:name="shiroikuma.memo" />
+        <package android:name="shiroikuma.kako" />
+        <package android:name="shiroikuma.simplex" />
+        <package android:name="shiroikuma.kuchusen" />
+        <package android:name="shiroikuma.shoruikanri" />
+        <package android:name="shiroikuma.kagiango" />
+        <package android:name="shiroikuma.nekokan" />
+        <package android:name="shiroikuma.anki" />
+        <package android:name="shiroikuma.mahojutan" />
+        <package android:name="shiroikuma.shutokukanri" />
+        <package android:name="shiroikuma.fairemail" />
+        <package android:name="shiroikuma.handyrss" />
+        <package android:name="shiroikuma.gauguin" />
+        <package android:name="shiroikuma.jinsoningen" />
+        <package android:name="shiroikuma.jisho" />
+        <package android:name="shiroikuma.mise" />
+        <package android:name="shiroikuma.ongakuots" />
+        <package android:name="shiroikuma.renketsujoka" />
+        <package android:name="shiroikuma.sokki" />
+        <package android:name="shiroikuma.tenki" />
     </queries>
 
     <application
