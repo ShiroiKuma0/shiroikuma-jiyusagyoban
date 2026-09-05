@@ -24,6 +24,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionSummaryFormatter
@@ -75,7 +78,14 @@ internal fun PreflightReviewDialog(
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(report.title, style = MaterialTheme.typography.titleMedium)
+                // Re-running a preflight replaces the report in place. The title is its summary
+                // line, so announcing just that says the run finished and how it went, without
+                // reading the whole report back.
+                Text(
+                    report.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
                 Text(stringResource(R.string.preflight_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
                     value = syntheticVariables,

@@ -79,6 +79,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.displayLabel
+import com.opentasker.ui.utils.expandCollapseToggle
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -230,7 +231,7 @@ private fun RunLogRetentionCard(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth().expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {

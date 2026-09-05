@@ -1,7 +1,6 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +55,7 @@ import com.opentasker.core.scenes.SceneIssue
 import com.opentasker.core.scenes.SceneIssueSeverity
 import com.opentasker.core.scenes.SceneValidator
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.utils.expandCollapseToggle
 
 @Composable
 internal fun SceneEmptyState(
@@ -180,7 +180,7 @@ internal fun SceneCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(
-                modifier = Modifier.clickable { expanded = !expanded },
+                modifier = Modifier.expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md),
             ) {

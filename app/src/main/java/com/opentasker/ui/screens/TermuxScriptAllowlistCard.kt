@@ -1,7 +1,6 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +40,7 @@ import com.opentasker.core.scripting.TermuxAllowlistSaveResult
 import com.opentasker.core.scripting.TermuxScriptAllowlistStore
 import com.opentasker.core.scripting.TermuxScriptPolicy
 import com.opentasker.core.scripting.ApprovedTermuxScript
+import com.opentasker.ui.utils.expandCollapseToggle
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,7 +73,7 @@ internal fun TermuxScriptAllowlistCard(onMessage: (String) -> Unit) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth().expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {

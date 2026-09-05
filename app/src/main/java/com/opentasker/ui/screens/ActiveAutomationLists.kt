@@ -3,7 +3,6 @@ package com.opentasker.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +81,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.ui.theme.DesignSystem
+import com.opentasker.ui.utils.expandCollapseToggle
 @Composable
 internal fun ProfilesScreen(
     profiles: List<Profile>,
@@ -376,7 +376,7 @@ private fun ProfileCard(
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
-                modifier = Modifier.clickable { expanded = !expanded },
+                modifier = Modifier.expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {
@@ -597,7 +597,7 @@ private fun TaskCard(
     ) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             Row(
-                modifier = Modifier.clickable { expanded = !expanded },
+                modifier = Modifier.expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
             ) {

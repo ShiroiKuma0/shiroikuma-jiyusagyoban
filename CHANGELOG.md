@@ -12,6 +12,15 @@
   a release asset also verifies the APK really carries a signature, so an
   unsigned build cannot reach a release page under the published filename.
 
+### Fixed
+
+- Cards that open and close a section now tell a screen reader what they are
+  and whether the section is already open. Seven of them, across Setup, the run
+  log, the Inspector, the scene library and both automation lists, previously
+  said only "double tap to activate", with the same words whether the next tap
+  opened or closed. Finishing a backup, an import or a preflight is also spoken
+  now instead of changing silently on screen.
+
 ### Added
 
 - Importing from Tasker now understands three more of its actions. HTTP Request

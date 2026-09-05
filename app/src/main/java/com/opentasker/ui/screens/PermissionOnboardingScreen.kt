@@ -19,7 +19,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
@@ -79,6 +78,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -141,6 +142,7 @@ import com.opentasker.core.updates.UpdateCheckAvailability
 import com.opentasker.core.updates.UpdateCheckSettings
 import com.opentasker.core.updates.UpdateCheckState
 import com.opentasker.core.updates.UpdateCheckWorker
+import com.opentasker.ui.utils.expandCollapseToggle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1405,7 +1407,7 @@ private fun BackupSetupCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                modifier = Modifier.fillMaxWidth().expandCollapseToggle(expanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -1503,7 +1505,12 @@ private fun BackupStateBanner(state: BackupSetupState) {
         else -> stringResource(R.string.setup_backup_none_body)
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        // This banner is how a finished backup or a staged restore reports itself. It replaces its
+        // own text with no focus change, so without a live region a screen-reader user is told
+        // nothing when the work they started completes.
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
         color = color.copy(alpha = 0.12f),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.26f)),

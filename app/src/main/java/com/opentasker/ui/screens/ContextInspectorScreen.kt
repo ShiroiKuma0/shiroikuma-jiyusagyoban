@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,6 +92,7 @@ import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.StorageDecodeIssue
+import com.opentasker.ui.utils.expandCollapseToggle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -677,7 +677,7 @@ private fun ProfileInspectorCard(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { lintExpanded = !lintExpanded },
+                                .expandCollapseToggle(lintExpanded) { lintExpanded = !lintExpanded },
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {

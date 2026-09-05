@@ -21,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
@@ -537,7 +540,11 @@ private fun TaskerImportListSection(
 internal fun TransferProgressRow(progress: TransferProgress?) {
     if (progress == null) return
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        // The stage label is the only thing that reports an import or export moving from one step
+        // to the next, and it changes in place without moving focus.
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs),
     ) {
         Text(
