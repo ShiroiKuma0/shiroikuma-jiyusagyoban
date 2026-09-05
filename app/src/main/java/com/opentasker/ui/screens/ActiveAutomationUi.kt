@@ -1233,6 +1233,7 @@ fun ActiveAutomationUi(
                 onDeleteAction = { task, index ->
                     if (task.actions.getOrNull(index) != null) openDeleteAction(task, index)
                 },
+                onRunAction = viewModel::runActionNow,
                 onApplyActions = { task, newActions ->
                     viewModel.updateTask(task.copy(actions = newActions), "Actions updated")
                 },

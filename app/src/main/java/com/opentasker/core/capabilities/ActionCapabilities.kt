@@ -62,7 +62,6 @@ object ActionCapabilityRegistry {
             CapabilityLevel.RequiresSetup,
             "Global and Secure need WRITE_SECURE_SETTINGS, granted once over ADB; System uses Write Settings.",
         ),
-        "app.kill" to ActionCapability(CapabilityLevel.Unsupported, "Force-stopping another app requires privileged app-management access that no normal app can hold."),
         "volume.set" to volumeCapability("May be blocked by Do Not Disturb policy access."),
         "dnd.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Do Not Disturb access.", CapabilityRequirement.Dnd),
         "ringer.set" to ActionCapability(CapabilityLevel.RequiresSetup, "May require Do Not Disturb access on some devices when switching to silent mode."),
