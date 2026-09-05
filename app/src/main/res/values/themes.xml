@@ -8,4 +8,24 @@
     <style name="Theme.OpenTasker" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
+
+    <!--
+        A floating window for the small settings that are one control and a button. 「バンドの時計」
+        is a switch, a dial and a Set: given a whole page it left the dial stranded at the top of a
+        field of black and read as a stray widget rather than as a thing being set (白い熊,
+        2026-09-05). Floating centres it and dims what is behind, which is what says "answer me".
+
+        The minimum widths are not decoration. A floating window defaults to the platform's dialog
+        width, and the clock dial wants 256dp before its padding — the same 320dp cap that squeezes
+        a WRAP_CONTENT overlay would squeeze this.
+    -->
+    <style name="Theme.OpenTasker.Dialog" parent="android:Theme.Material.Dialog.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowMinWidthMajor">78%</item>
+        <item name="android:windowMinWidthMinor">94%</item>
+    </style>
 </resources>
