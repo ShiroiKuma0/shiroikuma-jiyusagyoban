@@ -99,9 +99,18 @@ class LauncherIconContractTest {
         // the stock media-play triangle. Matching only the call that broke first would have kept
         // missing the second, so this bans the reference outright. There are legitimately zero of
         // them, and the app ships its own glyph for every surface that needs one.
+        // Two fork surfaces reference the framework set deliberately, and both are named rather
+        // than pattern-matched so a third one is still a decision somebody writes down.
+        val deliberate = mapOf(
+            "app/src/main/java/com/opentasker/ui/screens/FrameworkIconPickerDialog.kt" to
+                "the fork's icon picker exists to offer a curated android.R.drawable subset",
+            "app/src/main/java/com/opentasker/core/bubbles/FlashBubbleOverlayManager.kt" to
+                "sym_def_app_icon is the placeholder for an app whose own icon cannot be loaded",
+        )
         val kotlinOffenders = ProductionSources.allKotlinFiles()
             .filter { path -> "android.R.drawable" in path.readText() }
             .map(::relative)
+            .filterNot { it in deliberate }
 
         val resourceOffenders = Files.walk(file("app/src/main/res")).use { paths ->
             paths.filter { path -> Files.isRegularFile(path) && path.toString().endsWith(".xml") }
