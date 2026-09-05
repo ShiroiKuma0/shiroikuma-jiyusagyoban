@@ -8,6 +8,54 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+053 — 2026-09-05
+
+Rebased onto upstream `a1b1f784` — 52 commits past the previous base, `29d06ff7`. Upstream's own
+version literal did not move, so the sha and date in the version string are what say how current
+this is.
+
+### New, from upstream
+
+- **Write Setting** (`settings.write`) — change one Android setting by name. Global and Secure need
+  `WRITE_SECURE_SETTINGS` granted once over ADB; System uses Modify system settings. The value is
+  read back after writing, so a value Android quietly ignores reports a failure instead of success.
+- **Lock** works now, and it runs on **this fork's** device admin — the one Setup already activates
+  for the **Lockdown** action. Upstream ships a second admin receiver of its own; adopting it would have put a
+  duplicate entry in Android's device-admin list and asked for a second activation for no gain.
+- **Run one action on its own**, from an action's long-press menu — to tune an HTTP call or a
+  variable write without re-running everything before it. It goes through the same execution path,
+  admission controller and run log as a whole-task manual run, and the row says which action it was.
+  Flow-control markers are never offered: an `if` without its `end if` is not a smaller program.
+- **HTTP Request can be pinned to one transport** — any, Wi-Fi, mobile data, or unmetered.
+
+### Fixed, from upstream
+
+- A **Quick Settings tile waits for unlock** before running its task.
+- A run arriving on a **cold process loads the engine** first. A notification button or an external
+  `RUN_TASK` used to bring the service up, record a healthy heartbeat and match nothing until the
+  next minute tick happened to reload it.
+- A **sub-task collision no longer cancels the task that called it** — the nested run gets its own
+  Job, so an "abort existing run" on the sub-task stops the sub-task.
+- **Wi-Fi and internet state stay visible to every rebuilt matcher.** The two families shared one
+  replay slot, so a matcher rebuilt after both had spoken saw only whichever spoke last — and a
+  profile stuck "matched" produced no exit event and never ran its exit task.
+- A **Wi-Fi network with no internet** is no longer treated as offline.
+- **Stale Bluetooth connections are forgotten** when the receiver restarts, rather than counting as
+  still-connected.
+- The **trigger ledger stopped writing to disk on the main thread**.
+- **Secrets stay out of exports.** A literal secret typed into a run-only-if guard or an action's
+  label is redacted on the way into a bundle, as it already was for action arguments.
+
+### Fork side
+
+- **The broadcast trigger stays ours.** Upstream wrote its own after this fork already had one, and
+  its matcher reads metadata keys ours does not write — merged as-is it would have refused every
+  broadcast profile in the workspace. `%INTENT_*` variables, their per-invocation threading and the
+  sister-app reply heartbeat are unchanged. The Context Inspector reports which broadcast actions
+  are registered, which is upstream's idea kept.
+- Two notification icons stopped borrowing an Android framework glyph, and the Variables disclosure
+  row now announces its role and expanded state to a screen reader.
+
 ## 0.2.93+2026-09-01.00-11.g29d06ff7+052 — 2026-09-05
 
 ### 健康 — 「バンドの時計」 becomes a dialog
