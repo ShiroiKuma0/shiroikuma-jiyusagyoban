@@ -256,10 +256,21 @@ object OpenTaskerBundleCodec {
             "Secret variables must never be serialised into a bundle: " +
                 bundle.variables.filter { it.isSecret }.joinToString { it.name }
         }
-        // Export writes the NAME-ONLY BundleFile DTO (no ids), but upstream's redaction pass runs
-        // first: it strips a literal copy of a secret out of an action's arguments, its run-only-if
-        // guard and its label before any of it reaches the file.
-        return json.encodeToString(BundleFile.fromDomain(sanitizeForExport(bundle)))
+        // Export writes the NAME-ONLY [BundleFile] (no ids), converted from the freshly-built domain
+        // bundle — and NOTHING is redacted on the way.
+        //
+        // Upstream runs sanitizeForExport() here. Composing it in (2026-09-05, the 0.2.93 sync) was a
+        // mistake, caught the same day: ExportRedactionPolicy redacts by ARGUMENT-KEY NAME, so every
+        // `param:token` and `param:token_var` in the 保存復元 wrappers became "[REDACTED]" — including
+        // the ones holding a VARIABLE NAME rather than a value. 69 tasks in one export.
+        //
+        // Upstream can afford that because its bundle is something you share. This fork's bundle is
+        // also its BACKUP: the workspace export, the bridge's EXPORT_WORKSPACE and the app-state ZIP's
+        // workspace entry all come through here, so anything dropped on the way out is gone from the
+        // only copy. Secret VARIABLES are still refused outright by the require() above, which is the
+        // protection that belongs on this path. sanitizeForExport() stays for callers that are
+        // genuinely sharing a bundle.
+        return json.encodeToString(BundleFile.fromDomain(bundle))
     }
 
     /** Applies the same field-aware policy used by diagnostic and Tasker XML serialization. */

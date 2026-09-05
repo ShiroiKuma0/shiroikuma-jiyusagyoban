@@ -13,20 +13,21 @@ import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
 import com.opentasker.core.bubbles.FreezeBubbleStore
 import com.opentasker.core.icons.TaskIconStore
-import com.opentasker.core.shizuku.ShizukuShell
+import com.opentasker.core.policy.AppFreeze
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
  * The internal handler each generated relay APK forwards into (see `core/share/relay/`). It receives
  * the relay's `ACTION_SEND`/`SEND_MULTIPLE` with `EXTRA_SHORTCUT_ID = "share_<targetpkg>"`, unfreezes
- * the target app if it is frozen (Shizuku `pm enable`), forwards the shared content to it, and drops a
- * re-freeze bubble ([FreezeBubbleStore]) so the app can be frozen again from the Desktop.
+ * the target app if it is frozen ([AppFreeze.thaw], which clears the disabled and both suspension
+ * slots), forwards the shared content to it, and drops a re-freeze bubble ([FreezeBubbleStore]) so the
+ * app can be frozen again from the Desktop.
  *
  * Exported (no permission) so a relay — a separately-signed app — can call it by explicit component;
  * it has no SEND intent-filter, so the main app itself is not a share-sheet tile (only the relays are).
@@ -60,25 +61,19 @@ class ShareForwardActivity : Activity() {
             val entry = ShareRelayStore.find(pkg)
             val label = entry?.label ?: appLabel(pkg)
             val iconPath = entry?.iconPath ?: TaskIconStore.saveFromApp(pkg)
-            val frozen = when (runCatching { packageManager.getApplicationEnabledSetting(pkg) }.getOrNull()) {
-                null -> {
-                    // getApplicationEnabledSetting throws for uninstalled packages.
-                    if (entry != null) ShareRelayStore.remove(pkg)
-                    toastAndFinish("$label is no longer installed"); return@launch
-                }
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED,
-                -> true
-                else -> false
+            // The same three-slot read the app.frozen action uses. Reading only the enabled state
+            // here reported a policy-suspended target as ready, and the share then forwarded into an
+            // app that could not be started at all.
+            val state = withContext(Dispatchers.IO) { AppFreeze.read(this@ShareForwardActivity, pkg) }
+            if (!state.installed) {
+                if (entry != null) ShareRelayStore.remove(pkg)
+                toastAndFinish("$label is no longer installed"); return@launch
             }
-            if (frozen) {
-                if (!ShizukuShell.available()) {
-                    toastAndFinish("$label is frozen — Shizuku unavailable"); return@launch
+            if (state.frozen) {
+                val thawed = withTimeoutOrNull(UNFREEZE_TIMEOUT_MS) {
+                    withContext(Dispatchers.IO) { AppFreeze.thaw(this@ShareForwardActivity, pkg) }
                 }
-                val exec = scope.async(Dispatchers.IO) { runCatching { ShizukuShell.exec("pm enable $pkg") } }
-                val result = withTimeoutOrNull(UNFREEZE_TIMEOUT_MS) { exec.await() }?.getOrNull()
-                if (result == null || result.exitCode != 0) {
+                if (thawed != true) {
                     toastAndFinish("Could not unfreeze $label"); return@launch
                 }
                 // Re-freeze reminder — only when WE unfroze it; an already-running app stays as-is.
