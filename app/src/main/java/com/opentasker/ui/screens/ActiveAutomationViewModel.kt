@@ -13,7 +13,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.diagnostics.DiagnosticExport
+import com.opentasker.core.actions.ActionMetadataRegistry
+import com.opentasker.core.engine.ExecutionAdmissionRegistry
 import com.opentasker.core.engine.HeldExecutionPayloadCodec
+import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.location.LocationDwellStateStore
@@ -965,12 +968,10 @@ class ActiveAutomationViewModel(
                 val report = DiagnosticExport.buildReport(appContext, db)
                 val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                     ?: throw IllegalStateException("Clipboard service is unavailable")
-                clipboard.setPrimaryClip(
-                    ClipData.newPlainText(appContext.getString(R.string.diagnostics_copy), report),
-                )
-                events.send(message(R.string.ui_message_diagnostics_copied))
+                clipboard.setPrimaryClip(ClipData.newPlainText("白い熊 自由作業盤 Diagnostic Report", report))
+                events.send("Diagnostic report copied to the clipboard.")
             } catch (ex: Exception) {
-                events.send(errorMessage(ex, R.string.ui_error_copy_diagnostics))
+                events.send("Error: ${ex.message ?: "Failed to copy the diagnostic report"}")
             }
         }
     }
@@ -1004,6 +1005,43 @@ class ActiveAutomationViewModel(
      * in flight, or the other way round. The consume already defeats two taps on the *same* row; the
      * flag is what stops two *different* one-shot runs from overlapping.
      */
+    /**
+     * Runs one action of [task] on its own, so tuning an HTTP call or a variable write does not mean
+     * re-running everything before it.
+     *
+     * It goes through the same execution path as a whole-task manual run, against the engine's live
+     * admission controller, so limits, the collision policy and the run log all behave as they do for
+     * a real run. Flow-control markers are refused: the menu does not offer them, and
+     * [SingleActionRun.taskFor] refuses them again in case a stale index arrives.
+     */
+    fun runActionNow(task: Task, index: Int) {
+        viewModelScope.launch {
+            if (_runActionBusy.value) { events.send("A run is already in flight."); return@launch }
+            val single = SingleActionRun.taskFor(task, index) ?: return@launch
+            val action = single.actions.first()
+            val label = action.label?.takeIf { it.isNotBlank() }
+                ?: ActionMetadataRegistry.get(action.type)?.name
+                ?: action.type
+            _runActionBusy.value = true
+            // finally, not a trailing assignment: executeAndLogTask is not wrapped in a runCatching
+            // here, so a throw would otherwise leave the flag standing and disable Run for the rest
+            // of the process.
+            try {
+                val result = executeAndLogTask(
+                    appContext = appContext,
+                    db = db,
+                    task = single,
+                    source = SingleActionRun.sourceFor(label),
+                    admissionController = ExecutionAdmissionRegistry.current(appContext),
+                )
+                val status = if (result.report.success) "succeeded" else "failed"
+                events.send("$label $status (${result.report.durationMs}ms)")
+            } finally {
+                _runActionBusy.value = false
+            }
+        }
+    }
+
     fun replayHeldRun(entry: RunLogEntry) {
         viewModelScope.launch {
             if (_runActionBusy.value) return@launch
@@ -1046,7 +1084,7 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            if (_runActionBusy.value) { events.send(message(R.string.ui_message_run_busy)); return@launch }
+            if (_runActionBusy.value) { events.send("A run is already in flight."); return@launch }
             _runActionBusy.value = true
             // finally, not a plain trailing assignment: executeAndLogTask is not wrapped in a
             // runCatching here, so a throw would otherwise leave the flag standing and disable
