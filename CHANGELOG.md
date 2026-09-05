@@ -8,6 +8,40 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-01.00-11.g29d06ff7+043 — 2026-09-05
+
+### 保存復元 — a repair button for a refused foreground start
+
+- A sister app whose export cannot start its foreground service now answers the reserved key
+  `ERROR:no-foreground-start`, and the failed row offers **「電池最適化を除外」** — the same
+  grant → back → 保存し直す repair that `ERROR:no-storage-access` already earned.
+- **The key is matched alone, never on exception text.** An app that catches `Throwable` and emits it
+  unconditionally is the easy implementation and the one that produces a button which cannot help: on
+  this phone a refused start is just as likely to be アプリ起動管理 on 自動管理, which no app can set
+  for itself. Every other start failure keeps a descriptive line and no button.
+- The opener falls back to the app's own details page, since EMUI keeps the per-app control there.
+
+### 保存復元 — the nine apps the roster was missing
+
+- The door was implemented in 42 apps and the roster held 33, so nine were reachable in principle and
+  had **never once been exercised**: gauguin, jinsoningen, jisho, mise, ongakuots, renketsujoka,
+  shizuku, sokki, tenki. Each gains a wrapper, its `BR_Token_`/`BR_Items_` pair in 01, an `itemMeta`
+  row, and an entry in `BR_Apps`, which goes from 33 to 42.
+- **保存中核 loses its two v1 token guards.** It refused an empty token before ever contacting the
+  app, and a second branch overrode every specific failure reason with "token not set" whenever the
+  token was blank. Under v2 the token is opt-in and blank by design, so both fired on the normal
+  case. Running the nine cold is what surfaced a four-site foreground-start defect across the family.
+
+### The sister-app contract
+
+- Four foreground-start sites rather than one, with both services their own site; the three-step
+  ordering that satisfies foreground-first and reply-address-first at once; a `finally` is not a
+  `catch`; grep for both `startForegroundService` and `startForeground(`; the reserved key's two
+  emission conditions; `requires_permissions` must never list `MANAGE_EXTERNAL_STORAGE`; an import
+  may not silently weaken another surface; and a revision stamp, because a chat reads this file once
+  and then holds a stale copy for hours.
+
+
 ## 0.2.93+2026-09-01.00-11.g29d06ff7+042 — 2026-09-04
 
 Built on upstream `0.2.93` (`g29d06ff7`, 2026-09-01), unchanged from the previous release — the whole
