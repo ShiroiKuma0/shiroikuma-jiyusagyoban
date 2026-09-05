@@ -1,6 +1,6 @@
 # Sister-app contract v2 — automation, and app data that survives a clean phone
 
-> ## ⟳ REVISION 2026-09-05 08:05 — re-read before quoting this file
+> ## ⟳ REVISION 2026-09-05 08:19 — re-read before quoting this file
 >
 > **This document is corrected in place, several times a day, while sister chats are working from
 > it.** If you read it earlier in your session you are holding a snapshot, and nothing will tell you
@@ -10,6 +10,11 @@
 > diagnosed this and asked for the stamp.)
 >
 > **Corrections since the rollout began**, newest first — if your copy lacks one, it is stale:
+> - **§2a the job id** — the **callee** mints it and the `OK:<job_id>` return value is the
+>   correlation key; a caller's own `job_id` extra is advisory (and on `cancel` only, is not).
+>   A terminal reply can also arrive **before `call()` returns**.
+> - **§2a import must not weaken another surface** — the check is **callee-side, at the write**:
+>   the caller supplies provenance, never judgment.
 > - **§1 foreground start** — FOUR start sites, not one (was three); the reserved `ERROR:no-foreground-start`
 >   key and its two emission conditions; the verification traps.
 > - **§2a import must not weaken another surface** — restore a security-relevant preference only
@@ -691,6 +696,35 @@ string in the same `OK:` / `ERROR:` grammar as §1, so a caller has one vocabula
 Extras in: `fd` (`ParcelFileDescriptor`, required for export/import), `token` (optional — see §2),
 `items`, `job_id`, `reply_action`, `reply_package`, `progress_action`.
 
+**The callee mints the job id, and `OK:<job_id>` is the correlation key.** This is the one place
+§2a inverts §1, and the inversion is easy to carry straight past: §1's `reply_id` is minted by the
+*caller* and echoed back verbatim, while `export`/`import` mint their own id — the reference
+implementation does it in the provider (`AutomationJobs.begin()`), hands it back as the return value
+of `call()`, and broadcasts the terminal reply and every progress line under **that** id. Five
+callees were checked against this during the rollout (`ArcaneChat`, `人造人間`, `天気`, `麹菌`,
+`メモ`) and all five mint their own. So:
+
+- **Callee:** mint the id, return it in `OK:`, use it in every reply and every progress line. A
+  `job_id` extra arriving on `export`/`import` is **advisory** — you may adopt it, but the id you
+  return in `OK:` is what the caller correlates on, so return the one you actually use. On `cancel`
+  the `job_id` extra is not advisory: it names an id you handed out earlier.
+- **Caller:** correlate on the id the `OK:` payload returned, **never on one you invented**. Sending
+  your own is permitted and means nothing; a callee that ignores it is behaving correctly.
+- **Caller:** a terminal reply can arrive **before `call()` returns.** A small export finishes on the
+  service thread while the binder call is still unwinding, so a caller that starts correlating only
+  afterwards drops the completion of exactly the fastest jobs. Hold unclaimed terminal replies in a
+  map keyed by job id and check it once the `OK:` is in hand.
+
+**What the ambiguity cost.** 応用管理 invented a UUID, sent it as `job_id` and filtered incoming
+replies on it. Every callee answered under its own id, so every reply failed the correlation and was
+dropped: a 22 MB `ArcaneChat` export that had **already completed on disk** sat on the app-supplied
+data stage until the two-minute silence watchdog fired and reported 「Could not backup」. The door,
+the service and the reply broadcast were all working — the only fault was the correlation key. Fixed
+caller-side in 応用管理 `4.1.0+2026-06-29.21-57.gfc1e7007+116` (2026-09-05), which now adopts the
+returned id, still accepts its own, and holds early terminal replies in an unclaimed map. Ours was
+the only implementation that got this wrong, and nothing in v2's wording forced the point — which is
+why it is spelled out here rather than left to the table above.
+
 **Never degrade to an implicit broadcast. `setPackage(replyPackage.ifEmpty { null })` is the bug.**
 Three repos shipped exactly that line — `shiroikuma-denwa`, `shiroikuma-rindenwa`,
 `shiroikuma-yotehyo` — and it reads as defensive when it is the opposite: passing `null` to
@@ -923,6 +957,22 @@ as the one already on the device, or it must leave it alone and say so in the re
 loosen. If your app has such a preference, name it in your `describe` `contains` string so 白い熊 can
 see what a restore would touch before choosing to run one. (`shiroikuma-mise` raised the shape;
 白い熊 ruled it a real concern rather than a hypothetical.)
+
+**The check lives in the callee, at the write — not in 応用管理.** 応用管理 argued the placement and
+it holds (2026-09-05): only the app that owns a preference knows which of its preferences are
+security-relevant, so a caller-side allowlist would have to encode the security semantics of
+forty-two apps and be re-checked whenever any of them added a setting — and the day it fell behind
+it would fail **silently and permissively**. The caller is also not always 応用管理: an archive is a
+file and can be handed back by anything, so a check that lives in the caller is a check that can be
+walked around. What the caller contributes is **provenance, not judgment** — 応用管理 checksums and
+encrypts both app-data members with everything else in the archive and verifies them before restore,
+which says where an archive came from and nothing about what a value inside it means.
+
+**The same gap exists in 応用管理's own settings backup, and is not built.** Its
+`SettingsBackupManager` replays every `shared_prefs/*.xml` wholesale; `EXCLUDED_PREFS` drops whole
+files that must never travel, but there is no per-key rule and no tighten-only asymmetry, and it
+does carry security-relevant preferences of its own (installer verification, tracker blocking).
+Raised by 応用管理 2026-09-05, awaiting 白い熊.
 
 **応用管理 is deliberately NOT a callee.** It has no `.automation` provider and will not get one
 (白い熊, 2026-09-05) — it speaks this contract as a client only. Do not expect a door there, and do
