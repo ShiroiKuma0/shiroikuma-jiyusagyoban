@@ -8,6 +8,107 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-01.00-11.g29d06ff7+050 — 2026-09-05
+
+### 保存復元 — the roster goes through the door
+
+- The workspace's **保存中核** — the shared core every 「保存 ⇨ `<pkg>`」 wrapper calls — now exports
+  through the **door first**, keeping §1 as the fallback, rather than speaking §1 only. Two smaller
+  changes make that work: the `LIST_CATEGORIES` pre-flight is **no longer fatal in save mode** (a
+  silent §1 receiver must not prevent a save the door can complete; the two modes that genuinely need
+  the category list still treat it as fatal), and the archive name is derived from the package.
+- **All nine apps that had never once produced a backup now export through their own roster wrapper**
+  — gauguin, 人造人間, 辞書, 蜜, ongakuots, renketsujoka, shizuku, sokki, 天気 — including 辞書's
+  1.17 GB archive, and 人造人間, which is thawed and re-frozen around the export.
+- `backup.export` also reports a **display size** (`<store>_size`) in §1's grammar, so a row in the
+  progress panel reads the same whichever transport wrote it.
+- **Storage grants are untouched.** An app that exports *directly* still needs one; the door is the
+  second way in and needs none. The two paths are not alternatives to each other (白い熊, 2026-09-05).
+- `<queries>` now names all 42 roster packages explicitly (shipped +049). A frozen app matches no
+  intent, so an intent-derived view cannot see it — the same reason §2a makes every sister app name
+  its two callers one by one.
+
+## 0.2.93+2026-09-01.00-11.g29d06ff7+047 — 2026-09-05
+
+### 保存復元 — a just-thawed app's door is waited for
+
+- `backup.export` retries an *Unknown authority* answer (six attempts, backing off) instead of
+  failing at once. A package the batch has just thawed does not become visible the instant
+  `pm enable` returns — its provider is republished and our own package-visibility view catches up a
+  moment later. Measured on 人造人間: thawed by the task and still unreachable 3 s later, while a
+  probe from another process at that same moment was answered correctly. Every other failure still
+  returns immediately, since there is nothing to wait for.
+
+## 0.2.93+2026-09-01.00-11.g29d06ff7+046 — 2026-09-05
+
+### 保存復元 — the archive is checked by content, not by its name
+
+- `backup.export` now writes **straight to the final name** and proves the result by reading the end
+  of the file: a complete ZIP ends with the end-of-central-directory record `50 4b 05 06`, the same
+  signature §1 of the contract names. The `.part`-then-rename dance it replaces looked safer and was
+  not — `File.renameTo` on the emulated volume **failed persistently** for 辞書's 1.17 GB archive
+  (measured, ten retries over 16 s), which would have discarded a finished backup over its name.
+- The content check is the stronger guarantee in any case: it catches a callee that reports success
+  over a **truncated** archive, which no rename could ever notice.
+
+## 0.2.93+2026-09-01.00-11.g29d06ff7+045 — 2026-09-05
+
+### 保存復元 — back up through the door, so no app needs storage access
+
+- New action **Backup Through The Door** (`backup.export`): calls a sister app's §2a automation
+  provider with a `ParcelFileDescriptor` **we** open, so the app writes into our file and needs no
+  storage permission of its own. `ERROR:no-storage-access` cannot arise on this path — that refusal
+  only exists because §1 hands the app a *path* and asks it to write there itself. Demanding the
+  All-Files grant app by app was wrong (白い熊, 2026-09-05).
+- **The foreground-start refusal is pre-empted, not reported.** Measured across the nine roster apps:
+  a background broadcast means `startForegroundService` is refused unless the app has a recent
+  foreground allowance — gauguin answered the reserved `ERROR:no-foreground-start`, tenki answered
+  the raw platform exception, and **jinsoningen, mise, ongakuots and sokki died without replying at
+  all**, which reads as "no receiver" and is nothing of the kind. Proof: mise, launched to the
+  foreground first, exported in **224 ms**. So the action grants the target a **temporary** power
+  allowance (`cmd deviceidle tempwhitelist` through Shizuku) for the length of the call. Temporary on
+  purpose — it expires by itself, so a crash cannot leave a permanent battery-optimisation exemption
+  behind. 応用管理 pre-empts the same refusal the same way.
+- The caller half follows §2a as written: it correlates on the **job id the callee returns**, parks a
+  terminal reply that arrives before `call()` returns, writes to `<name>.part` and renames only on
+  success, and cancels the job if it times out rather than leaving an export writing into a
+  descriptor nobody waits on.
+
+## 0.2.93+2026-09-01.00-11.g29d06ff7+044 — 2026-09-05
+
+### 凍結融解 — tick the freeze bubbles from one grid
+
+- New action **Pick Freeze Bubbles** (`tasks.freezebubbles`), the companion to **Make Launcher
+  Tasks**: it shows the same icon grid over the launcher tasks that already exist — every app whose
+  bubble is **on pre-ticked and listed first**, every other launcher task in scope unticked below —
+  and writes the ticks straight back to each task's `freezeBubble` flag. One pass turns bubbles off
+  for apps that no longer want them and on for apps that newly do, without opening a task card.
+- `project` and `group` narrow the list (both = that group, project alone = the whole project,
+  neither = every task). **A task currently showing a bubble is listed whatever the scope**: the
+  point of the picker is to be able to switch one off, and a scope that hid it would leave it ticked
+  and unreachable.
+- **Unticking also drops the bubble already queued.** The flag governs only the next run, so a
+  bubble enqueued earlier would keep drawing on the Desktop until tapped — which reads as the switch
+  not having worked.
+- The rule for *which* app a freeze-enabled task acts on (`app.launch` first, then `app.unfreeze`,
+  expanded, `%var` dropped) now lives in one place, `FreezeBubbleTarget`, called by both the engine's
+  enqueue and the picker. Two copies would have meant a grid that offers apps no bubble appears for.
+
+### The app picker — two fixes found on the way
+
+- A **restricted** grid can now show a package the platform cannot resolve — uninstalled since the
+  task naming it was written — as a stand-in tile labelled by its id. Without it such an app stays
+  ticked, is written back on OK, and can never be reached to untick. The unrestricted grid has always
+  done this; the restricted one skipped it.
+- **`app.pick` with an empty Packages field drew an empty grid.** Its own field hint promises
+  "empty = all user apps", but the empty set was passed through as a restriction to nothing.
+
+### Release truth
+
+- `roomSchemaVersion` corrected 29 → 30. It has been stale since the workouts schema bump, so
+  `verifyReleaseTruth` was already failing before this change; `buildFork` does not depend on it,
+  which is why no build noticed.
+
 ## 0.2.93+2026-09-01.00-11.g29d06ff7+043 — 2026-09-05
 
 ### 保存復元 — a repair button for a refused foreground start

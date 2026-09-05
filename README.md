@@ -357,16 +357,16 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (195 registered + 10 engine-handled)
+### Actions (197 registered + 10 engine-handled)
 
-**195 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**197 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/actions/ActionCatalog.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.
 
 > Bold = added or materially extended in this fork.
 
-**App (27)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
+**App (29)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Pick Freeze Bubbles** *(tick which launcher tasks pop a re-freeze bubble; the ones already on are pre-ticked and first)* · **Backup Through The Door** *(§2a provider export onto a descriptor we open — no storage permission in the app)* · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
 
 **System (35)** — **Tap by Label** *(press a control in another app by the words on it — several candidate labels, because the caption follows the phone's language)* · **Huawei Band GNSS** *(serve the band its satellite assistance data, band-driven)* · **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
