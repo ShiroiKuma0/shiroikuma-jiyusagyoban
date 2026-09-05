@@ -1133,10 +1133,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "huawei.time",
             name = "Huawei Band clock",
-            description = "Move the band's clock, so a watch face can be looked at as it renders at some other hour. Not destructive: every session pushes the phone's time anyway, so the next connection puts it back — and this action with no arguments does that deliberately. A jump that crosses midnight can disturb the band's daily counters, so prefer the smallest move that answers the question",
+            description = "Move the band's clock, so a watch face can be looked at as it renders at some other hour. Not destructive: every session pushes the phone's time anyway, so the next connection puts it back — and this action with no arguments does that deliberately. A jump that crosses midnight can disturb the band's daily counters, so prefer the smallest move that answers the question. Tick 「Ask first」 and it opens a window with a calendar, a draggable dial and a switch for the phone's own time, which is the version worth keeping on a tile: one task that sets any time and resets",
             category = "Health",
             fields = listOf(
-                ActionField("at", "Set to", FieldType.TEXT, hint = "HH:MM today, or 'now'/blank to restore the phone's time"),
+                ActionField("at", "Set to", FieldType.TEXT, hint = "HH:MM today, YYYY-MM-DD HH:MM, a date on its own for midnight, or 'now'/blank to restore the phone's time"),
+                ActionField("pick", "Ask first", FieldType.CHECKBOX, hint = "open the picker window instead of setting anything — the date, the dial, and a switch for the phone's time"),
                 ActionField("address", "Band address", FieldType.TEXT, hint = "blank = the band's known address"),
                 ActionField("prefix", "Variable prefix", FieldType.TEXT, hint = "default HUAWEI_"),
                 ActionField("store", "Store the result in", FieldType.TEXT),
