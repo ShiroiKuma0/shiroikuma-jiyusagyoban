@@ -132,6 +132,32 @@ object HuaweiText {
         "バンドは一度に一つしか受け取らない。",
     )
 
+    // --- バンドの時計 ---------------------------------------------------------------------------
+    val clockTitle = Loc("Band clock", "バンドの時計")
+    val clockWhy = Loc(
+        "Stands the band's clock wherever a face needs looking at. Nothing is harmed: every "
+            + "connection announces the phone's time, so the real one comes back by itself.",
+        "文字盤を見たい時刻にバンドの時計を立たせる。壊れるものではない — 接続のたびに電話の時刻が"
+            + "伝わるので、本当の時刻はひとりでに戻る。",
+    )
+    val clockUseNow = Loc("The phone's time", "電話の時刻")
+    val clockDate = Loc("Date", "日付")
+    val clockChange = Loc("Change", "変える")
+    val clockOnTheHour = Loc("On the hour", "丁度")
+    val clockHalfPast = Loc("Half past", "半")
+    val clockSeconds = Loc("The seconds are sent as zero.", "秒は 〇 で送る。")
+    val clockSet = Loc("Set the band's clock", "バンドの時計を合わせる")
+    val clockSetting = Loc("Setting…", "合わせている…")
+    val clockFailed = Loc("The band did not answer.", "バンドが答えなかった。")
+    val clockPick = Loc("Use this day", "この日にする")
+    val clockCancel = Loc("Cancel", "やめる")
+    val clockMidnight = Loc(
+        "A jump across midnight can disturb the band's own daily counters, so prefer the smallest "
+            + "move that answers the question.",
+        "日をまたぐ移動は、バンドが持つその日の集計を乱すことがある。用の足りる範囲で、いちばん"
+            + "小さく動かすこと。",
+    )
+
     val sleepTitle = Loc("Last night", "昨夜の睡眠")
     /**
      * The PAGE, which is not one night.
