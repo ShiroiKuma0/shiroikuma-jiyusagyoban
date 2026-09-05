@@ -61,10 +61,11 @@ class ExpandCollapseSemanticsSourceTest {
     fun asyncResultSurfacesAnnounceThemselves() {
         // Each of these replaces its own text when work the user started finishes, without moving
         // focus, so without a live region the completion is silent.
+        // Upstream also lists its backup banner (PermissionOnboardingScreen) and PreflightReviewDialog.
+        // This fork ships neither: the backup card was replaced by its own app-state Export/Import and
+        // the preflight dialog was deleted outright, so naming them here would gate a file that is gone.
         val surfaces = mapOf(
-            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt" to "the backup banner",
             "com/opentasker/ui/screens/ImportReviewDialogs.kt" to "the import and export stage label",
-            "com/opentasker/ui/screens/PreflightReviewDialog.kt" to "the preflight report title",
         )
 
         surfaces.forEach { (path, description) ->
