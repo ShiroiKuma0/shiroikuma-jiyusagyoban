@@ -393,6 +393,60 @@ object TaskerXmlImporter {
                 ActionSpec(type = "url.open", label = "Tasker open URL", args = mapOf("url" to strings.getOrElse(0) { "" })),
             )
             "176", "screenshot", "screenshot.take" -> ActionWithLoss(ActionSpec(type = "screenshot.take", label = "Tasker screenshot"))
+            "339", "http.request" -> {
+                val byIndex = element.actionStringsByIndex()
+                val methodIndex = intsByIndex[TASKER_HTTP_METHOD_ARG]
+                val method = methodIndex?.let(TASKER_HTTP_METHODS::get)
+                val skipped = listOfNotNull(
+                    byIndex[TASKER_HTTP_QUERY_ARG].orEmptyIfBlank()?.let { "query parameters" },
+                    byIndex[TASKER_HTTP_FILE_TO_SEND_ARG].orEmptyIfBlank()?.let { "the file to send" },
+                    byIndex[TASKER_HTTP_OUTPUT_FILE_ARG].orEmptyIfBlank()?.let { "the output file" },
+                    "the request method (Tasker index $methodIndex)".takeIf { methodIndex != null && method == null },
+                )
+                ActionWithLoss(
+                    ActionSpec(
+                        type = "http.request",
+                        label = "Tasker HTTP request",
+                        args = buildMap {
+                            method?.let { put("method", it) }
+                            put("url", byIndex[TASKER_HTTP_URL_ARG].orEmpty())
+                            byIndex[TASKER_HTTP_HEADERS_ARG].orEmptyIfBlank()?.let { put("headers", it) }
+                            byIndex[TASKER_HTTP_BODY_ARG].orEmptyIfBlank()?.let { put("body", it) }
+                            intsByIndex[TASKER_HTTP_TIMEOUT_ARG]?.takeIf { it > 0 }?.let { put("timeout_sec", it.toString()) }
+                        },
+                    ),
+                    lossyWarning = skipped.takeIf { it.isNotEmpty() }
+                        ?.let { "Tasker HTTP request fields not imported: ${it.joinToString(", ")}" },
+                )
+            }
+            "105", "clipboard.set" -> ActionWithLoss(
+                ActionSpec(
+                    type = "clipboard.set",
+                    label = "Tasker set clipboard",
+                    args = mapOf("text" to element.actionStringsByIndex()[0].orEmpty()),
+                ),
+                lossyWarning = "Tasker's clipboard \"Add\" option was not imported; the clipboard is replaced"
+                    .takeIf { (intsByIndex[1] ?: 0) != 0 },
+            )
+            "410", "file.write" -> {
+                val byIndex = element.actionStringsByIndex()
+                // Tasker's Write File stores arg2=Append and arg3=Add Newline. Append maps onto this
+                // app's separate file.append action rather than a flag, so an appending Tasker action
+                // must not import as a truncating write.
+                val appending = (intsByIndex[2] ?: 0) != 0
+                ActionWithLoss(
+                    ActionSpec(
+                        type = if (appending) "file.append" else "file.write",
+                        label = if (appending) "Tasker append to file" else "Tasker write file",
+                        args = mapOf(
+                            "path" to byIndex[0].orEmpty(),
+                            "text" to byIndex[1].orEmpty(),
+                        ),
+                    ),
+                    lossyWarning = "Tasker's \"Add Newline\" option was not imported"
+                        .takeIf { (intsByIndex[3] ?: 0) != 0 },
+                )
+            }
             "37", "if", "flow.if" -> ActionWithLoss(
                 ActionSpec(type = "flow.if", label = "Tasker if", args = mapOf("condition" to strings.joinToString(" ").ifBlank { "true" })),
             )
@@ -520,6 +574,20 @@ object TaskerXmlImporter {
         directChildren("Int")
             .sortedBy { it.argIndex() }
             .mapNotNull { it.getAttribute("val").ifBlank { it.textContent.orEmpty() }.trim().toIntOrNull() }
+
+    /**
+     * Str args keyed by their Tasker `sr` argument index. Tasker writes children in lexicographic
+     * `sr` order (arg1, arg10, arg11, arg12, arg2, ...) and omits fields it considers unset, so a
+     * dense positional list silently shifts every field after a gap. Fixed-position actions must
+     * read by index for the same reason [actionIntsByIndex] exists.
+     */
+    private fun Element.actionStringsByIndex(): Map<Int, String> =
+        directChildren("Str").mapNotNull { element ->
+            val index = element.argIndex().takeIf { it != Int.MAX_VALUE } ?: return@mapNotNull null
+            index to element.getAttribute("val").ifBlank { element.textContent.orEmpty() }.trim()
+        }.toMap()
+
+    private fun String?.orEmptyIfBlank(): String? = this?.takeIf(String::isNotBlank)
 
     /** Int args keyed by their Tasker `sr` argument index, so fixed-position fields keep their unit. */
     private fun Element.actionIntsByIndex(): Map<Int, Int> =
@@ -656,6 +724,28 @@ object TaskerXmlImporter {
         val action: ActionSpec,
         val lossyWarning: String? = null,
     )
+
+    // Tasker's HTTP Request (code 339) argument layout, read off real exports rather than the help
+    // page, whose field order does not match the XML: arg1 is the method spinner, arg2 the URL,
+    // arg3 headers ("X-API-Version:1"), arg5 the request body (a JSON document on arg1=1 actions),
+    // arg7 the file to save the response into ("Pictures/bili/%BILI_NAME.jpg" on a download), and
+    // arg8 the timeout in seconds. arg4 and arg6 were empty in every sample examined, so they are
+    // reported as not imported rather than guessed into a field.
+    private const val TASKER_HTTP_METHOD_ARG = 1
+    private const val TASKER_HTTP_URL_ARG = 2
+    private const val TASKER_HTTP_HEADERS_ARG = 3
+    private const val TASKER_HTTP_QUERY_ARG = 4
+    private const val TASKER_HTTP_BODY_ARG = 5
+    private const val TASKER_HTTP_FILE_TO_SEND_ARG = 6
+    private const val TASKER_HTTP_OUTPUT_FILE_ARG = 7
+    private const val TASKER_HTTP_TIMEOUT_ARG = 8
+
+    /**
+     * Only the two method indices observed in real exports are mapped. An unknown index imports
+     * without a method and says so, because turning an unrecognised verb into a GET would send a
+     * different request than the user wrote.
+     */
+    private val TASKER_HTTP_METHODS = mapOf(0 to "GET", 1 to "POST")
 
     private val PROFILE_SCALAR_TAGS = setOf(
         "cdate",

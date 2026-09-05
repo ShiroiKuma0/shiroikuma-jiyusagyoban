@@ -14,6 +14,14 @@
 
 ### Added
 
+- Importing from Tasker now understands three more of its actions. HTTP Request
+  arrives as an HTTP Request here, keeping the method, address, headers, body and
+  timeout; Set Clipboard and Write File arrive as themselves. A Write File set to
+  append becomes an append rather than a write, so importing one can no longer
+  wipe the file it was meant to add a line to. Anything the import cannot carry
+  across, such as query parameters or an attached file, is named in the import
+  review instead of being dropped quietly or put in the wrong box.
+
 - **Write Setting**, a new action that changes one Android setting by name, the way
   Tasker's Custom Setting does. The Global and Secure tables need access that no app can
   ask for and no settings screen offers: you grant it once from a computer, and a new
