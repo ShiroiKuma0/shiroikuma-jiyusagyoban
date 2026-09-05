@@ -388,11 +388,9 @@ fun changedGlobals(
  */
 private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: VariableStore) {
     if (!task.freezeBubble) return
-    val pkgRaw = task.actions.firstOrNull { it.type == "app.launch" }?.args?.get("package")
-        ?: task.actions.firstOrNull { it.type == "app.unfreeze" }?.args?.get("package")
-        ?: return
-    val pkg = variables.expand(pkgRaw).trim()
-    if (pkg.isEmpty() || pkg.contains('%')) return
+    // The same rule the `tasks.freezebubbles` picker lists by — kept in one place on purpose.
+    val pkg = com.opentasker.core.bubbles.FreezeBubbleTarget
+        .packageOf(task.actions) { variables.expand(it) } ?: return
     val label = runCatching {
         val pm = appContext.packageManager
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
