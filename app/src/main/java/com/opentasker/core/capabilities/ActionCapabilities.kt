@@ -92,9 +92,12 @@ object ActionCapabilityRegistry {
         // action like shell.run, NOT upstream's (never-shipped) privileged transport. Upstream's
         // elevatedUnsupported() here made the pre-flight hard-fail every task containing a wake.
         "wake" to shizukuCapability("Screen wake (KEYCODE_WAKEUP)"),
-        "app.freeze" to shizukuCapability("Freeze app (pm disable-user)"),
+        // Freeze/unfreeze have TWO transports since 2026-09-05: the device-policy suspension 白い熊 雫
+        // delegates (no Shizuku at all) and the older pm disable-user (Shizuku). Non-blocking on
+        // purpose — a hard Shizuku gate here refused tasks that the policy path runs perfectly.
+        "app.freeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Freezes through 白い熊 雫's device-policy delegation when it is granted, otherwise pm disable-user over Shizuku.", CapabilityRequirement.Shizuku),
         "share.relays" to shizukuCapability("Generate + install per-app share relays"),
-        "app.unfreeze" to shizukuCapability("Unfreeze app (pm enable)"),
+        "app.unfreeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Clears every freeze slot: the shell suspension, the device-policy suspension, and pm disable-user.", CapabilityRequirement.Shizuku),
         "tasks.launchers" to shizukuCapability("Create launcher tasks"),
         TermuxScriptBackend.ACTION_ID to ActionCapability(
             CapabilityLevel.RequiresSetup,
