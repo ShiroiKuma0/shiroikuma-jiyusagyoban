@@ -8,6 +8,42 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+057 — 2026-09-06
+
+### 相撲字時計 — twelve reads 〇時, and every hour ends in 時
+
+The kanji watch face this repo builds for the HUAWEI Band 11 Pro now reads 一時 through 九時, then
+十時, 十一時 and **〇時**. Hours one to ten are bit-for-bit what the previous face drew; only eleven
+and twelve change.
+
+- **Eleven is 一 with a corner 十, because the band allows nothing else.** The hour arrives as two
+  bindings, so hours 1-9 share one tens image and 10/11/12 share the other, while hour 1 shares its
+  units image with 11 and hour 2 with 12. That leaves exactly one bespoke glyph for ten, eleven and
+  twelve between them — and the face spends it on twelve's 〇. Ten takes its 十 back through its own
+  units image; eleven can take back only hour ONE's, which is 一.
+- **What caps the mark is hour two, not the corner.** The mark is tens-bound, so twelve must erase
+  it, and the only image that tells twelve from eleven is the units one at index 2 — which the band
+  also draws over 二 at two o'clock. So the mark may cross 二's ink only where the 〇's ring is
+  solid, because there the ring paints the pixel itself and nothing needs erasing. 48 px of ink with
+  the ring untouched, 52 with it 3 px heavier.
+- **Neither mask is a shape.** A hard-edged knockout leaves a ghost 十 on the ring at twelve, so the
+  knockout and the punched 一 are alphas computed per pixel from what the tiles actually paint.
+  Checked against a render with no machinery in it: hours 1, 2, 10 and 11 identical, twelve off by
+  1 of 255.
+- **The ring thickens inward** — drawn smaller and grown back — since growing it where it stood
+  pushed 20 px of it flat against the screen's left edge. And the mark is built with straight alpha,
+  because the builder's own `render` darkens the RGB of a soft edge as well as its alpha, which
+  dulled the ring wherever the mark crossed it.
+
+### 健康の盤 — a 時 合わせる card
+
+The band-clock window had to be reached through the task list. It gets a card on the board, next to
+文字盤, because that is what it is used with: a face can only be judged at the hour it draws, and
+some hours come round slowly. Calendar, dial, 丁度 and 半, and a switch that hands the band the
+phone's time back — nothing destructive, since every connection announces the phone's time anyway.
+Its picture is drawn in the board's idiom like the others: an amber dial with its hands at eleven
+and a setting arrow over the top.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+055 — 2026-09-05
 
 ### 凍結融解 — the freeze bubbles freeze through device policy
