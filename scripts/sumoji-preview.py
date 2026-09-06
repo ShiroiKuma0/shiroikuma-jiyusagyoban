@@ -18,8 +18,10 @@ alone; this is the thing that relies on it.
 
 This exists because the only other way to see the clock is to pack it, upload it over Bluetooth and
 photograph the band — a three-minute loop for a change worth one glance. It draws what the band
-draws: the hour's two layers ADD (the tens mark over the units glyph, both transparent), while the
-minute and second cells COVER (opaque tiles, so an override truly replaces rather than intersects).
+draws, in the band's own order: the hour's cell one is FOUR tiles since v5 — the numerals, the 〇
+over them, the corner 十, then the tile that hands ten its glyph and takes the mark away again at
+two and twelve — while the minute and second cells COVER (opaque tiles, so an override truly
+replaces rather than intersects).
 """
 import argparse
 import datetime
@@ -53,12 +55,18 @@ SAMPLES = [
 def panel(g, when, batt, steps):
     hour, minute = when.hour, when.minute
     im = Image.new("RGBA", (W, H), (0, 0, 0, 255))
-    # The hour is two cells again in v3, units-under-tens in each, exactly like the minutes.
+    # v5: cell one is FOUR tiles and the order carries the meaning — the numerals underneath, the
+    # 〇 over them (which only twelve keeps), the mark, then the tile that hands ten its 十, shows
+    # the mark through the 一 at eleven, and erases it at two and twelve. Cell two is still a pair.
     h12 = hour % 12 or 12                      # the band counts 1..12, confirmed against its own clock
     ht, hu = divmod(h12, 10)
-    for x, cell in ((B.CELL1_X, "h1"), (B.CELL2_X, "h2")):
-        im.alpha_composite(g[f"{cell}_units_{hu}"], (x, B.HOUR_Y))
-        im.alpha_composite(g[f"{cell}_tens_{ht}"], (x, B.HOUR_Y))
+    im.alpha_composite(g[f"h1_units_{hu}"], (B.CELL1_X, B.HOUR_Y))
+    im.alpha_composite(g[f"h1_tens_{ht}"], (B.CELL1_X, B.HOUR_Y))
+    im.alpha_composite(g[f"hmark_{ht}"], (B.CELL1_X + B.HOUR_MARK_XY[0],
+                                          B.HOUR_Y + B.HOUR_MARK_XY[1]))
+    im.alpha_composite(g[f"h1_top_{hu}"], (B.CELL1_X, B.HOUR_Y))
+    im.alpha_composite(g[f"h2_units_{hu}"], (B.CELL2_X, B.HOUR_Y))
+    im.alpha_composite(g[f"h2_tens_{ht}"], (B.CELL2_X, B.HOUR_Y))
     # The minute line is five tiles and its own order — cell 1 is tens, units, tens, and cell 2 is
     # tens then units. Nothing crosses the seam: the tens word stays in cell 1 and the units word in
     # cell 2, which is what lets :30 read 半 and :00 read 丁度. Drawing cell 1's三十 last would put
