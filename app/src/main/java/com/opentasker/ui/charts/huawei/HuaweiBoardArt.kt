@@ -14,13 +14,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
  * The board's pictures, drawn rather than shipped.
  *
- * Two of the sixteen cards show real photographs — the earth watch face, and a piece of the map 地図
+ * Two of the cards show real photographs — the earth watch face, and a piece of the map 地図
  * drew of a real walk — and these fourteen have to sit beside them without looking like clip art.
  * Drawn in Compose for the same reason every chart in this app is: a PNG is fixed at one size and one
  * theme, while these have to be sharp on a folded panel, survive a re-theme, and cost nothing in the
@@ -307,6 +308,32 @@ fun BoardArt(key: String, modifier: Modifier = Modifier) {
                     polyline(listOf(Offset(w * 0.5f, h * (0.5f + d * 0.1f)),
                         Offset(w * 0.5f, h * (0.5f + d * 0.26f))), Ink, h * 0.045f)
                 }
+            }
+
+            // A dial whose hands were PUT where they stand, not read: the arrow outside says the
+            // time is being set rather than kept. The hands sit at eleven, which is the hour a face
+            // is usually being checked at. Violet and amber, so it does not read as the blue watch
+            // body two cards up — this one is the clock, not the face.
+            "clock" -> {
+                sky(Color(0xFF1A1036), Color(0xFF2E1B4E))
+                glow(Offset(w * 0.5f, h * 0.52f), w * 0.3f, Color(0xFF7E57C2))
+                val dial = Rect(Offset(w * 0.3f, h * 0.24f), Size(w * 0.4f, h * 0.56f))
+                arcOf(dial, 0f, 360f, Color(0xFFFFB74D), h * 0.06f)
+                val c = dial.center
+                polyline(listOf(c, Offset(c.x - w * 0.09f, c.y - h * 0.13f)), Ink, h * 0.05f)
+                polyline(listOf(c, Offset(c.x, c.y - h * 0.21f)), Ink, h * 0.04f)
+                drawCircle(Ink, h * 0.035f, c)
+                // The setting arrow: an arc round the outside, ending in a head at -30 degrees.
+                val ring = Rect(Offset(w * 0.14f, h * 0.08f), Size(w * 0.72f, h * 0.86f))
+                arcOf(ring, 200f, 130f, Color(0xFFFFE082), h * 0.035f)
+                val a = (-30f) * PI.toFloat() / 180f
+                val tip = Offset(ring.center.x + ring.width / 2f * cos(a),
+                                 ring.center.y + ring.height / 2f * sin(a))
+                polyline(
+                    listOf(tip + Offset(-w * 0.075f, -h * 0.015f), tip,
+                           tip + Offset(-w * 0.015f, h * 0.085f)),
+                    Color(0xFFFFE082), h * 0.035f,
+                )
             }
 
             // A pulse read off a grid — asking the band what it is.
