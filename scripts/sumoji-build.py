@@ -60,13 +60,54 @@ Cell 1's middle tile is a black square rather than a glyph: its whole job is to 
 and that costs nothing only because cell 1 is blank at :00 in this layout anyway. Under the old
 centred one it held the 〇, which is the other half of why the hop had to go.
 
-## The hour is two cells
+## The hour is two cells, and twelve is 〇時
 
-一時 through 九時, then 十時, 十一, 十二 — two characters wide, in the same two cells the minutes
-use, and by the same override: the units tile first, the tens tile painted over it, both OPAQUE so
-the later one replaces. Cell two carries 時 at index zero and the numeral at one and two, and for
-hours one to nine the tens tile paints 時 over whatever cell two holds, so only its first three
-images are ever seen.
+一時 through 九時, then 十時, 十一時, 〇時 — two characters wide, in the same two cells the minutes
+use. Cell two is 時 at every hour; cell one carries the numeral, and eleven takes a 十 in its corner
+rather than a cell of its own.
+
+**Twelve reads 〇時, and that is what shapes the whole hour.** The band gives the hour as two
+bindings, so hours 1-9 share one tens image and 10/11/12 share the other, while hour 1 shares its
+UNITS image with 11 and hour 2 with 12. Ten owns its units image alone. That leaves exactly one
+bespoke glyph for the three of them — whatever the tens tile paints — and this face spends it on
+twelve's 〇. Ten then takes its 十 back through its own units image, and eleven can take back only
+hour ONE's, which is 一. So eleven is 一時 with a mark, not because a mark is prettier but because
+the bindings allow nothing else (白い熊 chose it from the three-案 sheet, 2026-09-06).
+
+    hour    cell 1                                        cell 2
+    1-9     units 二…九, or the top tile's 一 at one       tens 時, opaque   ->  三時
+    10      top tile 十, opaque                            units 時          ->  十時
+    11      top tile 一 + the corner 十 showing through     units 時          ->  十一時
+    12      tens 〇, opaque                                 units 時          ->  〇時
+
+Four tiles in cell one, in this order: the numerals 二…九 underneath, the tens 〇 over them, the
+mark, and a units tile on top holding 十 (ten), the punched 一 (one and eleven) and the knockout
+(two and twelve).
+
+**The mark's size is set by hour TWO, not by the corner.** It is tens-bound, so it is drawn at ten,
+eleven and twelve alike. Ten wipes it with its own opaque 十. Twelve has to erase it, and the only
+image that tells twelve from eleven is the units one at index 2 — which the band also draws over 二
+at two o'clock. So the mark may cross 二's ink only where the 〇's ring is SOLID, because there the
+ring paints the pixel itself and nothing needs erasing. That one rule is the whole ceiling: 48 px of
+ink with the ring untouched, 52 with it 3 px heavier, and no more until +7 (白い熊 picked +3).
+
+**Neither mask is a shape.** A hard-edged knockout leaves a ghost 十 on the ring at twelve — black
+eating the ring's soft edge on one side, the mark's own edge hardening it on the other. Both are
+alphas computed per pixel from what the tiles actually paint:
+
+    knockout   k = 1 - C / ((1-m)*C + m*255)      restores the ring exactly
+    一 tile    t = 1 - m*255 / ((1-m)*C + m*255)  leaves the mark exactly, on black
+
+where C is what the 〇 tile paints there and m is the mark's alpha. Checked against a render with no
+machinery in it: hours 1, 2, 10 and 11 come out bit-for-bit identical and twelve is off by 1 of 255.
+
+**The ring is thickened INWARD** — drawn 3 px smaller and grown back — so it keeps its outer size.
+Growing it where it stood pushed 20 px of it flat against the screen's left edge.
+
+**The mark is built with STRAIGHT alpha**, yellow everywhere with alpha from the glyph. `render`
+pastes ink through a mask, which darkens the RGB of its soft edge as well as its alpha; over black —
+every other tile here — that is invisible, but over the 〇's ink it dulled the ring by a quarter
+wherever the mark's edge crossed it.
 
 **A previous version made the hour ONE full-width glyph**, with a small 十 in the top-left corner
 for eleven and twelve, and its two layers transparent so the mark ADDED instead of covering. It read
@@ -74,8 +115,8 @@ beautifully at 242 px and it is recorded here because the trade is worth knowing
 rediscovering: a single glyph needs a 239 px row, a pair needs 146, and that difference is a whole
 line. The seconds were worth more than the size.
 
-The band counts 1–12, not 0–11. That was not assumed: the face showed 十 at 12:50, and the only way
-to settle it was to stand the band's clock at noon with `huawei.time` and read it. It said 十二.
+The band counts 1-12, not 0-11. That was not assumed: the face showed 十 at 12:50, and the only way
+to settle it was to stand the band's clock at noon with `huawei.time`. It said 十二.
 
 ## The date
 
@@ -117,7 +158,8 @@ import pathlib
 import struct
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont
+import numpy as np
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 SUMO = "/home/shiroikuma/〇/[06] 蔵書/[06][821] フォント/[06][821][03] 相撲フォント/"
 FONT = SUMO + "A-OTF 勘亭流 Std Ultra 1.001.otf"
@@ -330,6 +372,80 @@ def clear(w, h):
     return Image.new("RGBA", (w, h), (0, 0, 0, 0))
 
 
+# ── the hour's twelfth, and the machinery it takes ───────────────────────────────────────────────
+#
+# The mark is a 66 px tile at (9, 0) of cell one, which puts 52 x 51 px of ink above the left of the
+# 一. Both numbers were searched, not chosen: it is the largest 十 whose knockout crosses 二's ink
+# only where the ring is solid. See the hour section of this file's docstring for the rule.
+HOUR_MARK_W, HOUR_MARK_XY, RING_FAT = 66, (9, 0), 3
+
+
+def ink(ch, w, h, fat=0):
+    """One glyph's ink with nothing behind it.
+
+    `fat` gives it a heavier stroke at the SAME size: the glyph is drawn that many pixels smaller
+    and then grown back. Growing it where it stands pushes it past the cell — 20 px of the 〇's ring
+    came out flat against the screen's left edge that way (白い熊 spotted the cut, 2026-09-06).
+    """
+    g = render(ch, w, h, "centre", pad=fat, chars=1, solid=False, vpad=max(3, fat))
+    if not fat:
+        return g
+    a = np.array(Image.fromarray(np.array(g)[:, :, 3]).filter(ImageFilter.MaxFilter(2 * fat + 1)))
+    out = np.zeros((h, w, 4), np.uint8)
+    out[:, :, 0], out[:, :, 1], out[:, :, 3] = INK[0], INK[1], a
+    return Image.fromarray(out)
+
+
+def opaque(img):
+    """An ink image stood on the face's black, which is what an hour tile is."""
+    t = Image.new("RGBA", img.size, (0, 0, 0, 255))
+    t.alpha_composite(img)
+    return t
+
+
+def hour_mark():
+    """The 十 that says eleven, with STRAIGHT alpha — yellow everywhere, alpha from the glyph.
+
+    render() pastes its ink through a mask, so a soft pixel comes out with darkened RGB as well as
+    reduced alpha. Over black that is the same picture; over the 〇's ink it is not, and it dulled
+    the ring by a quarter wherever the mark's edge crossed it.
+    """
+    a = np.array(render("十", HOUR_MARK_W, HOUR_MARK_W, "centre", chars=1,
+                        solid=False, vpad=2))[:, :, 3]
+    o = np.zeros((HOUR_MARK_W, HOUR_MARK_W, 4), np.uint8)
+    o[:, :, 0], o[:, :, 1], o[:, :, 3] = INK[0], INK[1], a
+    return Image.fromarray(o)
+
+
+def hour_masks():
+    """The two tiles that leave the mark showing at eleven and nowhere else.
+
+    Not shapes — alphas, computed per pixel from what the tiles actually paint, or the mark's soft
+    edge and the ring's fight and leave a ghost 十 on the 〇 at twelve:
+
+        knockout   k = 1 - C / ((1-m)*C + m*255)      restores the ring exactly
+        一 tile    t = 1 - m*255 / ((1-m)*C + m*255)  leaves the mark exactly, on black
+
+    C is what the 〇 tile paints at that pixel, m the mark's alpha. Where the ring is solid k is 0,
+    which is what lets the mark cross 二 at all: nothing is erased there, so nothing is taken out of
+    二 at two o'clock either.
+    """
+    w, (mx, my) = HOUR_MARK_W, HOUR_MARK_XY
+    m = np.zeros((HOUR_H, CELL_W))
+    m[my:my + w, mx:mx + w] = np.array(hour_mark())[:, :, 3] / 255.0
+    C = np.array(opaque(ink("〇", CELL_W, HOUR_H, RING_FAT)))[:, :, 0].astype(np.float64)
+    Cd = (1 - m) * C + m * 255.0
+    ok = Cd > 0
+    k = np.clip(np.where(ok, 1 - C / np.where(ok, Cd, 1), 0), 0, 1)
+    t = np.clip(np.where(ok, 1 - m * 255.0 / np.where(ok, Cd, 1), 1), 0, 1)
+
+    knock = Image.new("RGBA", (CELL_W, HOUR_H), (0, 0, 0, 0))
+    knock.putalpha(Image.fromarray(np.round(k * 255).astype(np.uint8)))
+    punched = np.array(opaque(ink("一", CELL_W, HOUR_H)))
+    punched[:, :, 3] = np.round(np.minimum(punched[:, :, 3] / 255.0, t) * 255).astype(np.uint8)
+    return knock, Image.fromarray(punched)
+
+
 # The bottom band, in face coordinates.
 #
 # The skin paints a yellow bar with the word MUSIC across y 408..443 and the date row draws over it
@@ -371,33 +487,40 @@ def glyphs():
     hh = HOUR_H
     mw, mh = CELL_W, MIN_H
 
-    # ── the hour: two cells, 一時 … 十時, 十一, 十二 ──
+    # ── the hour: two cells, 一時 … 十時, 十一時, 〇時 ──
     #
-    # A glyph that depends on BOTH digits cannot come from either binding alone, so each cell holds
-    # the units-bound tile with the tens-bound one painted over it. The tiles are OPAQUE here, so
-    # the later one REPLACES rather than adds — the opposite of the single-glyph hour v2 used, and
-    # the reason that one needed a corner mark while this one does not.
+    # Cell one is four tiles and cell two is two, and the order is the whole trick. See the hour
+    # section of the module docstring for why twelve gets the tens tile and eleven gets a mark.
     #
-    #     hour    cell 1                        cell 2
-    #     1-9     units 一…九                   tens 時, opaque      ->  三時
-    #     10      tens  十, opaque              units 時             ->  十時
-    #     11-12   tens  十, opaque              units 一 / 二        ->  十一, 十二
-    #
-    # Cell 2's units tile carries 時 at zero and the numeral at one and two; for hours one to nine
-    # the tens tile paints 時 straight over whatever it holds, so only indices 0-2 are ever seen.
+    #     cell 1, bottom to top                        cell 2
+    #     units  二…九            (drawn)              units  時   (drawn)
+    #     tens   〇, opaque       (covers)             tens   時   (covers, hours one to nine)
+    #     mark   十               (adds)
+    #     units  十 / 一 / knockout                    ten, then one and eleven, then two and twelve
     hw = CELL_W
-    for u in range(10):
-        out[f"h1_units_{u}"] = render(DIG[u], hw, hh, "centre", pad=0, chars=1)
+    knock, punched = hour_masks()
+    for u in range(10):                                        # 二…九 underneath; one and eleven
+        out[f"h1_units_{u}"] = render(DIG[u], hw, hh, "centre", pad=0, chars=1) if u >= 2 \
+            else clear(hw, hh)                                 # come from the top tile instead
     out["h1_tens_0"] = clear(hw, hh)
-    for t in (1, 2):
-        out[f"h1_tens_{t}"] = render("十", hw, hh, "centre", pad=0, chars=1)
+    out["h1_tens_1"] = opaque(ink("〇", hw, hh, RING_FAT))     # twelve, and only twelve, keeps it
+    out["h1_tens_2"] = clear(hw, hh)                           # 24-hour mode; the band never asks
 
-    out["h2_units_0"] = render("時", hw, hh, "centre", pad=0, chars=1)   # ten
-    out["h2_units_1"] = render("一", hw, hh, "centre", pad=0, chars=1)   # eleven
-    out["h2_units_2"] = render("二", hw, hh, "centre", pad=0, chars=1)   # twelve
+    out["hmark_0"] = clear(HOUR_MARK_W, HOUR_MARK_W)
+    out["hmark_1"] = hour_mark()                               # drawn at ten, eleven and twelve
+    out["hmark_2"] = clear(HOUR_MARK_W, HOUR_MARK_W)
+
+    out["h1_top_0"] = render("十", hw, hh, "centre", pad=0, chars=1)   # ten: also wipes the mark
+    out["h1_top_1"] = punched                                          # one and eleven
+    out["h1_top_2"] = knock                                            # two and twelve
     for u in range(3, 10):
-        out[f"h2_units_{u}"] = clear(hw, hh)                              # always covered
-    out["h2_tens_0"] = render("時", hw, hh, "centre", pad=0, chars=1)    # hours one to nine
+        out[f"h1_top_{u}"] = clear(hw, hh)
+
+    for u in range(3):                                         # cell two is 時 at every hour now
+        out[f"h2_units_{u}"] = render("時", hw, hh, "centre", pad=0, chars=1)
+    for u in range(3, 10):
+        out[f"h2_units_{u}"] = clear(hw, hh)                    # always covered
+    out["h2_tens_0"] = render("時", hw, hh, "centre", pad=0, chars=1)   # hours one to nine
     for t in (1, 2):
         out[f"h2_tens_{t}"] = clear(hw, hh)
 
@@ -579,6 +702,12 @@ PLAN = {
 SEC_UNITS, SEC_TENS = 64, 63
 MONTH, DAY_UNITS, DAY_TENS, WEEKDAY = 51, 71, 70, 52
 NEW = [
+    # Cell one of the hour needs FOUR tiles and the layer offers two, so the mark and the tile above
+    # it are appended. Appended elements are drawn last, in this list's order, which is exactly the
+    # order they need: the 〇 (element 9) first, then the mark over it, then the tile that shows the
+    # mark at eleven and takes it away at ten and twelve.
+    ("hmark",  HOUR_TENS,  (CELL1_X + HOUR_MARK_XY[0], HOUR_Y + HOUR_MARK_XY[1]), 3),
+    ("h1_top", HOUR_UNITS, (CELL1_X, HOUR_Y), 10),
     # The minute line needs FIVE tiles and the layer only offers four in place, so cell 2's units
     # tile is appended. It has to be drawn after cell 2's tens tile, and appended elements come
     # last, which is exactly the order wanted.
