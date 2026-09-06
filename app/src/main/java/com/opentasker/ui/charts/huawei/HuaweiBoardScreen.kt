@@ -146,6 +146,11 @@ val BOARD_TILES = listOf(
     BoardTile("rehab", "機能訓練（Huawei） -- [727]", Loc("Rehab", "機能訓練")),
     BoardTile("walks", "運動（Huawei） -- [727]", Loc("Walks", "運動")),
     BoardTile("faces", "バンド文字盤（Huawei） -- [727]", Loc("Watch faces", "文字盤")),
+    // Beside the faces, because it is what a face is looked at WITH: a face can only be judged at
+    // the hour it draws, and some hours come round slowly. The card opens the same window as the
+    // task — calendar, dial, 丁度 and 半, and a switch that hands the band the phone's time back.
+    // Nothing here is destructive: every connection announces the phone's time anyway.
+    BoardTile("clock", "時 合わせる -- [727]", Loc("Band clock", "時 合わせる")),
     BoardTile("sat", "衛星予測（Huawei） -- [727]", Loc("Satellites", "衛星"),
         reopenTask = "衛星予測 開"),
     // Beside the predicted set, because they are the two halves of the same job and 白い熊 reaches
