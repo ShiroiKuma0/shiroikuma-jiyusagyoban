@@ -69,6 +69,28 @@ object HuaweiText {
         "Drawn over a shared map — one map serves every walk in the area.",
         "共有の地図に重ねて描いています。同じ辺りの運動は一枚で足ります。",
     )
+    val walksZoomOpen = Loc("Tap the map to zoom in", "地図を軽く叩くと拡大します")
+    /** Shown when the band recorded materially less of the walk than it says the walk was. */
+    val walksRoutePartial = Loc(
+        "Part of this walk was never recorded — the route shows %1\$s of %2\$s.",
+        "この運動は一部しか記録されていません。経路は %2\$s のうち %1\$s です。",
+    )
+    val walksFirstFixLate = Loc(
+        "The band's GPS did not fix until %s into the walk.",
+        "バンドの GPS が測位できたのは開始 %s 後でした。",
+    )
+    val walksFirstFix = Loc("first fix %s in", "初測位 開始%s後")
+    /** The grid cell has no room for a sentence — one word, and the detail explains it. */
+    val walksPartialShort = Loc("partial route", "経路 一部")
+    val walksZoomClose = Loc("Close", "閉じる")
+    val walksZoomHint = Loc(
+        "Pinch to zoom · drag to move · double tap to fill or fit",
+        "つまんで拡大・引いて移動・二度叩きで全体と拡大を切り替え",
+    )
+    val walksZoomFetching = Loc(
+        "Asking 白い熊 地図 for a sharper map of this walk…",
+        "白い熊 地図 にこの運動の詳しい地図を頼んでいます…",
+    )
 
     val facesFullTitle = Loc("The band is full", "バンドが一杯")
     val facesFullBody = Loc(
