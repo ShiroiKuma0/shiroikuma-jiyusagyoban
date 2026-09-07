@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -90,6 +91,27 @@ fun HuaweiWalkDetailScreen(
     onBack: () -> Unit,
     /** Ask 地図 for the base map of this walk's area, once, for every walk that will follow. */
     onFetchMap: () -> Unit = {},
+    /**
+     * The same map at the viewer's own resolution, decoded by the caller while the viewer is open.
+     *
+     * Separate from [base] because the two have different budgets out of the same bytes: the cell
+     * sub-samples, the viewer does not. Null falls back to [base], so tapping always opens
+     * something rather than a black screen while the sharper picture is on its way.
+     */
+    zoomBase: androidx.compose.ui.graphics.ImageBitmap? = null,
+    /**
+     * How much of this walk the band actually recorded, and how late its GPS fixed.
+     *
+     * Null when there is no track to measure. Supplied rather than computed here for the same
+     * reason everything else is: it walks the whole polyline once, where the screen would redo it
+     * on every recomposition and a preview would never run it at all.
+     */
+    coverage: com.opentasker.core.huawei.maps.WalkTrack.Coverage? = null,
+    /** The viewer was opened: load the full-resolution picture, and fetch a sharper one if this
+     *  area has never had one. */
+    onZoomOpen: () -> Unit = {},
+    /** The viewer was closed: let go of the big bitmap. */
+    onZoomClose: () -> Unit = {},
     /** Write the heart rate out as JSON, and the route out as GPX. Both report where they landed. */
     onExportHeart: () -> Unit = {},
     onExportGpx: () -> Unit = {},
@@ -110,6 +132,9 @@ fun HuaweiWalkDetailScreen(
     // LazyColumn and would take its own dialog down with it the moment it scrolled out of view.
     var editingNote by remember(walk.id) { mutableStateOf(false) }
     var editingStops by remember(walk.id) { mutableStateOf(false) }
+    // The viewer is a dialog, so it lives at the screen's level for the same reason the editors do:
+    // the map is one item of a LazyColumn and would take its own dialog down when it scrolled away.
+    var zooming by remember(walk.id) { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -150,12 +175,25 @@ fun HuaweiWalkDetailScreen(
                 // The route, drawn over whatever cutout covers this area. No PNG is kept per
                 // walk any more — see WalkMap for why that was twenty times the size of the walk.
                 var needsMap by remember(walk.id) { mutableStateOf(false) }
+                val zoomable = plot?.cutout != null
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .aspectRatio(4f / 3f)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        // Only when there is a map to zoom. A tap that opens a black dialog is
+                        // worse than a tap that does nothing.
+                        .then(
+                            if (zoomable) {
+                                Modifier.clickable {
+                                    zooming = true
+                                    onZoomOpen()
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     WalkMap.Picture(
@@ -184,7 +222,42 @@ fun HuaweiWalkDetailScreen(
                         else Text(HuaweiText.walksGetMap[lang])
                     }
                 } else {
-                    NoteText(HuaweiText.walksMapShared[lang])
+                    NoteText(
+                        if (zoomable) {
+                            "${HuaweiText.walksMapShared[lang]}  ${HuaweiText.walksZoomOpen[lang]}"
+                        } else {
+                            HuaweiText.walksMapShared[lang]
+                        },
+                    )
+                }
+                // Said plainly, and above the "shared map" line, because it is about THIS walk
+                // rather than about how maps work. A route that silently omits half a walk is what
+                // made 白い熊 doubt the drawing rather than the recording (2026-09-06).
+                coverage?.takeIf { it.partial }?.let { c ->
+                    NoteText(
+                        warn = true,
+                        text = HuaweiText.walksRoutePartial[lang].format(
+                            metresShort(c.routeMetres),
+                            metresShort(c.bandMetres),
+                        ) + "  " +
+                            HuaweiText.walksFirstFixLate[lang].format(
+                                shortDuration(c.firstFixDelaySeconds),
+                            ),
+                    )
+                }
+                if (zooming && plot != null) {
+                    WalkMapViewer.Show(
+                        plot = plot,
+                        base = zoomBase ?: base,
+                        // The sharper picture is fetched through the same one-round-trip-at-a-time
+                        // machinery as every other 地図 request, so `sharing` is what says it is
+                        // running — the viewer only has to show that it is.
+                        fetching = sharing,
+                        onClose = {
+                            zooming = false
+                            onZoomClose()
+                        },
+                    )
                 }
                 // 地図 itself stays available for zooming and layers, but only for a walk that was
                 // actually sent there. Nothing sends walks there by default any more.
