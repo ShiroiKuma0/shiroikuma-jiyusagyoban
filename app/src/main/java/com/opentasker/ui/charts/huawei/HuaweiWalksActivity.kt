@@ -24,9 +24,7 @@ import androidx.compose.ui.Modifier
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncRunner
 import com.opentasker.core.huawei.HuaweiSyncEngine
-import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.huawei.HuaweiGpsTrack
 import com.opentasker.core.huawei.HuaweiWorkoutImport
@@ -58,6 +56,7 @@ private data class Loaded(
     val efforts: Map<String, HuaweiWorkoutStore.Effort>,
     val plots: Map<String, WalkPlot>,
     val bases: Map<String, ImageBitmap>,
+    val coverage: Map<String, com.opentasker.core.huawei.maps.WalkTrack.Coverage>,
 )
 
 /** Everything this app writes for 白い熊 lands here — the probe, the exports, the bundles. */
@@ -134,27 +133,44 @@ class HuaweiWalksActivity : ComponentActivity() {
                                     HuaweiWorkoutStore.effortOf(dao, w)?.let { w.id to it }
                                 }.toMap()
                                 val keys = dao.cutoutKeys()
-                                val plots = walks.filter { it.hasTrack }.mapNotNull { w ->
+                                val decoded = walks.filter { it.hasTrack }.mapNotNull { w ->
                                     val raw = HuaweiWorkoutStore.trackOf(dao, w) ?: return@mapNotNull null
                                     val track = HuaweiGpsTrack.decode(raw) ?: return@mapNotNull null
-                                    val points = track.points.map { p -> p.latitude to p.longitude }
+                                    Triple(w, track, track.points.map { p -> p.latitude to p.longitude })
+                                }
+                                val plots = decoded.associate { (w, _, points) ->
                                     w.id to com.opentasker.core.huawei.maps.WalkTrack.plot(points, keys)
-                                }.toMap()
+                                }
+                                // Measured here, once, for the same reason the efforts are: a cell
+                                // that walked its own polyline would do it on every recomposition,
+                                // and the screenshot engine would never run it at all.
+                                val coverage = decoded.associate { (w, track, points) ->
+                                    w.id to com.opentasker.core.huawei.maps.WalkTrack.coverage(
+                                        points = points,
+                                        trackStartSeconds = track.startSeconds,
+                                        workoutStartSeconds = w.startSeconds,
+                                        bandMetres = w.distanceMetres ?: 0,
+                                    )
+                                }
                                 // One decode per cutout, not per walk: a neighbourhood's worth of
                                 // walking shares one megabyte of picture, and decoding it forty
                                 // times is forty megabytes of bitmap for one image.
                                 val bases = plots.values.mapNotNull { it.cutout?.id }.distinct()
                                     .mapNotNull { key ->
-                                        dao.cutout(key)?.let { png ->
-                                            BitmapFactory.decodeByteArray(png, 0, png.size)
-                                                ?.asImageBitmap()?.let { key to it }
+                                        HuaweiWorkoutStore.cutout(dao, key)?.let { png ->
+                                            // The cells' own budget, not the picture's. A cutout
+                                            // fetched for the zoom viewer is 3072 px and would be
+                                            // 28 MB of bitmap here — more than the whole cache.
+                                            WalkMap.decode(png, com.opentasker.core.huawei.maps.MapCutouts.MAX_CUTOUT_PX)
+                                                ?.let { key to it }
                                         }
                                     }.toMap()
-                                Loaded(walks, efforts, plots, bases)
+                                Loaded(walks, efforts, plots, bases, coverage)
                             }
                             state = state.copy(
                                 walks = loaded.walks, efforts = loaded.efforts,
-                                plots = loaded.plots, bases = loaded.bases, loading = false,
+                                plots = loaded.plots, bases = loaded.bases,
+                                coverage = loaded.coverage, loading = false,
                             )
                         }
 
@@ -338,6 +354,8 @@ class HuaweiWalksActivity : ComponentActivity() {
                                 effort = state.efforts[opened.id],
                                 plot = state.plots[opened.id],
                                 base = state.plots[opened.id]?.cutout?.id?.let { state.bases[it] },
+                                zoomBase = state.zoomBase,
+                                coverage = state.coverage[opened.id],
                                 exported = state.exported,
                                 onShare = {
                                     state = state.copy(sharing = opened.id, message = null)
@@ -424,6 +442,80 @@ class HuaweiWalksActivity : ComponentActivity() {
                                         }
                                     }
                                 },
+                                onZoomOpen = {
+                                    HuaweiSyncRunner.scope.launch {
+                                        // Two jobs, in this order, because the first is instant and
+                                        // the second may take 地図 a while: show the picture we
+                                        // already hold at full resolution, THEN go and get a
+                                        // sharper one. Opening the viewer must never wait on a
+                                        // round trip.
+                                        val plot = state.plots[opened.id]
+                                        val key = plot?.cutout?.id
+                                        if (key != null) {
+                                            val big = withContext(Dispatchers.IO) {
+                                                HuaweiWorkoutStore.cutout(dao, key)?.let { png ->
+                                                    WalkMap.decode(
+                                                        png,
+                                                        com.opentasker.core.huawei.maps.MapCutouts
+                                                            .VIEWER_CUTOUT_PX,
+                                                    )
+                                                }
+                                            }
+                                            scope.launch { state = state.copy(zoomBase = big) }
+                                        }
+                                        val box = plot?.box ?: return@launch
+                                        val want = com.opentasker.core.huawei.maps.MapCutouts.detailed(
+                                            box,
+                                            com.opentasker.core.huawei.maps.WalkTrack.zoomFor(
+                                                box,
+                                                com.opentasker.core.huawei.maps.MapCutouts
+                                                    .VIEWER_CUTOUT_PX,
+                                            ),
+                                        )
+                                        // Already held, or already the one being drawn on: there is
+                                        // nothing sharper to be had, so do not spend a 地図 round
+                                        // trip re-fetching a picture we have.
+                                        if (want.id in state.bases || want.id == key) return@launch
+                                        if (state.busy || state.sharing != null) return@launch
+                                        scope.launch {
+                                            state = state.copy(sharing = opened.id, message = null)
+                                        }
+                                        val outcome = withContext(Dispatchers.IO) {
+                                            HuaweiChizu.basemap(
+                                                applicationContext, want, dao, lang,
+                                                budgetPx = com.opentasker.core.huawei.maps
+                                                    .MapCutouts.VIEWER_CUTOUT_PX,
+                                            )
+                                        }
+                                        // cover() ranks on zoom, so once this is stored it becomes
+                                        // the walk's cutout — the cells get it too, sub-sampled to
+                                        // their own budget.
+                                        val sharper = if (outcome.ok) {
+                                            withContext(Dispatchers.IO) {
+                                                HuaweiWorkoutStore.cutout(dao, want.id)?.let { png ->
+                                                    WalkMap.decode(
+                                                        png,
+                                                        com.opentasker.core.huawei.maps.MapCutouts
+                                                            .VIEWER_CUTOUT_PX,
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            null
+                                        }
+                                        scope.launch {
+                                            state = state.copy(
+                                                sharing = null,
+                                                message = if (outcome.ok) null else outcome.message,
+                                                zoomBase = sharper ?: state.zoomBase,
+                                            )
+                                            reload()
+                                        }
+                                    }
+                                },
+                                // Twenty-eight megabytes of bitmap has no business outliving the
+                                // screen that asked for it.
+                                onZoomClose = { state = state.copy(zoomBase = null) },
                             )
                         } else {
                             HuaweiWalksScreen(

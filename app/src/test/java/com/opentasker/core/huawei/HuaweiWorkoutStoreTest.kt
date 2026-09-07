@@ -55,6 +55,28 @@ class HuaweiWorkoutStoreTest {
     }
 
     @Test
+    fun `a cutout bigger than a cursor window still reads back byte for byte`() = runBlocking {
+        val dao = FakeWorkoutDao()
+        // 3 MB — past Android's ~2 MB CursorWindow, which is the size that crashed the walks
+        // window on 2026-09-06, and past several chunks so the loop is actually exercised.
+        // Pseudo-random rather than a repeated byte: a chunk written to the wrong offset, or one
+        // dropped entirely, would survive a fill of identical bytes without a single assertion
+        // noticing.
+        val png = ByteArray(3 * 1024 * 1024).also { java.util.Random(20260906).nextBytes(it) }
+        HuaweiWorkoutStore.putCutout(
+            dao = dao, key = "z16_x35396_y22204_8x8", zoom = 16,
+            tileX = 35396, tileY = 22204, tilesW = 8, tilesH = 8,
+            tilePx = 192, png = png,
+        )
+        val read = HuaweiWorkoutStore.cutout(dao, "z16_x35396_y22204_8x8")
+        assertNotNull("a big cutout must come back at all", read)
+        assertEquals("and at its real length", png.size, read!!.size)
+        assertTrue("and identical — an off-by-one in substr() silently ruins the PNG", png.contentEquals(read))
+
+        assertNull("an area we hold no picture for is a real answer", HuaweiWorkoutStore.cutout(dao, "z16_x1_y1_1x1"))
+    }
+
+    @Test
     fun `a stored workout reads back as what it was`() = runBlocking {
         val dao = FakeWorkoutDao()
         val lift = storeLift(dao)

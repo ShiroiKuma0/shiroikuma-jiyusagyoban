@@ -50,8 +50,14 @@ import kotlin.math.roundToInt
  */
 object WalkMap {
 
-    /** Padding around the route, as a fraction of the fitted box. */
-    private const val PAD = 0.08f
+    /**
+     * Padding around the route, as a fraction of the fitted box.
+     *
+     * Read from [MapCutouts.FRAME_PAD] rather than written out again here: a cutout is now cut for
+     * the frame this padding produces, so the two drifting apart would put the ends of a walk back
+     * outside the map that was fetched for it.
+     */
+    private val PAD = MapCutouts.FRAME_PAD.toFloat()
 
     /**
      * Cutouts are shared, so decoding one per cell would decode the same megabyte a dozen times
@@ -59,6 +65,29 @@ object WalkMap {
      */
     private val cache = object : LruCache<String, ImageBitmap>(24 * 1024 * 1024) {
         override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
+    }
+
+    /**
+     * Decode a cutout to at most [maxPx] on its longest edge.
+     *
+     * The budget is the CALLER's, not the picture's, and that is the whole point: one cutout now
+     * serves a 4:3 grid cell and a viewer being pinched into, and those want wildly different
+     * bitmaps out of the same bytes. A 3072 px viewer picture decoded straight into the grid would
+     * be 28 MB — more than the entire cache — so the cells sub-sample it and the viewer does not.
+     *
+     * `inSampleSize` only takes powers of two, so the result is the first power of two that fits;
+     * asking for less than the picture has costs nothing and returns it whole.
+     */
+    fun decode(png: ByteArray, maxPx: Int): ImageBitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(png, 0, png.size, bounds)
+        val longest = max(bounds.outWidth, bounds.outHeight)
+        if (longest <= 0) return null
+        var sample = 1
+        while (longest / sample > maxPx) sample *= 2
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        return runCatching { BitmapFactory.decodeByteArray(png, 0, png.size, opts) }
+            .getOrNull()?.asImageBitmap()
     }
 
     /** Decode a cutout, cached. Null when the file is missing or not an image. */
@@ -71,7 +100,26 @@ object WalkMap {
     }
 
     /** The transform that puts a route's own bounds into a view of [size], uniformly scaled. */
-    private data class Fit(val scale: Float, val dx: Float, val dy: Float)
+    private data class Fit(val scale: Float, val dx: Float, val dy: Float) {
+        /**
+         * The same transform with [zoom] and [pan] applied about the view's centre.
+         *
+         * A point already lands at `p * scale + d`; zooming about the centre `c` puts it at
+         * `(p * scale + d - c) * zoom + c + pan`, which is this scale and this offset. Composing it
+         * here rather than in the gesture keeps the base fit — and therefore the route's framing —
+         * the single thing that decides what "unzoomed" means.
+         */
+        fun zoomed(zoom: Float, pan: Offset, size: Size): Fit {
+            if (zoom == 1f && pan == Offset.Zero) return this
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            return Fit(
+                scale = scale * zoom,
+                dx = (dx - cx) * zoom + cx + pan.x,
+                dy = (dy - cy) * zoom + cy + pan.y,
+            )
+        }
+    }
 
     private fun fit(
         pts: List<Offset>,
@@ -96,9 +144,14 @@ object WalkMap {
         val h = max(1f, y1 - y0)
         // CONTAIN, not cover. Covering filled the cell nicely and cut the ends off every route
         // whose shape did not match it (白い熊, 2026-08-31) — and a walk with its corners missing
-        // is not a picture of that walk. Containing costs nothing here, because the base map is a
-        // whole neighbourhood: the route is fitted, and the map keeps drawing past it into
-        // whatever slack the cell has left, so the cell still fills with cartography.
+        // is not a picture of that walk.
+        //
+        // What containing costs is paid on the OTHER side, in MapCutouts.frame: the base is drawn
+        // at the route's scale, so it fills the cell only if the cutout reaches beyond the route by
+        // the cell's own shape. It did not, for a long time — the map came up a third narrower than
+        // its frame with the walk running edge to edge (白い熊, 2026-09-06) — because a cutout was
+        // chosen by whether it merely CONTAINED the track. It is now chosen by whether it contains
+        // the frame, which is this fit expressed as geography.
         val scale = min(size.width / w, size.height / h)
         val cx = (x0 + x1) / 2f
         val cy = (y0 + y1) / 2f
@@ -118,6 +171,9 @@ object WalkMap {
         modifier: Modifier = Modifier,
         line: Color = Color(0xFFFF3B30),
         base: ImageBitmap? = null,
+        /** 白い熊's own pinch, applied about the view's centre on top of the fitted framing. */
+        userZoom: Float = 1f,
+        userPan: Offset = Offset.Zero,
     ) {
         // The cutout's bytes come from the database now, decoded by the caller — there is no file
         // to read here and no path to be wrong about. Without one the route still draws, projected
@@ -131,7 +187,9 @@ object WalkMap {
                 Offset(x, y)
             }
             if (projected.isEmpty()) return@Canvas
-            val f = fit(projected, bw, bh, size)
+            // The fit frames the walk; the pinch is applied on top of it, so letting go of the
+            // gesture always returns to the framing rather than to some remembered scroll offset.
+            val f = fit(projected, bw, bh, size).zoomed(userZoom, userPan, size)
             clipRect {
                 if (image != null) {
                     drawImage(

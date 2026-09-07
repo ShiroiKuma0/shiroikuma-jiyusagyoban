@@ -121,14 +121,17 @@ class HuaweiGnssAction : Action {
         // decides that is the staging directory above, where a person can see it.
         val nowGps = System.currentTimeMillis() / 1000 - GPS_UNIX_EPOCH + GPS_LEAP_SECONDS
         val expired = mutableListOf<String>()
+        var live = 0
         var windowEnd = 0L
         for (name in files.keys) {
             if (!name.startsWith(PREDICTED_PREFIX) || name == PREDICTED_STATIC) continue
+            if (name in ALWAYS_STALE) continue
             val last = lastBlockSeconds(files[name]!!) ?: continue
             if (last < nowGps) {
                 expired += name
-            } else if (windowEnd == 0L || last < windowEnd) {
-                windowEnd = last
+            } else {
+                live++
+                if (windowEnd == 0L || last < windowEnd) windowEnd = last
             }
         }
         ctx.variables.set(
@@ -147,6 +150,36 @@ class HuaweiGnssAction : Action {
                 "none of ${wanted.joinToString(", ")} found in $dir — nothing to serve",
             )
         }
+
+        // A set with NOTHING live in it is not handed over. This is the one case the 2026-08-29
+        // measurement above did not cover, and it is the opposite result.
+        //
+        // That measurement removed the two stale files from a set whose GPS and Galileo were good,
+        // and the fix got worse — so a partly-stale set is still worth serving, and it still is.
+        // A set where every constellation is dead is a different animal: the band takes it, marks
+        // its assistance data current, and then STOPS ASKING for the broadcast ephemeris that would
+        // have rescued it — "The band never asked — its data is still fresh", in the app's own log.
+        // 白い熊 then waited nineteen minutes for a fix on 2026-09-06, against the 581 s this
+        // repository measured with no valid set at all. Handing over a wholly dead set is
+        // measurably worse than handing over nothing, so it stops here.
+        val predictedHeld = files.keys.count {
+            it.startsWith(PREDICTED_PREFIX) && it != PREDICTED_STATIC && it !in ALWAYS_STALE
+        }
+        if (predictedHeld > 0 && live == 0) {
+            val until = expired.joinToString(", ")
+            ctx.variables.set(
+                "${prefix}PgnssAlert",
+                "THE BAND WAS NOT GIVEN THE FORECAST — every file in the set is out of date " +
+                    "($until). Nothing was handed over: a dead set stops the band asking for the " +
+                    "broadcast ephemeris it can still use, which is worse than giving it nothing. " +
+                    "Run 衛星更新 again to build a current one.",
+            )
+            return fail(
+                ctx, prefix, store,
+                "NOT HANDED OVER — the whole predicted set is past its window ($until)",
+            )
+        }
+        ctx.variables.set("${prefix}PgnssAlert", "")
 
         // Capped, so that the ceiling which fires is this one and not the engine's. TaskRunner wraps
         // every action in `withTimeout`, and an action that outlives its budget is killed where it
@@ -380,6 +413,20 @@ class HuaweiGnssAction : Action {
 
         /** The static blob — almanacs, iono, channel tables. Not a 36-block epoch file. */
         const val PREDICTED_STATIC = "HW_PGNSS_EXTRA"
+
+        /**
+         * Files whose window is expired BY CONSTRUCTION, and which must not raise the alarm.
+         *
+         * `HW_PGNSS_QZS` is Huawei's own captured file, copied verbatim rather than fitted — it has
+         * carried the window 2026-08-25 → 08-28 since the day it was captured and always will. It
+         * is byte-identical in tonight's set and in both baseline archives, INCLUDING the one that
+         * fixed in 13 s, so it demonstrably costs nothing; and QZSS is a regional system over East
+         * Asia that is permanently below the horizon in Prague, so it can never earn anything
+         * either. Reporting it as expired on every single run is a warning that is always lit, and
+         * a warning that is always lit is one that hides the real one — which is part of how a set
+         * four days dead went unnoticed for four days (白い熊, 2026-09-06).
+         */
+        val ALWAYS_STALE = setOf("HW_PGNSS_QZS")
 
         /** 1980-01-06 in Unix seconds, and the current GPS-UTC offset. */
         const val GPS_UNIX_EPOCH = 315_964_800L

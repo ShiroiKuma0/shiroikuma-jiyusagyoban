@@ -263,9 +263,14 @@ object HuaweiChizu {
         cutout: MapCutouts.Cutout,
         dao: com.opentasker.core.storage.HuaweiWorkoutDao,
         lang: BandLanguage = BandLanguage.EN,
+        /** How many pixels the block may be drawn on — a cell's budget, or a viewer's. */
+        budgetPx: Int = MapCutouts.MAX_CUTOUT_PX,
     ): Outcome {
         val token = HuaweiSettings.chizuToken(context)
         if (token.isNullOrBlank()) return Outcome(false, "no 地図 token — set %Huawei_ChizuToken")
+        // How many pixels this much ground is drawn on. A big block is rendered coarser so the
+        // picture stays the size it has always been — see MapCutouts.tilePxFor.
+        val tilePx = MapCutouts.tilePxFor(cutout.tilesW, cutout.tilesH, budgetPx)
 
         // 地図 renders straight into the stream, so what is at this URI is whole only once the reply
         // says OK. That is why it is a scratch file of ours and not the row itself: the bytes reach
@@ -282,7 +287,7 @@ object HuaweiChizu {
                 putExtra("tile_y", cutout.tileY.toString())
                 putExtra("tiles_w", cutout.tilesW.toString())
                 putExtra("tiles_h", cutout.tilesH.toString())
-                putExtra("tile_px", Mercator.TILE_PX.toString())
+                putExtra("tile_px", tilePx.toString())
                 putExtra("out_uri", uri.toString())
                 addFlags(
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION,
@@ -328,7 +333,7 @@ object HuaweiChizu {
                 dao = dao, key = cutout.id, zoom = cutout.zoom,
                 tileX = cutout.tileX, tileY = cutout.tileY,
                 tilesW = cutout.tilesW, tilesH = cutout.tilesH,
-                tilePx = Mercator.TILE_PX, png = png,
+                tilePx = tilePx, png = png,
             )
             return Outcome(true, "map cached for this area")
         } finally {

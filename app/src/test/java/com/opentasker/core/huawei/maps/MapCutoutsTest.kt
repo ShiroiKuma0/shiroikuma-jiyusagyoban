@@ -2,6 +2,8 @@ package com.opentasker.core.huawei.maps
 
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -88,6 +90,95 @@ class MapCutoutsTest {
         assertTrue("and the block kept small", c.tilesW <= MapCutouts.MAX_TILES)
         assertTrue(c.tilesH <= MapCutouts.MAX_TILES)
         assertTrue("it still has to cover the walk", c.covers(huge))
+    }
+
+    @Test
+    fun theFrameCarriesTheCellsShapeWhateverTheWalksIs() {
+        // A walk four times as tall as it is wide — the shape that broke this: a river path, drawn
+        // in a 4:3 cell, on a map cut to the track and therefore a third too narrow to fill it.
+        val tall = MapCutouts.Box(50.0700, 14.4370, 50.0800, 14.4400)
+        val f = MapCutouts.frame(tall)
+        // Measured in projected coordinates, because that is what the renderer scales in — degrees
+        // of longitude and latitude are different distances and would not answer the question.
+        val z = 21
+        val w = Mercator.tileX(f.east, z) - Mercator.tileX(f.west, z)
+        val h = Mercator.tileY(f.south, z) - Mercator.tileY(f.north, z)
+        assertEquals("the frame is the cell's shape", MapCutouts.CELL_ASPECT, w / h, 1e-6)
+        assertTrue("and it contains the walk it was framed for", f.south < tall.south)
+        assertTrue(f.north > tall.north)
+        assertTrue(f.west < tall.west)
+        assertTrue(f.east > tall.east)
+
+        // The wide case takes the same route through the other branch of the aspect step.
+        val wide = MapCutouts.Box(50.0755, 14.4300, 50.0770, 14.4500)
+        val g = MapCutouts.frame(wide)
+        val gw = Mercator.tileX(g.east, z) - Mercator.tileX(g.west, z)
+        val gh = Mercator.tileY(g.south, z) - Mercator.tileY(g.north, z)
+        assertEquals(MapCutouts.CELL_ASPECT, gw / gh, 1e-6)
+        assertTrue(g.north > wide.north && g.south < wide.south)
+    }
+
+    @Test
+    fun aWalkThatStandsStillStillGetsAPlace() {
+        // One fix, repeated: the box has no span at all, and the aspect step would divide by zero.
+        val still = MapCutouts.Box(50.0755, 14.4378, 50.0755, 14.4378)
+        val f = MapCutouts.frame(still)
+        assertTrue("a frame with real extent", f.north > f.south && f.east > f.west)
+        val c = MapCutouts.needed(still, preferredZoom = 17)
+        assertTrue("and a cutout that contains it", c.covers(f))
+    }
+
+    @Test
+    fun whatIsCutIsWhatIsThenAcceptedBackAgain() {
+        // The loop that must never exist: needed() answering with a cutout that cover() rejects
+        // would send the window back to 地図 for the same area forever. Checked across shapes,
+        // because the aspect step is what makes the two disagree if only one of them frames.
+        val shapes = listOf(
+            MapCutouts.Box(50.0700, 14.4370, 50.0800, 14.4400),   // tall
+            MapCutouts.Box(50.0755, 14.4300, 50.0770, 14.4500),   // wide
+            MapCutouts.Box(50.0740, 14.4360, 50.0760, 14.4400),   // square-ish
+            MapCutouts.Box(49.1900, 14.4300, 50.0800, 16.6100),   // sprawling, zoom stepped down
+        )
+        for (box in shapes) {
+            val wanted = MapCutouts.needed(box, WalkTrack.zoomFor(box))
+            assertNotNull(
+                "a cutout just cut for $box must satisfy the cover test that asked for it",
+                MapCutouts.cover(listOf(wanted.id), box),
+            )
+        }
+    }
+
+    @Test
+    fun aMapThatOnlyTouchesTheWalkIsNoLongerGoodEnough() {
+        // Exactly the fault 白い熊 saw: a cutout that contains the track and nothing more. It used
+        // to be accepted — edges counted as covered — and the walk was then drawn on a map with no
+        // street beyond its own ends.
+        val walk = MapCutouts.Box(50.0700, 14.4370, 50.0800, 14.4400)
+        // The tiles the track itself spans, snapped outward and not one tile further — which is
+        // what an area's cutout decays into once a later walk grows out to its rim.
+        val z = 16
+        val x0 = floor(Mercator.tileX(walk.west, z)).toInt()
+        val x1 = ceil(Mercator.tileX(walk.east, z)).toInt()
+        val y0 = floor(Mercator.tileY(walk.north, z)).toInt()
+        val y1 = ceil(Mercator.tileY(walk.south, z)).toInt()
+        val tight = MapCutouts.Cutout(z, x0, y0, x1 - x0, y1 - y0)
+        assertTrue("the fixture has to be a map that really does contain the track", tight.covers(walk))
+        assertNull("but containing the track is no longer the question", MapCutouts.cover(listOf(tight.id), walk))
+        // And the roomy one cut for it is accepted, so this is a raised bar and not a closed door.
+        val proper = MapCutouts.needed(walk, 16)
+        assertNotNull(MapCutouts.cover(listOf(proper.id, tight.id), walk))
+    }
+
+    @Test
+    fun theFinestMapWins() {
+        // Two cutouts, both framing the walk. The old rule took the smallest by area, which is the
+        // coarser one here; what is wanted is the one with the most detail.
+        val walk = MapCutouts.Box(50.0740, 14.4360, 50.0760, 14.4400)
+        val fine = MapCutouts.needed(walk, 17)
+        val coarse = MapCutouts.needed(walk, 14)
+        assertTrue("the fixture needs two different zooms", fine.zoom > coarse.zoom)
+        val chosen = MapCutouts.cover(listOf(coarse.id, fine.id), walk)
+        assertEquals(fine.id, chosen!!.id)
     }
 
     @Test

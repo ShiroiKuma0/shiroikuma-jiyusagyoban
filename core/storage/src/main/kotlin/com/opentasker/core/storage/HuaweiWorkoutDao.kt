@@ -202,8 +202,31 @@ interface HuaweiWorkoutDao {
 
     // --- cutouts ---------------------------------------------------------------------------------
 
-    @Query("SELECT png FROM huawei_map_cutouts WHERE key = :key")
-    suspend fun cutout(key: String): ByteArray?
+    /**
+     * How many bytes the picture is — asked before it is read, because it has to be read in pieces.
+     *
+     * **A whole cutout cannot be SELECTed.** Android hands a query's result back through a
+     * `CursorWindow` of about 2 MB, and the limit is per ROW: a single blob past it throws
+     * `SQLiteBlobTooBigException` rather than truncating, and no amount of paging helps because
+     * there is only ever one row. It crashed the walks window the moment cutouts were allowed to
+     * grow to 8×8 tiles (白い熊, 2026-09-06) — and it was already latent at 6×6, which is
+     * 1536×1536 and lands near enough to 2 MB that a detailed area would have found it eventually.
+     *
+     * So the bytes come out through [cutoutChunk] instead, which never puts more than one chunk in
+     * a window. Nothing else about the row changes, and a picture already stored oversized reads
+     * back correctly — that is the point of fixing it on the read side rather than by capping what
+     * may be written.
+     */
+    @Query("SELECT length(png) FROM huawei_map_cutouts WHERE key = :key")
+    suspend fun cutoutBytes(key: String): Int?
+
+    /**
+     * One slice of a cutout: [count] bytes from [from], **1-based**, as SQLite's `substr` counts.
+     *
+     * Assembled by `HuaweiWorkoutStore.cutout`, which is the only thing that should call this.
+     */
+    @Query("SELECT substr(png, :from, :count) FROM huawei_map_cutouts WHERE key = :key")
+    suspend fun cutoutChunk(key: String, from: Int, count: Int): ByteArray?
 
     @Query("SELECT key FROM huawei_map_cutouts")
     suspend fun cutoutKeys(): List<String>

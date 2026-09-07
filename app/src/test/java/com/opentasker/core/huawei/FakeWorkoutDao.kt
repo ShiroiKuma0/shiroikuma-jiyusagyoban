@@ -52,7 +52,10 @@ class FakeWorkoutDao : HuaweiWorkoutDao {
         blobs.keys.filter { it.first == startSeconds }.forEach { blobs.remove(it) }
     }
 
-    override suspend fun cutout(key: String) = cutouts[key]?.png
+    override suspend fun cutoutBytes(key: String) = cutouts[key]?.png?.size
+    // substr() is 1-based and clamps at the end, which is what the chunked read relies on.
+    override suspend fun cutoutChunk(key: String, from: Int, count: Int): ByteArray? =
+        cutouts[key]?.png?.let { it.copyOfRange((from - 1).coerceIn(0, it.size), (from - 1 + count).coerceIn(0, it.size)) }
     override suspend fun cutoutKeys() = cutouts.keys.toList()
     override suspend fun putCutout(row: HuaweiMapCutoutEntity) { cutouts[row.key] = row }
 }
