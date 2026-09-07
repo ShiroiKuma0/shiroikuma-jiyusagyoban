@@ -8,6 +8,83 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+070 — 2026-09-07
+
+### 衛星 — the forecast had been four days dead, and nothing said so
+
+A walk waited **nineteen minutes** for a GPS fix. The predicted-ephemeris set on the band had been
+built on **2026-09-02** and its 72-hour window closed on the 5th — and every 「衛星更新」 since had
+quietly been a no-op, two consecutive runs producing byte-identical files. After the fix, the band
+fixes in about **13 seconds** again.
+
+Three layers, each hiding the next:
+
+- **`BRDC00WRD_R` stopped carrying an ionospheric block.** Its header is down to a single
+  `LEAP SECONDS` line — no GPSA, no GPSB, and no GPUT time-system correction either. That is not a
+  partial file; it is what BKG's `gfzrnx` conversion now emits. Nothing in this repository changed.
+- **The build died on it before its write loop.** `PredictedSet` assembles all six files in memory
+  and writes them at the end, so anything that throws earlier leaves the previous set on disk and
+  writes nothing at all — while the panel still read "Download done, Building the set done".
+- **Nothing recorded that no rebuild had happened**, so four days of runs looked like successes.
+
+The repairs:
+
+- **`BRDC00IGS_R` is fetched first**, with `BRDC00WRD_R` as fallback. Of the four broadcast products
+  BKG publishes it is the only one that still carries GPSA, GPSB and GPUT — `BRDM00DLR_S` has GPUT
+  but its ionosphere is GAL/BDS/QZS/IRN only, and `BRD400DLR_S` and `BRDC00WRD_S` have neither. IGS
+  is a daily published after the day closes, so today falls back and yesterday supplies the header.
+- **The Klobuchar header is searched across every downloaded day**, not just the first. The other
+  days were already being fetched for BeiDou.
+- **The build reads its own output back** — every file's first block stamp against the window this
+  run planned, honouring GLONASS −3600 s and BeiDou +14 s — so it can never again report success
+  over a store it did not write.
+
+Graded after the fix, over the window 2026-09-06 19:59 → 09-09 17:59 UTC: **GPS median 0.03 m**,
+p95 0.07 m; **Galileo median 0.03 m**. `pgnss-verify` clean against Huawei's captured vintage.
+
+### 衛星 — the instruments that found it
+
+- **`HUAWEI_PgnssResult` records every exit**, reading `NOT REBUILT — <reason>` whenever a run did
+  not actually rebuild. This is what turned four days of guesswork into one run.
+- **A magenta ⚠ banner in 「衛星予測 画面」**, driven by the new `HUAWEI_PgnssAlert`, whenever nothing
+  reached the band. Magenta rather than red: the step dots already use red for fail and green for
+  done, and those are precisely the pair a red-green colour-blind reader cannot separate.
+- **Every built set is copied to `/sdcard/tmp/pgnss_<stamp>/`** with a `built.txt` naming the window
+  its bytes actually hold, so `scripts/pgnss-grade.py` can be pointed at what the phone really
+  produced — which had never been possible.
+- **A wholly expired set is no longer handed over.** The band takes one, marks its assistance data
+  current, and stops asking for the broadcast ephemeris it could still use: 1135 s measured against
+  581 s for no set at all. A partly stale set is still served, which is what the 2026-08-29
+  measurement covered. QZSS is exempt from the expiry warning altogether — it is Huawei's captured
+  file, expired by construction, byte-identical in the set that once fixed in 13 s, and permanently
+  below the horizon in Prague.
+
+### 運動 — the map is framed for the cell, and it zooms
+
+- **A cutout is chosen by whether it contains the FRAME, not the track.** It used to be enough for a
+  map to contain the route, so a walk that reached the rim of a cached cutout was drawn on it with no
+  margin at all — a third of the frame empty and the walk running edge to edge. The frame is the
+  route padded, expanded to the cell's 4:3 shape; `MAX_TILES` rises to 8, and a pixel budget keeps
+  the bytes and the bitmaps exactly where they were.
+- **Tapping a walk's map opens it full screen**, pinchable to 4×, draggable, double-tap to fill or
+  fit. Opening it asks 地図 for a sharper cutout of the same frame and swaps it in when it lands.
+- **A walk the band only partly recorded says so.** Four of fifteen were partial, and the screen was
+  printing the band's own distance directly above a map showing half of it. The route's own length is
+  measured against the band's, and the first fix's delay is reported with it.
+
+### 保存 — a cutout no longer crosses a cursor
+
+`SELECT *` over a table with a multi-megabyte blob throws past Android's ~2 MB `CursorWindow`, and
+the limit is per row, so no page size helps. It crashed the walks window, and separately broke
+白い熊 応用管理's backup of this app entirely. Every read of a cutout now asks `length(png)` and
+pulls the bytes through `substr` in slices — in the app and in the export alike.
+
+### 面 — the launcher icon is back inside its safe zone
+
+The mark was drawn at 78 % × 94 % of the adaptive-icon layer, so the launcher's mask cut the hexagon
+frame off and left an enlarged gear running to the edge of the tile. It now matches its own
+monochrome layer at 55–59 % × 67–70 %, inside the 61 % safe zone.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+057 — 2026-09-06
 
 ### 相撲字時計 — twelve reads 〇時, and every hour ends in 時
