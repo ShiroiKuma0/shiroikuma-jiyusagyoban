@@ -353,7 +353,32 @@ object HuaweiWorkoutStore {
 
     // --- cutouts ----------------------------------------------------------------------------
 
-    suspend fun cutout(dao: HuaweiWorkoutDao, key: String): ByteArray? = dao.cutout(key)
+    /**
+     * A cutout's bytes, read in pieces because a whole one will not cross a cursor.
+     *
+     * `SELECT png` throws `SQLiteBlobTooBigException` on anything past the ~2 MB `CursorWindow`,
+     * and the limit is per row, so there is no paging around it — it took the walks window down as
+     * soon as cutouts were allowed to reach 8×8 tiles. Every read goes through here now, including
+     * the ones that were small enough to get away with it, so the size of a picture is once again
+     * nobody's business but the renderer's.
+     */
+    suspend fun cutout(dao: HuaweiWorkoutDao, key: String): ByteArray? {
+        val size = dao.cutoutBytes(key)?.takeIf { it > 0 } ?: return null
+        val out = ByteArray(size)
+        var got = 0
+        while (got < size) {
+            // substr() counts from 1, not 0 — an off-by-one here silently drops the PNG's first
+            // byte and hands the decoder something that is no longer a PNG.
+            val chunk = dao.cutoutChunk(key, got + 1, CUTOUT_CHUNK) ?: return null
+            if (chunk.isEmpty()) return null
+            chunk.copyInto(out, got)
+            got += chunk.size
+        }
+        return out
+    }
+
+    /** Comfortably inside the cursor window, and few enough round trips to not matter. */
+    private const val CUTOUT_CHUNK = 512 * 1024
 
     suspend fun putCutout(
         dao: HuaweiWorkoutDao,
