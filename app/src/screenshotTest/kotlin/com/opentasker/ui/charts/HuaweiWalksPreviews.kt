@@ -22,6 +22,14 @@ import com.opentasker.core.huawei.maps.MapCutouts
 import com.opentasker.core.huawei.maps.WalkPlot
 import com.opentasker.ui.charts.huawei.HuaweiWalksScreen
 import com.opentasker.ui.charts.huawei.HuaweiWalksState
+import com.opentasker.ui.charts.huawei.WalkMap
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.geometry.Offset
 import com.opentasker.ui.theme.OpenTaskerTheme
 import java.io.File
 
@@ -299,6 +307,59 @@ fun HuaweiWalkStopsDialogPreview() {
                     onPick = {},
                     onDismiss = {},
                 )
+            }
+        }
+    }
+}
+
+
+/**
+ * The pinch transform, at rest and zoomed — the one part of the zoom viewer that can be LOOKED at
+ * without the phone.
+ *
+ * The viewer itself is a `Dialog` and a gesture, neither of which a one-frame screenshot engine can
+ * exercise. What it composes, though, is arithmetic: `Fit.zoomed` scales about the view's centre and
+ * then translates. That is checkable here, and it is the part that goes silently wrong — a zoom
+ * applied about the origin instead of the centre still draws a route, just not the one under the
+ * finger.
+ *
+ * Read the three panels as one statement: the middle is the left magnified about its own centre,
+ * and the right is the middle pushed left and up. If the middle panel's centre is not the left
+ * panel's centre, the composition is wrong.
+ *
+ * **`@PreviewTest` is not optional** — the engine discovers that annotation, not `@Preview`.
+ */
+@PreviewTest
+@Preview(name = "walk map — pinch transform", widthDp = 420, heightDp = 190, showBackground = true)
+@Composable
+fun WalkMapZoomPreview() {
+    val pts = (0 until 120).map { i ->
+        val t = i / 14.0
+        (50.0755 + 0.0035 * kotlin.math.sin(t)) to (14.4378 + 0.0050 * kotlin.math.cos(t * 0.7))
+    }
+    val box = MapCutouts.Box.of(pts)!!
+    val cutout = MapCutouts.needed(box, 15)
+    OpenTaskerTheme {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Row(Modifier.fillMaxWidth().padding(6.dp)) {
+                listOf(
+                    Triple("fit 1.0x", 1f, Offset.Zero),
+                    Triple("2.5x centred", 2.5f, Offset.Zero),
+                    Triple("2.5x panned", 2.5f, Offset(-60f, -40f)),
+                ).forEach { (label, zoom, pan) ->
+                    Column(
+                        Modifier.weight(1f).padding(4.dp),
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelSmall)
+                        WalkMap.Route(
+                            cutout = cutout,
+                            points = pts,
+                            userZoom = zoom,
+                            userPan = pan,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                        )
+                    }
+                }
             }
         }
     }
