@@ -83,20 +83,14 @@ class HuaweiPgnssAction : Action {
         }
 
         val cancelVar = args["cancel_var"]?.trim()?.ifEmpty { null }
-        // Defaulted ON, which is not the usual shape for an optional field and is deliberate.
-        //
-        // The set is built by the 「Satellite update」 SCENE, whose task passes fixed arguments; a
-        // new field on this action is invisible there, so an opt-in copy could only be reached by
-        // editing the workspace. The copy is what makes the set gradeable at all — six files,
-        // about two megabytes, next to the fifteen-megabyte APKs already in that folder — and
-        // until the satellite data is trusted again it should happen every time without anyone
-        // remembering to ask (白い熊, 2026-09-06). `off` turns it off.
-        val copyArg = args["copy_to"]?.trim().orEmpty()
-        val copyTo = when {
-            copyArg.isEmpty() -> DEFAULT_COPY_TO
-            copyArg.lowercase() in setOf("off", "none", "no", "0", "false") -> null
-            else -> copyArg
-        }
+        // OFF unless asked for. It was defaulted ON for one evening — the evening the satellite
+        // data was broken and every run had to be gradeable without anyone remembering to ask
+        // (白い熊, 2026-09-06) — and turned back off the moment the band fixed in 13 s again.
+        // Diagnostic machinery that outlives its diagnosis is just litter in the one folder 白い熊
+        // actually looks at, at about 800 KB a run. The capability stays: give it a folder and the
+        // six files land there stamped, which is what `scripts/pgnss-grade.py` needs.
+        val copyTo = args["copy_to"]?.trim()?.ifEmpty { null }
+            ?.takeIf { it.lowercase() !in setOf("off", "none", "no", "0", "false") }
         cancelVar?.let { ctx.variables.set(it, "0") }
 
         val power = ctx.app.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -455,9 +449,6 @@ class HuaweiPgnssAction : Action {
      * Failures are logged and never thrown — a diagnostic copy must not fail a build that
      * succeeded.
      */
-    /** Where a built set is copied unless told otherwise — the one folder 白い熊 and adb both read. */
-    private val DEFAULT_COPY_TO = "/sdcard/tmp"
-
     private fun copyOut(outDir: java.io.File, dest: String, logger: (String) -> Unit) {
         runCatching {
             val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
