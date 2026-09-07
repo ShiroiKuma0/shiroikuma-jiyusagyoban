@@ -31,6 +31,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -88,6 +89,22 @@ data class HuaweiWalksState(
     val efforts: Map<String, HuaweiWorkoutStore.Effort> = emptyMap(),
     /** Each walk's route and the cutout under it, resolved the same way and for the same reason. */
     val plots: Map<String, com.opentasker.core.huawei.maps.WalkPlot> = emptyMap(),
+    /**
+     * How much of each walk the band actually recorded — see `WalkTrack.Coverage`.
+     *
+     * Measured with the plots rather than in a cell, because it walks the whole polyline and a cell
+     * would redo it on every recomposition.
+     */
+    val coverage: Map<String, com.opentasker.core.huawei.maps.WalkTrack.Coverage> = emptyMap(),
+    /**
+     * The open walk's map at the ZOOM viewer's resolution — the same bytes as its cell picture,
+     * decoded without sub-sampling.
+     *
+     * Held only while the viewer is open, and dropped when it closes: at 3072 px this is some
+     * twenty-eight megabytes of bitmap, which is more than the whole shared cutout cache, so it is
+     * exactly the thing not to keep around for a screen nobody is looking at.
+     */
+    val zoomBase: androidx.compose.ui.graphics.ImageBitmap? = null,
     /** Cutout pixels by cutout id — decoded once, shared by every walk that crosses one. */
     val bases: Map<String, androidx.compose.ui.graphics.ImageBitmap> = emptyMap(),
     /** Where the last export landed, shown under the buttons that wrote it. */
@@ -183,6 +200,7 @@ fun HuaweiWalksScreen(
                 effort = state.efforts[walk.id],
                 plot = state.plots[walk.id],
                 base = state.plots[walk.id]?.cutout?.id?.let { state.bases[it] },
+                coverage = state.coverage[walk.id],
                 sharing = state.sharing == walk.id,
                 busy = state.busy,
                 onShare = { onShare(walk) },
@@ -200,6 +218,8 @@ private fun WalkCell(
     effort: HuaweiWorkoutStore.Effort?,
     plot: com.opentasker.core.huawei.maps.WalkPlot?,
     base: androidx.compose.ui.graphics.ImageBitmap?,
+    /** Null when there is no track; see `WalkTrack.Coverage`. */
+    coverage: com.opentasker.core.huawei.maps.WalkTrack.Coverage? = null,
     sharing: Boolean,
     busy: Boolean,
     onShare: () -> Unit,
@@ -252,6 +272,22 @@ private fun WalkCell(
                 // Never "there is no map" — the fetch is already under way, or about to be.
                 needsMap = { NoteText(HuaweiText.walksAskingMap[lang]) },
             )
+            // Two words over the corner of the picture, because the picture is the thing that
+            // lies: a route missing half a walk looks exactly like a walk half as long. The
+            // detail says how much and why; here it only has to stop the cell being believed.
+            coverage?.takeIf { it.partial }?.let {
+                Text(
+                    HuaweiText.walksPartialShort[lang],
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = 0.66f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
 
         Text(
@@ -386,3 +422,20 @@ internal fun walkBandFigures(
 
 /** Seconds as `0h 29m`. */
 internal fun hhmm(seconds: Long): String = (seconds / 60).let { "${it / 60}h ${it % 60}m" }
+
+/**
+ * Seconds as `19m 5s`, or `1h 02m` once it is long enough for the seconds to stop mattering.
+ *
+ * [hhmm] renders a time to first fix of 1135 s as `0h 18m`, which throws away the part being
+ * measured: the difference between a 20 s fix and a 90 s one is the entire question about the
+ * satellite data, and both round to `0h 01m`.
+ */
+internal fun shortDuration(seconds: Long): String = when {
+    seconds < 60 -> "${seconds}s"
+    seconds < 3600 -> "${seconds / 60}m ${seconds % 60}s"
+    else -> hhmm(seconds)
+}
+
+/** Metres as `1.25 km`, or `840 m` while kilometres would be all zeroes. */
+internal fun metresShort(metres: Int): String =
+    if (metres >= 1000) "%.2f km".format(Locale.US, metres / 1000.0) else "$metres m"
