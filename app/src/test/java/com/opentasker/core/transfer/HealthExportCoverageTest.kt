@@ -2,6 +2,7 @@ package com.opentasker.core.transfer
 
 import com.opentasker.ProductionSources
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -138,5 +139,38 @@ class HealthExportCoverageTest {
         assertTrue("no HEALTH_DATA category", backup.contains("HEALTH_DATA(\"health_data\""))
         val optedOut = Regex("HEALTH[A-Z_]*\\([^)]*defaultSelected\\s*=\\s*false").findAll(backup).count()
         assertEquals("a health category must not ship unticked", 0, optedOut)
+    }
+
+    /**
+     * The base-map export must never SELECT the pixels through a cursor.
+     *
+     * `SELECT * FROM huawei_map_cutouts` threw `Row too big to fit into CursorWindow` as soon as one
+     * cutout passed 2 MB, and it took 応用管理's whole app-data backup of this app down with it
+     * (2026-09-06). The limit is per ROW against a ~2 MB window, so no page size helps and no
+     * `LIMIT` helps — the column simply cannot come back that way. This is a source gate rather than
+     * a behaviour test because reproducing it needs a real SQLite cursor and a multi-megabyte row,
+     * and what actually has to hold is a property of the QUERY.
+     */
+    @Test
+    fun `the cutouts export never selects the blob through a cursor`() {
+        // Sliced with the bounded helper: a bare substringAfter widens to the whole file when its
+        // marker goes, and this gate would then read green off some other query in the same file.
+        val body = ProductionSources.block(
+            "com/opentasker/core/transfer/SettingsBackup.kt",
+            "private suspend fun exportCutouts(",
+            "private fun importCutouts(",
+        )
+        assertFalse(
+            "SELECT * over the cutouts table is what broke the backup — project around `png`",
+            body.contains("SELECT * FROM `\$MAPS_TABLE`") && !body.contains("LIMIT 0"),
+        )
+        assertTrue(
+            "the pixels must come out through substr(), one slice per query",
+            body.contains("substr(png, ?, ?)"),
+        )
+        assertTrue(
+            "and the length must be asked for separately, so the loop knows when to stop",
+            body.contains("SELECT length(png)"),
+        )
     }
 }

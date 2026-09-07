@@ -350,6 +350,42 @@ object PredictedSet {
             )
         }
 
+        // What is on DISK now, read back rather than assumed.
+        //
+        // The write loop above is the only thing that touches the store, and it runs after all six
+        // files exist — so anything that throws earlier leaves the PREVIOUS set in place and writes
+        // nothing at all. That is not a hypothetical: on 2026-09-06 the band was still being served
+        // a set built on 2026-09-02, through repeated runs that reported Download and Build done
+        // (白い熊). A build that cannot say what it left behind cannot be trusted to have left
+        // anything, so it now reads its own output back and refuses to call it built otherwise.
+        for (name in NAMES) {
+            val onDisk = written.getValue(name)
+            val stamp = runCatching {
+                onDisk.inputStream().use { input ->
+                    val head = ByteArray(4)
+                    if (input.read(head) != 4) null
+                    else (head[0].toLong() and 0xFF) or ((head[1].toLong() and 0xFF) shl 8) or
+                        ((head[2].toLong() and 0xFF) shl 16) or ((head[3].toLong() and 0xFF) shl 24)
+                }
+            }.getOrNull()
+            // Each constellation stamps the same instant differently, and all three offsets are
+            // documented: GLONASS an hour early, BeiDou +14 s for BDT, GPS and Galileo on the
+            // stamp itself. Getting BeiDou wrong here cost a red test whose two printed times were
+            // identical to the minute — which is the only reason the fourteen seconds were found.
+            val expected = when (name) {
+                NAME_GLONASS -> plan.stamps.first() - 3600L
+                NAME_BDS -> plan.stamps.first() + 14L
+                else -> plan.stamps.first()
+            }
+            if (stamp != null && name != NAME_EXTRA && name != NAME_QZS && stamp != expected) {
+                throw IOException(
+                    "$name was written but reads back stamped ${utc(stamp)} UTC instead of " +
+                        "${utc(expected)} UTC (${stamp - expected} s out) — the store still " +
+                        "holds an older set",
+                )
+            }
+        }
+
         val summary = buildString {
             append("${written.size} files, ${bytes / 1024} KB · ")
             append("${utc(plan.stamps.first())} → ${utc(plan.stamps.last())} UTC · ")
@@ -786,15 +822,39 @@ object PredictedSet {
         }
         // One file at a time: these are 1.5-8.5 MB of text and holding two decoded at once is
         // tens of megabytes of `String` on a phone for no reason.
-        val first = src.brdcNav.first().readText()
-        val header = Almanac.parseRinexHeader(first)
-        val nav = Almanac.parseRinexBds(first)
-        for (extra in src.brdcNav.drop(1)) {
-            Almanac.mergeBdsNav(nav, Almanac.parseRinexBds(extra.readText()))
+        //
+        // The Klobuchar header is taken from the first file that HAS one, not from the first file.
+        // Today's BRDC is still being written when this runs, and a partial one carries no
+        // IONOSPHERIC CORR block at all — so this threw `RINEX header carries no GPSA ionospheric
+        // correction`, the build died before its write loop, and the store kept the set it already
+        // had. That is how 白い熊's band came to be served a set built on 2026-09-02 for four days,
+        // through runs whose panel read "Build done" (found 2026-09-06, once the action was made to
+        // record why it had not rebuilt). The other days are already downloaded for BeiDou; the
+        // ionosphere changes slowly enough that yesterday's is the right answer, and infinitely
+        // better than not rebuilding.
+        var header: Pair<KlobucharSet, UtcParameters>? = null
+        var headerFrom = ""
+        var nav: MutableMap<Int, MutableList<BdsNavRecord>>? = null
+        for (file in src.brdcNav) {
+            val text = file.readText()
+            if (header == null) {
+                runCatching { Almanac.parseRinexHeader(text) }
+                    .onSuccess { header = it; headerFrom = file.name }
+            }
+            val parsed = Almanac.parseRinexBds(text)
+            if (nav == null) nav = parsed else Almanac.mergeBdsNav(nav, parsed)
+        }
+        val resolvedHeader = header ?: throw PgnssBuildException(
+            "none of the ${src.brdcNav.size} broadcast navigation file(s) carries a GPSA/GPSB " +
+                "ionospheric correction: ${src.brdcNav.joinToString(", ") { it.name }}",
+        )
+        if (nav == null) throw PgnssBuildException("no BeiDou ephemeris in any broadcast navigation file")
+        if (headerFrom != src.brdcNav.first().name) {
+            stats.add("Klobuchar from $headerFrom — today's broadcast file carries none yet")
         }
         val bds = PgnssExtraFile.buildBds(nav, reference, epoch)
         val out = PgnssExtraFile.build(
-            epoch, reference, yuma, gssc, agl, header.first, header.second, bds,
+            epoch, reference, yuma, gssc, agl, resolvedHeader.first, resolvedHeader.second, bds,
         )
         stats.add(
             "EXTRA ${yuma.size} GPS / ${gssc.size} Galileo / ${agl.size} GLONASS almanacs, " +

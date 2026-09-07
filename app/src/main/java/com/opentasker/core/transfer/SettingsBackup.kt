@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.opentasker.core.storage.AppDatabase
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -414,18 +416,28 @@ object SettingsBackup {
         }
         if (MAPS_TABLE !in present) return
 
+        // Every column EXCEPT the pixels. `SELECT *` here threw
+        // `SQLiteBlobTooBigException: Row too big to fit into CursorWindow` the moment one cutout
+        // passed 2 MB, and took the whole app-data backup down with it — 応用管理 could not back
+        // this app up at all (found 2026-09-06 by 応用管理, in a run of its own). A cursor row must
+        // fit a ~2 MB window whole, so a multi-megabyte blob cannot come back through one at any
+        // page size; the only fix is not to select it. The bytes are fetched per key below.
+        val columns = ArrayList<String>()
+        sql.query("SELECT * FROM `$MAPS_TABLE` LIMIT 0").use { c ->
+            for (i in 0 until c.columnCount) if (c.getColumnName(i) != "png") columns.add(c.getColumnName(i))
+        }
+        if (columns.isEmpty()) return
+
         val index = StringBuilder()
-        val pngs = LinkedHashMap<String, ByteArray>()
-        sql.query("SELECT * FROM `$MAPS_TABLE`").use { c ->
+        val keys = ArrayList<String>()
+        sql.query("SELECT ${columns.joinToString(",") { "`$it`" }} FROM `$MAPS_TABLE`").use { c ->
             while (c.moveToNext()) {
                 if (isCancelled?.invoke() == true) throw ExportCancelledException()
                 var key: String? = null
-                var png: ByteArray? = null
                 val row = buildJsonObject {
                     for (i in 0 until c.columnCount) {
                         val name = c.getColumnName(i)
                         when {
-                            name == "png" -> png = c.getBlob(i)
                             c.getType(i) == android.database.Cursor.FIELD_TYPE_NULL -> {}
                             c.getType(i) == android.database.Cursor.FIELD_TYPE_INTEGER ->
                                 put(name, JsonPrimitive(c.getLong(i)))
@@ -441,13 +453,50 @@ object SettingsBackup {
                 }
                 val id = key ?: continue
                 index.append(ndjsonLine(row)).append('\n')
-                png?.let { pngs[id] = it }
+                keys.add(id)
             }
         }
         if (index.isEmpty()) return
         writeEntry(zip, "$MAPS_DIR/index.ndjson", index.toString().toByteArray())
-        for ((id, bytes) in pngs) writeEntry(zip, "$MAPS_DIR/$id.png", bytes)
+        // One picture at a time, and each one streamed in slices rather than held: four cutouts at
+        // the viewer's resolution would otherwise be thirty megabytes of ByteArray waiting on a ZIP.
+        for (id in keys) {
+            if (isCancelled?.invoke() == true) throw ExportCancelledException()
+            writeCutoutEntry(zip, sql, id)
+        }
     }
+
+    /**
+     * Copy one cutout's pixels into the archive without ever putting the whole row in a cursor.
+     *
+     * `substr()` on a BLOB counts BYTES and is 1-based; each slice comes back as its own small row,
+     * so the window limit that broke the export above cannot apply however large the picture is.
+     * A row that vanishes between the index read and here simply contributes no entry — the import
+     * side already skips an index line whose picture is missing.
+     */
+    private fun writeCutoutEntry(zip: ZipOutputStream, sql: SupportSQLiteDatabase, key: String) {
+        val size = sql.query(
+            SimpleSQLiteQuery("SELECT length(png) FROM `$MAPS_TABLE` WHERE `key` = ?", arrayOf<Any?>(key)),
+        ).use { c -> if (c.moveToNext() && !c.isNull(0)) c.getInt(0) else 0 }
+        if (size <= 0) return
+        zip.putNextEntry(ZipEntry("$MAPS_DIR/$key.png"))
+        var got = 0
+        while (got < size) {
+            val slice = sql.query(
+                SimpleSQLiteQuery(
+                    "SELECT substr(png, ?, ?) FROM `$MAPS_TABLE` WHERE `key` = ?",
+                    arrayOf<Any?>(got + 1, BLOB_CHUNK, key),
+                ),
+            ).use { c -> if (c.moveToNext()) c.getBlob(0) else null } ?: break
+            if (slice.isEmpty()) break
+            zip.write(slice)
+            got += slice.size
+        }
+        zip.closeEntry()
+    }
+
+    /** Comfortably inside the ~2 MB cursor window, and few enough queries to not matter. */
+    private const val BLOB_CHUNK = 512 * 1024
 
     /** Put the base maps back — the row from the index, the pixels from the file beside it. */
     private fun importCutouts(entries: Map<String, ByteArray>, db: AppDatabase): Int {

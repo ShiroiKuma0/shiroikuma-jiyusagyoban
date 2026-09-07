@@ -27,6 +27,7 @@ import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.huawei.HuaweiFaceLibrary
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncRunner
+import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.ui.charts.BandLanguage
 import com.opentasker.ui.charts.ChartStyle
 import com.opentasker.ui.charts.Loc
@@ -309,7 +310,7 @@ class HuaweiBoardActivity : ComponentActivity() {
     private suspend fun walkCutout(): ByteArray? = runCatching {
         val dao = OpenTaskerApp_NoHilt.db.huaweiWorkoutDao()
         val key = dao.cutoutKeys().firstOrNull() ?: return null
-        val png = dao.cutout(key) ?: return null
+        val png = HuaweiWorkoutStore.cutout(dao, key) ?: return null
         val src = BitmapFactory.decodeByteArray(png, 0, png.size) ?: return null
         val w = src.width
         val h = (w * 3f / 4f).toInt().coerceAtMost(src.height)
