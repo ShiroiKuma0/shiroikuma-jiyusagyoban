@@ -8,6 +8,29 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+071 — 2026-09-07
+
+### 衛星 — the set is only copied out when asked for
+
+`+070` copied every built set to `/sdcard/tmp/pgnss_<stamp>/` by default. That was deliberate and it
+was temporary: for one evening the satellite data was broken, and every run had to be gradeable
+without anyone having to remember to ask for the evidence first. The band fixes in about **13 s**
+again, so it goes back off.
+
+Diagnostic machinery that outlives its diagnosis is litter in the one folder that gets looked at, at
+roughly 800 KB a run. **The capability stays** — give the action a folder and the six files land
+there under a datetime stamp, with a `built.txt` naming the window the bytes actually carry, which is
+what `scripts/pgnss-grade.py` needs to grade the orbits against an independent product. An empty
+setting simply means: do not copy.
+
+Everything from `+070` that is a guard rather than an instrument stays exactly as it was — the build
+still reads its own output back before calling itself done, `HUAWEI_PgnssResult` still records
+`NOT REBUILT — <reason>` on any run that did not really rebuild, and the magenta ⚠ banner still
+appears whenever nothing reached the band. Those cost nothing on a healthy run and they are what
+turned four days of guesswork into one.
+
+**Install this rather than `+070`** — it is the same fix without the debugging behaviour.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+070 — 2026-09-07
 
 ### 衛星 — the forecast had been four days dead, and nothing said so
