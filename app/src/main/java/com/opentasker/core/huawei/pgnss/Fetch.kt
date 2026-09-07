@@ -205,13 +205,36 @@ class PgnssFetcher(
         throw IOException("no IAC GLONASS almanac available for ${today.year} or ${today.year - 1}")
     }
 
-    /** The BKG mixed broadcast navigation file — Klobuchar, the UTC set and the BeiDou ephemeris. */
+    /**
+     * The BKG mixed broadcast navigation file — Klobuchar, the UTC set and the BeiDou ephemeris.
+     *
+     * **Two products, IGS first.** `BRDC00WRD_R` stopped carrying an `IONOSPHERIC CORR` block: its
+     * header is down to a single `LEAP SECONDS` line, with no GPSA, no GPSB and no GPUT. That is
+     * not a partial file — it is what BKG's `gfzrnx` conversion now emits, confirmed by fetching
+     * days 248 and 249 by hand. The build needs GPS Klobuchar, so it died on every run from
+     * 2026-09-02 onwards and left 白い熊's band on a set four days old (2026-09-06).
+     *
+     * `BRDC00IGS_R` carries GPSA, GPSB and GPUT and is a MIXED file like the other, so it serves
+     * both purposes. It is a daily product published after the day closes, so TODAY is a 404 and
+     * today falls back to `WRD` — which is fine, because the caller fetches several days and the
+     * header is taken from whichever of them has one. Checked and rejected: `BRDM00DLR_S` has GPUT
+     * but its ionosphere is GAL/BDS/QZS/IRN only, and `BRD400DLR_S` and `BRDC00WRD_S` have neither.
+     */
     fun fetchBrdcNav(date: LocalDate): File {
         val year = date.year
         val doy = String.format(Locale.ROOT, "%03d", date.dayOfYear)
-        val name = "BRDC00WRD_R_$year${doy}0000_01D_MN.rnx.gz"
-        val gz = fetch(name, "$BKG/$year/$doy/$name", ::looksLikeGzip)
-        return gunzip(gz)
+        var last: Exception? = null
+        for (product in BRDC_PRODUCTS) {
+            val name = "${product}_$year${doy}0000_01D_MN.rnx.gz"
+            try {
+                return gunzip(fetch(name, "$BKG/$year/$doy/$name", ::looksLikeGzip))
+            } catch (e: IOException) {
+                // A product that is not published for this day yet is the ordinary case, not a
+                // fault: the next one in the list is what this list is for.
+                last = e
+            }
+        }
+        throw last ?: IOException("no broadcast navigation file for $year/$doy")
     }
 
     // ── transport ───────────────────────────────────────────────────────────────────────────────
@@ -340,6 +363,9 @@ class PgnssFetcher(
         private const val ICGEM = "https://icgem.gfz-potsdam.de"
         private const val GSSC = "https://www.gsc-europa.eu/sites/default/files/sites/all/files"
         private const val BKG = "https://igs.bkg.bund.de/root_ftp/IGS/BRDC"
+
+        /** Broadcast navigation products, best header first. See [fetchBrdcNav]. */
+        private val BRDC_PRODUCTS = listOf("BRDC00IGS_R", "BRDC00WRD_R")
         /**
          * Where `WUM0MGXNRT` can be had, fastest first. The product is Wuhan's either way — `WUM`
          * is Wuhan Multi-GNSS — and both mirrors serve byte-identical files; only the wire speed

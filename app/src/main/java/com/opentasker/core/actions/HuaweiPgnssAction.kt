@@ -83,6 +83,20 @@ class HuaweiPgnssAction : Action {
         }
 
         val cancelVar = args["cancel_var"]?.trim()?.ifEmpty { null }
+        // Defaulted ON, which is not the usual shape for an optional field and is deliberate.
+        //
+        // The set is built by the 「Satellite update」 SCENE, whose task passes fixed arguments; a
+        // new field on this action is invisible there, so an opt-in copy could only be reached by
+        // editing the workspace. The copy is what makes the set gradeable at all — six files,
+        // about two megabytes, next to the fifteen-megabyte APKs already in that folder — and
+        // until the satellite data is trusted again it should happen every time without anyone
+        // remembering to ask (白い熊, 2026-09-06). `off` turns it off.
+        val copyArg = args["copy_to"]?.trim().orEmpty()
+        val copyTo = when {
+            copyArg.isEmpty() -> DEFAULT_COPY_TO
+            copyArg.lowercase() in setOf("off", "none", "no", "0", "false") -> null
+            else -> copyArg
+        }
         cancelVar?.let { ctx.variables.set(it, "0") }
 
         val power = ctx.app.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -120,11 +134,33 @@ class HuaweiPgnssAction : Action {
                 }
             }
             panel.finish(result)
+            // A copy where a grader can reach it, when asked for.
+            //
+            // The set is byte-perfect by construction — `RecordsTest` holds every record and every
+            // assembled file identical to Huawei's own capture — and that says nothing about
+            // whether the ORBITS in it are right, because the encoder is graded against the
+            // reference and the trajectory is not. `scripts/pgnss-grade.py` is the check that
+            // bites, and it could not be run at all: the six files land in `user_files`, which no
+            // export carries and `adb` cannot read on a release build (白い熊, 2026-09-06, after a
+            // walk that waited nineteen minutes for a fix on a set the band accepted as fresh).
+            // Recorded on EVERY path, not only this one — see the failure branches below. A run
+            // that reports "Build done" and leaves a four-day-old set behind is the fault this
+            // whole round exists to stop (白い熊, 2026-09-06), and the panel could not tell the
+            // difference because nothing wrote down what had actually been produced.
+            ctx.variables.set("${prefix}PgnssResult", result.summary)
+            // Cleared only by a run that really did rebuild. See the failure paths.
+            ctx.variables.set("${prefix}PgnssAlert", "")
             store?.let { ctx.variables.set(it, result.summary) }
             ctx.logger("Huawei predicted ephemeris: ${result.summary}")
             for (note in result.notes) ctx.logger("  $note")
             return ActionResult.Success
         } catch (cancelled: PgnssCancelledException) {
+            ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — cancelled at step ${panel.step}")
+            ctx.variables.set(
+                "${prefix}PgnssAlert",
+                "THE SET WAS NOT REBUILT — cancelled at step ${panel.step}. The band still holds " +
+                    "whatever it had before, which may be out of date.",
+            )
             return panel.fail(store, panel.step, "cancelled")
         } catch (timeout: TimeoutCancellationException) {
             return panel.fail(
@@ -137,13 +173,33 @@ class HuaweiPgnssAction : Action {
             // actually matters, and it must not hop dispatchers to do its work.
             throw stopped
         } catch (error: Throwable) {
-            return panel.fail(store, panel.step, error.message ?: error::class.java.simpleName)
+            val why = error.message ?: error::class.java.simpleName
+            ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — $why")
+            // The loud one. A build that fails leaves the PREVIOUS set on disk and the band goes on
+            // being served it — which is exactly how a set from 2026-09-02 survived four days of
+            // runs whose panel read "Build done" (白い熊, 2026-09-06). Silence here is the bug.
+            ctx.variables.set(
+                "${prefix}PgnssAlert",
+                "THE SET WAS NOT REBUILT — $why. The band still holds the previous set, which may " +
+                    "be out of date. Nothing new has been handed over.",
+            )
+            return panel.fail(store, panel.step, why)
         } finally {
             // NonCancellable, for the reason spelled out in HuaweiSessionGuard: `withContext` calls
             // `ensureActive()` BEFORE it runs anything, so cleanup that hops dispatchers throws
             // instead of cleaning up once the coroutine has been cancelled — silently, when it is
             // wrapped in runCatching as cleanup usually is.
             withContext(NonCancellable) {
+                // The copy lives HERE, not on the success path, because the success path is not
+                // where 白い熊 leaves this action.
+                //
+                // Steps 3 and 4 are the band's, and the band refuses a new set for an hour after
+                // taking one — so the ordinary end of a run is 白い熊 CANCELLING at step 3, which
+                // threw the finished set away along with the rest of the run (白い熊, 2026-09-06).
+                // The bytes exist the moment the build returns; anything after that is the band's
+                // business and none of it can make the set less worth grading. NonCancellable is
+                // what makes this survive the cancel that is the whole point of it.
+                copyTo?.let { dest -> runCatching { copyOut(outDir, dest, ctx.logger) } }
                 runCatching { wakeLock.release() }
                 // The scratch is deleted every time, success or failure. There is no cache here on
                 // purpose, and a 25 MB input left behind is one a future run might be tempted to
@@ -389,5 +445,57 @@ class HuaweiPgnssAction : Action {
             val scale = battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
             return if (level >= 0 && scale > 0) level * 100 / scale else -1
         }
+    }
+
+    /**
+     * Copy the finished set somewhere a grader can read it, under its own datetime stamp.
+     *
+     * Stamped rather than overwritten because the whole point is comparing one day's set against
+     * another's: a run that replaced yesterday's would destroy the only evidence of what changed.
+     * Failures are logged and never thrown — a diagnostic copy must not fail a build that
+     * succeeded.
+     */
+    /** Where a built set is copied unless told otherwise — the one folder 白い熊 and adb both read. */
+    private val DEFAULT_COPY_TO = "/sdcard/tmp"
+
+    private fun copyOut(outDir: java.io.File, dest: String, logger: (String) -> Unit) {
+        runCatching {
+            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.US)
+                .format(java.util.Date())
+            val target = java.io.File(dest.trim(), "pgnss_$stamp")
+            target.mkdirs()
+            var n = 0
+            var bytes = 0L
+            outDir.listFiles()?.sortedBy { it.name }?.forEach { f ->
+                if (!f.isFile) return@forEach
+                f.copyTo(java.io.File(target, f.name), overwrite = true)
+                n++
+                bytes += f.length()
+            }
+            // A note beside the bytes saying WHEN the set they came from was built.
+            //
+            // The copy runs even when the build was cancelled or failed, which is what makes it
+            // useful — and also what makes it treacherous: it will happily copy a set from four
+            // days ago and look exactly like a fresh one. The window is in the files themselves,
+            // so writing it down costs nothing and settles the question the moment the folder is
+            // opened (白い熊, 2026-09-06 — two runs whose copies turned out to be the same corpse).
+            val window = runCatching {
+                java.io.File(target, "HW_PGNSS_GPS").inputStream().use { input ->
+                    val head = ByteArray(4)
+                    if (input.read(head) != 4) null else {
+                        val gps = (head[0].toLong() and 0xFF) or ((head[1].toLong() and 0xFF) shl 8) or
+                            ((head[2].toLong() and 0xFF) shl 16) or ((head[3].toLong() and 0xFF) shl 24)
+                        val ms = (gps - 18L + 315_964_800L) * 1000L
+                        val f = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm 'UTC'", java.util.Locale.US)
+                        f.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                        f.format(java.util.Date(ms))
+                    }
+                }
+            }.getOrNull() ?: "unknown"
+            val age = "copied ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                .format(java.util.Date())} · window starts $window"
+            runCatching { java.io.File(target, "built.txt").writeText(age + "\n") }
+            logger("Huawei predicted ephemeris: copied $n file(s), $bytes B to ${target.absolutePath} · $age")
+        }.onFailure { logger("Huawei predicted ephemeris: could not copy the set out — ${it.message}") }
     }
 }
