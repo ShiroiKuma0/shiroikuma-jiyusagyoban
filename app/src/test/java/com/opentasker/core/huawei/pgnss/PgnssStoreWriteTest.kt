@@ -1,6 +1,7 @@
 package com.opentasker.core.huawei.pgnss
 
 import com.opentasker.ProductionSources
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -56,12 +57,19 @@ class PgnssStoreWriteTest {
     }
 
     @Test
-    fun `a copied set carries the window it was built for`() {
+    fun `a copied set carries the window it was built for, and nothing is copied unasked`() {
         val src = ProductionSources.read("com/opentasker/core/actions/HuaweiPgnssAction.kt")
         // The copy runs even on a cancelled run, so a folder of files proves nothing on its own —
         // it looked identical for a set four days dead and one built minutes ago.
         assertTrue("the copy must write a note beside the bytes", src.contains("built.txt"))
         assertTrue("naming the window the files carry", src.contains("window starts"))
+        // And it is OFF unless a folder is given. It was defaulted on for exactly one evening, to
+        // make a broken set gradeable; diagnostic machinery that outlives its diagnosis is litter
+        // in the one folder 白い熊 actually looks at (白い熊, 2026-09-07).
+        assertFalse(
+            "no default destination — an empty argument must mean do not copy",
+            src.contains("DEFAULT_COPY_TO"),
+        )
     }
 
     @Test
