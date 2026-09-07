@@ -1231,7 +1231,7 @@ fun registerActionMetadata() {
                 ActionField("dir", "Folder to write the set into", hint = "default gnss — the SAME folder the Huawei Band GNSS action reads. Six files land here: HW_PGNSS_GPS, _BDS, _GLONASS, _GALILEO, _QZS and _EXTRA"),
                 ActionField("work", "Scratch folder", hint = "where the downloads land. Default: the app's cache. Emptied at the end of every run, successful or not — a kept orbit product is a WRONG orbit product a day later"),
                 ActionField("cancel_var", "Cancel variable", hint = "set it to 1 to stop the build — it is minutes of work and needs a way out that is not force-stopping the app"),
-                ActionField("copy_to", "Also copy the set to", hint = "default /sdcard/tmp — a stamped copy of the six files, so scripts/pgnss-grade.py can grade the ORBITS against an independent product. Set it to off to keep the set inside the app"),
+                ActionField("copy_to", "Also copy the set to", hint = "empty = do not copy. Give it a folder such as /sdcard/tmp and the six files land there under a datetime stamp, with a built.txt naming the window they carry — which is what scripts/pgnss-grade.py needs to grade the orbits"),
                 ActionField("force", "Run it anyway", FieldType.CHECKBOX, hint = "off by default. Without it the build is refused below 20 % battery: it is several minutes of every core. Charging is never required"),
                 ActionField("prefix", "Variable prefix", hint = "default HUAWEI_ — writes <prefix>PgnssSteps, PgnssPhase, PgnssDetail, PgnssCount, PgnssPct, PgnssElapsed, PgnssEta, PgnssLog, PgnssResult and PgnssFailed"),
                 ActionField("store", "Store the summary in"),
