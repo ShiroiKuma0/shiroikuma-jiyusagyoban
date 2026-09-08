@@ -114,7 +114,32 @@ Checks that actually bite, in order of value:
   position: whatever they use must carry something in ours, whatever they leave zero must stay zero.
   Run it against **both** vintages in the archive, not one.
 - **Against an independent orbit product**, read without the generator's own epoch handling. Current
-  numbers: **GPS 0.24 m median**, **Galileo 0.14 m median** against the precise orbit.
+  numbers, measured 2026-09-07 on the first set built after the `BRDC00IGS_R` repair — the one that
+  fixed in ~13 s — against **Wuhan's OBSERVED orbits** (`WUM0MGXNRT`, WHU, observed half only):
+
+  | constellation | median | p95 | max |
+  | --- | --- | --- | --- |
+  | GPS | **0.22 m** | 0.54 m | 0.92 m |
+  | Galileo | **0.26 m** | 0.67 m | 0.85 m |
+  | BeiDou, excluding GEO | **0.09 m** | 0.36 m | 2.27 m |
+  | BeiDou, GEO included | 0.10 m | 0.63 m | 2.68 m |
+
+  The earlier figures this line carried — GPS 0.24 m, Galileo 0.14 m — were the PC-built set and are
+  the same class, so nothing regressed when the build moved onto the phone.
+
+  **The same set graded 0.03 m against `COD0OPSPRD_05D.SP3` and that number is worthless.** CODE's
+  five-day prediction is the product the build FITS TO, so grading against it is prediction against
+  prediction: it measures the fit and the byte encoding, both of which are sound, and cannot see the
+  orbits being wrong. The real error is seven times larger. This is the rule at the head of this
+  section, caught in the act — and it is why the honest grade has to wait for a window that has
+  passed and a product somebody else observed.
+
+  Scope of the 2026-09-07 run: the first ~22 h of a 72 h window, 57 samples per satellite against
+  180 for the full span, because Wuhan's newest issue was stamped doy 249 18:00 and its observed day
+  ends 09-07 18:00. The rest is gradeable from about 09-10.
+
+  For proportion: assistance data has to be right to within tens of metres to speed acquisition up.
+  At a quarter of a metre the orbits are nowhere near the limiting factor — the 13 s was earned.
 - **Against a broadcast capture** — RTCM 1019/1020 settle clock signs and TGD with no orbit product
   involved at all.
 - **By orbit, not by label** — propagate each record and identify which real satellite it *is*, then
