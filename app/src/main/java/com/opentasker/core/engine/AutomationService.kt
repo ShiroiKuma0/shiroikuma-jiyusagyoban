@@ -967,7 +967,21 @@ class AutomationService : Service() {
         scope.launch {
             delay(2_000) // let the engine + context sources settle before re-establishing state
             for (id in AutoStartSettings.taskIds(this@AutomationService)) {
-                val task = db.taskDao().getById(id)?.toDomain() ?: continue
+                val task = db.taskDao().getById(id)?.toDomain()
+                if (task == null) {
+                    // Said out loud, because the silence is what cost a whole restore. A task id
+                    // that resolves to nothing looks exactly like an empty auto-start list, and on
+                    // 2026-09-07 a restored phone ran nothing at all on startup for that reason —
+                    // the ids had come across from a database that numbered its rows differently
+                    // (白い熊). The archive carries names now; this is the guard for every other way
+                    // a row can go missing.
+                    AppLogger.info(
+                        "OpenTasker",
+                        "Auto-start: no task with id $id — it was removed, or restored from another " +
+                            "database. Re-add it under Monitor → Run on start.",
+                    )
+                    continue
+                }
                 runCatching { executeAndLogTask(this@AutomationService, db, task, source = "Auto-start") }
             }
         }
