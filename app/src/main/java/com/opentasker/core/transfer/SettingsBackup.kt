@@ -7,6 +7,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.opentasker.core.storage.AppDatabase
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.opentasker.core.logging.AppLogger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -131,7 +132,10 @@ object SettingsBackup {
         Cat.BUBBLES to listOf("shiroikuma_freeze_bubbles", "shiroikuma_flash_bubbles"),
         Cat.APP_SETTINGS to listOf(
             "shiroikuma_list_sort", "project_selection", "run_log_retention",
-            "auto_start_settings", "app_picker_prefs", "shiroikuma_runlog_seen", "ui_state",
+            // `shutdown_settings` was simply missing, so the run-on-exit list never travelled at
+            // all — the mirror of the run-on-start one, and just as silent about it.
+            "auto_start_settings", "shutdown_settings",
+            "app_picker_prefs", "shiroikuma_runlog_seen", "ui_state",
         ),
         Cat.SHARE_TILES to listOf("shiroikuma_share_relays"),
         // Every store 健康 authors. The band settings ride along because a restored phone that has
@@ -166,6 +170,43 @@ object SettingsBackup {
      */
     private const val MAPS_TABLE = "huawei_map_cutouts"
     private const val MAPS_DIR = "map_cutouts"
+
+    /**
+     * Preference files that hold TASK IDS, and the key each keeps them under.
+     *
+     * ## Why these cannot travel as they are
+     *
+     * A task id is a Room `autoGenerate` row number. It is stable and correct inside one database
+     * and meaningless outside it: an import rebuilds the table, so the same tasks come back numbered
+     * from scratch. 白い熊 restored this app onto a new phone on 2026-09-07 and **nothing ran on
+     * startup** — `auto_start_settings` had been carried across verbatim as `task_ids = "1511"`, a
+     * number from a database that had grown for months on the old phone and matched no row on the
+     * new one. The engine looked it up, found nothing, and ran nothing, because a dangling id and an
+     * empty list are the same thing to a `?: continue`.
+     *
+     * This is the rule the bundle layer has always followed — **ids inside, NAMES on the wire** —
+     * reaching the one place that never saw it, because these are preference strings rather than
+     * bundle fields and so never passed through the name-based DTO layer at all.
+     *
+     * So on the way out the ids become [TASK_NAMES_KEY], and on the way in the names become ids
+     * again. An archive written before this still imports: its bare `task_ids` is taken as-is, which
+     * is exactly as right or wrong as it was before.
+     */
+    private val TASK_ID_PREFS = mapOf(
+        "auto_start_settings" to "task_ids",
+        "shutdown_settings" to "task_ids",
+    )
+
+    /** Where the translated names live in the archive. Never written back into the preferences. */
+    private const val TASK_NAMES_KEY = "task_names"
+
+    /**
+     * The separator inside [TASK_NAMES_KEY].
+     *
+     * A tab, not a comma: task names here routinely carry ` -- [727]` and commas are ordinary
+     * inside them, while a tab is not a character any of 白い熊's names contains.
+     */
+    private const val TASK_NAME_SEP = "\t"
 
     /** Rows per read and per insert. Bounded so a table of a quarter-million rows never lands whole in memory. */
     private const val PAGE = 2_000
@@ -290,7 +331,7 @@ object SettingsBackup {
                     Cat.HEALTH_DATA -> exportTables(zip, db, isCancelled)
                     Cat.MAPS -> exportCutouts(zip, db, isCancelled)
                     else -> {
-                        writeEntry(zip, "${cat.id}.json", exportPrefs(context, PREF_FILES.getValue(cat)))
+                        writeEntry(zip, "${cat.id}.json", exportPrefs(context, PREF_FILES.getValue(cat), db))
                         if (cat == Cat.APPEARANCE) exportDirFiles(zip, File(context.filesDir, "fonts"), FONTS_DIR)
                     }
                 }
@@ -617,12 +658,36 @@ object SettingsBackup {
     }
 
     /** Type-tagged dump of the named SharedPreferences files: `{file: {key: {"t":…, "v":…}}}`. */
-    private fun exportPrefs(context: Context, files: List<String>): ByteArray {
+    private suspend fun exportPrefs(
+        context: Context,
+        files: List<String>,
+        db: AppDatabase,
+    ): ByteArray {
+        // id -> name, read once. Names are what the archive carries; see TASK_ID_PREFS.
+        val nameById = if (files.any { it in TASK_ID_PREFS }) {
+            db.taskDao().getAll().associate { it.id to it.name }
+        } else {
+            emptyMap()
+        }
         val root = buildJsonObject {
             files.forEach { name ->
                 val sp = context.getSharedPreferences(name, Context.MODE_PRIVATE)
+                val idKey = TASK_ID_PREFS[name]
                 put(name, buildJsonObject {
+                    if (idKey != null) {
+                        // A task whose row is gone contributes nothing rather than an empty name:
+                        // an id that already dangles on THIS phone is not worth carrying to the next.
+                        val names = (sp.getString(idKey, "") ?: "").split(",")
+                            .mapNotNull { it.trim().toLongOrNull() }
+                            .mapNotNull { nameById[it] }
+                        if (names.isNotEmpty()) {
+                            put(TASK_NAMES_KEY, typed("s", JsonPrimitive(names.joinToString(TASK_NAME_SEP))))
+                        }
+                    }
                     sp.all.forEach { (key, value) ->
+                        // The raw ids are not written: they would be restored verbatim by any
+                        // reader that does not understand the names, which is the bug itself.
+                        if (idKey != null && key == idKey) return@forEach
                         val tagged: JsonObject? = when (value) {
                             is Boolean -> typed("b", JsonPrimitive(value))
                             is Int -> typed("i", JsonPrimitive(value))
@@ -707,7 +772,7 @@ object SettingsBackup {
                 }
                 else -> {
                     val raw = entries["${cat.id}.json"] ?: continue
-                    val n = importPrefs(context, raw)
+                    val n = importPrefs(context, raw, db)
                     if (cat == Cat.APPEARANCE) importDirFiles(entries, FONTS_DIR, File(context.filesDir, "fonts"))
                     lines += "${cat.label}: $n keys"
                     restartNeeded = true
@@ -735,12 +800,35 @@ object SettingsBackup {
     }
 
     /** Merges a type-tagged prefs dump back — never clears, so missing keys keep current values. */
-    private fun importPrefs(context: Context, raw: ByteArray): Int {
+    private suspend fun importPrefs(context: Context, raw: ByteArray, db: AppDatabase): Int {
         val root = json.parseToJsonElement(raw.toString(Charsets.UTF_8)).jsonObject
         var n = 0
         root.forEach { (file, values) ->
             val ed = context.getSharedPreferences(file, Context.MODE_PRIVATE).edit() // merge — never clear
+            // Names back to ids, against THIS database. A name that no longer resolves is dropped
+            // rather than guessed at, and the count says how many landed — a silently shorter list
+            // is what made the original fault invisible for a whole restore.
+            TASK_ID_PREFS[file]?.let { idKey ->
+                val packed = (values.jsonObject[TASK_NAMES_KEY] as? JsonObject)
+                    ?.get("v")?.jsonPrimitive?.contentOrNull
+                if (packed != null) {
+                    val wanted = packed.split(TASK_NAME_SEP).map { it.trim() }.filter { it.isNotEmpty() }
+                    val found = wanted.map { it to db.taskDao().getByNameIgnoreCase(it)?.id }
+                    ed.putString(idKey, found.mapNotNull { it.second }.joinToString(","))
+                    n++
+                    val missing = found.filter { it.second == null }.map { it.first }
+                    if (missing.isNotEmpty()) {
+                        AppLogger.info(
+                            "SettingsBackup",
+                            "$file: ${wanted.size - missing.size} of ${wanted.size} task(s) resolved " +
+                                "by name — no such task: ${missing.joinToString(", ")}",
+                        )
+                    }
+                }
+            }
             values.jsonObject.forEach inner@{ (key, tagged) ->
+                // The names have already been turned into ids above; the key itself is not a setting.
+                if (key == TASK_NAMES_KEY && file in TASK_ID_PREFS) return@inner
                 val obj = tagged as? JsonObject ?: return@inner
                 val t = obj["t"]?.jsonPrimitive?.contentOrNull ?: return@inner
                 val v = obj["v"] ?: return@inner
