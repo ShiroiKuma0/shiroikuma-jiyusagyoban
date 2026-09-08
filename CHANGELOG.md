@@ -8,6 +8,48 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+072 — 2026-09-08
+
+### 保存 — the startup task lists travel as names, not row ids
+
+白い熊 restored this app onto a second, identical phone and **nothing ran on startup**. Not a setting
+they had missed: `auto_start_settings` had come across verbatim as `task_ids = "1511"` — a Room row
+number from a database that had grown for months on the first phone, matching no row on the second,
+where the import had renumbered all 348 tasks from scratch. Both phones' archives were read and both
+said `1511`.
+
+The engine looked the id up, found nothing, and ran nothing, because `?: continue` cannot tell a
+dangling id from an empty list. That silence is why it survived a whole restore rather than being
+noticed on the first boot.
+
+This is the oldest transport rule here — **ids inside, names on the wire** — reaching the one place
+that never saw it: these are preference strings, so they never passed through the name-based DTO
+layer that already does this for everything else.
+
+- **The ids become task names on the way out**, and are resolved against the importing database on
+  the way in. The raw ids are **not** written beside them: a reader that ignored the names would
+  restore them verbatim, which is the bug itself. Names are tab-separated, since a task name here
+  routinely contains a comma and never a tab.
+- **`shutdown_settings` — the run-on-exit list — was in no export category at all**, so it had never
+  travelled. It does now.
+- **A dangling id says so.** The engine names the id it could not find and points at Monitor → Run on
+  start; an import that cannot resolve a name reports which one, rather than silently shortening the
+  list.
+
+An archive written before this still imports: its bare `task_ids` is taken as-is, exactly as right or
+wrong as it was before. **A backup taken with this build is what carries the names**, so re-take one
+rather than restoring an older archive.
+
+Confirmed on the second phone: the restore now comes up running its start task.
+
+### One thing a restore can never carry
+
+Display scaling is a system setting, not app data. 白い熊's setup is `display_density_forced = 390`
+against a physical 460, and `font_scale = 1.3`; a freshly restored phone comes up at 460/1.0 and
+every dp-sized overlay renders **19 %** larger — measured on the 82 dp brightness panel, 168 px
+against 200 px. `wm density 390` and `settings put system font_scale 1.3` set them, and the engine
+wants restarting afterwards so live overlays are rebuilt at the new scale.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+071 — 2026-09-07
 
 ### 衛星 — the set is only copied out when asked for
