@@ -133,6 +133,22 @@ class VariableExpander {
         var i = 0
         while (i < expr.length) {
             val c = expr[i]
+            // `%%` is a literal percent.
+            //
+            // Nothing consumed it before, so a text ending "電池 %HUAWEI_BatteryPct%%" expanded the
+            // variable and then printed BOTH signs — 「電池 19%%」 on the one notification meant to
+            // be read at a glance (白い熊, 2026-09-08). Writing `%%` for a literal `%` beside a
+            // variable is the natural thing to reach for, and it was silently wrong.
+            //
+            // Safe to add now rather than later: `%%` occurs exactly three times in the whole
+            // workspace, all three in that one pair of tasks and all three meaning this. The
+            // alternative — editing the tasks — would re-import them, and a task re-imported alone
+            // is re-IDed, which dangles whatever profile runs it.
+            if (c == '%' && i + 1 < expr.length && expr[i + 1] == '%') {
+                out.append('%')
+                i += 2
+                continue
+            }
             if (expr.startsWith("\\%", i) && startsVariable(expr, i + 2)) {
                 // \%%name is a percent sign and the value, and Tasker reads an unset name as blank there.
                 val token = readVariableToken(expr, i + 2, variableStore, arrayStore)
