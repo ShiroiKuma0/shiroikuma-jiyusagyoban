@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
+import com.opentasker.core.logging.AppLogger
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -178,31 +179,70 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         // Drop anything this client is still holding before asking for a second link. The band
         // serves ONE connection, so a socket stranded by an earlier run does not merely leak — it
         // locks the band out from under its own owner, and every attempt after it fails identically.
-        closeQuietly()
-        runCatching {
-            a.cancelDiscovery()
-            val s = device.createRfcommSocketToServiceRecord(SERVICE_UUID)
-            // PUBLISHED BEFORE THE CONNECT, deliberately.
-            //
-            // `connect()` blocks with no timeout of its own and cannot be cancelled either; closing
-            // the socket is the documented way to abort it, and is safe here in a way it is not for
-            // [read]: a connect that has not completed has no session to lose. Assigning the field
-            // only afterwards left a pending connect invisible to [close], so the session watchdog
-            // one layer up had nothing to close and its "the socket close is what breaks a blocked
-            // call" contract quietly did not hold during connect — the one place it is needed most.
-            socket = s
-            val watchdog = watchdogs.launch {
-                delay(CONNECT_TIMEOUT_MS)
-                runCatching { s.close() }
-            }
-            try { s.connect() } finally { watchdog.cancel() }
-            input = s.inputStream
-            output = s.outputStream
-        }.exceptionOrNull()?.let { e ->
+        // THREE WAYS OF ASKING, and the point is the message when all three fail.
+        //
+        // On 2026-09-09 every sync on 白い熊's second phone died with a bare
+        // "read failed, socket might closed or timeout, read ret: -1" while Bluetooth was on, the
+        // band was bonded, awake and at 99 %, and the permissions were granted. One opaque line
+        // cannot distinguish a sleeping band from an unresolved SDP lookup from a refused link, and
+        // a day went into guessing between them — a flat battery, then a stale SDP cache, both
+        // wrong.
+        //
+        // Asking several ways and reporting ALL the answers settles it in one screenshot. It did:
+        // the secure UUID, the insecure variant, the alternate record AND the two channels dialled
+        // by NUMBER (which need no SDP at all) every failed identically — which proves the fault is
+        // below the channel, in the link itself. That is a stale link key: the phone still says
+        // BOND_BONDED while the band no longer honours it, and only an unpair-and-re-pair clears
+        // it (白い熊, who reached that conclusion first). The re-pair fixed it: 1008 samples,
+        // 49/49 records.
+        //
+        // The two by-number rungs are GONE now. They earned their keep by killing the SDP theory
+        // and cannot fix the fault that was actually there, so keeping a reflective call on a
+        // hidden constructor to guard a case never observed is a liability, not insurance. What
+        // stays is the shape that made the diagnosis: several public routes, every answer reported.
+        val attempts: List<Pair<String, () -> BluetoothSocket>> = listOf(
+            "uuid" to { device.createRfcommSocketToServiceRecord(SERVICE_UUID) },
+            "uuid-insecure" to { device.createInsecureRfcommSocketToServiceRecord(SERVICE_UUID) },
+            "alt-uuid" to { device.createRfcommSocketToServiceRecord(ALT_SERVICE_UUID) },
+        )
+        val failures = StringBuilder()
+        for ((label, make) in attempts) {
             closeQuietly()
-            return@withContext "RFCOMM refused: ${e.message ?: e::class.java.simpleName}"
+            val outcome = runCatching {
+                a.cancelDiscovery()
+                val s = make()
+                // PUBLISHED BEFORE THE CONNECT, deliberately.
+                //
+                // `connect()` blocks with no timeout of its own and cannot be cancelled either;
+                // closing the socket is the documented way to abort it, and is safe here in a way
+                // it is not for [read]: a connect that has not completed has no session to lose.
+                // Assigning the field only afterwards left a pending connect invisible to [close],
+                // so the session watchdog one layer up had nothing to close and its "the socket
+                // close is what breaks a blocked call" contract quietly did not hold during
+                // connect — the one place it is needed most.
+                socket = s
+                val watchdog = watchdogs.launch {
+                    delay(CONNECT_TIMEOUT_MS)
+                    runCatching { s.close() }
+                }
+                try { s.connect() } finally { watchdog.cancel() }
+                input = s.inputStream
+                output = s.outputStream
+            }
+            if (outcome.isSuccess) {
+                if (label != "uuid") {
+                    // Worth saying: the first rung is the one that works on a settled phone, so
+                    // needing a later one is a fact about this pairing, not noise.
+                    AppLogger.info("HuaweiRfcomm", "RFCOMM opened on the $label rung, not the SDP lookup")
+                }
+                return@withContext null
+            }
+            val e = outcome.exceptionOrNull()
+            failures.append(if (failures.isEmpty()) "" else "; ")
+                .append(label).append(": ").append(e?.message ?: e?.let { it::class.java.simpleName })
         }
-        null
+        closeQuietly()
+        return@withContext "RFCOMM refused: $failures"
     }
 
     /** False once the link is gone, so a pump loop can tell a quiet band from a dead one. */
