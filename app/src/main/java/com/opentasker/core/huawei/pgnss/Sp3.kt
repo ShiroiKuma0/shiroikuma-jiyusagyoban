@@ -207,11 +207,21 @@ object Sp3 {
      * invents: two BeiDou satellites were graded at 37 km and 32 km against nothing but the
      * interpolator's imagination, and their orbits were fine. Anything that reads a merged series
      * has to ask this first.
+     *
+     * It also asks whether [t] is INSIDE the stencil, which is a different question and was missing
+     * until 2026-09-09. A time before the first sample clamps the stencil to the first nine, which
+     * are perfectly contiguous — so this said yes and [interpolatePosition] then EXTRAPOLATED a
+     * degree-8 polynomial. The grading script shares this code's shape and had the same hole: a
+     * satellite that joins the merged product a day late graded at 3.3e13 m, twice, and cost a day
+     * of attention each time before the number was recognised as impossible rather than alarming.
+     * No caller here can reach it — [PredictedSet] bounds its own sample times — which is exactly
+     * why it is worth closing now rather than after the next caller.
      */
     fun spanned(times: DoubleArray, t: Double, order: Int = 9, tol: Double = 1.5): Boolean {
         val lo = stencilStart(times, t, order)
         val hi = min(lo + order, times.size)
         if (hi - lo < order) return false
+        if (t < times[lo] || t > times[hi - 1]) return false
         val diffs = DoubleArray(hi - lo - 1) { times[lo + it + 1] - times[lo + it] }
         return times[hi - 1] - times[lo] <= tol * median(diffs) * (order - 1)
     }
