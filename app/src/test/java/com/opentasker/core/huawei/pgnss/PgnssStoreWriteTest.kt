@@ -74,10 +74,12 @@ class PgnssStoreWriteTest {
 
     @Test
     fun `a broadcast file with no ionosphere block does not stop the build`() {
+        // The nav files are read in `validate` now, not in `buildExtra` — which is the same fix
+        // told twice: the refusal below used to fire AFTER the ten minutes of fitting.
         val body = ProductionSources.block(
             "com/opentasker/core/huawei/pgnss/PredictedSet.kt",
-            "private fun buildExtra(",
-            "fun seedCaptured(",
+            "private fun readBroadcastNav(",
+            "// ── BeiDou ",
         )
         // The header used to be read from brdcNav.first() alone. Today's BRDC is still being
         // written while this runs, so a partial one has no IONOSPHERIC CORR block, the parse threw,
@@ -85,7 +87,7 @@ class PgnssStoreWriteTest {
         // reading "Build done". Four days of 白い熊's walks were served a set from 2026-09-02.
         assertTrue(
             "the header must be searched for across every downloaded day",
-            body.contains("for (file in src.brdcNav)") && body.contains("if (header == null)"),
+            body.contains("for ((file, _) in usable)") && body.contains("if (header == null)"),
         )
         assertTrue(
             "a missing block in one file must not throw out of the loop",
