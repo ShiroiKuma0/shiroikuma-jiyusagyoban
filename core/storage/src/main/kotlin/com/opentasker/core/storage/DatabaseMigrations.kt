@@ -556,6 +556,20 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * `tasks.enabled` — a task that is kept but does not run.
+     *
+     * The DEFAULT is spelled out because the entity declares `@ColumnInfo(defaultValue = "1")`, and
+     * Room validates the live database against its exported schema at OPEN time: a column added
+     * without the default matches on a fresh install and throws on every existing one, which is a
+     * failure only a device holding the old database can show.
+     */
+    val MIGRATION_30_31 = object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `tasks` ADD COLUMN `enabled` INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -587,6 +601,7 @@ object DatabaseMigrations {
             MIGRATION_27_28,
             MIGRATION_28_29,
             MIGRATION_29_30,
+            MIGRATION_30_31,
         )
     }
 }
