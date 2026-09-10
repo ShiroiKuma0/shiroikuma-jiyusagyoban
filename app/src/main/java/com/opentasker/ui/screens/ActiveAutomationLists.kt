@@ -68,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardActions
@@ -136,6 +137,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.opentasker.core.engine.RunLogOutcome
+import com.opentasker.core.engine.FlowControl
 import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.engine.outcome
 /**
@@ -836,6 +838,7 @@ internal fun TasksScreen(
     // nothing is worse than one that plainly says "not now".
     runBusy: Boolean = false,
     onSetTaskFreeze: (Task, Boolean) -> Unit,
+    onSetTaskEnabled: (Task, Boolean) -> Unit,
     onPinTask: (Task) -> Unit,
     onAddAction: (Task) -> Unit,
     onEditAction: (Task, Int, ActionSpec) -> Unit,
@@ -931,6 +934,7 @@ internal fun TasksScreen(
                     onRun = { onRunTask(task) },
                     runBusy = runBusy,
                     onToggleFreeze = { onSetTaskFreeze(task, it) },
+                    onToggleEnabled = { onSetTaskEnabled(task, it) },
                     onPin = { onPinTask(task) },
                     onAddAction = { onAddAction(task) },
                     onEditAction = { index, action -> onEditAction(task, index, action) },
@@ -1074,6 +1078,7 @@ private fun TaskCard(
     onRun: () -> Unit,
     runBusy: Boolean = false,
     onToggleFreeze: (Boolean) -> Unit,
+    onToggleEnabled: (Boolean) -> Unit,
     onPin: () -> Unit,
     onAddAction: () -> Unit,
     onEditAction: (Int, ActionSpec) -> Unit,
@@ -1195,7 +1200,16 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (broken) HealthAlertIcon()
-                        Text(task.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            task.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            // Dimmed and badged, never by hue alone — see the same treatment on a
+                            // disabled action row.
+                            modifier = Modifier.alpha(if (task.enabled) 1f else 0.45f),
+                        )
+                        if (!task.enabled) StatusPill("OFF", MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     // Collapsed: just the task name. Expanded: the priority / collision line.
                     if (expanded) {
@@ -1216,6 +1230,13 @@ private fun TaskCard(
                         ThemedDropdownMenu(expanded = taskMenu, onDismissRequest = { taskMenu = false }) {
                             DropdownMenuItem(text = { Text("Rename") }, onClick = { taskMenu = false; showRename = true })
                             DropdownMenuItem(text = { Text("Edit") }, onClick = { taskMenu = false; onEdit() })
+                            // Kept whole, simply not run — by a profile, a widget, `task.run`, a
+                            // shortcut or the bridge alike, because the gate is in the one place
+                            // every run funnels through.
+                            DropdownMenuItem(
+                                text = { Text(if (task.enabled) "Disable" else "Enable") },
+                                onClick = { taskMenu = false; onToggleEnabled(!task.enabled) },
+                            )
                         }
                     }
                 }
@@ -1294,6 +1315,23 @@ private fun TaskCard(
                             val sel = targetActions(index).toSet()
                             applyActions(task.actions.filterIndexed { i, _ -> i !in sel })
                         },
+                        // One switch for the whole selection, and it moves them all the SAME way:
+                        // if anything selected is still on, the press turns everything off. A
+                        // per-item flip would leave a mixed selection mixed, which is the one
+                        // outcome nobody presses a button expecting.
+                        //
+                        // Every action qualifies, flow-control markers included (白い熊, 2026-09-10).
+                        onToggleEnabled = {
+                            val sel = targetActions(index).toSet()
+                            if (sel.isNotEmpty()) {
+                                val turnOff = sel.any { task.actions[it].enabled }
+                                applyActions(
+                                    task.actions.mapIndexed { i, a ->
+                                        if (i in sel) a.copy(enabled = !turnOff) else a
+                                    },
+                                )
+                            }
+                        },
                         onPasteBefore = { applyActions(task.actions.toMutableList().apply { addAll(index, clipboard) }) },
                         onPaste = { applyActions(task.actions.toMutableList().apply { addAll(index + 1, clipboard) }) },
                         onEdit = { onEditAction(index, action) },
@@ -1354,6 +1392,7 @@ private fun ActionRow(
     onCopy: () -> Unit,
     onCut: () -> Unit,
     onDeleteSelection: () -> Unit,
+    onToggleEnabled: () -> Unit,
     onPasteBefore: () -> Unit,
     onPaste: () -> Unit,
     onEdit: () -> Unit,
@@ -1396,6 +1435,9 @@ private fun ActionRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+                    // Dimmed AND badged. 白い熊 is red-green colour-blind, so "off" is never carried
+                    // by hue: the alpha does the work at a glance and the OFF pill says it in words.
+                    .alpha(if (action.enabled) 1f else 0.45f)
                     .padding(horizontal = 12.dp, vertical = themePrefs.actionRowPadDp.dp),
                 verticalArrangement = Arrangement.spacedBy(themePrefs.actionRowPadDp.dp),
             ) {
@@ -1406,6 +1448,7 @@ private fun ActionRow(
                     } else {
                         StatusPill("#${index + 1}", MaterialTheme.colorScheme.secondary)
                     }
+                    if (!action.enabled) StatusPill("OFF", MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(
                         Modifier.weight(1f)
                             .clip(RoundedCornerShape(8.dp))
@@ -1532,6 +1575,10 @@ private fun ActionRow(
                 DropdownMenuItem(text = { Text("Copy") }, onClick = onCopy)
                 DropdownMenuItem(text = { Text("Cut") }, onClick = onCut)
                 DropdownMenuItem(text = { Text("Delete") }, onClick = onDeleteSelection)
+                DropdownMenuItem(
+                    text = { Text(if (action.enabled) "Disable" else "Enable") },
+                    onClick = { onMenuDismiss(); onToggleEnabled() },
+                )
                 if (!clipboardEmpty) {
                     DropdownMenuItem(text = { Text("Paste before") }, onClick = onPasteBefore)
                     DropdownMenuItem(text = { Text("Paste after") }, onClick = onPaste)
