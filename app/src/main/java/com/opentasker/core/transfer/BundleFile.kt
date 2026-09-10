@@ -64,9 +64,9 @@ data class BundleFile(
             taskIdByName[d.name.lowercase()] = id
             Task(
                 id = id, name = d.name, priority = d.priority, collisionMode = d.collisionMode,
-                actions = d.actions.map { a -> ActionSpec(id = 0, type = a.type, label = a.label, args = a.args, continueOnError = a.continueOnError, condition = a.condition) },
+                actions = d.actions.map { a -> ActionSpec(id = 0, type = a.type, label = a.label, args = a.args, continueOnError = a.continueOnError, condition = a.condition, enabled = a.enabled) },
                 projectId = projId(d.projectName), position = d.position, iconPath = null,
-                freezeBubble = d.freezeBubble, iconData = d.iconData,
+                freezeBubble = d.freezeBubble, iconData = d.iconData, enabled = d.enabled,
             )
         }
         fun taskId(name: String): Long? = name.takeIf { it.isNotBlank() }?.let { taskIdByName[it.lowercase()] }
@@ -186,8 +186,11 @@ data class BundleFile(
             val tasks = b.tasks.map { t ->
                 TaskDto(
                     name = t.name, projectName = projName(t.projectId), priority = t.priority, collisionMode = t.collisionMode,
-                    actions = t.actions.map { a -> ActionDto(a.type, a.label, cleanArgs(a.type, a.args), a.continueOnError, a.condition) },
-                    position = t.position, freezeBubble = t.freezeBubble, iconData = t.iconData,
+                    actions = t.actions.map { a -> ActionDto(
+                        type = a.type, label = a.label, args = cleanArgs(a.type, a.args),
+                        continueOnError = a.continueOnError, condition = a.condition, enabled = a.enabled,
+                    ) },
+                    position = t.position, freezeBubble = t.freezeBubble, iconData = t.iconData, enabled = t.enabled,
                 )
             }
             val profiles = b.profiles.map { p ->
@@ -264,6 +267,8 @@ data class TaskDto(
     val actions: List<ActionDto> = emptyList(),
     val position: Int = 0,
     val freezeBubble: Boolean = false,
+    /** Off = kept but never run. Defaults true, so every archive written before this imports unchanged. */
+    val enabled: Boolean = true,
     val iconData: String? = null,      // base64 PNG (the device-local iconPath is intentionally not exported)
 )
 
@@ -273,6 +278,8 @@ data class ActionDto(
     val label: String? = null,
     val args: Map<String, String> = emptyMap(),
     val continueOnError: Boolean = false,
+    /** Off = the interpreter walks past it. Defaults true, like the task's own flag. */
+    val enabled: Boolean = true,
     val condition: String? = null,
 )
 
