@@ -26,6 +26,25 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
@@ -231,9 +250,41 @@ fun HuaweiBoardScreen(
     onCloseLanguage: () -> Unit = {},
 ) {
     val lang = state.lang
+    val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+
+    // The arrangement, and the drag that changes it.
+    //
+    // Held here rather than in the store while a finger is down: a drag rewrites the order many
+    // times a second, and writing each of those to disk would be a preference file churned for one
+    // gesture. It is committed once, on release.
+    val stored by BoardOrder.keys.collectAsState()
+    LaunchedEffect(Unit) { BoardOrder.load(context) }
+    var dragKey by remember { mutableStateOf<String?>(null) }
+    val order = remember { mutableStateListOf<BoardTile>() }
+    LaunchedEffect(stored) {
+        // Never while a finger is down: the store catching up mid-drag would yank the list out from
+        // under the gesture and drop the tile somewhere nobody aimed at.
+        if (dragKey == null) {
+            order.clear()
+            order.addAll(BoardOrder.apply(BOARD_TILES, stored))
+        }
+    }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    // Measured, not assumed: the grid is Adaptive, so the column count depends on the panel it is
+    // opened on and a hard-coded four would put the vertical step wrong on every other width.
+    var cellSize by remember { mutableStateOf(IntSize.Zero) }
+    var gridWidth by remember { mutableIntStateOf(0) }
+    val spacingPx = with(density) { 10.dp.toPx() }
+    val columns = remember(cellSize, gridWidth) {
+        if (cellSize.width <= 0 || gridWidth <= 0) 1
+        else ((gridWidth + spacingPx) / (cellSize.width + spacingPx)).toInt().coerceAtLeast(1)
+    }
+
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 168.dp),
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().onGloballyPositioned { gridWidth = it.size.width },
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -251,7 +302,8 @@ fun HuaweiBoardScreen(
                 modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 2.dp, bottom = 6.dp),
             )
         }
-        items(BOARD_TILES, key = { it.key }) { tile ->
+        items(order, key = { it.key }) { tile ->
+            val dragging = dragKey == tile.key
             BoardCard(
                 tile = tile,
                 lang = lang,
@@ -266,6 +318,61 @@ fun HuaweiBoardScreen(
                     else -> null
                 },
                 onOpen = { onRun(tile) },
+                modifier = Modifier
+                    .onGloballyPositioned { if (cellSize == IntSize.Zero) cellSize = it.size }
+                    // Lifted while held, so it is obvious which tile is travelling.
+                    .zIndex(if (dragging) 1f else 0f)
+                    .graphicsLayer {
+                        if (dragging) {
+                            translationX = dragOffset.x
+                            translationY = dragOffset.y
+                            scaleX = 1.06f
+                            scaleY = 1.06f
+                        }
+                    }
+                    .pointerInput(tile.key, columns) {
+                        detectDragGesturesAfterLongPress(
+                            // The haptic is the moment it latches — without it a long-press that
+                            // has taken hold is indistinguishable from one that has not.
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                dragKey = tile.key
+                                dragOffset = Offset.Zero
+                            },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragOffset += amount
+                                val di = order.indexOfFirst { it.key == dragKey }
+                                if (di !in order.indices) return@detectDragGesturesAfterLongPress
+                                // One position at a time, past HALF a step — the same rule the
+                                // project chips use, given a second axis. Sideways moves by one,
+                                // up or down moves by a whole row.
+                                val stepX = cellSize.width + spacingPx
+                                val stepY = cellSize.height + spacingPx
+                                if (dragOffset.x > stepX / 2 && di < order.lastIndex) {
+                                    order.add(di + 1, order.removeAt(di)); dragOffset -= Offset(stepX, 0f)
+                                } else if (dragOffset.x < -stepX / 2 && di > 0) {
+                                    order.add(di - 1, order.removeAt(di)); dragOffset += Offset(stepX, 0f)
+                                } else if (dragOffset.y > stepY / 2 && di + columns <= order.lastIndex) {
+                                    order.add(di + columns, order.removeAt(di)); dragOffset -= Offset(0f, stepY)
+                                } else if (dragOffset.y < -stepY / 2 && di - columns >= 0) {
+                                    order.add(di - columns, order.removeAt(di)); dragOffset += Offset(0f, stepY)
+                                }
+                            },
+                            // Committed once, on release — and on CANCEL too, because a gesture the
+                            // system takes away (a call, a notification shade) has still moved the
+                            // tiles on screen, and leaving the screen and the store disagreeing is
+                            // how an arrangement silently reverts on the next open.
+                            onDragEnd = {
+                                dragKey = null; dragOffset = Offset.Zero
+                                BoardOrder.set(context, order.map { it.key })
+                            },
+                            onDragCancel = {
+                                dragKey = null; dragOffset = Offset.Zero
+                                BoardOrder.set(context, order.map { it.key })
+                            },
+                        )
+                    },
             )
         }
     }
@@ -366,9 +473,10 @@ private fun BoardCard(
     anyBusy: Boolean,
     art: ByteArray?,
     onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val accent = if (busy) ChartPalette.HEART_RATE else ChartPalette.AXIS_TEXT
-    SectionCard(accent = accent) {
+    SectionCard(accent = accent, modifier = modifier) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(4f / 3f)
                 .clip(RoundedCornerShape(12.dp))
