@@ -53,6 +53,21 @@ suspend fun executeAndLogTask(
      */
     allowFallback: Boolean = true,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
+    // Switched off in the editor. Checked HERE, at the one place every run funnels through, so a
+    // profile, a widget, `task.run`, a shortcut and the adb bridge all obey it — a gate that only
+    // covered the profile path would be a switch that quietly does nothing when pressed elsewhere.
+    //
+    // It leaves a run-log row rather than vanishing: the whole point of the flag is that the task
+    // still exists and is expected to be found later, and "it did not run and nothing said so" is
+    // the failure this app has been bitten by more than once.
+    if (!task.enabled) {
+        val reason = "Task is disabled."
+        val inserted = logSkippedRun(db, task, source, reason, metadata)
+        return@withContext TaskExecutionResult(
+            report = collisionSkippedReport(task, reason),
+            logInserted = inserted,
+        )
+    }
     val admission = admissionController.tryAcquire(profileId, profileLimits)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
