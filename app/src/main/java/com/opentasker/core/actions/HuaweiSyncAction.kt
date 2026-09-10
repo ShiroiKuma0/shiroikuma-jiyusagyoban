@@ -5,6 +5,8 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.HuaweiSessionMarker
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncArgs
 import com.opentasker.core.huawei.HuaweiSyncRunner
@@ -37,6 +39,23 @@ class HuaweiSyncAction : Action {
         ctx.variables.set("${prefix}Phase", "starting")
         ctx.variables.set("${prefix}Pct", "0")
         ctx.variables.set("${prefix}Records", "0")
+
+        // Read BEFORE anything opens a link: after that the mark belongs to the session now running.
+        //
+        // A mark still standing means the previous session's close never ran — the process was
+        // killed with the band link open. That is the leading explanation for the band holding a
+        // stale slot and refusing every later host until it is restarted, and this is the only
+        // evidence that can distinguish it from the band dropping the slot on its own: `logcat`
+        // rolls within hours and the run log is in a table nothing can read off the phone.
+        val unclean = runCatching { HuaweiSessionMarker.takeUnclean(ctx.app) }.getOrNull()
+        ctx.variables.set("${prefix}LastSessionUnclean", unclean ?: "")
+        if (unclean != null) {
+            AppLogger.warn(
+                "HuaweiSync",
+                "the band session opened at $unclean never closed — the process was killed holding " +
+                    "the link. If the band is now refusing connections, that is why; restart the band.",
+            )
+        }
 
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val timeoutSec = args["timeout_sec"]?.trim()?.toIntOrNull() ?: HuaweiSettings.timeoutSec(ctx.app)
@@ -71,6 +90,7 @@ class HuaweiSyncAction : Action {
         return when (outcome) {
             is HuaweiSyncRunner.Outcome.Ok -> {
                 val text = listOfNotNull(outcome.summary, outcome.warning).joinToString(" — ")
+                    .let { withUncleanNote(it, unclean) }
                 store?.let { ctx.variables.set(it, text) }
                 ctx.variables.set("${prefix}Summary", text)
                 ctx.variables.set("${prefix}SyncId", outcome.syncId.toString())
@@ -78,14 +98,16 @@ class HuaweiSyncAction : Action {
                 ActionResult.Success
             }
             is HuaweiSyncRunner.Outcome.Skipped -> {
-                store?.let { ctx.variables.set(it, outcome.reason) }
-                ctx.variables.set("${prefix}Summary", outcome.reason)
+                val text = withUncleanNote(outcome.reason, unclean)
+                store?.let { ctx.variables.set(it, text) }
+                ctx.variables.set("${prefix}Summary", text)
                 ActionResult.Skip
             }
             is HuaweiSyncRunner.Outcome.Failed -> {
-                store?.let { ctx.variables.set(it, outcome.reason) }
-                ctx.variables.set("${prefix}Summary", outcome.reason)
-                ActionResult.Failure(outcome.reason)
+                val text = withUncleanNote(outcome.reason, unclean)
+                store?.let { ctx.variables.set(it, text) }
+                ctx.variables.set("${prefix}Summary", text)
+                ActionResult.Failure(text)
             }
         }
     }
@@ -120,4 +142,20 @@ class HuaweiSyncAction : Action {
         .ofPattern("yyyy-MM-dd HH:mm")
         .withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(millis))
+
+    /**
+     * Put the unclean-session note where 白い熊 is already looking.
+     *
+     * The sync panel's summary line is the one thing photographed every time this goes wrong, so a
+     * finding that lands anywhere else is a finding nobody sees. It is appended rather than
+     * prepended: the sync's own outcome is still the headline.
+     */
+    private fun withUncleanNote(text: String, unclean: String?): String =
+        if (unclean == null) {
+            text
+        } else {
+            "$text\n\nThe previous band session (opened $unclean) never closed — this app was " +
+                "killed while holding the link, which is what leaves the band refusing every later " +
+                "connection. If it refuses now, restart the band."
+        }
 }
