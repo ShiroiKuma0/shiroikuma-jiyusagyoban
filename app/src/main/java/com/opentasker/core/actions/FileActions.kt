@@ -184,11 +184,26 @@ private fun fileNameMatcher(pattern: String): java.nio.file.PathMatcher? {
 }
 
 /**
- * Move/rename a file within the sandbox.
+ * Move/rename a file, within either base or between them.
  *
  * Args:
  *   - "from": source path (must exist)
  *   - "to": destination path
+ *   - "shared": both sides resolve under /sdcard instead of the app's private files
+ *   - "from_shared" / "to_shared": one side does
+ *
+ * ## Why a move has two of them
+ *
+ * Every other file action resolves ONE path, so one `shared` says everything. A move resolves two,
+ * and the interesting case is the one that crosses: a file that arrived in `/sdcard/tmp` — from a
+ * file manager, from another app's export, from an `adb push` — has no way into the app's own files
+ * otherwise. `file.read`/`file.write` cannot carry it, because they carry TEXT and the thing worth
+ * moving is usually not text; the captured satellite set that a fresh phone cannot build without is
+ * 240 kB of binary. So `shared` sets both sides, which is what a move inside `/sdcard` wants, and
+ * the per-side flags express the crossing.
+ *
+ * It grants nothing new: reading from and writing to shared storage were already available
+ * separately, under the same containment, symlink and no-follow checks.
  */
 class MoveFileAction : Action {
     override val id = "file.move"
@@ -197,8 +212,13 @@ class MoveFileAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val fromArg = args["from"] ?: return ActionResult.Failure("missing from")
         val toArg = args["to"] ?: return ActionResult.Failure("missing to")
-        val src = safeUserFile(ctx, fromArg, mustExist = true) ?: return ActionResult.Failure("source is outside 白い熊 自由作業盤 files")
-        val dest = safeUserFile(ctx, toArg) ?: return ActionResult.Failure("destination is outside 白い熊 自由作業盤 files")
+        val both = sharedArg(args)
+        val fromShared = both || sharedArg(args, "from_shared")
+        val toShared = both || sharedArg(args, "to_shared")
+        val src = safeTarget(ctx, fromArg, mustExist = true, shared = fromShared)
+            ?: return ActionResult.Failure("source is outside 白い熊 自由作業盤 files")
+        val dest = safeTarget(ctx, toArg, shared = toShared)
+            ?: return ActionResult.Failure("destination is outside 白い熊 自由作業盤 files")
         return try {
             dest.parentFile?.mkdirs()
             val ok = src.renameTo(dest) || run {
@@ -317,9 +337,13 @@ internal fun safeTarget(
 /** Every spelling of the primary external volume; /sdcard and /storage/self/primary are symlinks. */
 private val EXTERNAL_ROOTS = listOf("/sdcard", "/storage/emulated/0", "/storage/self/primary")
 
-/** `shared=true` on a file action: resolve against the user's storage instead of the sandbox. */
-internal fun sharedArg(args: Map<String, String>): Boolean =
-    args["shared"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+/**
+ * `shared=true` on a file action: resolve against the user's storage instead of the sandbox.
+ *
+ * [key] names the argument, because a move has one flag per side and they are read the same way.
+ */
+internal fun sharedArg(args: Map<String, String>, key: String = "shared"): Boolean =
+    args[key]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
 
 /**
  * Resolves [path] against the sandbox [baseDir] and refuses anything that could escape it,
