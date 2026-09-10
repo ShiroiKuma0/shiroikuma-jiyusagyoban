@@ -106,8 +106,8 @@ fun MonitorScreen(
         ShutdownSettings.load(context)
         BootStartSettings.load(context)
     }
-    val autoIds by AutoStartSettings.ids.collectAsState()
-    val exitIds by ShutdownSettings.ids.collectAsState()
+    val autoNames by AutoStartSettings.names.collectAsState()
+    val exitNames by ShutdownSettings.names.collectAsState()
     val bootStart by BootStartSettings.enabled.collectAsState()
     // Which list the task picker is filling — "start" (run on start) or "exit" (run on exit); null = closed.
     var pickerFor by remember { mutableStateOf<String?>(null) }
@@ -130,8 +130,10 @@ fun MonitorScreen(
     val events = EngineHeartbeat.events()
     val enabled = profiles.filter { it.enabled }
     val overlays = SceneOverlayManager.shownSceneNames()
-    val autoTasks = autoIds.mapNotNull { id -> tasks.firstOrNull { it.id == id } }
-    val exitTasks = exitIds.mapNotNull { id -> tasks.firstOrNull { it.id == id } }
+    // Resolved by NAME, in the list's own order. A name that no longer matches simply drops
+    // out of the display, exactly as a missing task does at run time.
+    val autoTasks = autoNames.mapNotNull { n -> tasks.firstOrNull { it.name.equals(n, ignoreCase = true) } }
+    val exitTasks = exitNames.mapNotNull { n -> tasks.firstOrNull { it.name.equals(n, ignoreCase = true) } }
     // Re-taken every second with `now`: the same list the shutdown report uses, so a stray overlay or a
     // task that never finished can be found (and stopped) WITHOUT exiting the app.
     val live = remember(now) { RuntimeInventory.snapshot(context) }
@@ -271,7 +273,7 @@ fun MonitorScreen(
                     ) {
                         Dot(AMBER, 8.dp)
                         Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { AutoStartSettings.remove(context, t.id) }) {
+                        IconButton(onClick = { AutoStartSettings.remove(context, t.name) }) {
                             Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
                         }
                     }
@@ -337,7 +339,7 @@ fun MonitorScreen(
                     ) {
                         Dot(AMBER, 8.dp)
                         Text(t.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { ShutdownSettings.remove(context, t.id) }) {
+                        IconButton(onClick = { ShutdownSettings.remove(context, t.name) }) {
                             Icon(Icons.Filled.Close, contentDescription = "Remove", tint = RED)
                         }
                     }
@@ -523,8 +525,8 @@ fun MonitorScreen(
     val pickerTarget = pickerFor
     if (pickerTarget != null) {
         val forExit = pickerTarget == "exit"
-        val alreadyPicked = if (forExit) exitIds else autoIds
-        val pickable = tasks.filter { it.id !in alreadyPicked }
+        val alreadyPicked = if (forExit) exitNames else autoNames
+        val pickable = tasks.filter { t -> alreadyPicked.none { it.equals(t.name, ignoreCase = true) } }
         val knownIds = projects.map { it.id }.toSet()
         // Group by project (display order); within each project keep the tasks' own order (their manual
         // `position` — so 71 before 37, etc.), NOT alphabetical. Unfiled bucket for the rest.
@@ -589,8 +591,8 @@ fun MonitorScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                if (forExit) ShutdownSettings.add(context, t.id)
-                                                else AutoStartSettings.add(context, t.id)
+                                                if (forExit) ShutdownSettings.add(context, t.name)
+                                                else AutoStartSettings.add(context, t.name)
                                                 pickerFor = null
                                             }
                                             .padding(start = 30.dp, top = 10.dp, bottom = 10.dp),
