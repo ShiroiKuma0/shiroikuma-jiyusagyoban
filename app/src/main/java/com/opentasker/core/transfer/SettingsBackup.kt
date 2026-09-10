@@ -67,6 +67,97 @@ object SettingsBackup {
 
     private const val FONTS_DIR = "fonts"
     private const val ICONS_DIR = "icons"
+
+    /**
+     * The satellite store, inside the archive.
+     *
+     * ## What travels and what deliberately does not
+     *
+     * The store holds two unlike things. Most of it is a **generated set** — the six `HW_PGNSS_*`
+     * files the band is given, plus the broadcast ephemeris `HW_AGNSS_RTCM_33` — which is rebuilt
+     * from free products and is worthless within 72 hours. Carrying that would hand a restored
+     * phone a stale set, which is the exact failure this whole feature exists to prevent, so
+     * [EXPIRING] is excluded by name.
+     *
+     * Everything else in the store travels, because everything else is a record. Two kinds:
+     *
+     *  * `captured/` — Huawei's own predicted-ephemeris capture. Two things in a set cannot be
+     *    derived from anything public: the whole **QZSS file**, and (until 2026-09-09) BeiDou's
+     *    per-satellite group delays. A phone without the capture cannot build a set at all — it
+     *    refuses, correctly, rather than substituting. They lived only in private storage and in no
+     *    export category, so a restored phone came up unable to generate: 白い熊's second phone did
+     *    exactly that on 2026-09-09, and the remedy was staging files by hand from an archive
+     *    folder that had since been deleted — kept outside the app, where they had no business
+     *    being (白い熊). They are internal app data and they belong in the backup.
+     *  * anything a task has written beside it — `watch-log.txt` records when the band was caught
+     *    asking for broadcast ephemeris, and nothing can re-create an observation. The category
+     *    carries the whole store rather than a list of blessed names precisely so the NEXT such
+     *    file is covered without anybody remembering to add it (白い熊, 2026-09-09).
+     *
+     * Small: about 430 kB, once, not per run.
+     */
+    private const val GNSS_DIR = "gnss"
+
+    /**
+     * The pre-2026-09-09 archive path, which carried only `captured/` and carried it flat.
+     *
+     * Read on import and never written. It existed for about an hour of one afternoon, so this
+     * costs four lines to make an archive from that hour restorable rather than mysteriously empty.
+     */
+    private const val GNSS_CAPTURED_DIR = "gnss_captured"
+
+    /**
+     * Files in the store's TOP LEVEL that are regenerated and must not be carried.
+     *
+     * Spelled out rather than imported from `PredictedSet.NAMES`, like the store's path above and
+     * for the same reason; `GnssCapturedBackupTest` compares the two lists so a rename is a red
+     * test rather than a backup that quietly ships a stale set.
+     *
+     * **Top level only.** `captured/HW_PGNSS_BDS` has the same NAME as an expiring file and is the
+     * one thing here that must survive — matching on the name alone anywhere in the tree would
+     * throw away precisely what this category was added to carry.
+     */
+    private val EXPIRING = setOf(
+        "HW_PGNSS_GPS", "HW_PGNSS_GALILEO", "HW_PGNSS_GLONASS", "HW_PGNSS_BDS",
+        "HW_PGNSS_QZS", "HW_PGNSS_EXTRA", "HW_AGNSS_RTCM_33",
+    )
+
+    /**
+     * Where that capture lives on disk.
+     *
+     * `user_files/<dir>/captured`, where `<dir>` is the satellite action's own folder argument. The
+     * default is the only value ever used, and it is spelled here rather than imported so a change
+     * on either side is a visible mismatch rather than a silent one.
+     */
+    private fun gnssDir(context: Context): File =
+        File(File(context.filesDir, "user_files"), "gnss")
+
+    /**
+     * The archive directory a PREFERENCES category also carries loose files in, if any.
+     *
+     * Two categories do. Both are files an app cannot re-derive — a font 白い熊 imported, a capture
+     * of Huawei's own satellite set — and both used to be written next to their category's JSON by
+     * an `if` in the export loop, with the matching `if` in the import loop. Naming them once, here,
+     * is what lets [categoriesIn] see an archive that carries the files and no preferences at all.
+     */
+    private fun archiveDirOf(cat: Cat): String? = when (cat) {
+        Cat.APPEARANCE -> FONTS_DIR
+        Cat.HEALTH -> GNSS_DIR
+        else -> null
+    }
+
+    /** Where those files live on this phone. */
+    private fun filesDirOf(context: Context, cat: Cat): File? = when (cat) {
+        Cat.APPEARANCE -> File(context.filesDir, "fonts")
+        Cat.HEALTH -> gnssDir(context)
+        else -> null
+    }
+
+    /** Which of a category's files are regenerated and must not be carried. Top level only. */
+    private fun skipInDir(cat: Cat): (String) -> Boolean = when (cat) {
+        Cat.HEALTH -> { relative -> relative in EXPIRING }
+        else -> { _ -> false }
+    }
     private const val MAX_ENTRY_BYTES = 48 * 1024 * 1024
     private const val MAX_TOTAL_BYTES = 256 * 1024 * 1024
 
@@ -143,6 +234,9 @@ object SettingsBackup {
         Cat.HEALTH to listOf(
             "recovery_log", "recovery_notes", "rehab_log", "rehab_notes",
             "training_sessions", "band_settings", "huawei_band_settings",
+            // The 健康 board's own tile arrangement. Small, authored, and un-recreatable by any
+            // device — 白い熊 dragged those tiles into that order for a reason.
+            "huawei_board",
         ),
     )
 
@@ -188,9 +282,14 @@ object SettingsBackup {
      * reaching the one place that never saw it, because these are preference strings rather than
      * bundle fields and so never passed through the name-based DTO layer at all.
      *
-     * So on the way out the ids become [TASK_NAMES_KEY], and on the way in the names become ids
-     * again. An archive written before this still imports: its bare `task_ids` is taken as-is, which
-     * is exactly as right or wrong as it was before.
+     * **Since 2026-09-10 the preferences hold names themselves** — see `AutoStartSettings.KEY` —
+     * so the archive and the store now carry the same string under the same key and no translation
+     * happens in the ordinary case. What remains here is the two ends of that change: a phone that
+     * has not yet converted still holds `task_ids`, which is translated on the way out; and an
+     * archive written before the change carries `task_ids`, which is written through and converted
+     * on first use by `AutoStartSettings.migrate`.
+     *
+     * The raw ids are never written INTO an archive, in either direction. That is the bug itself.
      */
     private val TASK_ID_PREFS = mapOf(
         "auto_start_settings" to "task_ids",
@@ -332,7 +431,14 @@ object SettingsBackup {
                     Cat.MAPS -> exportCutouts(zip, db, isCancelled)
                     else -> {
                         writeEntry(zip, "${cat.id}.json", exportPrefs(context, PREF_FILES.getValue(cat), db))
-                        if (cat == Cat.APPEARANCE) exportDirFiles(zip, File(context.filesDir, "fonts"), FONTS_DIR)
+                        // The loose files that ride with a preferences category — fonts with the
+                        // theme, Huawei's captured satellite set with 健康, both because they are
+                        // things no device can hand back. See archiveDirOf.
+                        val dir = filesDirOf(context, cat)
+                        val entryDir = archiveDirOf(cat)
+                        if (dir != null && entryDir != null) {
+                            exportDirFiles(zip, dir, entryDir, skipInDir(cat))
+                        }
                     }
                 }
                 count++
@@ -651,9 +757,30 @@ object SettingsBackup {
         return total
     }
 
-    private fun exportDirFiles(zip: ZipOutputStream, dir: File, entryDir: String) {
-        dir.listFiles()?.filter { it.isFile }?.forEach { file ->
-            writeEntry(zip, "$entryDir/${file.name}", file.readBytes())
+    /**
+     * Write a directory TREE into the archive under [entryDir], skipping what [skip] rejects.
+     *
+     * [skip] is asked about the path relative to [dir] (`captured/HW_PGNSS_BDS`, not the bare
+     * name), so a rule about the store's top level cannot reach inside a subdirectory of it.
+     *
+     * Recursive since 2026-09-09. It was flat, which was fine while the only trees here were
+     * `fonts/` and `icons/` — and was silently wrong the moment a category was pointed at a store
+     * with a subdirectory in it: the whole of `captured/` would simply not have been written.
+     */
+    private fun exportDirFiles(
+        zip: ZipOutputStream,
+        dir: File,
+        entryDir: String,
+        skip: (String) -> Boolean = { false },
+        prefix: String = "",
+    ) {
+        dir.listFiles()?.sortedBy { it.name }?.forEach { file ->
+            val relative = if (prefix.isEmpty()) file.name else "$prefix/${file.name}"
+            if (skip(relative)) return@forEach
+            when {
+                file.isFile -> writeEntry(zip, "$entryDir/$relative", file.readBytes())
+                file.isDirectory -> exportDirFiles(zip, file, entryDir, skip, relative)
+            }
         }
     }
 
@@ -674,7 +801,10 @@ object SettingsBackup {
                 val sp = context.getSharedPreferences(name, Context.MODE_PRIVATE)
                 val idKey = TASK_ID_PREFS[name]
                 put(name, buildJsonObject {
-                    if (idKey != null) {
+                    // Only for a phone that has not converted yet: once the preferences hold
+                    // `task_names`, the generic loop below writes it like any other string and this
+                    // must not write a second, older copy over it.
+                    if (idKey != null && !sp.contains(TASK_NAMES_KEY)) {
                         // A task whose row is gone contributes nothing rather than an empty name:
                         // an id that already dangles on THIS phone is not worth carrying to the next.
                         val names = (sp.getString(idKey, "") ?: "").split(",")
@@ -733,7 +863,12 @@ object SettingsBackup {
                 // the `else` branch it would look for `maps.json`, which nothing ever writes, so an
                 // archive with base maps in it would restore everything except them — silently.
                 Cat.MAPS -> entries.keys.any { it.startsWith("$MAPS_DIR/") }
-                else -> "${cat.id}.json" in entries
+                // A category is present if its preferences are — OR if only its files are. An
+                // archive holding just the captured satellite reference is a real archive: it is
+                // how a phone that has never built a set is seeded without restoring anything else.
+                else -> "${cat.id}.json" in entries ||
+                    archiveDirOf(cat)?.let { d -> entries.keys.any { it.startsWith("$d/") } } == true ||
+                    (cat == Cat.HEALTH && entries.keys.any { it.startsWith("$GNSS_CAPTURED_DIR/") })
             }
         }.toSet()
     }
@@ -771,10 +906,26 @@ object SettingsBackup {
                     if (n > 0) lines += "${cat.label}: $n"
                 }
                 else -> {
-                    val raw = entries["${cat.id}.json"] ?: continue
-                    val n = importPrefs(context, raw, db)
-                    if (cat == Cat.APPEARANCE) importDirFiles(entries, FONTS_DIR, File(context.filesDir, "fonts"))
-                    lines += "${cat.label}: $n keys"
+                    // The files first, and NOT behind the preferences dump. Reading the JSON first
+                    // and bailing out when it is absent made an archive that carries only the
+                    // captured satellite reference restore precisely nothing — no error, no line,
+                    // no files. Either half on its own is a valid archive; only neither is a miss.
+                    val dir = filesDirOf(context, cat)
+                    val entryDir = archiveDirOf(cat)
+                    var files = if (dir != null && entryDir != null) {
+                        importDirFiles(entries, entryDir, dir)
+                    } else {
+                        -1
+                    }
+                    // An archive from before the store travelled whole: `gnss_captured/` flat.
+                    if (cat == Cat.HEALTH && dir != null) {
+                        val legacy = importDirFiles(entries, GNSS_CAPTURED_DIR, File(dir, "captured"))
+                        if (legacy > 0) files = maxOf(files, 0) + legacy
+                    }
+                    val raw = entries["${cat.id}.json"]
+                    if (raw == null && files <= 0) continue
+                    val n = if (raw == null) 0 else importPrefs(context, raw, db)
+                    lines += "${cat.label}: $n keys" + if (files > 0) " · $files files" else ""
                     restartNeeded = true
                 }
             }
@@ -783,18 +934,32 @@ object SettingsBackup {
         return ImportResult(lines, restartNeeded)
     }
 
-    /** Restores files under `entryDir/` in the archive into [dest] (basename only — no traversal). */
+    /**
+     * Restore the tree under `entryDir/` in the archive into [dest].
+     *
+     * The relative path is KEPT, so `gnss/captured/HW_PGNSS_BDS` lands in `captured/` rather than
+     * being flattened on top of the store — and keeping it is what makes the traversal check load
+     * bearing rather than decorative. An entry is resolved lexically against [dest] and refused
+     * unless it stays inside: a ZIP is an untrusted list of names, and `../../` in one of them is
+     * the oldest archive attack there is. Nothing that fails the check is written, and it does not
+     * abort the rest of the restore.
+     */
     private fun importDirFiles(entries: Map<String, ByteArray>, entryDir: String, dest: File): Int {
-        val files = entries.filterKeys { it.startsWith("$entryDir/") }
+        val files = entries.filterKeys { it.startsWith("$entryDir/") && !it.endsWith("/") }
         if (files.isEmpty()) return -1
-        dest.mkdirs()
+        val root = dest.canonicalFile
         var n = 0
         files.forEach { (name, bytes) ->
-            val base = File(name).name
-            if (base.isNotEmpty()) {
-                File(dest, base).writeBytes(bytes)
-                n++
+            val relative = name.removePrefix("$entryDir/")
+            if (relative.isEmpty()) return@forEach
+            val target = File(root, relative).toPath().normalize().toFile()
+            if (target != root && !target.path.startsWith(root.path + File.separator)) {
+                AppLogger.info("SettingsBackup", "refused an archive entry that escapes $entryDir: $name")
+                return@forEach
             }
+            target.parentFile?.mkdirs()
+            target.writeBytes(bytes)
+            n++
         }
         return n
     }
@@ -805,23 +970,27 @@ object SettingsBackup {
         var n = 0
         root.forEach { (file, values) ->
             val ed = context.getSharedPreferences(file, Context.MODE_PRIVATE).edit() // merge — never clear
-            // Names back to ids, against THIS database. A name that no longer resolves is dropped
-            // rather than guessed at, and the count says how many landed — a silently shorter list
-            // is what made the original fault invisible for a whole restore.
-            TASK_ID_PREFS[file]?.let { idKey ->
+            // The names go in AS NAMES — the store speaks names now, so there is nothing to
+            // translate and nothing that can go stale between the archive and the preference.
+            //
+            // They are still CHECKED against this database, because a name that resolves to nothing
+            // is the one thing worth saying out loud: a silently shorter list is what made the
+            // original fault invisible for a whole restore. Unresolved names are kept rather than
+            // dropped — the task may be imported by a later category in the same archive, and a
+            // name that matches nothing is inert rather than dangerous, which an id never was.
+            if (file in TASK_ID_PREFS) {
                 val packed = (values.jsonObject[TASK_NAMES_KEY] as? JsonObject)
                     ?.get("v")?.jsonPrimitive?.contentOrNull
                 if (packed != null) {
                     val wanted = packed.split(TASK_NAME_SEP).map { it.trim() }.filter { it.isNotEmpty() }
-                    val found = wanted.map { it to db.taskDao().getByNameIgnoreCase(it)?.id }
-                    ed.putString(idKey, found.mapNotNull { it.second }.joinToString(","))
+                    ed.putString(TASK_NAMES_KEY, wanted.joinToString(TASK_NAME_SEP))
                     n++
-                    val missing = found.filter { it.second == null }.map { it.first }
+                    val missing = wanted.filter { db.taskDao().getByNameIgnoreCase(it) == null }
                     if (missing.isNotEmpty()) {
                         AppLogger.info(
                             "SettingsBackup",
                             "$file: ${wanted.size - missing.size} of ${wanted.size} task(s) resolved " +
-                                "by name — no such task: ${missing.joinToString(", ")}",
+                                "by name — no such task yet: ${missing.joinToString(", ")}",
                         )
                     }
                 }
