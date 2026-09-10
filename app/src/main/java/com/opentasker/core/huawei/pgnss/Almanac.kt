@@ -159,6 +159,19 @@ data class BdsNavRecord(
     val idot: Double,
     val week: Int,
     val toeAbs: Double,
+    /**
+     * TGD1, the B1I-minus-B3I equipment group delay, in SECONDS.
+     *
+     * `BROADCAST ORBIT - 6` field 3 (RINEX 3.05 Table A14). It is a hardware calibration rather
+     * than an orbital quantity, which is why it is broadcast at all: `BDS-SIS-ICD-B1I-3.0` §4.2
+     * puts the B3I delay inside the clock's own a0 and gives the B1I difference here, as a signed
+     * 10-bit count of 0.1 ns that the receiver SUBTRACTS. RINEX stores that in seconds, so the
+     * range is +-51.2 ns and the resolution 0.1 ns.
+     *
+     * TGD2 (field 4) is deliberately not carried: 840 of 888 records broadcast it equal to TGD1,
+     * only C09 and C10 differ, and Huawei's file has nowhere to put it.
+     */
+    val tgd1: Double = 0.0,
 )
 
 // ── time ──────────────────────────────────────────────────────────────────────────────────────
@@ -395,6 +408,8 @@ object Almanac {
                             i0 = vals[15], crc = vals[16], omega = vals[17], omegaDot = vals[18],
                             idot = vals[19], week = week,
                             toeAbs = week * WEEK_SECONDS + vals[11],
+                            // ORBIT 6 is `vals[23..26]`; field 3 of it is TGD1.
+                            tgd1 = vals[25],
                         ),
                     )
                 }
@@ -413,6 +428,33 @@ object Almanac {
      * to fit mean elements to; the previous day supplies the rest. De-duplication is on ABSOLUTE BDT
      * seconds, so the week roll between the two files is a non-issue.
      */
+    /**
+     * How many navigation records the file holds, per constellation letter.
+     *
+     * Cheap, and the only thing that can see a **half-written** file: BKG publishes by writing the
+     * archive in place, so a fetch landing in that window gets a VALID gzip of an incomplete file —
+     * measured 2026-09-09 as a 134 kB `BRDC00IGS_R` carrying C, E and R and no GPS, QZSS or SBAS at
+     * all, with the same URL serving the full 1.26 MB fifteen minutes later. No magic number and no
+     * gunzip can tell the two apart; a per-system count can.
+     *
+     * A complete mixed BRDC always carries GPS. That is the invariant this exists to express — not
+     * a threshold on how many records is enough, which nothing publishes and which would be invented.
+     */
+    fun countRinexRecords(text: String): Map<Char, Int> = countRinexRecords(text.lineSequence())
+
+    /** As above, streaming — so a file can be counted without decoding eleven megabytes of it. */
+    fun countRinexRecords(lines: Sequence<String>): Map<Char, Int> {
+        val out = HashMap<Char, Int>()
+        for (line in lines) {
+            if (line.length < 4 || line[3] != ' ') continue
+            val system = line[0]
+            if (system !in "GREJCIS") continue
+            if (!line[1].isDigit() || !line[2].isDigit()) continue
+            out[system] = (out[system] ?: 0) + 1
+        }
+        return out
+    }
+
     fun mergeBdsNav(
         into: MutableMap<Int, MutableList<BdsNavRecord>>,
         extra: Map<Int, List<BdsNavRecord>>,

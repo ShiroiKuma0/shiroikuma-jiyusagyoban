@@ -173,11 +173,21 @@ def spanned(times, t, order=9, tol=1.5):
     9-point Lagrange polynomial fitted across a hole that size does not interpolate, it invents:
     C01 and C03 were graded at 37 km and 32 km against nothing but the interpolator's imagination,
     and the orbits were fine (2026-08-30). Anything that reads one of these series has to ask first.
+
+    It also has to ask whether [t] is INSIDE the stencil, which this did not until 2026-09-09. A
+    time before the first sample gives `searchsorted` 0, the stencil is the first nine samples, they
+    are perfectly contiguous, and `interp` then EXTRAPOLATES a degree-8 polynomial backwards. C02
+    joins the merged product a day after the others, so every sample of its first day was
+    extrapolated: it graded at 3.3e13 m and took a day of somebody's attention twice, once as a
+    "BeiDou divergence" and once as an artefact of merging. A satellite that reads as having left
+    the solar system is a bug in the measurement, every time.
     """
     i = int(np.searchsorted(times, t))
     lo = max(0, min(i - order // 2, len(times) - order))
     hi = min(lo + order, len(times))
     if hi - lo < order:
+        return False
+    if not (times[lo] <= t <= times[hi - 1]):
         return False
     step = np.median(np.diff(times[lo:hi]))
     return bool(times[hi - 1] - times[lo] <= tol * step * (order - 1))

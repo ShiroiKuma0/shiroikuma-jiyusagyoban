@@ -138,8 +138,17 @@ def main():
     kinds = {}
     if args.system == "BDS":
         for sat, d in truth.items():
-            if d["t"][4] <= first <= d["t"][-5]:
-                kinds[sat] = pgb.bds_kind(d, first)
+            # Classify at the first epoch the satellite's OWN arc covers, not at the window's start.
+            #
+            # It used to require the arc to span `first`, and a satellite whose product coverage
+            # begins later than the window simply got no class. That is not a cosmetic gap: a GEO
+            # with no class is propagated with the ordinary variant, which is the wrong formula for
+            # a geostationary orbit, and C02 duly graded at 3.3e13 m. A whole day was spent on that
+            # "BeiDou divergence" before it turned out to be this line — the grader was wrong, not
+            # the set. Anything that reads like a satellite having left the solar system is a bug in
+            # the measurement.
+            t = min(max(first, d["t"][4]), d["t"][-5])
+            kinds[sat] = pgb.bds_kind(d, t)
 
     rows, semi, skipped = {}, {}, set()
     for i in range(BLOCKS):
