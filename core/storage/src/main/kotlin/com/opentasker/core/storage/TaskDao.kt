@@ -1,5 +1,6 @@
 package com.opentasker.core.storage
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Entity
@@ -26,6 +27,8 @@ data class TaskEntity(
     val position: Int = 0,
     val iconPath: String? = null,
     val freezeBubble: Boolean = false,
+    /** Off = the task does not run. See [Task.enabled]; the DEFAULT is spelled in MIGRATION_30_31. */
+    @ColumnInfo(defaultValue = "1") val enabled: Boolean = true,
 ) {
     fun toDomain(): Task = toDomainDecodeResult().requireDecoded()
 
@@ -33,7 +36,7 @@ data class TaskEntity(
         val mode = runCatching { CollisionMode.valueOf(collisionMode) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath, freezeBubble),
+                    value = Task(id, name, priority, CollisionMode.ABORT_NEW, emptyList(), projectId, position, iconPath, freezeBubble, enabled = enabled),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -47,7 +50,7 @@ data class TaskEntity(
         val actions = runCatching { StorageJson.decodeFromString<List<ActionSpec>>(actionsJson) }
             .getOrElse { error ->
                 return StorageDecodeResult(
-                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble),
+                    value = Task(id, name, priority, mode, emptyList(), projectId, position, iconPath, freezeBubble, enabled = enabled),
                     issue = StorageDecodeIssue(
                         recordType = StorageRecordType.TASK,
                         recordId = id,
@@ -59,13 +62,13 @@ data class TaskEntity(
             }
 
         return StorageDecodeResult(
-            value = Task(id, name, priority, mode, actions, projectId, position, iconPath, freezeBubble),
+            value = Task(id, name, priority, mode, actions, projectId, position, iconPath, freezeBubble, enabled = enabled),
         )
     }
 }
 
 fun Task.toEntity() = TaskEntity(
-    id, name, priority, collisionMode.name, StorageJson.encodeToString(actions), projectId, position, iconPath, freezeBubble
+    id, name, priority, collisionMode.name, StorageJson.encodeToString(actions), projectId, position, iconPath, freezeBubble, enabled
 )
 
 @Dao

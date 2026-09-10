@@ -260,9 +260,24 @@ class TaskRunner(
                     break
                 }
                 val spec = task.actions[pc]
+                // Switched off in the editor: walked past, whatever it is.
+                //
+                // **Including flow control.** 白い熊, 2026-09-10: *"It doesn't have to mean anything
+                // — I want to be able to disable any action; the propriety of the full task is then
+                // on me."* So this is deliberately not block-aware: disabling a `flow.if` does not
+                // disable its block, it removes the test and lets the body run; disabling a
+                // `flow.else` lets both branches run. Those are strange tasks, and they are the
+                // author's to write.
+                //
+                // What it CANNOT do is hang or corrupt. [FlowStructure] still analyses every action,
+                // disabled ones included, so the pairing never shifts; a `flow.endfor` that arrives
+                // without its loop already fails with "flow.endfor without an active loop" and
+                // halts; and MAX_FLOW_STEPS bounds anything pathological. The worst case is a task
+                // that fails legibly, never one that spins.
                 if (!spec.enabled) {
-                    results += ActionResult.Skip
-                    traces += markerTrace(pc, spec, ActionResult.Skip, ActionTraceStatus.SKIPPED, STEP_TURNED_OFF)
+                    val result = ActionResult.Skip
+                    results += result
+                    traces += markerTrace(pc, spec, result, ActionTraceStatus.SKIPPED, "Disabled")
                     pc++
                     continue
                 }
@@ -445,7 +460,7 @@ class TaskRunner(
                 if (frame == null || frame.foreachIndex != structure.endforToForeach[pc]) {
                     ControlOutcome(
                         result = ActionResult.Failure("flow.endfor without an active loop"),
-                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endfor without an active loop"), ActionTraceStatus.FAILURE),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endfor without an active loop"), ActionTraceStatus.FAILURE, "flow.endfor without an active loop"),
                         nextPc = pc + 1,
                         halt = true,
                     )
@@ -471,7 +486,7 @@ class TaskRunner(
                 val config = FlowControl.parseTryConfig(spec.args)
                     ?: return ControlOutcome(
                         result = ActionResult.Failure("invalid flow.try retry bounds"),
-                        trace = markerTrace(pc, spec, ActionResult.Failure("invalid flow.try retry bounds"), ActionTraceStatus.FAILURE),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("invalid flow.try retry bounds"), ActionTraceStatus.FAILURE, "invalid flow.try retry bounds"),
                         nextPc = pc + 1,
                         halt = true,
                     )
@@ -491,7 +506,7 @@ class TaskRunner(
                 if (frame == null || frame.catchIndex != pc) {
                     ControlOutcome(
                         result = ActionResult.Failure("flow.catch without an active try"),
-                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.catch without an active try"), ActionTraceStatus.FAILURE),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.catch without an active try"), ActionTraceStatus.FAILURE, "flow.catch without an active try"),
                         nextPc = pc + 1,
                         halt = true,
                     )
@@ -509,7 +524,7 @@ class TaskRunner(
                 if (frame == null || frame.endIndex != pc) {
                     ControlOutcome(
                         result = ActionResult.Failure("flow.endtry without an active try"),
-                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endtry without an active try"), ActionTraceStatus.FAILURE),
+                        trace = markerTrace(pc, spec, ActionResult.Failure("flow.endtry without an active try"), ActionTraceStatus.FAILURE, "flow.endtry without an active try"),
                         nextPc = pc + 1,
                         halt = true,
                     )
@@ -815,6 +830,21 @@ class TaskRunner(
         if (target.id > 0L && target.id in executionChain) {
             return fail("sub-task '${target.name}' is already active in this execution chain")
         }
+        // A disabled task is disabled here too. `task.run` builds its own child runner rather than
+        // going back through `executeAndLogTask`, so the gate there does NOT cover it — and this is
+        // the path that matters most: 起動完了 ⇨ 起動 calls every project's 71 task this way, so a
+        // switch that every OTHER caller obeyed would still be overridden by the one caller 白い熊
+        // uses to start everything.
+        //
+        // A SKIP, not a failure: the caller asked for something the user has switched off, which is
+        // an instruction obeyed rather than an error, and it must not abort the task that asked.
+        if (!target.enabled) {
+            val result = ActionResult.Skip
+            return result to traceFor(
+                index, spec, started, result, ActionArgumentExpansionReport.Empty,
+                "Sub-task '${target.name}' is disabled",
+            )
+        }
 
         // Named parameters (param:<name>); values are already expanded in the caller's scope.
         val parameters = buildMap {
@@ -1030,6 +1060,8 @@ class TaskRunner(
         started: Long,
         result: ActionResult,
         expansionReport: ActionArgumentExpansionReport,
+        /** Overrides the status word in the run log. A skip has more than one reason. */
+        note: String? = null,
     ): ActionExecutionTrace = ActionExecutionTrace(
         index = index,
         actionType = spec.type,
@@ -1040,7 +1072,7 @@ class TaskRunner(
             is ActionResult.Failure -> if (result.message.startsWith("timed out")) ActionTraceStatus.TIMEOUT else ActionTraceStatus.FAILURE
             is ActionResult.Skip -> ActionTraceStatus.SKIPPED
         },
-        message = when (result) {
+        message = note ?: when (result) {
             is ActionResult.Failure -> result.message
             is ActionResult.Skip -> "Skipped"
             is ActionResult.Success -> "Completed"
