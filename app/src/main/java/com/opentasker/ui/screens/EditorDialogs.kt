@@ -209,7 +209,31 @@ internal fun TemplateSlotDialog(
                 Text(stringResource(R.string.action_create_for_review))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        // A pill, like the confirm beside it. A bare text button next to a filled one reads as a
+        // caption rather than a choice, and Cancel is the one people reach for in a hurry
+        // (白い熊, 2026-09-10). Outlined rather than filled, so the destructive button is still the
+        // one that carries weight — the two are equally PRESSABLE, not equally loud.
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(50),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+            ) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+        // The dialog's own edge. On a black ground an unbordered surface floats with nothing to say
+        // where it ends — the content simply stops — and every other surface in this app is framed.
+        shape = RoundedCornerShape(DesignSystem.Radii.lg),
+        containerColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.border(
+            2.dp,
+            MaterialTheme.colorScheme.primary,
+            RoundedCornerShape(DesignSystem.Radii.lg),
+        ),
     )
 }
 
