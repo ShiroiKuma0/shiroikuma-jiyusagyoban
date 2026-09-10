@@ -35,7 +35,7 @@ object AppShutdown {
         /** Run-on-exit tasks still going after the timeout — deliberately NOT cancelled, so they show up below. */
         val timedOut: List<String> = emptyList(),
         /** Configured task ids that no longer resolve — a stale "Run on exit" entry. */
-        val missing: List<Long> = emptyList(),
+        val missing: List<String> = emptyList(),
         /** Everything still live after the exit tasks. Should be empty; each entry is a leak. */
         val leftovers: List<RuntimeInventory.LiveItem> = emptyList(),
     ) {
@@ -51,12 +51,13 @@ object AppShutdown {
         val db = OpenTaskerApp_NoHilt.db
         val ran = mutableListOf<String>()
         val timedOut = mutableListOf<String>()
-        val missing = mutableListOf<Long>()
+        val missing = mutableListOf<String>()
 
-        for (id in ShutdownSettings.taskIds(app)) {
-            val task = runCatching { db.taskDao().getById(id)?.toDomain() }.getOrNull()
+        ShutdownSettings.migrate(app, db)
+        for (name in ShutdownSettings.taskNames(app)) {
+            val task = runCatching { db.taskDao().getByNameIgnoreCase(name)?.toDomain() }.getOrNull()
             if (task == null) {
-                missing += id
+                missing += name
                 continue
             }
             // Each task runs on an independent job so a timeout ABANDONS the wait without killing the

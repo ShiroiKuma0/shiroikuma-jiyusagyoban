@@ -564,11 +564,14 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "file.move",
             name = "Move File",
-            description = "Move or rename a file within the app's files",
+            description = "Move or rename a file — inside the app's files, inside /sdcard, or from one to the other",
             category = "File",
             fields = listOf(
                 ActionField("from", "From", required = true, hint = "source path"),
                 ActionField("to", "To", required = true, hint = "destination path"),
+                ActionField("shared", "Both in shared storage", FieldType.TEXT, hint = "true = resolve BOTH paths under /sdcard instead of the app's private files"),
+                ActionField("from_shared", "Source in shared storage", FieldType.TEXT, hint = "true = the source is under /sdcard — this is how a file put in /sdcard/tmp gets into the app's own files"),
+                ActionField("to_shared", "Destination in shared storage", FieldType.TEXT, hint = "true = the destination is under /sdcard"),
             )
         )
     )
