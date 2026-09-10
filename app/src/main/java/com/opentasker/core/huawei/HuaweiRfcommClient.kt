@@ -230,6 +230,8 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
                 output = s.outputStream
             }
             if (outcome.isSuccess) {
+                // The link is up: mark it, so an ending that never happens is visible next time.
+                HuaweiSessionMarker.open(context)
                 if (label != "uuid") {
                     // Worth saying: the first rung is the one that works on a settled phone, so
                     // needing a later one is a fact about this pairing, not noise.
@@ -242,7 +244,45 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
                 .append(label).append(": ").append(e?.message ?: e?.let { it::class.java.simpleName })
         }
         closeQuietly()
-        return@withContext "RFCOMM refused: $failures"
+        return@withContext refusalMessage(a, device, failures.toString())
+    }
+
+    /**
+     * Say what actually went wrong, instead of Android's word for everything.
+     *
+     * `BluetoothSocket.connect()` throws the same sentence — *"read failed, socket might closed or
+     * timeout, read ret: -1"* — for a band that is asleep, a band out of range, a band that refused,
+     * and an adapter that is off. It names nothing, and on 2026-09-10 it cost 白い熊 two failures and
+     * a morning of mine to learn from `logcat` what the phone had known all along: the band was
+     * found, its name was read back, and it answered with **HCI 0x0D, Connection Rejected — Limited
+     * Resources**. The band had a stale session; restarting it fixed it.
+     *
+     * ## What can and cannot be known from inside the app
+     *
+     * The HCI status is not exposed to applications — there is no API for it and reading the system
+     * log needs a permission only a system app holds. So this does NOT claim to know the reason. It
+     * reports the two things it CAN check — the adapter and the bond — and, when both are fine,
+     * names the likeliest cause and the remedy that has actually worked, marked as a likelihood
+     * rather than a finding. The rung-by-rung detail stays, because it is what distinguishes "every
+     * channel refused" from "one channel is wrong".
+     */
+    private fun refusalMessage(
+        adapter: android.bluetooth.BluetoothAdapter,
+        device: BluetoothDevice,
+        failures: String,
+    ): String {
+        val detail = "RFCOMM refused: $failures"
+        if (!adapter.isEnabled) {
+            return "$detail\n\nBluetooth is off on this phone — switch it on and try again."
+        }
+        if (device.bondState != BluetoothDevice.BOND_BONDED) {
+            return "$detail\n\nThe band is not paired with this phone. Run バンド接続（Huawei）first."
+        }
+        return detail + "\n\nBluetooth is on and the band is still paired, so the connection was " +
+            "refused rather than misaddressed. The usual cause is a stale session on the BAND — it " +
+            "serves one host at a time and goes on holding the slot after that host has gone. " +
+            "**Restart the band** and try again; unpairing is not needed and tells you less. " +
+            "If a restart does not help, the band may simply be out of range or asleep."
     }
 
     /** False once the link is gone, so a pump loop can tell a quiet band from a dead one. */
@@ -328,6 +368,9 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
     override suspend fun close() = withContext(NonCancellable + Dispatchers.IO) { closeQuietly() }
 
     private fun closeQuietly() {
+        // Cleared first, and only when there is something to clear: closeQuietly runs between rungs
+        // of the connect ladder too, where no session was ever opened.
+        if (socket != null) runCatching { HuaweiSessionMarker.close(context) }
         runCatching { input?.close() }
         runCatching { output?.close() }
         runCatching { socket?.close() }
