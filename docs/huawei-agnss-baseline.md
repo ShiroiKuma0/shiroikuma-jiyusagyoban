@@ -138,6 +138,39 @@ Checks that actually bite, in order of value:
   180 for the full span, because Wuhan's newest issue was stamped doy 249 18:00 and its observed day
   ends 09-07 18:00. The rest is gradeable from about 09-10.
 
+  **The full span, measured 2026-09-09 on that same set** (window 2026-09-06 19:59, graded against
+  Wuhan's observed halves out to 09-08 12:00). The first day is not ours — Wuhan's own 48-hour
+  product covers it and is shipped directly — so the table is really two measurements:
+
+  | hours into the window | median | p95 | max | whose orbit |
+  | --- | --- | --- | --- | --- |
+  | 0–18 | **0.06–0.13 m** | 0.6 m | 2.2 m | Wuhan's, shipped as-is |
+  | 22–24 | 6.7 m | — | — | the seam |
+  | 24–30 | 13.2 m | 22.5 m | 44.8 m | ours, integrated |
+  | 60–66 | **33.7 m** | 88.2 m | 93.9 m | ours, integrated |
+
+  Decomposed into radial / along-track / cross-track, which is what says *what* is wrong rather than
+  how much:
+
+  | hours | radial | along-track | cross-track |
+  | --- | --- | --- | --- |
+  | 24–30 | 1.0 m | 4.0 m | **11.5 m** |
+  | 60–66 | 1.5 m | **19.3 m** | 19.0 m |
+
+  Radial is flat at 1.0–1.5 m for two days, so the geopotential, GM and the frame's radial scale are
+  right. Along-track grows as **t²** — a constant unmodelled acceleration of about 8e-10 m/s², which
+  is roughly 1 % of solar radiation pressure. Cross-track appears early, grows slowly, and **splits
+  by orbital plane**: RAAN 11–14° gives 10–12 m, RAAN 134° and 253° give 18.5–21.3 m, with every
+  satellite in a plane agreeing to a metre. Plane-dependent, once-per-revolution cross-track is the
+  ECOM B terms, which `NSRP_DEFAULT = 3` omits.
+
+  **Every impossible number this project has produced came from one line.** `spanned()` checked that
+  the interpolation stencil was contiguous and never that the time was INSIDE it, so a satellite
+  whose product coverage starts a day late — C02 — was answered by extrapolating a degree-8
+  polynomial: 3.3e13 m, twice, once diagnosed as a "BeiDou divergence" and once as a merge artefact.
+  Fixed in `pgnss-build.py` and in `Sp3.kt`, whose copy had the same hole and no caller that could
+  reach it. The honest worst case for BeiDou is **93.9 m**, not 3.3e13.
+
   For proportion: assistance data has to be right to within tens of metres to speed acquisition up.
   At a quarter of a metre the orbits are nowhere near the limiting factor — the 13 s was earned.
 - **Against a broadcast capture** — RTCM 1019/1020 settle clock signs and TGD with no orbit product
