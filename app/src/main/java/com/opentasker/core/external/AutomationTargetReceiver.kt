@@ -172,6 +172,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
             }.getOrElse { failure(it.message ?: "Automation target request failed") }
             try {
                 pending.setResultCode(response.resultCode)
+                pending.setResultData(response.data)
                 pending.setResultExtras(response.extras)
             } catch (e: Exception) {
                 AppLogger.error(TAG, "Failed to publish automation target result", e)
@@ -229,8 +230,11 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         return try {
             ContextCompat.startForegroundService(appContext, serviceIntent)
             TargetResponse(
-                Activity.RESULT_OK,
-                Bundle().apply {
+                // The id in the text too: a shell caller polls ACTION_QUERY_EXECUTION with it, and
+                // could not read it out of a Bundle.
+                data = "OK:$executionId",
+                resultCode = Activity.RESULT_OK,
+                extras = Bundle().apply {
                     putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
                     putBoolean(AutomationTargetContract.EXTRA_ACCEPTED, true)
                     putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
@@ -261,14 +265,15 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val record = ExternalExecutions.get(appContext, executionId)
         val state = record?.state ?: ExternalExecutionState.UNKNOWN
         return TargetResponse(
+            data = "OK:${state.name}",
             // An unknown id is a caller error, not a task failure; a still-running execution is a
             // valid answer, so only a genuinely failed run reports CANCELED.
-            if (state == ExternalExecutionState.UNKNOWN || state == ExternalExecutionState.FAILED) {
+            resultCode = if (state == ExternalExecutionState.UNKNOWN || state == ExternalExecutionState.FAILED) {
                 Activity.RESULT_CANCELED
             } else {
                 Activity.RESULT_OK
             },
-            Bundle().apply {
+            extras = Bundle().apply {
                 putInt(AutomationTargetContract.EXTRA_PROTOCOL_VERSION, AutomationTargetContract.PROTOCOL_VERSION)
                 putString(AutomationTargetContract.EXTRA_EXECUTION_ID, executionId)
                 putString(AutomationTargetContract.EXTRA_EXECUTION_STATE, state.name)
@@ -302,8 +307,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         }
         db.profileDao().update(profile.copy(enabled = enabled).toEntity())
         return TargetResponse(
-            Activity.RESULT_OK,
-            Bundle().apply {
+            data = "OK:enabled=$enabled",
+            resultCode = Activity.RESULT_OK,
+            extras = Bundle().apply {
                 putBoolean(AutomationTargetContract.EXTRA_PROFILE_FOUND, true)
                 putBoolean(AutomationTargetContract.EXTRA_PROFILE_ENABLED, enabled)
             },
@@ -314,8 +320,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val db = OpenTaskerApp_NoHilt.db
         val profile = resolveProfile(intent)
         return TargetResponse(
-            Activity.RESULT_OK,
-            Bundle().apply {
+            data = "OK",
+            resultCode = Activity.RESULT_OK,
+            extras = Bundle().apply {
                 // Fork: deliberately NOT gated — "are you stopped?" has to be answerable precisely
                 // when the answer is yes, so a caller can dim its shortcuts instead of firing.
                 putBoolean(AutomationTargetContract.EXTRA_STOPPED, EngineShutdown.isStopped(appContext))
@@ -356,8 +363,9 @@ class AutomationTargetReceiver : BroadcastReceiver() {
     private fun failure(message: String, extras: Bundle = Bundle()): TargetResponse {
         AppLogger.warn(TAG, message)
         return TargetResponse(
-            Activity.RESULT_CANCELED,
-            extras.apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },
+            data = "ERROR:$message",
+            resultCode = Activity.RESULT_CANCELED,
+            extras = extras.apply { putString(AutomationTargetContract.EXTRA_ERROR, message) },
         )
     }
 
@@ -378,4 +386,14 @@ class AutomationTargetReceiver : BroadcastReceiver() {
 private data class TargetResponse(
     val resultCode: Int,
     val extras: Bundle,
+    /**
+     * The same answer as one line of text, for a caller that cannot read a Bundle.
+     *
+     * Every refusal used to live only in [extras] and a log line, so `am broadcast` — the way this
+     * bridge is actually driven from a shell, and the way the workspace-mirror workflow documents
+     * driving it — showed `result=0` and nothing else. A refused run and a run that never happened
+     * looked identical, and four attempts went into chasing a bridge that had been answering all
+     * along (2026-09-09). `resultData` is what `am broadcast` prints, so the reason goes there too.
+     */
+    val data: String,
 )
