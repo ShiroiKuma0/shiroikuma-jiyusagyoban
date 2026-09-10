@@ -32,8 +32,12 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.TaskEntity
+import com.opentasker.core.storage.ProfileEntity
+import com.opentasker.core.storage.SceneEntity
 import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.ui.components.UiMessage
 import com.opentasker.core.storage.EditHistoryEntity
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.storage.ItemMetaEntity
@@ -272,8 +276,18 @@ class ActiveAutomationViewModel(
 
     fun deleteProject(project: Project, deleteItems: Boolean) = launchWithMessage(
         if (deleteItems) "Project and its items deleted" else "Project deleted; items moved to Unfiled"
-    ) {
+    ) { offer ->
         val pid = project.id
+        // Everything the delete is about to touch, captured whole. A project delete is the largest
+        // of these and the only one that can take hundreds of rows with it, which is exactly why it
+        // is the one worth being able to take back.
+        val undoProfiles = db.profileDao().getAll().filter { it.projectId == pid }
+        val undoTasks = db.taskDao().getAll().filter { it.projectId == pid }
+        val undoScenes = db.sceneDao().getAll().filter { it.projectId == pid }
+        val undoGroups = db.itemGroupDao().getAll().filter { it.projectId == pid }
+        val undoMeta = db.itemMetaDao().getAll()
+        val undoVariables = db.variableDao().getAll().filter { it.projectId == pid }
+        val undoProject = project.toEntity()
         db.withTransaction {
             val profileRows = db.profileDao().getAll().filter { it.projectId == pid }
             val taskRows = db.taskDao().getAll().filter { it.projectId == pid }
@@ -301,6 +315,25 @@ class ActiveAutomationViewModel(
         }
         if ((projectFilter as? ProjectFilter.Of)?.projectId == pid) {
             selectProject(ProjectFilter.All)
+        }
+        undoTasks.forEach { undoIcons[it.id] = it.iconPath }
+        offer {
+            db.withTransaction {
+                db.projectDao().insert(undoProject)
+                undoGroups.forEach { db.itemGroupDao().upsert(it) }
+                // Insert restores a deleted row and rewrites one that was only moved to Unfiled —
+                // both cases are "put it back as it was", and REPLACE makes them the same call.
+                undoProfiles.forEach { db.profileDao().insert(it) }
+                undoTasks.forEach { db.taskDao().insert(it) }
+                undoScenes.forEach { db.sceneDao().insert(it) }
+                db.variableDao().insertAll(undoVariables)
+                undoMeta.forEach { db.itemMetaDao().upsert(it) }
+            }
+            undoTasks.forEach { undoIcons.remove(it.id) }
+            TaskWidgetProvider.requestRefresh(appContext)
+            "Restored “${project.name}” with ${undoTasks.size} task${plural(undoTasks.size)}, " +
+                "${undoProfiles.size} profile${plural(undoProfiles.size)} and " +
+                "${undoScenes.size} scene${plural(undoScenes.size)}"
         }
     }
 
@@ -347,10 +380,15 @@ class ActiveAutomationViewModel(
         db.itemGroupDao().upsert(group.copy(name = name.trim()))
     }
 
-    fun deleteGroup(group: ItemGroupEntity) = viewModelScope.launch {
+    fun deleteGroup(group: ItemGroupEntity) = launchWithMessage("Group “${group.name}” deleted") { offer ->
+        // Captured BEFORE the orphaning, because that is the part the undo has to put back: the
+        // group row alone would return an empty group with its members still scattered.
+        val members = db.itemMetaDao().getAll().filter { it.tab == group.tab && it.groupId == group.id }
+        val children = db.itemGroupDao().getAll().filter { it.parentGroupId == group.id }
         db.itemMetaDao().clearGroup(group.tab, group.id) // orphan its members back to top level
         db.itemGroupDao().orphanChildren(group.id)       // its sub-groups float up to top level
         db.itemGroupDao().delete(group.id)
+        offer { restoreGroup(group, members, children) }
     }
 
     fun toggleGroupExpanded(group: ItemGroupEntity) = viewModelScope.launch {
@@ -397,7 +435,7 @@ class ActiveAutomationViewModel(
                 }
                 // 3. Force MANUAL sort so the freshly written positions drive the tab's order.
                 ListSortStore.set(sortTab, SortMethod.MANUAL)
-            }.onFailure { events.send("Error: ${it.message ?: "Reorder failed"}") }
+            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Reorder failed"}")) }
         }
     }
 
@@ -419,7 +457,7 @@ class ActiveAutomationViewModel(
                     }
                 }
             }
-        }.onFailure { events.send("Error: ${it.message ?: "Group reorder failed"}") }
+        }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Group reorder failed"}")) }
     }
 
     fun moveItemToNewGroup(tab: String, projectId: Long?, name: String, itemKey: String) = viewModelScope.launch {
@@ -445,16 +483,20 @@ class ActiveAutomationViewModel(
         }
 
     fun deleteScenes(items: List<Scene>) =
-        launchWithMessage("Deleted ${items.size} scene${plural(items.size)}") {
+        launchWithMessage("Deleted ${items.size} scene${plural(items.size)}") { offer ->
+            val rows = items.map { it.toEntity() }
             items.forEach {
                 db.sceneDao().delete(it.toEntity())
                 db.itemMetaDao().delete("scenes", it.id.toString())
             }
+            offer { restoreScenes(rows) }
         }
 
     fun deleteProfiles(items: List<Profile>) =
-        launchWithMessage("Deleted ${items.size} profile${plural(items.size)}") {
+        launchWithMessage("Deleted ${items.size} profile${plural(items.size)}") { offer ->
+            val rows = items.map { it.toEntity() }
             items.forEach { db.profileDao().delete(it.toEntity()); locationDwellStateStore.clearProfile(it.id) }
+            offer { restoreProfiles(rows) }
         }
 
     /** Delete several tasks at once, skipping any still referenced by a profile (same guard as [deleteTask]). */
@@ -465,19 +507,99 @@ class ActiveAutomationViewModel(
                 val usedIds = db.profileDao().getAll().map { it.toDomain() }
                     .flatMap { listOfNotNull(it.enterTaskId, it.exitTaskId) }.toSet()
                 val (used, free) = items.partition { it.id in usedIds }
-                free.forEach { db.taskDao().delete(it.toEntity()); TaskIconStore.delete(it.iconPath) }
-                buildString {
+                val rows = free.map { it.toEntity() }
+                free.forEach { db.taskDao().delete(it.toEntity()); undoIcons[it.id] = it.iconPath }
+                TaskWidgetProvider.requestRefresh(appContext)
+                rows to buildString {
                     append("Deleted ${free.size} task${plural(free.size)}")
                     if (used.isNotEmpty()) append("; skipped ${used.size} used by a profile")
                 }
             }
-                .onSuccess { events.send(it) }
-                .onFailure { events.send("Error: ${it.message ?: "Delete failed"}") }
+                .onSuccess { (rows, text) ->
+                    val token = if (rows.isEmpty()) null else offerUndo(rows.map { it.id }) { restoreTasks(rows) }
+                    events.send(UiMessage(text, token))
+                }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Delete failed"}")) }
         }
     }
 
-    private val events = Channel<String>(Channel.BUFFERED)
+    private val events = Channel<UiMessage>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
+
+    /**
+     * The work each outstanding Undo would do, keyed by the token its bar carries.
+     *
+     * In MEMORY, deliberately, and the snapshot it restores from is passed in the closure. The bar
+     * is what makes an undo reachable and the bar does not survive the process, so persisting the
+     * token would buy an offer nobody can accept. What IS durable is the deletion itself: it happens
+     * immediately, because the engine, the widgets and the overlays read this database live and a
+     * row that is "deleted" on screen while still running would be worse than no undo at all.
+     *
+     * Bounded, and oldest-first: an undo nobody took is litter, and holding a whole deleted project
+     * forever because a bar scrolled past is how a tidy feature becomes a leak.
+     */
+    /** One outstanding offer: the work, and any icon files being held for it. */
+    private class PendingUndo(val work: suspend () -> String, val taskIds: List<Long> = emptyList())
+
+    private val pendingUndos = object : LinkedHashMap<String, PendingUndo>(0, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, PendingUndo>): Boolean {
+            // An offer that falls off the end takes its held icons with it, or a deleted task's PNG
+            // would sit on disk forever waiting for an Undo nobody can press any more.
+            if (size > MAX_PENDING_UNDOS) {
+                forgetUndo(eldest.value.taskIds)
+                return true
+            }
+            return false
+        }
+    }
+
+    /** Register an undo and hand back the token that reaches it. */
+    private fun offerUndo(taskIds: List<Long> = emptyList(), work: suspend () -> String): String {
+        val token = "undo-${undoCounter.incrementAndGet()}"
+        pendingUndos[token] = PendingUndo(work, taskIds)
+        return token
+    }
+
+    private val undoCounter = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
+     * Icon files belonging to deleted tasks, held while their Undo is still on offer.
+     *
+     * `deleteTask` used to remove the PNG immediately. That is right when the deletion is final and
+     * wrong while it can be taken back: bytes off disk do not come back from a row snapshot, so the
+     * task would return wearing no icon and nothing would say why. Swept when the offer lapses.
+     */
+    private val undoIcons = mutableMapOf<Long, String?>()
+
+    /** The offer is gone — now the icon can go too. */
+    private fun forgetUndo(taskIds: Collection<Long>) {
+        taskIds.forEach { id -> undoIcons.remove(id)?.let { TaskIconStore.delete(it) } }
+    }
+
+    private companion object {
+        /** How many outstanding Undos to keep. More bars than this and the oldest offer lapses. */
+        const val MAX_PENDING_UNDOS = 10
+    }
+
+    /**
+     * Take back the deletion the bar is offering.
+     *
+     * A token can be spent once: pressing Undo twice on a bar that lingered must not insert the row
+     * twice. Anything already gone from the registry answers plainly rather than silently doing
+     * nothing, because "I pressed it and cannot tell whether it worked" is its own small failure.
+     */
+    fun undo(token: String) {
+        val pending = pendingUndos.remove(token)
+        if (pending == null) {
+            viewModelScope.launch { events.send(UiMessage("That undo is no longer available")) }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { pending.work() }
+                .onSuccess { events.send(UiMessage(it)) }
+                .onFailure { events.send(UiMessage("Undo failed: ${it.message ?: "unknown error"}")) }
+        }
+    }
 
     private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
     val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
@@ -556,9 +678,21 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) {
+    fun updateTask(task: Task, message: String = "Task updated") = launchWithMessage(message) { offer ->
         val previous = db.taskDao().getById(task.id)
         if (previous != null) {
+            // Offered whenever the edit made the list SHORTER, whatever route it came by — the
+            // action row's Delete, the selection's Delete, a paste that replaced a block. "I removed
+            // something" is exactly when an undo is wanted, and the snapshot already exists below,
+            // so this costs a comparison rather than a mechanism.
+            val before = runCatching {
+                StorageJson.decodeFromString<List<com.opentasker.core.model.ActionSpec>>(previous.actionsJson).size
+            }.getOrDefault(-1)
+            if (before > task.actions.size) {
+                val removed = before - task.actions.size
+                val json = previous.actionsJson
+                offer { restoreTaskActions(task.id, json, "$removed action${plural(removed)}") }
+            }
             // DATA-LOSS GUARD (白い熊 critical): if the STORED actions currently fail to decode, the
             // in-memory task was built from an empty fallback — writing it would clobber recoverable JSON.
             // Refuse rather than persist a silent wipe. (Genuine "delete all actions" decodes cleanly →
@@ -570,7 +704,7 @@ class ActiveAutomationViewModel(
                     "ActiveAutomationVM",
                     "BLOCKED save of task ${task.id} '${task.name}': stored actions unreadable (${prevIssue.message}); not overwriting with empty",
                 )
-                events.send("Save blocked: this task's stored actions couldn't be read — not overwriting them")
+                events.send(UiMessage("Save blocked: this task's stored actions couldn't be read — not overwriting them"))
                 return@launchWithMessage
             }
             // Trace every task write so a rogue overwriter (dropping actions) is identifiable in logcat.
@@ -609,17 +743,25 @@ class ActiveAutomationViewModel(
                 val profilesUsingTask = db.profileDao().getAll().map { it.toDomain() }
                     .filter { it.enterTaskId == task.id || it.exitTaskId == task.id }
                 if (profilesUsingTask.isNotEmpty()) {
-                    events.send("Task is used by ${profilesUsingTask.size} profile(s). Reassign or delete those profiles first.")
+                    events.send(UiMessage("Task is used by ${profilesUsingTask.size} profile(s). Reassign or delete those profiles first."))
                     return@launch
                 }
-                db.taskDao().delete(task.toEntity())
-                TaskIconStore.delete(task.iconPath)
+                val row = task.toEntity()
+                db.taskDao().delete(row)
+                // The icon is the one thing a row snapshot cannot hold: it is a PNG on disk, and
+                // deleting it here would make the undo restore a task with a blank icon. So it is
+                // left in place, and only swept once the offer has lapsed — see forgetUndo.
+                undoIcons[row.id] = task.iconPath
                 // Otherwise a widget bound to this task keeps looking runnable and only answers a
                 // tap with "Task not found".
                 TaskWidgetProvider.requestRefresh(appContext)
+                row
             }
-                .onSuccess { events.send("Task deleted") }
-                .onFailure { events.send("Error: ${it.message ?: "Task delete failed"}") }
+                .onSuccess { row ->
+                    val token = offerUndo(listOf(row.id)) { restoreTasks(listOf(row)) }
+                    events.send(UiMessage("Task deleted", token))
+                }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Task delete failed"}")) }
         }
     }
 
@@ -651,8 +793,10 @@ class ActiveAutomationViewModel(
         db.sceneDao().update(scene.toEntity())
     }
 
-    fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") {
-        db.sceneDao().delete(scene.toEntity())
+    fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") { offer ->
+        val row = scene.toEntity()
+        db.sceneDao().delete(row)
+        offer { restoreScenes(listOf(row)) }
     }
 
     fun createProfile(
@@ -680,7 +824,7 @@ class ActiveAutomationViewModel(
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =
-        launchWithMessage(message) {
+        launchWithMessage(message) { offer ->
             requireValidProfileFieldLimits(profile)
             // Atomic read-check-snapshot-update (upstream deep-audit), so racing writers
             // (dialog save vs. notification/external-intent path) can't lose a revision.
@@ -700,6 +844,14 @@ class ActiveAutomationViewModel(
                     writeSettingsGuard.requireWriteSettingsIfEnabled(profile)
                 }
                 if (previousEntity != null) {
+                    // Same rule as a task's actions: a shorter list is a removal, and a removal is
+                    // the moment to offer the way back.
+                    val before = previous?.contexts?.size ?: -1
+                    if (before > profile.contexts.size) {
+                        val removed = before - profile.contexts.size
+                        val json = previousEntity.contextsJson
+                        offer { restoreProfileContexts(profile.id, json, "$removed context${plural(removed)}") }
+                    }
                     db.editHistoryDao().insert(
                         EditHistoryEntity(
                             entityType = EditHistoryDao.TYPE_PROFILE,
@@ -721,8 +873,10 @@ class ActiveAutomationViewModel(
             }
         }
 
-    fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") {
-        db.profileDao().delete(profile.toEntity())
+    fun deleteProfile(profile: Profile) = launchWithMessage("Profile deleted") { offer ->
+        val row = profile.toEntity()
+        db.profileDao().delete(row)
+        offer { restoreProfiles(listOf(row)) }
         LocaleConditionGrantStore(appContext).apply {
             revokeAllForBinding(LocaleConditionGrantStore.profileKey(profile.id))
             profile.contexts.indices.forEach { index ->
@@ -757,9 +911,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _taskerImportReview.value = it
-                    events.send("${it.title.removePrefix("Review ").removeSuffix(" import")} import ready for review")
+                    events.send(UiMessage("${it.title.removePrefix("Review ").removeSuffix(" import")} import ready for review"))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Import preview failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Import preview failed"}")) }
         }
     }
 
@@ -779,12 +933,12 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { importReport ->
                     _taskerImportReview.value = null
-                    events.send(
+                    events.send(UiMessage(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}"
-                    )
+                    ))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Tasker XML import failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Tasker XML import failed"}")) }
         }
     }
 
@@ -806,13 +960,13 @@ class ActiveAutomationViewModel(
                 }
             }
                 .onSuccess { bundle ->
-                    events.send(
+                    events.send(UiMessage(
                         "Exported ${bundle.tasks.size} task${plural(bundle.tasks.size)}, " +
                             "${bundle.profiles.size} profile${plural(bundle.profiles.size)}, " +
                             "${bundle.scenes.size} scene${plural(bundle.scenes.size)}"
-                    )
+                    ))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "export failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "export failed"}")) }
         }
     }
 
@@ -861,9 +1015,9 @@ class ActiveAutomationViewModel(
                         if (bundle.variables.isNotEmpty()) add("${bundle.variables.size} variable${plural(bundle.variables.size)}")
                         if (bundle.templates.isNotEmpty()) add("${bundle.templates.size} template${plural(bundle.templates.size)}")
                     }
-                    events.send("Exported ${parts.joinToString().ifEmpty { "nothing" }}")
+                    events.send(UiMessage("Exported ${parts.joinToString().ifEmpty { "nothing" }}"))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Export failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Export failed"}")) }
         }
     }
 
@@ -880,9 +1034,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess {
                     _openTaskerBundleReview.value = it
-                    events.send("Import ready to review")
+                    events.send(UiMessage("Import ready to review"))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "import preview failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "import preview failed"}")) }
         }
     }
 
@@ -910,13 +1064,13 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { importReport ->
                     _openTaskerBundleReview.value = null
-                    events.send(
+                    events.send(UiMessage(
                         "Imported ${importReport.insertedTasks} task${plural(importReport.insertedTasks)}, " +
                             "${importReport.insertedProfiles} disabled profile${plural(importReport.insertedProfiles)}, " +
                             "${importReport.insertedScenes} scene${plural(importReport.insertedScenes)}"
-                    )
+                    ))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "import failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "import failed"}")) }
         }
     }
 
@@ -929,8 +1083,8 @@ class ActiveAutomationViewModel(
             runCatching {
                 withContext(Dispatchers.IO) { db.runLogDao().clearUnpinned() }
             }
-                .onSuccess { deleted -> events.send("Cleared $deleted run log entr${if (deleted == 1) "y" else "ies"}") }
-                .onFailure { events.send("Error: ${it.message ?: "Run log clear failed"}") }
+                .onSuccess { deleted -> events.send(UiMessage("Cleared $deleted run log entr${if (deleted == 1) "y" else "ies"}")) }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Run log clear failed"}")) }
         }
     }
 
@@ -944,9 +1098,9 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { deleted ->
                     val suffix = if (deleted > 0) "; pruned $deleted old entry${plural(deleted)}" else ""
-                    events.send("Run log retention updated$suffix")
+                    events.send(UiMessage("Run log retention updated$suffix"))
                 }
-                .onFailure { events.send("Error: ${it.message ?: "Run log retention update failed"}") }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Run log retention update failed"}")) }
         }
     }
 
@@ -969,9 +1123,9 @@ class ActiveAutomationViewModel(
                 val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                     ?: throw IllegalStateException("Clipboard service is unavailable")
                 clipboard.setPrimaryClip(ClipData.newPlainText("白い熊 自由作業盤 Diagnostic Report", report))
-                events.send("Diagnostic report copied to the clipboard.")
+                events.send(UiMessage("Diagnostic report copied to the clipboard."))
             } catch (ex: Exception) {
-                events.send("Error: ${ex.message ?: "Failed to copy the diagnostic report"}")
+                events.send(UiMessage("Error: ${ex.message ?: "Failed to copy the diagnostic report"}"))
             }
         }
     }
@@ -988,7 +1142,7 @@ class ActiveAutomationViewModel(
                 }
                 appContext.startActivity(Intent.createChooser(intent, "Share diagnostic report").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             } catch (ex: Exception) {
-                events.send("Error: ${ex.message ?: "Failed to share diagnostic report"}")
+                events.send(UiMessage("Error: ${ex.message ?: "Failed to share diagnostic report"}"))
             }
         }
     }
@@ -1016,7 +1170,7 @@ class ActiveAutomationViewModel(
      */
     fun runActionNow(task: Task, index: Int) {
         viewModelScope.launch {
-            if (_runActionBusy.value) { events.send("A run is already in flight."); return@launch }
+            if (_runActionBusy.value) { events.send(UiMessage("A run is already in flight.")); return@launch }
             val single = SingleActionRun.taskFor(task, index) ?: return@launch
             val action = single.actions.first()
             val label = action.label?.takeIf { it.isNotBlank() }
@@ -1035,7 +1189,7 @@ class ActiveAutomationViewModel(
                     admissionController = ExecutionAdmissionRegistry.current(appContext),
                 )
                 val status = if (result.report.success) "succeeded" else "failed"
-                events.send("$label $status (${result.report.durationMs}ms)")
+                events.send(UiMessage("$label $status (${result.report.durationMs}ms)"))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1053,17 +1207,17 @@ class ActiveAutomationViewModel(
                 val entryId = entry.id
                 val consumed = runCatching { db.runLogDao().clearHeld(entryId) }.getOrDefault(0)
                 if (consumed == 0) {
-                    events.send("That held run has already been replayed.")
+                    events.send(UiMessage("That held run has already been replayed."))
                     return@launch
                 }
                 val payload = HeldExecutionPayloadCodec.decode(entry.heldPayload)
                 if (payload == null) {
-                    events.send("That held run no longer carries enough detail to replay.")
+                    events.send(UiMessage("That held run no longer carries enough detail to replay."))
                     return@launch
                 }
                 val task = runCatching { db.taskDao().getById(payload.taskId)?.toDomain() }.getOrNull()
                 if (task == null) {
-                    events.send("${payload.taskName} no longer exists.")
+                    events.send(UiMessage("${payload.taskName} no longer exists."))
                     return@launch
                 }
                 val result = executeAndLogTask(
@@ -1075,7 +1229,7 @@ class ActiveAutomationViewModel(
                     initialVariables = payload.initialVariables,
                 )
                 val status = if (result.report.success) "succeeded" else "failed"
-                events.send("${task.name} $status (${result.report.durationMs}ms)")
+                events.send(UiMessage("${task.name} $status (${result.report.durationMs}ms)"))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1084,7 +1238,7 @@ class ActiveAutomationViewModel(
 
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
-            if (_runActionBusy.value) { events.send("A run is already in flight."); return@launch }
+            if (_runActionBusy.value) { events.send(UiMessage("A run is already in flight.")); return@launch }
             _runActionBusy.value = true
             // finally, not a plain trailing assignment: executeAndLogTask is not wrapped in a
             // runCatching here, so a throw would otherwise leave the flag standing and disable
@@ -1097,7 +1251,7 @@ class ActiveAutomationViewModel(
                     source = "Manual run",
                 )
                 val status = if (result.report.success) "succeeded" else "failed"
-                events.send("${task.name} $status (${result.report.durationMs}ms)")
+                events.send(UiMessage("${task.name} $status (${result.report.durationMs}ms)"))
             } finally {
                 _runActionBusy.value = false
             }
@@ -1107,14 +1261,14 @@ class ActiveAutomationViewModel(
     fun pinTaskShortcut(task: Task) {
         viewModelScope.launch {
             if (!TaskShortcutHelper.canPinShortcut(appContext)) {
-                events.send("Launcher does not support pinned shortcuts")
+                events.send(UiMessage("Launcher does not support pinned shortcuts"))
                 return@launch
             }
             val requested = TaskShortcutHelper.requestPinShortcut(appContext, task)
             if (requested) {
-                events.send("Pinning \"${task.name}\" to home screen")
+                events.send(UiMessage("Pinning \"${task.name}\" to home screen"))
             } else {
-                events.send("Failed to pin shortcut")
+                events.send(UiMessage("Failed to pin shortcut"))
             }
         }
     }
@@ -1129,8 +1283,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_TASK, taskId)
                 true
             }.onSuccess { undone ->
-                events.send(if (undone) "Edit undone" else "No edit history available")
-            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
+                events.send(UiMessage(if (undone) "Edit undone" else "No edit history available"))
+            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Undo failed"}")) }
         }
     }
 
@@ -1144,8 +1298,8 @@ class ActiveAutomationViewModel(
                 db.editHistoryDao().deleteFor(EditHistoryDao.TYPE_PROFILE, profileId)
                 true
             }.onSuccess { undone ->
-                events.send(if (undone) "Edit undone" else "No edit history available")
-            }.onFailure { events.send("Error: ${it.message ?: "Undo failed"}") }
+                events.send(UiMessage(if (undone) "Edit undone" else "No edit history available"))
+            }.onFailure { events.send(UiMessage("Error: ${it.message ?: "Undo failed"}")) }
         }
     }
 
@@ -1170,8 +1324,8 @@ class ActiveAutomationViewModel(
                 LocaleConditionGrantStore(appContext)
                     .revokeAllForBinding(LocaleConditionGrantStore.variableKey(projectId, name))
             }
-                .onSuccess { events.send("Variable deleted") }
-                .onFailure { events.send("Error: ${it.message ?: "Variable could not be deleted"}") }
+                .onSuccess { events.send(UiMessage("Variable deleted")) }
+                .onFailure { events.send(UiMessage("Error: ${it.message ?: "Variable could not be deleted"}")) }
         }
     }
 
@@ -1199,11 +1353,115 @@ class ActiveAutomationViewModel(
             }
         }
 
-    private fun launchWithMessage(successMessage: String, block: suspend () -> Unit) {
+    /**
+     * Restore a task's action list to what it was before the last edit — the undo behind
+     * "Action removed", and the cheapest of the four tiers.
+     *
+     * Nothing is re-inserted: the row never went anywhere, `updateTask` already snapshotted its
+     * `actionsJson` into `edit_history`, and putting the old JSON back is the whole operation. That
+     * is why tier 1 costs almost nothing and why it covers contexts and scene elements too.
+     */
+    /**
+     * Put deleted rows back **under their original ids**.
+     *
+     * The id is the whole difficulty. `Run on start`, `Run on exit`, widget bindings and a profile's
+     * `enterTaskId`/`exitTaskId` all point at tasks by number, so a restore that took a fresh id
+     * would look successful and leave every one of them pointing at nothing — which is exactly what
+     * happened to 白い熊's Run-on-start entry on 2026-09-10, from the other direction. Room honours
+     * an explicit non-zero id on an `autoGenerate` key, so the original goes back in.
+     *
+     * The one case that cannot: without `AUTOINCREMENT` SQLite reuses the highest free rowid, so
+     * deleting the newest row and creating another before pressing Undo can hand that id away. Then
+     * the row comes back under a new number and the message SAYS so, rather than reporting a clean
+     * restore over a reference that no longer resolves.
+     */
+    private suspend fun restoreTasks(entities: List<TaskEntity>): String {
+        var renumbered = 0
+        db.withTransaction {
+            entities.forEach { row ->
+                if (db.taskDao().getById(row.id) == null) {
+                    db.taskDao().insert(row)
+                } else {
+                    db.taskDao().insert(row.copy(id = 0))
+                    renumbered++
+                }
+            }
+        }
+        // Restored: the icons are theirs again, so release them from the holding pen unharmed.
+        entities.forEach { undoIcons.remove(it.id) }
+        TaskWidgetProvider.requestRefresh(appContext)
+        val what = "${entities.size} task${plural(entities.size)}"
+        return if (renumbered == 0) {
+            "Restored $what"
+        } else {
+            "Restored $what — $renumbered had to be renumbered, so check Monitor → Run on start"
+        }
+    }
+
+    private suspend fun restoreProfiles(entities: List<ProfileEntity>): String {
+        db.withTransaction { entities.forEach { db.profileDao().insert(it) } }
+        return "Restored ${entities.size} profile${plural(entities.size)}"
+    }
+
+    private suspend fun restoreScenes(entities: List<SceneEntity>): String {
+        db.withTransaction { entities.forEach { db.sceneDao().insert(it) } }
+        return "Restored ${entities.size} scene${plural(entities.size)}"
+    }
+
+    /**
+     * A group, and the membership that went with it.
+     *
+     * Deleting a group orphans its members back to the top level rather than deleting them, so the
+     * undo has to put the group back AND re-point the rows that were in it — otherwise the group
+     * returns empty and the items stay where the delete scattered them.
+     */
+    private suspend fun restoreGroup(
+        group: ItemGroupEntity,
+        members: List<ItemMetaEntity>,
+        children: List<ItemGroupEntity>,
+    ): String {
+        db.withTransaction {
+            db.itemGroupDao().upsert(group)
+            members.forEach { db.itemMetaDao().upsert(it) }
+            children.forEach { db.itemGroupDao().upsert(it) }
+        }
+        return "Restored group “${group.name}” and ${members.size} item${plural(members.size)}"
+    }
+
+    private suspend fun restoreTaskActions(taskId: Long, actionsJson: String, what: String): String {
+        val current = db.taskDao().getById(taskId) ?: return "“$what” is gone — nothing to undo into"
+        db.taskDao().update(current.copy(actionsJson = actionsJson))
+        return "Restored $what"
+    }
+
+    private suspend fun restoreProfileContexts(profileId: Long, contextsJson: String, what: String): String {
+        val current = db.profileDao().getById(profileId) ?: return "“$what” is gone — nothing to undo into"
+        db.profileDao().update(current.copy(contextsJson = contextsJson))
+        return "Restored $what"
+    }
+
+    /**
+     * Run [block], then say what happened — and offer to take it back if [block] asked.
+     *
+     * The block receives a sink: calling `it { ... }` registers the work that would reverse what is
+     * about to happen, and the bar then carries an Undo pill. Every existing caller ignores the
+     * parameter and reads exactly as it did, which is why this is a sink rather than a new function
+     * — one message path, one place that decides how a message reaches the screen.
+     */
+    private fun launchWithMessage(
+        successMessage: String,
+        block: suspend (offer: (suspend () -> String) -> Unit) -> Unit,
+    ) {
         viewModelScope.launch {
-            runCatching { block() }
-                .onSuccess { events.send(successMessage) }
-                .onFailure { events.send("Error: ${it.message ?: "Operation failed"}") }
+            var token: String? = null
+            runCatching { block { work -> token = offerUndo(work = work) } }
+                .onSuccess { events.send(UiMessage(successMessage, token)) }
+                .onFailure {
+                    // The undo is dropped rather than left dangling: if the change did not happen,
+                    // an offer to reverse it would reverse something nobody did.
+                    token?.let { t -> pendingUndos.remove(t) }
+                    events.send(UiMessage("Error: ${it.message ?: "Operation failed"}"))
+                }
         }
     }
 }
