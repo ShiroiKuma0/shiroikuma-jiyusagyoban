@@ -220,15 +220,18 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                                 matches.single().id
                             }
                         val summary = mutableListOf<String>()
+                        // `resolve` still runs: it is what refuses an unknown or ambiguous name, so
+                        // the list can only ever be set to tasks that exist. The NAMES are what get
+                        // stored — see AutoStartSettings.KEY for why an id here was never safe.
                         intent.getStringExtra(EXTRA_START_TASKS)?.let { raw ->
-                            val ids = resolve(raw)
-                            AutoStartSettings.set(app, ids)
-                            summary += "run-on-start = ${ids.size} task(s)"
+                            val names = resolve(raw).mapNotNull { id -> allTasks.firstOrNull { it.id == id }?.name }
+                            AutoStartSettings.set(app, names)
+                            summary += "run-on-start = ${names.size} task(s)"
                         }
                         intent.getStringExtra(EXTRA_EXIT_TASKS)?.let { raw ->
-                            val ids = resolve(raw)
-                            ShutdownSettings.set(app, ids)
-                            summary += "run-on-exit = ${ids.size} task(s)"
+                            val names = resolve(raw).mapNotNull { id -> allTasks.firstOrNull { it.id == id }?.name }
+                            ShutdownSettings.set(app, names)
+                            summary += "run-on-exit = ${names.size} task(s)"
                         }
                         intent.getStringExtra(EXTRA_BOOT_START)?.let { raw ->
                             val on = raw.trim().equals("true", ignoreCase = true) || raw.trim() == "1"
