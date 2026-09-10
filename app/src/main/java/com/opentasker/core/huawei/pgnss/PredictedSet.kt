@@ -30,7 +30,11 @@ import kotlinx.coroutines.withContext
  * Python printed one line about falling back and then produced a complete, plausible, correctly
  * sized set whose BeiDou file had expired two days earlier — and reported success. So:
  *
- * * every input is validated up front, before ten minutes of CPU is spent ([validate]);
+ * * every input is validated up front, before ten minutes of CPU is spent ([validate]) — though
+ *   not yet per CONSTELLATION: BKG serves a valid gzip of a half-written nav file during
+ *   publication, measured on 2026-09-09 as a 134 kB `BRDC00IGS_R` holding C, E and R and no GPS,
+ *   QZSS or SBAS at all, with the same URL returning the full 1.26 MB fifteen minutes later. No
+ *   magic-number check can see that; a per-system record count would;
  * * nothing is substituted for anything: there is no cache, no "keep the old one", no default;
  * * the six files are assembled **entirely in memory** and written only once all six exist, so a
  *   failure half way through cannot leave a store holding three fresh files and three stale ones.
@@ -41,20 +45,36 @@ import kotlinx.coroutines.withContext
  *
  * **QZSS is a byte-for-byte copy of Huawei's captured file, deliberately.** QZSS is regional: its
  * satellites hold longitudes around 135 degrees east, which from Prague at 14 east are below the
- * horizon at every hour of every day. Generating it is possible — JAXA's `JGX0OPSULT` carries the
- * five QZSS satellites on the same anonymous mirror BeiDou comes from, and the propagator that
- * stretches BeiDou to 72 hours would stretch that too — but it would cost a second data source and
- * buy a constellation this band will never see from here. The 28 kB file is carried instead. The
+ * horizon at every hour of every day. Generating it is possible, but it would cost a second data
+ * source and buy a constellation this band will never see from here. The 28 kB file is carried
+ * instead.
+ *
+ * This file used to name `JGX0OPSULT` as where that generated QZSS would come from. **It does not
+ * carry QZSS** — checked satellite by satellite on 2026-09-09, its header is 79 satellites of
+ * G+R+E, as are CODE's five-day prediction and every WUM product. The only free source that has it
+ * is QZSS's own ultra-rapid, `https://sys.qzss.go.jp/dod/api/get/ultra-rapid-sp3`: SP3-c, 34
+ * satellites, all five live QZSS including the SECOND GEO at 90.5 east that this file's "one GEO"
+ * reading predates, 24 h observed plus 24 h predicted, four issues a day. It parses with the
+ * existing fixed-column reader. Its API terms permit not-for-profit use only, which is the one
+ * string none of the other mirrors attach. The
  * copy is shipped even once its own window has closed: measured on the band, carrying the stale
  * pair the fix took about a minute and removing them took it back to about three (白い熊,
  * 2026-08-29). Its age is reported, never acted on.
  *
  * ## Where the carried bytes come from
- * Three things cannot be fitted from any orbit product because they are hardware calibrations:
- * the GPS and Galileo group delays and BeiDou's TGD1 (bytes 20-23 of its record). They are lifted
- * per satellite from Huawei's own captured set, which is safe precisely because it is CONSTANT —
- * every satellite carries the identical value across all 36 epochs of both captured vintages three
- * days apart. See [CapturedSet].
+ * The GPS and Galileo group delays are hardware calibrations rather than orbital quantities, are in
+ * no orbit product, and are lifted per satellite from Huawei's own captured set. That is safe
+ * precisely because they are CONSTANT — every satellite carries the identical value across all 36
+ * epochs of both captured vintages three days apart. See [CapturedSet].
+ *
+ * **BeiDou's TGD1 used to be lifted alongside them and no longer is.** It is a calibration too, but
+ * the satellites BROADCAST it and the file this build already downloads carries it: RINEX 3.05
+ * Table A14, `BROADCAST ORBIT - 6` field 3, columns 43-61 of the seventh line of each `C##` record,
+ * in seconds, and our field is exactly `round(seconds * 1e10)` as a little-endian int16 at byte 22.
+ * Checked against the capture of 2026-08-25 with the next day's `BRDC00IGS_R`: 32 of 32 satellites
+ * within 2 counts (0.2 ns), the residual being real drift between the epochs. The broadcast file
+ * also carries 37 BeiDou satellites where the capture held 32, so C06, C07, C08, C31 and C40 are
+ * shipped now instead of being dropped. See [Records.bdsTails].
  */
 object PredictedSet {
 
@@ -67,6 +87,20 @@ object PredictedSet {
 
     /** The six files, in the order Huawei Health serves them. */
     val NAMES = listOf(NAME_GPS, NAME_BDS, NAME_GLONASS, NAME_GALILEO, NAME_QZS, NAME_EXTRA)
+
+    /**
+     * The files worth KEEPING a capture of — the four [CapturedSet] actually opens.
+     *
+     * GLONASS and EXTRA are deliberately not among them. `seedCaptured` used to copy all six, which
+     * put 368 kB of bytes nothing ever reads into the store and, since 2026-09-09, into every
+     * backup made from it. The capture exists to supply what cannot be derived: QZSS whole, and the
+     * group delays out of the GPS, Galileo and BeiDou records. Nothing reads a captured GLONASS
+     * file or a captured almanac, and a copy nothing reads is not a reference, it is weight.
+     *
+     * Existing installs are untouched: the directory is written once and never again, so a phone
+     * seeded before this keeps its six and simply carries them.
+     */
+    val CAPTURED_NAMES = listOf(NAME_GPS, NAME_GALILEO, NAME_BDS, NAME_QZS)
 
     /** The subdirectory of the store that keeps Huawei's own capture, seeded once. */
     const val CAPTURED_DIR = "captured"
@@ -323,7 +357,7 @@ object PredictedSet {
             tally.advance(), tally.total,
             DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE + BDS_SHARE,
         )
-        built[NAME_EXTRA] = withContext(dispatcher) { buildExtra(src, nowGpsSeconds, stats) }
+        built[NAME_EXTRA] = withContext(dispatcher) { buildExtra(src, plan, nowGpsSeconds, stats) }
 
         // ── write, once every one of the six exists ─────────────────────────────────────────────
         require(built.keys.containsAll(NAMES)) {
@@ -512,9 +546,7 @@ object PredictedSet {
                     "hourly issues overlap and do not lengthen the arc",
             )
         }
-        if (captured.bdsTail.isEmpty()) {
-            throw PgnssBuildException("the captured BeiDou file carries no group delays to lift")
-        }
+        val nav = readBroadcastNav(src, captured, notes)
 
         return BuildPlan(
             sats = sats,
@@ -527,7 +559,111 @@ object PredictedSet {
             field = field,
             stamps = stamps,
             notes = notes,
+            bdsNav = nav.bds,
+            bdsTail = nav.tail,
+            klobuchar = nav.klobuchar,
+            utc = nav.utc,
         )
+    }
+
+    /** What one pass over the broadcast navigation files yields. */
+    private class BroadcastNav(
+        val bds: Map<Int, List<BdsNavRecord>>,
+        val tail: Map<Int, ByteArray>,
+        val klobuchar: KlobucharSet,
+        val utc: UtcParameters,
+    )
+
+    /**
+     * Read every broadcast navigation file once, and refuse a half-written one.
+     *
+     * ## The partial file
+     *
+     * BKG publishes by writing the archive in place, so a fetch landing in the publication window
+     * gets a **valid gzip of an incomplete file**. Measured 2026-09-09: a 134 kB `BRDC00IGS_R`
+     * carrying C, E and R and no GPS, QZSS or SBAS at all, with the same URL serving the full
+     * 1.26 MB fifteen minutes later. Nothing about the bytes says so — the gzip is well formed and
+     * the header is complete, because the header is written first.
+     *
+     * **A complete mixed BRDC always carries GPS.** That is the whole test, and it is deliberately
+     * an invariant rather than a threshold: how many records is "enough" is published nowhere, so
+     * any number here would be invented. A file failing it is skipped with its counts named, and
+     * the build carries on with whatever else was fetched — which is the right answer, because the
+     * OTHER file in the list is yesterday's and complete.
+     *
+     * ## The group delays
+     *
+     * Broadcast first, the capture only where the broadcast is silent. See [Records.bdsTails] for
+     * why a value believed underivable turned out to be in a file we already download.
+     */
+    private fun readBroadcastNav(
+        src: PgnssSources,
+        captured: CapturedSet,
+        notes: MutableList<String>,
+    ): BroadcastNav {
+        if (src.brdcNav.isEmpty()) {
+            throw PgnssBuildException(
+                "no broadcast navigation file — the BeiDou almanac, the group delays and Klobuchar all come from it",
+            )
+        }
+        // Counted first, and STREAMED: this decides which files to decode, so doing it on the
+        // decoded text would defeat the point of not decoding a half-written one.
+        val counted = src.brdcNav.map { file -> file to file.useLines { Almanac.countRinexRecords(it) } }
+        val complete = counted.filter { (_, counts) -> (counts['G'] ?: 0) > 0 }
+        // Prefer a complete file when there is one; never throw away the ONLY file on a heuristic.
+        // A partial file cannot corrupt anything — the merge only ever adds records — so the harm
+        // it does is silent narrowing, and that harm is undone by having a complete file beside it.
+        val usable = complete.ifEmpty { counted }
+        if (complete.isNotEmpty() && complete.size < counted.size) {
+            notes.add(
+                "Broadcast navigation: skipped as half-written, no GPS records — " +
+                    counted.filterNot { it in complete }.joinToString(", ") { (file, counts) ->
+                        "${file.name} (${counts.entries.sortedBy { it.key }.joinToString(" ") { "${it.key}=${it.value}" }})"
+                    },
+            )
+        }
+        var header: Pair<KlobucharSet, UtcParameters>? = null
+        var headerFrom = ""
+        var bds: MutableMap<Int, MutableList<BdsNavRecord>>? = null
+        // One file at a time: these are 1.5-11 MB of text and holding two decoded at once is tens
+        // of megabytes of `String` on a phone for no reason.
+        //
+        // The header is taken from the first file that HAS one, not from the first file. Today's
+        // BRDC is still being written when this runs, and a partial one carries no IONOSPHERIC
+        // CORR block at all — which used to throw, out of a loop that ran AFTER the fitting.
+        for ((file, _) in usable) {
+            val text = file.readText()
+            if (header == null) {
+                runCatching { Almanac.parseRinexHeader(text) }
+                    .onSuccess { header = it; headerFrom = file.name }
+            }
+            val parsed = Almanac.parseRinexBds(text)
+            if (bds == null) bds = parsed else Almanac.mergeBdsNav(bds, parsed)
+        }
+        val resolved = header ?: throw PgnssBuildException(
+            "none of the ${src.brdcNav.size} broadcast navigation file(s) carries a GPSA/GPSB " +
+                "ionospheric correction: ${src.brdcNav.joinToString(", ") { it.name }}",
+        )
+        val nav = bds ?: throw PgnssBuildException("no BeiDou ephemeris in any broadcast navigation file")
+        if (headerFrom != usable.first().first.name) {
+            notes.add("Klobuchar from $headerFrom — today's broadcast file carries none yet")
+        }
+
+        val broadcast = Records.bdsTails(nav)
+        val tail = LinkedHashMap<Int, ByteArray>(captured.bdsTail)
+        tail.putAll(broadcast)
+        if (tail.isEmpty()) {
+            throw PgnssBuildException(
+                "no BeiDou group delay from either the broadcast file or the capture — the field " +
+                    "would be zero for every satellite and nothing is substituted",
+            )
+        }
+        val onlyCaptured = tail.size - broadcast.size
+        notes.add(
+            "BeiDou group delays: ${broadcast.size} from the broadcast file" +
+                if (onlyCaptured > 0) ", $onlyCaptured carried from the capture" else "",
+        )
+        return BroadcastNav(nav, tail, resolved.first, resolved.second)
     }
 
     // ── BeiDou ──────────────────────────────────────────────────────────────────────────────────
@@ -718,7 +854,10 @@ object PredictedSet {
         }
         if (held.isNotEmpty()) notes.add("BeiDou not integrated past the product: ${held.joinToString(", ")}")
 
-        val shipped = captured.bdsTail.keys.map { it + 1 }.toSet()
+        // Which satellites are SHIPPED, not merely which have a group delay — the two used to be
+        // the same question because the capture answered both, and five satellites the band could
+        // have had (C06, C07, C08, C31, C40) were left out because one file from August lacked them.
+        val shipped = plan.bdsTail.keys.map { it + 1 }.toSet()
         val jobs = ArrayList<KeplerJob>()
         for (index in bstamps.indices) {
             for (sat in track.keys.sorted()) {
@@ -730,7 +869,7 @@ object PredictedSet {
         if (jobs.isEmpty()) {
             throw PgnssBuildException(
                 "no BeiDou element set could be scheduled: ${track.size} satellites tracked, " +
-                    "${shipped.size} carried in the capture, none trusted across the window",
+                    "${shipped.size} with a group delay, none trusted across the window",
             )
         }
         tally.advance(names.size * bstamps.size - jobs.size)
@@ -779,7 +918,7 @@ object PredictedSet {
                 job,
                 Records.encodeBds(
                     idx, el, clock[0], clock[1], tow, tow,
-                    captured.bdsTail[idx] ?: ByteArray(4),
+                    plan.bdsTail[idx] ?: ByteArray(4),
                 ),
                 err,
             )
@@ -811,50 +950,30 @@ object PredictedSet {
      * Its validity is a whole week rather than 72 hours, so the epoch is the hour rather than the
      * two-hour block: `pgnss-extra-build.py` floors the clock to the hour and this does the same.
      */
-    private fun buildExtra(src: PgnssSources, nowGpsSeconds: Long, stats: MutableList<String>): ByteArray {
+    private fun buildExtra(
+        src: PgnssSources,
+        plan: BuildPlan,
+        nowGpsSeconds: Long,
+        stats: MutableList<String>,
+    ): ByteArray {
         val epoch = Math.floorDiv(nowGpsSeconds, 3600L) * 3600L
         val reference = PgnssExtraFile.capturedReference()
         val yuma = Almanac.parseYuma(src.yuma.readText(), epoch.toDouble())
         val gssc = Almanac.parseGssc(src.galileoXml.readText())
         val agl = Almanac.parseAgl(src.glonassAgl.readText())
-        if (src.brdcNav.isEmpty()) {
-            throw PgnssBuildException("no broadcast navigation file — Klobuchar and the BeiDou almanac come from it")
-        }
-        // One file at a time: these are 1.5-8.5 MB of text and holding two decoded at once is
-        // tens of megabytes of `String` on a phone for no reason.
-        //
-        // The Klobuchar header is taken from the first file that HAS one, not from the first file.
-        // Today's BRDC is still being written when this runs, and a partial one carries no
-        // IONOSPHERIC CORR block at all — so this threw `RINEX header carries no GPSA ionospheric
-        // correction`, the build died before its write loop, and the store kept the set it already
-        // had. That is how 白い熊's band came to be served a set built on 2026-09-02 for four days,
-        // through runs whose panel read "Build done" (found 2026-09-06, once the action was made to
-        // record why it had not rebuilt). The other days are already downloaded for BeiDou; the
-        // ionosphere changes slowly enough that yesterday's is the right answer, and infinitely
-        // better than not rebuilding.
-        var header: Pair<KlobucharSet, UtcParameters>? = null
-        var headerFrom = ""
-        var nav: MutableMap<Int, MutableList<BdsNavRecord>>? = null
-        for (file in src.brdcNav) {
-            val text = file.readText()
-            if (header == null) {
-                runCatching { Almanac.parseRinexHeader(text) }
-                    .onSuccess { header = it; headerFrom = file.name }
-            }
-            val parsed = Almanac.parseRinexBds(text)
-            if (nav == null) nav = parsed else Almanac.mergeBdsNav(nav, parsed)
-        }
-        val resolvedHeader = header ?: throw PgnssBuildException(
-            "none of the ${src.brdcNav.size} broadcast navigation file(s) carries a GPSA/GPSB " +
-                "ionospheric correction: ${src.brdcNav.joinToString(", ") { it.name }}",
-        )
-        if (nav == null) throw PgnssBuildException("no BeiDou ephemeris in any broadcast navigation file")
-        if (headerFrom != src.brdcNav.first().name) {
-            stats.add("Klobuchar from $headerFrom — today's broadcast file carries none yet")
-        }
+        // The broadcast files were read, counted and parsed in [validate] — see [readBroadcastNav].
+        // They used to be read again here, which cost a second decode of twenty megabytes of text
+        // AND, far worse, put the "this file has no ionospheric correction" refusal at the END of
+        // the build. Today's BRDC is still being written when this runs and a partial one carries
+        // no IONOSPHERIC CORR block, so that refusal fired after the ten minutes of fitting, the
+        // build died before its write loop, and the store kept the set it already had. That is how
+        // 白い熊's band came to be served a set built on 2026-09-02 for four days, through runs
+        // whose panel read "Build done" (found 2026-09-06, once the action was made to record why
+        // it had not rebuilt).
+        val nav = plan.bdsNav
         val bds = PgnssExtraFile.buildBds(nav, reference, epoch)
         val out = PgnssExtraFile.build(
-            epoch, reference, yuma, gssc, agl, resolvedHeader.first, resolvedHeader.second, bds,
+            epoch, reference, yuma, gssc, agl, plan.klobuchar, plan.utc, bds,
         )
         stats.add(
             "EXTRA ${yuma.size} GPS / ${gssc.size} Galileo / ${agl.size} GLONASS almanacs, " +
@@ -875,9 +994,12 @@ object PredictedSet {
      * is in the store at the time, which is how a freshly staged capture is adopted.
      */
     fun seedCaptured(outDir: File, capturedDir: File) {
-        if (File(capturedDir, NAME_BDS).isFile && File(capturedDir, NAME_QZS).isFile) return
+        // Keyed on QZSS alone, because that is the only file left that a build cannot do without:
+        // BeiDou's group delay now comes from the broadcast navigation file. A directory holding
+        // QZSS is a seeded directory, whatever else is or is not beside it.
+        if (File(capturedDir, NAME_QZS).isFile) return
         capturedDir.mkdirs()
-        for (name in NAMES) {
+        for (name in CAPTURED_NAMES) {
             val from = File(outDir, name)
             val to = File(capturedDir, name)
             if (from.isFile && !to.isFile) from.copyTo(to, overwrite = false)
@@ -992,6 +1114,20 @@ object PredictedSet {
         val field: GravityField,
         val stamps: LongArray,
         val notes: List<String>,
+        /**
+         * Everything the broadcast navigation files yield, read ONCE.
+         *
+         * They are 1.5-11 MB of text apiece and used by two different parts of the build — the
+         * BeiDou records and group delays here, the Klobuchar and UTC header in `HW_PGNSS_EXTRA`.
+         * Reading them in both places meant decoding twenty megabytes of `String` twice, and worse:
+         * the header's absence was discovered at the END, after the ten minutes of fitting, which
+         * is how a set froze for four days behind a panel that read "Build done".
+         */
+        val bdsNav: Map<Int, List<BdsNavRecord>>,
+        /** 0-based satellite index -> the four-byte group-delay tail. Broadcast first, capture behind. */
+        val bdsTail: Map<Int, ByteArray>,
+        val klobuchar: KlobucharSet,
+        val utc: UtcParameters,
     )
 
     /**
@@ -1175,12 +1311,16 @@ class PgnssNetworkSources(private val wuhanIssues: Int = 3) : PgnssSourceSupplie
  * The bytes no orbit product carries, lifted from Huawei's own captured set.
  *
  * TGD is the delay between a satellite's two carriers — a hardware calibration, not an orbital
- * quantity — so it is in no product and cannot be fitted. Lifting it is safe because it is
+ * quantity — so it is in no ORBIT product and cannot be fitted. Lifting it is safe because it is
  * CONSTANT: across all 36 epochs of the capture every satellite carries the identical value, 29 of
- * 29 for GPS and 18 of 18 for Galileo, and BeiDou's is identical across both captured vintages
- * three days apart. That measurement is the licence; without it this would be a hope.
+ * 29 for GPS and 18 of 18 for Galileo. That measurement is the licence; without it this would be a
+ * hope.
  *
- * A satellite the capture does not carry gets zero, which is exactly where it was before.
+ * **Only QZSS is mandatory here now.** BeiDou's tails are still read when the file is present, but
+ * only as a backstop for a satellite the broadcast navigation file is silent about — that file is
+ * where the value comes from since 2026-09-09, and a phone with no BeiDou capture builds a complete
+ * set. GPS and Galileo remain lifted, and a satellite the capture does not carry gets zero, which
+ * is exactly where it was before.
  */
 class CapturedSet(
     /** 0-based index -> signed byte at offset 54 of a GPS record. */
@@ -1205,25 +1345,23 @@ class CapturedSet(
          * five files where the band expects six — both of which would look like success.
          */
         fun read(dir: File): CapturedSet {
-            val missing = ArrayList<String>()
-            val bds = File(dir, PredictedSet.NAME_BDS)
             val qzs = File(dir, PredictedSet.NAME_QZS)
-            if (!bds.isFile) missing.add(PredictedSet.NAME_BDS)
-            if (!qzs.isFile) missing.add(PredictedSet.NAME_QZS)
-            if (missing.isNotEmpty()) {
+            if (!qzs.isFile) {
                 throw PgnssBuildException(
-                    "no captured ${missing.joinToString(" or ")} in ${dir.absolutePath}. " +
-                        "BeiDou's group delay and the QZSS file cannot be derived from anything " +
-                        "public, so they are lifted from Huawei's own set — stage it into the " +
-                        "store first. Nothing is being substituted for them.",
+                    "no captured ${PredictedSet.NAME_QZS} in ${dir.absolutePath}. The QZSS file " +
+                        "cannot be derived from anything public, so it is carried from Huawei's " +
+                        "own set — stage that into the store first. Nothing is substituted for it.",
                 )
             }
+            // BeiDou is no longer required here. Its group delay is read from the broadcast
+            // navigation file the build already downloads (see [Records.bdsTails]), and the
+            // capture is only consulted for a satellite the broadcast file is silent about — so a
+            // phone that has never held a BeiDou capture still builds a complete set.
             val tails = LinkedHashMap<Int, ByteArray>()
-            forEachRecord(bds.readBytes(), Records.BDS_RECLEN) { record ->
-                tails[u16(record, 0)] = record.copyOfRange(20, 24)
-            }
-            if (tails.isEmpty()) {
-                throw PgnssBuildException("${bds.absolutePath} holds no BeiDou records to lift")
+            File(dir, PredictedSet.NAME_BDS).takeIf { it.isFile }?.let { f ->
+                forEachRecord(f.readBytes(), Records.BDS_RECLEN) { record ->
+                    tails[u16(record, 0)] = record.copyOfRange(20, 24)
+                }
             }
             val gpsTgd = LinkedHashMap<Int, Int>()
             File(dir, PredictedSet.NAME_GPS).takeIf { it.isFile }?.let { f ->

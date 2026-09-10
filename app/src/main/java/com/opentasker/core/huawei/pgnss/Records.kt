@@ -190,6 +190,47 @@ object Records {
      * builder's own check grades the element set before it is encoded, so it saw the un-truncated
      * toe the fit was anchored to and reported 0.60 m while the shipped bytes were 7557 m out.
      */
+    /**
+     * The four-byte BeiDou tail, built from the BROADCAST group delay rather than lifted.
+     *
+     * ## What the tail is
+     *
+     * Bytes 20-23 of a BeiDou record. Measured across both captured vintages, bytes 20-21 are
+     * **always zero** and bytes 22-23 are a little-endian signed 16-bit count — which is exactly
+     * `TGD1` in units of 0.1 ns, the ICD's own encoding widened from ten bits to sixteen. So the
+     * value is `round(seconds * 1e10)`.
+     *
+     * ## Why it is derived now and was lifted before
+     *
+     * It was believed to be underivable, being a hardware calibration rather than an orbital
+     * quantity — and it is, but the satellites BROADCAST it and the file we already download every
+     * run carries it. Checked against Huawei's capture of 2026-08-25 with the next day's
+     * `BRDC00IGS_R`: **32 of 32 satellites within 2 counts (0.2 ns, about 6 cm of range)**, and the
+     * residual is genuine drift between the two epochs rather than an encoding error.
+     *
+     * The broadcast file also carries **37** BeiDou satellites where the capture held 32 — C06,
+     * C07, C08, C31 and C40 were shipped with a zero group delay until this existed, because the
+     * capture decided not only the VALUE but which satellites were shipped at all.
+     *
+     * [nav] is keyed by PRN; the result is keyed by the record's 0-based index, `prn - 1`, which is
+     * what [encodeBds] wants. The FIRST record of each satellite is used: TGD is a calibration and
+     * changes by a count or two a month, so any record would do and the first is the cheapest to
+     * defend.
+     */
+    fun bdsTails(nav: Map<Int, List<BdsNavRecord>>): Map<Int, ByteArray> {
+        val out = LinkedHashMap<Int, ByteArray>()
+        for ((prn, records) in nav) {
+            val first = records.minByOrNull { it.toeAbs } ?: continue
+            val counts = Math.round(first.tgd1 * 1e10)
+            // Out of the ICD's range means the field was misread, not that a satellite is unusual.
+            if (counts < Short.MIN_VALUE || counts > Short.MAX_VALUE) continue
+            val tail = ByteArray(4)
+            put(tail, 2, counts, 2)
+            out[prn - 1] = tail
+        }
+        return out
+    }
+
     fun encodeBds(
         idx: Int,
         el: Orbit.Elements,
