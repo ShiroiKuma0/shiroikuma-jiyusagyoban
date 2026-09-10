@@ -77,6 +77,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -699,7 +701,25 @@ fun ActiveAutomationUi(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { snackbarHostState.showSnackbar(it) }
+        viewModel.messages.collect { message ->
+            // A message with an undo waits INDEFINITELY and carries its own ✕. Material's longest
+            // fixed duration is about ten seconds, which is not long enough to notice a mistake,
+            // read what it was and decide — and a bar you can close by hand does not need a timer.
+            // Everything else keeps the old short flash.
+            val result = snackbarHostState.showSnackbar(
+                message = message.text,
+                actionLabel = message.undoToken?.let { "Undo" },
+                withDismissAction = message.undoToken != null,
+                duration = if (message.undoToken != null) {
+                    SnackbarDuration.Indefinite
+                } else {
+                    SnackbarDuration.Short
+                },
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                message.undoToken?.let { viewModel.undo(it) }
+            }
+        }
     }
 
     var showMoreDestinations by rememberSaveable { mutableStateOf(false) }
@@ -1216,6 +1236,9 @@ fun ActiveAutomationUi(
                 onRunTask = { viewModel.runTaskNow(it) },
                 runBusy = runActionBusy,
                 onSetTaskFreeze = { t, on -> viewModel.updateTask(t.copy(freezeBubble = on), if (on) "Freeze bubble on" else "Freeze bubble off") },
+                onSetTaskEnabled = { t, on ->
+                    viewModel.updateTask(t.copy(enabled = on), if (on) "Task enabled" else "Task disabled")
+                },
                 onPinTask = { viewModel.pinTaskShortcut(it) },
                 onAddAction = { openActionPicker(it) },
                 onEditAction = { task, index, action ->
