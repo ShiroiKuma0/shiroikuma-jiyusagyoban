@@ -8,6 +8,94 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+084 — 2026-09-10
+
+Built on upstream `a1b1f784`.
+
+### 無効 — an action or a task can be switched off instead of deleted
+
+There was no way to take something out of a task for a while. The only way to express it was to
+delete it and hope the workspace mirror was current enough to put it back — which on 2026-09-10 meant
+a 58-action task restored from a snapshot three days old that happened to be right.
+
+Select one or more actions and switch them off from the long-press menu; the rows dim and carry an
+**OFF** pill, and the run log says `Disabled` rather than a bare `Skipped`, because a skip already
+means a false condition. A disabled action keeps its arguments, its label and its place, so switching
+it back on restores exactly what was there.
+
+**Flow-control markers can be switched off too**, and it is deliberately not block-aware: a disabled
+`If` drops the test and lets its body run, a disabled `Else` lets both branches run. What the engine
+still guarantees is that it cannot hang or corrupt — the `If`/`End If` pairing never shifts, and an
+`End For` reached without its loop fails by name and stops instead of jumping back to a marker that
+is no longer there.
+
+A whole task can be switched off as well. It is honoured by profiles, widgets, shortcuts, the adb
+bridge — and by `task.run`, which builds its own runner and would otherwise have let the master
+startup task override the switch on everything it starts.
+
+### 取消 — every deletion can be taken back from the bar that announces it
+
+Every destructive action already announced itself and then left nothing to do about it. The bar now
+carries an **Undo** pill and a close button, and waits indefinitely: ten seconds is not long enough
+to notice a mistake, read what it was and decide.
+
+Actions, contexts and scene elements; tasks, profiles and scenes singly and in bulk; a group with its
+members' membership and its sub-groups; and a whole project with everything it carried.
+
+The deletion is real immediately — the engine and the overlays read the database live, so a row that
+is "deleted" on screen while still running would be worse than no undo. A restored task goes back
+under its **original id**, because Run on start, Run on exit, widget bindings and a profile's
+enter/exit task all point at tasks by number; where SQLite has handed that id away in the meantime,
+the row returns renumbered and the bar says so. A deleted task's icon is parked rather than deleted
+while the offer stands, since a file does not come back from a row snapshot.
+
+### 保存復元 — the satellite store travels, and the task lists hold names
+
+Two things in a predicted-ephemeris set cannot be derived from anything public, and they lived only
+in private storage and in no export category — so a restored phone came up unable to generate at all.
+The 健康 category now carries the whole satellite store, tree and all, minus the seven files that are
+rebuilt from free products and worthless in 72 hours. The exclusion matches on the path relative to
+the store, never on the bare name: `captured/HW_PGNSS_BDS` shares its name with an excluded file and
+is the one thing that must survive.
+
+`file.move` gained per-side bases, so a file left in `/sdcard` can reach the app's own storage —
+`file.read`/`file.write` carry UTF-8 and would shred a binary capture.
+
+The Run-on-start and Run-on-exit lists now hold task **names** on disk, not row ids. An id there
+lives outside the database's own integrity: it cost a restore that ran nothing at all on startup, and
+again a re-import that renumbered a task and left the list pointing at nothing. An existing install
+converts itself once, against its own database.
+
+### 衛星 — BeiDou's group delay comes from the broadcast file
+
+It was believed underivable and was lifted from a capture of Huawei's own set, so a phone without
+that capture could not build at all. It is in the navigation file the build already downloads every
+run, and matches the capture on 32 of 32 satellites to within 0.2 ns. The broadcast file also carries
+five satellites the capture never held, which were being shipped with a zero delay.
+
+Also: the navigation files are read once, at the start, so a missing ionospheric correction is
+refused before ten minutes of fitting rather than after; a half-written file published mid-write is
+skipped when a complete one exists; and the interpolator no longer answers for a time outside its
+own stencil, which is where every impossible orbit number this project ever produced came from.
+
+### 健康 — the board reorders, and a refused band says why
+
+The board's tiles drag to reorder, with the column count measured rather than assumed, written once
+on release and on cancel, and merged rather than replaced so a tile added later is not lost. The
+arrangement rides in the 健康 export.
+
+When the band refuses a connection the panel used to print Android's generic socket message three
+times over, naming nothing; the real answer was reachable only through the system log and a cable. It
+now reports what it can check and names the likeliest cause and its remedy — restart the band, which
+is what actually worked — without claiming to know a status the app cannot see. A session marker
+records the absence of an ending, so a link that was never closed is visible at the next attempt
+instead of being inferred.
+
+### 橋 — RUN_TASK answers in the result data
+
+The receiver filled the extras bundle; `am broadcast` prints the result string. Every call from the
+dev loop came back looking mute, and the answer existed somewhere the caller never looks.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+072 — 2026-09-08
 
 ### 保存 — the startup task lists travel as names, not row ids
