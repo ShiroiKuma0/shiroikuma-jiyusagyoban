@@ -38,7 +38,7 @@ private fun parseState(raw: String?): ProgressRowState = when (raw?.trim()?.lowe
 
 /** Display label for a package, frozen ones included; falls back to the package name itself. */
 internal fun appLabel(pm: PackageManager, pkg: String): String = runCatching {
-    pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS).loadLabel(pm).toString()
+    pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN).loadLabel(pm).toString()
 }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg
 
 /**
