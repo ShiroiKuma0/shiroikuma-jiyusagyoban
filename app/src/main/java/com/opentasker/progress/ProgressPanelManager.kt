@@ -1123,8 +1123,9 @@ private fun AppIcon(pkg: String, size: Dp) {
     val bitmap = remember(pkg) {
         runCatching {
             val pm = context.packageManager
-            // MATCH_DISABLED_COMPONENTS: a frozen app still gets its icon drawn in the roster.
-            val info = pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS)
+            // MATCH_FROZEN: a frozen app still gets its icon drawn in the roster — including one
+            // hidden by device policy, which plain flags report as not installed at all.
+            val info = pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN)
             info.loadIcon(pm).toBitmap(72, 72).asImageBitmap()
         }.getOrNull()
     }

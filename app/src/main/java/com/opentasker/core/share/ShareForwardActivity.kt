@@ -85,7 +85,7 @@ class ShareForwardActivity : Activity() {
 
     private fun appLabel(pkg: String): String = runCatching {
         packageManager.getApplicationLabel(
-            packageManager.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS),
+            packageManager.getApplicationInfo(pkg, AppFreeze.MATCH_FROZEN),
         ).toString()
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: pkg.substringAfterLast('.')
 

@@ -188,7 +188,14 @@ object FreezeBubbleOverlayManager {
             layoutParams = FrameLayout.LayoutParams(iconSizePx, iconSizePx)
             val bmp = TaskIconStore.loadBitmap(entry.iconPath)
             if (bmp != null) setImageBitmap(bmp)
-            else runCatching { setImageDrawable(ctx.packageManager.getApplicationIcon(entry.pkg)) }
+            else runCatching {
+                val pm = ctx.packageManager
+                setImageDrawable(
+                    pm.getApplicationIcon(
+                        pm.getApplicationInfo(entry.pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN),
+                    ),
+                )
+            }
             if (cornerPx > 0) {
                 clipToOutline = true
                 outlineProvider = object : ViewOutlineProvider() {
