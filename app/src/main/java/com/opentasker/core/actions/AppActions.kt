@@ -41,7 +41,7 @@ class LaunchAppAction : Action {
         val pkg = args["package"] ?: return ActionResult.Failure("missing package")
         return try {
             val intent = ctx.app.packageManager.getLaunchIntentForPackage(pkg)
-                ?: return ActionResult.Failure("app not found: $pkg")
+                ?: return frozenOrMissing(ctx, pkg)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             ctx.app.startActivity(intent)
             ctx.logger("Launch: $pkg")
@@ -49,6 +49,23 @@ class LaunchAppAction : Action {
         } catch (e: Exception) {
             ActionResult.Failure("launch failed: ${e.message}")
         }
+    }
+}
+
+/**
+ * A launch intent that resolved to nothing, explained.
+ *
+ * A frozen app has no launch intent — hidden or disabled, `getLaunchIntentForPackage` answers null
+ * exactly as it does for one that was never installed. Saying "app not found" for an app sitting
+ * frozen on the phone sent whoever read the run log looking for an install problem; the state is one
+ * cheap read away, so read it.
+ */
+private fun frozenOrMissing(ctx: ActionContext, pkg: String): ActionResult {
+    val state = AppFreeze.read(ctx.app, pkg)
+    return when {
+        !state.installed -> ActionResult.Failure("app not found: $pkg")
+        state.frozen -> ActionResult.Failure("$pkg is frozen (${state.summary}) — unfreeze it first")
+        else -> ActionResult.Failure("app has no launcher entry: $pkg")
     }
 }
 
@@ -168,10 +185,12 @@ internal fun maskPhoneNumber(number: String): String {
 /**
  * Freeze an app so it cannot run, as hard as this phone allows.
  *
- * Prefers the **device-policy suspension** — filed under 白い熊 雫's admin, and liftable only by the
- * owner or another delegate, so no shell command can undo it. Falls back to the old
- * `pm disable-user` over Shizuku when the delegation is not held. The log line says which happened,
- * because that is the first thing anyone wants when a later defrost misbehaves.
+ * Applies the same **four gates** as 白い熊 応用管理's "Total freeze" — force-stop, the device-policy
+ * suspension, `pm disable-user`, and the device-policy hide — so an app re-frozen from a bubble ends
+ * up exactly as held as 応用管理 left it, rather than in a weaker state that adb could lift. The two
+ * policy gates need 雫's delegation, the two shell gates need Shizuku, and whichever are available are
+ * applied; the log line names them, because that is the first thing anyone wants when a later defrost
+ * misbehaves.
  *
  * Three packages are refused outright — see [AppFreeze.PROTECTED].
  *
@@ -189,28 +208,22 @@ class FreezeAppAction : Action {
             ctx.logger("Refused to freeze $pkg — $reason")
             return ActionResult.Failure("$pkg must never be frozen: $reason")
         }
-        val method = withContext(Dispatchers.IO) { AppFreeze.freeze(ctx.app, pkg) }
-        return when (method) {
-            AppFreeze.FreezeMethod.POLICY -> {
-                ctx.logger("Froze $pkg (policy)")
-                ActionResult.Success
-            }
-            AppFreeze.FreezeMethod.DISABLE -> {
-                ctx.logger("Froze $pkg (disabled)")
-                ActionResult.Success
-            }
-            AppFreeze.FreezeMethod.NONE -> {
-                ctx.logger("Freeze failed: $pkg")
-                ActionResult.Failure("could not freeze $pkg — needs the device-policy delegation or Shizuku")
-            }
+        val result = withContext(Dispatchers.IO) { AppFreeze.freeze(ctx.app, pkg) }
+        if (!result.frozen) {
+            ctx.logger("Freeze failed: $pkg")
+            return ActionResult.Failure("could not freeze $pkg — needs the device-policy delegation or Shizuku")
         }
+        // Which gates landed, not just that something did: a freeze that misses the two policy gates
+        // is one adb command away from being undone, and only this line says so.
+        ctx.logger("Froze $pkg (${result.summary})")
+        return ActionResult.Success
     }
 }
 
 /**
  * Thaw an app, clearing **every** lock that could be holding it.
  *
- * "Frozen" covers three independent slots and an app stays held while any one survives, so this does
+ * "Frozen" covers four independent gates and an app stays held while any one survives, so this does
  * not branch on how it was frozen — it cannot know, and with two delegates under one admin whatever
  * either app suspended the other must be able to lift. Success is re-read from the platform
  * afterwards, never inferred from an exit code: the incident this fixes had `pm enable` exiting 0
@@ -227,12 +240,15 @@ class UnfreezeAppAction : Action {
         val pkg = args["package"]?.trim().orEmpty()
         if (pkg.isEmpty()) return ActionResult.Failure("missing package")
         val thawed = withContext(Dispatchers.IO) { AppFreeze.thaw(ctx.app, pkg) }
-        ctx.logger(if (thawed) "Unfroze $pkg" else "Unfreeze failed: $pkg")
-        return if (thawed) {
-            ActionResult.Success
-        } else {
-            ActionResult.Failure("could not unfreeze $pkg — a lock is still held")
+        if (thawed) {
+            ctx.logger("Unfroze $pkg")
+            return ActionResult.Success
         }
+        // The two ways a defrost fails need opposite fixes — a missing delegation and a missing
+        // Shizuku — so the message names which one this was.
+        val reason = withContext(Dispatchers.IO) { AppFreeze.stuckReason(ctx.app, pkg) }
+        ctx.logger("Unfreeze failed: $reason")
+        return ActionResult.Failure("could not unfreeze $pkg — $reason")
     }
 }
 
@@ -245,10 +261,11 @@ class UnfreezeAppAction : Action {
  * its whole reply timeout in silence. Read the state, thaw it, do the work, and re-freeze exactly
  * what was frozen.
  *
- * **Frozen means disabled OR suspended.** Until 2026-09-05 this read only the enabled state, so an
- * app suspended by device policy answered "false" — and 保存中核's thaw-work-refreeze then skipped
- * the thaw and blamed the sister app for the silence that followed. Both are readable with no
- * privilege at all, and this action keeps needing none.
+ * **Frozen means disabled OR suspended OR hidden.** Until 2026-09-05 this read only the enabled
+ * state, so an app suspended by device policy answered "false" — and 保存中核's thaw-work-refreeze
+ * then skipped the thaw and blamed the sister app for the silence that followed. Hiding, 応用管理's
+ * fourth gate since 2026-09-10, was worse still: a hidden app answered "not installed" and failed
+ * outright. All three are readable with no privilege at all, and this action keeps needing none.
  *
  * Args:
  *   - "package": package name
@@ -265,16 +282,17 @@ class AppFrozenAction : Action {
         val state = withContext(Dispatchers.IO) { AppFreeze.read(ctx.app, pkg) }
         if (!state.installed) {
             ctx.variables.set(store, "")
-            return ActionResult.Failure("app not installed: $pkg")
+            // A remembered package is not a frozen one. The platform still answers questions about a
+            // system app uninstalled for this user, and calling that "frozen" would send a
+            // thaw-work-refreeze off to work on a ghost.
+            return ActionResult.Failure(
+                if (state.remembered) "$pkg is not installed for this user — only its data is remembered"
+                else "app not installed: $pkg",
+            )
         }
         ctx.variables.set(store, state.frozen.toString())
         // Which lock, not just whether: a defrost that fails reads very differently for the two.
-        val how = when {
-            state.disabled && state.suspended -> " (disabled+suspended)"
-            state.disabled -> " (disabled)"
-            state.suspended -> " (suspended)"
-            else -> ""
-        }
+        val how = state.summary.takeIf { it.isNotEmpty() }?.let { " ($it)" }.orEmpty()
         ctx.logger("$pkg frozen=${state.frozen}$how → %$store")
         return ActionResult.Success
     }

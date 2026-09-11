@@ -51,7 +51,10 @@ object TaskIconStore {
 
     /** Snapshot an installed app's launcher icon to a square PNG. Returns the absolute path, or null. */
     fun saveFromApp(context: Context, pkg: String): String? = runCatching {
-        val drawable = context.packageManager.getApplicationIcon(pkg)
+        val pm = context.packageManager
+        // MATCH_FROZEN: an icon is most often captured for an app a task is about to thaw, and a
+        // hidden one throws NameNotFoundException under plain flags.
+        val drawable = pm.getApplicationIcon(pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN))
         val target = targetSize(context)
         writePng(context, drawableToBitmap(drawable, target))
     }.getOrNull()

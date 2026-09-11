@@ -408,7 +408,9 @@ private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: V
         .packageOf(task.actions) { variables.expand(it) } ?: return
     val label = runCatching {
         val pm = appContext.packageManager
-        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        // MATCH_FROZEN: the bubble is queued for an app that is frozen more often than not, and a
+        // hidden one has no label at all under plain flags — the task name is a poor second.
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN)).toString()
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
     com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
 }

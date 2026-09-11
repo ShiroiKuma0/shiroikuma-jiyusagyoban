@@ -95,9 +95,9 @@ object ActionCapabilityRegistry {
         // Freeze/unfreeze have TWO transports since 2026-09-05: the device-policy suspension 白い熊 雫
         // delegates (no Shizuku at all) and the older pm disable-user (Shizuku). Non-blocking on
         // purpose — a hard Shizuku gate here refused tasks that the policy path runs perfectly.
-        "app.freeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Freezes through 白い熊 雫's device-policy delegation when it is granted, otherwise pm disable-user over Shizuku.", CapabilityRequirement.Shizuku),
+        "app.freeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Applies 応用管理's four freeze gates: force-stop and pm disable-user over Shizuku, suspend and hide through 白い熊 雫's device-policy delegation.", CapabilityRequirement.Shizuku),
         "share.relays" to shizukuCapability("Generate + install per-app share relays"),
-        "app.unfreeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Clears every freeze slot: the shell suspension, the device-policy suspension, and pm disable-user.", CapabilityRequirement.Shizuku),
+        "app.unfreeze" to ActionCapability(CapabilityLevel.RequiresSetup, "Clears every freeze gate: the device-policy hide first, then the shell suspension, the device-policy suspension, and pm disable-user.", CapabilityRequirement.Shizuku),
         "tasks.launchers" to shizukuCapability("Create launcher tasks"),
         TermuxScriptBackend.ACTION_ID to ActionCapability(
             CapabilityLevel.RequiresSetup,
