@@ -233,6 +233,10 @@ object SettingsBackup {
         // the history but cannot reach the band is a restored phone that stops collecting.
         Cat.HEALTH to listOf(
             "recovery_log", "recovery_notes", "rehab_log", "rehab_notes",
+            // The day notes of the other two calendars. Named here the moment they exist: this list
+            // is explicit on purpose, so a store nobody adds to it is a store that silently does not
+            // survive a restore — which is exactly what happened to `shutdown_settings`.
+            "walk_notes", "lift_notes",
             "training_sessions", "band_settings", "huawei_band_settings",
             // The 健康 board's own tile arrangement. Small, authored, and un-recreatable by any
             // device — 白い熊 dragged those tiles into that order for a reason.
