@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.93+2026-09-05.11-25.ga1b1f784+084`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.93+2026-09-05.11-25.ga1b1f784+089`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -98,12 +98,16 @@ Behind it, 運動と回復 keeps every night and every rating: a calendar of the
 
 A 1–5 says a night was bad; it cannot say **why**, and by the time the reason matters — a month
 later, reading a run of 4s in the grid — it is gone. So every morning takes a written note beside its
-rating, reachable from the report, from any calendar tile and from any table line, and every walk
-takes one too, along with a **stop count** in a black pill with a yellow number. The walk's note
-lives inside `walk.json` in 白い熊's own tracks archive rather than in app data, so it survives the
-app being cleared; the day's note lives in its own preferences file keyed by the same morning the
-rating is. Blank saves delete, one pill either way — the pattern comes over unchanged from 白い熊
-応用管理 and 白い熊 考直, because a control learned once should not have to be learned again.
+rating, reachable from the report, from any calendar tile and from any table line, and every walk,
+lift and rehab session takes one too — a walk along with a **stop count** in a black pill with a
+yellow number, answerable in one tap from the grid itself rather than by opening the session. Each
+calendar writes its own note file, keyed by the day, because all of them are keyed alike and one
+shared file would have "why I did not walk" overwrite "why I did not lift"; every one of them is
+named in the backup, so a note survives a restore. **A day with nothing on it can be written on** —
+the day with no walk in it is the one worth explaining — and the tile then carries the same mark a
+session's own note gives it, in its top-right corner, beside the session count in its top-left.
+Blank saves delete, one pill either way — the pattern comes over unchanged from 白い熊 応用管理 and
+白い熊 考直, because a control learned once should not have to be learned again.
 
 **機能訓練** sits directly under the morning rating, because both are things only 白い熊 can answer
 and both are worth nothing if the day passes unanswered. It is a tick per calendar day on a
@@ -138,7 +142,7 @@ that the night was adverse.
 A per-app coloured **edge-light** for incoming notifications. Screen-on, a frame blinks in the app's colour. **Screen-off, it wakes the device *over the lockscreen* and rotates through every unread app** (colour + sender + preview), then sleeps — repeating on a sub-minute timer. It survives EMUI's aggressive service-reaping with a `SCREEN_BRIGHT` wakelock, draw-before-wake, an opaque show-when-locked Activity, and a clean self-sleep. Powered by new engine primitives: a **`sec_tick`** sub-minute trigger, `state.get screen`, and `wake` / `screen.off`.
 
 ### ❄️ Freeze / Unfreeze + the launcher-task generator
-**Freeze App** and **Unfreeze App** apply and lift the strongest lock the phone has. Where [白い熊 雫](https://github.com/ShiroiKuma0/shiroikuma-shizuku) is the Device Owner and delegates package access, a freeze is a real **device-policy suspension** — filed under the owner's admin, so no shell command can undo it — and needs no Shizuku at all; otherwise it falls back to `pm disable-user`, and the run log says which happened. Unfreeze clears **every** slot (shell suspension, policy suspension, disabled state) and reports success only from a fresh read of the package, never from an exit code. `shiroikuma.shizuku`, `shiroikuma.oyokanri` and this app itself are refused outright. The **Make Launcher Tasks** action pops a **near-fullscreen multi-select grid of app-icon tiles** (all installed user apps, *including frozen ones*) — each tile shows the **package id under a bold label**, search matches **name or id**, and a ⚙ panel makes icon size, both text sizes, bold, and grid padding **settable and persistent** — and, on OK, writes one **unfreeze-then-launch** task per chosen app into a project group — re-sorted alphabetically on every run, with no duplicates. Each generated task takes the app's own icon and is set to show a re-freeze bubble.
+**Freeze App** and **Unfreeze App** apply and lift the strongest lock the phone has. Where [白い熊 雫](https://github.com/ShiroiKuma0/shiroikuma-shizuku) is the Device Owner and delegates package access, a freeze is a real **device-policy suspension** — filed under the owner's admin, so no shell command can undo it — and needs no Shizuku at all; otherwise it falls back to `pm disable-user`, and the run log names the gates that landed. A freeze applies the same **four gates** 白い熊 応用管理 does — force-stop, the policy suspension, `pm disable-user`, and the policy **hide** — so an app re-frozen from a bubble is exactly as held as it was found. Unfreeze clears all four, **unhiding first**: a hidden package reads as *not installed* to every lookup, which is what a thaw has to fix before it can do anything else. Success is reported only from a fresh read of the package, never from an exit code, and a defrost that fails names the missing power — the delegation, or Shizuku — rather than saying a lock is still held. `shiroikuma.shizuku`, `shiroikuma.oyokanri` and this app itself are refused outright. The **Make Launcher Tasks** action pops a **near-fullscreen multi-select grid of app-icon tiles** (all installed user apps, *including frozen ones*) — each tile shows the **package id under a bold label**, search matches **name or id**, and a ⚙ panel makes icon size, both text sizes, bold, and grid padding **settable and persistent** — and, on OK, writes one **unfreeze-then-launch** task per chosen app into a project group — re-sorted alphabetically on every run, with no duplicates. Each generated task takes the app's own icon and is set to show a re-freeze bubble.
 
 ### 🫧 Freeze bubbles — re-freeze from the Desktop
 A native port of the Tasker 凍結 融解 idea. Any task flagged **Freeze bubble** (toggleable inline on the task card; on by default for the generated launch tasks) drops a small **draggable bubble** when it runs. The bubbles appear **only while your home launcher (the Desktop) is in the foreground** — nowhere else, so nothing intrudes while you work — each showing the app's icon. **Tap a bubble to freeze that app** — the hard suspension above, where the delegation is granted — and remove it; **long-tap to just dismiss**. The three apps that keep the automation running never get a bubble. Bubbles persist across reboots, keep their position relative to the top-right edge across rotation/fold, and are fully styleable (icon size, roundness, label size/weight/font) with a live preview.
