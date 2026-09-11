@@ -8,6 +8,40 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.17-44.g09a659b5+090 — 2026-09-11
+
+Built on upstream `09a659b5`.
+
+### Rebased onto four upstream fixes; nothing here changed
+
+Upstream left its own version at `0.2.93` through all four commits, so the build tail kept counting
+rather than resetting — the installer compares `versionCode` and nothing else, and a fresh `.g<sha>`
+pin does not make a build newer.
+
+Three of the four fixes arrived intact. **Read data from HTML** now refuses `:matches()`, its three
+variants and `[attr~=regex]` before the selector reaches jsoup: those five compile through
+`java.util.regex`, where a pattern such as `(a+)+$` backtracks for minutes inside a plain loop that
+the task timeout cannot interrupt, so the task hung instead of failing. A later commit closed the
+hole in that guard itself — jsoup decodes CSS escapes before matching, so `:mat\63 hes(...)` selected
+exactly what `:matches(...)` selects while containing neither substring. **Secret redaction on export**
+became case-insensitive: a secret stored as `sk-live-abc123` and retyped as `sk-Live-ABC123` is the
+same credential, and a case-sensitive `contains()` had been letting it out in the clear through the
+bundle, the paste text, a shared profile and the diagnostic report. That widening matches on the
+configured secret *values*, not on argument-key names, so it is not the redaction that cost this fork
+69 tasks in +047 — the backup path is untouched.
+
+The fourth is deleted here. Upstream hit its own 2,400-line ceiling on `PermissionOnboardingScreen.kt`
+and moved the Setup row catalogue out into a new `SetupRows.kt`. This fork rewrote that screen down to
+851 lines, and the new file cannot stand beside it: it wants `SetupSection`, which
+this fork deleted; it wants `PermissionSetupItem` and `PermissionAction` as `internal` where this fork
+keeps them `private`; and its `buildPermissionItems`, `hasPermission` and `openOemSettings` would each
+duplicate one of ours in the same package. Same call as upstream's Compose preview file. The three
+source-scanning gates that now name `SetupRows.kt` — the localization, accessibility and Shizuku
+posture gates — were already retired here for reading files this fork does not have, so they carried
+forward unchanged.
+
+2,231 tests green, including upstream's three new ones.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+089 — 2026-09-11
 
 Built on upstream `a1b1f784`.
