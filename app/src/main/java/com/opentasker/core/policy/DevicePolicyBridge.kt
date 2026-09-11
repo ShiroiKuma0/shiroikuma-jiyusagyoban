@@ -22,11 +22,12 @@ import com.opentasker.core.logging.AppLogger
  *
  * **A lock outlives the delegation.** Revoking the scope stops future calls and releases nothing
  * already set; uninstalling this app releases nothing either. That is what a hard lock means, and it
- * is why [AppFreeze.thaw] clears every slot unconditionally rather than trusting any bookkeeping of
+ * is why [AppFreeze.thaw] clears every gate unconditionally rather than trusting any bookkeeping of
  * our own. 雫's `clear_all_locks` on its policy provider is the way back of last resort.
  *
- * Only the suspension scope is used here. The set 雫 grants also carries permission-fixing and
- * uninstall-blocking; this app deliberately exposes neither.
+ * Only the package-access scope is used here — it carries both policy gates, suspending and
+ * hiding. The set 雫 grants also carries permission-fixing and uninstall-blocking; this app
+ * deliberately exposes neither.
  */
 object DevicePolicyBridge {
 
@@ -42,6 +43,9 @@ object DevicePolicyBridge {
 
     @Volatile private var scopes: List<String> = emptyList()
     @Volatile private var scopesAt = 0L
+
+    /** The scope set [logScopes] last announced, so a steady state is said once and not every read. */
+    @Volatile private var logged: List<String>? = null
 
     /** Drop the cached scopes — call after anything that could have changed them. */
     fun invalidate() {
@@ -75,9 +79,30 @@ object DevicePolicyBridge {
         return got
     }
 
-    /** Whether the platform will let us suspend a package under the owner's admin. */
-    fun canSuspend(context: Context): Boolean =
+    /**
+     * Whether the platform will let us write a package's state under the owner's admin.
+     *
+     * One scope covers both policy gates — `DELEGATION_PACKAGE_ACCESS` carries suspending *and*
+     * hiding — so this is asked once and answers for [setSuspended] and [setHidden] alike.
+     */
+    fun canManagePackages(context: Context): Boolean =
         SUPPORTED && DevicePolicyManager.DELEGATION_PACKAGE_ACCESS in scopes(context)
+
+    /**
+     * Say once, in a line EMUI's logcat actually keeps, what device-policy powers this app holds.
+     *
+     * Not decoration: `dumpsys device_policy` does not print the delegation map on the Mate XT, so
+     * without this line there is no way to tell a revoked delegation from a bug — and the two look
+     * identical from the outside (a freeze that silently applies two gates instead of four, a thaw
+     * that cannot lift what 応用管理 set). ERROR level for the same reason every other line here is:
+     * anything lower is dropped before it reaches logcat on this phone.
+     */
+    fun logScopes(context: Context) {
+        val held = scopes(context)
+        if (held == logged) return
+        logged = held
+        AppLogger.error(TAG, "Device-policy scopes: ${held.takeIf { it.isNotEmpty() }?.joinToString() ?: "none"}")
+    }
 
     /** Whether [pkg] currently carries a suspension we could see. */
     fun isSuspended(context: Context, pkg: String): Boolean = runCatching {
@@ -92,7 +117,7 @@ object DevicePolicyBridge {
      * re-read afterwards rather than inferred: never record a state a write did not achieve.
      */
     fun setSuspended(context: Context, pkg: String, suspended: Boolean): Boolean {
-        if (!canSuspend(context)) return false
+        if (!canManagePackages(context)) return false
         return runCatching {
             val failed = dpm(context)?.setPackagesSuspended(null, arrayOf(pkg), suspended)
             if (failed != null && failed.isNotEmpty()) {
@@ -103,6 +128,45 @@ object DevicePolicyBridge {
         }.getOrElse { error ->
             // EMUI's logcat keeps only E/ and F/, so this has to be an error to be findable at all.
             AppLogger.error(TAG, "Suspending $pkg refused", error)
+            false
+        }
+    }
+
+    /**
+     * Whether [pkg] is hidden right now.
+     *
+     * Only a delegate may ask, so this answers false on a phone where we hold nothing — which is why
+     * [AppFreeze.read] also probes the difference between a plain lookup and a [AppFreeze.MATCH_FROZEN]
+     * one, and never depends on this call alone.
+     */
+    fun isHidden(context: Context, pkg: String): Boolean = runCatching {
+        dpm(context)?.isApplicationHidden(null, pkg) == true
+    }.getOrDefault(false)
+
+    /**
+     * Hide or reveal [pkg] — the gate that survives every shell command on this phone.
+     *
+     * `pm hide` / `pm unhide` from the shell die with *"Neither user 2000 nor current process has
+     * android.permission.MANAGE_USERS"* (measured on this build, EMUI 13), so this call is not an
+     * optimisation over the shell: it is the only way back for anything 応用管理's Total freeze hid.
+     *
+     * `setApplicationHidden` returns whether it *changed* the setting, so it answers false for a
+     * package already in the requested state — an idempotent action must not read that as failure.
+     * The state is re-read instead, which is also the only thing that proves the write landed.
+     */
+    fun setHidden(context: Context, pkg: String, hidden: Boolean): Boolean {
+        if (!canManagePackages(context)) return false
+        return runCatching {
+            dpm(context)?.setApplicationHidden(null, pkg, hidden)
+            val now = isHidden(context, pkg)
+            if (now != hidden) {
+                AppLogger.error(TAG, "Device policy refused to hide=$hidden $pkg")
+                false
+            } else {
+                true
+            }
+        }.getOrElse { error ->
+            AppLogger.error(TAG, "Hiding $pkg refused", error)
             false
         }
     }

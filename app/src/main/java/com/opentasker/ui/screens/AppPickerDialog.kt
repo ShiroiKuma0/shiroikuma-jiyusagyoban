@@ -60,7 +60,10 @@ internal fun AppPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
         apps = withContext(Dispatchers.IO) {
             val pm = context.packageManager
             runCatching {
-                pm.getInstalledApplications(0)
+                // MATCH_FROZEN, like the multi-select picker: a hidden app is missing from a plain
+                // listing entirely, and a freeze/launch field is exactly where a frozen app is named.
+                @Suppress("DEPRECATION")
+                pm.getInstalledApplications(com.opentasker.core.policy.AppFreeze.MATCH_FROZEN)
                     .map { InstalledApp(pm.getApplicationLabel(it).toString(), it.packageName) }
                     .sortedBy { it.label.lowercase() }
             }.getOrDefault(emptyList())
