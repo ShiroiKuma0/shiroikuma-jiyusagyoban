@@ -111,6 +111,10 @@ class HuaweiWalksActivity : ComponentActivity() {
                         var calendar by remember { mutableStateOf(false) }
                         // 機能訓練 only — a day done without the band, marked by hand.
                         var tickDay by remember { mutableStateOf<Long?>(null) }
+                        // The day being written about, on any of the three. A day with no session is
+                        // the one the calendar could hold nothing about until 2026-09-11, and it is
+                        // the day most worth a sentence: what happened instead of the walk.
+                        var notingDay by remember { mutableStateOf<Long?>(null) }
                         val scope = rememberCoroutineScope()
                         val dao = remember { OpenTaskerApp_NoHilt.db.huaweiWorkoutDao() }
 
@@ -307,11 +311,11 @@ class HuaweiWalksActivity : ComponentActivity() {
                                 } else {
                                     emptySet()
                                 },
-                                notes = if (kind == HuaweiWorkoutStore.Kind.REHAB) {
-                                    com.opentasker.core.band.DayNotes.REHAB.all(applicationContext)
-                                } else {
-                                    emptyMap()
-                                },
+                                // Every kind has day notes now, one prefs file each. Read on each
+                                // composition rather than held in state: a write closes its dialog,
+                                // which recomposes this, which re-reads — one source, no cache to
+                                // forget to invalidate.
+                                notes = dayNotesFor(kind).all(applicationContext),
                                 zone = zone,
                                 contentPadding = insets,
                                 // A filled tile is the way to its session, which is what makes this
@@ -321,10 +325,13 @@ class HuaweiWalksActivity : ComponentActivity() {
                                     calendar = false
                                 },
                                 onTapEmptyDay = { day ->
-                                    if (kind == HuaweiWorkoutStore.Kind.REHAB) {
-                                        tickDay = com.opentasker.core.band.RehabLog
-                                            .dateKeyOf(java.time.LocalDate.ofEpochDay(day))
-                                    }
+                                    val key = com.opentasker.core.band.RehabLog
+                                        .dateKeyOf(java.time.LocalDate.ofEpochDay(day))
+                                    // 機能訓練 asks the tick first, since a day done without the
+                                    // band has to be markable and its note hangs off that dialog.
+                                    // The other two have nothing to tick, so the tap IS the note.
+                                    if (kind == HuaweiWorkoutStore.Kind.REHAB) tickDay = key
+                                    else notingDay = key
                                 },
                                 onBack = { calendar = false },
                             )
@@ -339,8 +346,27 @@ class HuaweiWalksActivity : ComponentActivity() {
                                             .setDone(applicationContext, key, done)
                                         tickDay = null
                                     },
-                                    onEditNote = {},
+                                    // This was a no-op, so 機能訓練's note pill has been inert
+                                    // since the dialog was written: it looked like a control and
+                                    // answered nothing. The tick dialog closes and the editor opens
+                                    // in its place, on the same day.
+                                    onEditNote = {
+                                        tickDay = null
+                                        notingDay = key
+                                    },
                                     onDismiss = { tickDay = null },
+                                )
+                            }
+                            notingDay?.let { key ->
+                                com.opentasker.ui.charts.NoteDialog(
+                                    title = com.opentasker.ui.charts.nightDateFull(key, lang),
+                                    note = dayNotesFor(kind).note(applicationContext, key),
+                                    onSave = { text ->
+                                        // Blank deletes, as everywhere else a note is written.
+                                        dayNotesFor(kind).setNote(applicationContext, key, text)
+                                        notingDay = null
+                                    },
+                                    onDismiss = { notingDay = null },
                                 )
                             }
                         } else if (opened != null) {
@@ -546,8 +572,32 @@ class HuaweiWalksActivity : ComponentActivity() {
                                                 // "walk", so that printed "walk · walk · walk · …"
                                                 // and told 白い熊 nothing (2026-08-30). What is
                                                 // actually wanted is how many arrived and when.
+                                                // What arrived for the OTHER two windows, named
+                                                // rather than left to be discovered.
+                                                //
+                                                // 白い熊, 2026-09-11: *"when I pull lifting - it
+                                                // pulls also rehab?"* — it always did, and every
+                                                // window always pulled all three, but a message that
+                                                // reported only this window's share made the fetch
+                                                // look narrower than it is. The others are a tail on
+                                                // the line rather than a second message: this window
+                                                // still answers about itself first.
+                                                val elsewhere = HuaweiWorkoutStore.Kind.entries
+                                                    .filter { it != kind }
+                                                    .mapNotNull { other ->
+                                                        fetched.count { other.matches(it.summary.type) }
+                                                            .takeIf { it > 0 }
+                                                            ?.let { "$it ${HuaweiText.titleFor(other)[lang]}" }
+                                                    }
+                                                val alsoTail = elsewhere.takeIf { it.isNotEmpty() }
+                                                    ?.joinToString(
+                                                        separator = " · ",
+                                                        prefix = " (${HuaweiText.pullAlso[lang]} ",
+                                                        postfix = ")",
+                                                    )
+                                                    .orEmpty()
                                                 if (walks.isEmpty()) {
-                                                    HuaweiText.noneFoundFor(kind)[lang]
+                                                    HuaweiText.noneFoundFor(kind)[lang] + alsoTail
                                                 }
                                                 else {
                                                     val fmt = java.text.SimpleDateFormat(
@@ -557,7 +607,7 @@ class HuaweiWalksActivity : ComponentActivity() {
                                                         .mapNotNull { it.summary.startSeconds }
                                                         .sorted()
                                                         .map { fmt.format(java.util.Date(it * 1000)) }
-                                                    "${walks.size}: ${when_.joinToString(" · ")}"
+                                                    "${walks.size}: ${when_.joinToString(" · ")}$alsoTail"
                                                 }
                                             },
                                             onFailure = { it.message ?: "failed" },
@@ -585,6 +635,18 @@ class HuaweiWalksActivity : ComponentActivity() {
                                 },
                                 onOpen = { open = it.id },
                                 onOpenCalendar = { calendar = true },
+                                // The same write the walk's own screen makes, from the grid's pill.
+                                // On the runner's scope like every other annotation here: a count
+                                // lost because the window was closed as it was filed would be a
+                                // count 白い熊 believes is on file.
+                                onSetStops = { walk, n ->
+                                    HuaweiSyncRunner.scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            HuaweiWorkoutStore.annotate(dao, walk, walk.note, n)
+                                        }
+                                        scope.launch { reload() }
+                                    }
+                                },
                             )
                         }
                     }

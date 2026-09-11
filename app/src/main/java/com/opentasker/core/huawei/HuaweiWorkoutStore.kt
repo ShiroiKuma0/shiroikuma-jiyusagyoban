@@ -79,6 +79,17 @@ object HuaweiWorkoutStore {
 
         /** No route to draw, so no map, no cutout and nothing to hand to 地図. */
         val trackless: Boolean get() = this != WALK
+
+        /**
+         * Whether a session of this kind can be asked how many times it STOPPED.
+         *
+         * A walk only. The stop count reached the other two by inheritance rather than by decision —
+         * 「重量挙げ」 and 機能訓練 are the walks window told to show something else, so they arrived
+         * carrying the walks window's questions — and it is not a question a lift or a rehab session
+         * has an answer to: there is no route to stop on, and an empty count asks 白い熊 for one
+         * anyway. (白い熊, 2026-09-11: "remove the stops — it should have only notes".)
+         */
+        val countsStops: Boolean get() = this == WALK
     }
 
     /** 地図's own arithmetic over the same route — kept beside ours, never merged into it. */
