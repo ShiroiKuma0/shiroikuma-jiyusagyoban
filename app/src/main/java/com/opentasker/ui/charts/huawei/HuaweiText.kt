@@ -276,12 +276,53 @@ object HuaweiText {
         "機能訓練の記録はまだ無い。バンドの「フリー運動」で記録する。衛星は要らないので室内でも動く。",
     )
     val rehabCalendar = Loc("Calendar", "暦")
+
+    /**
+     * What one pull actually fetches, said on every window that offers the button.
+     *
+     * The band is asked for a WINDOW OF TIME, not for a kind — it has no filter to send and a lift
+     * costs the same round trips as a walk — so every pull brings back all three and files each
+     * where it belongs. That was true from the first day and said nowhere, which is why 白い熊 asked
+     * whether lifting was pulling rehab as well (2026-09-11): it was, and so is this window, and the
+     * only thing missing was the sentence saying so.
+     */
+    val pullAllKinds = Loc(
+        "One pull fetches every kind — walks, lifting and 機能訓練 together — because the band is " +
+            "asked for a stretch of time rather than for a sport. Whatever arrives is filed in its " +
+            "own window; this one then reports its share.",
+        "取得は一度で全種類を取ってくる。散歩も、重量挙げも、機能訓練も一緒に。" +
+            "バンドには期間を訊くのであって、種目を訊くのではないから。" +
+            "届いたものはそれぞれの窓に仕舞われ、この窓はこの窓の分を報告する。",
+    )
+
+    /** Heads the tail that names what the other two windows just received. */
+    val pullAlso = Loc("also", "他に")
     val windowsTitle = Loc("What the band recorded", "バンドが記録したもの")
     val noHeart = Loc("no heart rate recorded", "心拍の記録が無い")
     val calendarTapNote = Loc(
         "Tap a filled day to open that session.",
         "埋まっている日を押すと、その日の記録が開く。",
     )
+    /**
+     * What tapping an EMPTY day does, which is different on 機能訓練 and has to say so.
+     *
+     * Every calendar can be written on now (白い熊, 2026-09-11): a day with no session is the day
+     * most worth a sentence, because the thing worth recording is why there was none. 機能訓練 opens
+     * its tick as well, since a day done without the band still has to be markable by hand.
+     */
+    private val calendarEmptyRehab = Loc(
+        "Tap an empty day to tick it off by hand, or to write about it.",
+        "空いている日を押せば、手で印を付けられる。書き留めることもできる。",
+    )
+    private val calendarEmptyOther = Loc(
+        "Tap an empty day to write about it — why there was none, or what happened instead.",
+        "空いている日を押せば、その日について書き留められる。無かった理由でも、代わりに何をしたかでも。",
+    )
+
+    fun calendarEmptyNote(kind: com.opentasker.core.huawei.HuaweiWorkoutStore.Kind) =
+        if (kind == com.opentasker.core.huawei.HuaweiWorkoutStore.Kind.REHAB) calendarEmptyRehab
+        else calendarEmptyOther
+
     private val calendarAboutRehab = Loc(
         "Filled from the sessions the band recorded. A day done without the band can still be " +
             "marked by hand — tap an empty one.",
