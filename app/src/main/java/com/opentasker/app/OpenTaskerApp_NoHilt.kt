@@ -127,6 +127,10 @@ class OpenTaskerApp_NoHilt : Application() {
             ThemeStore.init(this)
             com.opentasker.core.icons.TaskIconStore.init(this)
             com.opentasker.core.bubbles.FreezeBubbleStore.init(this)
+            // One line naming the device-policy powers this app actually holds. Freezing and thawing
+            // both depend on a delegation that lives in another app and is invisible to dumpsys on
+            // this phone, so without this the difference between "revoked" and "broken" is unreadable.
+            com.opentasker.core.policy.DevicePolicyBridge.logScopes(this)
             com.opentasker.core.bubbles.FlashBubbleStore.init(this)
             com.opentasker.core.share.ShareRelayStore.init(this)
             com.opentasker.widget.TemplateStore.init(this)
