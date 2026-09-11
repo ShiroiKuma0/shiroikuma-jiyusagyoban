@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,15 +66,18 @@ data class DayGridCell(
     val border: Color? = null,
     /** Whether [label] is bold. The rating grids want it; a plain date does not. */
     val bold: Boolean = true,
+    /** Whether the day carries something 白い熊 wrote. Drawn INSIDE the tile, top-right. */
     val hasNote: Boolean = false,
     /**
-     * How many sessions the day holds, when that is more than one.
+     * A ringed mark in the tile's top-LEFT corner, or null for none.
      *
-     * Null on every ordinary day, so the mark appears only where it means something. A calendar
-     * tile is a seventh of a phone's width and already carries a date; a badge on all of them
-     * would be a badge that says nothing on most of them.
+     * A string rather than a count, because the grid must not decide when one is worth drawing: a
+     * calendar of sessions shows it only above one (a badge saying "1" on every filled day says
+     * nothing), while a calendar of stops shows every answer including "0", since "I did not stop"
+     * is a statement and an absent badge is the lack of one. Both rules are the caller's, and a
+     * grid that tried to hold them both would end up holding neither. (白い熊, 2026-09-11.)
      */
-    val count: Int? = null,
+    val badge: String? = null,
     /** The bar under the tile, as a fraction of the cell's width. Null draws none. */
     val bar: Float? = null,
 )
@@ -118,6 +123,55 @@ private fun gridMonthOpenedBy(week: List<DayGridCell?>, isFirst: Boolean): java.
     days.firstOrNull { LocalDate.ofEpochDay(it.epochDay).dayOfMonth == 1 }
         ?.let { return BandMonths.ofEpochDay(it.epochDay) }
     return if (isFirst) BandMonths.ofEpochDay(days.first().epochDay) else null
+}
+
+/**
+ * The day's own count, ringed, in the tile's own ink — sessions on a rehab calendar, stops on a
+ * walks one. Nothing at all when the caller passed none.
+ *
+ * Top-LEFT wherever it appears, because the right corner is the note's (白い熊, 2026-09-11: stops on
+ * the left, the note on the right). The ring is what separates it from the date beside it — a numeral
+ * next to a numeral reads as part of it.
+ */
+@Composable
+private fun TileBadge(badge: String?, ink: Color) {
+    if (badge == null) return
+    Box(
+        Modifier.size(18.dp).border(1.5.dp, ink, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            badge,
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 12.sp),
+            fontWeight = FontWeight.Bold,
+            color = ink,
+        )
+    }
+}
+
+/**
+ * "I wrote something about this day", in the tile's top-right corner.
+ *
+ * It has been three things before this: a dot, which said nothing and vanished on the emerald; a note
+ * glyph on a black chip inside the tile, at half again the size asked for, which covered the very
+ * rating the tile exists to show; and then a mark in the strip below the tile, where it could obscure
+ * nothing but sat a row away from the day it belonged to. 白い熊 asked for it back inside, top-right
+ * (2026-09-11), and what makes it work this time is the size — 14 dp, no chip behind it — plus the
+ * day tile growing a strip of its own for the marks to live in.
+ *
+ * Drawn in the annotation yellow on a dark fill and in the tile's own ink on a light one: a yellow
+ * glyph on the yellow of a done rehab day would be invisible, and legibility is not something the
+ * annotation language gets to overrule.
+ */
+@Composable
+private fun TileNote(hasNote: Boolean, skin: ScaleSkin) {
+    if (!hasNote) return
+    Icon(
+        Icons.Filled.EditNote,
+        contentDescription = null,
+        tint = if (skin.fill.luminance() > 0.5f) skin.ink else ANNOTATION_INK,
+        modifier = Modifier.size(18.dp),
+    )
 }
 
 /**
@@ -196,8 +250,12 @@ fun DayGrid(
     val lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
     val dateLine = if (lineHeight.isSp) with(density) { lineHeight.toDp() } else 21.dp
     // vertical padding + date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load bar
+    //
+    // The day calendar has no strip at all any more: the note moved into the tile (白い熊,
+    // 2026-09-11) and the load bar was never drawn there, so the 18 dp it reserved was 18 dp of
+    // nothing per row — five rows of it in a full calendar, and a fifth of the 機能訓練 card.
     val weekRow =
-        if (dateInTile) 3.dp + 39.dp + 2.dp + 18.dp else 6.dp + dateLine + 2.dp + 39.dp + 2.dp + 18.dp
+        if (dateInTile) 3.dp + 49.dp else 6.dp + dateLine + 2.dp + 39.dp + 2.dp + 18.dp
     val headLine = MaterialTheme.typography.titleMedium.lineHeight
     val monthRule = (if (headLine.isSp) with(density) { headLine.toDp() } else 22.dp) + 12.dp
     val viewport = weekRow * visibleWeeks + monthRule
@@ -321,7 +379,7 @@ fun DayGrid(
                             Box(
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(34.dp)
+                                    .height(if (dateInTile) 44.dp else 34.dp)
                                     .clip(RoundedCornerShape(5.dp))
                                     .background(skin.fill)
                                     .then(
@@ -335,66 +393,46 @@ fun DayGrid(
                                     .clickable { onTap(cell.epochDay) },
                                 contentAlignment = Alignment.Center,
                             ) {
+                                // ONE line, in both calendars: the date (or the rating) centred and
+                                // as large as the tile allows, with the marks overlapping its line
+                                // from the corners rather than sitting in a row above it.
+                                //
+                                // It was stacked for one build — a marks strip along the top, the
+                                // date centred underneath — which kept them from ever touching and
+                                // cost the date its size. 白い熊, 2026-09-11: *"you keep it as two
+                                // lines basically … I don't want this. Make the date text bigger, not
+                                // on a separate line — the note can reach into the date's line,
+                                // reaching all the way down to the mid of the date's text, there is
+                                // space."* So the marks reach DOWN into the numeral's band and the
+                                // numeral owns the middle of the tile: they share the height and
+                                // divide the width, which is what makes a day cell wide enough on the
+                                // unfolded screen to carry all three.
                                 Text(
                                     if (dateInTile) dayNumber else cell.label,
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = if (dateInTile) MaterialTheme.typography.headlineSmall
+                                    else MaterialTheme.typography.titleMedium,
                                     fontWeight = if (cell.bold) FontWeight.Bold else FontWeight.Normal,
                                     color = skin.ink,
+                                    maxLines = 1,
                                 )
-                                // How many sessions the day holds, when that is more than one —
-                                // in the tile, ringed, in the tile's own ink.
-                                //
-                                // Small enough to clear the date beside it: a 12 dp ring in the
-                                // corner of a 34 dp square leaves the centred numeral alone, where
-                                // a 15 dp one sat on the 9 of "29". The ring is what separates it
-                                // from the date — a numeral beside a numeral reads as part of it.
-                                cell.count?.takeIf { it > 1 }?.let { many ->
-                                    Box(
-                                        Modifier
-                                            .align(Alignment.TopEnd)
-                                            // Inset from both edges, so the ring sits INSIDE the
-                                            // tile rather than running along its corner
-                                            // (白い熊, 2026-09-04).
-                                            .padding(top = 3.dp, end = 3.dp)
-                                            .size(17.dp)
-                                            .border(1.5.dp, skin.ink, CircleShape),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            many.toString(),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = 11.sp,
-                                                lineHeight = 11.sp,
-                                            ),
-                                            fontWeight = FontWeight.Bold,
-                                            color = skin.ink,
-                                        )
-                                    }
+                                // Hard into the corners: every dp of inset is a dp taken off the
+                                // numeral's clearance, and on the FOLDED cover panel — 1008 px at
+                                // density 390, so 413 dp, seven columns, a tile some 45 dp wide —
+                                // there is no clearance to spend. Unfolded it is 915 dp and the
+                                // marks sit well clear of the date.
+                                Box(Modifier.align(Alignment.TopStart).padding(1.dp)) {
+                                    TileBadge(cell.badge, skin.ink)
+                                }
+                                Box(Modifier.align(Alignment.TopEnd).padding(1.dp)) {
+                                    TileNote(cell.hasNote, skin)
                                 }
                             }
                             }
-                            // UNDER the tile, in both calendars — never inside it.
-                            //
-                            // "I wrote something about this day", and nothing else. It was a dot,
-                            // which said nothing and vanished on the emerald; then the note glyph on
-                            // a black chip inside the tile; then, at half again the size 白い熊 asked
-                            // for (2026-09-03), a chip that covered the very rating the tile exists
-                            // to show — a 21 dp mark cannot share a 34 dp tile with a number. So the
-                            // mark moved out from under the value instead of shrinking back: it sits
-                            // in the strip below, at a size that can actually be seen, and it can
-                            // never obscure anything again.
-                            //
-                            // The session load shares that strip, pinned to the bottom, so a day can
-                            // carry both. They coincide rarely and now legibly when they do.
-                            Box(Modifier.fillMaxWidth().height(18.dp)) {
-                                if (cell.hasNote) {
-                                    Icon(
-                                        Icons.Filled.EditNote,
-                                        contentDescription = null,
-                                        tint = ANNOTATION_INK,
-                                        modifier = Modifier.align(Alignment.TopCenter).size(15.dp),
-                                    )
-                                }
+                            // The strip under the tile, which now carries ONE thing: the session
+                            // load of a rated night. The note used to share it and has moved into
+                            // the tile (白い熊, 2026-09-11), so the day calendar — which never drew
+                            // a load bar — no longer reserves the height at all.
+                            if (!dateInTile) Box(Modifier.fillMaxWidth().height(18.dp)) {
                                 cell.bar?.takeIf { it > 0f }?.let { load ->
                                     Box(
                                         Modifier
