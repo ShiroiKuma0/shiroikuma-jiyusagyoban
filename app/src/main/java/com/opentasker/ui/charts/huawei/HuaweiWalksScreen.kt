@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,8 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,9 +47,13 @@ import com.opentasker.ui.charts.BodyText
 import com.opentasker.ui.charts.ChartPalette
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material3.Icon
 import com.opentasker.ui.charts.ActionPill
+import com.opentasker.ui.charts.ANNOTATION_INK
+import com.opentasker.ui.charts.AnnotationText
 import com.opentasker.ui.charts.CountPill
-import com.opentasker.ui.charts.NotePill
+import com.opentasker.ui.charts.CountPickerDialog
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
@@ -136,6 +143,14 @@ fun HuaweiWalksScreen(
     /** Open the calendar of which days this kind was recorded on. */
     onOpenCalendar: () -> Unit = {},
     /**
+     * File a stop count for one walk, straight from its cell. Null withdraws the answer.
+     *
+     * The grid used to be read-only about this and the walk's own screen was the only way in, which
+     * made answering a question that takes one tap cost four: open, tap, pick, back. 白い熊, 2026-09-11:
+     * the pill is on the cell, and a walk with no answer yet shows the same pill carrying a `+`.
+     */
+    onSetStops: (HuaweiWorkoutStore.Workout, Int?) -> Unit = { _, _ -> },
+    /**
      * Where a cell's picture comes from, for callers that are not reading a real archive — today the
      * screenshot previews, which is the only way this layout can be looked at at all, since 白い熊's
      * phone is normally locked and `screencap` returns the keyguard.
@@ -159,6 +174,9 @@ fun HuaweiWalksScreen(
             SectionCard(accent = accent) {
                 SectionTitle(HuaweiText.titleFor(state.kind)[lang], accent)
                 BodyText(HuaweiText.aboutFor(state.kind)[lang])
+                // Directly above the button it describes: what the button fetches is all three
+                // kinds, and this window is one of the places they land.
+                NoteText(HuaweiText.pullAllKinds[lang])
                 state.message?.let { NoteText(it) }
                 Button(
                     onClick = onDownload,
@@ -206,6 +224,7 @@ fun HuaweiWalksScreen(
                 onShare = { onShare(walk) },
                 onOpenInChizu = { onOpenInChizu(walk) },
                 onOpen = { onOpen(walk) },
+                onSetStops = { n -> onSetStops(walk, n) },
             )
         }
     }
@@ -225,8 +244,13 @@ private fun WalkCell(
     onShare: () -> Unit,
     onOpenInChizu: () -> Unit,
     onOpen: () -> Unit,
+    onSetStops: (Int?) -> Unit = {},
 ) {
     val lang = LocalBandLanguage.current
+    // The stop picker belongs to the CELL, not to the screen: it is opened by this walk's pill and
+    // answers about this walk, and a single picker hoisted to the grid would have to carry which
+    // walk it was asking about through every recomposition of forty cells.
+    var askingStops by remember { mutableStateOf(false) }
     // Every cell is built identically — picture, date, two lines of stats, one button — because a
     // grid of unequal cards is what 白い熊 asked this not to be, and `fillMaxHeight()` cannot deliver
     // it here: a vertical `LazyVerticalGrid` measures its items with an unbounded height and then
@@ -315,24 +339,70 @@ private fun WalkCell(
         )
 
         // 白い熊's own annotation, so the grid answers "which walks did I write on" by looking —
-        // the same question the calendar's note dots answer for the mornings.
+        // the same question the calendar's note marks answer for the mornings.
         //
         // The row's height is RESERVED whether or not there is anything in it. A vertical
         // `LazyVerticalGrid` sizes each row to its tallest cell, so a line that appears only on
         // annotated walks would leave every cell beside them padded with empty space, which is
         // exactly the ragged grid this screen was built not to be.
         //
-        // Read-only here: the cell already opens the walk, and the editors are on the walk's own
-        // screen, where there is room to name what is being answered.
+        // **The stop count is answerable from here.** It is the one thing on a walk that only 白い熊
+        // can supply, it takes one tap to answer, and it used to cost four — open the walk, tap the
+        // pill, pick, come back. The pill is the same one the walk's own screen carries, with the
+        // same withdraw-by-re-tapping rule, and an unanswered walk shows it as a `+` rather than
+        // showing nothing (白い熊, 2026-09-11). The note stays read-only here: a note needs a
+        // keyboard and a dialog that names what is being annotated, which is what the walk's screen
+        // is for.
+        //
+        // Stops LEFT, note RIGHT, one line — the same order as the calendar's tile corners, so the
+        // two ways of looking at the same walk are read the same way round.
         Row(
             Modifier.fillMaxWidth().height(30.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            walk.stops?.let { CountPill(count = it) }
-            if (!walk.note.isNullOrBlank()) {
-                NotePill(note = walk.note, modifier = Modifier.weight(1f), compact = true)
+            // Only a walk has stops to count; a lift and a rehab session are asked nothing here.
+            if (kind.countsStops) {
+                CountPill(count = walk.stops, onClick = { askingStops = true })
             }
+            // A MARK, not the note itself — 白い熊, 2026-09-11: *"add its icon on the right side in
+            // the same line where we show the stops, so we see in one look there are notes"*.
+            //
+            // It was a pill carrying the note's first line, which answered a different question:
+            // what does this one say, rather than which of these has one. A pill sized by its text
+            // cannot be found by glance — a long first line filled the cell and put the glyph back on
+            // the left, which is exactly where it must not be if the row is to be read as "stops
+            // left, note right", the same way round as the calendar tile. The text is one tap away,
+            // on the screen that can show all of it.
+            //
+            // The Box owns the rest of the row rather than the arrangement placing the mark: a
+            // weighted child is drawn at the START of the width it is given, so alignment has to
+            // happen inside it.
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                if (!walk.note.isNullOrBlank()) {
+                    Icon(
+                        Icons.Filled.EditNote,
+                        contentDescription = AnnotationText.note[lang],
+                        tint = ANNOTATION_INK,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+        if (askingStops) {
+            CountPickerDialog(
+                title = AnnotationText.stopsAsk[lang],
+                current = walk.stops,
+                range = STOPS_RANGE,
+                onPick = { n ->
+                    // Re-tapping the number on file withdraws it, exactly as it does on the walk's
+                    // own screen and as re-tapping a 1–5 rating does. A count that can be changed but
+                    // never taken back turns a stray tap into data 白い熊 did not author.
+                    onSetStops(if (walk.stops == n) null else n)
+                    askingStops = false
+                },
+                onDismiss = { askingStops = false },
+            )
         }
 
         // Always one button, so every cell is the same height. It no longer offers to SEND the

@@ -282,11 +282,17 @@ fun HuaweiWalkDetailScreen(
         // directly under the figures, because it is the only thing on this screen that is an answer
         // rather than a reading — and the only thing here that does not exist unless it is given.
         item {
-            // A lift has ONE authored answer, so the card is that answer: titled 「覚え書き」 rather
-            // than "your own record", no stop count, and the note editable where it sits instead of
-            // behind a dialog (白い熊, 2026-09-03). A walk keeps the fuller card — it has a stop
-            // count to carry, and the dialog is what names which of the two is being answered.
-            if (walk.isStrength) {
+            // Anything that is not a WALK has ONE authored answer, so the card is that answer:
+            // titled 「覚え書き」 rather than "your own record", no stop count, and the note editable
+            // where it sits instead of behind a dialog (白い熊, 2026-09-03). A walk keeps the fuller
+            // card — it has a stop count to carry, and the dialog is what names which of the two is
+            // being answered.
+            //
+            // It read `isStrength` until 2026-09-11, which left 機能訓練 — the third kind, added
+            // after this line was written — being asked how many times a rehab session stopped. See
+            // [HuaweiWorkoutStore.Kind.countsStops]: the rule belongs to the kind, so the next window
+            // cannot inherit the question by default again.
+            if (!walk.kindOf.countsStops) {
                 SectionCard(accent = ChartPalette.HEART_RATE) {
                     SectionTitle(AnnotationText.note[lang], ChartPalette.HEART_RATE)
                     NoteField(
@@ -446,5 +452,5 @@ fun HuaweiWalkDetailScreen(
  * ten: the longest walk on file paused twice, and a picker that needs scrolling to reach the number
  * you want is a picker that gets the wrong number tapped.
  */
-private val STOPS_RANGE = 0..9
+internal val STOPS_RANGE = 0..9
 
