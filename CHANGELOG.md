@@ -8,6 +8,107 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+089 — 2026-09-11
+
+Built on upstream `a1b1f784`.
+
+### 暦 — a day with nothing on it can be written on
+
+Every calendar could record only what the band brought back, so the one day that could hold nothing
+was the day worth explaining: the one with no lifting in it, no walk, no 機能訓練. Tap an empty tile
+on any of the three now and the note editor opens on that date — *"why there was none, or what
+happened instead"* — and the tile carries the note mark afterwards exactly as a session's own note
+does.
+
+機能訓練 keeps asking the tick first, because a day done without the band still has to be markable by
+hand and its note hangs off that dialog. **That dialog's note pill was wired to nothing** from the day
+it was written — it looked like a control and answered nothing — and now opens the editor on the same
+day.
+
+Each calendar writes its own note file (`walk_notes`, `lift_notes` beside `rehab_notes`), because all
+of them are keyed `yyyyMMdd` and a shared file would have "why I did not walk" overwrite "why I did
+not lift" on the same date. **All four are named in the backup**, which lists its preference files one
+by one on purpose: a store nobody adds to that list is a store that silently does not survive a
+restore, which is exactly what happened to `shutdown_settings` in +072. A test now fails if a fifth
+note file is ever added without travelling.
+
+## 0.2.93+2026-09-05.11-25.ga1b1f784+088 — 2026-09-11
+
+Built on upstream `a1b1f784`.
+
+### 暦 — the date is the tile again
+
+Three corrections to +087, all 白い熊's, all the same morning.
+
+**The corner mark counts SESSIONS again**, on walks as on the other two, and only when there is more
+than one. It carried the day's stop count for exactly one build. The stop count is the authored half
+of a walk, so putting it where the eye already goes looked right — but a calendar answers *which days*
+and *how many*, and how many times a walk stopped belongs on the walk, where it is still shown and
+still answerable in one tap.
+
+**The date is back on its own line and bigger than it has ever been** — `headlineSmall`, where it was
+`titleMedium` before any of this. +087 had given the marks a strip of their own along the top of the
+tile, which guaranteed they could never touch the date and cost the date the height that makes a
+calendar readable at a glance: 白い熊 read it as two lines, because it was two lines.
+
+**The marks reach into the date's line instead**, at 18 dp rather than 14, from the top corners: the
+session count left, the note right, overlapping the numeral's band exactly as asked — *"the note can
+reach into the date's line, reaching all the way down to the mid of the date's text — there is
+space"*. There is, unfolded: 2232 px at density 390 is 915 dp, and a tile is some 120 dp wide with
+the marks well clear of the digits. On the **folded cover panel** it is 1008 px — 413 dp, seven
+columns, a 45 dp tile — and a big date and two marks cannot all have their own width, so there the
+marks graze the digits. That is the trade the instruction asks for, and it is rendered at both widths
+now rather than guessed at: `Calendar — walks` is the folded panel, `Calendar — walks unfolded` the
+open screen at 白い熊's own 1.3 type scale.
+
+## 0.2.93+2026-09-05.11-25.ga1b1f784+087 — 2026-09-11
+
+Built on upstream `a1b1f784`.
+
+### 健康 — what 白い熊 wrote, where it can be seen
+
+Five things 白い熊 asked for on 2026-09-11, and one answer to a question.
+
+**運動と回復's notes moved into the tile.** They sat in a strip under each day, a row away from the
+day they belonged to. They are in the tile's top-right corner now, at 14 dp with no chip behind them,
+which is the size that lets a mark share a 34 dp square with the rating it must not cover — the
+reason the last attempt at this was moved out.
+
+**The walks calendar counts STOPS, not sessions.** The ringed mark in the corner was the number of
+sessions that day, shown only above one — so a calendar that 白い熊 read as a stop count went blank
+the moment the double-walk weekends stopped, which is exactly what "from the 7th it shows no stops"
+was. It is the day's stop count now, summed over its walks, and **`0` is shown**: "I did not stop" is
+an answer, and an empty corner is what not having said looks like. Stops on the left, the note on the
+right, as asked — and the day tile is taller and stacked to make room, because rendered on a phone
+the ring sat on the `1` of `11` and the note glyph on the second one. Lifting and 機能訓練 keep the
+session count, which is the only thing they have to count.
+
+**A stop count can be answered from the grid.** The pill on a walk's cell is live: tap it and pick,
+tap the number again to withdraw it. An unanswered walk shows the same pill carrying a `+` rather
+than showing nothing, so the question is visible before the answer exists. It cost four steps before
+— open the walk, tap, pick, come back.
+
+**A note shows as a mark on the right of that same line**, on all three kinds, so "which of these did
+I write on" is answered by looking rather than by opening. It was a pill carrying the note's first
+line, which answers a different question and, on a long note, filled the cell and put the glyph back
+on the left. The words are one tap away.
+
+**機能訓練 is no longer asked how many times it stopped.** The window was built from the walks window
+and inherited its questions; a rehab session has no route to stop on. The rule now lives on the kind
+(`Kind.countsStops`) rather than in a two-way `if` that could only ever describe two of the three.
+
+**And the calendars mark days with notes on the sessions themselves**, not only days with a note on
+the DAY. Walks and lifting have no day notes at all, so their calendars could never mark anything
+however much was written on the walks.
+
+### One pull was always all three
+
+白い熊 asked whether pulling lifting also pulls 機能訓練. It does, and so does pulling walks: the band
+is asked for a stretch of TIME and has no sport filter to send, so every window has always fetched
+everything and filed each kind where it belongs. Only the report was per-window, which is what made
+the fetch look narrower than it is. Every window now says so above the button, and the line after a
+pull names what the other two received.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+086 — 2026-09-10
 
 Built on upstream `a1b1f784`.
