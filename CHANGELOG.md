@@ -8,6 +8,96 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.11-25.ga1b1f784+086 — 2026-09-10
+
+Built on upstream `a1b1f784`.
+
+### 融解 — a package the phone remembers is not a package that is here
+
++085 read "hidden" as *invisible to a plain lookup, visible under `MATCH_UNINSTALLED_PACKAGES`*. That
+flag answers for one more thing than hiding: a system app uninstalled for user 0 keeps its
+`PackageSetting`, and `dumpsys` says `installed=false hidden=false` for **102 packages on this
+phone** — `com.android.nfc`, `com.android.printspooler`, `com.android.providers.calendar` and the
+rest of the debloat.
+
+Every one of those would have read as hidden, so frozen. That is the same bug as before with the
+sign flipped, and the flipped one is worse: `app.frozen` would have said "frozen" for an app that is
+not there, 保存中核 would have thawed a ghost and waited out its reply timeout, and the share relay's
+dead entries — which the old reading at least cleaned up — would have become immortal. No task in the
+workspace names one of the 102 today, but 保存中核 sweeps a roster chosen at runtime, so nothing
+guaranteed it would stay that way. (Caught by 応用管理 the same day, from the other side of the
+contract.)
+
+`ApplicationInfo.FLAG_INSTALLED` is what separates them: set for a hidden app, clear for a remembered
+one. It is read **only** on the branch where the plain lookup already failed, so an OEM that never set
+the bit could at worst report a hidden app as absent — this fork's behaviour before +085 — and could
+never talk a visible app out of existing. `State.frozen` now requires the app to be present at all,
+and `app.frozen` says "not installed for this user — only its data is remembered" rather than
+pretending the package is gone entirely.
+
+Also corrected: eight of 凍結融解's launcher targets — F-Droid, Neo Store, Aurora, Obtainium,
+Droid-ify, 2FAS, Speedtest, FitTrack — are **not installed on either phone**, not frozen. They are
+absent from `pm list packages -u` and `dumpsys package` cannot find them; their tasks have been
+firing at nothing for a while.
+
+## 0.2.93+2026-09-05.11-25.ga1b1f784+085 — 2026-09-10
+
+Built on upstream `a1b1f784`.
+
+### 融解 — the fourth freeze gate, and the thaw that could no longer see it
+
+白い熊 応用管理 +29 made **"Total freeze"** its default, and a frozen app now carries four gates at
+once instead of one — measured the same day on `com.huawei.hiview`:
+
+    installed=true hidden=true suspended=true stopped=true enabled=3
+    Suspend params: suspendingPackage=android
+
+Force-stop, the device-policy suspension, `pm disable-user`, and — the new one — the device-policy
+**hide**. Hiding is not just a fourth lock: it changes what the phone will *admit* about a package.
+`getApplicationInfo` without `MATCH_UNINSTALLED_PACKAGES` throws `NameNotFoundException`, `pm list
+packages` omits it, `getLaunchIntentForPackage` answers null. A hidden app does not read as frozen
+here — it reads as **not installed**, which is the answer every pre-flight in this app took at face
+value:
+
+- `app.frozen` failed outright, so 保存中核's thaw-work-refreeze never got a `%froz` to branch on and
+  skipped its own thaw — the exact silence its 2026-09-05 fix existed to end.
+- The share forwarder went further and *deleted* the target from the relay store as "no longer
+  installed" before finishing.
+- `app.launch` said "app not found" for an app sitting right there.
+
+And the shell cannot undo any of it. `pm hide` / `pm unhide` die with *"Neither user 2000 nor current
+process has android.permission.MANAGE_USERS"*, and `pm unsuspend` clears only
+`suspendingPackage=com.android.shell` — it exits 0 against a suspension filed under `android` and
+changes nothing. Both gates are liftable only by the Device Owner or a `DELEGATION_PACKAGE_ACCESS`
+delegate, which is what 白い熊 雫 makes this app.
+
+So:
+
+- **`app.unfreeze` unhides first**, then clears the two suspensions and the enabled state. The order
+  is load-bearing at the front: while the package is hidden every later call argues with a lookup
+  that says it is not there — the bug 応用管理's own +29 had to fix.
+- **A failed defrost names the missing power** instead of "a lock is still held": a policy gate with
+  no delegation points at 雫's device-policy powers, an enabled-state gate with no shell points at
+  Shizuku. The two need opposite fixes and the old message pointed at neither.
+- **`app.freeze` applies the same four gates in the same order**, hide last. Anything less would be a
+  downgrade rather than a re-freeze: the thaw clears all four, so a bubble that suspended and nothing
+  more would leave every app it touched one adb command from being lifted, while 応用管理 went on
+  listing it as frozen by a route nobody had applied. The run log names the gates that landed.
+- **`app.frozen` counts hidden as frozen**, and every label, icon and picker that may meet a frozen
+  app now reads it under both match flags — the roster icons, the bubble labels, the captured task
+  icon, the share relay's generated icon, and the app picker, where a hidden app had disappeared from
+  the list you would name it in.
+- **The app says once, at startup, which device-policy powers it holds.** `dumpsys device_policy`
+  does not print the delegation map on the Mate XT, so a revoked delegation and a bug are otherwise
+  indistinguishable from the outside.
+
+**A PERSISTENT system app is not stopped by any of this.** `ActivityManagerService` spares persistent
+processes from force-stop by design; `com.huawei.hiview` was measured still running through all four
+gates. They keep it from being *started* — they cannot evict what the platform brought up at boot.
+
+The 57 launcher tasks in 凍結融解, 保存中核 and 扉試験 needed no edit: they call these actions rather
+than shelling out, which is why one fix reaches all of them.
+
 ## 0.2.93+2026-09-05.11-25.ga1b1f784+084 — 2026-09-10
 
 Built on upstream `a1b1f784`.
