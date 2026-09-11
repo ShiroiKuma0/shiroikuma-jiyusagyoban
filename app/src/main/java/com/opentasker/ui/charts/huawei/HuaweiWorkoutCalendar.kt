@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import com.opentasker.ui.charts.ANNOTATION_INK
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.opentasker.core.band.DayNotes
 import com.opentasker.core.band.RehabLog
 import com.opentasker.core.huawei.HuaweiWorkoutStore
 import com.opentasker.ui.charts.BodyText
@@ -118,11 +119,16 @@ fun HuaweiWorkoutCalendarScreen(
                     // A hand-ticked day is unioned in rather than distinguished. The question is
                     // "did I do it", and the answer does not change because the band was charging.
                     days = rehabCells(from, to, byDay.keys + ticked, notes).map { cell ->
-                        // How many sessions that day holds, so a doubled day is visible before it
-                        // is tapped rather than only in the chooser that follows.
+                        val onThatDay = byDay[RehabLog.dateKeyOf(LocalDate.ofEpochDay(cell.epochDay))]
+                            .orEmpty()
                         cell.copy(
-                            count = byDay[RehabLog.dateKeyOf(LocalDate.ofEpochDay(cell.epochDay))]
-                                ?.size,
+                            badge = badgeFor(onThatDay),
+                            // A note on the DAY (機能訓練's tick dialog writes those) or on any
+                            // session recorded in it. Until 2026-09-11 only the first counted, so
+                            // the walks and lifting calendars — which have no day notes at all —
+                            // could never mark anything, however much 白い熊 had written on the
+                            // walks themselves.
+                            hasNote = cell.hasNote || onThatDay.any { !it.note.isNullOrBlank() },
                         )
                     },
                     zone = zone,
@@ -141,6 +147,7 @@ fun HuaweiWorkoutCalendarScreen(
                     gridStyle = DayGridStyle.DAYS,
                 )
                 NoteText(HuaweiText.calendarTapNote[lang])
+                NoteText(HuaweiText.calendarEmptyNote(kind)[lang])
             }
         }
     }
@@ -156,6 +163,31 @@ fun HuaweiWorkoutCalendarScreen(
         )
     }
 }
+
+/**
+ * Which day-note file this kind writes to.
+ *
+ * One per calendar, because all four note stores are keyed `yyyyMMdd` and a shared file would have
+ * "why I did not walk" overwrite "why I did not lift" on the same date. The mapping lives here rather
+ * than on [DayNotes] so that the store stays a dumb prefs file with no opinion about workouts.
+ */
+internal fun dayNotesFor(kind: HuaweiWorkoutStore.Kind): DayNotes = when (kind) {
+    HuaweiWorkoutStore.Kind.WALK -> DayNotes.WALK
+    HuaweiWorkoutStore.Kind.STRENGTH -> DayNotes.LIFT
+    HuaweiWorkoutStore.Kind.REHAB -> DayNotes.REHAB
+}
+
+/**
+ * The mark in a tile's corner: how many sessions the day holds, and only when that is more than one.
+ *
+ * The same on all three calendars. It carried the day's STOP count on walks for one build — the
+ * stop count is the authored half of a walk, so putting it where the eye already goes looked right —
+ * and 白い熊 reversed it the same day (2026-09-11): a calendar of walks is read for WHICH DAYS and
+ * HOW MANY, and the number of stops belongs on the walk. A badge reading "1" on every filled day
+ * would say nothing on any of them, which is why one is not drawn at all.
+ */
+private fun badgeFor(onThatDay: List<HuaweiWorkoutStore.Workout>): String? =
+    onThatDay.size.takeIf { it > 1 }?.toString()
 
 /**
  * Which of the day's sessions did you mean?
