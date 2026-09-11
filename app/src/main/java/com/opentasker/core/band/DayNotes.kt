@@ -84,5 +84,21 @@ class DayNotes private constructor(private val prefsName: String) {
          * overwrite whichever was written second.
          */
         val REHAB = DayNotes("rehab_notes")
+
+        /**
+         * What 白い熊 wrote about a DAY'S walking, and about a day's lifting — one file each.
+         *
+         * A walk and a lift carry their own notes, so these are for the days that carry NEITHER:
+         * *"we need to add the possibility of adding notes to days that have no lifting for instance,
+         * and the other two categories too"* (白い熊, 2026-09-11). A day with no session is the day
+         * most worth writing on — why there was none — and until now it was the one day in the
+         * calendar that could hold nothing at all.
+         *
+         * Separate files for [REHAB]'s reason, which is the same reason again: all four are keyed
+         * `yyyyMMdd` and all four describe the same date, so one file would have them overwrite each
+         * other by construction.
+         */
+        val WALK = DayNotes("walk_notes")
+        val LIFT = DayNotes("lift_notes")
     }
 }
