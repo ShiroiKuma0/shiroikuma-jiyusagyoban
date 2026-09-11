@@ -273,6 +273,9 @@ fun HuaweiRehabGridPreview() {
                             startSeconds = 1_788_330_000L,
                             endSeconds = 1_788_331_400L,
                             calories = 71,
+                            // 白い熊 asked for notes on this page too (2026-09-11), so one session
+                            // here has to carry one or the preview cannot show whether they read.
+                            note = "肩は楽だった。回数は同じ。",
                         ),
                     ),
                     efforts = mapOf(REHAB.id to LIFT_EFFORT),
@@ -307,17 +310,32 @@ fun HuaweiWalkCalendarPreview() {
         WALK_WITH_EFFORT.copy(
             number = 30 - i,
             startSeconds = base - i * day * (if (i % 3 == 0) 2 else 1),
+            // Every state the tile corners have to hold, spread across the month: a stop count, the
+            // answer ZERO — which is a statement and must look different from having said nothing —
+            // an unanswered walk, and a note with and without a count beside it.
+            stops = when (i % 4) {
+                0 -> 2
+                1 -> 0
+                2 -> null
+                else -> 1
+            },
+            note = if (i % 3 == 0) "stopped at the bakery, then on the bridge" else null,
         )
         // Two on one day, which is 白い熊's ordinary Saturday: the tile has to offer both rather
         // than quietly keep whichever the map happened to hold.
-    } + WALK_WITH_EFFORT.copy(number = 31, startSeconds = base + 11 * 3600)
+    } + WALK_WITH_EFFORT.copy(number = 31, startSeconds = base + 11 * 3600, stops = 3)
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
         Frame {
             HuaweiWorkoutCalendarScreen(
                 kind = HuaweiWorkoutStore.Kind.WALK,
                 workouts = walks,
                 ticked = emptySet(),
-                notes = emptyMap(),
+                // Days with NO walk on them, written on anyway — the state 白い熊 asked for on
+                // 2026-09-11, and the one a calendar of recorded sessions could not hold at all.
+                notes = mapOf(
+                    20260813L to "rain all day",
+                    20260903L to "dentist, then too dark",
+                ),
                 zone = zone,
                 contentPadding = PaddingValues(0.dp),
                 onOpenSession = {},
@@ -361,6 +379,86 @@ fun HuaweiLiftDetailPreview() {
         Frame {
             HuaweiWalkDetailScreen(
                 walk = LIFT.copy(note = "脚。最後の一組がだめだった"),
+                effort = LIFT_EFFORT,
+                sharing = false,
+                busy = false,
+                message = null,
+                contentPadding = PaddingValues(10.dp),
+                onShare = {},
+                onOpenInChizu = {},
+                onBack = {},
+            )
+        }
+    }
+}
+
+/**
+ * The same calendar on the UNFOLDED screen, at 白い熊's own type scale.
+ *
+ * 413 dp is not "a narrow phone" here — it is the Mate XT's **folded cover panel**, 1008 px at
+ * density 390, which is where a seven-column calendar is tightest and where the corner marks graze
+ * the date. Unfolded is 2232 px, so 915 dp, and a tile is nearly three times as wide. Both are the
+ * same screen on the same day, so both have to be looked at before a size is called right.
+ */
+@PreviewTest
+@Preview(
+    name = "Calendar — walks unfolded",
+    widthDp = 915,
+    heightDp = 900,
+    fontScale = 1.3f,
+    showBackground = true,
+)
+@Composable
+fun HuaweiWalkCalendarUnfoldedPreview() {
+    val zone = java.time.ZoneId.of("Europe/Prague")
+    val day = 24L * 3600
+    val base = 1_788_000_000L
+    val walks = (0..9).map { i ->
+        WALK_WITH_EFFORT.copy(
+            number = 30 - i,
+            startSeconds = base - i * day * (if (i % 3 == 0) 2 else 1),
+            note = if (i % 3 == 0) "stopped at the bakery, then on the bridge" else null,
+        )
+    } + WALK_WITH_EFFORT.copy(number = 31, startSeconds = base + 11 * 3600)
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Frame {
+            HuaweiWorkoutCalendarScreen(
+                kind = HuaweiWorkoutStore.Kind.WALK,
+                workouts = walks,
+                ticked = emptySet(),
+                // Days with NO walk on them, written on anyway — the state 白い熊 asked for on
+                // 2026-09-11, and the one a calendar of recorded sessions could not hold at all.
+                notes = mapOf(
+                    20260813L to "rain all day",
+                    20260903L to "dentist, then too dark",
+                ),
+                zone = zone,
+                contentPadding = PaddingValues(0.dp),
+                onOpenSession = {},
+                onTapEmptyDay = {},
+                onBack = {},
+            )
+        }
+    }
+}
+
+/**
+ * 機能訓練's own page — the one that used to ask how many times a rehab session stopped.
+ *
+ * The third window arrived as a copy of the walks window, so it inherited the walks window's
+ * questions: a stop count with a `+` in it, sitting above the note on a session that has no route to
+ * stop on (白い熊, 2026-09-11: *"remove the stops — it should have only notes"*). What this preview
+ * checks is the absence — one card, 「覚え書き」, a note field and nothing else — which is not a thing
+ * a passing test can show and a rendered page can.
+ */
+@PreviewTest
+@Preview(name = "機能訓練 — one session", widthDp = 413, heightDp = 1000, showBackground = true)
+@Composable
+fun HuaweiRehabDetailPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        Frame {
+            HuaweiWalkDetailScreen(
+                walk = REHAB.copy(note = "肩は楽だった。回数は同じ。"),
                 effort = LIFT_EFFORT,
                 sharing = false,
                 busy = false,
