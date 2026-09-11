@@ -76,7 +76,7 @@ object RelayGenerator {
 
     private fun appIcon(context: Context, pkg: String): Bitmap? = runCatching {
         val pm = context.packageManager
-        val d = pm.getApplicationIcon(pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS))
+        val d = pm.getApplicationIcon(pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN))
         (d as? BitmapDrawable)?.bitmap ?: Bitmap.createBitmap(
             d.intrinsicWidth.coerceAtLeast(96), d.intrinsicHeight.coerceAtLeast(96), Bitmap.Config.ARGB_8888,
         ).also { d.setBounds(0, 0, it.width, it.height); d.draw(Canvas(it)) }
