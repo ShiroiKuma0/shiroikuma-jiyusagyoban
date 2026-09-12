@@ -14,6 +14,7 @@ import android.view.inputmethod.InputMethodManager
 import com.opentasker.core.contexts.AppForegroundChangedContextEvents
 import com.opentasker.core.engine.EngineShutdown
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.scenes.SceneOverlayManager
 import kotlinx.coroutines.delay
 
 /**
@@ -28,15 +29,23 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
         rebindGaveUpAt = 0L
+        // Windows we host died with the previous binding — see [SceneOverlayManager.onAccessibilityServiceGone].
+        SceneOverlayManager.onAccessibilityServiceConnected()
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         instance = null
+        SceneOverlayManager.onAccessibilityServiceGone()
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
-        if (instance === this) instance = null
+        val wasCurrent = instance === this
+        if (wasCurrent) {
+            instance = null
+            // Idempotent: onUnbind usually ran first and left nothing hosted. Killed outright, it didn't.
+            SceneOverlayManager.onAccessibilityServiceGone()
+        }
         super.onDestroy()
     }
 
