@@ -28,6 +28,7 @@ import com.opentasker.core.accessibility.ShiroiKumaAccessibilityService
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.engine.variables.PersistentGlobalScope
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.model.Scene
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
@@ -46,11 +47,18 @@ import kotlinx.coroutines.launch
  * can't take text input — use a modal scene for fields.
  */
 object SceneOverlayManager {
+    private const val TAG = "SceneOverlay"
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val main = Handler(Looper.getMainLooper())
     private val active = LinkedHashMap<Long, Overlay>()
     private val shownNames = LinkedHashMap<Long, String>() // sceneId -> name, for the monitor view
     private var appContext: Context? = null
+
+    /**
+     * Respawn thunks for the overlays an accessibility-service teardown took down with it, kept until
+     * the service rebinds. See [onAccessibilityServiceGone].
+     */
+    private val pendingA11yRespawn = LinkedHashMap<Long, () -> Unit>()
 
     /**
      * Window alpha for a pass-through overlay when no accessibility service is available to host it as a
@@ -75,6 +83,11 @@ object SceneOverlayManager {
         val heightFraction: Float = 0f,
         val widthFraction: Float = 0f,
         val timeoutMs: Long = 0L,
+        /**
+         * Re-runs the original [show] call, verbatim. Non-null only when the window is hosted by the
+         * accessibility service — the one host that can take our windows away without telling us.
+         */
+        val respawn: (() -> Unit)? = null,
         var dismissRunnable: Runnable? = null,
     )
 
@@ -371,10 +384,23 @@ object SceneOverlayManager {
                 @Suppress("DEPRECATION")
                 params.flags = params.flags or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
             }
+            // Only an a11y-hosted window needs one: the app context outlives every overlay it owns,
+            // so an APPLICATION_OVERLAY is never taken away behind our back.
+            val respawn: (() -> Unit)? = if (a11y == null) null else {
+                {
+                    show(
+                        context = app, scene = scene, position = position, modal = modal, timeoutMs = timeoutMs,
+                        dismissOnOutside = dismissOnOutside, fullWidth = fullWidth, fullscreen = fullscreen,
+                        edgeCenter = edgeCenter, insetDp = insetDp, heightFraction = heightFraction, vAlign = vAlign,
+                        widthFraction = widthFraction, hAlign = hAlign, showWhenLocked = showWhenLocked,
+                        keepScreenOn = keepScreenOn,
+                    )
+                }
+            }
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs)
+                    val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs, respawn)
                     active[scene.id] = overlay
                     shownNames[scene.id] = scene.name
                     if (fullscreen || heightFraction > 0f || widthFraction > 0f) ensureDisplayListener(app)
@@ -395,7 +421,13 @@ object SceneOverlayManager {
                         main.postDelayed(r, timeoutMs)
                     }
                 }
-                .onFailure { owner.onDestroy() }
+                .onFailure {
+                    // Was silent, and that is how a missing edge bar stayed a mystery: an a11y-hosted
+                    // window whose service has gone throws here, the scene is dropped, and nothing —
+                    // no log, no flash, no Monitor entry — says so (白い熊, 2026-09-12).
+                    AppLogger.warn(TAG, "overlay ${scene.name}: addView failed (a11y-hosted=${a11y != null})", it)
+                    owner.onDestroy()
+                }
         }
     }
 
@@ -419,9 +451,66 @@ object SceneOverlayManager {
 
     private fun remove(sceneId: Long) {
         shownNames.remove(sceneId)
+        pendingA11yRespawn.remove(sceneId)
         val overlay = active.remove(sceneId) ?: return
         runCatching { overlay.wm.removeView(overlay.view) }
         overlay.owner.onDestroy()
+    }
+
+    /**
+     * The accessibility service is going away — take its overlays off the books.
+     *
+     * A window added through the service dies with it, and only those windows do: the bottom edge bars
+     * (`widthFraction`) and the trusted pass-through frames are hosted there, everything else by the
+     * application context. Nothing used to notice, so [active] kept the dead ids forever and [show]'s
+     * "already showing" guard turned every later 辺表示 into a no-op for exactly those scenes — the
+     * bottom toolbar was gone until the next reboot and re-running 起動 could not bring it back.
+     * The framework rebuilds its accessibility registry on any package install, so this fired often
+     * (白い熊's phone, 2026-09-12: three teardowns inside two seconds).
+     *
+     * Forgetting them is what makes a manual 辺表示 work again — it re-adds them as plain app overlays
+     * while the service is away. [onAccessibilityServiceConnected] puts them back properly when it returns.
+     */
+    fun onAccessibilityServiceGone() {
+        main.post {
+            val hosted = active.filterValues { it.respawn != null }
+            if (hosted.isEmpty()) return@post
+            AppLogger.info(TAG, "a11y service gone: releasing ${hosted.size} hosted overlay(s)")
+            hosted.forEach { (id, overlay) ->
+                val thunk = overlay.respawn ?: return@forEach
+                remove(id) // clears pendingA11yRespawn[id] too, hence the re-put below
+                pendingA11yRespawn[id] = thunk
+            }
+        }
+    }
+
+    /**
+     * The accessibility service has (re)bound — put back the overlays it used to host.
+     *
+     * Also sweeps anything still sitting in [active] with a respawn thunk: when the service is killed
+     * outright neither `onUnbind` nor `onDestroy` runs, so the first we hear of it is this callback and
+     * the entry is still there with a window that no longer exists.
+     */
+    fun onAccessibilityServiceConnected() {
+        main.post {
+            active.filterValues { it.respawn != null }.forEach { (id, overlay) ->
+                val thunk = overlay.respawn ?: return@forEach
+                remove(id)
+                pendingA11yRespawn[id] = thunk
+            }
+            if (pendingA11yRespawn.isEmpty()) return@post
+            val pending = pendingA11yRespawn.toMap() // remove() below writes to the live map
+            pendingA11yRespawn.clear()
+            AppLogger.info(TAG, "a11y service back: restoring ${pending.size} hosted overlay(s)")
+            pending.forEach { (id, thunk) ->
+                // A 辺表示 run while the service was away will have re-added the scene as a plain app
+                // overlay: on screen, but UNTRUSTED, so the bottom bar no longer wins the system gesture
+                // it exists to catch and show() would refuse the trusted one as "already showing".
+                // Drop that window first; the thunk puts the accessibility-hosted one back.
+                remove(id)
+                thunk()
+            }
+        }
     }
 
     private fun runTask(ref: String, projectId: Long?) {
