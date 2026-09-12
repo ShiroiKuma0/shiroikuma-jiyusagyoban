@@ -8,6 +8,38 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.17-44.g09a659b5+091 — 2026-09-12
+
+Built on upstream `09a659b5`.
+
+### 画面操作 — the bottom edge bars come back when the accessibility service does
+
+Six edge bars up, three missing, no error anywhere: the bottom toolbar had stopped answering gestures
+and the project read as broken. It was not. Those three bars are the only overlays this app does not
+own — they carry a `widthFraction`, which is what routes them through the accessibility service as a
+`TYPE_ACCESSIBILITY_OVERLAY`, the one window type that takes the bottom system gesture away from the
+OS without also taking key focus away from the keyboard. The six side bars are plain application
+overlays and were never at risk.
+
+**A window added through that service dies with the service**, and the framework tears every
+accessibility service down and re-reads the registry whenever a package is installed — on the phone
+that fired three times inside two seconds, two minutes after the app had started and put its bars up.
+The bars went with it. Nothing noticed: the dead scene ids stayed in the overlay manager's `active`
+map, `show()`'s "already showing" guard turned every later 辺表示 into a no-op for exactly those three
+scenes, and there was no way back short of a reboot — re-running 起動 could not do it, because from the
+app's own side the bars were still up.
+
+Overlays hosted by the service now record how to rebuild themselves. When the service goes they are
+released — they leave `active`, so a manual 辺表示 works in the meantime and re-adds them as ordinary
+app overlays — and when it rebinds they are put back as trusted ones. A service killed outright runs
+neither `onUnbind` nor `onDestroy`, so the rebind also sweeps anything still listed whose window no
+longer exists. It drops that plain fallback overlay before restoring the trusted one, or the bar would
+sit there looking perfectly correct while quietly losing the gesture it exists to catch.
+
+**The failure was silent, and that is why it cost a morning to find.** `addView` throwing against a
+dead host dropped the scene without a log line, a flash or a Monitor entry. It now warns — into the
+in-app log, since EMUI keeps a non-debuggable app's output out of `logcat` altogether.
+
 ## 0.2.93+2026-09-05.17-44.g09a659b5+090 — 2026-09-11
 
 Built on upstream `09a659b5`.
