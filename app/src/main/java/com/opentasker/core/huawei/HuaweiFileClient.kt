@@ -250,9 +250,19 @@ class HuaweiFileClient(private val session: HuaweiSession) {
          * The stream inside `sequence_data` that holds sleep.
          *
          * Established by dumping all three ids Huawei Health was seen asking for and checking their
-         * contents against the band's own Sleep screen — 700004 and 700021 hold something else.
+         * contents against the band's own Sleep screen — 700004 and 700021 are not sleep. 700021
+         * turned out to be the per-beat series; see [BEAT_STREAM_ID].
          */
         const val SLEEP_STREAM_ID = 700_013
+
+        /**
+         * The stream inside `sequence_data` that holds the per-beat RR series.
+         *
+         * Dismissed here as "something else" until 2026-09-12, on the strength of not being sleep.
+         * It is the beat-by-beat interval series — see [HuaweiBeats], which decodes it — and it is
+         * the only source of a respiratory rate this band has, since it has no temperature sensor.
+         */
+        const val BEAT_STREAM_ID = HuaweiBeats.STREAM_ID
 
         /** Per-beat RR intervals. Takes no id. */
         const val RRI_DATA = "rrisqi_data.bin"
