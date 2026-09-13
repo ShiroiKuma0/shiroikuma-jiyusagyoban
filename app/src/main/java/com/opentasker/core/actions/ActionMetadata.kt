@@ -1172,12 +1172,14 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "huawei.settings",
             name = "Huawei Band recording settings",
-            description = "Decide what the band actually measures. A fresh band has continuous heart rate and automatic SpO₂ switched OFF, and a band that is not recording looks exactly like one that cannot — this is the only way to set them without handing the band back to Huawei Health. Each switch is sent separately, so one refusal does not hide the others. Leave a field blank to leave that setting alone; blank is NOT off",
+            description = "Decide what the band actually measures. A fresh band has continuous heart rate, automatic SpO₂, sleep breathing awareness and stress all switched OFF, and a band that is not recording looks exactly like one that cannot — this is the only way to set them without handing the band back to Huawei Health. Each switch is sent separately, so one refusal does not hide the others. Leave a field blank to leave that setting alone; blank is NOT off",
             category = "Health",
             fields = listOf(
                 ActionField("trusleep", "truSleep", FieldType.TEXT, hint = "on / off / blank to leave alone"),
                 ActionField("continuous_hr", "Continuous heart rate", FieldType.TEXT, hint = "on / off / blank. OFF on a fresh band — this is why heart rate can be missing"),
                 ActionField("auto_spo2", "Automatic SpO₂", FieldType.TEXT, hint = "on / off / blank. Also off on a fresh band"),
+                ActionField("apnea", "Sleep breathing awareness", FieldType.TEXT, hint = "on / off / blank. The band's respiratory channel during sleep — off on a fresh band"),
+                ActionField("stress", "Emotions / stress", FieldType.TEXT, hint = "on / off / blank. Real RR-derived stress, unlike the Hume band's device-state index"),
                 ActionField("high_hr", "High heart-rate alert", FieldType.TEXT, hint = "a bpm threshold to enable (Health uses 120), or off"),
                 ActionField("low_hr", "Low heart-rate alert", FieldType.TEXT, hint = "a bpm threshold to enable (Health uses 40), or off"),
                 ActionField("low_spo2", "Low SpO₂ alert", FieldType.TEXT, hint = "a percentage to enable (Health uses 90), or off"),
@@ -2375,6 +2377,42 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "bubble.freeze_add",
+            name = "Freeze Bubble Add",
+            description = "Queue a re-freeze bubble for an app down the Desktop's RIGHT edge (凍結融解). Running a task on the roster already queues one — this is for an app thawed some other way, or a bubble whose freeze set is not what any task thawed. Tap / long-tap / ↗ each run a workspace task",
+            category = "System",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "the app the bubble is FOR — its icon, label and dedupe key"),
+                ActionField("label", "Label", hint = "bubble label; blank = the app's own label (read so a frozen app still has one)"),
+                ActionField("freeze", "Also freeze", hint = "space-separated extra packages this bubble should re-freeze; blank = just the app above"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.freeze_remove",
+            name = "Freeze Bubble Remove",
+            description = "Drop one app's freeze bubble WITHOUT freezing it — the long-tap, from a task. A no-op when that app has no bubble",
+            category = "System",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app, or type a package / %var"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "bubble.freeze_clear",
+            name = "Freeze Bubbles Clear",
+            description = "Drop every pending freeze bubble. Nothing is frozen — the apps stay thawed, so this clears the Desktop rather than giving up on re-freezing them",
+            category = "System",
+            fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "tasks.launchers",
             name = "Make Launcher Tasks",
             description = "Pick apps; create an unfreeze-then-launch task for each in a project group.",
@@ -2414,11 +2452,12 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "tasks.freezebubbles",
             name = "Pick Freeze Bubbles",
-            description = "Tick which launcher tasks pop a re-freeze bubble on the Desktop (the ones already on are pre-ticked and shown first).",
+            description = "Tick which launcher tasks pop a re-freeze bubble on the Desktop (the ones already on are pre-ticked and shown first). Name a variable and the answer is written there as a space-separated package list — the roster then lives in a settings task you can read and edit, not in a hidden per-task flag",
             category = "App",
             fields = listOf(
                 ActionField("project", "Project", hint = "narrow the list to this project; empty = every project"),
                 ActionField("group", "Group", hint = "narrow it further to this Tasks-tab group; empty = the whole project"),
+                ActionField("variable", "Write the roster to", hint = "e.g. Toketsu_Bubbles — a space-separated package list, pre-ticked from the same variable. Empty = the old per-task flag"),
                 ActionField("title", "Title", hint = "dialog title (default: Freeze bubbles)"),
                 ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
             )

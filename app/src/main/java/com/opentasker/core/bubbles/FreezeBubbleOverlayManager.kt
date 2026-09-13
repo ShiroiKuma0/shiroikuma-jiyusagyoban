@@ -40,7 +40,19 @@ import kotlin.math.hypot
  * Renders the pending freeze bubbles ([FreezeBubbleStore]) as draggable system-overlay windows, shown
  * **only while the device's default home launcher (the Desktop) is foreground** — nowhere else. One small
  * window per bubble, anchored to the screen's **top + right** edges (so it keeps its relative spot across
- * rotation / fold). **Tap** freezes the app and removes the bubble; **long-tap** removes it only.
+ * rotation / fold). **Tap** freezes the app and removes the bubble; **long-tap** removes it only; the
+ * ↗ badge opens the app and leaves the bubble where it is.
+ *
+ * ## What this class decides, and what it no longer does
+ *
+ * It owns only what a scene provably cannot: the launcher-foreground gate, one overlay window per
+ * pending app, an icon readable while the app is frozen, and drag-with-persistence.
+ *
+ * **What each gesture MEANS is not here.** Every one of the three resolves a named workspace task —
+ * [TASK_FREEZE], [TASK_DISMISS], [TASK_LAUNCH], or an app's own `<label> ⇦ 凍結` — and runs it with
+ * the bubble's package, label and freeze set threaded in as event-locals. Each falls back to the
+ * behaviour that used to be hard-coded here, so a renamed or missing task degrades rather than
+ * turning the bubble into a button that does nothing visible.
  *
  * Native replacement for the Tasker 凍結 融解 AutoTools-WebScreen bubble layer.
  */
@@ -330,29 +342,112 @@ object FreezeBubbleOverlayManager {
         }
     }
 
+    /**
+     * The workspace tasks a gesture runs, by NAME.
+     *
+     * ## Why names and not settings
+     *
+     * 白い熊, 2026-09-13: *"the flow on both sides … in activities run on bubble tap, long-tap etc.
+     * should all be task-based, so this behavior can be managed and audited."* A name is the whole
+     * binding: the task exists and the gesture does what it says, or it does not and the fallback
+     * below runs. Nothing to configure, and what happens is readable in the workspace.
+     *
+     * The flash bubbles hold their equivalents in `ThemeStore` as editable settings. Deliberately not
+     * copied: 凍結融解 is about to own its configuration in a 01 settings task, and a second surface
+     * in the app's own preferences would compete with it for the same question.
+     */
+    const val TASK_FREEZE = "凍結泡 ⇨ 凍結"
+    const val TASK_DISMISS = "凍結泡 ⇨ 捨てる"
+    const val TASK_LAUNCH = "凍結泡 ⇨ 起動"
+
+    /**
+     * The per-app override, by name: `<label> ⇦ 凍結`.
+     *
+     * Tried before [TASK_FREEZE], so a single app can do something the general rule cannot — and the
+     * EXISTENCE of the task is the whole override. Nothing is enabled, ticked or listed anywhere;
+     * `resolveTaskByName` returns null when there is no such task and the general path runs.
+     *
+     * `⇦` rather than `⇨`: the launcher tasks point forward into the app, this points back out of it.
+     */
+    private fun overrideNameFor(label: String) = "$label ⇦ 凍結"
+
+    /**
+     * Run a workspace task by name with the bubble's context threaded in, or null if there is none.
+     *
+     * **Event-locals, not globals.** `%APP_PACKAGE` as a super-global is written by every foreground
+     * change on this phone, including the ones our own overlays provoke — a bubble reading it would
+     * be reading whatever window moved last. Per-invocation locals belong to this tap alone.
+     *
+     * @return true when a task was found and started.
+     */
+    private suspend fun runNamed(name: String, entry: BubbleEntry): Boolean {
+        val ctx = appContext ?: return false
+        val db = OpenTaskerApp_NoHilt.db
+        val task = com.opentasker.core.engine.resolveTaskByName(db, name, null) ?: return false
+        val locals = mapOf(
+            "APP_PACKAGE" to entry.pkg,
+            "APP_LABEL" to entry.label,
+            // Space-separated, the convention every package roster in this workspace uses
+            // (%BR_Apps, %SC_Blacklist) and the one `var.split` is pointed at.
+            "FREEZE_PACKAGES" to entry.freezeTargets.joinToString(" "),
+        )
+        runCatching {
+            executeAndLogTask(ctx, db, task, source = "FreezeBubble", eventLocals = locals, logTag = TAG)
+        }
+        return true
+    }
+
+    /**
+     * Freeze everything the launch thawed, then retire the bubble.
+     *
+     * Three ways in, in order: the app's own `<label> ⇦ 凍結` task, the general 凍結泡 task, and —
+     * when the workspace holds neither — a synthesised run of `app.freeze` over the same packages.
+     *
+     * **The fallback is not decoration.** A renamed or not-yet-imported task would otherwise turn the
+     * bubble into a button that removes itself and freezes nothing, which looks exactly like success.
+     * [BubbleEntry.freezeTargets] is never empty: a bubble stored before the companion list existed
+     * falls back to its own package.
+     */
     private fun freezeAndRemove(entry: BubbleEntry) {
         val ctx = appContext ?: return
         val s = scope ?: return
+        val targets = entry.freezeTargets
         s.launch(Dispatchers.IO) {
+            if (runNamed(overrideNameFor(entry.label), entry)) return@launch
+            if (runNamed(TASK_FREEZE, entry)) return@launch
+            // One task carrying an `app.freeze` per target rather than one task each: they run in
+            // order under a single run-log entry, so a half-completed re-freeze reads as one failed
+            // task instead of two unrelated ones.
             val task = Task(
-                name = "Freeze ${entry.label}",
-                actions = listOf(ActionSpec(type = "app.freeze", args = mapOf("package" to entry.pkg))),
+                name = if (targets.size == 1) "Freeze ${entry.label}" else "Freeze ${entry.label} (${targets.size})",
+                actions = targets.map { ActionSpec(type = "app.freeze", args = mapOf("package" to it)) },
             )
             runCatching { executeAndLogTask(ctx, OpenTaskerApp_NoHilt.db, task, source = "FreezeBubble", logTag = TAG) }
         }
         FreezeBubbleStore.remove(entry.pkg)  // flow → sync() removes the window
     }
 
+    /**
+     * Long-tap: drop the reminder and leave the app thawed.
+     *
+     * The bubble is retired here rather than by the task, so a workspace that has no 捨てる task still
+     * behaves correctly — the task, if present, is for whatever 白い熊 wants to happen BESIDES the
+     * dismissal.
+     */
     private fun dismissOnly(pkg: String) {
+        val entry = FreezeBubbleStore.bubbles.value.firstOrNull { it.pkg == pkg }
         FreezeBubbleStore.remove(pkg)  // flow → sync() removes the window; app stays thawed
+        val s = scope ?: return
+        if (entry != null) s.launch(Dispatchers.IO) { runNamed(TASK_DISMISS, entry) }
     }
 
-    /** Open the bubble's target app (reuses the `app.launch` action). The bubble stays put — the app is
+    /** Open the bubble's target app. The bubble stays put — the app is
      *  still thawed, so the reminder reappears when you come back to the Desktop to re-freeze it. */
     private fun launchApp(entry: BubbleEntry) {
         val ctx = appContext ?: return
         val s = scope ?: return
         s.launch(Dispatchers.IO) {
+            if (runNamed(TASK_LAUNCH, entry)) return@launch
             val task = Task(
                 name = "Launch ${entry.label}",
                 actions = listOf(ActionSpec(type = "app.launch", args = mapOf("package" to entry.pkg))),

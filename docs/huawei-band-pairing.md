@@ -287,6 +287,30 @@ neighbours. The primitive is general; the ids are not derivable.
 Arrhythmia analysis is **on-demand** — after activation the band shows a "Measure" button — so it
 produces an event when pressed rather than a series. Recorded for completeness, not a data source.
 
+### `0x37/0x01` applies the config and NEVER answers (2026-09-12)
+
+Every other setting in this file is a request/response. This one is not, and nothing in the capture
+said so — Health's own writes are visible, its replies are not, because there are none.
+
+Sending the three module configs from this app produced three timeouts in a session where all six
+fitness switches were acknowledged normally: 18 s of a 20.7 s run, each waiting its full 6 s rather
+than erroring. The frames were byte-identical to the captured ones. Two readings fitted — the band
+ignored them, or the band applied them silently — and only the band could tell them apart.
+
+**It applies them.** After the writes, 白い熊 read the band's own screens: sleep breathing awareness
+shows *"No abnormalities"* and stress shows *"Neutral"*, both populated where an unset module has
+nothing to display.
+
+So a timeout on `0x37/0x01` is the CORRECT outcome and must not be treated as a failure. The
+plausible alternative — that DataSync wants a topic announcement first, since the band raises
+`0x37/0x02` for `hw.wearable.httpProxy` carrying a topic id — is **disproven**, and is written down
+here only so it is not re-derived.
+
+What this does not settle is where the two features' data goes. Nothing is known to decode an OSA or
+an emotion record yet, and the per-minute grid may simply gain a feature bit — in which case it
+arrives as `unknown_XX` in `huawei_samples`, because undecoded bits are carried through rather than
+dropped. That is the thing to watch after a day of wear.
+
 ---
 
 ### 10a. The band's display language — `0x0C/0x01`

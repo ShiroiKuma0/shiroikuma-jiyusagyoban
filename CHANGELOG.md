@@ -8,6 +8,133 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.17-44.g09a659b5+113 — 2026-09-13
+
+Built on upstream `09a659b5`.
+
+### 健康 — the band was asked why a bad week left no trace, and the honest answer was "we never looked"
+
+白い熊 felt ill on the 11th and the 12th and could find nothing in the data that said so. Pulling the
+archive rather than reading the screens settled it: the canonical infection trio — nocturnal heart
+rate up, HRV down, SpO₂ down — did not move at all. Nocturnal HR came in at **+0.8 bpm** on the night
+before, HRV was if anything *elevated*, and SpO₂ rose. What did move was **sleep length**: 636 minutes
+against a 442 baseline, **z = +4.09**, the longest night in the record.
+
+**The counting rule could not see it, by construction.** Radin's published conjunction wants sleep
+*below* baseline; `MarkerReading.adverse` deliberately does not treat a long night as an event. So a
+second conjunction now reads the other direction — a long night after a quiet evening — kept apart
+from the first, holding Radin's 0.5 SD operating point because no published one exists for this pair,
+and saying so on the card every time it draws. On the one episode available it is very nearly a
+sleep-length detector: the sleep limb cleared its threshold eight times over, the heart-rate limb by a
+third of one. There is a test named for that.
+
+### 健康 — what the band records, and what we were throwing away
+
+Three gaps, two of them ours:
+
+**The per-beat RR series was never pulled.** `sequence_data` stream 700021 — the beat-by-beat
+intervals every `rrisqi` float is computed *from* — was dismissed as "something else" and fetched only
+by hand during the decoding work. It is now pulled on every sync into `huawei_beats` (schema **32**),
+which yields SDNN and pNN50 (in no Huawei surface at all) and, more to the point, a **respiratory
+rate** derived from respiratory sinus arrhythmia. After skin temperature, which this band has no
+sensor for, that is the best-evidenced day-ahead illness signal there is.
+
+**The first version of those numbers was wrong, and wrong in the most believable way.** Raw RMSSD came
+out at a median of **133 ms** — four to six times any resting figure the band itself publishes —
+because the PPG misses beats and a missed beat records one interval at exactly twice the local value
+(714 → 1434 ms in 白い熊's own data). Malik's 20 % rule now runs before every time-domain statistic, at
+a threshold **calibrated against the band's own f5** over the 109 records that provably pair with an
+`rrisqi` window: ratio 1.000, 80 % within 10 %, tightest spread of four candidates. Median RMSSD
+34 ms. The respiratory estimate takes the *uncorrected* series — deleting an interval deletes the time
+it occupied — and declines to answer at all when no HF peak stands out, at an operating point measured
+rather than picked.
+
+**A repair has to be able to retract.** Fixing the estimator left the four most artefact-ridden
+windows of 265 holding the four worst figures in the series (535, 268, 256, 220 ms), because an upsert
+overwrites a value with a value and writes nothing where the corrected window falls under the minimum
+interval count. Those rows are deleted now, not overwritten. The recompute is versioned and runs
+before the sync's lock — not inside its Bluetooth session, where three consecutive syncs degraded to a
+broken pipe and took the repair with them, and not in the dashboard, which a locked phone never opens.
+
+**The band's two module features were never switched on.** Sleep breathing awareness and
+emotions/stress are not bytes on the fitness service but config ids written to a JS module over
+DataSync, and nothing here had ever sent one. `0x37/0x01` **applies the config and never answers** —
+three writes timed out in a session where all six fitness switches were acknowledged, and the band's
+own screens showed both features live. A timeout there is correct, and is now reported as "sent (this
+service never answers)" rather than as a failure.
+
+### 健康 — 「平常との差」, at the top of the report
+
+Eight quantities beside 白い熊's own median, each opening its own history page. Numbers, never a
+score: the form the recovery engine's own header argues for at length.
+
+It exists because the episode above was legible in the data and invisible on the screen. Two of its
+rows are new — the **going-to-bed heart rate** (the first hour after onset, where an evening that has
+already given up shows and the four-hour window averages it away) and the **night's HR swing**, which
+is the part of "show me the shape" that survived contact with the data. The obvious measure, the
+nocturnal dip, reads *better than average* on the night in question; a template correlation against
+白い熊's own curve shape is too noisy to alarm on. The swing separates cleanly: 6.0 bpm, the smallest
+of 21 nights.
+
+The night's heart rate is drawn as a **bounded chart with both axes** — 20 bpm exactly, snapped to
+whole gridline steps, half again as tall as it started, on a floor rather than a fitted range so a
+16 bpm fall fills the frame while the flattest night on record still reads as flat. Under it, three
+facts in words: where the low fell, how far the curve moved, and what it was doing by morning —
+measured on the same curve the chart draws, after an earlier version measured the descent from raw
+samples and printed "a drop of 16 bpm" under a row saying 9.
+
+A run detector reports consecutive nights of elevated HF power. It occurred once in 21 nights, which
+is what justifies its threshold — and it reached that threshold on the **second** day 白い熊 already
+felt ill. The card says so. It confirms; it does not predict.
+
+### 凍結融解 — a freeze bubble stops being native behaviour
+
+白い熊: *"it's an inferior way to have native code construct bubbles … the flow on both sides should
+all be task-based, so this behavior can be managed and audited."*
+
+**The bug underneath it.** `FreezeBubbleTarget.packageOf` returned only the *first* package a launcher
+thawed. `RaiPay` thaws Raiffeisen and RaiPay; `ČSOB Smart` thaws the key app and Smart. Tapping either
+bubble re-froze one of the two and left the companion running — silently, because a bubble
+disappearing looks exactly like a bubble that did its job. The freeze set is now **every** package the
+task thawed, read off the launch task so it can never drift from what it mirrors.
+
+**Which apps** moved out of a per-task database column and into `%Toketsu_Bubbles`, published by
+凍結融解's first 01 and seeded from the 56 tasks that carried the flag. The handover is soft on
+purpose: an unset roster leaves the old flag in charge, because a hard switch would have ended every
+bubble on the phone the moment this build landed, for a reason nothing on screen could explain. Three
+writers of that flag are gone, including a generator that had been adding itself to a roster 白い熊
+curates.
+
+**What a gesture means** is three named workspace tasks — `凍結泡 ⇨ 凍結`, `⇨ 捨てる`, `⇨ 起動` — run
+with the package, label and freeze set as per-invocation locals, with a per-app `<App> ⇦ 凍結` task
+overriding the first. The *existence* of that task is the whole override. Every gesture keeps its
+built-in fallback, or a renamed task would turn a bubble into a control that retires itself and
+freezes nothing.
+
+**Queueing** is now expressible too: `bubble.freeze_add` / `_remove` / `_clear`, mirroring the flash
+ones.
+
+Native keeps only what a scene provably cannot do — the launcher-foreground gate, one window per
+pending app, an icon readable while the app is frozen, and drag-with-persistence.
+
+### App pickers — a frozen app is not a missing app
+
+On this phone a frozen app is the *resting* state, so a grid of apps is mostly a grid of apps the
+plain lookup denies exists. `getApplicationIcon(String)` re-resolves under plain flags and throws for
+a hidden package; a restricted grid searched a bulk enumeration that never returns one. Both now use
+`AppFreeze.MATCH_FROZEN`, which is what those flags were defined for.
+
+A roster grid is also ordered in four tiers — installed and ticked, installed and unticked, then the
+apps that are not on this phone in the same two groups. 36 of 凍結融解's 56 entries name apps that
+were never installed here, and led with, they filled the first screen with package ids.
+
+### Back means up one level
+
+There was no `BackHandler` in either charts window. Every sub-screen offered a tappable header and the
+system button fell straight through to the activity's default, closing the whole thing — true of the
+chart detail, the register, the sleep detail and 機能訓練 since each was written, and caught on a
+marker history page.
+
 ## 0.2.93+2026-09-05.17-44.g09a659b5+091 — 2026-09-12
 
 Built on upstream `09a659b5`.
