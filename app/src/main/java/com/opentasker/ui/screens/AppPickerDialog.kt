@@ -118,7 +118,8 @@ private fun AppTile(pkg: String, label: String, onClick: () -> Unit) {
     val icon by produceState<ImageBitmap?>(initialValue = null, pkg) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                context.packageManager.getApplicationIcon(pkg).toBitmap(144, 144).asImageBitmap()
+                com.opentasker.core.apps.AppIcons.load(context, pkg)
+                    ?.toBitmap(144, 144)?.asImageBitmap()
             }.getOrNull()
         }
     }

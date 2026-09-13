@@ -123,6 +123,83 @@ object BandText {
     val markerSleep = Loc("Time asleep", "実睡眠")
     val markerFelt = Loc("How you woke", "目覚め")
     val markerTemperature = Loc("Skin temperature", "皮膚温")
+    val markerBedtimeHr = Loc("Going-to-bed heart rate", "就寝時心拍")
+    val markerRespiration = Loc("Breathing rate", "呼吸数")
+    val markerHrSwing = Loc("Night's HR swing", "夜間心拍の振れ")
+    /** Under the chart: what it is, in as few words as it takes. One series needs no legend. */
+    val curveCaption = Loc("Heart rate through the night", "一晩の心拍の推移")
+
+    // The commentary. Facts the chart already shows, said once in words — never an interpretation;
+    // see HrCurveShape for why nothing here calls a night good or bad.
+    val curveShape = Loc(
+        "Lowest %s, %d bpm between its highest and lowest, %s.",
+        "最低は%s、最高と最低の差は %d bpm、%s。",
+    )
+    val curveNadirEarly = Loc("early in the night", "夜の早い時間")
+    val curveNadirMiddle = Loc("around the middle of the night", "夜半ごろ")
+    val curveNadirLate = Loc("late in the night", "夜の遅い時間")
+    val curveEndRising = Loc("and climbing again by morning", "朝に向けて再び上がっている")
+    val curveEndLow = Loc("and still near its floor at waking", "起床時もまだ底に近い")
+    val curveEndFalling = Loc("and still falling when you woke", "起床時もまだ下がり続けていた")
+    /** When the curve is too flat for the position of its low point to mean anything. */
+    val curvesTitle = Loc("The last few nights, overlaid", "直近数夜の重ね描き")
+    // "below where it started" was wrong: a night can end ABOVE its bed-time level and the flat
+    // night of 2026-09-12 does exactly that, so the label contradicted its own chart.
+    val curvesNote = Loc(
+        "%d nights, each drawn as change from where it started, bed to waking. " +
+            "Last night is the bold line.",
+        "%d 夜分。各夜を就寝時からの変化として、就寝から起床まで描いている。濃い線が昨夜。",
+    )
+
+    // The marker history page, behind every row of the strip.
+    val markerNights = Loc("%d nights on record", "記録は %d 夜")
+    val markerEveryNight = Loc("Every night", "すべての夜")
+    val markerBest = Loc("Your best nights", "最も良かった夜")
+    val markerAllNights = Loc("Night by night", "夜ごとの記録")
+    val markerChartNote = Loc(
+        "The shaded band is your usual range; the dashed line is your baseline. Last night is marked.",
+        "帯は平常の範囲、破線は基準値。最後の点が昨夜。",
+    )
+    /** Tells a reader the rows open. Without it a tappable row looks like a label. */
+    val deviationTapHint = Loc(
+        "Tap any line for its history.",
+        "各行を押すとその履歴が開く。",
+    )
+
+    // The curve's descent, against 白い熊's own usual one — the "from where" 白い熊 asked for.
+    val curveDescent = Loc(
+        "Usually you fall from %s to %s — a drop of %s. Last night: %s to %s, a drop of %s.",
+        "普段は %s から %s まで下がる — 下げ幅 %s。昨夜は %s から %s、下げ幅 %s。",
+    )
+    val curveDescentShallow = Loc(
+        "That is %s less than usual.",
+        "いつもより %s 浅い。",
+    )
+    val curveDescentDeeper = Loc(
+        "That is %s more than usual.",
+        "いつもより %s 深い。",
+    )
+    /** The best nights' descent, for something to aim the comparison at. */
+    val curveBestDescent = Loc(
+        "On your three deepest-dropping nights it fell from %s to %s.",
+        "下げ幅が最も大きかった三夜では %s から %s まで下がっていた。",
+    )
+
+    val curveFlat = Loc(
+        "Almost flat — only %d bpm between its highest and lowest all night.",
+        "ほぼ平坦 — 一晩を通じて最高と最低の差はわずか %d bpm。",
+    )
+    /** The consecutive-night HF run. A statement of fact; the caveat follows it. */
+    val hrvRun = Loc(
+        "Heart-rate variability has run above your usual for %d nights.",
+        "心拍変動が平常を上回って %d 夜続いている。",
+    )
+    val hrvRunCaveat = Loc(
+        "Seen once before in the record — and it caught up with how you felt rather than " +
+            "getting there first. Worth watching, not worth acting on.",
+        "記録中で一度きりの並び — しかも体感より先ではなく、後から追いついた。" +
+            "見ておく価値はあるが、これで動くほどではない。",
+    )
     val bandUsual = Loc("usual", "平常")
     val bandHigh = Loc("high", "高い")
     val bandLow = Loc("low", "低い")
@@ -360,6 +437,42 @@ object BandText {
         regColDate, regColFelt, regColHr, regColSleep,
         regColDeep, regColDeepRem, regColLowHr, regColHrv, regColSpo2,
     )
+    // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
+    //
+    // Added after an episode that every counted marker and both published flags walked past while
+    // it was plainly legible in the numbers. The strip prints numbers rather than verdicts, which is
+    // the file header's own conclusion: an explicit numeric range cost almost nothing in trust
+    // across five experiments where a verbal hedge cost a lot.
+    val deviationTitle = Loc("Against your own normal", "平常との差")
+    val deviationSubtitle = Loc(
+        "Last night beside the median of the %d before it.",
+        "昨夜と、その前 %d 夜の中央値との比較。",
+    )
+    val deviationBaseline = Loc("usual %s", "平常 %s")
+    val deviationNoBaseline = Loc(
+        "Not enough nights yet to say what your normal is.",
+        "平常を言うにはまだ夜が足りない。",
+    )
+    /** The header of the flag, when the conjunction fires. Deliberately a question, not a verdict. */
+    val sicknessTitle = Loc("A long night after a quiet evening", "静かな夜からの長い睡眠")
+    val sicknessBody = Loc(
+        "You slept %s longer than usual and went to bed %s below your usual level. " +
+            "Those two together are worth noticing — this is the shape fatigue and an oncoming " +
+            "illness both take, and nothing here can tell them apart.",
+        "いつもより %s 長く眠り、就寝時の心拍は平常より %s 低かった。" +
+            "この二つが重なるのは見ておく価値がある — 疲労も病気の始まりも同じ形をとるので、" +
+            "ここではどちらとも言えない。",
+    )
+    /** Said once, where the flag is drawn: this one has never been checked against a real illness. */
+    val sicknessUnproven = Loc(
+        "Physiology, not a validation study — no published threshold exists for this pair.",
+        "検証研究ではなく生理学に基づく — この組み合わせに公表された閾値はない。",
+    )
+    val respirationNone = Loc(
+        "No breathing rate: the band records the intervals it is derived from only some nights.",
+        "呼吸数なし：導出元の拍間隔をバンドが記録しない夜がある。",
+    )
+
     val registerNightsEmpty = Loc(
         "No nights recorded yet. A sleep session has to sync from the band before anything appears here.",
         "まだ夜の記録がない。バンドから睡眠が同期されるまでここには何も出ない。",
