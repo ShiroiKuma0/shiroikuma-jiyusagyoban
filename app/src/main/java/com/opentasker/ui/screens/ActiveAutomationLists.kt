@@ -1265,11 +1265,9 @@ private fun TaskCard(
                 item { StatusPill(stringResource(R.string.label_priority_short, task.priority), MaterialTheme.colorScheme.secondary) }
                 item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            // Freeze bubble toggle — editable inline on the card without opening the editor (白い熊).
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text("Freeze bubble", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = task.freezeBubble, onCheckedChange = onToggleFreeze)
-            }
+            // The inline "Freeze bubble" switch was removed on 2026-09-13. Which apps pop a bubble is
+            // now %Toketsu_Bubbles, published by 凍結融解's 01 settings task and ticked in 泡を選ぶ —
+            // a switch here would write a column nothing reads, which is worse than no switch.
             if (task.actions.isEmpty()) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_task_has_no_actions),

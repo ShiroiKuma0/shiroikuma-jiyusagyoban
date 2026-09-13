@@ -77,6 +77,8 @@ class ShareForwardActivity : Activity() {
                     toastAndFinish("Could not unfreeze $label"); return@launch
                 }
                 // Re-freeze reminder — only when WE unfroze it; an already-running app stays as-is.
+                // No companion list: this path thaws exactly the one app it is forwarding to, so the
+                // bubble's own package IS the whole freeze set. Deliberate, not an omission.
                 FreezeBubbleStore.enqueue(pkg, label, iconPath)
             }
             forward(pkg, label)
