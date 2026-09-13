@@ -96,6 +96,7 @@ private fun recoveryFixture() = RecoveryResult(
     adverseMarkers = emptyList(),
     lateEffortMinutesBeforeSleep = null,
     illnessSigns = false,
+    sicknessBehaviour = false,
 )
 
 /**

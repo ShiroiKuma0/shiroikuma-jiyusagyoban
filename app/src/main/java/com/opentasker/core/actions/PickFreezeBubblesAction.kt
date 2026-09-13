@@ -50,6 +50,10 @@ class PickFreezeBubblesAction : Action {
         val projectName = ctx.variables.expand(args["project"].orEmpty()).trim()
         val groupName = ctx.variables.expand(args["group"].orEmpty()).trim()
         val title = ctx.variables.expand(args["title"].orEmpty()).trim().ifEmpty { "Freeze bubbles" }
+        // Where the answer is written. A variable name means the roster lives in the workspace — in
+        // 凍結融解's 01 settings task — and this action only publishes it; blank keeps the legacy
+        // per-task flag. See [ROSTER_NOTE].
+        val variable = ctx.variables.expand(args["variable"].orEmpty()).trim().removePrefix("%")
         val db = OpenTaskerApp_NoHilt.db
 
         val candidates = when (val scan = withContext(Dispatchers.IO) { scan(db, ctx, projectName, groupName) }) {
@@ -61,7 +65,14 @@ class PickFreezeBubblesAction : Action {
         }
 
         val packages = candidates.map { it.pkg }.distinct()
-        val alreadyOn = candidates.filter { it.entity.freezeBubble }.map { it.pkg }.distinct()
+        // Pre-ticked from whichever store is in charge. Reading the flag while WRITING the variable
+        // would open the grid with last month's answer and quietly re-publish it.
+        val alreadyOn = if (variable.isNotEmpty()) {
+            ctx.variables.get(variable).orEmpty().split(Regex("\\s+"))
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        } else {
+            candidates.filter { it.entity.freezeBubble }.map { it.pkg }.distinct()
+        }
 
         val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
@@ -84,16 +95,30 @@ class PickFreezeBubblesAction : Action {
             }
         }
 
-        val (turnedOn, turnedOff) = withContext(Dispatchers.IO) {
-            var on = 0
-            var off = 0
-            for (candidate in candidates) {
-                val wanted = candidate.pkg in picked
-                if (wanted == candidate.entity.freezeBubble) continue
-                db.taskDao().update(candidate.entity.copy(freezeBubble = wanted))
-                if (wanted) on++ else off++
+        val summary = if (variable.isNotEmpty()) {
+            // SPACE-separated: the convention every package roster in this workspace uses (%BR_Apps,
+            // %SC_Blacklist), and the one `var.split` and `app.pickmulti` both expect. A comma list
+            // would read back as a single token.
+            //
+            // Ordered as the grid listed them, not as they were ticked, so re-running the picker
+            // without changing anything produces a byte-identical value — which is what makes the
+            // 01's diff meaningful.
+            val roster = packages.filter { it in picked }
+            ctx.variables.set(variable, roster.joinToString(" "))
+            "%$variable = ${roster.size} apps"
+        } else {
+            val (on, off) = withContext(Dispatchers.IO) {
+                var turnedOn = 0
+                var turnedOff = 0
+                for (candidate in candidates) {
+                    val wanted = candidate.pkg in picked
+                    if (wanted == candidate.entity.freezeBubble) continue
+                    db.taskDao().update(candidate.entity.copy(freezeBubble = wanted))
+                    if (wanted) turnedOn++ else turnedOff++
+                }
+                turnedOn to turnedOff
             }
-            on to off
+            "+$on / -$off"
         }
 
         // Unticking has to take the bubble that is ALREADY queued with it. The flag only governs the
@@ -105,7 +130,7 @@ class PickFreezeBubblesAction : Action {
             .distinct()
             .forEach { FreezeBubbleStore.remove(it) }
 
-        ctx.logger("Freeze bubbles: ${picked.size} of ${packages.size} apps on (+$turnedOn / -$turnedOff)")
+        ctx.logger("Freeze bubbles: ${picked.size} of ${packages.size} apps on ($summary)")
         return ActionResult.Success
     }
 
