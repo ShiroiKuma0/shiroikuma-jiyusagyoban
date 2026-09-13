@@ -47,6 +47,7 @@ import com.opentasker.ui.charts.MetricPreviewCard
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.DailySummaryCard
 import com.opentasker.ui.charts.HealthIndexCard
+import com.opentasker.ui.charts.DeviationStrip
 import com.opentasker.ui.charts.RecoveryCard
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.Icons
@@ -84,6 +85,15 @@ const val SLEEP_KEY = "hw:sleep"
  */
 const val REHAB_KEY = "hw:rehab"
 
+/**
+ * Route prefix for one strip row's history page — `hw:marker:HRV` and so on.
+ *
+ * The same `selected` string every other route on this screen uses, rather than a second piece of
+ * navigation state: the back stack, `rememberSaveable` and the existing dismissal then all keep
+ * working for free, and a rotation does not drop the page 白い熊 was reading.
+ */
+const val MARKER_PREFIX = "hw:marker:"
+
 @Composable
 fun HuaweiDashboardScreen(
     state: HuaweiDashboardState,
@@ -91,6 +101,8 @@ fun HuaweiDashboardScreen(
     contentPadding: PaddingValues,
     onSync: () -> Unit,
     onOpenMetric: (String) -> Unit,
+    /** Opens one strip row's own history page. */
+    onOpenMarker: (com.opentasker.ui.charts.RecoveryMarker) -> Unit = {},
     onFelt: (Int) -> Unit = {},
     /** Open the note editor for the morning the card is asking about. */
     onNote: () -> Unit = {},
@@ -149,6 +161,27 @@ fun HuaweiDashboardScreen(
         // this morning, and it sat between two cards that ARE about this morning.
         //
         // What replaces it is the way through: one pill per window, in the order they cost effort.
+        // 「平常との差」 — the FIRST measured thing on the page, directly under the morning rating.
+        //
+        // 白い熊, 2026-09-12: "these need to be top … I need to orient myself on these indicators and
+        // not have to dig for them." It sat fifth before, under 回復, which is where a reader finds
+        // something only if they already know to look.
+        //
+        // Under the morning card rather than above it, and that order is not arbitrary: the rating
+        // is the one thing on this screen that does not exist unless it is answered, and an
+        // unanswered morning cannot be recovered later. Input first, then what the night measured.
+        state.recovery?.let { rec ->
+            item("deviation") {
+                DeviationStrip(
+                    rec,
+                    hrCurve = state.lastNightHrCurve,
+                    descent = state.descent,
+                    bestDescent = state.bestDescent,
+                    onOpenMarker = onOpenMarker,
+                )
+            }
+        }
+
         item("windows") {
             SectionCard(accent = ChartPalette.HEART_RATE) {
                 SectionTitle(HuaweiText.windowsTitle[lang], ChartPalette.HEART_RATE)

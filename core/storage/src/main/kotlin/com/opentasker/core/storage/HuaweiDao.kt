@@ -114,6 +114,65 @@ data class HuaweiSleepEntity(
 )
 
 /**
+ * One record of the band's per-beat RR series — `sequence_data` stream 700021.
+ *
+ * ## Why the beats are a blob and not rows
+ *
+ * A night holds on the order of 30 000 beats. As rows that is a table an order of magnitude larger
+ * than every other health table put together, for data that is only ever read a whole record at a
+ * time — nothing asks "what was the 4 174th interval". So the record is the row and the beats are
+ * the band's own wire encoding inside it: (uint16 LE interval, uint16 LE quality) pairs, four bytes
+ * a beat, written and read by `HuaweiBeats.encode` / `decode`. The same call the workout blobs make,
+ * for the same reason.
+ *
+ * **The derived statistics are NOT stored here.** SDNN, pNN50, RMSSD and the respiratory rate go
+ * into `huawei_samples` as ordinary metrics, so every chart, query and export already reaches them.
+ * This table is the evidence they were computed from — kept because a better estimator arriving next
+ * year can be run over it, and re-wearing the band for a month cannot.
+ */
+@Entity(
+    tableName = "huawei_beats",
+    primaryKeys = ["startSeconds"],
+    indices = [Index(value = ["startSeconds"])],
+)
+data class HuaweiBeatEntity(
+    /** UTC seconds the record begins. Unique, so re-reading a span overwrites rather than doubles. */
+    val startSeconds: Long,
+    /** The record's own declared end. */
+    val endSeconds: Long,
+    /** How many beats [intervals] holds — stored so a count needs no blob read. */
+    val beatCount: Int,
+    /**
+     * True when the intervals sum to within the tolerance of the declared span.
+     *
+     * The file's own arithmetic agreeing with itself, held in 266 of 267 records. A record that
+     * fails it is kept and flagged rather than dropped — the beats may be sound — but nothing should
+     * quote a respiratory rate off a record whose own clock disagrees with it.
+     */
+    val exact: Boolean,
+    /** (uint16 LE interval ms, uint16 LE quality) pairs. Quality 0xFFFF = the page stamp took it. */
+    val intervals: ByteArray,
+    val syncId: Long,
+) {
+    // ByteArray in a data class: the generated equals compares identity, which would make every
+    // row unequal to its own copy and every test about it meaningless.
+    override fun equals(other: Any?): Boolean =
+        other is HuaweiBeatEntity && startSeconds == other.startSeconds &&
+            endSeconds == other.endSeconds && beatCount == other.beatCount &&
+            exact == other.exact && syncId == other.syncId &&
+            intervals.contentEquals(other.intervals)
+
+    override fun hashCode(): Int {
+        var h = startSeconds.hashCode()
+        h = 31 * h + endSeconds.hashCode()
+        h = 31 * h + beatCount
+        h = 31 * h + exact.hashCode()
+        h = 31 * h + syncId.hashCode()
+        return 31 * h + intervals.contentHashCode()
+    }
+}
+
+/**
  * What one metric did over a window. Not an entity — a projection Room fills from an aggregate.
  *
  * [n] is carried so the caller can tell "averaged over 300 samples" from "averaged over 2", which
@@ -160,6 +219,16 @@ interface HuaweiSampleDao {
 
     @Query("SELECT COUNT(*) FROM huawei_samples")
     suspend fun count(): Int
+
+    /**
+     * Remove named metrics at named instants — for a recompute that must be able to RETRACT.
+     *
+     * `@Insert(REPLACE)` can only overwrite a value with another value. An estimator that stops
+     * being able to produce one leaves the old row standing, which is how the most damaged windows
+     * kept the most absurd figures through a repair that appeared to work.
+     */
+    @Query("DELETE FROM huawei_samples WHERE metric IN (:metrics) AND epochSeconds IN (:seconds)")
+    suspend fun deleteAt(metrics: List<String>, seconds: List<Long>)
 
     @Query("SELECT COUNT(*) FROM huawei_samples WHERE metric = :metric")
     suspend fun countFor(metric: String): Int
@@ -235,6 +304,40 @@ interface HuaweiSampleDao {
             "ORDER BY epochSeconds, metric",
     )
     suspend fun window(from: Long, to: Long): List<HuaweiSampleEntity>
+}
+
+@Dao
+interface HuaweiBeatDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rows: List<HuaweiBeatEntity>)
+
+    @Query("SELECT COUNT(*) FROM huawei_beats")
+    suspend fun count(): Int
+
+    /** Total beats on record — the figure worth printing, since a record is not a fixed size. */
+    @Query("SELECT SUM(beatCount) FROM huawei_beats")
+    suspend fun beatCount(): Long?
+
+    @Query("SELECT MIN(startSeconds) FROM huawei_beats")
+    suspend fun oldest(): Long?
+
+    @Query("SELECT MAX(startSeconds) FROM huawei_beats")
+    suspend fun newest(): Long?
+
+    /** Every record overlapping the window, oldest first. */
+    @Query(
+        "SELECT * FROM huawei_beats WHERE endSeconds >= :from AND startSeconds <= :to " +
+            "ORDER BY startSeconds ASC",
+    )
+    suspend fun window(from: Long, to: Long): List<HuaweiBeatEntity>
+
+    /**
+     * The record starts already stored, so a re-sync can skip re-decoding what it already holds.
+     *
+     * Just the keys: the blobs are the large part and a dedupe check has no use for them.
+     */
+    @Query("SELECT startSeconds FROM huawei_beats WHERE startSeconds BETWEEN :from AND :to")
+    suspend fun startsIn(from: Long, to: Long): List<Long>
 }
 
 @Dao
