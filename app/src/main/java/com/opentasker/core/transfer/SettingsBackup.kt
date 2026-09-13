@@ -253,6 +253,11 @@ object SettingsBackup {
     private val HEALTH_TABLES = listOf(
         "band_samples", "band_daily", "band_sleep", "band_syncs",
         "huawei_samples", "huawei_sleep", "huawei_syncs",
+        // The per-beat RR series. Large — four bytes a beat, ~30 000 beats a night — and kept in
+        // anyway for the reason the whole category is: the band holds days in a ring buffer, not
+        // months, so anything older than that is gone the moment the table is. It is also the one
+        // table a better HRV estimator could ever be re-run over.
+        "huawei_beats",
         // The workouts, and the band's own bytes behind them — the GPS file, the summary container
         // and each block of the heart-rate stream. Small: 288 KB for ten workouts, which is why
         // they ride in the NDJSON as base64 rather than earning their own file-per-blob path.

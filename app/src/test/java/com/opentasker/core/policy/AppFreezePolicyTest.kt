@@ -57,6 +57,68 @@ class AppFreezePolicyTest {
     }
 
     /**
+     * The COMPANION packages are guarded too — a bubble that freezes two apps is two freeze buttons.
+     *
+     * From 2026-09-13 a bubble carries every package its launch task thawed, so tapping it can freeze
+     * an app whose name never appears in `BubbleEntry.pkg`. The original guard only ever saw that one
+     * field, so a companion would have walked straight past it. Guarded in the same place and in the
+     * same breath, because a second gate somewhere else is a gate someone forgets.
+     */
+    @Test
+    fun `no companion package in a bubble can be a protected one`() {
+        val enqueue = ProductionSources.block(
+            "com/opentasker/core/bubbles/FreezeBubbleStore.kt",
+            "fun enqueue(",
+            "val current = _bubbles.value",
+        )
+        assertTrue(
+            "the companion list must be filtered by the same rule as the bubble's own package",
+            "protectedReason(it) == null" in enqueue,
+        )
+        assertTrue(
+            "and filtered before anything is stored",
+            enqueue.indexOf("protectedReason(it) == null") < enqueue.length,
+        )
+    }
+
+    /**
+     * Every app picker loads its icons under [AppFreeze.MATCH_FROZEN].
+     *
+     * On this phone a frozen app is the RESTING state — 凍結融解 keeps 54 of them that way — so a
+     * grid of apps is mostly a grid of apps the plain lookup denies exists. `getApplicationIcon(String)`
+     * re-resolves the package without the flags, throws `NameNotFoundException` for a hidden one, and
+     * the `runCatching` around it turns that into an empty box. 白い熊 caught it on 2026-09-13 in the
+     * picker that makes the unfreeze tasks: Raiffeisen had a name and no icon, RaiPay — thawed at
+     * that moment — had both.
+     *
+     * Asserted on the sources rather than by rendering, because the failure is invisible in a unit
+     * test and obvious only on a phone whose apps are frozen.
+     */
+    @Test
+    fun `app pickers load icons under the frozen-readable flags`() {
+        val pickers = listOf(
+            "com/opentasker/ui/screens/AppMultiSelectDialog.kt",
+            "com/opentasker/ui/screens/AppPickerDialog.kt",
+            "com/opentasker/ui/screens/InstalledAppPicker.kt",
+        )
+        for (path in pickers) {
+            val src = ProductionSources.read(path)
+            assertTrue(
+                "$path must go through AppIcons, which applies MATCH_FROZEN",
+                "AppIcons.load(" in src,
+            )
+            assertTrue(
+                "$path must not re-resolve an icon by package name under plain flags",
+                "getApplicationIcon(pkg)" !in src && "getApplicationIcon(app.packageName)" !in src,
+            )
+        }
+        assertTrue(
+            "AppIcons is where the flags are applied",
+            "AppFreeze.MATCH_FROZEN" in ProductionSources.read("com/opentasker/core/apps/AppIcons.kt"),
+        )
+    }
+
+    /**
      * The incident this whole file exists for: `pm enable` cleared one slot of three, exited 0, and
      * the action reported success. Every gate, then a re-read — never an exit code.
      *

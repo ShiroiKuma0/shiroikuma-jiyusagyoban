@@ -93,7 +93,36 @@ class HuaweiChartsActivity : ComponentActivity() {
                         var rehabDay by rememberSaveable { mutableStateOf<Long?>(null) }
                         var notingRehab by rememberSaveable { mutableStateOf<Long?>(null) }
 
+                        // The system Back button, which until now was not wired to this screen's
+                        // state at all. Every sub-screen offered a tappable header to return, and
+                        // Back itself fell straight through to the activity's default and closed
+                        // the whole window — 白い熊 hit it on a marker history page (2026-09-13),
+                        // and it was equally true of the chart detail, the register, the sleep
+                        // detail and 機能訓練 since each of those was written.
+                        //
+                        // Back now always means "up one level": a sub-screen returns to the report,
+                        // and the report closes. That costs a window opened straight onto one metric
+                        // by an external intent a second press to dismiss, because the first reveals
+                        // the report underneath. Worth it for one rule that holds everywhere rather
+                        // than a special case whose behaviour depends on how the window was opened.
+                        //
+                        // The dialogs are deliberately NOT handled here. A Compose `Dialog` owns its
+                        // own window and consumes Back before this does, dismissing itself through
+                        // `onDismissRequest` — which is exactly what returns the note editor to the
+                        // 機能訓練 day dialog underneath it rather than closing both at once.
+                        androidx.activity.compose.BackHandler(enabled = selected != null) {
+                            selected = null
+                        }
+
                         val chart = state.metrics.firstOrNull { it.spec.key == selected }
+                        // A strip row's history. Encoded into the same `selected` string every other
+                        // route uses, so the back stack, rememberSaveable and the existing dismissal
+                        // all keep working rather than needing a parallel piece of state.
+                        val openMarker = selected?.removePrefix(MARKER_PREFIX)
+                            ?.takeIf { selected?.startsWith(MARKER_PREFIX) == true }
+                            ?.let { name ->
+                                com.opentasker.ui.charts.RecoveryMarker.entries.firstOrNull { it.name == name }
+                            }
                         val registerOpen = selected == com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
                         val rehabOpen = selected == REHAB_KEY
                         val sleepOpen = selected == SLEEP_KEY
@@ -142,6 +171,29 @@ class HuaweiChartsActivity : ComponentActivity() {
                                     .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
                                 onBack = { selected = null },
                             )
+                        } else if (openMarker != null) {
+                            // One strip row's own history. Its own branch rather than a synthetic
+                            // MetricChart: these are per-NIGHT derived values and the chart detail
+                            // screen exists to clean raw sample series — see MarkerHistory.
+                            val markerZone = java.time.ZoneId.systemDefault()
+                            val series = state.markerHistory[openMarker]
+                            if (series == null || series.nights.isEmpty()) {
+                                selected = null
+                            } else {
+                                com.opentasker.ui.charts.MarkerHistoryScreen(
+                                    series = series,
+                                    zone = markerZone,
+                                    contentPadding = insets,
+                                    onBack = { selected = null },
+                                    // The swing's page carries the curves themselves: that is what
+                                    // "the history of this shape" actually means.
+                                    extra = if (openMarker == com.opentasker.ui.charts.RecoveryMarker.HR_SWING) {
+                                        { com.opentasker.ui.charts.RecentCurvesCard(state.recentCurves, markerZone) }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
                         } else if (chart == null) {
                             HuaweiDashboardScreen(
                                 state = state,
@@ -149,6 +201,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onSync = model::sync,
                                 onOpenMetric = { selected = it },
+                                onOpenMarker = { selected = MARKER_PREFIX + it.name },
                                 onFelt = model::setFelt,
                                 onNote = { notingMorning = state.feltMorning ?: model.morningKeyNow() },
                                 onTapRehabDay = { rehabDay = com.opentasker.core.band.RehabLog

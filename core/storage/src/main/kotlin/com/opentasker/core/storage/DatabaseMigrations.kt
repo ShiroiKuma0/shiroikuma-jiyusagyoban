@@ -570,6 +570,37 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * `huawei_beats` — the band's per-beat RR series.
+     *
+     * Purely additive: a new table, nothing altered, so an existing database keeps every row it has.
+     *
+     * **The DEFAULTs are spelled out because the entity declares them.** Room validates the live
+     * database against its exported JSON at OPEN time, and a mismatch as small as a missing default
+     * throws rather than opening — on a device holding the old database, where a clean build and a
+     * fresh install both pass. Upstream never meets this because it generates `AutoMigration`s; this
+     * fork registers every migration by hand, so the `ALTER`/`CREATE` has to state what the entity
+     * states. See `scripts/check-room-migration.py --all`.
+     */
+    val MIGRATION_31_32 = object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `huawei_beats` (" +
+                    "`startSeconds` INTEGER NOT NULL, " +
+                    "`endSeconds` INTEGER NOT NULL, " +
+                    "`beatCount` INTEGER NOT NULL, " +
+                    "`exact` INTEGER NOT NULL, " +
+                    "`intervals` BLOB NOT NULL, " +
+                    "`syncId` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`startSeconds`))",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_huawei_beats_startSeconds` " +
+                    "ON `huawei_beats` (`startSeconds`)",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -602,6 +633,7 @@ object DatabaseMigrations {
             MIGRATION_28_29,
             MIGRATION_29_30,
             MIGRATION_30_31,
+            MIGRATION_31_32,
         )
     }
 }

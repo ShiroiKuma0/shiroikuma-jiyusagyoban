@@ -2,6 +2,7 @@ package com.opentasker.core.huawei
 
 import android.content.Context
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.HuaweiBeatEntity
 import com.opentasker.core.storage.HuaweiSampleEntity
 import com.opentasker.core.storage.HuaweiSleepEntity
 import com.opentasker.core.storage.HuaweiSyncEntity
@@ -199,6 +200,174 @@ object HuaweiSyncRunner {
         rows.chunked(500).forEach { db.huaweiSampleDao().upsert(it) }
         return windows.size
     }
+
+    /**
+     * Fetch the per-beat RR series and store its records, plus the statistics derived from them.
+     *
+     * ## Two things are written, on purpose
+     *
+     * The raw records go to `huawei_beats` — the evidence, kept because a better estimator arriving
+     * later can be run over it and re-wearing the band for a month cannot. The derived statistics go
+     * to `huawei_samples` as ordinary metrics, so every chart, query, detail screen and export
+     * already reaches them without knowing this table exists.
+     *
+     * Records already stored are skipped before the blob is even encoded: every sync asks for an
+     * overlapping window on purpose, and a night's worth of beats re-encoded each time would be the
+     * most expensive thing in the sync for no new data. The statistics are recomputed for the fresh
+     * records only, for the same reason.
+     *
+     * @return how many NEW records were written.
+     */
+    private suspend fun storeBeats(
+        db: AppDatabase,
+        session: HuaweiSession,
+        syncId: Long,
+        fromSeconds: Long,
+        toSeconds: Long,
+    ): Int {
+        val file = HuaweiFileClient(session).fetch(
+            HuaweiFileClient.SEQUENCE_DATA, HuaweiFileClient.SEQUENCE_TYPE,
+            fromSeconds, toSeconds, id = HuaweiFileClient.BEAT_STREAM_ID,
+        )
+        if (file !is HuaweiFileClient.Result.Data) return 0
+        val records = HuaweiBeats.parse(file.bytes).filter { it.beats.isNotEmpty() }
+        if (records.isEmpty()) return 0
+
+        val known = runCatching {
+            db.huaweiBeatDao().startsIn(
+                records.minOf { it.startSeconds }, records.maxOf { it.startSeconds },
+            ).toSet()
+        }.getOrDefault(emptySet())
+        val fresh = records.filterNot { it.startSeconds in known }
+
+        fresh.chunked(100).forEach { chunk ->
+            db.huaweiBeatDao().upsert(
+                chunk.map {
+                    HuaweiBeatEntity(
+                        startSeconds = it.startSeconds,
+                        endSeconds = it.endSeconds,
+                        beatCount = it.beats.size,
+                        exact = it.exact,
+                        intervals = HuaweiBeats.encode(it.beats),
+                        syncId = syncId,
+                    )
+                },
+            )
+        }
+
+        // The statistics are recomputed for EVERY record in the file, not just the new ones — a
+        // re-served span costs arithmetic over records already in memory and cannot go stale.
+        writeBeatStats(db, records.map { Triple(it.startSeconds, it.beats, it.exact) }, syncId)
+        return fresh.size
+    }
+
+    /**
+     * Write one batch of derived beat statistics, RETRACTING whatever stood at those instants first.
+     *
+     * The delete is the load-bearing half. `@Insert(REPLACE)` overwrites a value with a value, and
+     * an estimator that has stopped being able to produce one writes nothing at all — so the old row
+     * survives a repair that reports success. On 2026-09-12 that left the four most artefact-ridden
+     * windows of 265 holding the four most absurd RMSSD figures in the series (535, 268, 256, 220 ms
+     * against a corrected median of 35), because a window too damaged to compute is precisely a
+     * window that used to compute to nonsense.
+     */
+    private suspend fun writeBeatStats(
+        db: AppDatabase,
+        records: List<Triple<Long, List<HuaweiBeats.Beat>, Boolean>>,
+        syncId: Long,
+    ) {
+        records.chunked(200).forEach { chunk ->
+            runCatching {
+                db.huaweiSampleDao().deleteAt(HuaweiRriKeys.BEAT_METRICS, chunk.map { it.first })
+            }
+            val stats = chunk.flatMap { (start, beats, exact) ->
+                beatStats(start, beats, syncId, exact)
+            }
+            stats.chunked(500).forEach { db.huaweiSampleDao().upsert(it) }
+        }
+    }
+
+    /**
+     * The derived series for one record: the HRV statistics, and the respiratory pair when the
+     * record's own arithmetic agrees with its declared span.
+     *
+     * Two series, deliberately. The time-domain statistics take the artefact-corrected one; the
+     * respiratory estimate takes the uncorrected one, because deleting an interval deletes the time
+     * it occupied and slides every later beat earlier. See [HuaweiBeatMetrics].
+     *
+     * A record whose beats do not add up to its span contributes its HRV — computed from the
+     * intervals alone, which do not care about the clock — but NOT a respiratory rate, which is a
+     * frequency and therefore entirely a claim about time.
+     */
+    private fun beatStats(
+        startSeconds: Long,
+        beats: List<HuaweiBeats.Beat>,
+        syncId: Long,
+        exact: Boolean = true,
+    ): List<HuaweiSampleEntity> {
+        val usable = HuaweiBeatMetrics.usable(beats)
+        val series = HuaweiBeatMetrics.timeSeries(beats)
+        return buildList {
+            fun put(metric: String, value: Double?) {
+                value?.let { add(HuaweiSampleEntity(metric, startSeconds, it, syncId)) }
+            }
+            put(HuaweiRriKeys.BEAT_SDNN, HuaweiBeatMetrics.sdnn(usable))
+            put(HuaweiRriKeys.BEAT_RMSSD, HuaweiBeatMetrics.rmssd(usable))
+            put(HuaweiRriKeys.BEAT_PNN50, HuaweiBeatMetrics.pnn50(usable))
+            put(HuaweiRriKeys.BEAT_COUNT, usable.size.toDouble())
+            if (exact) {
+                val peak = HuaweiBeatMetrics.hfPeak(series)
+                put(HuaweiRriKeys.BEAT_RESP_BPM, peak?.breathsPerMinute)
+                put(HuaweiRriKeys.BEAT_RSA_MS, peak?.amplitudeMs)
+            }
+        }
+    }
+
+    /**
+     * Recompute every stored record's statistics when the estimator has changed under them.
+     *
+     * **This is the repair path, and it exists because "it will heal on the next sync" is false.**
+     * The band answers a repeat request for a file it has already served with `0x00023281` rather
+     * than with bytes, so a record that arrived under a wrong estimator would keep its wrong figures
+     * for as long as the database lived. On 2026-09-12 that was 265 records carrying an RMSSD whose
+     * median was 133 ms — four to six times any resting figure the band itself publishes.
+     *
+     * The stored blobs are the only copy of the evidence, which is the whole reason they are stored:
+     * a better estimator can be run over them, and re-wearing the band for three days cannot.
+     *
+     * Runs once per version bump — the version is recorded only on success, so an interrupted pass
+     * is retried rather than silently skipped.
+     *
+     * **Deliberately NOT part of a sync.** It reads stored blobs and touches no Bluetooth, so making
+     * it wait for a session would tie a pure-arithmetic repair to the band being in range, awake and
+     * not holding a stale session slot — which is exactly what it did on 2026-09-12, when three
+     * consecutive syncs degraded to `Broken pipe` and the repair never ran. It is called from the
+     * dashboard instead, where the numbers it fixes are actually read.
+     *
+     * @return how many records were recomputed, or 0 when nothing was due.
+     */
+    suspend fun recomputeBeatStats(context: Context, db: AppDatabase): Int {
+        if (HuaweiSettings.beatMetricsVersion(context) >= HuaweiBeatMetrics.VERSION) return 0
+        val dao = db.huaweiBeatDao()
+        val rows = runCatching { dao.window(0L, Long.MAX_VALUE / 2) }.getOrNull() ?: return 0
+        if (rows.isEmpty()) {
+            // Nothing to repair, but the version is still current from here on.
+            HuaweiSettings.setBeatMetricsVersion(context, HuaweiBeatMetrics.VERSION)
+            return 0
+        }
+        // Each row keeps the sync that actually produced its beats, rather than being re-attributed
+        // to whatever triggered the repair. Grouped by that sync so the attribution survives.
+        rows.groupBy { it.syncId }.forEach { (sid, group) ->
+            writeBeatStats(
+                db,
+                group.map { Triple(it.startSeconds, HuaweiBeats.decode(it.intervals), it.exact) },
+                sid,
+            )
+        }
+        HuaweiSettings.setBeatMetricsVersion(context, HuaweiBeatMetrics.VERSION)
+        return rows.size
+    }
+
 
     /**
      * Fetch the night file and store its segments.
@@ -1097,8 +1266,80 @@ object HuaweiSyncRunner {
 
     private const val GNSS_TOKEN = "42E41FAF3CAABEF0E56DFD793DF99E6DF15EA2FC9B18A5D73ABF0DC1D0F06CCA"
 
-    /** One setting the band was asked to change, and what it said. */
-    data class SettingOutcome(val name: String, val ok: Boolean, val detail: String)
+    /**
+     * One setting the band was asked to change, and what it said.
+     *
+     * [confirmed] is the third state this needed on 2026-09-12. A write can succeed, fail with a
+     * result code — or go out and be met with silence, which is neither. Collapsing silence into
+     * either of the other two tells 白い熊 something untrue in one direction or the other.
+     */
+    data class SettingOutcome(
+        val name: String,
+        val ok: Boolean,
+        val detail: String,
+        val confirmed: Boolean = true,
+    )
+
+    /**
+     * One write that changes what the band records.
+     *
+     * Carries its own SERVICE because the band has two unrelated ways of being told this. The
+     * fitness switches are a byte on `0x07`; the module features — sleep breathing awareness,
+     * emotions — are a configuration written to a JS module over DataSync `0x37`, and a module
+     * config sent to the fitness service is ACKed with the band's ordinary success code while
+     * changing nothing. Putting the service in the row rather than in the function is what stops
+     * that from being possible to express.
+     */
+    data class SettingWrite(
+        val name: String,
+        val service: Int,
+        val command: Int,
+        val payload: ByteArray,
+        /**
+         * How long to wait for the band's acknowledgement.
+         *
+         * The fitness switches answer well inside the 6 s default; the module writes are a JS module
+         * on the band rather than a byte in its settings, so they get longer before silence is
+         * called silence.
+         */
+        val timeoutMs: Long = 6_000,
+        /**
+         * Whether a TIMEOUT is an acceptable outcome for this write.
+         *
+         * True only for DataSync, and **the band's silence there is the protocol, not a fault.**
+         *
+         * On 2026-09-12 every fitness switch in one session was acknowledged and all three module
+         * writes timed out at `0x37/0x01` — 18 s of a 20.7 s run, so each waited its full timeout
+         * rather than erroring. The frame was byte-identical to the one Huawei Health was captured
+         * sending and the session was plainly healthy, so the question was whether the band had
+         * ignored the write or merely declined to answer it.
+         *
+         * **It applies it and does not answer.** Settled the same day the only way it could be — on
+         * the band itself, by 白い熊: after these writes the sleep-breathing screen reads *"No
+         * abnormalities"* and the stress screen reads *"Neutral"*, both populated where an unset
+         * module has nothing to show. The `0x37/0x02` topic-announcement theory is therefore
+         * disproven, and is recorded here only so nobody spends an afternoon re-deriving it.
+         *
+         * So the write goes out — `request` sends before it waits — and a timeout on this service is
+         * the expected outcome rather than a failure. [SettingOutcome.confirmed] stays false all the
+         * same: the wire genuinely does not confirm it, and the day the band DOES start answering is
+         * a day worth noticing rather than one to have papered over.
+         */
+        val unacknowledged: Boolean = false,
+    ) {
+        // ByteArray in a data class: the generated equals would compare identity, and these rows are
+        // compared in tests.
+        override fun equals(other: Any?): Boolean =
+            other is SettingWrite && name == other.name && service == other.service &&
+                command == other.command && timeoutMs == other.timeoutMs &&
+                unacknowledged == other.unacknowledged && payload.contentEquals(other.payload)
+
+        override fun hashCode(): Int {
+            var h = ((name.hashCode() * 31 + service) * 31 + command) * 31 + payload.contentHashCode()
+            h = 31 * h + timeoutMs.hashCode()
+            return 31 * h + unacknowledged.hashCode()
+        }
+    }
 
     /**
      * Apply recording switches to the band.
@@ -1111,14 +1352,22 @@ object HuaweiSyncRunner {
     suspend fun applySettings(
         context: Context,
         address: String,
-        toggles: List<Triple<String, Int, ByteArray>>,
+        writes: List<SettingWrite>,
     ): Result<List<SettingOutcome>> = withSession(context, address) { session, _ ->
-        toggles.map { (name, command, payload) ->
+        writes.map { w ->
             runCatching {
-                session.requireOk(HuaweiCommands.SVC_FITNESS, command, payload)
-                SettingOutcome(name, true, "set")
+                session.requireOk(w.service, w.command, w.payload, timeoutMs = w.timeoutMs)
+                SettingOutcome(w.name, true, "set")
             }.getOrElse { e ->
-                SettingOutcome(name, false, e.message ?: e::class.java.simpleName)
+                // Silence on a write that was never known to answer is not a failure — the frame
+                // went out before the wait began. It is also not a success. See [SettingWrite].
+                if (w.unacknowledged && e is HuaweiTimeoutException) {
+                    // The expected outcome for this service, and the wording says so — "not
+                    // acknowledged" alone read as a fault for something that works every time.
+                    SettingOutcome(w.name, true, "sent (this service never answers)", confirmed = false)
+                } else {
+                    SettingOutcome(w.name, false, e.message ?: e::class.java.simpleName)
+                }
             }
         }
     }
@@ -1265,6 +1514,16 @@ object HuaweiSyncRunner {
             // information in a variable or a failure is unlocatable after the fact.
             onPhase(name)
         }
+        // Before the lock and before any Bluetooth: the repair reads stored blobs and needs neither.
+        //
+        // It lived in the dashboard for one build and that was wrong twice over — a locked phone
+        // never runs it, and it made a pure-arithmetic fix wait on someone opening a screen. Inside
+        // the session was wrong for the mirror reason: three syncs in a row degraded to a broken
+        // pipe and the repair went with them. Here it runs whenever a sync is ATTEMPTED, which is
+        // the most often anything happens in this feature, and it costs nothing once the recorded
+        // version matches.
+        runCatching { recomputeBeatStats(context, db) }
+
         if (!running.tryLock()) {
             // Deliberately NOT touching HuaweiSyncState: the progress on screen belongs to the sync
             // that holds the lock, and resetting it here would blank a run that is still going.
@@ -1492,6 +1751,13 @@ object HuaweiSyncRunner {
                     val to = request.windows.first().last
                     storeRri(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
                 }.getOrElse { 0 }
+                // The per-beat series, from the same container as sleep and in the same phase.
+                // Tolerant like the other two: a stream that will not parse must not cost the
+                // samples already written.
+                val beatRecords = runCatching {
+                    val to = request.windows.first().last
+                    storeBeats(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
+                }.getOrElse { 0 }
                 val nights = runCatching {
                     // Its OWN window, not the sample window.
                     //
@@ -1515,6 +1781,7 @@ object HuaweiSyncRunner {
                             else " · no night in the last ${SLEEP_LOOKBACK_SEC / 86_400} days"
                             ) +
                         (if (beats > 0) " · $beats RR windows" else "") +
+                        (if (beatRecords > 0) " · $beatRecords beat records" else "") +
                         if (probe.isEmpty()) "" else " | $probe",
                 )
             }
