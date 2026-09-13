@@ -310,17 +310,9 @@ internal fun TaskEditorDialog(
                 )
                 // Freeze bubble: running this task pops a re-freeze bubble for the app it launches,
                 // shown on the Desktop launcher.
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Freeze bubble", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "Re-freeze on the Desktop — running this task pops a freeze bubble for its app.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = freezeBubble, onCheckedChange = { freezeBubble = it })
-                }
+                // The "Freeze bubble" row was removed on 2026-09-13: which apps pop a bubble is
+                // %Toketsu_Bubbles now, ticked in 泡を選ぶ and published by 凍結融解's 01. The field
+                // below is kept only so a task edited here round-trips its stored value unchanged.
                 TaskIconEditorRow(iconPath = iconPath, onStage = { stageIcon(it) })
             }
         },

@@ -65,7 +65,8 @@ import com.opentasker.core.apps.PackageNamePolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private data class PickableApp(val label: String, val pkg: String)
+/** One tile: what it says, and which package it means. Internal so [rosterOrder] can be tested. */
+internal data class PickableApp(val label: String, val pkg: String)
 
 /** Persisted picker knobs: tile sizing (icon dp, label/id sp, bold, padding) + the system-apps filter. */
 private object AppPickerPrefs {
@@ -177,6 +178,23 @@ internal fun AppMultiSelectDialog(
         val loaded = withContext(Dispatchers.IO) {
             val pm = context.packageManager
             val ownPkg = context.packageName
+            // A RESTRICTED grid asks about packages the caller already named, so each one is looked
+            // up directly instead of being searched for in the bulk enumeration.
+            //
+            // Not an optimisation — a correctness fix. 泡を選ぶ lists the freeze roster, which is by
+            // definition a list of FROZEN apps, and `getInstalledApplications` does not return a
+            // hidden package however it is flagged. Every tile fell through to the "missing" path and
+            // drew a bare package id with no icon; 白い熊's screenshot of 2026-09-13 shows all 56 of
+            // them that way. `getApplicationInfo(pkg, MATCH_FROZEN)` answers for a hidden app, which
+            // is the whole reason those flags exist.
+            if (restrictPackages != null) {
+                return@withContext restrictPackages.mapNotNull { pkg ->
+                    runCatching {
+                        val info = pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN)
+                        PickableApp(pm.getApplicationLabel(info).toString(), pkg)
+                    }.getOrNull()
+                }
+            }
             runCatching {
                 val all = if (Build.VERSION.SDK_INT >= 33) {
                     pm.getInstalledApplications(
@@ -306,8 +324,26 @@ internal fun AppMultiSelectDialog(
                 )
                 Spacer(Modifier.height(8.dp))
                 val list = apps
-                // Stand-in tiles first, then the discovered apps (already preselected-first, alphabetical).
-                val shown = (extras + list.orEmpty()).distinctBy { it.pkg }
+                val shown = if (restrictPackages != null) {
+                    // 白い熊, 2026-09-13: installed first — ticked, then unticked — and only then the
+                    // apps that are not on this phone, in the same two groups.
+                    //
+                    // A restricted grid is a roster, and this one's is a workspace that outlived a
+                    // phone: 36 of 凍結融解's 56 entries name apps that were never installed here. Led
+                    // with, they filled the first screen with package ids and buried every app 白い熊
+                    // could actually act on. They are kept — the launcher tasks are still good if an
+                    // app comes back — but they belong at the bottom.
+                    //
+                    // Ordered on the INITIAL selection, not the live one, so ticking a tile does not
+                    // make the grid jump under the finger. Same reasoning as the seeding above.
+                    rosterOrder(list.orEmpty(), extras, preselected)
+                } else {
+                    // Unrestricted: stand-in tiles FIRST, deliberately. Here an extra is either a
+                    // package 白い熊 has just typed in by id — which must not vanish to the bottom of
+                    // a list of three hundred — or one that is ticked and invisible, which is the one
+                    // thing they most need to reach.
+                    (extras + list.orEmpty()).distinctBy { it.pkg }
+                }
                 val typed = query.trim()
                 // A package Android hides from us is still blacklistable BY ID — the foreground package
                 // arrives through accessibility, which owes nothing to package visibility. So a typed id
@@ -429,7 +465,9 @@ private fun SelectableAppTile(
             runCatching {
                 // Rasterize at the real pixel size so a large icon stays sharp.
                 val px = with(density) { iconDp.dp.roundToPx() }.coerceAtLeast(48)
-                context.packageManager.getApplicationIcon(pkg).toBitmap(px, px).asImageBitmap()
+                // MATCH_FROZEN, or every frozen app in the grid draws an empty box — see [AppIcons].
+                com.opentasker.core.apps.AppIcons.load(context, pkg)
+                    ?.toBitmap(px, px)?.asImageBitmap()
             }.getOrNull()
         }
     }
@@ -494,4 +532,42 @@ private fun SelectableAppTile(
             textAlign = TextAlign.Center,
         )
     }
+}
+
+/**
+ * The four tiers a restricted app grid is drawn in.
+ *
+ * `installed & ticked` → `installed & unticked` → `absent & ticked` → `absent & unticked`, each tier
+ * alphabetical by the label shown on the tile.
+ *
+ * ## Why the absent ones go last rather than away
+ *
+ * A restricted grid is a roster, and 凍結融解's is a workspace that outlived a phone: 36 of its 56
+ * entries name apps that were never installed on this one, so they resolve to nothing and draw a bare
+ * package id. Led with — which is what `extras` prepended did — they filled the first screen and
+ * buried every app 白い熊 could actually act on. They are kept, because the launcher tasks behind them
+ * are still good if an app comes back, and because a ticked entry that cannot be reached cannot be
+ * unticked either.
+ *
+ * ## Ordered on the INITIAL selection
+ *
+ * [preselected], not the live selection: ticking a tile must not make the grid re-sort under the
+ * finger. The same reasoning the seeding above it carries.
+ *
+ * @param installed apps the platform resolved — with real labels and icons.
+ * @param absent stand-in tiles for packages it could not resolve, labelled by id.
+ */
+internal fun rosterOrder(
+    installed: List<PickableApp>,
+    absent: List<PickableApp>,
+    preselected: Set<String>,
+): List<PickableApp> {
+    val present = installed.mapTo(HashSet()) { it.pkg }
+    return (installed + absent).distinctBy { it.pkg }.sortedWith(
+        compareBy(
+            { if (it.pkg in present) 0 else 1 },
+            { if (it.pkg in preselected) 0 else 1 },
+            { it.label.lowercase() },
+        ),
+    )
 }

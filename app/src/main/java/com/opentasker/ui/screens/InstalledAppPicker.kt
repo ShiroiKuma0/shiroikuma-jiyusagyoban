@@ -236,9 +236,9 @@ private fun InstalledAppIcon(app: InstalledApp) {
     val image by produceState<ImageBitmap?>(initialValue = null, app.packageName, appContext) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                appContext.packageManager.getApplicationIcon(app.packageName)
-                    .toBitmap(width = 48, height = 48)
-                    .asImageBitmap()
+                com.opentasker.core.apps.AppIcons.load(appContext, app.packageName)
+                    ?.toBitmap(width = 48, height = 48)
+                    ?.asImageBitmap()
             }.getOrNull()
         }
     }

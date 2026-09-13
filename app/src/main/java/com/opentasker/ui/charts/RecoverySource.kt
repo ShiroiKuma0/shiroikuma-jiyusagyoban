@@ -58,6 +58,61 @@ object RecoverySource {
         val lowestHr: Double? = null,
         val spo2: Double? = null,
         val hrvMs: Double? = null,
+        /**
+         * The level the body went to bed AT — median heart rate over the first hour of the session.
+         *
+         * A different fact from [nocturnalHr], which measures the floor the night settles to, and
+         * the two can move in opposite directions. Measured over 白い熊's nights it separates them
+         * plainly: 2026-09-11 came in at 64 bpm against a 74 baseline (z = −2.70) while the nocturnal
+         * figure that night was unremarkable. The first hour is where an evening that has already
+         * given up is visible, and the four-hour window averages it away.
+         *
+         * **Measured from sleep ONSET, not from a clock hour.** The two are not the same and reading
+         * one as the other moved an observation onto the wrong night once already: sessions here
+         * begin anywhere between 20:38 and 04:00, so "the 22:00 hour" and "the first hour in bed"
+         * can belong to different nights entirely.
+         */
+        val bedtimeHr: Double? = null,
+        /**
+         * Breaths per minute, from respiratory sinus arrhythmia — see `HuaweiBeatMetrics`.
+         *
+         * After skin temperature, which this band has no sensor for, nocturnal respiratory rate is
+         * the best-evidenced day-ahead illness signal in the wearable literature. Null for every
+         * night before the per-beat stream began to be pulled, and for any night whose records were
+         * all too noisy to carry a peak.
+         */
+        val respirationBpm: Double? = null,
+        /**
+         * The night's heart rate in twelfths, for drawing its shape.
+         *
+         * Binned rather than sampled so that a night with a dense hour and a sparse one still yields
+         * a curve of the same length, and so a single artefact cannot become a spike: each bin is a
+         * MEDIAN. Empty when the night is too thinly sampled to bin — never partly filled, because a
+         * curve with a hole in it invites reading the hole as a measurement.
+         */
+        val hrCurve: List<Double> = emptyList(),
+        /**
+         * How far the binned curve moves across the night, top to bottom, in bpm.
+         *
+         * The measure of "flat" that survived 白い熊's own data. Three candidates were tested over 21
+         * nights: this one, the going-to-bed-minus-nadir dip, and a correlation against the person's
+         * own median curve shape. The dip **fails outright** — the night it was meant to catch reads
+         * 7.2 bpm against a 2.8 median, better than average — and the template correlation is too
+         * noisy to alarm on, taking values of −0.73, −0.62 and 0.01 on unremarkable nights.
+         *
+         * The swing separates cleanly: 2026-09-11 came in at **6.0 bpm, the smallest of the 21**,
+         * against a trailing median of 13.5. A night whose heart rate barely moves is a real and
+         * visible thing; which SHAPE it should have had is, on this much data, not.
+         */
+        val hrSwing: Double? = null,
+        /**
+         * Median HF power over the night — `rri_f8`, in ms².
+         *
+         * Carried for the consecutive-night run rather than for its own sake: a single night's HF
+         * says little (+32 %, +43 %, +80 % and +106 % all occur on ordinary nights) while a RUN of
+         * them was unique in the record. See [Recovery.runAbove].
+         */
+        val hfPower: Double? = null,
     )
 
     /**
@@ -148,6 +203,10 @@ object RecoverySource {
         spo2Points: List<ChartPoint> = emptyList(),
         /** RMSSD windows — already filtered to the ones the band itself considers publishable. */
         hrvPoints: List<ChartPoint> = emptyList(),
+        /** Per-record respiratory rates. Empty for every band and every night that has none. */
+        respirationPoints: List<ChartPoint> = emptyList(),
+        /** Per-window HF power. Empty for the Hume band, which never measured one. */
+        hfPoints: List<ChartPoint> = emptyList(),
     ): NightMetrics = NightMetrics(
         startMs = session.startMs,
         endMs = session.endMs,
@@ -161,7 +220,62 @@ object RecoverySource {
         lowestHr = lowestHr(session, hrPoints),
         spo2 = nightMedian(session, spo2Points),
         hrvMs = nightMedian(session, hrvPoints),
+        bedtimeHr = bedtimeHr(session, hrPoints),
+        respirationBpm = nightMedian(session, respirationPoints),
+        hrCurve = hrCurve(session, hrPoints),
+        hrSwing = hrCurve(session, hrPoints).takeIf { it.isNotEmpty() }?.let { it.max() - it.min() },
+        hfPower = nightMedian(session, hfPoints),
     )
+
+    /** How many slices the night is cut into for [NightMetrics.hrCurve]. */
+    const val CURVE_BINS = 12
+
+    /** Fewest readings across the whole night before a curve is drawn from it. */
+    const val MIN_CURVE_SAMPLES = 25
+
+    /**
+     * The night's heart rate as [CURVE_BINS] medians, or empty when it cannot be filled.
+     *
+     * All-or-nothing on purpose. A curve missing its third bin is not a curve with a gap, it is a
+     * curve a reader will interpolate across without knowing they did — and the interpolation will
+     * look exactly like a measurement.
+     */
+    fun hrCurve(session: SleepSession, hrPoints: List<ChartPoint>): List<Double> {
+        val inNight = hrPoints.filter { it.tMs in session.startMs..session.endMs }
+        if (inNight.size < MIN_CURVE_SAMPLES) return emptyList()
+        val span = session.endMs - session.startMs
+        if (span <= 0) return emptyList()
+        val out = ArrayList<Double>(CURVE_BINS)
+        for (i in 0 until CURVE_BINS) {
+            val lo = session.startMs + span * i / CURVE_BINS
+            val hi = session.startMs + span * (i + 1) / CURVE_BINS
+            val w = inNight.filter { it.tMs in lo until hi }.map { it.value }
+            out += HealthIndexSource.median(w) ?: return emptyList()
+        }
+        return out
+    }
+
+    /** How long after sleep onset [bedtimeHr] averages over. */
+    const val BEDTIME_WINDOW_MIN = 60
+
+    /**
+     * Median heart rate over the first [BEDTIME_WINDOW_MIN] minutes of the session.
+     *
+     * A median rather than a mean because the first hour is where the night's largest single
+     * transient lives — the descent from waking level — and one long tail should not move the
+     * figure. [MIN_BEDTIME_SAMPLES] guards the other direction: an hour holding three readings is
+     * not a level, and printing one beside a baseline invites reading a gap in the record as a
+     * change in 白い熊.
+     */
+    fun bedtimeHr(session: SleepSession, hrPoints: List<ChartPoint>): Double? {
+        val until = session.startMs + BEDTIME_WINDOW_MIN * 60_000L
+        val window = hrPoints.filter { it.tMs in session.startMs..minOf(until, session.endMs) }
+        if (window.size < MIN_BEDTIME_SAMPLES) return null
+        return HealthIndexSource.median(window.map { it.value })
+    }
+
+    /** Fewest readings in the bedtime window before it is a level rather than an anecdote. */
+    const val MIN_BEDTIME_SAMPLES = 8
 
     /**
      * The lowest per-minute heart rate recorded between sleep onset and waking.
