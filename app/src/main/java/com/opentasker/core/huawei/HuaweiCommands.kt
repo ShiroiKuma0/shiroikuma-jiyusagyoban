@@ -115,6 +115,52 @@ object HuaweiCommands {
     const val FIT_LOW_HR_ALERT = 0x22
     const val FIT_LOW_SPO2_ALERT = 0x25   // threshold in percent
 
+    // ---- Module features (0x37/0x01) — a config id and a flag, not a fitness byte -------
+    //
+    // Some of what the band measures is not a switch on 0x07 at all but a configuration written to
+    // a JS module ON the band, addressed by package name over DataSync. Captured from Huawei Health
+    // the same way the fitness switches were, by toggling each one with a decrypted btsnoop running:
+    //
+    //     84 0E 05 04 35 A9 7C E8 06 01 01 07 03 01 01 01     apnea ON
+    //     84 0E 05 04 35 A9 7C E9 06 01 01 07 03 01 01 00     arrhythmia, flag 0
+    //
+    // **There is ONE primitive here, not a recipe per feature** — [moduleConfig] writes any config
+    // id with any flag. What is NOT general is the ids: apnea and arrhythmia sit together in
+    // 0x35A97CE… while emotions is 0x35AC8A3C, so an id has to be captured rather than guessed from
+    // its neighbours. Only the three below have ever been observed on the wire.
+    const val DATA_SYNC_CONFIG = 0x01
+
+    /**
+     * Sleep breathing awareness — `hw.health.apneajsmodule` ↔ `hw.watch.health.osa`.
+     *
+     * TWO ids, both written together: Health never sent one without the other, and which half owns
+     * which part of the feature was not visible in the capture. Sending the pair is what was
+     * observed to work; sending one is untested and would be a guess dressed as a setting.
+     *
+     * This is the band's respiratory channel, and it is the reason this constant exists at all —
+     * nocturnal respiratory rate is, after skin temperature, the best-evidenced day-ahead illness
+     * signal in the wearable literature, and this band has no temperature sensor.
+     */
+    val MODULE_APNEA = intArrayOf(0x35A97CE7, 0x35A97CE8)
+
+    /**
+     * Emotions / stress — `hw.health.emotion` ↔ `hw.watch.health.emotion`.
+     *
+     * Derived from real RR intervals, unlike the Hume band's "stress", which was a lookup on its
+     * device-state byte and carried no independent information. So this is the one Hume metric the
+     * migration would otherwise have lost, and an upgrade rather than a like-for-like replacement.
+     */
+    const val MODULE_EMOTION = 0x35AC8A3C
+
+    /**
+     * Pulse-wave arrhythmia analysis — `hw.health.ppgjsmodule`.
+     *
+     * Recorded for completeness and deliberately NOT offered as a setting: after activation the band
+     * shows a "Measure" button, so it produces an event when pressed rather than a series. Turning
+     * it on would add a button to 白い熊's band and no data to this app.
+     */
+    const val MODULE_ARRHYTHMIA = 0x35A97CE9
+
     // ---- WatchFace (0x27) — transferring a face is only HALF of installing one ----------
     //
     // The bytes go over 0x28, but the band does nothing with them until it is told to. Two more
@@ -721,6 +767,30 @@ object HuaweiCommands {
 
     /** A plain on/off switch: `{1: 01}` or `{1: 00}`. */
     fun fitnessToggle(on: Boolean): ByteArray = tlv(1, byteArrayOf(if (on) 1 else 0))
+
+    /**
+     * A module feature's configuration: one config id, one on/off flag.
+     *
+     * The DataSync container, decoded by comparing an ON against an OFF rather than replayed as a
+     * blob:
+     *
+     * ```
+     * 0x84 { 0x05 = configId (4 bytes, big-endian)
+     *        0x06 = action        1 = phone->band, 2 = band->phone
+     *        0x07 = 01 01 <flag>  the last byte is on/off }
+     * ```
+     *
+     * Note this is NOT [fitnessToggle]'s shape and is not sent to [SVC_FITNESS]. A module config
+     * posted to the fitness service is answered with the band's success code and changes nothing,
+     * which is the same trap the locale push carries a note about.
+     */
+    fun moduleConfig(configId: Int, on: Boolean): ByteArray =
+        tlv(
+            0x84,
+            tlv(5, HuaweiProtocol.intBytes(configId, 4)) +
+                tlv(6, byteArrayOf(1)) +
+                tlv(7, byteArrayOf(1, 1, if (on) 1 else 0)),
+        )
 
     /**
      * An alert switch with its threshold.
