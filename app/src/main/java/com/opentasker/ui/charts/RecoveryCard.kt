@@ -201,8 +201,8 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
     val narrow = isNarrowScreen()
     val usual = if (m.usualLo != null && m.usualHi != null) {
         BandText.usualRange[lang].format(
-            format(m.marker, m.usualLo, lang, unit = false),
-            format(m.marker, m.usualHi, lang, unit = false),
+            markerValue(m.marker, m.usualLo, lang, unit = false),
+            markerValue(m.marker, m.usualHi, lang, unit = false),
         )
     } else {
         null
@@ -222,7 +222,7 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
             )
             Spacer(Modifier.width(10.dp))
             Text(
-                m.value?.let { format(m.marker, it, lang) } ?: "—",
+                m.value?.let { markerValue(m.marker, it, lang) } ?: "—",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 color = sectionInk,
@@ -515,6 +515,9 @@ fun markerLabel(m: RecoveryMarker): Loc = when (m) {
     RecoveryMarker.DEEP -> BandText.regColDeep
     RecoveryMarker.DEEP_REM -> BandText.regColDeepRem
     RecoveryMarker.HRV -> BandText.regColHrv
+    RecoveryMarker.BEDTIME_HR -> BandText.markerBedtimeHr
+    RecoveryMarker.RESPIRATION -> BandText.markerRespiration
+    RecoveryMarker.HR_SWING -> BandText.markerHrSwing
 }
 
 fun loadBandLabel(b: LoadBand): Loc = when (b) {
@@ -675,8 +678,13 @@ fun feltLabel(n: Int): Loc = when (n) {
     else -> BandText.feltNormal
 }
 
-/** Each marker in its own unit, rounded to the precision it actually has. */
-private fun format(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: Boolean = true): String =
+/**
+ * Each marker in its own unit, rounded to the precision it actually has.
+ *
+ * Shared with [DeviationStrip] rather than copied into it: two formatters for one set of markers
+ * drift the first time a unit is corrected, and the strip prints the same quantities this card does.
+ */
+fun markerValue(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: Boolean = true): String =
     when (marker) {
         RecoveryMarker.NOCTURNAL_HR -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
         RecoveryMarker.SLEEP -> {
@@ -695,6 +703,14 @@ private fun format(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: 
         }
         RecoveryMarker.DEEP_REM -> "${(v * 100).roundToInt()}%"
         RecoveryMarker.HRV -> if (unit) "${v.roundToInt()} ms" else "${v.roundToInt()}"
+        RecoveryMarker.BEDTIME_HR -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
+        // A tenth, because that is what the estimator returns — and no more, because a 60-second
+        // record resolves one breath per minute and a second decimal would be inventing precision.
+        RecoveryMarker.RESPIRATION ->
+            if (unit) String.format("%.1f /min", v) else String.format("%.1f", v)
+        // A span of heart rate, so bpm — but never rounded away to nothing: the whole quantity on a
+        // flat night is six of them.
+        RecoveryMarker.HR_SWING -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
     }
 
 /** Same measured-not-guessed column trick as the health index — see `labelColumnWidth` there. */
@@ -807,7 +823,7 @@ fun RecoveryDetail(recovery: RecoveryResult?, load: RecoveryBuild.LoadReading?, 
             r.markers.forEach { m ->
                 Text(
                     markerLabel(m.marker)[lang] + "  " +
-                        (m.value?.let { format(m.marker, it, lang) } ?: "\u2014") +
+                        (m.value?.let { markerValue(m.marker, it, lang) } ?: "\u2014") +
                         (m.z?.let { String.format("   z = %+.2f", it) } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = style.axisText,
@@ -819,4 +835,17 @@ fun RecoveryDetail(recovery: RecoveryResult?, load: RecoveryBuild.LoadReading?, 
             InfoBody(BandText.loadFloorNote[lang])
         }
     }
+}
+
+/**
+ * A signed difference in the marker's own unit — the channel that survives greyscale.
+ *
+ * Always carries its sign, including for a marker where "more" is the bad direction: the sign says
+ * which way the night moved, and what that means is the row's colour and the reader's business. A
+ * delta rendered without its sign would need the colour to be readable at all, which is exactly what
+ * [DeviationStrip] refuses to rely on.
+ */
+fun markerDelta(marker: RecoveryMarker, d: Double, lang: BandLanguage): String {
+    val sign = if (d >= 0) "+" else "−"
+    return sign + markerValue(marker, abs(d), lang, unit = false)
 }

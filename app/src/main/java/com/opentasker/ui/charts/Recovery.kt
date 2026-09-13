@@ -63,7 +63,44 @@ import kotlin.math.max
  * N3 is 13–23 %), and RMSSD norms are so age-dependent that a population ladder would paint every
  * night of a 40-year-old the same colour.
  */
-enum class RecoveryMarker { NOCTURNAL_HR, SLEEP, FELT, TEMPERATURE, DEEP, DEEP_REM, HRV }
+enum class RecoveryMarker {
+    NOCTURNAL_HR, SLEEP, FELT, TEMPERATURE, DEEP, DEEP_REM, HRV,
+
+    /**
+     * The heart rate of the first hour in bed — display-only, like the three above it.
+     *
+     * Added 2026-09-12 because an episode passed every counted marker and every published flag while
+     * being plainly visible here. 白い熊 felt ill on the 11th and the 12th; the night before, the
+     * nocturnal HR marker read +0.8 bpm and the Radin conjunction could not fire, while the evening
+     * level was 70 against the 78–85 that every other night that fortnight began at.
+     */
+    BEDTIME_HR,
+
+    /**
+     * How far the heart rate moves across the night, top to bottom — display-only.
+     *
+     * 白い熊 asked for the nightly HR shape and a warning when it is not regular (2026-09-12). This
+     * is the part of that which survived their own data; [RecoverySource.hrSwing] records what was
+     * tested and what failed. A flat night is a real, visible thing and this measures it; what shape
+     * a night *ought* to have had is not answerable on twenty-one nights.
+     *
+     * **It is not an early warning and must never be presented as one.** It reached its record low
+     * on 2026-09-11 — the second day 白い熊 already felt ill. The night before the illness began was
+     * ordinary in shape.
+     */
+    HR_SWING,
+
+    /**
+     * Nocturnal respiratory rate — display-only, and new to this band.
+     *
+     * Recovered from the per-beat RR series rather than measured: no Huawei surface publishes it.
+     * It is display-only for the ordinary reason everything except the trio is — the counting rule
+     * is a rule of three with published operating points, and a rule of four is a different rule
+     * with none — and for a second reason of its own: this band has recorded no illness yet, so
+     * there is no night here against which its behaviour has been seen.
+     */
+    RESPIRATION,
+}
 
 /** Which side of usual a marker landed on. */
 enum class RecoveryBand { LOW, USUAL, HIGH, UNKNOWN }
@@ -105,7 +142,8 @@ data class MarkerReading(
             // only ever be read by mistake, and `false` is the answer that makes the mistake
             // harmless rather than the one that quietly adds a fourth marker to a rule built on
             // three (≥2 of 3 → 92 % PPV; a rule of five is a different rule with no evidence).
-            RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM, RecoveryMarker.HRV -> false
+            RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM, RecoveryMarker.HRV,
+            RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION, RecoveryMarker.HR_SWING -> false
         }
 
     /**
@@ -133,12 +171,19 @@ data class MarkerReading(
             // 体感 sits with heart rate and temperature since the 2026-08-12 flip: on the new scale a
             // HIGHER number is a worse night, the same direction those two already ran in.
             val worse = when (marker) {
-                RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE, RecoveryMarker.FELT ->
+                RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.TEMPERATURE, RecoveryMarker.FELT,
+                // Breathing faster than usual is the adverse direction; a bedtime heart rate is
+                // adverse when it is HIGH, in the ordinary reading. The episode that prompted this
+                // marker ran the other way — see [RecoveryResult.sicknessBehaviour], which is where
+                // a suppressed evening is read, because it is only meaningful in conjunction.
+                RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION ->
                     deviations > 0
                 // More is better for all four: time asleep, time in deep, the restorative share, and
                 // the beat-to-beat variability. A night BELOW the baseline is the worse night.
+                // More is better for all five: time asleep, time in deep, the restorative share,
+                // the beat-to-beat variability, and a night whose heart rate actually moves.
                 RecoveryMarker.SLEEP, RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM,
-                RecoveryMarker.HRV -> deviations < 0
+                RecoveryMarker.HRV, RecoveryMarker.HR_SWING -> deviations < 0
             }
             val far = kotlin.math.abs(deviations) >= 2.0
             if (!worse && marker == RecoveryMarker.TEMPERATURE) return 3
@@ -200,6 +245,59 @@ data class RecoveryResult(
      * rates. It is a flag in its own right, not a component of anything.
      */
     val illnessSigns: Boolean,
+    /**
+     * The OTHER direction — extended sleep with a suppressed evening heart rate.
+     *
+     * ## Why a second flag rather than a wider first one
+     *
+     * [illnessSigns] is Radin's published conjunction and it requires sleep to run *below* baseline.
+     * The night of 2026-09-10 ran far above it: **636 minutes asleep, z = +4.09** against the seven
+     * nights before it, the longest in the record — with the going-to-bed heart rate at 74 bpm
+     * against a 76.5 baseline, **z = −0.67**, and every counted marker inside its usual band. 白い熊
+     * felt ill the next day and the day after. Radin's rule could not fire, by construction; nor
+     * could the counting trio, because [MarkerReading.adverse] deliberately does not treat a long
+     * night as an event.
+     *
+     * **Be honest about which limb did the work.** On this episode the flag is very nearly a
+     * sleep-length detector: the sleep limb cleared its threshold eight times over, the heart-rate
+     * limb by a third of one. The pairing is what keeps a long lie-in from firing on its own, and
+     * that is the whole of its contribution so far.
+     *
+     * **The dramatic evening drop belongs to the NEXT night, not this one** — 64 bpm at z = −2.70
+     * on 2026-09-11, which is during the illness rather than before it, and which this flag does not
+     * catch because sleep that night ran *short* (z = −1.24). Recorded because the first analysis
+     * misread the two nights for each other and built a fixture out of the mix-up.
+     *
+     * Widening Radin's rule to "sleep moved either way" would silently change what a published
+     * operating point detects, and this file does not do that. So this is its own flag, and it is
+     * labelled for what it is.
+     *
+     * ## What it rests on, and what it does not
+     *
+     * **Physiology, not a validation study.** Extended sleep is the best-characterised component of
+     * sickness behaviour — the somnogenic cytokines IL-1β and TNF-α increase NREM sleep, which is a
+     * conserved response to infection rather than a wearable finding (Krueger; Hart 1988). The
+     * parasympathetic form of functional overreaching presents the same way round: bradycardia and
+     * RAISED variability alongside deep fatigue, where the sympathetic form raises heart rate. Both
+     * fit the episode above; nothing here distinguishes them, and the flag does not try to.
+     *
+     * **There is no published operating point for this conjunction**, so it borrows Radin's — the
+     * same 0.5 SD on each limb, in the directions this pattern runs. That is a known threshold used
+     * somewhere it was not measured, which is worth stating plainly and is still better than a
+     * number invented here.
+     *
+     * It is therefore a flag that says *look*, never a verdict, and it reaches no count and no
+     * headline — for the reason the file header gives at length: a confident wrong reading has a
+     * measured cost, and this one has never yet been checked against an illness on this wrist.
+     */
+    val sicknessBehaviour: Boolean,
+    /**
+     * Consecutive nights, ending last night, whose HF power ran above its own trailing median.
+     *
+     * A number, not a flag — see [Recovery.runAbove] for what it is worth and what it is not. Zero
+     * when last night was not above its baseline, which is the common case.
+     */
+    val hrvRunNights: Int = 0,
 ) {
     val hasHeadline: Boolean get() = confidence != RecoveryConfidence.COLLECTING
 }
@@ -239,6 +337,17 @@ object Recovery {
     const val SLEEP_MEANINGFUL_MIN = 30.0
     const val FELT_MEANINGFUL_STEPS = 1.0
     const val TEMP_MEANINGFUL_C = 0.3
+
+    /**
+     * Smallest respiratory-rate change worth a colour, in breaths per minute.
+     *
+     * **This is a resolution floor, not a smallest-worthwhile-change.** The published illness work
+     * on respiratory rate (Fitbit, Oura) reports shifts of roughly 1–2 breaths/min a day or two
+     * before symptoms, which would argue for 1.0 — but a 60-second record resolves 1/60 Hz, which is
+     * exactly one breath per minute, so a threshold at 1.0 would be a threshold at the measurement's
+     * own quantisation. 1.5 is the first step this estimator can distinguish from its own grid.
+     */
+    const val RESPIRATION_MEANINGFUL_BPM = 1.5
 
     /**
      * Floors under the usual-band half-width for the three DISPLAY-ONLY markers.
@@ -349,6 +458,48 @@ object Recovery {
         sigmaFloor = (median(history) ?: 0.0) * HR_SIGMA_FLOOR_FRACTION,
     )
 
+    /**
+     * How many nights in a row, ending with the most recent, ran ABOVE their own trailing median.
+     *
+     * [values] is oldest-first and may contain nulls for nights the quantity was not measured on; a
+     * null breaks the run rather than being skipped, because "we did not look" is not evidence of
+     * continuation.
+     *
+     * **Each night is judged against the nights before IT, not against the whole series.** That is
+     * the only way a run can be seen at all: a stretch of elevated nights drags a whole-series
+     * baseline up behind it until the later nights of the run look ordinary, which is exactly why no
+     * single-night marker could ever have caught this pattern.
+     *
+     * ## What it is worth, measured
+     *
+     * Over 白い熊's 21 nights, applied to nightly HF power, a run of four occurred **once** — the
+     * only one in the record — and applied to RMSSD it occurred twice. HF is therefore the series
+     * this is used on.
+     *
+     * **And it confirms rather than predicts.** The run reached 3 on the first day 白い熊 felt ill
+     * and 4 on the second; a threshold of 3 would have fired that first morning and also on one
+     * unremarkable night. Nothing here bought a day's notice, and the card that draws it says so
+     * rather than implying otherwise.
+     */
+    fun runAbove(values: List<Double?>, baselineNights: Int = 7, minHistory: Int = 4): Int {
+        var run = 0
+        for (i in values.indices) {
+            val v = values[i]
+            val prior = values.subList(maxOf(0, i - baselineNights), i).filterNotNull()
+            run = if (v != null && prior.size >= minHistory && v > (median(prior) ?: v)) run + 1 else 0
+        }
+        return run
+    }
+
+    /**
+     * The run length at which the HF pattern is worth printing as a finding rather than a number.
+     *
+     * Four, because four is where it was unique in the record. One occurrence is the entire evidence
+     * base, which is why the threshold changes only whether a sentence appears — never a count, a
+     * headline, or any verdict.
+     */
+    const val HRV_RUN_NIGHTS = 4
+
     fun confidenceFor(nights: Int): RecoveryConfidence = when {
         nights < MIN_NIGHTS_FOR_ANY -> RecoveryConfidence.COLLECTING
         nights < MIN_NIGHTS_FOR_Z -> RecoveryConfidence.PROVISIONAL
@@ -363,6 +514,15 @@ object Recovery {
      * bedroom nearly as much as 白い熊 (r = 0.961 with ambient in simultaneous measurement, Sato
      * 2024), and the ambient/bedding term is 3–20× the size of the physiological signal.
      */
+    /**
+     * The threshold each limb of a conjunction must cross, in robust SDs.
+     *
+     * Radin's operating point, and deliberately NOT [BAND_SIGMA]: a conjunction of two 0.5 SD moves
+     * is a different and much more sensitive test than either marker leaving its 1.5 SD display
+     * band, and re-using the display edge would quietly turn a published rule into another one.
+     */
+    const val CONJUNCTION_SIGMA = 0.5
+
     fun assemble(
         nightStartMs: Long?,
         nightEndMs: Long? = null,
@@ -373,15 +533,42 @@ object Recovery {
         temperatureSustained: Boolean,
         lateEffortMinutesBeforeSleep: Int?,
         nightsOfHistory: Int,
+        /** The first hour in bed, for [RecoveryResult.sicknessBehaviour]. Display-only otherwise. */
+        bedtimeHr: MarkerReading? = null,
+        /** Nocturnal respiratory rate. Display-only; carried so the strip can print it. */
+        respiration: MarkerReading? = null,
+        /**
+         * Deep-sleep minutes and nightly RMSSD — display-only, and carried for the same reason.
+         *
+         * They existed as [RecoveryMarker] values from the start but reached only the night table,
+         * so the deviation strip listed them and drew nothing: a marker absent from [markers] is
+         * silently skipped. On the night of 2026-09-11 deep sleep fell to 14 % of a night against a
+         * ~35 % baseline — the single largest deviation in the whole record — and that was the row
+         * the strip could not show.
+         */
+        deep: MarkerReading? = null,
+        hrv: MarkerReading? = null,
+        /** The night's HR swing — display-only, like the three above it. */
+        hrSwing: MarkerReading? = null,
+        /** Consecutive elevated-HF nights ending last night. See [runAbove]. */
+        hrvRunNights: Int = 0,
     ): RecoveryResult {
         val confidence = confidenceFor(nightsOfHistory)
         val tempShown = if (temperatureSustained) temperature else temperature.copy(band = RecoveryBand.USUAL)
-        val markers = listOf(nocturnalHr, sleep, felt, tempShown)
+        val markers = listOfNotNull(
+            nocturnalHr, sleep, felt, tempShown, bedtimeHr, respiration, deep, hrv, hrSwing,
+        )
         val fired = markers.filter { it.counted && it.adverse }.map { it.marker }
         // Radin's conjunction, at ITS thresholds (0.5 SD), not the 1.5 SD display band: it is a
         // separate published rule with its own operating point, and re-using our band edges would
         // silently change what it detects.
-        val illness = (nocturnalHr.z ?: 0.0) >= 0.5 && (sleep.z ?: 0.0) <= -0.5
+        val illness = (nocturnalHr.z ?: 0.0) >= CONJUNCTION_SIGMA &&
+            (sleep.z ?: 0.0) <= -CONJUNCTION_SIGMA
+        // The mirror: a long night that the evening was already heading into. Both limbs are
+        // required — a long lie-in on its own is a Sunday, and a quiet evening on its own is a rest
+        // day. It is their coincidence that is worth a second look.
+        val sickness = (sleep.z ?: 0.0) >= CONJUNCTION_SIGMA &&
+            (bedtimeHr?.z ?: 0.0) <= -CONJUNCTION_SIGMA
         return RecoveryResult(
             nightStartMs = nightStartMs,
             nightEndMs = nightEndMs,
@@ -392,6 +579,8 @@ object Recovery {
             adverseMarkers = fired,
             lateEffortMinutesBeforeSleep = lateEffortMinutesBeforeSleep,
             illnessSigns = illness && confidence == RecoveryConfidence.ESTABLISHED,
+            sicknessBehaviour = sickness && confidence == RecoveryConfidence.ESTABLISHED,
+            hrvRunNights = hrvRunNights,
         )
     }
 }

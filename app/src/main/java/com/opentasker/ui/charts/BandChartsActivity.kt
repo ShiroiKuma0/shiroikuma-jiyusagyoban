@@ -102,6 +102,14 @@ class BandChartsActivity : ComponentActivity() {
                         var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
                         val state by model.state.collectAsState()
 
+                        // Back means "up one level" here too — the Hume report carried the same gap
+                        // as the Huawei one: sub-screens offered a tappable header and the system
+                        // button closed the window outright. See HuaweiChartsActivity for the full
+                        // reasoning, including why the dialogs are not handled here.
+                        androidx.activity.compose.BackHandler(enabled = selected != null) {
+                            selected = null
+                        }
+
                         if (selected == null) {
                             BandDashboardScreen(
                                 model = model,
