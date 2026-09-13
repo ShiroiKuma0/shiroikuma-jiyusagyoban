@@ -69,6 +69,20 @@ data class HuaweiDashboardState(
     val sleepScore: com.opentasker.ui.charts.SleepScore.Breakdown? = null,
     val register: com.opentasker.ui.charts.SessionRegister.Register? = null,
     val nights: List<com.opentasker.ui.charts.SleepSession> = emptyList(),
+    /**
+     * Last night's heart rate in twelfths, for the deviation strip's sparkline.
+     *
+     * Lifted out of the assembled night rather than recomputed in the UI: it is the SAME curve the
+     * swing marker is measured from, and two derivations of one curve would drift the first time
+     * either was touched.
+     */
+    val lastNightHrCurve: List<Double> = emptyList(),
+    /** The per-night series behind every strip row, keyed by marker. See [MarkerHistory]. */
+    val markerHistory: Map<com.opentasker.ui.charts.RecoveryMarker, com.opentasker.ui.charts.MarkerHistory.Series> = emptyMap(),
+    val descent: com.opentasker.ui.charts.MarkerHistory.DescentComparison? = null,
+    val bestDescent: com.opentasker.ui.charts.MarkerHistory.Descent? = null,
+    /** Recent nights' HR curves, newest last — stacked under the swing's history page. */
+    val recentCurves: List<Pair<Long, List<Double>>> = emptyList(),
     /** One row per day, back across the whole history — see [buildDerived]. */
     val days: List<com.opentasker.ui.charts.DaySummary> = emptyList(),
     /** How many of [nights] came off the OTHER wrist — stated, never implied. */
@@ -136,6 +150,12 @@ class HuaweiDashboardModel(
     }
 
     private suspend fun load(): HuaweiDashboardState {
+        // Heal any stored `beat_` series the estimator has moved under, before anything reads them.
+        // Needs no band — it recomputes from the stored per-beat blobs — and does nothing once the
+        // recorded version matches. The sync runs it too, and that is the one that actually fires on
+        // a locked phone; this one is here so a reader never sees a stale figure on the way in.
+        runCatching { HuaweiSyncRunner.recomputeBeatStats(appContext, db) }
+
         val samples = db.huaweiSampleDao()
         val oldest = samples.oldestAny()
         val newest = samples.newestAny()
@@ -215,6 +235,11 @@ class HuaweiDashboardModel(
             loading = false,
             index = derived.index,
             recovery = derived.recovery,
+            lastNightHrCurve = derived.lastNightHrCurve,
+            markerHistory = derived.markerHistory,
+            descent = derived.descent,
+            bestDescent = derived.bestDescent,
+            recentCurves = derived.recentCurves,
             load = derived.load,
             sri = derived.sri,
             sleepScore = derived.sleepScore,
@@ -317,6 +342,8 @@ class HuaweiDashboardModel(
         val assembled = com.opentasker.ui.charts.RecoveryBuild.build(
             metrics = rekeyed,
             hrvPoints = publishableRmssd(),
+            respirationPoints = respirationPoints(),
+            hfPoints = publishableField(8),
             sessions = nights,
             ratings = com.opentasker.core.band.RecoveryLog.all(appContext),
             notes = com.opentasker.core.band.DayNotes.RECOVERY.all(appContext),
@@ -359,6 +386,11 @@ class HuaweiDashboardModel(
             index = com.opentasker.ui.charts.HealthIndexSource.compute(rekeyed, latest, emptySet()),
             days = days,
             recovery = assembled.recovery,
+            lastNightHrCurve = assembled.lastNightHrCurve,
+            markerHistory = assembled.markerHistory,
+            descent = assembled.descent,
+            bestDescent = assembled.bestDescent,
+            recentCurves = assembled.recentCurves,
             load = assembled.load,
             sri = assembled.sri,
             sleepScore = assembled.sleepScore,
@@ -378,6 +410,11 @@ class HuaweiDashboardModel(
         val nights: List<com.opentasker.ui.charts.SleepSession> = emptyList(),
         val days: List<com.opentasker.ui.charts.DaySummary> = emptyList(),
         val humeNights: Int = 0,
+        val lastNightHrCurve: List<Double> = emptyList(),
+        val markerHistory: Map<com.opentasker.ui.charts.RecoveryMarker, com.opentasker.ui.charts.MarkerHistory.Series> = emptyMap(),
+        val descent: com.opentasker.ui.charts.MarkerHistory.DescentComparison? = null,
+        val bestDescent: com.opentasker.ui.charts.MarkerHistory.Descent? = null,
+        val recentCurves: List<Pair<Long, List<Double>>> = emptyList(),
     )
 
     /** The Hume band's nights, for the era before this band existed. */
@@ -397,7 +434,16 @@ class HuaweiDashboardModel(
      * The two series are joined on the window's start second, which is the key both are written
      * under: one row per field per window, so a count and its RMSSD share an instant exactly.
      */
-    private suspend fun publishableRmssd(): List<ChartPoint> {
+    private suspend fun publishableRmssd(): List<ChartPoint> = publishableField(5)
+
+    /**
+     * One `rrisqi` field, filtered to the windows the band itself would publish.
+     *
+     * Generalised from the RMSSD-only version when HF power was needed too: the publishability rule
+     * is a property of the WINDOW, not of the field read out of it, so applying it per field in two
+     * places would have been the same rule written twice.
+     */
+    private suspend fun publishableField(field: Int): List<ChartPoint> {
         val dao = db.huaweiSampleDao()
         val from = 0L
         val to = Long.MAX_VALUE / 2
@@ -406,10 +452,27 @@ class HuaweiDashboardModel(
             .filter { it.value >= com.opentasker.core.huawei.HuaweiRri.MIN_VALID_INTERVALS }
             .mapTo(HashSet()) { it.epochSeconds }
         if (publishable.isEmpty()) return emptyList()
-        return runCatching { dao.range(HuaweiRriKeys.metricFor(5), from, to) }.getOrNull().orEmpty()
+        return runCatching { dao.range(HuaweiRriKeys.metricFor(field), from, to) }.getOrNull().orEmpty()
             .filter { it.epochSeconds in publishable }
             .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
     }
+
+    /**
+     * Every respiratory rate the per-beat series yielded, as points.
+     *
+     * Unfiltered, unlike [publishableRmssd] — and the asymmetry is deliberate. That filter exists
+     * because Huawei Health applies a publishability threshold to the rrisqi windows and a night's
+     * median over the sparse ones would be a number with no measurement behind it. There is no
+     * vendor threshold here because there is no vendor metric here: the gating happens at the point
+     * of computation instead, where `HuaweiBeatMetrics` declines to return a rate at all unless the
+     * HF peak stands out. A row that exists has already passed its test.
+     */
+    private suspend fun respirationPoints(): List<ChartPoint> =
+        runCatching {
+            db.huaweiSampleDao()
+                .range(HuaweiRriKeys.BEAT_RESP_BPM, 0L, Long.MAX_VALUE / 2)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
 
     private suspend fun loadHumeSessions(zone: java.time.ZoneId): List<com.opentasker.ui.charts.SleepSession> {
         val rows = runCatching { db.bandSleepDao().recent(400) }.getOrDefault(emptyList())

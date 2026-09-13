@@ -401,18 +401,78 @@ fun changedGlobals(
  * read from the task's `app.launch` (preferred) or `app.unfreeze` action, expanded against the run's
  * variables; an unresolved (`%var`-still-present) or blank package is skipped.
  */
+/**
+ * The variable that holds which apps get a freeze bubble — 凍結融解's 01 settings task publishes it.
+ *
+ * A space-separated package roster, the convention every list of packages in this workspace uses.
+ */
+private const val FREEZE_ROSTER_VAR = "Toketsu_Bubbles"
+
+/**
+ * Whether running [task] should queue a re-freeze bubble.
+ *
+ * ## Two answers, and why both are still here
+ *
+ * The roster variable is the real one: 白い熊 asked for the list to be an ordinary setting they can
+ * read and edit rather than a database column toggled by a switch (2026-09-13). Once
+ * `%Toketsu_Bubbles` exists it decides, alone.
+ *
+ * The `freezeBubble` column remains the answer **only until then**. A hard switch would mean that
+ * installing this build before importing and running the new 01 silently ended every bubble on the
+ * phone — the feature would look broken, for a reason nothing on screen could explain. So an unset
+ * or unexpanded roster falls back to the flag, and the changeover happens when the setting arrives.
+ *
+ * Once the roster is set the column is vestigial: still on the entity, still round-tripped through
+ * bundles, read by nothing.
+ */
+private fun wantsFreezeBubble(task: Task, variables: VariableStore): Boolean =
+    FreezeRoster.wants(
+        roster = variables.expand("%$FREEZE_ROSTER_VAR"),
+        pkg = com.opentasker.core.bubbles.FreezeBubbleTarget.packageOf(task.actions) { variables.expand(it) },
+        legacyFlag = task.freezeBubble,
+    )
+
+/** The decision itself, with no engine around it so it can be tested. */
+object FreezeRoster {
+
+    /** The variable 凍結融解's 01 publishes. */
+    const val VARIABLE = FREEZE_ROSTER_VAR
+
+    /**
+     * Whether a task whose target is [pkg] should queue a bubble.
+     *
+     * [roster] is the raw expansion of `%Toketsu_Bubbles`: empty or still carrying a `%` means the
+     * variable does not exist, which is NOT the same as an empty roster and must not be read as
+     * "no app gets a bubble" — see the caller's note on why the flag still answers until then.
+     */
+    fun wants(roster: String, pkg: String?, legacyFlag: Boolean): Boolean {
+        val list = parse(roster) ?: return legacyFlag
+        return pkg != null && pkg in list
+    }
+
+    /** The roster as packages, or null when the variable is unset. */
+    fun parse(roster: String): List<String>? {
+        val trimmed = roster.trim()
+        if (trimmed.isEmpty() || trimmed.contains('%')) return null
+        return trimmed.split(Regex("""\s+""")).map { it.trim() }.filter { it.isNotEmpty() }
+    }
+}
+
 private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: VariableStore) {
-    if (!task.freezeBubble) return
+    if (!wantsFreezeBubble(task, variables)) return
     // The same rule the `tasks.freezebubbles` picker lists by — kept in one place on purpose.
-    val pkg = com.opentasker.core.bubbles.FreezeBubbleTarget
-        .packageOf(task.actions) { variables.expand(it) } ?: return
+    // EVERY package the task thaws, not just the first: a launcher that thaws a companion app must
+    // re-freeze both, and until this list existed it re-froze one and left the other running.
+    val targets = com.opentasker.core.bubbles.FreezeBubbleTarget
+        .packagesOf(task.actions) { variables.expand(it) }
+    val pkg = targets.firstOrNull() ?: return
     val label = runCatching {
         val pm = appContext.packageManager
         // MATCH_FROZEN: the bubble is queued for an app that is frozen more often than not, and a
         // hidden one has no label at all under plain flags — the task name is a poor second.
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, com.opentasker.core.policy.AppFreeze.MATCH_FROZEN)).toString()
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
-    com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath)
+    com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath, targets)
 }
 
 /**

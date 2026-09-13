@@ -145,6 +145,11 @@ object ActionCatalog {
         define("bubble.flash_clear", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FlashBubbleClearAction),
         define("bubble.flashkill_show", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FlashKillIconShowAction),
         define("bubble.flashkill_hide", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FlashKillIconHideAction),
+        // NEVER for the add: re-running it after a partial failure would re-queue a bubble 白い熊 may
+        // have just dismissed. The other two are idempotent — removing what is not there is a no-op.
+        define("bubble.freeze_add", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::FreezeBubbleAddAction),
+        define("bubble.freeze_remove", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FreezeBubbleRemoveAction),
+        define("bubble.freeze_clear", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FreezeBubbleClearAction),
         define("tasks.launchers", ActionCategory.APP, ActionRetrySafety.NEVER, ::MakeLauncherTasksAction),
         define("tasks.freezebubbles", ActionCategory.APP, ActionRetrySafety.NEVER, ::PickFreezeBubblesAction),
         define("share.relays", ActionCategory.APP, ActionRetrySafety.NEVER, ::GenerateShareRelaysAction),
