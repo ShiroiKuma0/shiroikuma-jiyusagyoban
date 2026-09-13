@@ -81,6 +81,28 @@ object RecoveryBuild {
         val regime: RecoveryRegime.Regime,
         /** Every marked session beside the night that followed it — see [SessionRegister]. */
         val register: SessionRegister.Register,
+        /**
+         * Last night's heart rate in twelfths, for the deviation strip's sparkline.
+         *
+         * Handed out from here rather than recomputed in the UI: it is the same curve
+         * [RecoveryMarker.HR_SWING] is measured from, and two derivations of one curve drift the
+         * first time either is touched.
+         */
+        val lastNightHrCurve: List<Double> = emptyList(),
+        /**
+         * The per-night series behind every row of the strip, so each row can be opened.
+         *
+         * Assembled here because this is where the nights already are, banded and in order. Building
+         * it again in the UI would mean a second definition of "the history of this marker", and the
+         * two would disagree the first time either was touched.
+         */
+        val markerHistory: Map<RecoveryMarker, MarkerHistory.Series> = emptyMap(),
+        /** Last night's descent beside the usual one — the curve's commentary. */
+        val descent: MarkerHistory.DescentComparison? = null,
+        /** The deepest-dropping nights on record, to aim that comparison at. */
+        val bestDescent: MarkerHistory.Descent? = null,
+        /** Recent nights' HR curves, newest last — stacked under the swing's history page. */
+        val recentCurves: List<Pair<Long, List<Double>>> = emptyList(),
     )
 
     /**
@@ -102,6 +124,16 @@ object RecoveryBuild {
          * never sent a beat-to-beat interval in its life.
          */
         hrvPoints: List<ChartPoint> = emptyList(),
+        /**
+         * Per-record respiratory rates, from the band's own per-beat series.
+         *
+         * A parameter for the same reason [hrvPoints] is: not a charted series, no [MetricSpec], and
+         * arriving from the Huawei sample table by storage key. The Hume side passes nothing — that
+         * band never sent a beat-to-beat interval, so there is nothing to derive a rate from.
+         */
+        respirationPoints: List<ChartPoint> = emptyList(),
+        /** Per-window HF power (`rri_f8`), for the consecutive-night run. Empty for the Hume band. */
+        hfPoints: List<ChartPoint> = emptyList(),
         sessions_: List<TrainingSessions.Session>,
         sessionOpen: Boolean,
         localDateOf: (Long) -> Long,
@@ -133,7 +165,9 @@ object RecoveryBuild {
         val restingSpot = RecoverySource.restingSpotHr(spotPoints)
         val gridFrom = gridStart(todayEpochDay)
         val history = nights.map {
-            RecoverySource.metricsFor(it, hrPoints, tempPoints, spo2Points, hrvPoints)
+            RecoverySource.metricsFor(
+                it, hrPoints, tempPoints, spo2Points, hrvPoints, respirationPoints, hfPoints,
+            )
         }
         // By the night's END: the morning it is filed under. See [ratableMorning].
         val feltFor = { m: RecoverySource.NightMetrics -> ratings[localDateOf(m.endMs)]?.toDouble() }
@@ -184,6 +218,43 @@ object RecoveryBuild {
             RecoveryMarker.TEMPERATURE, latest.skinTemp, prior.mapNotNull { it.skinTemp },
             Recovery.TEMP_MEANINGFUL_C, confidence, counted = false, oneSidedHigh = true,
         )
+        // Display-only, both of them, and banded on the heart-rate machinery where that applies: a
+        // bedtime level is a heart rate and carries the same measured 3.5 % sensor dispersion the
+        // nocturnal one does, so it gets the same floor. Giving it a floor of zero would let a quiet
+        // fortnight score a 2 bpm drift at z = 4 — exactly the failure HR_SIGMA_FLOOR_FRACTION
+        // exists to prevent, and it would do it on the one marker a conjunction now reads.
+        val bedtime = Recovery.band(
+            RecoveryMarker.BEDTIME_HR, latest.bedtimeHr, prior.mapNotNull { it.bedtimeHr },
+            Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
+            sigmaFloor = (Recovery.median(prior.mapNotNull { it.bedtimeHr }) ?: 0.0) *
+                Recovery.HR_SIGMA_FLOOR_FRACTION,
+        )
+        val respiration = Recovery.band(
+            RecoveryMarker.RESPIRATION, latest.respirationBpm, prior.mapNotNull { it.respirationBpm },
+            Recovery.RESPIRATION_MEANINGFUL_BPM, confidence, counted = false,
+        )
+        // Banded here as well as in the night table, so the strip can print them. Their floors are
+        // the display-only ones — a quarter-hour of deep sleep, five milliseconds of RMSSD — which
+        // exist to stop a short history manufacturing colour, and are NOT smallest-worthwhile-
+        // changes: no published figure exists for either on a consumer band.
+        val deep = Recovery.band(
+            RecoveryMarker.DEEP, latest.deepMinutes, prior.mapNotNull { it.deepMinutes },
+            Recovery.DEEP_MEANINGFUL_MIN, confidence, counted = false,
+        )
+        val hrv = Recovery.band(
+            RecoveryMarker.HRV, latest.hrvMs, prior.mapNotNull { it.hrvMs },
+            Recovery.HRV_MEANINGFUL_MS, confidence, counted = false,
+        )
+        // The swing is a heart rate in bpm, so it takes the heart rate's own published
+        // smallest-worthwhile-change rather than a figure invented for it. No dispersion floor: that
+        // one is a fraction of a RESTING heart rate and means nothing applied to a range.
+        val swing = Recovery.band(
+            RecoveryMarker.HR_SWING, latest.hrSwing, prior.mapNotNull { it.hrSwing },
+            Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
+        )
+        // Over the whole history, not just the baseline window: a run is a property of the sequence
+        // and truncating the sequence truncates the run.
+        val hrvRun = Recovery.runAbove(history.map { it.hfPower })
 
         // "Sustained" means the night before was warm too. One warm night at the wrist is the
         // bedroom, not 白い熊 — ambient correlates with the sensor at r = 0.961.
@@ -195,8 +266,7 @@ object RecoveryBuild {
             ).band == RecoveryBand.HIGH
         } ?: false
 
-        return Assembled(
-            recovery = Recovery.assemble(
+        val assembledRecovery = Recovery.assemble(
                 nightStartMs = latest.startMs,
                 nightEndMs = latest.endMs,
                 nocturnalHr = hr,
@@ -206,7 +276,15 @@ object RecoveryBuild {
                 temperatureSustained = temp.band == RecoveryBand.HIGH && previousWarm,
                 lateEffortMinutesBeforeSleep = RecoverySource.lateEffortMinutes(latest.startMs, stepPoints),
                 nightsOfHistory = prior.size,
-            ),
+                bedtimeHr = bedtime,
+                respiration = respiration,
+                deep = deep,
+                hrv = hrv,
+                hrSwing = swing,
+                hrvRunNights = hrvRun,
+        )
+        return Assembled(
+            recovery = assembledRecovery,
             load = load,
             sri = sri,
             sleepScore = sleepScore,
@@ -214,7 +292,85 @@ object RecoveryBuild {
             peakCadenceDay = peakDay?.first,
             regime = regime,
             register = register,
+            lastNightHrCurve = latest.hrCurve,
+            markerHistory = markerHistory(history, assembledRecovery.markers.associateBy { it.marker }),
+            descent = descentOf(history, latest),
+            bestDescent = bestDescentOf(history),
+            recentCurves = history.filter { it.hrCurve.isNotEmpty() }
+                .takeLast(RECENT_CURVES).map { it.endMs to it.hrCurve },
         )
+    }
+
+    /** How many nights' curves the swing's history page stacks. Enough to see a habit, few enough to read. */
+    const val RECENT_CURVES = 5
+
+    /**
+     * One series per marker, from the same nights the strip is banded against.
+     *
+     * A night with no value for a marker is ABSENT rather than zero-filled: the band records a field
+     * only when it measured one, and a zero on a chart of nightly RMSSD would be a night 白い熊's
+     * heart stopped varying rather than a night the band was on the charger.
+     */
+    private fun markerHistory(
+        history: List<RecoverySource.NightMetrics>,
+        markers: Map<RecoveryMarker, MarkerReading>,
+    ): Map<RecoveryMarker, MarkerHistory.Series> {
+        fun series(marker: RecoveryMarker, pick: (RecoverySource.NightMetrics) -> Double?) =
+            marker to MarkerHistory.Series(
+                marker = marker,
+                nights = history.mapNotNull { n -> pick(n)?.let { MarkerHistory.Night(n.endMs, it) } },
+                latest = markers[marker],
+            )
+        return listOf(
+            series(RecoveryMarker.SLEEP) { it.sleepMinutes },
+            series(RecoveryMarker.BEDTIME_HR) { it.bedtimeHr },
+            series(RecoveryMarker.NOCTURNAL_HR) { it.nocturnalHr },
+            series(RecoveryMarker.DEEP) { it.deepMinutes },
+            series(RecoveryMarker.HRV) { it.hrvMs },
+            series(RecoveryMarker.HR_SWING) { it.hrSwing },
+            series(RecoveryMarker.RESPIRATION) { it.respirationBpm },
+        ).toMap()
+    }
+
+    /**
+     * Last night's descent beside the usual one.
+     *
+     * "Usual" is the median over EVERY night on record, not the trailing window the bands use: this
+     * is the sentence's "usually", and a reader comparing last night to it means 白い熊's normal —
+     * not the normal of the last seven days, which last night may itself have helped set.
+     */
+    /**
+     * One night's descent, measured on the SAME curve the chart draws.
+     *
+     * It used `bedtimeHr` and `lowestHr` — a median of the first hour, and the minimum of every raw
+     * per-minute sample in the session — and that put two answers to one question on a single card:
+     * 白い熊's screenshot of 2026-09-13 reads *"9 bpm between its highest and lowest"* directly above
+     * *"72 to 56, a drop of 16 bpm"*, with the chart's own low point marked at 64.
+     *
+     * The raw minimum is not wrong, it is a different quantity: one stray quiet minute, where the
+     * binned curve is twelve medians. But the commentary sits UNDER the chart and describes it, so it
+     * has to be about the thing drawn. First bin to lowest bin — the descent the reader can trace
+     * with a finger.
+     */
+    private fun curveDescent(n: RecoverySource.NightMetrics): MarkerHistory.Descent? =
+        n.hrCurve.takeIf { it.isNotEmpty() }?.let { MarkerHistory.Descent(it.first(), it.min()) }
+
+    private fun descentOf(
+        history: List<RecoverySource.NightMetrics>,
+        latest: RecoverySource.NightMetrics,
+    ): MarkerHistory.DescentComparison? {
+        val last = curveDescent(latest) ?: return null
+        val all = history.mapNotNull { curveDescent(it) }
+        val usual = MarkerHistory.descent(all.map { it.from }, all.map { it.to }) ?: return null
+        return MarkerHistory.DescentComparison(last, usual)
+    }
+
+    /** The median descent of the three nights that fell furthest — something to aim at. */
+    private fun bestDescentOf(history: List<RecoverySource.NightMetrics>): MarkerHistory.Descent? {
+        val all = history.mapNotNull { curveDescent(it) }
+        if (all.size < 3) return null
+        val deepest = all.sortedByDescending { it.drop }.take(3)
+        return MarkerHistory.descent(deepest.map { it.from }, deepest.map { it.to })
     }
 
     /**

@@ -28,6 +28,7 @@ object HuaweiSettings {
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
     private const val KEY_CHIZU_TOKEN = "chizu_token"
     private const val KEY_LAST_FILE_PULL = "last_file_pull_ms"
+    private const val KEY_BEAT_METRICS_VERSION = "beat_metrics_version"
     private const val KEY_LOOKBACK_HOURS = "lookback_hours"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
     private const val KEY_BOUND_AT = "bound_at"
@@ -193,6 +194,18 @@ object HuaweiSettings {
      * only way to not ask too often is to remember when we last asked.
      */
     fun lastFilePull(context: Context): Long = prefs(context).getLong(KEY_LAST_FILE_PULL, 0L)
+
+    /**
+     * Which `HuaweiBeatMetrics` version produced the stored `beat_` samples.
+     *
+     * 0 for a database written before the idea existed, which is correct: everything in it predates
+     * version 1 as far as this check is concerned, and a recompute over it is harmless.
+     */
+    fun beatMetricsVersion(context: Context): Int =
+        prefs(context).getInt(KEY_BEAT_METRICS_VERSION, 0)
+
+    fun setBeatMetricsVersion(context: Context, value: Int) =
+        prefs(context).edit { putInt(KEY_BEAT_METRICS_VERSION, value) }
 
     fun markFilePull(context: Context, atMs: Long = System.currentTimeMillis()) =
         prefs(context).edit { putLong(KEY_LAST_FILE_PULL, atMs) }
