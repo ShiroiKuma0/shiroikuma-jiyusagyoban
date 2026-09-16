@@ -114,15 +114,29 @@ class PgnssStoreWriteTest {
         // line — so the only source of GPS Klobuchar disappeared and the build died on it for four
         // days. BRDC00IGS_R has GPSA, GPSB and GPUT; it is a daily published after the day closes,
         // so today 404s and today falls back. A single hard-coded product is the fault itself.
-        assertTrue("it must walk a list of products", body.contains("for (product in BRDC_PRODUCTS)"))
+        //
+        // The products used to be a list walked against one host. They are a list of SOURCES now,
+        // each naming its own product, because the second fault was the same shape one level up:
+        // on 2026-09-14 one host's gateway went sour and six builds died although three other data
+        // centres were serving the file. Each source carries its own name and path because they are
+        // not one product under different roofs — ROB publishes BRDC00GOP_R, GOP BRDC01GOP_R.
+        // Matched on the collection, not on the loop's exact syntax: the loop gained an index when
+        // the alternatives became single-shot and only the last source kept its retries, and a test
+        // that breaks on `withIndex` is testing the spelling rather than the invariant.
+        assertTrue("it must walk the list of sources", Regex("""for \(.*BRDC_SOURCES""").containsMatchIn(body))
         assertTrue(
-            "a 404 for one product must not end the attempt",
+            "one source declining must not end the attempt",
             body.contains("catch (e: IOException)"),
         )
         val src = ProductionSources.read("com/opentasker/core/huawei/pgnss/Fetch.kt")
+        // Both products still asked for, and the one with the ionosphere asked for FIRST.
+        assertTrue("BRDC00IGS_R is still fetched", src.contains("BRDC00IGS_R_"))
+        assertTrue("BRDC00WRD_R is still fetched", src.contains("BRDC00WRD_R_"))
         assertTrue(
             "IGS first, because it is the one with the ionosphere",
-            src.contains("""listOf("BRDC00IGS_R", "BRDC00WRD_R")"""),
+            src.indexOf("BRDC00IGS_R_") < src.indexOf("BRDC00WRD_R_"),
         )
+        // And the same-day gap has a second answer, which is the only independent one that exists.
+        assertTrue("the hourly station fallback must stay", src.contains("fun fetchHourlyNav("))
     }
 }
