@@ -5,6 +5,7 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.coroutineContext
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.CoroutineDispatcher
@@ -105,6 +106,15 @@ object PredictedSet {
     /** The subdirectory of the store that keeps Huawei's own capture, seeded once. */
     const val CAPTURED_DIR = "captured"
 
+    /**
+     * The last good almanac of each kind, kept in the store so an outage cannot stop a build.
+     *
+     * Beside `captured/` rather than in the scratch directory, and for the same reason: the scratch
+     * is deleted after every run precisely so nothing can be tempted to reuse an orbit product.
+     * An almanac is not an orbit product — see the note in [PgnssFetcher.almanac].
+     */
+    const val ALMANAC_CACHE_DIR = "almanac"
+
     /** 1980-01-06 in Unix seconds, and GPS - UTC as of 2026. */
     private const val GPS_UNIX_EPOCH = 315_964_800L
     private const val LEAP = Orbit.LEAP.toLong()
@@ -159,7 +169,11 @@ object PredictedSet {
         capturedDir: File = File(outDir, CAPTURED_DIR),
         config: PgnssBuildConfig = PgnssBuildConfig(),
         nowGpsSeconds: Long = nowGps(),
-        sources: PgnssSourceSupplier = PgnssNetworkSources(config.wuhanIssues),
+        // The cache sits in the STORE, beside the captured set, not in the scratch that is deleted
+        // after every run — which is the whole point of it. Everything there except the six
+        // expiring files travels in the app's backup, so a restored phone starts with a fallback.
+        sources: PgnssSourceSupplier =
+            PgnssNetworkSources(config.wuhanIssues, File(outDir, ALMANAC_CACHE_DIR)),
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
         cancelled: () -> Boolean = { false },
         progress: (PgnssProgress) -> Unit = {},
@@ -225,6 +239,10 @@ object PredictedSet {
             PgnssStep.DOWNLOAD, "Downloaded", "", expectedFiles, expectedFiles, DOWNLOAD_SHARE,
             bytes = fetchedBytes.get(), line = "all sources on disk (${fetchedBytes.get() / 1024} KB)",
         )
+        // Said in the run log AND carried into the set's own summary below, because "the build
+        // succeeded" and "the build succeeded on a fortnight-old almanac" are different facts and
+        // only one of them is worth acting on.
+        for (note in src.notes) report.line(note)
 
         // ── step 2, build ───────────────────────────────────────────────────────────────────────
         report.step(PgnssStep.BUILD, "Reading the orbit products", "", 0, 0, DOWNLOAD_SHARE)
@@ -237,10 +255,45 @@ object PredictedSet {
 
         // GPS and Galileo: 2196 independent element sets in the shipping configuration.
         val keplerJobs = ArrayList<KeplerJob>()
+        val unschedulable = LinkedHashMap<String, Int>()
         for ((system, arcs) in listOf("GPS" to plan.gps, "GALILEO" to plan.galileo)) {
             for (index in plan.stamps.indices) {
-                for (sat in arcs) keplerJobs.add(KeplerJob(system, sat, index))
+                for (sat in arcs) {
+                    // ONLY WHERE THE PRODUCT ACTUALLY REACHES.
+                    //
+                    // This used to schedule every satellite for every block on the assumption that
+                    // a five-day predicted orbit covers a three-day window for everything in it.
+                    // That held until 2026-09-15, when CODE published G13 with 1215 of its 1441
+                    // epochs as the all-zero "no value" marker: a full epoch count and no orbit.
+                    // With the zeros dropped the arc is mostly hole, and a fit anchored in one
+                    // produced a NaN that killed the entire build over one satellite.
+                    //
+                    // BeiDou has had exactly this guard from the start, under the name `trust`.
+                    // GPS and Galileo never needed one, which is not the same as not wanting one.
+                    val arc = plan.sats[sat]
+                    val ts = plan.stamps[index].toDouble()
+                    if (arc == null || !Sp3.spanned(arc.t, ts) ||
+                        !Sp3.spanned(arc.t, ts - Orbit.FIT_HALF) ||
+                        !Sp3.spanned(arc.t, ts + Orbit.FIT_HALF)
+                    ) {
+                        unschedulable[sat] = (unschedulable[sat] ?: 0) + 1
+                        continue
+                    }
+                    keplerJobs.add(KeplerJob(system, sat, index))
+                }
             }
+        }
+        if (unschedulable.isNotEmpty()) {
+            report.line(
+                "not in the orbit product across the whole window: " +
+                    unschedulable.entries.joinToString(", ") { "${it.key} (${it.value} blocks)" },
+            )
+        }
+        if (keplerJobs.isEmpty()) {
+            throw PgnssBuildException(
+                "no GPS or Galileo element set could be scheduled — the orbit product covers none " +
+                    "of the window",
+            )
         }
 
         // ONE DENOMINATOR FOR THE WHOLE OF STEP 2.
@@ -283,18 +336,33 @@ object PredictedSet {
             )
             if (err > Orbit.MAX_ERROR_M) return@runParallel FittedRecord(job, null, err)
             val clock = Orbit.clockFit(arc, stamp.toDouble())
+            // The backstop, and it applies to every constellation because the fault it catches is
+            // not BeiDou's: a block whose fitted drift is physically impossible ships a range that
+            // is wrong by kilometres, and a receiver that believes it spends its search excluding
+            // the satellite instead of fixing. Dropping the block costs a receiver one satellite in
+            // one two-hour slice; shipping it cost 白い熊 a three-minute fix (2026-09-14).
+            if (abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT) return@runParallel FittedRecord(job, null, err)
             // 0-BASED, for every system in this format except GLONASS. Anchored against ESA's own
             // almanac, not against our decoder: Huawei's number = SVID-1 lands at 27 km median
             // against their files, = SVID at 45 120 km.
             val idx = job.sat.substring(1).toInt() - 1
+            // Named, because the encoder cannot name itself. `sgn`/`uns` refuse a NaN and say only
+            // how wide the field was — "cannot encode NaN into a 32-bit field" — which on
+            // 2026-09-15 cost an hour of guessing at which of four constellations, thirty-odd
+            // satellites and thirty-six blocks had produced it. The satellite and the block are
+            // known HERE and nowhere below.
             val record = if (job.system == "GPS") {
-                Records.encodeGps(
-                    idx, week, el, clock[0], clock[1], tow, tow, captured.gpsTgd[idx] ?: 0,
-                )
+                named(job.system, job.sat, job.index) {
+                    Records.encodeGps(
+                        idx, week, el, clock[0], clock[1], tow, tow, captured.gpsTgd[idx] ?: 0,
+                    )
+                }
             } else {
-                Records.encodeGalileo(
-                    idx, el, clock[0], clock[1], tow, tow, captured.galileoTgd[idx] ?: 0,
-                )
+                named(job.system, job.sat, job.index) {
+                    Records.encodeGalileo(
+                        idx, el, clock[0], clock[1], tow, tow, captured.galileoTgd[idx] ?: 0,
+                    )
+                }
             }
             FittedRecord(job, record, err)
         }
@@ -424,6 +492,9 @@ object PredictedSet {
             append("${written.size} files, ${bytes / 1024} KB · ")
             append("${utc(plan.stamps.first())} → ${utc(plan.stamps.last())} UTC · ")
             append(stats.joinToString(" · "))
+            // Last, and in the summary rather than only the log, because this is the one line that
+            // says the set was assembled from something older than today.
+            for (note in src.notes) append(" · $note")
         }
         report.step(PgnssStep.BUILD, "Built", "", tally.get(), tally.total, 1.0, line = summary)
         return PgnssBuildResult(
@@ -432,7 +503,7 @@ object PredictedSet {
             windowStartGps = plan.stamps.first(),
             windowEndGps = plan.stamps.last(),
             summary = summary,
-            notes = plan.notes + bds.notes,
+            notes = src.notes + plan.notes + bds.notes,
         )
     }
 
@@ -763,8 +834,17 @@ object PredictedSet {
                 itrs[3 * i + 1] = back[1]
                 itrs[3 * i + 2] = back[2]
             }
-            val clock = Orbit.clockExtrapolate(d, grid, config.bdsClockHours)
-            Track(sat, Sp3.Arc(grid.copyOf(), itrs, clock), fit.rms, null)
+            // The clock LINE, not just its values: the caller screens on how badly it misses the
+            // clock it was fitted to, which is the only thing that separates a satellite whose
+            // drift is steady from one whose drift turned inside the window.
+            val line = Orbit.clockLine(d, config.bdsClockHours)
+            val last = d.t[d.size - 1]
+            val clock = if (line == null) {
+                DoubleArray(grid.size) { Double.NaN }
+            } else {
+                DoubleArray(grid.size) { line.intercept + line.slope * (grid[it] - last) }
+            }
+            Track(sat, Sp3.Arc(grid.copyOf(), itrs, clock), fit.rms, null, line)
         }
         val failed = tracks.filter { it.arc == null }
         if (failed.isNotEmpty()) {
@@ -773,10 +853,12 @@ object PredictedSet {
         }
         val track = LinkedHashMap<String, Sp3.Arc>()
         val rms = HashMap<String, Double>()
+        val clockLines = HashMap<String, Orbit.ClockLine?>()
         for (result in tracks.sortedBy { it.sat }) {
             val a = result.arc ?: continue
             track[result.sat] = a
             rms[result.sat] = result.rms
+            clockLines[result.sat] = result.clock
         }
         if (track.isEmpty()) {
             throw PgnssBuildException(
@@ -847,6 +929,18 @@ object PredictedSet {
                 // manoeuvre. Whatever the reason, its dynamics are not to be trusted forward.
                 plan.bdsArc.getValue(sat).let { it.t[it.size - 1] } < fresh - 7200.0 ->
                     "dropped from the newest file"
+                // An orbit can be integrated; a clock can only be extended by believing that its
+                // drift holds. When it does not, the straight line through it is not approximately
+                // right, it is arbitrary — C10 on 2026-09-14 fitted −5.2e-10 s/s against a true
+                // +3.5e-12, which is 1.1 km of range in every block past the splice and a 14.5 km
+                // step where the two meet. The satellite is still perfectly good over the span the
+                // product covers, so it is CUT BACK to that span rather than dropped: the same
+                // remedy, and the same `trust` value, as an orbit we will not integrate forward.
+                clockLines[sat]?.let { it.rmsSeconds > config.bdsMaxClockRms } != false ->
+                    clockLines[sat]?.let {
+                        "clock line misses by " +
+                            "${"%.0f".format(it.rmsSeconds * PgnssConstants.C_LIGHT)} m"
+                    } ?: "no clock to extend"
                 else -> null
             }
             trust[sat] = if (why == null) Double.POSITIVE_INFINITY else productEnd
@@ -913,13 +1007,21 @@ object PredictedSet {
             )
             if (err > Orbit.MAX_ERROR_M) return@runParallel FittedRecord(job, null, err)
             val clock = Orbit.clockFit(d, ts)
+            // The backstop, and it applies to every constellation because the fault it catches is
+            // not BeiDou's: a block whose fitted drift is physically impossible ships a range that
+            // is wrong by kilometres, and a receiver that believes it spends its search excluding
+            // the satellite instead of fixing. Dropping the block costs a receiver one satellite in
+            // one two-hour slice; shipping it cost 白い熊 a three-minute fix (2026-09-14).
+            if (abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT) return@runParallel FittedRecord(job, null, err)
             val idx = job.sat.substring(1).toInt() - 1
             FittedRecord(
                 job,
-                Records.encodeBds(
-                    idx, el, clock[0], clock[1], tow, tow,
-                    plan.bdsTail[idx] ?: ByteArray(4),
-                ),
+                named("BDS", job.sat, job.index) {
+                    Records.encodeBds(
+                        idx, el, clock[0], clock[1], tow, tow,
+                        plan.bdsTail[idx] ?: ByteArray(4),
+                    )
+                },
                 err,
             )
         }
@@ -1099,7 +1201,27 @@ object PredictedSet {
 
     private class FittedRecord(val job: KeplerJob, val record: ByteArray?, val error: Double)
 
-    private class Track(val sat: String, val arc: Sp3.Arc?, val rms: Double, val why: String?)
+    /**
+     * Run [body], and if it refuses a value, say WHICH satellite and WHICH block it was.
+     *
+     * [Records.sgn] and [Records.uns] guard against encoding a NaN, which is right — a NaN in a
+     * broadcast field is a satellite placed somewhere impossible. What they cannot do is say whose
+     * it was: they see a Double and a field width. This wraps the one place that knows.
+     */
+    private inline fun <T> named(system: String, sat: String, block: Int, body: () -> T): T =
+        try {
+            body()
+        } catch (refused: IllegalArgumentException) {
+            throw PgnssBuildException("$system $sat, block $block: ${refused.message}")
+        }
+
+    private class Track(
+        val sat: String,
+        val arc: Sp3.Arc?,
+        val rms: Double,
+        val why: String?,
+        val clock: Orbit.ClockLine? = null,
+    )
 
     private class BeiDouResult(val file: ByteArray, val summary: String, val notes: List<String>)
 
@@ -1258,6 +1380,17 @@ class PgnssBuildConfig(
      * only number in the BeiDou path measured against somebody else's orbit.
      */
     val bdsMaxArcRms: Double = 50.0,
+    /**
+     * How far the extrapolated clock line may miss the clock it was fitted to, in SECONDS of RMS,
+     * before the satellite is cut back to the span the product covers.
+     *
+     * 3e-8 s is **9 m**. A steered satellite clock fitted linearly over a day and a half leaves
+     * nanoseconds — sub-metre — and a clock whose drift turned inside the window leaves
+     * microseconds; there is nothing in between to be careful about. C10 on 2026-09-14 would have
+     * been cut here and instead shipped 1.1 km of range error through two thirds of the window,
+     * because this screen did not exist and nothing else looks at a clock (白い熊, 2026-09-14).
+     */
+    val bdsMaxClockRms: Double = 3e-8,
     /** The four geostationary BeiDou satellites are not integrated past the product. */
     val integrateBdsGeo: Boolean = false,
     val geopotentialDegree: Int = PgnssConstants.NMAX_DEFAULT,
@@ -1302,9 +1435,14 @@ fun interface PgnssSourceSupplier {
 }
 
 /** The real one: [PgnssFetcher], which always downloads. */
-class PgnssNetworkSources(private val wuhanIssues: Int = 3) : PgnssSourceSupplier {
+class PgnssNetworkSources(
+    private val wuhanIssues: Int = 3,
+    /** Where the last good almanac of each kind lives. Null keeps the old fail-hard behaviour. */
+    private val almanacCache: File? = null,
+) : PgnssSourceSupplier {
     override suspend fun fetch(workDir: File, onProgress: (FetchProgress) -> Unit): PgnssSources =
-        PgnssFetcher(workDir, progress = onProgress).fetchAll(wuhanIssues = wuhanIssues)
+        PgnssFetcher(workDir, cacheDir = almanacCache, progress = onProgress)
+            .fetchAll(wuhanIssues = wuhanIssues)
 }
 
 /**

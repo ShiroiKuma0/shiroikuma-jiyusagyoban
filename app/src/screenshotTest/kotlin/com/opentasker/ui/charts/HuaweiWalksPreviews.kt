@@ -41,11 +41,18 @@ import java.io.File
  * asked for the area, so the preview is also the check that that state looks deliberate.
  */
 private fun plotFor(walk: HuaweiWorkoutStore.Workout): WalkPlot? {
+    // A walk with no fixes gets NO plot, exactly as in the window — which builds plots from
+    // `walks.filter { it.hasTrack }` and so never holds one for a walk that came home without a
+    // route. The fixture used to hand such a walk an empty plot instead, which drew the same
+    // placeholder by a route the real screen cannot take (白い熊, 2026-09-14).
+    if (!walk.hasTrack) return null
     // One walk of each state, deterministically. Left to a modulo of the real timestamps the grid
     // came out showing the same state in three cells of four, which checks a third of the screen.
     val seed = walk.startSeconds.toInt()
     val state = Math.floorMod(walk.startSeconds / 3600L, 3L).toInt()
-    if (state == 2) return WalkPlot(emptyList(), null, null)         // the band got no fix
+    // Points on file that will not rebuild — the OTHER empty frame, and the one that must not
+    // blame the satellites.
+    if (state == 2) return WalkPlot(emptyList(), null, null)
     val lat0 = 50.0755
     val lon0 = 14.4378
     val pts = (0 until 40).map { i ->
@@ -150,6 +157,14 @@ private val WALKS = listOf(
     walk(7, 1_787_400_000L, 52, 4_180, 3_090, mapped = false),
     walk(6, 1_787_320_000L, 14, 1_020, 812, mapped = true, note = "rain"),
     walk(5, 1_787_210_000L, 71, 5_640, 4_255, mapped = false, stops = 4),
+    // 白い熊's walk of 2026-09-13, which is the reason this state has words of its own: workout 46,
+    // 1.61 km and 23 minutes by the step counter, and `track=false` in the band's own list. Its
+    // figures are here to the metre so the cell can be compared against the phone.
+    walk(46, 1_789_290_960L, 23, 1_610, 0, mapped = false, stops = 1),
+    // The other empty frame: 1832 fixes on file that will not rebuild. Its hour is chosen to land
+    // on the plot state that returns an empty track — the two must be told apart by looking, since
+    // in the grid they are the same grey box three words apart.
+    walk(45, 1_789_200_000L, 34, 2_480, 1_832, mapped = false),
 )
 
 private fun previewFor(w: HuaweiWorkoutStore.Workout): ImageBitmap? = when (w.number) {
@@ -191,6 +206,32 @@ private fun Grid(state: HuaweiWalksState) {
 fun HuaweiWalksGridPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
         Grid(HuaweiWalksState(walks = WALKS, loading = false))
+    }
+}
+
+/**
+ * The two walks with nothing to draw, in the cell they are actually read in.
+ *
+ * Its own preview because the full grid puts them below the fold, and the 4:3 frame is where the
+ * wording is decided: it is a quarter of a phone's width, so a line that reads well in a paragraph
+ * arrives here as four words and a hyphen. Both must fit, and they must not read as the same state.
+ */
+@PreviewTest
+@Preview(name = "Walks — nothing to draw", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiWalksNoRoutePreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) {
+        Grid(HuaweiWalksState(walks = listOf(WALKS[4], WALKS[5]), loading = false))
+    }
+}
+
+/** The same pair in Japanese, which wraps by character and so fails differently. */
+@PreviewTest
+@Preview(name = "Walks — nothing to draw 日本語", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun HuaweiWalksNoRouteJaPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) {
+        Grid(HuaweiWalksState(walks = listOf(WALKS[4], WALKS[5]), loading = false))
     }
 }
 
@@ -247,14 +288,37 @@ fun HuaweiWalkMappedPreview() {
 }
 
 /**
- * A walk with no map yet — the state every walk starts in, and the one that must not read as a
- * failure. It gets the band's own figures and a single clear invitation.
+ * A walk never sent to 地図: its route drawn over the shared cutout, and no 地図 reading under the
+ * figures. The state that must not read as a failure — nothing is missing, it simply lives here.
  */
 @PreviewTest
 @Preview(name = "Walk — unsent 日本語", widthDp = 413, heightDp = 780, showBackground = true)
 @Composable
 fun HuaweiWalkUnsentPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Detail(WALKS[1]) }
+}
+
+/**
+ * The walk that has no route and never will.
+ *
+ * Both halves have to be looked at: the frame must say why it is empty rather than promise a
+ * picture, and the map furniture under it — the fetch button, the line about 地図 keeping the track
+ * — must be GONE, because there is nothing to fetch and nothing to keep. Its figures still stand:
+ * the band counted the steps whether or not it saw a satellite.
+ */
+@PreviewTest
+@Preview(name = "Walk — no fix", widthDp = 413, heightDp = 780, showBackground = true)
+@Composable
+fun HuaweiWalkNoFixPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.EN) { Detail(WALKS[4]) }
+}
+
+/** The same walk in Japanese, where the line has to fit a frame it cannot wrap out of. */
+@PreviewTest
+@Preview(name = "Walk — no fix 日本語", widthDp = 413, heightDp = 780, showBackground = true)
+@Composable
+fun HuaweiWalkNoFixJaPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Detail(WALKS[4]) }
 }
 
 /** 地図 not installed, or its half not built yet. The walk is untouched; only the picture is missing. */
