@@ -219,6 +219,19 @@ object PgnssExtraFile {
         b[0xF79] = (bds.week and 0xFF).toByte()
         b[0xF7A] = bdsToaField.toByte()
         b[0xF7B] = 0
+        // EVERY slot is structured, occupied or not — the index at +0 and the flags word at +34,
+        // with the thirty-four bytes between them left zero.
+        //
+        // That is what Huawei does: ten slots of its own capture (C15, C17, C18, C51-C55, C58, C63)
+        // carry an index and a flags word and nothing else. We wrote thirty-six zeros instead, so a
+        // slot we cannot fill lost its identity as well as its orbit — and a comparison against the
+        // capture duly showed every one of those ten as "Huawei writes bytes here and we do not"
+        // (白い熊, 2026-09-15). An empty slot said in the band's own idiom is better than an absence.
+        for (slot in 0 until BDS_SLOTS) {
+            val p = 0xF7C + slot * 36
+            b[p] = slot.toByte()
+            w.putShort(p + 34, ref.getShort(p + 34))
+        }
         for (slot in 0 until BDS_SLOTS) {
             val el = bds.records[slot] ?: continue
             val p = 0xF7C + slot * 36
@@ -247,7 +260,49 @@ object PgnssExtraFile {
         w.putInt(0x185C, (epochGps + 604800L).toInt())
         w.putInt(0x1860, 0)
         w.putInt(0x1864, utc.dtLS)
+        checkGeostationaries(bds)
         return b
+    }
+
+    /**
+     * The last thing before the file is handed back: are the geostationaries over their stations?
+     *
+     * **This gate exists because the fault it catches was invisible to everything else for
+     * seventeen days.** The carry-forward of a captured BeiDou record dropped the Earth-rotation
+     * term — `ωe·604800 = 44.1027 rad` is not a multiple of 2π, it folds to 6.904° per week of gap
+     * to the packaged capture — so five satellites walked east a little further every Sunday. The
+     * code never changed; the gap grew. `git log` could not show it, the golden diff could not see
+     * it because the Python twin shared the assumption, and every other instrument grades ephemeris.
+     * The band's only symptom was a slow fix: 13 s at +6.9°, two minutes at +27.6° (白い熊,
+     * 2026-08-30 to 2026-09-15; 8 s once corrected).
+     *
+     * A unit test covers the code path with fixture data. This covers **the file actually built
+     * today, from today's data**, which is what that fault needed — and it is nine records of
+     * arithmetic against numbers published by someone else, so it cannot be satisfied by agreeing
+     * with ourselves.
+     *
+     * Refusing is right. A set the band accepts and then searches the wrong sky with is worse than
+     * no set at all: it marks its data current and stops asking for the broadcast ephemeris that
+     * would have worked (measured at 1135 s against 581 s for nothing).
+     */
+    private fun checkGeostationaries(bds: BdsAlmanacFit) {
+        val wrong = ArrayList<String>()
+        for ((prn, station) in BDS_STATIONS) {
+            val el = bds.records[prn - 1] ?: continue
+            val p = almanacPosition(el, 0.0, bds.toa.toDouble())
+            val lon = Math.toDegrees(atan2(p[1], p[0]))
+            val off = ((lon - station + 540.0) % 360.0) - 180.0
+            if (abs(off) > MAX_GEO_OFFSET_DEG) {
+                wrong += "C%02d is %+.1f° from %.2f°E".format(prn, off, station)
+            }
+        }
+        if (wrong.isNotEmpty()) {
+            throw PgnssBuildException(
+                "the almanac puts geostationary satellites off their stations — " +
+                    wrong.joinToString(", ") +
+                    ". Nothing has been written; the band keeps the set it had.",
+            )
+        }
     }
 
     /**
@@ -357,11 +412,38 @@ object PgnssExtraFile {
                 if (slot in records) continue
                 val old = decodeReferenceBds(reference, slot) ?: continue
                 // Re-reference the captured record to our own toa through the almanac's own model.
+                //
+                // ## The Earth-rotation term, and why leaving it out rots by 6.9° a week
+                //
+                // [almanacPosition] forms the node as `Ω = Ω0 + (Ω̇ − ωe)·tk − ωe·toaSow`. Carrying a
+                // record from `(refWeek, old.toa)` to `(bwk, btoa)` means finding the Ω0 that makes
+                // the two evaluations agree at one absolute instant. Equating them and cancelling:
+                //
+                //     Ω0_new = Ω0_old + Ω̇·dt − ωe·(dt − (btoa − old.toa))
+                //
+                // and that last bracket is exactly `604800·(bwk − refWeek)` — a whole number of
+                // weeks. `ωe·604800 = 44.1027 rad`, which is NOT a multiple of 2π: it folds to
+                // 0.12049 rad, **6.904° per week of gap**. This file already warns about that
+                // constant in `bdsEphemerisPosition`; the carry forgot it.
+                //
+                // Without the term the record is rotated east by 6.904° for every week between the
+                // capture and the build, and the capture is frozen at the packaged 2026-08-25
+                // resource, so the error grows every Sunday for ever. Measured on the shipped files:
+                // the BeiDou geostationaries sit on their published stations in Huawei's own capture
+                // (C01 140.02°E, C03 110.55°E, C04 160.12°E) and in our 2026-08-30 build they were
+                // 6.9° east of them, in the 2026-09-06 build 13.8°, and by 2026-09-15 20.7° — which
+                // is 15 200 km at geostationary altitude. C59–C62 are the BDS-3 geostationaries at
+                // 140/80/110.5/160°E, the most continuously visible BeiDou satellites we carry.
+                //
+                // Written as `dt − (btoa − old.toa)` rather than as `604800 * weeks` on purpose: it
+                // is the model read backwards, so it cannot drift out of step with the formula the
+                // band actually evaluates.
                 val dt = btoaAbs - (refWeek * 604800.0 + old.toa)
                 val n = sqrt(MU / pow6(old.elements.sqrtA))
                 records[slot] = old.elements.copy(
                     m0 = old.elements.m0 + n * dt,
-                    omega0 = old.elements.omega0 + old.elements.omegaDot * dt,
+                    omega0 = old.elements.omega0 + old.elements.omegaDot * dt -
+                        OMEGA_E * (dt - (btoa - old.toa)),
                 )
                 carried.add(slot + 1)
             }
@@ -396,6 +478,25 @@ object PgnssExtraFile {
      * week roll — OMEGA_E * 604800 is 44.09 rad, not a multiple of 2*pi — and silently threw
      * satellites 4820 km out on any arc that straddled it.
      */
+    /**
+     * Where BeiDou parks its geostationary satellites, in degrees east. Published, so this is a
+     * check against the outside world rather than against ourselves — and it needs no orbit
+     * product, no fixture and no network.
+     */
+    private val BDS_STATIONS = mapOf(
+        1 to 140.0, 2 to 80.0, 3 to 110.5, 4 to 160.0, 5 to 58.75,
+        59 to 140.0, 60 to 80.0, 61 to 110.5, 62 to 160.0,
+    )
+
+    /**
+     * How far a geostationary may sit from its station before the set is refused.
+     *
+     * Five degrees, deliberately loose: two of the captured records are carried stale by Huawei
+     * ITSELF — its own C59 reads 4.58° east — and this must not demand better of us than the file
+     * we are reproducing. The fault it exists to catch was 27.6°.
+     */
+    const val MAX_GEO_OFFSET_DEG = 5.0
+
     fun almanacPosition(el: KeplerElements, tk: Double, toaSow: Double, mu: Double = MU): DoubleArray {
         val a = abs(el.sqrtA) * abs(el.sqrtA)
         val e = minOf(abs(el.e), 0.05)

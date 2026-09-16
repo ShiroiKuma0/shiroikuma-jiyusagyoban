@@ -8,6 +8,91 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-05.17-44.g09a659b5+126 — 2026-09-16
+
+Built on upstream `09a659b5`.
+
+### 衛星 — the almanac decides the fix, and ours had been walking east 6.9° a week
+
+The band took **two minutes** to find itself on the 14th and the 15th, where it had once taken 13
+seconds. Every instrument this project owns said the satellite data was excellent: the predicted
+ephemeris graded at **0.11 m** against an independent orbit product, clocks included. It was
+excellent, and it was beside the point. **The almanac decides which satellites to look for and
+roughly where; the ephemeris only matters once one has been found**, so a flawless set can still
+leave the receiver searching an empty sky.
+
+Swapping one file of six — Huawei's own captured almanac in place of ours, everything else today's —
+took the fix from two minutes to **15 seconds**. That isolated the fault to 6 248 bytes.
+
+**The fault was one missing term.** Where a BeiDou satellite has no public almanac we carry Huawei's
+captured record forward and re-reference it. The band forms the node as `Ω0 + (Ω̇ − ωe)·tk − ωe·toaSow`,
+so carrying across weeks needs
+
+```
+Ω0_new = Ω0_old + Ω̇·dt − ωe·(dt − (btoa − old.toa))
+```
+
+and that bracket is a whole number of weeks. **`ωe·604800 = 44.1027 rad` is not a multiple of 2π** —
+it folds to **6.904° per week**. We had only `Ω̇·dt`. The reference is a *packaged* file, so the gap
+grew every Sunday: `+6.9°` on 2026-08-30 when the band fixed in 13 s, `+27.6°` by 2026-09-15 when it
+took two minutes — **20 000 km at geostationary radius**, on C05 and the four BDS-3 geostationaries
+C59–C62, the most continuously visible BeiDou satellites we carry.
+
+It was armed the day the capture was packaged and got worse weekly, so no commit shows it, and the
+golden diff could not see it because the Python twin shared the assumption. Corrected in both.
+**Measured after: 8 seconds**, on a set generated end to end — only QZSS is still Huawei's, and it
+never rises over Prague.
+
+### 衛星 — three instruments, because a number nothing measures is a number nobody can trust
+
+- **The geostationaries are checked against their published stations**, at build time and in a test.
+  BeiDou parks C01/C59 at 140.0°E, C02/C60 at 80.0°E, C03/C61 at 110.5°E, C04/C62 at 160.0°E and C05
+  at 58.75°E, so the almanac can be graded against the outside world with no orbit product, no
+  fixture and no network. `buildExtra` now **refuses to write** a file that fails it, naming the
+  satellite — a set the band accepts and then searches the wrong sky with is worse than none, because
+  it marks its data current and stops asking for the broadcast ephemeris that would have worked.
+- **`scripts/pgnss-almanac-verify.py`** — promoted out of `.scratch`, where an acceptance harness had
+  sat since 2026-08-30 pinned to its fixtures and never run again. Independent decode, byte-position
+  diff against every captured vintage, per-satellite physical grade.
+- **`pgnss-grade.py` grades clocks and GLONASS**, neither of which it had ever touched. A range is
+  orbit *plus* clock, and BeiDou C10 duly turned out to be shipping **1.1 km** of clock error behind a
+  0.03 m orbit grade — wrong sign, 150× too large — because a linear fit had been run through a step.
+  That is screened now, with a blunt drift bound behind it.
+
+Three graders read catastrophe before any file was wrong — GLONASS at 11 923 km, Galileo at 14 360 km,
+BeiDou at 50 000 km — each an error in the measurement, not the measured. The tools carry that warning
+where it can be read.
+
+### 衛星 — one host is not an architecture
+
+`igs.bkg.bund.de` stopped answering on the evening of the 14th and six builds died on it. BKG was not
+down: it runs a **second host on another address** that answered 10 of 10 while the gateway managed 3.
+The navigation file now has **five sources across four organisations** — BKG over FTP, IGN, the Royal
+Observatory of Belgium, GOP — where it had one, and takes any of the last three days rather than
+insisting on today's. The three almanacs keep a **last-good cache** in the store (the orbit products
+deliberately do not: a cached orbit is a wrong orbit a day later). A dropped connection is retried;
+a 404 is not, and the retry no longer multiplies with the loops that already walk alternatives.
+
+Also: an all-zero SP3 position is read as **missing** rather than as the centre of the Earth — CODE
+published G13 with 1 215 of its 1 441 epochs that way — and GPS and Galileo are scheduled only for the
+blocks their data covers, a guard BeiDou has had from the start.
+
+### 健康 — "no map yet" said the wrong thing twice
+
+A walk with no route said *no map yet*, which named the wrong missing thing and promised a picture
+that was never coming. The band's own list settles it: workout 46 is flagged `track=false` where every
+other walk that fortnight is `track=true`. It now reads **no route — the band got no GPS fix**, with a
+separate line for the other case: a route on file that will not rebuild. The walk's own screen drops
+the "the map comes from 白い熊 地図" note when there is no picture to explain.
+
+### 衛星 — the panel says what to do, and stops offering what cannot help
+
+「即時」 told 白い熊 to press **Update** on the band, which asks for the three-day forecast — the one
+thing that task does not serve. It now says to **start an outdoor walk**, which is what makes the band
+ask for the broadcast ephemeris, and it listens until Close instead of giving up after sixty seconds.
+On the 衛星 panel, Cancel greys itself out once the transfer has finished and a line says plainly that
+Close is all that is left.
+
 ## 0.2.93+2026-09-05.17-44.g09a659b5+113 — 2026-09-13
 
 Built on upstream `09a659b5`.
