@@ -9,10 +9,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.atan2
 
 /**
  * `HW_PGNSS_EXTRA` assembly, graded against Huawei's own captured files and against the reference
@@ -325,6 +327,93 @@ class ExtraFileTest {
         assertEquals(captured!!.elements.sqrtA, fit.records.getValue(39).sqrtA, 1e-9)
         assertEquals(captured.elements.e, fit.records.getValue(39).e, 1e-12)
         assertTrue(abs(captured.elements.m0 - fit.records.getValue(39).m0) > 1e-6)
+    }
+
+    /**
+     * **The check that would have caught the 2026-09-15 regression on the day it was armed.**
+     *
+     * A geostationary satellite's longitude is published: BeiDou keeps C01/C59 at 140.0°E,
+     * C02/C60 at 80.0°E, C03/C61 at 110.5°E, C04/C62 at 160.0°E and C05 at 58.75°E. So the almanac
+     * can be graded against the outside world with no orbit product, no fixture and no network —
+     * evaluate the record at its own toa and see whether the satellite is over its station.
+     *
+     * Carrying a captured record to a new toa needs the Earth-rotation term, because the band's
+     * node is `Ω0 + (Ω̇ − ωe)·tk − ωe·toaSow`. `ωe·604800 = 44.1027 rad` is not a multiple of 2π: it
+     * folds to **6.904° per week of gap**, and the gap grows for ever because the reference is a
+     * packaged file. Without the term the geostationaries walked east — 6.9° on 2026-08-30 when the
+     * band fixed in 13 s, 27.6° by 2026-09-15 when it took two minutes, which is 20 000 km at
+     * geostationary radius (白い熊).
+     *
+     * Nothing else caught it. The golden diff compares Kotlin against the Python twin and both had
+     * the same missing term; every other instrument grades ephemeris. One published number per
+     * satellite would have.
+     */
+    @Test
+    fun everyBeidouGeostationarySitsOverItsPublishedStation() {
+        val stations = mapOf(
+            1 to 140.0, 2 to 80.0, 3 to 110.5, 4 to 160.0, 5 to 58.75,
+            59 to 140.0, 60 to 80.0, 61 to 110.5, 62 to 160.0,
+        )
+        // Carried records only: the fitted ones are checked by their own residual, and it is the
+        // CARRY whose arithmetic this pins.
+        // One real satellite so the build has an arc to work from; every other slot is carried,
+        // which is the path under test.
+        val nav = mapOf(
+            40 to (0..5).map { bdsRecord(40, 1078, 3600.0 + 1800.0 * it, if (it % 2 == 0) 0.5 else 1.5) },
+        )
+        val fit = PgnssExtraFile.buildBds(nav, reference, epochAfterTheArc, carryStale = true)
+        var checked = 0
+        for ((prn, station) in stations) {
+            val el = fit.records[prn - 1] ?: continue
+            if (PgnssExtraFile.decodeReferenceBds(reference, prn - 1) == null) continue
+            val p = PgnssExtraFile.almanacPosition(el, 0.0, fit.toa.toDouble())
+            val lon = Math.toDegrees(atan2(p[1], p[0]))
+            val err = ((lon - station + 540.0) % 360.0) - 180.0
+            checked++
+            // Generous, because two of the captured records are themselves carried stale by Huawei
+            // — its own C59 reads 4.58° east of station — and this test must not demand better of
+            // us than the file we are reproducing.
+            assertTrue(
+                "C%02d should be within 5 deg of %.2f E, it is %.2f E (%+.2f)"
+                    .format(prn, station, (lon + 360.0) % 360.0, err),
+                abs(err) < 5.0,
+            )
+        }
+        assertTrue("no geostationary was checked at all", checked >= 5)
+    }
+
+    /**
+     * The gate refuses rather than writes — and says which satellite.
+     *
+     * The unit test above checks the code path with fixture data; this checks that a bad result is
+     * REFUSED at the point of assembly, on the phone, where 白い熊 sees the reason in
+     * `HUAWEI_PgnssFailed`. A set the band accepts and then searches the wrong sky with is worse
+     * than none: it marks its data current and stops asking for the broadcast ephemeris that would
+     * have worked.
+     */
+    @Test
+    fun anAlmanacWithAGeostationaryOffItsStationIsRefusedNotWritten() {
+        val nav = mapOf(
+            40 to (0..5).map { bdsRecord(40, 1078, 3600.0 + 1800.0 * it, if (it % 2 == 0) 0.5 else 1.5) },
+        )
+        val good = PgnssExtraFile.buildBds(nav, reference, epochAfterTheArc, carryStale = true)
+        // Shove one geostationary a quarter-turn round its orbit — the shape the missing
+        // Earth-rotation term made, four weeks' worth of it.
+        val moved = good.records.toMutableMap()
+        val c01 = moved.getValue(0)
+        moved[0] = c01.copy(omega0 = c01.omega0 + Math.toRadians(90.0))
+        val broken = good.copy(records = moved)
+        val failure = assertThrows(PgnssBuildException::class.java) {
+            PgnssExtraFile.build(
+                1_472_133_618L, reference, gps, galileo, glonass, klobuchar, utc, broken,
+            )
+        }
+        assertTrue(
+            "the refusal must name the satellite, it said: ${failure.message}",
+            failure.message!!.contains("C01"),
+        )
+        // And the good one still builds, so the gate is not simply refusing everything.
+        PgnssExtraFile.build(1_472_133_618L, reference, gps, galileo, glonass, klobuchar, utc, good)
     }
 
     /** An empty capture slot carries nothing; it must not become a satellite at the origin. */

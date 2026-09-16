@@ -74,6 +74,22 @@ object Sp3 {
                 val x = number(line, 4, 18) ?: continue
                 val y = number(line, 18, 32) ?: continue
                 val z = number(line, 32, 46) ?: continue
+                // ALL-ZERO IS "NO VALUE", not the centre of the Earth.
+                //
+                // SP3 marks a missing position with 0.000000 in all three components, exactly as it
+                // marks a missing clock with 999999.999999 — and this reader honoured the clock
+                // sentinel and took the position literally. On 2026-09-15 CODE published a
+                // five-day predicted orbit in which **G13 carried 1215 of its 1441 epochs as
+                // zeros**: present in the header, a full epoch count, and no orbit. The Kepler fit
+                // duly fitted a satellite sitting at the centre of the Earth, produced a NaN, and
+                // the whole build died on `cannot encode NaN into a 32-bit field` — no satellite
+                // named, because only the encoder saw it.
+                //
+                // Dropping the epoch is what makes the rest work: the arc then has a hole, and
+                // `spanned` already refuses to interpolate across one, so the blocks G13 cannot
+                // support are simply not scheduled. One satellite is lost for as long as the
+                // product omits it; nothing else is touched.
+                if (x == 0.0 && y == 0.0 && z == 0.0) continue
                 val raw = number(line, 46, 60) ?: CLOCK_UNAVAILABLE
                 ts.getOrPut(sat) { ArrayList() }.add(t)
                 val pl = ps.getOrPut(sat) { ArrayList() }
