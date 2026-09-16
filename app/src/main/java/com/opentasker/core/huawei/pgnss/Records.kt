@@ -409,7 +409,15 @@ object Records {
                     Orbit.luniSolar(p, v, aTotal, a)
                     val c = Sp3.interpolate(d.t, d.clock, td)
                     val tau = if (!c.isFinite()) 0.0 else c
-                    recs.add(encodeGlonass(sat.substring(1).toInt() - 1, glonassTb(t), p, v, a, tau))
+                    recs.add(
+                        try {
+                            encodeGlonass(sat.substring(1).toInt() - 1, glonassTb(t), p, v, a, tau)
+                        } catch (refused: IllegalArgumentException) {
+                            // See the note beside `named` in PredictedSet: the encoder knows the
+                            // field width and nothing else, and the satellite is known only here.
+                            throw IllegalArgumentException("GLONASS $sat at $t: ${refused.message}")
+                        },
+                    )
                 }
                 subs.add(recs)
             }

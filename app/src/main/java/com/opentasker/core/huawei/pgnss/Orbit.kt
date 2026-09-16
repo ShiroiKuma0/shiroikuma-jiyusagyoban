@@ -468,11 +468,14 @@ object Orbit {
      * Unbounded first: it is faster and nine records in ten land inside the fields anyway. Only the
      * ones that would CLIP are refitted under bounds, which is where the cost is worth paying.
      */
+    /** The half-window a Kepler fit samples either side of its toe. A block is fitted from this. */
+    const val FIT_HALF = 3600.0
+
     fun fit(
         arc: Sp3.Arc,
         toeAbs: Double,
         toeTow: Double,
-        half: Double = 3600.0,
+        half: Double = FIT_HALF,
         samples: Int = 25,
         propagator: Propagator = Propagator { el, t, out -> propagate(el, t, out) },
         seeder: Seeder = Seeder { p, v, toe, tow -> seedElements(p, v, toe, tow) },
@@ -593,12 +596,38 @@ object Orbit {
      * out rather than shipped with a confident wrong number.
      */
     fun clockExtrapolate(arc: Sp3.Arc, grid: DoubleArray, hours: Double = 36.0): DoubleArray {
+        val line = clockLine(arc, hours) ?: return DoubleArray(grid.size) { Double.NaN }
+        val last = arc.t[arc.size - 1]
+        return DoubleArray(grid.size) { line.intercept + line.slope * (grid[it] - last) }
+    }
+
+    /**
+     * The straight line [clockExtrapolate] rides on, **and how badly it misses the clock it came
+     * from** — which is the number nobody was asking for.
+     *
+     * A line through a clock that turned inside the window is still a line: `linearFit` returns it
+     * without complaint, the 3σ pass cannot remove a TURN (half the points sit on each side of it,
+     * so both halves look like outliers of the other), and what ships is a confident wrong number.
+     *
+     * Measured on 2026-09-14: BeiDou C10's true drift is +3.5e-12 s/s and this fitted **−5.2e-10** —
+     * wrong sign, 150 times too big, 1.1 km of range error in every block past the splice and a
+     * 14.5 km step where the extrapolation meets the product's own clock. Nothing caught it, because
+     * every check this project owns grades ORBITS: the builder's residual, and `pgnss-grade.py`,
+     * which decodes the shipped bytes and compares positions. A range is orbit PLUS clock, and the
+     * clock half had no instrument at all (白い熊, 2026-09-14).
+     *
+     * [rmsSeconds] is what the caller screens on. A steered clock fitted over a day and a half
+     * leaves nanoseconds; a clock that turned leaves microseconds, and the two do not overlap.
+     */
+    class ClockLine(val intercept: Double, val slope: Double, val rmsSeconds: Double, val n: Int)
+
+    fun clockLine(arc: Sp3.Arc, hours: Double = 36.0): ClockLine? {
         val last = arc.t[arc.size - 1]
         val idx = ArrayList<Int>()
         for (i in 0 until arc.size) {
             if (arc.clock[i].isFinite() && arc.t[i] >= last - hours * 3600.0) idx.add(i)
         }
-        if (idx.size < 10) return DoubleArray(grid.size) { Double.NaN }
+        if (idx.size < 10) return null
         var xs = DoubleArray(idx.size) { arc.t[idx[it]] - last }
         var ys = DoubleArray(idx.size) { arc.clock[idx[it]] }
         var c = linearFit(xs, ys)
@@ -615,8 +644,30 @@ object Orbit {
             ys = DoubleArray(keep.size) { ys[keep[it]] }
             c = linearFit(xs, ys)
         }
-        return DoubleArray(grid.size) { c[0] + c[1] * (grid[it] - last) }
+        // The residual is of the line that is actually SHIPPED, over the points it was actually
+        // fitted to — not of the first pass. A screen on the wrong one would pass the exact case it
+        // exists to catch.
+        var sum = 0.0
+        for (i in xs.indices) {
+            val e = ys[i] - (c[0] + c[1] * xs[i])
+            sum += e * e
+        }
+        return ClockLine(c[0], c[1], sqrt(sum / xs.size), xs.size)
     }
+
+    /**
+     * A satellite clock's drift, beyond which the number is ours rather than the satellite's.
+     *
+     * Real broadcast `af1` lives around 1e-12 to 1e-11 s/s; the whole 2026-08-30 set that fixed in
+     * 13 s tops out at 3.7e-11. **1e-10 s/s is 216 m of range across one two-hour block** — already
+     * far beyond anything a working clock does, and far below the 1122 m and 23 917 m that shipped
+     * on 2026-09-14. A block over this is dropped rather than corrected: there is nothing to correct
+     * it to, and a missing satellite costs a receiver a little while a lying one costs it a fix.
+     */
+    const val MAX_CLOCK_DRIFT = 1e-10
+
+    /** The same bound stated as what it does to a range, for messages people have to read. */
+    fun driftMetres(af1: Double, seconds: Double = 7200.0): Double = abs(af1) * seconds * PgnssConstants.C_LIGHT
 
     /** `[intercept, slope]` by least squares, about the means so the normal equations stay tame. */
     internal fun linearFit(xs: DoubleArray, ys: DoubleArray): DoubleArray {

@@ -137,4 +137,25 @@ class Sp3Test {
         assertEquals(20_694L, Sp3.daysFromCivil(2026, 8, 29))
         assertEquals("a leap day", 1L, Sp3.daysFromCivil(2024, 3, 1) - Sp3.daysFromCivil(2024, 2, 29))
     }
+
+    @Test
+    fun `an all-zero position is missing, not the centre of the Earth`() {
+        // CODE's five-day predicted orbit of 2026-09-15 carried G13 with 1215 of its 1441 epochs
+        // as `0.000000 0.000000 0.000000 999999.999999` — present in the header, a full epoch
+        // count, and no orbit. Read literally, the Kepler fit fitted a satellite at the geocentre,
+        // produced a NaN, and the build died with a message that named no satellite.
+        val text = """
+            *  2026  9 15  0  0  0.00000000
+            PG13    138.584551  16825.907672 -20617.668459    442.263943
+            PG14   1000.000000   2000.000000   3000.000000    123.456789
+            *  2026  9 15  0 15  0.00000000
+            PG13      0.000000      0.000000      0.000000 999999.999999               P   P
+            PG14   1100.000000   2100.000000   3100.000000    123.456789
+        """.trimIndent()
+        val arcs = Sp3.parse(text)
+        assertEquals("the empty epoch is dropped, not kept as a position", 1, arcs.getValue("G13").size)
+        assertEquals("a real satellite keeps both", 2, arcs.getValue("G14").size)
+        // The one epoch it does have is the real one.
+        assertEquals(138.584551 * 1e3, arcs.getValue("G13").x(0), 1e-6)
+    }
 }
