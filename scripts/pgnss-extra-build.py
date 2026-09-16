@@ -460,6 +460,14 @@ def build(epoch_gps, ref, yuma, gssc, agl, iono, utc, bds, log):
     # ---- 0x0f78  BeiDou almanac ----------------------------------------------------------
     bwk, btoa, recs, carried = bds
     struct.pack_into("<BBBB", b, 0xF78, 63, bwk & 0xFF, uns(btoa / 4096, 8), 0)
+    # EVERY slot is structured, occupied or not: the index at +0 and the reference's flags word at
+    # +34, zeros between.  Huawei does this for the ten slots its own capture leaves empty
+    # (C15, C17, C18, C51-C55, C58, C63); we wrote thirty-six zeros, so an empty slot lost its
+    # identity as well as its orbit.  Mirrors the Kotlin, which carries the full note.
+    for slot in range(63):
+        p0 = 0xF7C + slot * 36
+        b[p0] = slot
+        struct.pack_into("<H", b, p0 + 34, struct.unpack_from("<H", ref, p0 + 34)[0])
     for slot in range(63):
         el = recs.get(slot)
         if el is None:
@@ -598,7 +606,14 @@ def build_bds(nav, ref, epoch_gps, carry, log):
             nn = math.sqrt(MU / old["sqrtA"] ** 6)
             new = dict(old)
             new["m0"] = old["m0"] + nn * dt
-            new["omega0"] = old["omega0"] + old["omegadot"] * dt
+            # The Earth-rotation term the Kotlin comment derives: the band forms
+            # `Om = Om0 + (Omdot - we)*tk - we*toaSow`, so carrying a record needs
+            # `Om0_new = Om0_old + Omdot*dt - we*(dt - (btoa - old_toa))`, and that bracket is a
+            # whole number of weeks.  we*604800 = 44.1027 rad folds to 0.12049 rad = 6.904 deg per
+            # week of gap, and the gap grows for ever because the capture is frozen.  Measured on
+            # the shipped files as the BeiDou geostationaries walking east off their stations.
+            new["omega0"] = (old["omega0"] + old["omegadot"] * dt
+                             - OMEGA_E * (dt - (btoa - old["toa"])))
             recs[slot] = new
             carried.append(slot + 1)
     log["bds_resid"] = resid
@@ -632,7 +647,14 @@ def main():
         d = datetime.datetime.fromisoformat(args.epoch).replace(tzinfo=datetime.timezone.utc)
         epoch = (d - GPS_EPOCH).total_seconds() + 18
     epoch = int(epoch)
-    now = datetime.datetime.now(datetime.timezone.utc)
+    # The navigation day follows the EPOCH, not the wall clock.
+    #
+    # It used to read `datetime.now()`, so `--epoch 2026-08-30T14:00:00` built a 2026-08-30 file out
+    # of today's broadcast navigation — which made the golden fixture unreproducible the moment the
+    # date rolled, and quietly mixed a past epoch with present-day ephemeris. A build for an epoch
+    # should use that epoch's day (2026-09-15, while regenerating the fixture the Earth-rotation fix
+    # invalidated).
+    now = gps_to_utc(epoch)
     doy = now.timetuple().tm_yday
 
     print(f"validity {gps_to_utc(epoch)} .. {gps_to_utc(epoch + 604800)} UTC", file=sys.stderr)

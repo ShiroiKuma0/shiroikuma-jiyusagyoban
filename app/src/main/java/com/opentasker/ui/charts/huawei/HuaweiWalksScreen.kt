@@ -292,7 +292,21 @@ private fun WalkCell(
                 base = base,
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
                 thinTo = 260,
-                empty = { NoteText(HuaweiText.walksNoMap[lang]) },
+                // Which of the two absences this is, the row can answer by itself: a walk with no
+                // points never had a route, and one with points whose track will not rebuild had
+                // one and lost it here. Nothing else on this screen separates them, and telling
+                // 白い熊 the satellites failed when the fault is on this side is the worse half of
+                // the mistake "no map yet" was already making.
+                empty = {
+                    NoteText(
+                        if (walk.hasTrack) {
+                            HuaweiText.walksTrackUnreadable[lang]
+                        } else {
+                            HuaweiText.walksNoFix[lang]
+                        },
+                        Modifier.padding(horizontal = 10.dp),
+                    )
+                },
                 // Never "there is no map" — the fetch is already under way, or about to be.
                 needsMap = { NoteText(HuaweiText.walksAskingMap[lang]) },
             )
