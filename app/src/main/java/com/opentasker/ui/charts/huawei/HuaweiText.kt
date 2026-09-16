@@ -247,7 +247,35 @@ object HuaweiText {
             "to find satellites before you set off.",
         "まだ何も無い。バンドの運動アプリで記録を — 屋外で、歩き出す前に一分ほど衛星を待つこと。",
     )
-    val walksNoMap = Loc("no map yet", "地図はまだ")
+    /**
+     * The walk that came home without a route.
+     *
+     * It read "no map yet" until 2026-09-14, which was wrong twice over. The missing thing is the
+     * ROUTE, not the map under it — 地図's ground is drawn from coordinates we do not have — and
+     * "yet" promises a picture that is never coming: there is no file on the band to fetch and no
+     * amount of asking produces one.
+     *
+     * The walk of 2026-09-13 is what settled it. The band's own list flags workout 46 `track=false`
+     * while every other walk in that fortnight is `track=true`, and its summary is an ordinary
+     * walk's in every other respect — three heart-rate blocks, a pace block, 1610 m, 2167 steps.
+     * A walk it recorded without ever getting a fix (白い熊, 2026-09-14).
+     */
+    val walksNoFix = Loc(
+        "no route — the band got no GPS fix",
+        "経路なし — 衛星を捕まえられなかった",
+    )
+    /**
+     * Fixes on file that would not come back: the row counts points, and rebuilding them from the
+     * stored bytes failed.
+     *
+     * A different fault from [walksNoFix] and it must not borrow its words. The band DID record a
+     * route here, so blaming the satellites would send 白い熊 looking at the sky for something that
+     * went wrong on this side.
+     */
+    val walksTrackUnreadable = Loc(
+        "route stored, but it would not read",
+        "経路は在るが、読めなかった",
+    )
     val walksSend = Loc("Send to 地図", "地図へ送る")
     val walksFixes = Loc("fixes", "点")
     val walksNoneFound = Loc("The band had no new walks.", "バンドに新しい運動は無かった。")

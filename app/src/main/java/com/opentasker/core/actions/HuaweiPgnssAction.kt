@@ -75,6 +75,7 @@ class HuaweiPgnssAction : Action {
             // and it should not be started on a nearly flat phone by an unattended profile. It does
             // not need a charger, and demanding one would make the refresh a chore that never gets
             // done.
+            recordHistory(outDir, "NOT REBUILT · battery at $battery %", ctx.logger)
             return panel.fail(
                 store, 1,
                 "the battery is at $battery % and this is several minutes of every core — " +
@@ -145,11 +146,14 @@ class HuaweiPgnssAction : Action {
             // Cleared only by a run that really did rebuild. See the failure paths.
             ctx.variables.set("${prefix}PgnssAlert", "")
             store?.let { ctx.variables.set(it, result.summary) }
+            recordHistory(outDir, built(result), ctx.logger)
+            ctx.variables.set("${prefix}PgnssWindow", windowOf(result))
             ctx.logger("Huawei predicted ephemeris: ${result.summary}")
             for (note in result.notes) ctx.logger("  $note")
             return ActionResult.Success
         } catch (cancelled: PgnssCancelledException) {
             ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — cancelled at step ${panel.step}")
+            recordHistory(outDir, "NOT REBUILT · cancelled at step ${panel.step}", ctx.logger)
             ctx.variables.set(
                 "${prefix}PgnssAlert",
                 "THE SET WAS NOT REBUILT — cancelled at step ${panel.step}. The band still holds " +
@@ -169,6 +173,7 @@ class HuaweiPgnssAction : Action {
         } catch (error: Throwable) {
             val why = error.message ?: error::class.java.simpleName
             ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — $why")
+            recordHistory(outDir, "NOT REBUILT · $why", ctx.logger)
             // The loud one. A build that fails leaves the PREVIOUS set on disk and the band goes on
             // being served it — which is exactly how a set from 2026-09-02 survived four days of
             // runs whose panel read "Build done" (白い熊, 2026-09-06). Silence here is the bug.
@@ -201,6 +206,44 @@ class HuaweiPgnssAction : Action {
                 runCatching { workDir.deleteRecursively() }
             }
         }
+    }
+
+    /** `2026-09-14 07:59 → 2026-09-17 05:59 UTC` — the span the set's own blocks cover. */
+    private fun windowOf(result: PgnssBuildResult): String =
+        "${utc(PredictedSet.unixMillis(result.windowStartGps))} → " +
+            "${utc(PredictedSet.unixMillis(result.windowEndGps))} UTC"
+
+    private fun built(result: PgnssBuildResult): String =
+        "built · ${windowOf(result)} · ${result.files.size} files, ${result.bytes / 1024} KB"
+
+    private fun utc(millis: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(millis))
+
+    /**
+     * One line per run, kept — what was produced and for which window, or why nothing was.
+     *
+     * **The question this exists to answer is asked afterwards.** On 2026-09-13 白い熊's band got no
+     * fix at all and on the 14th, on a freshly built set, it took three minutes; the first thing
+     * worth knowing was what window the band had actually been holding on the 13th, and nothing
+     * could say. `PgnssResult` and `PgnssSummary` are overwritten by the next run, so the state that
+     * explains a bad walk is gone by the time the walk is discussed (白い熊, 2026-09-14).
+     *
+     * `0fa1a4a3` made "was it rebuilt at all" impossible to fake. This is the same fact one step
+     * along: not whether a run rebuilt, but what every run left behind, in order.
+     *
+     * It lives beside the set rather than in a variable because a variable holds one value and this
+     * is a series, and because everything in this folder except the six expiring files travels in
+     * the app's own backup — so the history survives a phone.
+     */
+    private fun recordHistory(outDir: File, what: String, log: (String) -> Unit) {
+        runCatching {
+            outDir.mkdirs()
+            val file = File(outDir, HISTORY_NAME)
+            val stamp = utc(System.currentTimeMillis())
+            val kept = if (file.isFile) file.readLines().takeLast(HISTORY_LINES - 1) else emptyList()
+            file.writeText((kept + "$stamp UTC · $what").joinToString("\n", postfix = "\n"))
+        }.onFailure { log("Huawei predicted ephemeris: could not write $HISTORY_NAME — ${it.message}") }
     }
 
     /**
@@ -387,6 +430,12 @@ class HuaweiPgnssAction : Action {
     internal companion object {
         /** The store `huawei.gnss` reads by default. */
         const val DEFAULT_DIR = "gnss"
+
+        /** The kept series: what every run produced, in order. Written beside the set it describes. */
+        const val HISTORY_NAME = "built-log.txt"
+
+        /** Months of daily rebuilds, and a few kilobytes. Long enough that a window is still in it. */
+        const val HISTORY_LINES = 400
 
         /** Enough to see what happened, few enough to stay readable on a phone panel. */
         const val MAX_LOG_LINES = 26
