@@ -97,11 +97,38 @@ def dec_gal(rec):
                 cic=u(72, 2, 1) * 2 ** -29, cuc=u(74, 2, 1) * 2 ** -29)
 
 
+def dec_glo(rec):
+    """GLONASS is a STATE VECTOR, not a Kepler set — there is nothing to propagate at its own tb.
+
+    `Records.encodeGlonass`: idx u16, tb u16, tau i32 (2**-30 s, NEGATED — the field is tau_n and
+    SP3 publishes the bias itself), a spare word, the satellite-type flag, then per axis position
+    (km, 2**-11), velocity (km/s, 2**-20) and acceleration (km/s^2, 2**-30, one signed byte).
+
+    The slot is 1-BASED here, alone among the four systems. See `Records`' own note: Huawei's block 0
+    carries index 0, which cannot be a slot number because GLONASS slots start at 1.
+    """
+    u = _u(rec)
+    p, v = [], []
+    for base in (16, 28, 40):
+        p.append(u(base, 4, 1) * 2 ** -11 * 1e3)
+        v.append(u(base + 4, 4, 1) * 2 ** -20 * 1e3)
+    return dict(prn=u(0, 2, 0) + 1, tb=u(2, 2, 0),
+                # af0 and af1 in the shape the rest of this script expects, so one clock check
+                # serves all four systems. GLONASS broadcasts no drift term at all.
+                af0=-u(4, 4, 1) * 2 ** -30, af1=0.0, toc=None, toe=None,
+                sqrtA=float("nan"), state=(np.array(p), np.array(v)))
+
+
 SYSTEMS = {                              # reclen, capacity, decoder, SP3 prefix, seconds GPS -> own
     "GPS": (80, 32, dec_gps, "G", 0),
     "GALILEO": (76, 36, dec_gal, "E", 0),
     "BDS": (92, 63, dec_bds, "C", pgb.BDT_OFFSET),
+    # 8 sub-blocks per block, 900 s apart, and the file is `HW_PGNSS_GLONASS`. Never graded once
+    # before 2026-09-14 — the table simply had no row for it, so `--system GLONASS` died with a
+    # KeyError and a quarter of the constellation went out unchecked for the life of the feature.
+    "GLONASS": (52, 24, dec_glo, "R", 0),
 }
+SUBS = {"GLONASS": (8, 900.0)}           # sub-blocks per block, and their spacing
 
 
 def main():
@@ -150,33 +177,87 @@ def main():
             t = min(max(first, d["t"][4]), d["t"][-5])
             kinds[sat] = pgb.bds_kind(d, t)
 
-    rows, semi, skipped = {}, {}, set()
+    nsub, subgap = SUBS.get(args.system, (1, 0.0))
+    rows, semi, skipped, clocks = {}, {}, set(), {}
     for i in range(BLOCKS):
-        ts, off, _ = struct.unpack_from("<III", b, 12 * i)
-        n = struct.unpack_from("<I", b, off)[0]
-        for k in range(min(n, cap)):
-            rec = b[off + 4 + k * reclen: off + 4 + (k + 1) * reclen]
-            if not any(rec):
-                continue
-            el = dec(rec)
-            sat = f"{prefix}{el['prn']:02d}"
-            semi[sat] = el["sqrtA"] ** 2 / 1000.0
-            if sat not in truth:
-                continue
-            for dt in np.arange(-3600, 3601, args.step):
-                t = ts + dt
-                if not (tmin < t < tmax):
+        ts, off, blen = struct.unpack_from("<III", b, 12 * i)
+        for sub in range(nsub):
+            at = off + sub * (4 + cap * reclen)
+            n = struct.unpack_from("<I", b, at)[0]
+            # GLONASS SUB-EPOCHS SIT ON THE UTC HOUR, not on the block stamp.
+            #
+            # The block stamp is :59:42 in UTC and the GLONASS stamps are an hour earlier than the
+            # other constellations' — see `Records.glonassHour`, which floors the stamp to the hour
+            # in UTC and adds the leap seconds back. Sampling at `stamp + 900*sub` instead put every
+            # comparison up to an hour and eighteen minutes away from the state it was reading, and
+            # GLONASS covers about 12 000 km in an hour. That is exactly what this first reported:
+            # a median "error" of 11 923 km, on a set whose decoded radii are a flawless 25 508 km
+            # and which is byte-for-byte the same shape as the set that fixed in 13 s. The
+            # instrument was wrong, which is the failure this file already warns about for BeiDou.
+            tsub = (LEAP + 3600 * ((ts - LEAP) // 3600)) + sub * subgap if nsub > 1 else ts
+            for k in range(min(n, cap)):
+                rec = b[at + 4 + k * reclen: at + 4 + (k + 1) * reclen]
+                if not any(rec):
                     continue
-                if not pgb.spanned(truth[sat]["t"], t):
-                    skipped.add(sat)
+                el = dec(rec)
+                sat = f"{prefix}{el['prn']:02d}"
+                semi[sat] = el["sqrtA"] ** 2 / 1000.0
+                if sat not in truth:
                     continue
-                tow = (t - offset) % 604800
-                if args.system == "BDS":
-                    got = pgb.propagate_bds(el, tow, kinds.get(sat) == "GEO")
-                else:
-                    got = pgb.propagate(el, tow)
-                want = pgb.interp(truth[sat]["t"], truth[sat]["p"], t)
-                rows.setdefault(sat, []).append((t - first, float(np.linalg.norm(got - want))))
+                # ── the CLOCK, which nothing graded until 2026-09-14 ───────────────────────────
+                #
+                # A range is orbit plus clock and every check here was orbit-only, so BeiDou C10
+                # shipped a clock line 150x too steep and the wrong sign — 1.1 km of range in every
+                # block past the splice — behind a 0.03 m orbit grade. The floor of this comparison
+                # is the CONVENTIONS: a broadcast clock applies the relativistic eccentricity
+                # term separately and carries the group delay of its own signal pair, while an SP3
+                # clock already contains the one and is referenced to another. Measured 2026-09-14
+                # that floor sits at a median of 15 m for GPS, Galileo and GLONASS, and 0.01 m for
+                # BeiDou, whose clock is spliced straight from the product. **It is a floor, not a
+                # calibration** — no known-good vintage has been graded here, so read the SPREAD and
+                # not the level. C10 that day read 8569 m against a fleet whose worst was 63 m, and
+                # that is the shape a real fault makes.
+                def clock_at(t):
+                    """|ours - the product's|, as range, at one instant. None where it cannot be asked."""
+                    if not (tmin < t < tmax) or not pgb.spanned(truth[sat]["t"], t):
+                        return None
+                    want_c = pgb.interp(truth[sat]["t"], truth[sat]["c"], t)
+                    if not np.isfinite(want_c):
+                        return None
+                    dtc = 0.0 if el["toc"] is None else (
+                        ((t - offset) % 604800 - el["toc"] + 302400) % 604800 - 302400)
+                    return abs(float(el["af0"] + el["af1"] * dtc - want_c)) * 299792458.0
+
+                if args.system == "GLONASS":
+                    c = clock_at(tsub)
+                    if c is not None:
+                        clocks.setdefault(sat, []).append(c)
+                    # No propagation: the record IS the state at its own tb, so the comparison is
+                    # the position it carries against the product at the same instant.
+                    if not (tmin < tsub < tmax) or not pgb.spanned(truth[sat]["t"], tsub):
+                        skipped.add(sat)
+                        continue
+                    want = pgb.interp(truth[sat]["t"], truth[sat]["p"], tsub)
+                    rows.setdefault(sat, []).append(
+                        (tsub - first, float(np.linalg.norm(el["state"][0] - want))))
+                    continue
+                for dt in np.arange(-3600, 3601, args.step):
+                    t = ts + dt
+                    if not (tmin < t < tmax):
+                        continue
+                    if not pgb.spanned(truth[sat]["t"], t):
+                        skipped.add(sat)
+                        continue
+                    tow = (t - offset) % 604800
+                    if args.system == "BDS":
+                        got = pgb.propagate_bds(el, tow, kinds.get(sat) == "GEO")
+                    else:
+                        got = pgb.propagate(el, tow)
+                    want = pgb.interp(truth[sat]["t"], truth[sat]["p"], t)
+                    rows.setdefault(sat, []).append((t - first, float(np.linalg.norm(got - want))))
+                    c = clock_at(t)
+                    if c is not None:
+                        clocks.setdefault(sat, []).append(c)
 
     if skipped:
         print(f"  samples dropped where the product has a hole: {' '.join(sorted(skipped))}")
@@ -203,6 +284,22 @@ def main():
               f"p95 {np.percentile(good, 95):.2f} m, max {good.max():.2f} m")
     print(f"  overall: median {np.median(es):.2f} m, p95 {np.percentile(es, 95):.2f} m, "
           f"max {es.max():.2f} m")
+
+    if clocks:
+        allc = np.array([c for v in clocks.values() for c in v])
+        print(f"\n  CLOCK, as range ({len(allc)} samples; conventions put a floor under this "
+              f"— read the spread, not the level)")
+        print(f"  {'satellite':>10} {'n':>5} {'median':>10} {'max':>12}")
+        # Sorted by the WORST sample, not the median. A satellite whose clock is right for the part
+        # spliced from the product and wrong for the part extrapolated past it has an excellent
+        # median and ships kilometres — C10 on 2026-09-14 read 0.01 m median and 8569 m max.
+        for sat in sorted(clocks, key=lambda s: -max(clocks[s]))[:10]:
+            v = np.array(clocks[sat])
+            print(f"  {sat:>10} {len(v):5} {np.median(v):10.2f} {v.max():12.2f}")
+        print(f"  overall: median {np.median(allc):.2f} m, p95 "
+              f"{np.percentile(allc, 95):.2f} m, max {allc.max():.2f} m")
+    else:
+        print("\n  CLOCK: the orbit product carries no clocks — nothing to compare")
 
 
 if __name__ == "__main__":

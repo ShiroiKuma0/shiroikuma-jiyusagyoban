@@ -10,8 +10,10 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
@@ -50,8 +52,20 @@ import okhttp3.Request
 class PgnssFetcher(
     private val workDir: File,
     private val client: OkHttpClient = defaultClient(),
+    /**
+     * Where the last good ALMANAC of each kind is kept. Null disables the fallback entirely, which
+     * is what a test wants and what the old behaviour was.
+     *
+     * Declared BEFORE [progress] so the trailing-lambda call stays the natural one — every caller
+     * writes the progress callback as a block, and a parameter added after it would have turned
+     * each of them into a named argument.
+     */
+    private val cacheDir: File? = null,
     private val progress: (FetchProgress) -> Unit = {},
 ) {
+
+    /** What the run should say about where its inputs came from. Reset by each [fetchAll]. */
+    private val notes = ArrayList<String>()
 
     /**
      * Fetch the lot.
@@ -62,22 +76,133 @@ class PgnssFetcher(
      */
     fun fetchAll(today: LocalDate = LocalDate.now(ZoneOffset.UTC), wuhanIssues: Int = 3): PgnssSources {
         workDir.mkdirs()
+        notes.clear()
         return PgnssSources(
             codeSp3 = fetchCodeSp3(),
             codeErp = fetchCodeErp(today),
             wuhanOrbits = fetchWuhanOrbits(today, wuhanIssues),
             egm96 = fetchEgm96(),
-            yuma = fetchYuma(),
-            galileoXml = fetchGalileoAlmanac(today),
-            glonassAgl = fetchGlonassAlmanac(today),
-            // Today's navigation file is required; the PREVIOUS day's only lengthens the arc, and a
-            // day that has not been published yet must not stop the build. Today first, because the
-            // merge de-duplicates against what is already there.
+            // ── the three ALMANACS, each with the last good one behind it ───────────────────
+            //
+            // NOT the orbit products, and the distinction is the whole point. A cached ORBIT is a
+            // WRONG orbit a day later, which is why nothing in that path may fall back to anything
+            // (see the note at the top of this class). An almanac is the opposite kind of thing:
+            // coarse elements whose job is to tell a receiver roughly where to look, published
+            // every few days and useful for weeks. Serving a fortnight-old one costs a little
+            // acquisition time; refusing to build at all costs the whole set.
+            //
+            // ESA's GSSC went down on the evening of 2026-09-14 — three connection failures and a
+            // 404 across four dates, having served fine two hours earlier — and two builds in a row
+            // died with "no Galileo almanac XML in the last 10 days". Nothing else was wrong. 白い熊:
+            // *"How will we know when it's back?"* — with this, nobody has to.
+            yuma = almanac("gps-yuma") { fetchYuma() },
+            galileoXml = almanac("galileo") { fetchGalileoAlmanac(today) },
+            glonassAgl = almanac("glonass") { fetchGlonassAlmanac(today) },
+            // AT LEAST ONE navigation file, not specifically today's — and today's from the
+            // stations themselves when no merged file covers it.
+            //
+            // It used to require today's and treat yesterday's as a bonus, which reads as caution
+            // and is the opposite: today's IGS file is a 404 by design until the day closes, so the
+            // requirement rested entirely on one same-day product on one host. When that host's
+            // gateway went sour on 2026-09-14 the build died, although yesterday's file carries
+            // every single thing it reads — the Klobuchar block, the UTC set and the BeiDou
+            // ephemeris. The build was refusing over freshness it does not use.
+            //
+            // Ordered newest first because the merge de-duplicates against what is already there,
+            // so the freshest copy of a record wins. Three days, so a weekend outage is survivable.
             brdcNav = buildList {
-                add(fetchBrdcNav(today))
-                runCatching { add(fetchBrdcNav(today.minusDays(1))) }
+                var haveToday = false
+                for (back in 0L..2L) {
+                    runCatching { fetchBrdcNav(today.minusDays(back)) }.onSuccess {
+                        add(it)
+                        if (back == 0L) haveToday = true
+                    }
+                }
+                // Only when the merged same-day file could not be had: three station files are a
+                // hundred kilobytes and four more FTP round trips, which is worth paying to close a
+                // gap and not worth paying otherwise.
+                if (!haveToday) {
+                    val hourly = runCatching {
+                        fetchHourlyNav(LocalDateTime.now(ZoneOffset.UTC))
+                    }.getOrDefault(emptyList())
+                    if (hourly.isNotEmpty()) {
+                        addAll(hourly)
+                        notes.add(
+                            "today's ephemeris from ${hourly.size} IGN station file(s) — " +
+                                "no merged same-day file was available",
+                        )
+                    }
+                }
+            }.also {
+                if (it.isEmpty()) {
+                    throw IOException(
+                        "no broadcast navigation file for any of the last three days, from " +
+                            BRDC_SOURCES.joinToString(", ") { s -> s.name } +
+                            " or IGN's hourly stations — this file carries the ionosphere and the " +
+                            "BeiDou ephemeris and nothing can stand in for it",
+                    )
+                }
             },
+            notes = notes.toList(),
         )
+    }
+
+    /**
+     * One almanac: live if it can be had, and the last good one from the store if it cannot.
+     *
+     * The live copy is cached on every success, so the fallback is always one build behind at
+     * worst. The cached name carries the date it was CACHED, which is what makes its age legible
+     * in the run log and in the store without a sidecar to go stale beside it.
+     *
+     * [MAX_ALMANAC_AGE_DAYS] is the refusal. Past it the cache is no better than a guess and the
+     * build should fail loudly, exactly as it did before this existed — the point of the fallback
+     * is to survive an outage, not to go on serving a memory for a month.
+     */
+    internal fun almanac(kind: String, live: () -> File): File {
+        val attempt = runCatching { live() }
+        val dir = cacheDir
+        attempt.getOrNull()?.let { file ->
+            if (dir != null) {
+                runCatching {
+                    dir.mkdirs()
+                    // `<kind>.<the day it was cached>.<the name it was published under>`. The cache
+                    // date is what the age limit is measured on; the published name is what says
+                    // the real vintage, because the live fetch may itself have walked back several
+                    // days to find one. Both matter and neither needs a sidecar to go stale beside.
+                    val today = LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    val keep = File(dir, "$kind.$today.${file.name}")
+                    file.copyTo(keep, overwrite = true)
+                    // A cache, not an archive: one per kind, so the store cannot fill with almanacs.
+                    dir.listFiles()
+                        ?.filter { it.name.startsWith("$kind.") && it.name != keep.name }
+                        ?.forEach { it.delete() }
+                }
+            }
+            return file
+        }
+        val why = attempt.exceptionOrNull()
+        val cached = dir?.listFiles()?.filter { it.name.startsWith("$kind.") }?.maxByOrNull { it.name }
+            ?: throw IOException("the $kind almanac is unavailable and nothing is cached", why)
+        val rest = cached.name.removePrefix("$kind.")
+        val stamped = rest.take(10)
+        val published = rest.drop(11).ifEmpty { cached.name }
+        val age = runCatching {
+            ChronoUnit.DAYS.between(LocalDate.parse(stamped), LocalDate.now(ZoneOffset.UTC))
+        }.getOrDefault(Long.MAX_VALUE)
+        if (age > MAX_ALMANAC_AGE_DAYS) {
+            throw IOException(
+                "the $kind almanac is unavailable and the cached one was taken $age days ago " +
+                    "($published; the limit is $MAX_ALMANAC_AGE_DAYS)",
+                why,
+            )
+        }
+        val target = File(workDir, published)
+        cached.copyTo(target, overwrite = true)
+        notes.add(
+            "$kind almanac from the cache: $published, taken $age " +
+                "${if (age == 1L) "day" else "days"} ago — ${why?.message ?: "the source did not answer"}",
+        )
+        return target
     }
 
     // ── the individual sources ──────────────────────────────────────────────────────────────────
@@ -176,8 +301,16 @@ class PgnssFetcher(
         var last: Throwable? = null
         for (back in 0 until lookBackDays) {
             val date = today.minusDays(back.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            // RETRY THE FIRST DATE ONLY. This loop is already a retry — ten candidate days — and
+            // wrapping each of them in three transport attempts multiplies the two: a GSSC outage
+            // on 2026-09-15 cost nineteen minutes of thirty-second timeouts to reach a conclusion
+            // the cache could have given in one. A dropped connection on TODAY'S file is worth a
+            // second try; the ninth day back is not, and the answer for it is the next candidate.
             val attempt = runCatching {
-                fetch("galileo_$date.xml", "$GSSC/$date.xml", ::looksLikeGalileoAlmanac)
+                fetch(
+                    "galileo_$date.xml", "$GSSC/$date.xml", ::looksLikeGalileoAlmanac,
+                    attempts = if (back == 0) TRANSPORT_ATTEMPTS else 1,
+                )
             }
             attempt.getOrNull()?.let { return it }
             last = attempt.exceptionOrNull()
@@ -224,17 +357,80 @@ class PgnssFetcher(
         val year = date.year
         val doy = String.format(Locale.ROOT, "%03d", date.dayOfYear)
         var last: Exception? = null
-        for (product in BRDC_PRODUCTS) {
-            val name = "${product}_$year${doy}0000_01D_MN.rnx.gz"
+        // FIVE SOURCES ACROSS FOUR ORGANISATIONS, and every one of them exists because of an
+        // evening this file spent failing.
+        //
+        // On 2026-09-14 six builds in a row died because `igs.bkg.bund.de` was answering empty
+        // replies. BKG was NOT down: it runs a second host on another address, `igs-ftp`, which
+        // measured 10/10 on listings and 6/6 on fetches that same evening and served byte-identical
+        // files. One hostname was mistaken for an organisation, and 白い熊 said so before the
+        // measurement did. The orbit product has had mirrors since the day it was written; this
+        // file, which is just as necessary, had one.
+        //
+        // Each source names its own product, because they are not the same product under different
+        // roofs: ROB publishes `BRDC00GOP_R` and GOP's own server `BRDC01GOP_R`, with a different
+        // path shape and no day directory. All three merged products verified identical in content
+        // for day 256 — 447 GPS records and 886 BeiDou, GPSA, GPSB and GPUT present.
+        // ONE SHOT EACH, PERSISTENCE ONLY AT THE END. Five sources across three days is fifteen
+        // chances; giving each of them three transport attempts makes it forty-five, and on
+        // 2026-09-15 that arithmetic turned a dead server into nineteen minutes of timeouts.
+        // Trying the NEXT data centre is cheaper and more likely to work than trying the same one
+        // again, so the alternatives are single-shot and only the last one — where there is nothing
+        // left to fall back to — is worth retrying.
+        for ((index, source) in BRDC_SOURCES.withIndex()) {
+            val attempts = if (index == BRDC_SOURCES.size - 1) TRANSPORT_ATTEMPTS else 1
             try {
-                return gunzip(fetch(name, "$BKG/$year/$doy/$name", ::looksLikeGzip))
+                return gunzip(source.fetch(this, year, doy, attempts))
             } catch (e: IOException) {
-                // A product that is not published for this day yet is the ordinary case, not a
-                // fault: the next one in the list is what this list is for.
+                // A product not published for this day YET is the ordinary case, not a fault, and
+                // so is a data centre that does not carry it. Only running out of all of them is a
+                // failure.
                 last = e
             }
         }
-        throw last ?: IOException("no broadcast navigation file for $year/$doy")
+        throw last ?: IOException(
+            "no broadcast navigation file for $year/$doy from " +
+                BRDC_SOURCES.joinToString(", ") { it.name },
+        )
+    }
+
+    /**
+     * Today's ephemeris from the stations themselves, when no merged file covers today.
+     *
+     * **This is the only independent same-day path that exists.** A sweep of every public data
+     * centre on 2026-09-14 found no second organisation publishing a merged, global, same-day mixed
+     * navigation file with a GPS Klobuchar block — `BRDC00WRD_R` at BKG is the only one of its kind.
+     * The redundancy therefore has to be assembled rather than downloaded, out of IGN's hourly
+     * per-station tree on the host this build already trusts for orbits.
+     *
+     * A handful is enough and a handful is the point. Wettzell alone at hour 18 carried 32 GPS and
+     * 55 BeiDou satellites with a full Klobuchar header — MORE BeiDou than BKG's merged whole-day
+     * file held at the time — and a union of five vetted stations reproduced the merged file's
+     * constellation exactly, for about a hundred kilobytes. The list is vetted rather than
+     * discovered because not every station writes the ionosphere block: `WSRT00NLD` has none.
+     *
+     * Files are published 1 to 65 minutes after their hour closes, so the hour before last is the
+     * first one worth asking for.
+     */
+    fun fetchHourlyNav(now: LocalDateTime, wanted: Int = HOURLY_STATIONS_WANTED): List<File> {
+        val got = ArrayList<File>()
+        for (back in 1L..HOURLY_LOOK_BACK) {
+            val at = now.minusHours(back)
+            val year = at.year
+            val doy = String.format(Locale.ROOT, "%03d", at.dayOfYear)
+            val hh = String.format(Locale.ROOT, "%02d", at.hour)
+            for (station in HOURLY_STATIONS) {
+                if (got.size >= wanted) return got
+                val name = "${station}_R_$year$doy${hh}00_01H_MN.rnx.gz"
+                runCatching {
+                    got += gunzip(
+                        ftpDownload(name, IGN_HOST, "$IGN_HOURLY/$year/$doy/$name", ::looksLikeGzip),
+                    )
+                }
+            }
+            if (got.isNotEmpty()) return got
+        }
+        return got
     }
 
     // ── transport ───────────────────────────────────────────────────────────────────────────────
@@ -243,7 +439,53 @@ class PgnssFetcher(
      * Download [url] to `workDir/[name]`, reporting progress and refusing anything that does not
      * look like the format asked for. The generic primitive behind every fetcher above.
      */
-    fun fetch(name: String, url: String, sniff: (ByteArray) -> Boolean): File {
+    fun fetch(
+        name: String,
+        url: String,
+        sniff: (ByteArray) -> Boolean,
+        attempts: Int = TRANSPORT_ATTEMPTS,
+    ): File = retrying("$name from $url", attempts) { fetchOnce(name, url, sniff) }
+
+    /**
+     * Try [body] again when the CONNECTION broke, and never when the server answered.
+     *
+     * The distinction is the whole value. An `HTTP 404` means the file is not published for that day
+     * and retrying it costs seconds on every build for a certainty — the nav fetch alone would walk
+     * products × mirrors × days of them. A `Connection reset` or an `unexpected end of stream` means
+     * the bytes were coming and stopped, which the very next attempt usually carries.
+     *
+     * Measured on the evening of 2026-09-14: of six consecutive failed builds, **three** died on a
+     * dropped connection to a file that existed, and GSSC served three truncated bodies of a file it
+     * then served whole. That evening produced no set at all.
+     */
+    private fun <T> retrying(what: String, attempts: Int = TRANSPORT_ATTEMPTS, body: () -> T): T {
+        var last: IOException? = null
+        for (attempt in 1..attempts) {
+            try {
+                return body()
+            } catch (refused: SourceRefused) {
+                // The server answered, and its answer was no. That is information, not a glitch.
+                throw refused
+            } catch (broken: IOException) {
+                last = broken
+                if (attempt < attempts) {
+                    // Said out loud: a panel that goes quiet for four and a half seconds while the
+                    // wire is retried reads as a hang, which is the fault this file already learned
+                    // once with Wuhan's FTP.
+                    progress(
+                        FetchProgress(
+                            "$what — retrying (${broken.message ?: "connection lost"})",
+                            "", 0, 0, false, 0,
+                        ),
+                    )
+                    Thread.sleep(TRANSPORT_BACKOFF_MS * attempt)
+                }
+            }
+        }
+        throw last ?: IOException("$what failed")
+    }
+
+    private fun fetchOnce(name: String, url: String, sniff: (ByteArray) -> Boolean): File {
         val target = File(workDir, name)
         // Remove any earlier copy FIRST, so a failed request can never leave yesterday's file
         // sitting under today's name for the build to pick up.
@@ -257,7 +499,7 @@ class PgnssFetcher(
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("HTTP ${response.code} for $url")
+                throw SourceRefused(response.code, url)
             }
             val declared = response.body.contentLength()
             response.body.byteStream().use { source ->
@@ -279,7 +521,20 @@ class PgnssFetcher(
         }
     }
 
-    private fun ftpDownload(name: String, host: String, path: String, sniff: (ByteArray) -> Boolean): File {
+    private fun ftpDownload(
+        name: String,
+        host: String,
+        path: String,
+        sniff: (ByteArray) -> Boolean,
+        attempts: Int = TRANSPORT_ATTEMPTS,
+    ): File = retrying("$name from $host", attempts) { ftpDownloadOnce(name, host, path, sniff) }
+
+    private fun ftpDownloadOnce(
+        name: String,
+        host: String,
+        path: String,
+        sniff: (ByteArray) -> Boolean,
+    ): File {
         val target = File(workDir, name)
         target.delete()
         val started = System.currentTimeMillis()
@@ -359,13 +614,91 @@ class PgnssFetcher(
     }
 
     companion object {
+        /**
+         * How old a cached almanac may be before the build refuses it.
+         *
+         * Ten days, measured from the day it was CACHED — and the almanac inside it may be several
+         * days older still, because the live Galileo fetch walks back up to ten days itself to find
+         * one. That is why the note names the published file: the limit bounds the cache, the name
+         * shows the vintage.
+         *
+         * The EXTRA file this feeds claims a week's validity, and an almanac is coarse enough that
+         * some days past that still tells a receiver where to look. A month-old one is a memory,
+         * not an input, and shipping it inside a file stamped today would be the same lie the
+         * four-day-old set told on 2026-09-06. Past this the build fails loudly, exactly as it did
+         * before the cache existed.
+         */
+        const val MAX_ALMANAC_AGE_DAYS = 10L
+
         private const val AIUB = "https://download.aiub.unibe.ch/CODE"
         private const val ICGEM = "https://icgem.gfz-potsdam.de"
         private const val GSSC = "https://www.gsc-europa.eu/sites/default/files/sites/all/files"
-        private const val BKG = "https://igs.bkg.bund.de/root_ftp/IGS/BRDC"
+        /**
+         * BKG's FTP host, NOT its HTTPS gateway.
+         *
+         * `igs.bkg.bund.de` over HTTPS answered 3 of 10 listings and 5 of 8 file fetches on the
+         * evening of 2026-09-14; `igs-ftp.bkg.bund.de`, a different address, answered 10 of 10 and
+         * 6 of 6 with byte-identical files. The gateway is the flaky part, not the archive.
+         */
+        private const val BKG_HOST = "igs-ftp.bkg.bund.de"
+        private const val BKG_PATH = "/IGS/BRDC"
 
-        /** Broadcast navigation products, best header first. See [fetchBrdcNav]. */
-        private val BRDC_PRODUCTS = listOf("BRDC00IGS_R", "BRDC00WRD_R")
+        /**
+         * Where a merged broadcast navigation file can be had, in the order worth asking.
+         *
+         * BKG's two products first: `IGS` has the fullest header and `WRD` is the only same-day
+         * merged file anywhere. Then the same IGS product from IGN, then two other organisations
+         * entirely — the Royal Observatory of Belgium and GOP — so that a bad night at one data
+         * centre stops nothing.
+         */
+        internal val BRDC_SOURCES = listOf(
+            BrdcSource("BKG BRDC00IGS_R") { f, year, doy, a ->
+                val n = "BRDC00IGS_R_$year${doy}0000_01D_MN.rnx.gz"
+                f.ftpDownload(n, BKG_HOST, "$BKG_PATH/$year/$doy/$n", ::looksLikeGzip, a)
+            },
+            BrdcSource("BKG BRDC00WRD_R (same-day)") { f, year, doy, a ->
+                val n = "BRDC00WRD_R_$year${doy}0000_01D_MN.rnx.gz"
+                f.ftpDownload(n, BKG_HOST, "$BKG_PATH/$year/$doy/$n", ::looksLikeGzip, a)
+            },
+            BrdcSource("IGN BRDC00IGS_R") { f, year, doy, a ->
+                val n = "BRDC00IGS_R_$year${doy}0000_01D_MN.rnx.gz"
+                f.ftpDownload(n, IGN_HOST, "$IGN_DATA/$year/$doy/$n", ::looksLikeGzip, a)
+            },
+            // A different organisation, and its own product name. No day directory: the year holds
+            // every day's file.
+            BrdcSource("ROB BRDC00GOP_R") { f, year, doy, a ->
+                val n = "BRDC00GOP_R_$year${doy}0000_01D_MN.rnx.gz"
+                f.ftpDownload(n, "ftp.epncb.oma.be", "/pub/obs/BRDC/$year/$n", ::looksLikeGzip, a)
+            },
+            // GOP's own server carries the same content under `BRDC01GOP`, not `BRDC00GOP`.
+            BrdcSource("GOP BRDC01GOP_R") { f, year, doy, a ->
+                val n = "BRDC01GOP_R_$year${doy}0000_01D_MN.rnx.gz"
+                f.ftpDownload(n, "ftp.pecny.cz", "/LDC/orbits_brd/gop3/$year/$n", ::looksLikeGzip, a)
+            },
+        )
+
+        /**
+         * IGN stations that carry BOTH a GPS Klobuchar header and a full BeiDou set, measured.
+         *
+         * Vetted, not guessed: `WSRT00NLD` writes no ionosphere block at all, and a station picked
+         * at random is as likely to be that as to be Wettzell. Ordered by what they carried at hour
+         * 18 on 2026-09-14 — WTZR 32 GPS / 55 BeiDou PRNs, MATE 32/48, ALAC 32/47, EBRE 32/44,
+         * NTUS 32/37, BUCU 32/35 — and spread across Europe and Asia so one site's outage is not
+         * the list's.
+         */
+        internal val HOURLY_STATIONS = listOf(
+            "WTZR00DEU", "MATE00ITA", "ALAC00ESP", "EBRE00ESP", "NTUS00SGP", "BUCU00ROU",
+        )
+
+        /** Three stations reproduced the merged file's constellation; take three and stop. */
+        const val HOURLY_STATIONS_WANTED = 3
+
+        /** Hours to walk back before giving up. Publication lags the hour by up to ~65 minutes. */
+        const val HOURLY_LOOK_BACK = 4L
+
+        private const val IGN_HOST = "igs.ign.fr"
+        private const val IGN_DATA = "/pub/igs/data"
+        private const val IGN_HOURLY = "/pub/igs/data/hourly"
         /**
          * Where `WUM0MGXNRT` can be had, fastest first. The product is Wuhan's either way — `WUM`
          * is Wuhan Multi-GNSS — and both mirrors serve byte-identical files; only the wire speed
@@ -384,6 +717,12 @@ class PgnssFetcher(
         /** The ICGEM content hash for EGM96 as of 2026-08-30; [fetchEgm96] recovers if it moves. */
         private const val EGM96_HASH =
             "971b0a3b49a497910aad23cd85e066d4cd9af0aeafe7ce6301a696bed8570be3"
+
+        /** Three tries at the wire. Not at a 404 — see [retrying]. */
+        const val TRANSPORT_ATTEMPTS = 3
+
+        /** Multiplied by the attempt number: 1.5 s, then 3 s. Long enough to matter, short enough. */
+        const val TRANSPORT_BACKOFF_MS = 1500L
 
         private const val USER_AGENT = "Mozilla/5.0 (Android) shiroikuma-jiyusagyoban/pgnss"
         private const val SNIFF_BYTES = 4096
@@ -491,6 +830,32 @@ data class FetchProgress(
 )
 
 /** Everything a build needs, on disk. */
+/**
+ * One place a broadcast navigation file can be had, and how to ask for it.
+ *
+ * Each carries its own product name and path shape, because these are not one product under
+ * different roofs — ROB's is `BRDC00GOP_R` under a year directory with no day, GOP's own server
+ * calls the same content `BRDC01GOP_R`. Named, so a failure can say which one declined, which is
+ * what distinguishes "not published for that day yet" from "that host is down".
+ */
+/**
+ * The server answered, and its answer was no.
+ *
+ * Distinct from a broken connection, which the very next attempt usually carries. The difference is
+ * what keeps [PgnssFetcher.retrying] from burning seconds on a certainty: "not published for this
+ * day yet" is the ORDINARY case for a daily product, and the navigation fetch alone would otherwise
+ * retry it across two products, two mirrors and three days.
+ */
+class SourceRefused(val code: Int, what: String) : IOException("$code for $what")
+
+internal class BrdcSource(
+    val name: String,
+    private val ask: (PgnssFetcher, Int, String, Int) -> File,
+) {
+    fun fetch(fetcher: PgnssFetcher, year: Int, doy: String, attempts: Int): File =
+        ask(fetcher, year, doy, attempts)
+}
+
 data class PgnssSources(
     val codeSp3: File,
     val codeErp: File,
@@ -500,6 +865,8 @@ data class PgnssSources(
     val galileoXml: File,
     val glonassAgl: File,
     val brdcNav: List<File>,
+    /** What the fetch wants said about itself — which almanac came from the cache, and how old. */
+    val notes: List<String> = emptyList(),
 )
 
 /**
@@ -606,7 +973,12 @@ object Ftp {
             }
         }
         val code = line.take(3).toIntOrNull() ?: throw IOException("unparsable FTP reply: $line")
-        if (accept.isNotEmpty() && code !in accept.toList()) throw IOException("FTP said: $line")
+        // A 5xx is the server declining — a file that is not there, a path that is not served.
+        // Anything else that goes wrong here is the wire, and the wire is worth another try.
+        if (accept.isNotEmpty() && code !in accept.toList()) {
+            if (code in 500..599) throw SourceRefused(code, "FTP: $line")
+            throw IOException("FTP said: $line")
+        }
         return line
     }
 
