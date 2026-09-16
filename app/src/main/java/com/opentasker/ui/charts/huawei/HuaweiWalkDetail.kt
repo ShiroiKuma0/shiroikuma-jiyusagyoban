@@ -201,7 +201,17 @@ fun HuaweiWalkDetailScreen(
                         plot = plot,
                         base = base,
                         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
-                        empty = { NoteText(HuaweiText.walksNoMap[lang]) },
+                        // See the same pair in the grid: the row says which absence this is.
+                        empty = {
+                            NoteText(
+                                if (walk.hasTrack) {
+                                    HuaweiText.walksTrackUnreadable[lang]
+                                } else {
+                                    HuaweiText.walksNoFix[lang]
+                                },
+                                Modifier.padding(horizontal = 10.dp),
+                            )
+                        },
                         needsMap = {
                             NoteText(HuaweiText.walksAskingMap[lang])
                             LaunchedEffect(walk.id) { needsMap = true }
@@ -221,7 +231,11 @@ fun HuaweiWalkDetailScreen(
                         if (sharing) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         else Text(HuaweiText.walksGetMap[lang])
                     }
-                } else {
+                } else if (plot != null) {
+                    // Only where there is a picture to explain. A walk that came home without a
+                    // fix has just said so in the frame above; following that with "the map comes
+                    // from 白い熊 地図, which keeps the track" answers a question it did not ask and
+                    // implies a route is on its way to somewhere (白い熊, 2026-09-14).
                     NoteText(
                         if (zoomable) {
                             "${HuaweiText.walksMapShared[lang]}  ${HuaweiText.walksZoomOpen[lang]}"
