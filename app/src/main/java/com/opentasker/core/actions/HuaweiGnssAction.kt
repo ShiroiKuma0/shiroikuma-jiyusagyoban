@@ -108,6 +108,24 @@ class HuaweiGnssAction : Action {
             }
         }
 
+        // WHAT THE BAND IS HOLDING — read before anything is offered, so the answer exists even on
+        // a run that never reaches the band.
+        //
+        // Every record this feature kept was about the PHONE: `built-log.txt` says what was built,
+        // `GnssSummary` says what was offered. Nothing said what the band ACCEPTED, or until when
+        // that set is good — and on 2026-09-18 that was the whole story. A set was built (window to
+        // 09-21 11:59 UTC), the transfer after it moved ZERO bytes, and the band went on wearing the
+        // set from 09-15 whose window closed 09-18 13:59 UTC. The phone was in perfect health and
+        // said so; the band was starving and nothing could say that. 白い熊 lost four days to it and
+        // three separate theories were built about stale almanacs, all wrong (2026-09-19).
+        //
+        // So the accepted window is written down when the band takes a set, and read back here.
+        bandHoldsUntil(mirror)?.let { untilMs ->
+            val hoursLeft = (untilMs - System.currentTimeMillis()) / 3_600_000L
+            ctx.variables.set("${prefix}GnssBandUntil", stamp(untilMs))
+            ctx.variables.set("${prefix}GnssBandHours", hoursLeft.toString())
+        }
+
         // Every predicted file is offered, INCLUDING an expired one, and its window is reported.
         //
         // Dropping the expired ones is what this did for one build, on the reasoning that a set whose
@@ -179,7 +197,22 @@ class HuaweiGnssAction : Action {
                 "NOT HANDED OVER — the whole predicted set is past its window ($until)",
             )
         }
-        ctx.variables.set("${prefix}PgnssAlert", "")
+        // The band's own forecast, not the phone's, is what the banner warns about from here on.
+        // A phone holding a perfect set says nothing about a band still wearing last week's, and
+        // that gap is what cost four days in September 2026 — see [bandHoldsUntil].
+        val bandLeftHours = bandHoldsUntil(mirror)
+            ?.let { (it - System.currentTimeMillis()) / 3_600_000L }
+        ctx.variables.set(
+            "${prefix}PgnssAlert",
+            when {
+                bandLeftHours == null -> ""
+                bandLeftHours < 0 -> "THE BAND'S FORECAST RAN OUT ${-bandLeftHours} h AGO — it has " +
+                    "been fixing the slow way since. Press 更新 on the band while this is open."
+                bandLeftHours < BAND_WARN_HOURS -> "The band's forecast has $bandLeftHours h left. " +
+                    "Press 更新 on the band while this is open."
+                else -> ""
+            },
+        )
 
         // Capped, so that the ceiling which fires is this one and not the engine's. TaskRunner wraps
         // every action in `withTimeout`, and an action that outlives its budget is killed where it
@@ -351,6 +384,34 @@ class HuaweiGnssAction : Action {
                 ctx.variables.set("${prefix}GnssSource", r.source ?: "")
                 store?.let { ctx.variables.set(it, text) }
                 ctx.logger("Huawei GNSS: $text")
+
+                // The other half of `built-log.txt`. That file answers "what did the phone build";
+                // this one answers "did the band ever get it", which is the question the 2026-09-18
+                // failure needed and nothing could answer. One line per attempt, success or not.
+                val tookPredicted = r.served.any { it.startsWith(HuaweiSyncRunner.PGNSS_PREFIX) }
+                recordServed(
+                    mirror,
+                    buildString {
+                        append(if (r.served.isEmpty()) "TOOK NOTHING" else "took ${r.served.size} file(s), ${r.bytes} B")
+                        if (onlyBroadcast) append(" — BROADCAST ONLY, no forecast")
+                        append(" · offered ${files.size}")
+                        if (tookPredicted && windowEnd != 0L) {
+                            append(" · the band now holds a forecast to ${stamp(unixOf(windowEnd))} UTC")
+                        }
+                        if (!r.asked) append(" · the band never asked")
+                    },
+                    ctx.logger,
+                )
+                // Only a PREDICTED file changes what the band holds. It helps itself to the
+                // broadcast file whenever it wants a fix, and that is not a forecast.
+                if (tookPredicted && windowEnd != 0L) {
+                    writeBandHolds(mirror, unixOf(windowEnd), ctx.logger)
+                    ctx.variables.set("${prefix}GnssBandUntil", stamp(unixOf(windowEnd)))
+                    ctx.variables.set(
+                        "${prefix}GnssBandHours",
+                        ((unixOf(windowEnd) - System.currentTimeMillis()) / 3_600_000L).toString(),
+                    )
+                }
                 // Offering data the band declines is not success. Saying so here is the whole
                 // lesson of the weather bug: a transfer that reports "sent" while the band kept
                 // nothing is indistinguishable from one that worked.
@@ -362,6 +423,7 @@ class HuaweiGnssAction : Action {
                 panelSet("PgnssSteps", "done,done,fail,wait")
                 panelSet("PgnssFailed", "On the band: $why")
                 panelBeat()
+                recordServed(mirror, "FAILED · $why", ctx.logger)
                 fail(ctx, prefix, store, why)
             },
         )
@@ -396,6 +458,73 @@ class HuaweiGnssAction : Action {
     internal companion object {
         /** Enough to see what happened, few enough to stay readable on a phone panel. */
         const val MAX_LOG_LINES = 12
+
+        /** A predicted block stamp, in GPS seconds, as Unix milliseconds. */
+        internal fun unixOf(gpsSeconds: Long): Long =
+            (gpsSeconds - GPS_LEAP_SECONDS + GPS_UNIX_EPOCH) * 1000
+
+        /** `yyyy-MM-dd HH:mm` in UTC — the same clock `built-log.txt` writes in, and never local. */
+        internal fun stamp(unixMs: Long): String =
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                .format(java.util.Date(unixMs))
+
+        /**
+         * One line per transfer attempt, beside the set it describes.
+         *
+         * The twin of `built-log.txt`, and the half that was missing. That file answers *what did the
+         * phone build*; this one answers *did the band ever get it* — which on 2026-09-18 was the only
+         * question that mattered and the only one nothing could answer. A failure is written as loudly
+         * as a success, because the failure is the line someone comes looking for.
+         */
+        internal fun recordServed(outDir: File, what: String, log: (String) -> Unit) {
+            runCatching {
+                outDir.mkdirs()
+                val file = File(outDir, SERVED_NAME)
+                val kept = if (file.isFile) file.readLines().takeLast(SERVED_LINES - 1) else emptyList()
+                file.writeText(
+                    (kept + "${stamp(System.currentTimeMillis())} UTC · $what").joinToString("\n", postfix = "\n"),
+                )
+            }.onFailure { log("Huawei GNSS: could not write $SERVED_NAME — ${it.message}") }
+        }
+
+        /**
+         * Remember the window of the forecast the band actually accepted.
+         *
+         * One line, so it can be read by eye as well as by code: the Unix milliseconds the window ends,
+         * a tab, then the same instant written out. Only a run in which the band took a PREDICTED file
+         * writes here — it helps itself to the broadcast file whenever it wants a fix, and that is not
+         * a forecast.
+         */
+        internal fun writeBandHolds(outDir: File, untilMs: Long, log: (String) -> Unit) {
+            runCatching {
+                outDir.mkdirs()
+                File(outDir, BAND_HOLDS_NAME).writeText("$untilMs\t${stamp(untilMs)} UTC\n")
+            }.onFailure { log("Huawei GNSS: could not write $BAND_HOLDS_NAME — ${it.message}") }
+        }
+
+        /** What [writeBandHolds] left, or null when the band has never been seen taking a forecast. */
+        internal fun bandHoldsUntil(outDir: File): Long? = runCatching {
+            File(outDir, BAND_HOLDS_NAME).takeIf { it.isFile }
+                ?.readText()?.substringBefore('\t')?.trim()?.toLongOrNull()
+        }.getOrNull()
+
+        /** The kept series of TRANSFERS: what the band took, every time, in order. */
+        const val SERVED_NAME = "served-log.txt"
+
+        /** Months of daily transfers, and a few kilobytes — the same budget `built-log.txt` keeps. */
+        const val SERVED_LINES = 400
+
+        /** One line: when the forecast the band last ACCEPTED runs out. */
+        const val BAND_HOLDS_NAME = "band-holds.txt"
+
+        /**
+         * Hours of forecast left on the BAND below which the panel says so.
+         *
+         * A day: enough warning to rebuild and transfer before a morning walk, and not so much that
+         * the banner is always up. The set is good for 72 h, so this fires on the last third.
+         */
+        const val BAND_WARN_HOURS = 24L
 
         /**
          * The longest watch, in seconds — an hour, which is what 衛星待受 asks for.
