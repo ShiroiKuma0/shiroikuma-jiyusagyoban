@@ -8,6 +8,62 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+127 — 2026-09-19
+
+Built on upstream `aa1a372a`.
+
+### 衛星 — the transfer is the thing that was never written down
+
+The 8 seconds of the 16th were real. The four days after it were not the satellite data — they were
+a transfer that moved **zero bytes** and said nothing.
+
+Read the phone's own record and the week collapses into two lines:
+
+```
+built-log.txt        2026-09-18 15:57 UTC · built · 2026-09-18 13:59 → 2026-09-21 11:59 UTC
+HUAWEI_GnssSummary   … the band took NOTHING ·  HUAWEI_GnssBytes = 0
+```
+
+The set was built and it was good — every almanac in it had been published that same day. The
+transfer after it handed over nothing, so the band went on wearing the set built on the 15th, whose
+window had closed at 13:59 UTC on the 18th. **A band holding a dead set marks its assistance data
+current and stops asking for the broadcast ephemeris that would have rescued it**, which is exactly
+what 白い熊 saw: nothing standing still, then a fix some way into the walk. Running 「衛星 再送」
+again on the 19th — same bytes, same store — and the band asked within **6 seconds**, took all six
+files, and fixed outdoors in **8 seconds**.
+
+**Why nothing said so.** The success notification was already correctly guarded and did not fire.
+But the task's `notify.cancel` runs unconditionally, so the ongoing 「予測暦を作っています」 simply
+vanished with nothing in its place — indistinguishable from a quiet success. The failure existed
+only in a variable and as a red step on a panel you have to open.
+
+**And underneath it, the real gap: nothing knew what the BAND was holding.** Everything this feature
+recorded was about the phone — `built-log.txt` says what was built, `GnssSummary` says what was
+offered. What the band *accepted*, and until when that forecast is good, was written nowhere. A
+phone in perfect health says nothing about a band still wearing last week's set, and for four days
+that silence was mistaken for a data fault. Three theories were built on it, all wrong.
+
+- **`served-log.txt`** — the twin of `built-log.txt`, one line per transfer, a failure written as
+  loudly as a success. That file answers *what did the phone build*; this one answers *did the band
+  ever get it*.
+- **`band-holds.txt`**, with `%HUAWEI_GnssBandUntil` and `%HUAWEI_GnssBandHours` — the window of the
+  forecast the band actually took, written when it takes one and read back at the start of every
+  run. Only a predicted file counts: the band helps itself to the broadcast file whenever it wants a
+  fix, and that is not a forecast.
+- **The panel banner now warns about the band, not the phone** — *"THE BAND'S FORECAST RAN OUT n h
+  AGO"*, or a softer line inside the last day of its window.
+
+In the workspace, 「衛星 生成」 and 「衛星 再送」 gained a **failure notification** on the exact
+inverse condition of the success one; 「衛星 生成」 now clears `PgnssSteps` before it runs, so a
+stale `done,done,done,done` from a previous success cannot silence a failure, and archives every
+build to `/sdcard/tmp` so a set can still be graded after the walk that went wrong. Its `stage_from`
+is gone — a leftover from when sets were built on the PC, which would have mirrored a stale folder
+over a freshly built set, or deleted all six predicted files had that folder been empty.
+
+新しく 「衛星 診断」 — it writes every one of those records to `/sdcard/tmp/gnss-records.txt` and
+touches neither the network nor the band. It is the first thing to run when the fix is slow, and the
+note inside both satellite tasks now says so before it says anything about the data.
+
 ## 0.2.93+2026-09-05.17-44.g09a659b5+126 — 2026-09-16
 
 Built on upstream `09a659b5`.
