@@ -8,6 +8,44 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+128 — 2026-09-20
+
+Built on upstream `aa1a372a`.
+
+### 運動と回復 — the calendar closes up, and a note stops hiding in the colour
+
+Two things 白い熊 saw on the phone and named in one sentence: *"remove the padding in the calendar
+between the rows. The notes must have a black background and yellow border — otherwise they are
+almost invisible on green, and invisible on yellow."*
+
+**The rows.** A week row in the ratings calendar carried 3 dp of padding at each end that nothing
+needed. The row already has three separate pieces of air in it — the date line's own leading, the
+2.5 dp the tile sits inside so the TODAY ring never touches its fill, and the strip beneath that
+holds the training-load bar — and the padding was a fourth, saying nothing on top of the other
+three. It is gone. The strip itself is **8 dp rather than 18**, and the bar now hangs from the TOP
+of it: the bar is 4 dp tall, so fourteen of those eighteen dp were simply the gap to the next row's
+date, and a bar aligned to the bottom of the strip ended up nearer the day below it than the day it
+measures. Sixteen dp comes off every week row, five rows of it in the visible window. The rows abut
+now, which also gets the weekend rule running unbroken down the whole grid — the reason it was drawn
+inside the cells rather than between them in the first place. 機能訓練's day calendar keeps the
+metrics chosen from ten rendered options on 2026-09-03; only the ratings calendar moves.
+
+**The note mark.** It was a bare glyph, so it took its contrast from whatever it landed on — and
+these tiles are nothing but fill. Yellow on an emerald 2 was a mark you had to look for; on a light
+fill it fell back to the tile's own ink, which drew a **black** note glyph on the yellow 1s, in the
+same ink as the numeral beside it. It now brings its own ground: black fill, yellow ring, yellow
+glyph. That is not a new livery but the one the annotation language has had since 2026-09-02 — the
+stop pill and the note pill are the same three colours — so the shared black moves out of
+`Annotations.kt` as `ANNOTATION_FILL` and the mark is one object on every fill, on the walks
+calendar and 機能訓練's as much as on 運動と回復's.
+
+A chip behind that glyph is what was wrong the **first** time it was tried, half again the size
+asked for, covering the rating the tile exists to show. This one is sized to the footprint the bare
+glyph had — a 14 dp icon, a dp of air, a 1.5 dp border — so the numeral keeps the clearance it had
+yesterday. Both changes were rendered at 413 dp and 916 dp in English and 日本語 before they were
+built, which is the only way this end of the wire ever sees a layout: the phone is normally locked,
+and `screencap` returns the keyguard.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+127 — 2026-09-19
 
 Built on upstream `aa1a372a`.
