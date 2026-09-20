@@ -83,7 +83,10 @@ class WorkoutAnnotationRulesTest {
     fun `the two annotation marks keep one order everywhere`() {
         val grid = ProductionSources.read("com/opentasker/ui/charts/DayGrid.kt")
         assertTrue("the badge is the left mark", "TileBadge(cell.badge, skin.ink)" in grid)
-        assertTrue("the note is the right mark", "TileNote(cell.hasNote, skin)" in grid)
+        // No skin passed any more: since 2026-09-20 the note mark brings its own black ground and
+        // yellow ring rather than tinting itself from the fill it lands on, so the tile's colours are
+        // none of its business. The ORDER is what this test is about and that has not moved.
+        assertTrue("the note is the right mark", "TileNote(cell.hasNote)" in grid)
         // Overlaid on the numeral's own line, never stacked above it: a marks strip of their own
         // costs the date the height that makes it readable (白い熊, 2026-09-11 — "make the date text
         // bigger, not on a separate line").

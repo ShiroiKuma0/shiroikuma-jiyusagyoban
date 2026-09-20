@@ -262,7 +262,14 @@ private const val ADD_ALPHA = 0.55f
  * in each place. One colour for every annotation, and it is the app's own.
  */
 val ANNOTATION_INK = Color(0xFFFFFF00)
-private val COUNT_FILL = Color(0xFF000000)
+/**
+ * The ground every annotation is drawn on: the fork's own black, never the card it happens to sit on.
+ *
+ * Shared beyond this file since 2026-09-20, when the day-calendar note mark needed it — a yellow
+ * glyph straight onto a scale colour is invisible on the yellow step and nearly so on the emerald
+ * (白い熊), and what makes the pills legible anywhere is precisely that they bring their own ground.
+ */
+val ANNOTATION_FILL = Color(0xFF000000)
 
 /**
  * A note affordance for one thing — a night, a walk, whatever carries [note].
@@ -430,7 +437,7 @@ fun CountPill(
     Box(
         modifier
             .clip(RoundedCornerShape(100.dp))
-            .background(COUNT_FILL)
+            .background(ANNOTATION_FILL)
             .border(1.5.dp, ink, RoundedCornerShape(100.dp))
             .padding(horizontal = 10.dp, vertical = 3.dp)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
@@ -494,7 +501,7 @@ fun CountPickerDialog(
                             // identity is a yellow outline on black, and a "selected" outline on top
                             // of that would be a third border in a window that already reserves one
                             // for "today".
-                            .background(if (chosen) ANNOTATION_INK else COUNT_FILL)
+                            .background(if (chosen) ANNOTATION_INK else ANNOTATION_FILL)
                             .border(1.5.dp, ANNOTATION_INK, RoundedCornerShape(100.dp))
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                             .clickable { onPick(n) },
@@ -504,7 +511,7 @@ fun CountPickerDialog(
                             "$n",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (chosen) COUNT_FILL else ANNOTATION_INK,
+                            color = if (chosen) ANNOTATION_FILL else ANNOTATION_INK,
                         )
                     }
                 }
