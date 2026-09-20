@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.93+2026-09-14.00-34.gaa1a372a+127`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.93+2026-09-14.00-34.gaa1a372a+128`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -105,8 +105,11 @@ calendar writes its own note file, keyed by the day, because all of them are key
 shared file would have "why I did not walk" overwrite "why I did not lift"; every one of them is
 named in the backup, so a note survives a restore. **A day with nothing on it can be written on** —
 the day with no walk in it is the one worth explaining — and the tile then carries the same mark a
-session's own note gives it, in its top-right corner, beside the session count in its top-left.
-Blank saves delete, one pill either way — the pattern comes over unchanged from 白い熊 応用管理 and
+session's own note gives it, in its top-right corner, beside the session count in its top-left. That
+mark brings its own **black ground and yellow ring**, the same livery as the stop pill: a bare glyph
+took its contrast from whichever of the five scale colours it happened to land on, which made it a
+thing to hunt for on the good days and invisible on the best ones. Blank saves delete, one pill
+either way — the pattern comes over unchanged from 白い熊 応用管理 and
 白い熊 考直, because a control learned once should not have to be learned again.
 
 **機能訓練** sits directly under the morning rating, because both are things only 白い熊 can answer
