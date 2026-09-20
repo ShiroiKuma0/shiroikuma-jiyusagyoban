@@ -74,9 +74,9 @@ private fun keyOf(dayIndex: Int): Long =
 /**
  * A month of days: a rating on most, a note on a scattered few, one of them unrated.
  *
- * The notes are spread across DIFFERENT step colours on purpose — the dot is drawn in the tile's own
- * ink, which is the one foreground each fill is chosen to carry, and this is the render that shows
- * whether that holds on the yellow, the blue and the dark red alike.
+ * The notes are spread across DIFFERENT step colours on purpose — the mark is the annotation livery,
+ * black ground and yellow ring, and this is the render that shows it holding on the yellow, the blue
+ * and the dark red alike without taking the clearance the numeral needs.
  */
 private val NOTED = mapOf(
     2 to "woke at 03:00 and did not get back down",
