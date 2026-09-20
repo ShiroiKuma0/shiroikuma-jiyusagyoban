@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -156,22 +155,40 @@ private fun TileBadge(badge: String?, ink: Color) {
  * glyph on a black chip inside the tile, at half again the size asked for, which covered the very
  * rating the tile exists to show; and then a mark in the strip below the tile, where it could obscure
  * nothing but sat a row away from the day it belonged to. 白い熊 asked for it back inside, top-right
- * (2026-09-11), and what makes it work this time is the size — 14 dp, no chip behind it — plus the
- * day tile growing a strip of its own for the marks to live in.
+ * (2026-09-11), and what makes it work there is the size — small enough that the numeral keeps the
+ * middle of the tile — plus the day tile growing a strip of its own for the marks to live in.
  *
- * Drawn in the annotation yellow on a dark fill and in the tile's own ink on a light one: a yellow
- * glyph on the yellow of a done rehab day would be invisible, and legibility is not something the
- * annotation language gets to overrule.
+ * **On its own black ground, ringed in the annotation yellow** (白い熊, 2026-09-20: *"the notes must
+ * have a black background and yellow border — otherwise they are almost invisible on green, and
+ * invisible on yellow"*). A bare glyph took its legibility from whatever fill it landed on, and the
+ * fills are the whole point of these tiles: yellow-on-emerald was a mark you had to look for, and
+ * the dodge that kept it visible on a light fill — the tile's own ink — put a BLACK note glyph on
+ * the yellow 1s, the same mark in the same ink as the numeral beside it. The chip carries its own
+ * contrast instead, so the mark is one object everywhere and reads at a glance on every fill.
+ *
+ * That is the annotation language's own livery rather than a new one: black ground, yellow border,
+ * yellow glyph is exactly what [CountPill] and [NotePill] are. The chip is also what was wrong the
+ * FIRST time, so it is sized down to the footprint the bare glyph had — a 14 dp icon, a dp of air,
+ * and the 1.5 dp border — and the numeral it sits beside keeps the clearance it had yesterday.
  */
 @Composable
-private fun TileNote(hasNote: Boolean, skin: ScaleSkin) {
+private fun TileNote(hasNote: Boolean) {
     if (!hasNote) return
-    Icon(
-        Icons.Filled.EditNote,
-        contentDescription = null,
-        tint = if (skin.fill.luminance() > 0.5f) skin.ink else ANNOTATION_INK,
-        modifier = Modifier.size(18.dp),
-    )
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(ANNOTATION_FILL)
+            .border(1.5.dp, ANNOTATION_INK, RoundedCornerShape(4.dp))
+            .padding(1.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.EditNote,
+            contentDescription = null,
+            tint = ANNOTATION_INK,
+            modifier = Modifier.size(14.dp),
+        )
+    }
 }
 
 /**
@@ -217,7 +234,12 @@ fun DayGrid(
     // see [DayGridStyle.DAYS] for why each one moves.
     val weekendGutter = if (dateInTile) 8.dp else 0.dp
     val columnGap = if (dateInTile) 3.dp else 4.dp
-    val rowPadding = if (dateInTile) 1.5.dp else 3.dp
+    // NO vertical padding on a ratings row (白い熊, 2026-09-20: "remove the padding in the calendar
+    // between the rows"). A ratings row already carries three pieces of air the day calendar does
+    // not — the date line's own leading, the 2.5 dp the tile sits in so today's ring never touches
+    // the fill, and the load-bar strip below — so three more dp at each end was the fourth, and the
+    // one that did nothing. The rows abut now, which also lets the weekend rule run unbroken.
+    val rowPadding = if (dateInTile) 1.5.dp else 0.dp
     val style = LocalChartStyle.current
     // Today, marked wherever it lands. Five weeks of squares are five weeks of squares: without a
     // fixed point 白い熊 has to count columns to find the morning being asked about, and the tile most
@@ -249,13 +271,15 @@ fun DayGrid(
     val density = LocalDensity.current
     val lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
     val dateLine = if (lineHeight.isSp) with(density) { lineHeight.toDp() } else 21.dp
-    // vertical padding + date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load bar
+    // date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load-bar strip
     //
     // The day calendar has no strip at all any more: the note moved into the tile (白い熊,
     // 2026-09-11) and the load bar was never drawn there, so the 18 dp it reserved was 18 dp of
     // nothing per row — five rows of it in a full calendar, and a fifth of the 機能訓練 card.
+    // The ratings strip is 8 dp rather than 18 for the same reason: the bar it holds is 4 dp tall
+    // and the other fourteen were the gap 白い熊 asked to close (2026-09-20).
     val weekRow =
-        if (dateInTile) 3.dp + 49.dp else 6.dp + dateLine + 2.dp + 39.dp + 2.dp + 18.dp
+        if (dateInTile) 3.dp + 49.dp else dateLine + 2.dp + 39.dp + 2.dp + 8.dp
     val headLine = MaterialTheme.typography.titleMedium.lineHeight
     val monthRule = (if (headLine.isSp) with(density) { headLine.toDp() } else 22.dp) + 12.dp
     val viewport = weekRow * visibleWeeks + monthRule
@@ -424,7 +448,7 @@ fun DayGrid(
                                     TileBadge(cell.badge, skin.ink)
                                 }
                                 Box(Modifier.align(Alignment.TopEnd).padding(1.dp)) {
-                                    TileNote(cell.hasNote, skin)
+                                    TileNote(cell.hasNote)
                                 }
                             }
                             }
@@ -432,11 +456,15 @@ fun DayGrid(
                             // load of a rated night. The note used to share it and has moved into
                             // the tile (白い熊, 2026-09-11), so the day calendar — which never drew
                             // a load bar — no longer reserves the height at all.
-                            if (!dateInTile) Box(Modifier.fillMaxWidth().height(18.dp)) {
+                            //
+                            // Eight dp, and the bar at the TOP of them: the bar belongs to the tile
+                            // above it, so it hangs from that tile rather than floating at the far
+                            // end of a strip that was mostly the gap to the next row's date.
+                            if (!dateInTile) Box(Modifier.fillMaxWidth().height(8.dp)) {
                                 cell.bar?.takeIf { it > 0f }?.let { load ->
                                     Box(
                                         Modifier
-                                            .align(Alignment.BottomCenter)
+                                            .align(Alignment.TopCenter)
                                             .fillMaxWidth(load.coerceIn(0.15f, 1.0f))
                                             .height(4.dp)
                                             .clip(RoundedCornerShape(2.dp))
