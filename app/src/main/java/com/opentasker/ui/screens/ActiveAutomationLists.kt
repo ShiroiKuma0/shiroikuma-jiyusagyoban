@@ -10,6 +10,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -77,10 +78,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.runtime.rememberCoroutineScope
-import com.opentasker.app.OpenTaskerApp_NoHilt
-import com.opentasker.core.storage.ItemMetaEntity
-import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.foundation.layout.RowScope
@@ -1204,7 +1201,11 @@ private fun TaskCard(
                         Text(
                             task.name,
                             style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
+                            // Open, the card shows the task WHOLE, name included — a `-- [672][37]`
+                            // suffix is how these names are told apart and it is the end that an
+                            // ellipsis eats first. Closed, the row stays one line: 362 of them in a
+                            // list, and a wrapped name there buys nothing a tap does not.
+                            maxLines = if (expanded) Int.MAX_VALUE else 1,
                             overflow = TextOverflow.Ellipsis,
                             // Dimmed and badged, never by hue alone — see the same treatment on a
                             // disabled action row.
@@ -1375,7 +1376,7 @@ private fun TaskCard(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ActionRow(
+internal fun ActionRow(
     index: Int,
     taskId: Long,
     action: ActionSpec,
@@ -1402,19 +1403,20 @@ private fun ActionRow(
     val metadata = ActionMetadataRegistry.get(action.type)
     val capability = ActionCapabilityRegistry.get(action.type)
     val themePrefs by ThemeStore.state.collectAsState()
-    // Per-action label fold, persisted in item_meta (tab "action_label", key "<taskId>:<index>") — reuses
-    // the Note fold's store + noteExpanded boolean. Default folded: only the first line of the label shows.
-    val dao = remember { OpenTaskerApp_NoHilt.db.itemMetaDao() }
-    val foldKey = "$taskId:$index"
-    val foldMeta by remember(foldKey) { dao.getAsFlow("action_label", foldKey) }.collectAsState(initial = null)
-    val labelExpanded = foldMeta?.noteExpanded ?: false
-    val scope = rememberCoroutineScope()
-    val toggleFold: () -> Unit = {
-        scope.launch {
-            val cur = dao.get("action_label", foldKey) ?: ItemMetaEntity(tab = "action_label", itemKey = foldKey)
-            dao.upsert(cur.copy(noteExpanded = !labelExpanded))
-        }
-    }
+    // NOTHING IN AN ACTION IS EVER ABBREVIATED, at any width (白い熊, 2026-09-20 — "each task must
+    // show each action with its contents fully, breaking the value into more lines if necessary —
+    // there can be no '…' display. The full task must be fully visible on first look, without editing
+    // individual items", and then, of the one ellipsis left on the cover panel: "remove the label fold
+    // on the folded panel too").
+    //
+    // So there is no label fold left to store, and the per-action fold that lived in item_meta
+    // (tab "action_label", key "<taskId>:<index>") is gone with it — along with the DAO read that made
+    // every action row in an open task touch the database. Its rows stay where they are: they are
+    // 白い熊's data, they cost nothing, and a restore of an older backup would write them again.
+    //
+    // The width still decides how the ARGUMENTS pack (flow when there is room, one per line when
+    // there is not) — that is a layout question. Whether 白い熊 can read what an action says is not.
+    val narrow = isNarrowScreen()
     var editingKey by remember(action) { mutableStateOf<String?>(null) }
     Surface(
         color = if (selected) Color(themePrefs.selectionColor)
@@ -1454,7 +1456,13 @@ private fun ActionRow(
                             .border(themePrefs.actionLabelFrameWidthDp.dp, Color(themePrefs.actionLabelFrameColor), RoundedCornerShape(8.dp))
                             // In selection mode a tap toggles this action's selection; otherwise it folds.
                             // Long-press always (de)selects + opens the clone/copy/cut/paste menu.
-                            .combinedClickable(onClick = { if (selectionActive) onTap() else toggleFold() }, onLongClick = onLongPress)
+                            // Nothing to fold any more, so a plain tap only selects — and only while
+                            // selecting. Long-press still (de)selects and opens the action menu, which
+                            // is what the frame was reachable for besides the fold.
+                            .combinedClickable(
+                                onClick = { if (selectionActive) onTap() },
+                                onLongClick = onLongPress,
+                            )
                             .padding(horizontal = 8.dp, vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -1463,39 +1471,31 @@ private fun ActionRow(
                             style = MaterialTheme.typography.bodySmall,
                             fontSize = themePrefs.actionLabelSizeSp.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = if (labelExpanded) Int.MAX_VALUE else 1,
-                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            if (labelExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                            contentDescription = if (labelExpanded) "Collapse label" else "Expand label",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp),
                         )
                     }
                     IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit)) }
                     IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error) }
                 }
-                // Args — flush-left with the index. Label expanded → all args on ONE line (flow); folded →
-                // TWO lines (stacked). Tap a value to edit it in place.
+                // Args — flush-left with the index, and NEVER abbreviated: a value wraps to as many
+                // lines as it needs, in both layouts. What differs between them is only how the
+                // (key)+value pairs are packed.
                 if (action.args.isEmpty()) {
                     Text(
                         metadata?.description ?: stringResource(R.string.workspace_no_arguments),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
-                } else if (isNarrowScreen()) {
+                } else if (narrow) {
                     // Narrow (folded cover) reflow: EACH arg gets its own full-width line — the (key)
-                    // pill + a value that takes the whole rest and wraps to 2 lines, instead of the
-                    // one-line row that crushed var names to "Ong…" (白い熊 2026-07-11).
+                    // pill + a value that takes the whole rest, instead of the one-line row that
+                    // crushed var names to "Ong…" (白い熊 2026-07-11). The two-line cap on that value
+                    // is gone with the rest of them (2026-09-20).
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(themePrefs.actionRowPadDp.dp)) {
                         action.args.entries.forEach { e ->
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 ArgPill(
                                     argKey = e.key, value = e.value, valueWeight = true,
-                                    maxValueLines = 2,
                                     editing = editingKey == e.key,
                                     selectionActive = selectionActive,
                                     onStartEdit = { editingKey = e.key },
@@ -1508,21 +1508,37 @@ private fun ActionRow(
                         }
                     }
                 } else {
-                    // name + value (every arg) on ONE line: each (key) pill + its value. The last value
-                    // takes the remaining width and ellipsises — tap it to edit / see the whole thing.
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val entries = action.args.entries.toList()
-                        entries.forEachIndexed { i, e ->
-                            ArgPill(
-                                argKey = e.key, value = e.value, valueWeight = i == entries.lastIndex,
-                                editing = editingKey == e.key,
-                                selectionActive = selectionActive,
-                                onStartEdit = { editingKey = e.key },
-                                onSelectToggle = onTap,
-                                onLongPress = onLongPress,
-                                onCommit = { nv -> onSetArg(e.key, nv); editingKey = null },
-                                onCancel = { editingKey = null },
-                            )
+                    // Unfolded: the pairs FLOW. As many (key)+value pairs as fit stand side by side,
+                    // the next one starts a new line, and a pair too wide for any line gets a line of
+                    // its own with the value wrapping inside it — so a 916 dp screen stays as compact
+                    // as the values allow while still showing every one of them whole.
+                    //
+                    // It was one Row with only the LAST value weighted, which is where the "…" came
+                    // from: four args on a scene.show fitted three and hid the fourth behind an
+                    // ellipsis, and a file path lost everything after "/storage/e…". An action's args
+                    // ARE the action — hiding them means opening the editor to read what a task does
+                    // (白い熊, 2026-09-20: "the full task must be fully visible on first look").
+                    FlowRow(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(themePrefs.actionRowPadDp.dp),
+                    ) {
+                        action.args.entries.forEach { e ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                ArgPill(
+                                    argKey = e.key, value = e.value, valueWeight = false,
+                                    editing = editingKey == e.key,
+                                    selectionActive = selectionActive,
+                                    onStartEdit = { editingKey = e.key },
+                                    onSelectToggle = onTap,
+                                    onLongPress = onLongPress,
+                                    onCommit = { nv -> onSetArg(e.key, nv); editingKey = null },
+                                    onCancel = { editingKey = null },
+                                )
+                            }
                         }
                     }
                 }
@@ -1607,7 +1623,6 @@ private fun RowScope.ArgPill(
     onLongPress: () -> Unit,
     onCommit: (String) -> Unit,
     onCancel: () -> Unit,
-    maxValueLines: Int = 1,   // narrow-screen rows pass 2 so long values wrap instead of ellipsising
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
     val nameColor = Color(themePrefs.actionNameColor)   // the variable name (settable)
@@ -1666,13 +1681,15 @@ private fun RowScope.ArgPill(
             fontSize = dataSize,
             fontWeight = FontWeight.Bold,
             color = if (argKey == "name") nameColor else valueColor,
-            maxLines = maxValueLines,
-            overflow = TextOverflow.Ellipsis,
-            // Last arg: fill whatever is left (and ellipsise there). Non-last (e.g. a var.set NAME): take
-            // the NATURAL width so the name always shows completely — the hard 160dp cap truncated most
-            // %Ongaku_*-length names on a wide screen (白い熊). fill=false keeps it natural-sized while the
-            // 3:1 weights still guarantee the last value at least ~25% of the flexible width, so a
-            // pathological name ellipsises at ~75% instead of pushing the value off the row.
+            // NO LINE CAP AND NO ELLIPSIS, in either layout. A value that does not fit its line wraps
+            // onto the next one and the row grows — the row is the only place a task can be READ
+            // without opening each action in turn, and a cap of one line (or two) meant the longest
+            // values — paths, URLs, whole sentences of Japanese — were exactly the ones it hid
+            // (白い熊, 2026-09-20).
+            //
+            // valueWeight: the value takes the rest of a full-width line. Otherwise it is
+            // natural-sized, capped by whatever the line has left — the flow layout sizes each pair to
+            // its own content, and a value too long for any line simply wraps inside the pair.
             modifier = (if (valueWeight) Modifier.weight(1f) else Modifier.weight(3f, fill = false))
                 .clip(RoundedCornerShape(6.dp))
                 // In selection mode a tap toggles this action; otherwise it edits the value. Long-press
