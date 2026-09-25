@@ -4,6 +4,8 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.GnssForecastReminder
+import com.opentasker.core.huawei.pgnss.PredictedSet
 import com.opentasker.core.huawei.HuaweiSettings
 import com.opentasker.core.huawei.HuaweiSyncRunner
 import java.io.File
@@ -124,6 +126,11 @@ class HuaweiGnssAction : Action {
             val hoursLeft = (untilMs - System.currentTimeMillis()) / 3_600_000L
             ctx.variables.set("${prefix}GnssBandUntil", stamp(untilMs))
             ctx.variables.set("${prefix}GnssBandHours", hoursLeft.toString())
+            // Days AND hours, so the panel can be held up against the band's own screen without
+            // arithmetic (白い熊, 2026-09-21) — and what that screen will be claiming, beside it.
+            ctx.variables.set("${prefix}GnssBandLeft", GnssForecastReminder.leftLabel(untilMs))
+            // What the BAND will be saying is a question about when it took the set, which this
+            // early read does not know — only the transfer below does. Left to that.
         }
 
         // Every predicted file is offered, INCLUDING an expired one, and its window is reported.
@@ -144,7 +151,7 @@ class HuaweiGnssAction : Action {
         for (name in files.keys) {
             if (!name.startsWith(PREDICTED_PREFIX) || name == PREDICTED_STATIC) continue
             if (name in ALWAYS_STALE) continue
-            val last = lastBlockSeconds(files[name]!!) ?: continue
+            val last = coveredUntil(name, lastBlockSeconds(files[name]!!) ?: continue)
             if (last < nowGps) {
                 expired += name
             } else {
@@ -152,14 +159,12 @@ class HuaweiGnssAction : Action {
                 if (windowEnd == 0L || last < windowEnd) windowEnd = last
             }
         }
-        ctx.variables.set(
-            "${prefix}GnssPredUntil",
-            if (windowEnd == 0L) "" else {
-                val unix = (windowEnd - GPS_LEAP_SECONDS + GPS_UNIX_EPOCH) * 1000
-                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
-                    .format(java.util.Date(unix))
-            },
-        )
+        // UTC, like every other satellite time this feature writes.
+        //
+        // This one formatter had no zone set, so it printed the phone's own — and the panel showed
+        // `GnssPredUntil` as 16:59 beside `GnssBandUntil` as 14:59 and made one instant look like
+        // two, two hours apart (白い熊, 2026-09-21). One instant, one spelling.
+        ctx.variables.set("${prefix}GnssPredUntil", if (windowEnd == 0L) "" else stamp(unixOf(windowEnd)))
         ctx.variables.set("${prefix}GnssPredHours", if (windowEnd == 0L) "" else
             ((windowEnd - nowGps) / 3600).toString())
         if (files.isEmpty()) {
@@ -197,6 +202,61 @@ class HuaweiGnssAction : Action {
                 "NOT HANDED OVER — the whole predicted set is past its window ($until)",
             )
         }
+        // A BUILD THAT FAILED IS NOT OURS TO ERASE, AND NOT OURS TO PAPER OVER.
+        //
+        // 2026-09-19, and it is the whole of why 白い熊's walk failed two days later. The build died
+        // on `Unable to resolve host "download.aiub.unibe.ch"` and wrote its reason into
+        // `PgnssAlert`; 「衛星 生成」 carries `continueOnError` on that step, so the task walked on to
+        // THIS action; the line below used to overwrite that alert with "" because nothing was
+        // recorded about the band yet; the transfer of the PREVIOUS set then succeeded and rewrote
+        // the panel to `done,done,done,done`; and the task's last notification — gated on exactly
+        // that string — announced 「予測暦 済」. A failed build was converted into a success message
+        // and a two-day-old set was handed over as though it were three days of forecast.
+        //
+        // So the serve refuses outright while a build failure is standing. It did not repair the
+        // failure and it will not stand in front of it. `serve_stale` is the deliberate override —
+        // 「衛星 再送」 exists precisely to hand over the set already on the phone, and it clears the
+        // failure variables at its own start, so it never trips this.
+        val standingAlert = ctx.variables.get("${prefix}PgnssAlert").orEmpty()
+        val buildFailureStanding = standingAlert.startsWith(NOT_REBUILT)
+        val serveStale = args["serve_stale"]?.trim()?.lowercase() in setOf("1", "true", "yes", "on")
+        if (buildFailureStanding && !serveStale && predictedHeld > 0) {
+            GnssForecastReminder.refusedStaleSet(ctx.app, standingAlert)
+            return fail(
+                ctx, prefix, store,
+                "NOT HANDED OVER — the build did not produce a set ($standingAlert) and the band " +
+                    "must not be given the old one as though it were new. Fix the build and run " +
+                    "衛星 生成 again, or use 衛星 再送 to hand over the old set deliberately.",
+            )
+        }
+
+        // AND A BAR ON FRESHNESS, for the caller that knows what it just built.
+        //
+        // `min_hours` is what a task asserts about the set it is about to hand over: a run that has
+        // just built one holds 72 hours, so anything materially less means the build did not happen
+        // and the store still has yesterday's. Absent, nothing changes — only a wholly dead set is
+        // refused, which is the 2026-08-29 measurement's rule and stays.
+        args["min_hours"]?.trim()?.toLongOrNull()?.let { minHours ->
+            val leftHours = if (windowEnd == 0L) -1L else (windowEnd - nowGps) / 3600
+            if (predictedHeld > 0 && leftHours < minHours) {
+                ctx.variables.set(
+                    "${prefix}PgnssAlert",
+                    "THE SET ON THE PHONE HAS ONLY $leftHours h LEFT, and this run wanted at least " +
+                        "$minHours. Nothing was handed over. Rebuild with 衛星 生成.",
+                )
+                GnssForecastReminder.refusedStaleSet(
+                    ctx.app,
+                    "手元の一式は残り $leftHours 時間しかありません（$minHours 時間必要）。/ " +
+                        "the set on the phone has $leftHours h left, $minHours were required",
+                )
+                return fail(
+                    ctx, prefix, store,
+                    "NOT HANDED OVER — the set on the phone has $leftHours h left, below the " +
+                        "$minHours h this run required",
+                )
+            }
+        }
+
         // The band's own forecast, not the phone's, is what the banner warns about from here on.
         // A phone holding a perfect set says nothing about a band still wearing last week's, and
         // that gap is what cost four days in September 2026 — see [bandHoldsUntil].
@@ -205,6 +265,9 @@ class HuaweiGnssAction : Action {
         ctx.variables.set(
             "${prefix}PgnssAlert",
             when {
+                // Never overwritten with silence: see the block above. Kept even when this run is
+                // allowed to proceed, because the set it is serving is still the one nobody rebuilt.
+                buildFailureStanding -> standingAlert
                 bandLeftHours == null -> ""
                 bandLeftHours < 0 -> "THE BAND'S FORECAST RAN OUT ${-bandLeftHours} h AGO — it has " +
                     "been fixing the slow way since. Press 更新 on the band while this is open."
@@ -411,6 +474,28 @@ class HuaweiGnssAction : Action {
                         "${prefix}GnssBandHours",
                         ((unixOf(windowEnd) - System.currentTimeMillis()) / 3_600_000L).toString(),
                     )
+                    ctx.variables.set(
+                        "${prefix}GnssBandLeft",
+                        GnssForecastReminder.leftLabel(unixOf(windowEnd)),
+                    )
+                    // THE BAND COUNTS FROM RECEIPT, and this is the moment of it. Recorded so the
+                    // panel can print what its screen will be claiming beside what the data has —
+                    // the two differ by exactly the delay between building and handing over, which
+                    // is the thing worth seeing (白い熊, 2026-09-21).
+                    val receivedAt = System.currentTimeMillis()
+                    ctx.variables.set("${prefix}GnssBandFrom", stamp(receivedAt))
+                    ctx.variables.set(
+                        "${prefix}GnssBandClaims",
+                        GnssForecastReminder.leftLabel(
+                            receivedAt + GnssForecastReminder.BAND_WINDOW_HOURS * 3_600_000L,
+                        ),
+                    )
+                    // SAY IT, AND COME BACK AND SAY IT AGAIN. A window written to a file and a
+                    // variable is a window nobody reads: on 2026-09-21 白い熊 walked five hours past
+                    // the end of a forecast while the band's own screen promised eighteen more, and
+                    // every record needed to know better was already on the phone. See
+                    // [GnssForecastReminder] for what the band's countdown actually means.
+                    GnssForecastReminder.arm(ctx.app, unixOf(windowEnd), receivedAt)
                 }
                 // Offering data the band declines is not success. Saying so here is the whole
                 // lesson of the weather bug: a transfer that reports "sent" while the band kept
@@ -458,6 +543,41 @@ class HuaweiGnssAction : Action {
     internal companion object {
         /** Enough to see what happened, few enough to stay readable on a phone panel. */
         const val MAX_LOG_LINES = 12
+
+        /**
+         * How a failed BUILD announces itself, written by `huawei.pgnss` and read here.
+         *
+         * A string rather than a variable of its own because it is already the text 白い熊 sees on
+         * the panel; making the serve key off the same words is what keeps "the build failed" from
+         * being a fact only one action knows.
+         */
+        const val NOT_REBUILT = "THE SET WAS NOT REBUILT"
+
+        /**
+         * When a predicted file's last block stops covering the sky — NOT the stamp it carries.
+         *
+         * Two corrections, both worth an hour, and together they were most of the gap 白い熊 found
+         * between our panel and the band's own screen on 2026-09-21.
+         *
+         * **GLONASS is stamped an hour early on purpose.** `Records.glonassHour` floors the block to
+         * the UTC hour and the builder writes `stamps - 3600`; that is the format's convention, not
+         * a file that expires sooner. Taking a plain minimum across the six therefore always picked
+         * GLONASS and always read an hour pessimistic against GPS, Galileo and BeiDou.
+         *
+         * **A block covers the hour after it.** Every element set is fitted ±[Orbit.FIT_HALF] — the
+         * grader samples exactly that span around each stamp — so a block stamped 15:59 is good
+         * until 16:59, and reporting the stamp throws away the last hour we actually shipped.
+         */
+        internal fun coveredUntil(name: String, lastBlockGps: Long): Long =
+            lastBlockGps +
+                (if (name == PredictedSet.NAME_GLONASS) GLONASS_STAMP_OFFSET_SEC else 0L) +
+                BLOCK_COVERS_SEC
+
+        /** What the builder subtracts from a GLONASS block stamp; added back to compare like with like. */
+        const val GLONASS_STAMP_OFFSET_SEC = 3600L
+
+        /** [Orbit.FIT_HALF] as seconds: how far past its own stamp one element set stays good. */
+        const val BLOCK_COVERS_SEC = 3600L
 
         /** A predicted block stamp, in GPS seconds, as Unix milliseconds. */
         internal fun unixOf(gpsSeconds: Long): Long =

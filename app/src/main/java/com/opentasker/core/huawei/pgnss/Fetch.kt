@@ -491,6 +491,14 @@ class PgnssFetcher(
         // sitting under today's name for the build to pick up.
         target.delete()
         val started = System.currentTimeMillis()
+        // SAID BEFORE THE WAIT, not after it.
+        //
+        // Every other report in this file is emitted from inside the read loop, so a request whose
+        // server has not answered yet emits nothing at all — and the panel goes on showing the last
+        // file that DID deliver bytes. 白い熊, 2026-09-21: ten minutes reading `current_yuma.alm`
+        // and `7/11`, with nothing moving, while the almanac after it was the one being waited for.
+        // The display was not merely still; it was naming the wrong file.
+        progress(FetchProgress(name, url, 0, 0, false, 0))
         val request = Request.Builder()
             .url(url)
             // No conditional GET, no stored response: see the class KDoc.

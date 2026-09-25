@@ -9,6 +9,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.GnssForecastReminder
 import com.opentasker.core.huawei.pgnss.PgnssBuildConfig
 import com.opentasker.core.huawei.pgnss.PgnssBuildResult
 import com.opentasker.core.huawei.pgnss.PgnssCancelledException
@@ -156,15 +157,14 @@ class HuaweiPgnssAction : Action {
             recordHistory(outDir, "NOT REBUILT · cancelled at step ${panel.step}", ctx.logger)
             ctx.variables.set(
                 "${prefix}PgnssAlert",
-                "THE SET WAS NOT REBUILT — cancelled at step ${panel.step}. The band still holds " +
+                "${HuaweiGnssAction.NOT_REBUILT} — cancelled at step ${panel.step}. The band still holds " +
                     "whatever it had before, which may be out of date.",
             )
             return panel.fail(store, panel.step, "cancelled")
         } catch (timeout: TimeoutCancellationException) {
-            return panel.fail(
-                store, panel.step,
-                "gave up after ${MAX_RUN_MS / 60_000} minutes — ${panel.phase.ifEmpty { "no progress" }}",
-            )
+            val why = "gave up after ${MAX_RUN_MS / 60_000} minutes — ${panel.phase.ifEmpty { "no progress" }}"
+            GnssForecastReminder.buildFailed(ctx.app, why)
+            return panel.fail(store, panel.step, why)
         } catch (stopped: CancellationException) {
             // The engine or the user stopped the task. Propagate: a coroutine that swallows its own
             // cancellation goes on running as though nothing happened. The `finally` below is what
@@ -179,9 +179,13 @@ class HuaweiPgnssAction : Action {
             // runs whose panel read "Build done" (白い熊, 2026-09-06). Silence here is the bug.
             ctx.variables.set(
                 "${prefix}PgnssAlert",
-                "THE SET WAS NOT REBUILT — $why. The band still holds the previous set, which may " +
+                "${HuaweiGnssAction.NOT_REBUILT} — $why. The band still holds the previous set, which may " +
                     "be out of date. Nothing new has been handed over.",
             )
+            // …and loud where it will actually be SEEN. The banner above is inside a panel; the
+            // 2026-09-19 DNS failure sat in it unread for two days while the band's forecast ran
+            // out underneath (白い熊, 2026-09-21).
+            GnssForecastReminder.buildFailed(ctx.app, why)
             return panel.fail(store, panel.step, why)
         } finally {
             // NonCancellable, for the reason spelled out in HuaweiSessionGuard: `withContext` calls
@@ -271,6 +275,18 @@ class HuaweiPgnssAction : Action {
         private var dirty = false
         private var finished = false
 
+        /**
+         * When the build last had something NEW to say — not when the panel last redrew.
+         *
+         * The difference is the whole point. `PgnssElapsed` has ticked on a clock since 2026-08-30
+         * precisely so a long download does not read as a hang, and it was not enough: on
+         * 2026-09-21 白い熊 watched `7/11` and one file name for ten minutes with the seconds
+         * counting up beside them, and concluded — reasonably — that it was stuck. A clock that
+         * moves while nothing else does proves the PANEL is alive; it says nothing about the BUILD.
+         * This one does: it is how long the build itself has been silent.
+         */
+        private var lastProgressAt = System.currentTimeMillis()
+
         fun start() {
             // The clock belongs to the RUN, not to this action. Steps 3 and 4 are served by
             // `huawei.gnss` in the same task, and it reads this to keep counting from where the
@@ -314,15 +330,26 @@ class HuaweiPgnssAction : Action {
                 while (lines.size > MAX_LOG_LINES) lines.removeFirst()
             }
             dirty = true
+            lastProgressAt = System.currentTimeMillis()
             // A step boundary and a log line are worth the write immediately; a tick is not.
             if (advanced || p.line != null) publishNow() else throttled()
         }
 
         @Synchronized
         fun tick() {
-            set("PgnssHeartbeat", System.currentTimeMillis().toString())
-            set("PgnssElapsed", hms((System.currentTimeMillis() - startedAt) / 1000))
+            val now = System.currentTimeMillis()
+            set("PgnssHeartbeat", now.toString())
+            set("PgnssElapsed", hms((now - startedAt) / 1000))
             eta()?.let { set("PgnssEta", it) }
+            // HOW LONG THE BUILD HAS BEEN SILENT, which is the question "is it stuck?" actually asks.
+            //
+            // Blank until it is worth saying: a download reports every quarter-second while bytes
+            // are arriving, so a few seconds of quiet is ordinary and a line that flickered on and
+            // off would be worse than none. Past the threshold it is a server that has not answered
+            // yet — GSSC and the IAC both take minutes on a bad evening — and naming the wait is
+            // what separates that from a hang.
+            val quiet = (now - lastProgressAt) / 1000
+            set("PgnssQuiet", if (finished || quiet < QUIET_AFTER_SEC) "" else hms(quiet))
             if (dirty) throttled()
         }
 
@@ -472,6 +499,15 @@ class HuaweiPgnssAction : Action {
 
         /** About two seconds, as the contract says. */
         const val THROTTLE_MS = 2_000L
+
+        /**
+         * Quiet shorter than this is ordinary and is not reported.
+         *
+         * Twelve seconds: long enough that the gaps between chunks of a slow transfer never trip it
+         * — a download reports four times a second while bytes are moving — and short enough that
+         * 白い熊 learns a server has gone silent long before it looks like a hang.
+         */
+        const val QUIET_AFTER_SEC = 12L
 
         /** The elapsed clock's own tick. Same cadence, so the two never fight for the store. */
         const val TICK_MS = 2_000L
