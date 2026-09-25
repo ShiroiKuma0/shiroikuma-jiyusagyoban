@@ -207,12 +207,36 @@ class PgnssFetcher(
 
     // ── the individual sources ──────────────────────────────────────────────────────────────────
 
-    /** CODE's free five-day predicted orbit, ~9.6 MB. It spans the whole 72-hour window outright. */
-    fun fetchCodeSp3(): File = fetch(
-        name = "COD0OPSPRD_05D.SP3",
-        url = "$AIUB/COD0OPSPRD_05D.SP3",
-        sniff = ::looksLikeSp3,
-    )
+    /**
+     * CODE's free five-day predicted orbit, ~9.6 MB. It spans the whole 72-hour window outright.
+     *
+     * **The one orbit product with a fallback, and only because of what it is.** The rule at the
+     * head of this class stands — a cached orbit is a *wrong* orbit a day later — and it is about
+     * products that describe a fixed day. This one is a **five-day prediction**: yesterday's issue
+     * still covers today's 72-hour window, one prediction-day older and correspondingly less exact,
+     * which is a different thing from wrong. Two days is the cap, and it is arithmetic rather than
+     * taste: a product issued on day D reaches D+5, a window opened on D+k closes at D+k+3, so
+     * k ≤ 2 or it does not reach at all.
+     *
+     * And it is not trusted on that arithmetic alone. `validate()` compares the product's own last
+     * epoch against the window it is about to build and refuses — *"the orbit product ends before
+     * the 72 h window does"* — so a cached copy that falls short fails the build loudly instead of
+     * shortening the forecast behind 白い熊's back. The build note says the copy was cached and how
+     * old it is, every time it is used.
+     *
+     * Why it earned one: AIUB is the only host that serves this file. IGN and BKG carry IGS
+     * combinations, not CODE's own prediction; `ftp.aiub.unibe.ch` does not answer over HTTP;
+     * CDDIS wants an Earthdata login. On 2026-09-19 a single DNS failure — `Unable to resolve host
+     * "download.aiub.unibe.ch"` — killed the build, the band went on wearing a set that expired two
+     * days later, and 白い熊 walked with no fix.
+     */
+    fun fetchCodeSp3(): File = cachedOrbit("code-sp3", MAX_CODE_SP3_AGE_DAYS) {
+        fetch(
+            name = "COD0OPSPRD_05D.SP3",
+            url = "$AIUB/COD0OPSPRD_05D.SP3",
+            sniff = ::looksLikeSp3,
+        )
+    }
 
     /**
      * CODE's free 21-day PREDICTED Earth-rotation parameters.
@@ -226,7 +250,61 @@ class PgnssFetcher(
     fun fetchCodeErp(today: LocalDate): File {
         val yd = yearDoy(today.minusDays(1))
         val name = "COD0OPSPRD_${yd}0000_21D_06H_ERP.ERP"
-        return fetch(name = name, url = "$AIUB/$name", sniff = ::looksLikeErp)
+        // Twenty-one days of predicted pole, so an old copy reaches even further than the orbit's
+        // does — and it comes from the same single host, so it fails in the same breath. Same cap
+        // and the same loud note; see [fetchCodeSp3].
+        return cachedOrbit("code-erp", MAX_CODE_SP3_AGE_DAYS) {
+            fetch(name = name, url = "$AIUB/$name", sniff = ::looksLikeErp)
+        }
+    }
+
+    /**
+     * A product that may fall back to the last good copy — see [fetchCodeSp3] for why only these.
+     *
+     * Deliberately the same shape as [almanac], including the name that carries the cache date, so
+     * the two read as one mechanism rather than as two conventions.
+     */
+    internal fun cachedOrbit(kind: String, maxAgeDays: Long, live: () -> File): File {
+        val attempt = runCatching { live() }
+        val dir = cacheDir
+        attempt.getOrNull()?.let { file ->
+            if (dir != null) {
+                runCatching {
+                    dir.mkdirs()
+                    val today = LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    val keep = File(dir, "$kind.$today.${file.name}")
+                    file.copyTo(keep, overwrite = true)
+                    dir.listFiles()
+                        ?.filter { it.name.startsWith("$kind.") && it.name != keep.name }
+                        ?.forEach { it.delete() }
+                }
+            }
+            return file
+        }
+        val why = attempt.exceptionOrNull()
+        val cached = dir?.listFiles()?.filter { it.name.startsWith("$kind.") }?.maxByOrNull { it.name }
+            ?: throw IOException("$kind is unavailable and nothing is cached", why)
+        val rest = cached.name.removePrefix("$kind.")
+        val stamped = rest.take(10)
+        val published = rest.drop(11).ifEmpty { cached.name }
+        val age = runCatching {
+            ChronoUnit.DAYS.between(LocalDate.parse(stamped), LocalDate.now(ZoneOffset.UTC))
+        }.getOrDefault(Long.MAX_VALUE)
+        if (age > maxAgeDays) {
+            throw IOException(
+                "$kind is unavailable and the cached copy was taken $age days ago " +
+                    "($published; the limit is $maxAgeDays, past which a five-day prediction " +
+                    "cannot reach the end of a three-day window)",
+                why,
+            )
+        }
+        val target = File(workDir, published)
+        cached.copyTo(target, overwrite = true)
+        notes.add(
+            "$kind FROM THE CACHE: $published, taken $age ${if (age == 1L) "day" else "days"} ago " +
+                "— ${why?.message ?: "the source did not answer"}. The window check still applies.",
+        )
+        return target
     }
 
     /**
@@ -727,6 +805,15 @@ class PgnssFetcher(
             "971b0a3b49a497910aad23cd85e066d4cd9af0aeafe7ce6301a696bed8570be3"
 
         /** Three tries at the wire. Not at a 404 — see [retrying]. */
+        /**
+         * How old a cached CODE product may be: two days, which is arithmetic and not taste.
+         *
+         * A five-day prediction issued on day D reaches D+5; a 72-hour window opened on D+k closes
+         * at D+k+3. Past k = 2 it cannot reach the end of the window at all, and `validate()` would
+         * refuse it anyway — this simply says so before nine megabytes are copied.
+         */
+        const val MAX_CODE_SP3_AGE_DAYS = 2L
+
         const val TRANSPORT_ATTEMPTS = 3
 
         /** Multiplied by the attempt number: 1.5 s, then 3 s. Long enough to matter, short enough. */
