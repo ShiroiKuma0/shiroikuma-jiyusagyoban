@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.pm.ShortcutManagerCompat
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.Project
 import com.opentasker.core.model.Task
@@ -172,6 +173,7 @@ private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
     val toggle: (String) -> Unit = { key -> expanded = if (key in expanded) expanded - key else expanded + key }
     val list = nodes
 
+    val sizes = remember(prefs) { PickerSizes.from(prefs) }
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp)) {
         Text("Pick a task", style = MaterialTheme.typography.titleLarge, fontFamily = font)
         Spacer(Modifier.size(8.dp))
@@ -180,12 +182,12 @@ private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
                 list == null -> Unit
                 list.isEmpty() -> Text(
                     "No tasks yet. Create one in 白い熊 自由作業盤 first.",
-                    fontFamily = font, fontSize = prefs.pickerFontSizeSp.sp,
+                    fontFamily = font, fontSize = sizes.itemSp.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 else -> LazyColumn(
                     Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(prefs.pickerRowPadDp.dp),
+                    verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
                 ) {
                     items(list, key = { "p_${it.key}" }) { node ->
                         ProjectBlock(node, expanded, prefs, font, toggle, onPick)
@@ -204,7 +206,7 @@ private fun TaskPickerScreen(onPick: (Task) -> Unit, onCancel: () -> Unit) {
                 contentColor = MaterialTheme.colorScheme.primary,            // yellow label
             ),
         ) {
-            Text("Cancel", fontFamily = font, fontSize = prefs.pickerFontSizeSp.sp)
+            Text("Cancel", fontFamily = font, fontSize = sizes.itemSp.sp)
         }
     }
 }
@@ -214,13 +216,14 @@ private fun ProjectBlock(
     node: ProjectNode, expanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
     onToggle: (String) -> Unit, onPick: (Task) -> Unit,
 ) {
+    val sizes = remember(prefs) { PickerSizes.from(prefs) }
     val open = "p:${node.key}" in expanded
     Column(Modifier.fillMaxWidth()) {
         PickerHeader(node.title, node.taskCount, open, isProject = true, prefs, font) { onToggle("p:${node.key}") }
         if (open) {
             Column(
-                Modifier.fillMaxWidth().padding(start = prefs.pickerIndentDp.dp, top = prefs.pickerRowPadDp.dp),
-                verticalArrangement = Arrangement.spacedBy(prefs.pickerRowPadDp.dp),
+                Modifier.fillMaxWidth().padding(start = prefs.pickerIndentDp.dp, top = sizes.padDp.dp),
+                verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
             ) {
                 node.entries.forEach { EntryRow(it, expanded, prefs, font, onToggle, onPick) }
             }
@@ -233,6 +236,7 @@ private fun EntryRow(
     entry: PickerEntry, expanded: Set<String>, prefs: ThemePrefs, font: FontFamily?,
     onToggle: (String) -> Unit, onPick: (Task) -> Unit,
 ) {
+    val sizes = remember(prefs) { PickerSizes.from(prefs) }
     when (entry) {
         is GroupEntry -> {
             val open = "g:${entry.group.id}" in expanded
@@ -250,8 +254,8 @@ private fun EntryRow(
                 if (open) {
                     // Deeper indent for a group's expanded contents, so tasks sit clearly inside the box.
                     Column(
-                        Modifier.fillMaxWidth().padding(start = (prefs.pickerIndentDp + 16).dp, bottom = prefs.pickerRowPadDp.dp),
-                        verticalArrangement = Arrangement.spacedBy(prefs.pickerRowPadDp.dp),
+                        Modifier.fillMaxWidth().padding(start = (prefs.pickerIndentDp + 16).dp, bottom = sizes.padDp.dp),
+                        verticalArrangement = Arrangement.spacedBy(sizes.padDp.dp),
                     ) {
                         entry.children.forEach { EntryRow(it, expanded, prefs, font, onToggle, onPick) }
                     }
@@ -267,27 +271,30 @@ private fun PickerHeader(
     title: String, count: Int, open: Boolean, isProject: Boolean, prefs: ThemePrefs, font: FontFamily?,
     onToggle: () -> Unit,
 ) {
+    val sizes = remember(prefs) { PickerSizes.from(prefs) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(start = if (isProject) 0.dp else 10.dp, top = prefs.pickerRowPadDp.dp + 4.dp, bottom = prefs.pickerRowPadDp.dp + 4.dp, end = 6.dp),
+            // MINIMAL, and no longer +4 on top of it: the picker is a list to scan, not a form
+            // (白い熊, 2026-09-22). The gap is whatever the 01 asks for and nothing else.
+            .padding(start = if (isProject) 0.dp else 10.dp, top = sizes.padDp.dp, bottom = sizes.padDp.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (!isProject) {
-            Icon(Icons.Filled.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size((prefs.pickerFontSizeSp + 2).dp))
+            Icon(Icons.Filled.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size((sizes.itemSp + 2).dp))
             Spacer(Modifier.width(8.dp))
         }
         Text(
             title,
             fontFamily = font,
-            fontSize = (prefs.pickerFontSizeSp + if (isProject) 3 else 1).sp,
+            fontSize = (sizes.itemSp + if (isProject) 3 else 1).sp,
             fontWeight = if (isProject) FontWeight.Bold else FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text("$count", fontFamily = font, fontSize = prefs.pickerFontSizeSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$count", fontFamily = font, fontSize = sizes.itemSp.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
         Icon(
             if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -297,15 +304,62 @@ private fun PickerHeader(
     }
 }
 
+/**
+ * The two sizes 白い熊 asked to be able to set from a task, and where they come from.
+ *
+ * 2026-09-22: *"Increase the item and icon size to 2x. Make both settable in 01 設定 task."* The
+ * theme page already carried the type size, but the icon was derived from it (`font + 6`), so the
+ * two could never be set apart — and neither could be reached from the workspace at all.
+ *
+ * A **super-global** rather than a project-scoped name, because this picker is the launcher's and
+ * belongs to no project: any 01 settings task can publish it, 凍結融解's included, and the name says
+ * what it governs rather than who happens to set it. Unset or unreadable leaves the theme page's own
+ * value, so nothing has to be defined for the picker to work.
+ */
+private data class PickerSizes(val itemSp: Int, val iconDp: Int, val padDp: Int) {
+    companion object {
+        const val VAR_ITEM_SP = "SHORTCUT_PICKER_ITEM_SP"
+        const val VAR_ICON_DP = "SHORTCUT_PICKER_ICON_DP"
+
+        /**
+         * The gap between lines, settable for the same reason the other two are.
+         *
+         * 白い熊 asked for it to be minimal (2026-09-22), and a default alone could not deliver
+         * that: the theme page's stored value wins over a changed default for anyone who has ever
+         * opened the page. A variable set by the 01 settles it either way.
+         */
+        const val VAR_PAD_DP = "SHORTCUT_PICKER_PAD_DP"
+
+        fun from(prefs: ThemePrefs): PickerSizes {
+            // Read straight out of the persisted globals — this is an Activity, so there is no
+            // ActionContext to ask, and the widget renderer reaches them the same way.
+            val globals = runCatching { PersistentGlobalScope.snapshotAll() }.getOrDefault(emptyMap())
+            fun read(name: String, fallback: Int, max: Int) =
+                globals[name]?.trim()?.toIntOrNull()?.coerceIn(1, max) ?: fallback
+
+            val item = read(VAR_ITEM_SP, prefs.pickerFontSizeSp, ThemePrefs.PICKER_FONT_MAX)
+            val icon = read(
+                VAR_ICON_DP,
+                prefs.pickerIconDp.takeIf { it > 0 } ?: (prefs.pickerFontSizeSp + 6),
+                ThemePrefs.PICKER_ICON_MAX,
+            )
+            val pad = globals[VAR_PAD_DP]?.trim()?.toIntOrNull()?.coerceIn(0, ThemePrefs.PICKER_PAD_MAX)
+                ?: prefs.pickerRowPadDp
+            return PickerSizes(item, icon, pad)
+        }
+    }
+}
+
 @Composable
 private fun TaskRow(task: Task, prefs: ThemePrefs, font: FontFamily?, onClick: () -> Unit) {
     val bitmap = remember(task.iconPath) { TaskIconStore.loadBitmap(task.iconPath) }
-    val iconDp = (prefs.pickerFontSizeSp + 6).dp
+    val sizes = remember(prefs) { PickerSizes.from(prefs) }
+    val iconDp = sizes.iconDp.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = 12.dp, top = prefs.pickerRowPadDp.dp, bottom = prefs.pickerRowPadDp.dp, end = 4.dp),
+            .padding(start = 12.dp, top = sizes.padDp.dp, bottom = sizes.padDp.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Custom icon if set, else nothing — no misleading play/arrow glyph.
@@ -317,7 +371,7 @@ private fun TaskRow(task: Task, prefs: ThemePrefs, font: FontFamily?, onClick: (
             )
             Spacer(Modifier.width(10.dp))
         }
-        Text(task.name, fontFamily = font, fontSize = prefs.pickerFontSizeSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(task.name, fontFamily = font, fontSize = sizes.itemSp.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
