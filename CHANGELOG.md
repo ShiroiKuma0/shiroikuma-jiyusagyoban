@@ -8,6 +8,34 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+138 — 2026-09-25
+
+Built on upstream `aa1a372a`.
+
+### 衛星 — the banner comes down when the band takes the set
+
+`%HUAWEI_PgnssAlert` is raised **before** the wait, from what the band was holding then — *"THE
+BAND'S FORECAST RAN OUT n h AGO"*, under the panel's own ⚠ NOT HANDED OVER heading — and nothing
+recomputed it afterwards. So it went on shouting over a transfer that had just succeeded, with the
+result line underneath confirming it. It is cleared now in the one block that learns the band took a
+forecast: the band holds a live one, which is the whole of what that banner exists to say.
+
+### 衛星 診断 — the guards never matched, and the task was blind because of it
+
+Each read was conditioned on `%shindanStore ~ built-log`. **`~` is a whole-string glob** — anchored
+`\A…\z`, `*` the only wildcard — so that asked whether the *entire twelve-line listing* equals the
+literal `built-log`. Never true, so every read was skipped in silence and only the placeholders
+survived. `shindanStore`, the one variable carrying no condition, was the only thing that ever came
+through — which is exactly the shape the fault presented as.
+
+Fixed in the workspace with `*built-log*` patterns, and the task now prints the whole build history:
+the DNS failure of the 18th, and above it three builds that died on `GPS G13, block 7: cannot encode
+NaN into a 32-bit field`.
+
+**Measured, not reasoned about.** A throwaway probe read the same files with no conditions and got
+them all, which killed two earlier theories outright — variable shadowing, then a path-resolution
+difference. `file.read` on the app's private store had been working the entire time.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+137 — 2026-09-25
 
 Built on upstream `aa1a372a`.
