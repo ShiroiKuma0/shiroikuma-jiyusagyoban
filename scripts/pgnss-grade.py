@@ -179,6 +179,7 @@ def main():
 
     nsub, subgap = SUBS.get(args.system, (1, 0.0))
     rows, semi, skipped, clocks = {}, {}, set(), {}
+    clock_age = []
     for i in range(BLOCKS):
         ts, off, blen = struct.unpack_from("<III", b, 12 * i)
         for sub in range(nsub):
@@ -232,6 +233,7 @@ def main():
                     c = clock_at(tsub)
                     if c is not None:
                         clocks.setdefault(sat, []).append(c)
+                        clock_age.append((tsub - first, c))
                     # No propagation: the record IS the state at its own tb, so the comparison is
                     # the position it carries against the product at the same instant.
                     if not (tmin < tsub < tmax) or not pgb.spanned(truth[sat]["t"], tsub):
@@ -258,6 +260,7 @@ def main():
                     c = clock_at(t)
                     if c is not None:
                         clocks.setdefault(sat, []).append(c)
+                        clock_age.append((t - first, c))
 
     if skipped:
         print(f"  samples dropped where the product has a hole: {' '.join(sorted(skipped))}")
@@ -298,6 +301,22 @@ def main():
             print(f"  {sat:>10} {len(v):5} {np.median(v):10.2f} {v.max():12.2f}")
         print(f"  overall: median {np.median(allc):.2f} m, p95 "
               f"{np.percentile(allc, 95):.2f} m, max {allc.max():.2f} m")
+        # ── AND THE SAME QUESTION THE ORBIT TABLE ANSWERS: does it get WORSE with age? ──────────
+        #
+        # A clock error maps one-for-one into range, and ours is a straight line extrapolated past
+        # the product it was fitted to, so its error grows with every hour into the window by
+        # construction. Per-satellite medians cannot show that — a satellite good on day 1 and
+        # hopeless on day 3 has an unremarkable median — and until 2026-09-25 the decay of the
+        # thing most likely to decay was the one number this grader would not print.
+        if clock_age:
+            ch = np.array([a for a, _ in clock_age]) / 3600.0
+            cv = np.array([v for _, v in clock_age])
+            print(f"\n  {'hours into window':>18} {'n':>6} {'median':>10} {'p95':>10} {'max':>10}")
+            for lo in range(0, 72, 6):
+                m = (ch >= lo) & (ch < lo + 6)
+                if m.sum():
+                    print(f"  {lo:>8}..{lo+6:<8} {m.sum():6} {np.median(cv[m]):10.2f} "
+                          f"{np.percentile(cv[m], 95):10.2f} {cv[m].max():10.2f}")
     else:
         print("\n  CLOCK: the orbit product carries no clocks — nothing to compare")
 
