@@ -89,6 +89,17 @@ object Orbit {
             require(values.size == N) { "an element set has $N parameters" }
         }
 
+        /**
+         * Every parameter a real number — asked BEFORE the encoder is handed the set.
+         *
+         * `NaN > 50.0` is false, so a non-finite fit walks through every bound this file has and
+         * dies where it can say least: "cannot encode NaN into a 32-bit field", with the build gone
+         * and the previous set left on disk (2026-09-15, GPS G13 — CODE published 1215 of its 1441
+         * epochs as the all-zero "no value" marker). A satellite that will not encode is a satellite
+         * to drop, which is what the screens around it already do for every other kind of bad fit.
+         */
+        fun isFinite(): Boolean = toe.isFinite() && values.all { it.isFinite() }
+
         var sqrtA: Double
             get() = values[SQRT_A]
             set(x) { values[SQRT_A] = x }
