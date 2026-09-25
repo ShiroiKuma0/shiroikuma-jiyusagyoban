@@ -8,6 +8,62 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+139 — 2026-09-25
+
+Built on upstream `aa1a372a`.
+
+### 衛星 — the decay across a window is the CLOCK, and the orbits are fine
+
+Graded a shipped set against **CODE's own final, observed orbits** for doy 242–245 — a whole window
+that has long since passed — for every constellation CODE supplies. `scripts/pgnss-grade.py` now
+prints the **clock by age** as well as the orbit, which is what made this visible: a clock error maps
+one-for-one into range, ours is a straight line extrapolated past the product it was fitted to, and
+the decay of the thing most likely to decay was the one number the grader would not print.
+
+| | orbit 0–6 h → 66–72 h | clock 0–6 h → 66–72 h | clock p95, day 3 |
+| --- | --- | --- | --- |
+| GPS | 0.37 → **1.32 m** | 1.3 → **5.1 m** | 15.8 m |
+| Galileo | 0.38 → **1.46 m** | 2.9 → **9.3 m** | **132 m** |
+| GLONASS | 0.30 → **1.03 m** | 8.9 → **27.4 m** | **81 m** |
+
+**The orbits grow by a factor of three and a half and stay metre-class to the end of the window.**
+So the orbit-model work this project kept circling back to — the ECOM terms, the box-wing a priori —
+is dropped again, on evidence rather than on taste: it was approved on the premise that our orbits
+rot to a hundred metres, and for these three constellations that premise is measured false.
+
+The clocks grow monotonically in every bucket, which is what a straight line's error does, and they
+are not ours to fit away: the clock is a line through the product's own clock, so our error **is**
+CODE's prediction error, and nothing free predicts clocks better across three days (IGS and CODE
+ultra-rapids reach 24 h). Bounded by rebuilding, not by better arithmetic.
+
+**Unmeasured, and named as such:** BeiDou, the one constellation built here rather than sampled, is
+still ungraded from the PC — no MGEX product is reachable from it, which is why the phone does the
+fetching. The 33.7 m at 60–66 h in the baseline is that constellation and stands unchallenged.
+
+### 衛星 — a satellite that will not encode is dropped, not fatal
+
+`NaN > 50.0` is **false**, so a non-finite fit walked through the error bound and died in the encoder
+instead — *"GPS G13, block 7: cannot encode NaN into a 32-bit field"* — taking the whole build with
+it and leaving the previous set on disk. It happened three times on 2026-09-15 and the run log kept
+the evidence until 「衛星 診断」 could read it. Every other bad fit in that loop costs one satellite in
+one two-hour slice; this one does too now, in the Kepler and BeiDou paths alike, with the clock terms
+checked the same way and `Elements.isFinite()` asked before the encoder is handed anything.
+
+### 衛星 — the one product with no mirror gets a cache, bounded and loud
+
+AIUB alone serves `COD0OPSPRD_05D`: IGN and BKG carry IGS combinations rather than CODE's own
+prediction, `ftp.aiub.unibe.ch` does not answer over HTTP, and CDDIS wants a login. One DNS failure
+there on 2026-09-19 killed the build, left the band wearing a set that expired two days later, and
+cost a walk.
+
+The standing rule that a cached orbit is a **wrong** orbit still holds, and this is its one
+exception: a five-day prediction issued on day D still spans a window opened on D+k for k ≤ 2. That
+is the cap and it is arithmetic, not taste — and `validate()` still compares the product's own last
+epoch against the window and refuses if it falls short, so a copy that cannot reach fails the build
+loudly rather than shortening the forecast quietly. The build note says **FROM THE CACHE** and how
+old the copy is, every time it is used. The ERP, which comes from the same single host and fails in
+the same breath, got the same treatment.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+138 — 2026-09-25
 
 Built on upstream `aa1a372a`.
