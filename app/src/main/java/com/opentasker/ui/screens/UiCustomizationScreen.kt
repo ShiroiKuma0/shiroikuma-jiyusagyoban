@@ -813,6 +813,18 @@ fun UiCustomizationScreen(
                 )
             }
             item {
+                // Its own size since 2026-09-22. It used to be the font size plus six, which meant
+                // asking for a bigger icon meant asking for bigger type — and 白い熊 wanted both,
+                // separately. Zero hands it back to the type, the way it was.
+                SliderRow(
+                    level = 1, label = "Task icon size",
+                    value = prefs.pickerIconDp,
+                    valueText = if (prefs.pickerIconDp == 0) "follow the font" else "${prefs.pickerIconDp} dp",
+                    range = 0f..ThemePrefs.PICKER_ICON_MAX.toFloat(),
+                    onChange = { v -> ThemeStore.update { it.copy(pickerIconDp = v) } },
+                )
+            }
+            item {
                 SliderRow(
                     level = 1, label = "Indent per level",
                     value = prefs.pickerIndentDp, valueText = "${prefs.pickerIndentDp} dp",

@@ -1,6 +1,7 @@
 package com.opentasker.core.actions
 
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FreezeBubbleTarget
 import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.dialog.DialogOutcome
 import com.opentasker.core.engine.Action
@@ -9,6 +10,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.icons.TaskIconStore
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.policy.AppFreeze
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.TaskEntity
@@ -23,6 +25,30 @@ import kotlinx.serialization.json.Json
  *
  * Each generated task runs `app.unfreeze` (= `pm enable`, a harmless no-op when the app is already
  * enabled) followed by `app.launch`, so a frozen app is thawed and started in one tap.
+ *
+ * ## An app is its PACKAGE, and a label is not an identity
+ *
+ * Both halves of this action used to key off the app's LABEL, and 白い熊's phone is where that broke
+ * (2026-09-20): `com.rovio.angrybirdsgo`, `com.rovio.angrybirdstransformers`,
+ * `com.rovio.angrybirdsstarwarsii.ads` and `com.rovio.angrybirdsstarwarshd.premium.iap` **all four
+ * report the label `Angry Birds`**. One of them already had a task, so every other one generated the
+ * name `Angry Birds -- [1707][7107]`, matched the "already there" check, and was silently skipped —
+ * the action reported success, created nothing, and said so only in a run-log line nobody was looking
+ * at. Worse was waiting behind it: tasks carry a UNIQUE (projectId, name) index, so had the check not
+ * swallowed it the insert would have thrown.
+ *
+ * So the duplicate test is now **by package**, which is the only identity an app actually has, and a
+ * name that is already taken anywhere in the project is qualified with the package —
+ * `Angry Birds (com.rovio.angrybirdsgo) -- [1707][7107]` — rather than abandoned. A generator that
+ * cannot name a thing must still make it.
+ *
+ * ## The grid says which apps already have one
+ *
+ * Every package the project already launches arrives **pre-ticked and listed first**, exactly as
+ * 泡を選ぶ does it (白い熊, 2026-09-20: *"it should already show with a tick in the top right corner …
+ * which app already has a task"*). The tick is a READING, not a switch: leaving it on creates nothing
+ * twice, and taking it off deletes nothing. Generating tasks and destroying them are not the same
+ * gesture, and this action only ever adds.
  */
 class MakeLauncherTasksAction : Action {
     override val id = "tasks.launchers"
@@ -58,10 +84,43 @@ class MakeLauncherTasksAction : Action {
         } ?: return ActionResult.Failure("project not found: $projectName")
         val (pid, groupId) = resolved
 
-        // 2. Show the multi-select app picker.
+        // 2. What the project already launches, BY PACKAGE — the pre-ticks for the grid, and the
+        // "do not make this twice" test. Project-wide rather than group-only on purpose: an app whose
+        // task 白い熊 filed somewhere else still HAS a task, and the honest answer to "which of these
+        // already has one" does not depend on where it was filed.
+        val launchedAlready = withContext(Dispatchers.IO) {
+            db.taskDao().getAll()
+                .filter { it.projectId == pid }
+                .mapNotNull { entity ->
+                    // A task whose actions no longer decode names no package and drops out, rather
+                    // than being retyped by this action — the decode fallback yields no actions.
+                    val actions = entity.toDomainDecodeResult().value.actions
+                    FreezeBubbleTarget.packageOf(actions) { ctx.variables.expand(it) }
+                }
+                .toSet()
+        }
+
+        // Ticked only where there is a tile to tick. This grid is the INSTALLED-apps list, and a
+        // preselected package it cannot resolve is given a stand-in tile labelled by its bare id —
+        // at the TOP, by that grid's own deliberate rule. 凍結融解's project is a workspace that
+        // outlived a phone: 36 of its 56 launcher tasks name apps that were never installed here, so
+        // preselecting the lot would open the generator on a screenful of package ids and bury every
+        // app 白い熊 could actually make a task for. That is the exact failure the roster grid was
+        // fixed for on 2026-09-13, and it is not worth re-creating in the other grid to mark apps
+        // that are not there. MATCH_FROZEN, because 凍結融解's apps are hidden as their resting state
+        // and a hidden package reads as not installed under plain flags.
+        val ticked = withContext(Dispatchers.IO) {
+            val pm = ctx.app.packageManager
+            launchedAlready.filter { pkg ->
+                runCatching { pm.getApplicationInfo(pkg, AppFreeze.MATCH_FROZEN) }.isSuccess
+            }
+        }
+
+        // 3. Show the multi-select app picker, every already-covered app ticked and led with.
         val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
             putExtra(DialogActivity.EXTRA_TITLE, "Select apps")
+            putExtra(DialogActivity.EXTRA_PRESELECTED, ticked.joinToString("\n"))
         }
         val picked: List<Pair<String, String>> = when (outcome) {
             is DialogOutcome.Confirmed -> outcome.value
@@ -76,22 +135,23 @@ class MakeLauncherTasksAction : Action {
             DialogOutcome.Cancelled -> return ActionResult.Success
         }
 
-        val created = withContext(Dispatchers.IO) {
-            // Existing task names already in this group — to skip duplicates on re-run.
-            val metaForTasks = db.itemMetaDao().getForTab("tasks")
-            val groupTaskIds = metaForTasks.filter { it.groupId == groupId }
-                .mapNotNull { it.itemKey.toLongOrNull() }
-                .toSet()
-            val allTasks = db.taskDao().getAll()
-            val existingNamesInGroup = allTasks
-                .filter { it.id in groupTaskIds }
+        val (created, skipped) = withContext(Dispatchers.IO) {
+            // Every name already spoken for in this PROJECT. The uniqueness Room enforces is
+            // (projectId, name), so a clash two groups away is still a clash, and an insert that hits
+            // it throws rather than returning -1 — this set is what keeps the generator off it.
+            val takenNames = db.taskDao().getAll()
+                .filter { it.projectId == pid }
                 .map { it.name }
                 .toMutableSet()
+            val covered = launchedAlready.toMutableSet()
 
             var count = 0
+            var already = 0
             for ((pkg, label) in picked) {
-                val taskName = "$label$suffix"
-                if (taskName in existingNamesInGroup) continue
+                // BY PACKAGE. The pre-ticked apps come back in `picked` — that is what a tick means —
+                // so this is also the line that makes confirming the grid unchanged a no-op.
+                if (pkg in covered) { already++; continue }
+                val taskName = uniqueTaskName(label, suffix, pkg, takenNames)
                 val actions = listOf(
                     ActionSpec(type = "app.unfreeze", args = mapOf("package" to pkg)),
                     ActionSpec(type = "app.launch", args = mapOf("package" to pkg)),
@@ -115,17 +175,47 @@ class MakeLauncherTasksAction : Action {
                 db.itemMetaDao().upsert(
                     ItemMetaEntity(tab = "tasks", itemKey = newId.toString(), groupId = groupId),
                 )
-                existingNamesInGroup += taskName
+                takenNames += taskName
+                covered += pkg
                 count++
             }
 
-            // 3. Keep the group at the BOTTOM and its tasks in alphabetical order, re-sorted on EVERY run
+            // 4. Keep the group at the BOTTOM and its tasks in alphabetical order, re-sorted on EVERY run
             // (shared with the `tasks.sort` action).
             sortGroupTasksAlphabetically(pid, groupId)
-            count
+            count to already
         }
 
-        ctx.logger("Created $created launcher tasks in $groupName")
+        // Both numbers, always. "Created 0" on its own is what a run looks like when every pick was
+        // already covered AND what it looked like when the label check was eating them, and those two
+        // have to be tellable apart from the run log alone.
+        ctx.logger("Created $created launcher tasks in $groupName ($skipped already had one)")
         return ActionResult.Success
     }
+}
+
+/**
+ * `<label><suffix>`, qualified with the package if something in the project already answers to it.
+ *
+ * Four of 白い熊's games are called `Angry Birds`. A generator that gives up on the second one — which
+ * is what a bare duplicate check did — leaves an app the picker says it made a task for with no task,
+ * and one that ploughs on hits the UNIQUE (projectId, name) index and throws. The package is the
+ * disambiguator because it is the one thing that is certainly different, and it is in parentheses
+ * BEFORE the suffix so the ` -- [1707][7107]` tail every name in this group ends with stays the tail.
+ */
+internal fun uniqueTaskName(
+    label: String,
+    suffix: String,
+    pkg: String,
+    taken: Set<String>,
+): String {
+    val plain = "$label$suffix"
+    if (plain !in taken) return plain
+    val qualified = "$label ($pkg)$suffix"
+    if (qualified !in taken) return qualified
+    // Only reachable if the qualified name is taken too, which means a task already names this exact
+    // package — but a name is never returned unchecked: the insert behind it cannot be allowed to throw.
+    var n = 2
+    while ("$label ($pkg $n)$suffix" in taken) n++
+    return "$label ($pkg $n)$suffix"
 }

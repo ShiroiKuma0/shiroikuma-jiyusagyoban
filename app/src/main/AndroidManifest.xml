@@ -524,6 +524,19 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            The two satellite-forecast reminders. Not exported: only our own AlarmManager
+            PendingIntents reach it, and a forecast deadline is nobody else's business.
+        -->
+        <receiver
+            android:name="com.opentasker.core.huawei.GnssForecastReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.opentasker.huawei.GNSS_FORECAST_WARN" />
+                <action android:name="com.opentasker.huawei.GNSS_FORECAST_END" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="com.opentasker.core.contexts.SmsReceivedReceiver"
             android:enabled="${smsTriggerEnabled}"

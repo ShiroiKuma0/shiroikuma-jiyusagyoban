@@ -1219,6 +1219,8 @@ fun registerActionMetadata() {
                 ActionField("wait", "Seconds to wait for the band to ask", hint = "default 20. The band asks on its own when its data is stale"),
                 ActionField("announce", "Send the ready signal anyway", FieldType.CHECKBOX, hint = "on by default. The band opens the transfer 24 ms after this signal, so it may be the whole trigger"),
                 ActionField("panel", "Drive the four-step panel", FieldType.CHECKBOX, hint = "off by default. On, this reports into <prefix>PgnssSteps as steps 3 and 4 — the second half of a run whose first half was the predicted-ephemeris action, so one panel follows the whole flow"),
+                ActionField("min_hours", "Refuse a set with less than this left", hint = "hours. What the caller asserts about the set it is handing over: a run that has just BUILT one holds 72, so a smaller number means the build did not happen and the store still has yesterday's. Empty = no bar (only a wholly expired set is refused)"),
+                ActionField("serve_stale", "Hand over an old set on purpose", FieldType.CHECKBOX, hint = "off by default: while a failed build is standing, nothing is handed over, because the band must not be given the previous set as though it were new. 衛星 再送 is the deliberate exception"),
                 ActionField("address", "Band address", hint = "defaults to the paired band"),
                 ActionField("prefix", "Variable prefix", hint = "default HUAWEI_"),
                 ActionField("store", "Store the summary in"),

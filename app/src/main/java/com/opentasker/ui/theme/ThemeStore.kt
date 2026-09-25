@@ -82,8 +82,16 @@ data class ThemePrefs(
     val flashKillTaskName: String = "通知明滅消灯",     // per-app kill task; run with %APP_PACKAGE = the bubble's app
     val flashKillAllTaskName: String = "通知明滅全消灯", // kill-all task (the flash-ongoing notification's tap task)
     // ---- Launcher "add task shortcut" picker (projects → folder-boxes → tasks) --------------------
-    val pickerFontSizeSp: Int = 15,              // [PICKER_FONT_MIN, PICKER_FONT_MAX]
-    val pickerRowPadDp: Int = 3,                 // vertical padding per row; 0 = tightest [0, PICKER_PAD_MAX]
+    val pickerFontSizeSp: Int = 30,              // [PICKER_FONT_MIN, PICKER_FONT_MAX]
+    val pickerRowPadDp: Int = 0,                 // vertical padding per row; 0 = tightest [0, PICKER_PAD_MAX]
+    /**
+     * The task icon's own size, no longer derived from the type.
+     *
+     * It was `pickerFontSizeSp + 6`, which is why the two could not be set apart: 白い熊 asked for
+     * both at twice the size and for both to be settable, and one number cannot do that
+     * (2026-09-22). Zero means "follow the type", the old behaviour, for anyone who wants it back.
+     */
+    val pickerIconDp: Int = 42,                  // 0 = follow the font size [0, PICKER_ICON_MAX]
     val pickerIndentDp: Int = 14,                // indent per nesting level [0, PICKER_INDENT_MAX]
     val pickerGroupCornerDp: Int = 12,           // group folder-box corner radius [0, PICKER_CORNER_MAX]
     val pickerGroupBorderDp: Int = 1,            // group folder-box border width; 0 = no box [0, PICKER_BORDER_MAX]
@@ -199,8 +207,15 @@ data class ThemePrefs(
         val FLASH_BEHAVIORS = setOf("open_kill", "kill", "open", "dismiss")
 
         const val PICKER_FONT_MIN = 11
-        const val PICKER_FONT_MAX = 28
+
+        /**
+         * 44, not 28. The old ceiling was below the size 白い熊 actually wanted: the shortcut picker
+         * is read at arm's length on a launcher, not in the editor, and twice the old default is 30
+         * (白い熊, 2026-09-22).
+         */
+        const val PICKER_FONT_MAX = 44
         const val PICKER_PAD_MAX = 24
+        const val PICKER_ICON_MAX = 96
         const val PICKER_INDENT_MAX = 40
         const val PICKER_CORNER_MAX = 28
         const val PICKER_BORDER_MAX = 4
@@ -344,6 +359,7 @@ object ThemeStore {
     private const val K_FLASH_KILL_ALL_TASK = "flash_kill_all_task"
     private const val K_PICKER_FONT_SIZE = "picker_font_size"
     private const val K_PICKER_ROW_PAD = "picker_row_pad"
+    private const val K_PICKER_ICON = "picker_icon"
     private const val K_PICKER_INDENT = "picker_indent"
     private const val K_PICKER_GROUP_CORNER = "picker_group_corner"
     private const val K_PICKER_GROUP_BORDER = "picker_group_border"
@@ -500,6 +516,7 @@ object ThemeStore {
         chartDefaultSpanHours = chartDefaultSpanHours.coerceIn(1, ThemePrefs.CHART_SPAN_MAX),
         chartCurveMode = chartCurveMode.takeIf { it in ThemePrefs.CHART_CURVES } ?: ThemePrefs.DEFAULT.chartCurveMode,
         pickerRowPadDp = pickerRowPadDp.coerceIn(0, ThemePrefs.PICKER_PAD_MAX),
+        pickerIconDp = pickerIconDp.coerceIn(0, ThemePrefs.PICKER_ICON_MAX),
         pickerIndentDp = pickerIndentDp.coerceIn(0, ThemePrefs.PICKER_INDENT_MAX),
         pickerGroupCornerDp = pickerGroupCornerDp.coerceIn(0, ThemePrefs.PICKER_CORNER_MAX),
         pickerGroupBorderDp = pickerGroupBorderDp.coerceIn(0, ThemePrefs.PICKER_BORDER_MAX),
@@ -614,6 +631,7 @@ object ThemeStore {
             chartColorSleepRem = prefs.getInt(K_CHART_C_REM, d.chartColorSleepRem),
             chartColorSleepAwake = prefs.getInt(K_CHART_C_AWAKE, d.chartColorSleepAwake),
             pickerRowPadDp = prefs.getInt(K_PICKER_ROW_PAD, d.pickerRowPadDp),
+            pickerIconDp = prefs.getInt(K_PICKER_ICON, d.pickerIconDp),
             pickerIndentDp = prefs.getInt(K_PICKER_INDENT, d.pickerIndentDp),
             pickerGroupCornerDp = prefs.getInt(K_PICKER_GROUP_CORNER, d.pickerGroupCornerDp),
             pickerGroupBorderDp = prefs.getInt(K_PICKER_GROUP_BORDER, d.pickerGroupBorderDp),
@@ -729,6 +747,7 @@ object ThemeStore {
             putInt(K_CHART_C_REM, p.chartColorSleepRem)
             putInt(K_CHART_C_AWAKE, p.chartColorSleepAwake)
             putInt(K_PICKER_ROW_PAD, p.pickerRowPadDp)
+            putInt(K_PICKER_ICON, p.pickerIconDp)
             putInt(K_PICKER_INDENT, p.pickerIndentDp)
             putInt(K_PICKER_GROUP_CORNER, p.pickerGroupCornerDp)
             putInt(K_PICKER_GROUP_BORDER, p.pickerGroupBorderDp)
