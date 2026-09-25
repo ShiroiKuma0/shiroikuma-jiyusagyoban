@@ -339,14 +339,33 @@ object PredictedSet {
                 PgnssStep.BUILD, "Fitting ${job.system}", job.sat, n, tally.total,
                 DOWNLOAD_SHARE + KEPLER_SHARE * tally.fractionOfKepler(keplerJobs.size),
             )
-            if (err > Orbit.MAX_ERROR_M) return@runParallel FittedRecord(job, null, err)
+            // NOT FINITE IS NOT "SMALL ENOUGH".
+            //
+            // `NaN > 50.0` is **false**, so a fit that produced NaN walked straight through the
+            // screen above and died in the encoder instead — "GPS G13, block 7: cannot encode NaN
+            // into a 32-bit field" — taking the whole build with it and leaving the previous set on
+            // disk. It happened three times on 2026-09-15 and the run log has kept the evidence
+            // since; 白い熊 only saw it on 2026-09-25, once 衛星 診断 could read that log at all.
+            //
+            // A satellite whose elements will not encode is exactly a satellite to drop, which is
+            // what every other screen in this loop already does. G13 that day was CODE publishing
+            // 1215 of its 1441 epochs as the all-zero "no value" marker — [Sp3] now reads those as
+            // missing, so the arc is a hole rather than a satellite at the centre of the Earth, and
+            // this is the backstop for whatever produces the next one.
+            if (!err.isFinite() || err > Orbit.MAX_ERROR_M || !el.isFinite()) {
+                return@runParallel FittedRecord(job, null, err)
+            }
             val clock = Orbit.clockFit(arc, stamp.toDouble())
             // The backstop, and it applies to every constellation because the fault it catches is
             // not BeiDou's: a block whose fitted drift is physically impossible ships a range that
             // is wrong by kilometres, and a receiver that believes it spends its search excluding
             // the satellite instead of fixing. Dropping the block costs a receiver one satellite in
             // one two-hour slice; shipping it cost 白い熊 a three-minute fix (2026-09-14).
-            if (abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT) return@runParallel FittedRecord(job, null, err)
+            if (!clock[0].isFinite() || !clock[1].isFinite() ||
+                abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT
+            ) {
+                return@runParallel FittedRecord(job, null, err)
+            }
             // 0-BASED, for every system in this format except GLONASS. Anchored against ESA's own
             // almanac, not against our decoder: Huawei's number = SVID-1 lands at 27 km median
             // against their files, = SVID at 45 120 km.
@@ -1010,14 +1029,22 @@ object PredictedSet {
                 DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE +
                     BDS_SHARE * (TRACK_SHARE + (1.0 - TRACK_SHARE) * n / jobs.size),
             )
-            if (err > Orbit.MAX_ERROR_M) return@runParallel FittedRecord(job, null, err)
+            // Same screen as the Kepler loop, and for the same reason: `NaN > 50.0` is false, so a
+            // non-finite fit slips past a bound and dies in the encoder with the whole build.
+            if (!err.isFinite() || err > Orbit.MAX_ERROR_M || !el.isFinite()) {
+                return@runParallel FittedRecord(job, null, err)
+            }
             val clock = Orbit.clockFit(d, ts)
             // The backstop, and it applies to every constellation because the fault it catches is
             // not BeiDou's: a block whose fitted drift is physically impossible ships a range that
             // is wrong by kilometres, and a receiver that believes it spends its search excluding
             // the satellite instead of fixing. Dropping the block costs a receiver one satellite in
             // one two-hour slice; shipping it cost 白い熊 a three-minute fix (2026-09-14).
-            if (abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT) return@runParallel FittedRecord(job, null, err)
+            if (!clock[0].isFinite() || !clock[1].isFinite() ||
+                abs(clock[1]) > Orbit.MAX_CLOCK_DRIFT
+            ) {
+                return@runParallel FittedRecord(job, null, err)
+            }
             val idx = job.sat.substring(1).toInt() - 1
             FittedRecord(
                 job,
