@@ -8,6 +8,88 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+137 — 2026-09-25
+
+Built on upstream `aa1a372a`.
+
+### 衛星 — the forecast says how long it is good for, and a failed build stops there
+
+白い熊 walked on 2026-09-21 five hours after the last block of the set on their band. Every record
+needed to know better was already on the phone. **Four separate things failed to say so.**
+
+**The build failed and the task walked on.** 2026-09-19 11:33 UTC: `Unable to resolve host
+"download.aiub.unibe.ch"` — the one source for the GPS, GLONASS and Galileo orbits, and no mirror
+carries `COD0OPSPRD_05D`. 「衛星 生成」 carries `continueOnError` on the build step, so the run went
+straight to the serve; the serve overwrote `PgnssAlert` with `""` because nothing was yet recorded
+about the band; the transfer of the **previous** set succeeded and rewrote the panel to
+`done,done,done,done`; and the closing notification, gated on exactly that string, announced
+「予測暦 済」. A failed build became a success message, and a two-day-old set was handed over as
+though it were three days of forecast.
+
+- The serve **refuses while a build failure is standing** — it did not repair the failure and will
+  not stand in front of it — and never erases that alert again.
+- **`min_hours`** is the freshness the caller asserts: a run that has just built a set holds 72 h,
+  so materially less means the build did not happen and the store still has yesterday's.
+- **`serve_stale`** is the deliberate override, and 「衛星 再送」 — which exists to hand over the set
+  already on the phone — is what it is for.
+- A build that produces nothing now raises a **notification**, not a banner behind a panel nobody
+  opens.
+
+**The band's countdown is not our window.** It counts **72 hours from the moment it took the set** —
+taken 19:52 UTC, its screen read 2 d 23 h at 20:11, to the minute — so it over-claims by exactly the
+delay between building a set and handing it over. Under two hours in one run; a whole day when a set
+built on the 18th reaches the band on the 19th, which is what made a phone-side failure look like a
+band problem.
+
+- `GnssForecastReminder` says the real window **out loud** the moment the band accepts a set, in
+  **days and hours** because that is the unit the band's own screen uses, with what the band will be
+  claiming beside it and why they differ.
+- Tapping the notification opens it **full-screen in markup** — headings, bold, 1.35× — because a
+  notification that does nothing when pressed is a dead end at the moment someone wants to know more.
+- **Two exact alarms**: twelve hours before the end, and at it.
+- 「衛星予測 画面」 grew the same block, computing the countdown itself and re-rendering every five
+  seconds, so it is right whenever the panel is opened rather than frozen at the transfer.
+
+**And two hours of the gap were ours.** `windowEnd` took a plain minimum over the six files, which
+always picked **GLONASS** — stamped an hour early by the format's own convention, not because it
+expires sooner. We reported the last block's **stamp** rather than the hour it covers
+(`Orbit.FIT_HALF`). And `GnssPredUntil` was the one formatter in the feature with **no time zone
+set**, so it printed local while everything beside it printed UTC: one instant showing as 16:59 and
+14:59 at once.
+
+**Progress that does not lie.** Ten minutes of `7/11` and one file name with nothing moving read as a
+hang — and the name was wrong as well as still, because progress is only emitted from inside the
+download's read loop, so a request whose server has not answered emits nothing and the panel goes on
+showing the last file that delivered bytes. Each file is now announced **before** its request goes
+out, and **`PgnssQuiet`** says how long the *build* has had nothing to say. `PgnssElapsed` ticking on
+a clock only ever proved the panel was alive.
+
+### 起動作業 — an app is its package, not its label
+
+Four of the Rovio games installed here report the label `Angry Birds`. One had a task, so
+`tasks.launchers` generated the same name for every other one, matched its own "already there"
+check, and **skipped — reporting success having created nothing**. Worse sat behind it: tasks carry
+a UNIQUE (projectId, name) index, so had the check not swallowed it the insert would have thrown.
+
+- The duplicate test is **by package**; a name already taken in the project is qualified with it
+  (`Angry Birds (com.rovio.angrybirdsgo) -- [1707][7107]`).
+- The grid opens with every covered app **pre-ticked and listed first** — a reading, not a switch:
+  leaving a tick on creates nothing twice, taking one off deletes nothing. Ticked only where there
+  is a tile to tick, so a workspace that outlived a phone does not open on a screenful of bare ids.
+- The run log says how many were skipped, because "Created 0" had two meanings.
+
+### 近道 — the shortcut picker's sizes, settable from a task
+
+- The task **icon has its own size** at last. It was `font + 6`, so asking for a bigger icon meant
+  asking for bigger type and the two could never be set apart.
+- Item size and icon size **doubled**, line spacing **minimal**, and the type ceiling raised from 28
+  to 44 sp — the picker is read at arm's length on a launcher, not in the editor.
+- Three super-globals — `SHORTCUT_PICKER_ITEM_SP`, `SHORTCUT_PICKER_ICON_DP`, `SHORTCUT_PICKER_PAD_DP`
+  — let any 01 settings task publish them; 凍結融解's does. Spacing is settable for the reason the
+  other two are not enough on their own: a stored theme value outlives any change of default, so
+  only a variable could make "minimal" certain.
+- *UI customization → Shortcut picker* gained a **Task icon size** slider beside the existing ones.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+128 — 2026-09-20
 
 Built on upstream `aa1a372a`.
