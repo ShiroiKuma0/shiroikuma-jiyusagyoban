@@ -184,6 +184,30 @@ class GnssForecastReminderTest {
         assertTrue("the collapsed line is the punchline", "text.lineSequence().first()" in src)
     }
 
+    /**
+     * The banner comes DOWN when the transfer succeeds.
+     *
+     * It is raised before the wait, from what the band was holding then — and nothing recomputed it
+     * afterwards, so 白い熊 watched "⚠ NOT HANDED OVER · THE BAND'S FORECAST RAN OUT n h AGO" stay
+     * shouting over a transfer that had just worked, with the result line underneath saying so
+     * (2026-09-25). A banner that outlives the condition it describes teaches people to ignore it.
+     */
+    @Test
+    fun `a successful forecast transfer clears the banner it was warned by`() {
+        // Sliced with the bounded helper: a bare substringAfter widens to the whole file when its
+        // marker goes, and a gate that cannot fail is worse than no gate — this repo has a test of
+        // its own that says so, and it caught this one.
+        val accepted = ProductionSources.block(
+            "com/opentasker/core/actions/HuaweiGnssAction.kt",
+            "if (tookPredicted && windowEnd != 0L) {",
+            "// Offering data the band declines is not success",
+        )
+        assertTrue(
+            "the alert is cleared inside the block that learns the band took a forecast",
+            "ctx.variables.set(\"\${prefix}PgnssAlert\", \"\")" in accepted,
+        )
+    }
+
     /** The transfer that hands the band a forecast is the moment its deadline becomes knowable. */
     @Test
     fun `accepting a forecast arms the reminder, and a failed build says so`() {
