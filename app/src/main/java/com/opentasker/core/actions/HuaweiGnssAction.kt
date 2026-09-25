@@ -490,6 +490,13 @@ class HuaweiGnssAction : Action {
                             receivedAt + GnssForecastReminder.BAND_WINDOW_HOURS * 3_600_000L,
                         ),
                     )
+                    // AND THE BANNER COMES DOWN. It was raised before the wait, from what the band
+                    // was holding THEN — "THE BAND'S FORECAST RAN OUT n h AGO" — and nothing
+                    // recomputed it afterwards, so it stayed shouting over a transfer that had just
+                    // succeeded while the result line underneath said so (白い熊, 2026-09-25). The
+                    // band holds a live forecast now; that is the whole of what the banner exists to
+                    // say, and it has nothing left to say.
+                    ctx.variables.set("${prefix}PgnssAlert", "")
                     // SAY IT, AND COME BACK AND SAY IT AGAIN. A window written to a file and a
                     // variable is a window nobody reads: on 2026-09-21 白い熊 walked five hours past
                     // the end of a forecast while the band's own screen promised eighteen more, and
