@@ -39,6 +39,7 @@ blanked itself mid-transfer (白い熊, 2026-08-30: "it skipped showing #3").
 | `<prefix>PgnssLog` | the last few lines, newest at the bottom |
 | `<prefix>PgnssResult` | filled only at the end: what was built and served |
 | `<prefix>PgnssFailed` | non-empty if a step failed, naming which and why |
+| `<prefix>PgnssQuiet` | how long the BUILD has had nothing new to say, blank under 12 s |
 | `<prefix>PgnssHeartbeat` | wall clock, ms, rewritten on every publish — see below |
 | `<prefix>PgnssStartedAt` | wall clock, ms, when Generate was pressed; the gnss half reads it |
 
@@ -52,6 +53,13 @@ The serving step additionally reuses what `huawei.gnss` already publishes — `G
   more time redrawing than fetching.
 - **`PgnssElapsed` must keep moving** even when nothing else changes, or a long download looks like a
   hang. It is the one value that ticks on a clock rather than on progress.
+- **…and that is not sufficient, which is what `PgnssQuiet` is for.** A clock ticking beside a frozen
+  file name proves the PANEL is alive and says nothing about the BUILD. 白い熊, 2026-09-21, watched
+  `7/11` and one file name for ten minutes with the seconds counting up and reasonably concluded it
+  was stuck. `PgnssQuiet` is the time since the build last had something new to say — blank while
+  that is under twelve seconds, and a duration once a server has gone silent. The download also
+  announces each file BEFORE the request goes out (`Fetch.fetchOnce`), because the panel used to name
+  the last file that delivered bytes while waiting on the next one — still AND wrong.
 - **A step never goes backwards.** If the band asks for a second round after step 4, that is logged,
   not a return to `run`.
 - **`PgnssCount` counts real units**, not percentages dressed up: files for the download, element sets
