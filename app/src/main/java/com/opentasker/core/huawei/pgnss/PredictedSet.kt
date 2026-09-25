@@ -223,8 +223,13 @@ object PredictedSet {
                     // The NAME ALONE IS NOT PROGRESS. Wuhan's FTP takes a hundred seconds a file at
                     // 18 KB/s, so a panel showing only the file name sat unchanged for minutes and
                     // read as a hang (白い熊, 2026-08-30). Carry the bytes so something moves.
+                    //
+                    // A zero-byte report is the START of a file, emitted before the request goes out
+                    // (see `Fetch.fetchOnce`), and it prints no size: "0.0 MB" beside a name reads
+                    // as a stalled download rather than as one that has not begun.
                     report.step(
-                        PgnssStep.DOWNLOAD, "Downloading", "${p.name}  ${megabytes(p)}",
+                        PgnssStep.DOWNLOAD, "Downloading",
+                        if (p.bytesRead == 0L) "${p.name}  asking" else "${p.name}  ${megabytes(p)}",
                         min(fetched.get(), expectedFiles), expectedFiles,
                         DOWNLOAD_SHARE * min(
                             (fetched.get() + fraction(p)) / expectedFiles, 1.0,
