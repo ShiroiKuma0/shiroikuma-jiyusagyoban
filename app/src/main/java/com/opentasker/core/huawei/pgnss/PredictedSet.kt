@@ -449,7 +449,9 @@ object PredictedSet {
             tally.advance(), tally.total,
             DOWNLOAD_SHARE + KEPLER_SHARE + GLONASS_SHARE + BDS_SHARE,
         )
-        built[NAME_EXTRA] = withContext(dispatcher) { buildExtra(src, plan, nowGpsSeconds, stats) }
+        val extra = withContext(dispatcher) { buildExtra(src, plan, nowGpsSeconds, stats) }
+        built[NAME_EXTRA] = extra.bytes
+        for (reading in extra.readings) report.line(reading.describe())
 
         // ── write, once every one of the six exists ─────────────────────────────────────────────
         require(built.keys.containsAll(NAMES)) {
@@ -528,6 +530,8 @@ object PredictedSet {
             windowEndGps = plan.stamps.last(),
             summary = summary,
             notes = src.notes + plan.notes + bds.notes,
+            almanacAgeDays = src.almanacAgeDays,
+            almanacReadings = extra.readings,
         )
     }
 
@@ -1089,7 +1093,7 @@ object PredictedSet {
         plan: BuildPlan,
         nowGpsSeconds: Long,
         stats: MutableList<String>,
-    ): ByteArray {
+    ): ExtraResult {
         val epoch = Math.floorDiv(nowGpsSeconds, 3600L) * 3600L
         val reference = PgnssExtraFile.capturedReference()
         val yuma = Almanac.parseYuma(src.yuma.readText(), epoch.toDouble())
@@ -1114,8 +1118,18 @@ object PredictedSet {
                 "${bds.records.size} BeiDou slots" +
                 if (bds.carried.isNotEmpty()) " (${bds.carried.size} carried forward)" else "",
         )
-        return out
+        // AND HOW FAR OUT THOSE ALMANACS ACTUALLY PUT THE SATELLITES.
+        //
+        // Measured here because this is the one place holding both halves: the parsed almanacs and
+        // the precise orbits the plan read. An age is a proxy — a Galileo almanac three days old
+        // cost 2 227 km and a fix on 2026-09-25 — and this is the quantity that proxy stood for.
+        val readings = AlmanacCheck.measure(yuma, gssc, plan.sats, plan.stamps)
+        AlmanacCheck.summarise(readings).takeIf { it.isNotEmpty() }?.let(stats::add)
+        return ExtraResult(out, readings)
     }
+
+    /** The EXTRA file and what measuring its almanacs said — both produced in one pass. */
+    private class ExtraResult(val bytes: ByteArray, val readings: List<AlmanacCheck.Reading>)
 
     // ── the captured set ────────────────────────────────────────────────────────────────────────
 
@@ -1388,6 +1402,23 @@ class PgnssBuildResult(
     val windowEndGps: Long,
     val summary: String,
     val notes: List<String>,
+    /**
+     * How old each almanac was, in days, by the date its publisher stamped it.
+     *
+     * Carried out of the build rather than left in the log, because the one thing this had to
+     * become was **actionable**: on 2026-09-25 a set shipped a three-day-old Galileo almanac whose
+     * worst satellite sat 2 227 km from the ephemeris in its own set — against 96 km for a current
+     * one — and every record of that lived in prose nobody reads. See [PgnssSources.ALMANAC_STALE_DAYS].
+     */
+    val almanacAgeDays: Map<String, Long> = emptyMap(),
+    /**
+     * How far each Keplerian almanac puts a satellite from the precise orbit, over the window.
+     *
+     * The measurement the age was always standing in for — see [AlmanacCheck]. Empty when nothing
+     * could be measured (no orbit product for the satellites in the almanac), never zero: "we did
+     * not look" and "we looked and it was fine" must not read the same.
+     */
+    val almanacReadings: List<AlmanacCheck.Reading> = emptyList(),
 )
 
 /** Tunables. The defaults are the shipping configuration and the measured ones. */
