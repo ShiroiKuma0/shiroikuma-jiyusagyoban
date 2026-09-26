@@ -26,8 +26,14 @@ import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
 
 // Kept close under the current count. A floor far below it lets a large batch of tests be
-// deleted silently; the headroom only absorbs intentional consolidation.
-private val JVM_TEST_FLOOR = 1200
+// deleted silently; the headroom only absorbs intentional consolidation. The count now spans the
+// core modules as well as :app: 1,503, of which the three module suites are 41. The floor is set
+// so that losing those 41 drops under it, because while the gate read only :app's results
+// deleting every module test moved the observed count by exactly zero.
+private val JVM_TEST_FLOOR = 1470
+
+/** The modules that own JVM tests `:app:testDebugUnitTest` does not run. */
+private val JVM_TEST_MODULES = listOf(":core:storage", ":core:engine", ":core:common")
 
 private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
     Regex(pattern).find(file.readText())?.groupValues?.get(1)
@@ -258,6 +264,10 @@ android {
 
     lint {
         abortOnError = true
+        // :app:lintDebug analysed :app only, so core/storage - Room, SQLCipher, the Keystore key
+        // and the backup and restore paths - was never linted at all. checkDependencies pulls the
+        // library modules into the same run.
+        checkDependencies = true
     }
 
     compileOptions {
@@ -638,9 +648,15 @@ abstract class GenerateCycloneDxSbomTask : org.gradle.api.DefaultTask() {
 }
 
 abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
-    @get:org.gradle.api.tasks.InputDirectory
+    /**
+     * Every module's JVM results, not just `:app`'s. The gate read one directory, so the three
+     * core-module suites counted for nothing and deleting all of them would have moved the floor by
+     * zero. Missing directories are tolerated so the task still runs when a module is filtered out
+     * of a build; the non-empty check below is what catches "nothing ran at all".
+     */
+    @get:org.gradle.api.tasks.InputFiles
     @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    abstract val resultsDirectory: org.gradle.api.file.DirectoryProperty
+    abstract val resultsDirectories: org.gradle.api.file.ConfigurableFileCollection
 
     @get:org.gradle.api.tasks.Input
     abstract val minimumTests: org.gradle.api.provider.Property<Int>
@@ -650,9 +666,11 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
 
     @org.gradle.api.tasks.TaskAction
     fun verify() {
-        val reports = resultsDirectory.get().asFile.listFiles { file ->
-            file.isFile && file.name.startsWith("TEST-") && file.extension == "xml"
-        }.orEmpty()
+        val reports = resultsDirectories.files.flatMap { directory ->
+            directory.listFiles { file ->
+                file.isFile && file.name.startsWith("TEST-") && file.extension == "xml"
+            }.orEmpty().asList()
+        }
         check(reports.isNotEmpty()) { "No JVM test XML reports were produced." }
         fun count(attribute: String): Int = reports.sumOf { report ->
             Regex("""\b$attribute="(\d+)"""").find(report.readText())?.groupValues?.get(1)?.toInt() ?: 0
@@ -1368,7 +1386,11 @@ val verifyJvmTestCount = tasks.register<VerifyJvmTestCountTask>("verifyJvmTestCo
     group = "verification"
     description = "Fails if the passing JVM test count drops below the release floor."
     dependsOn("testDebugUnitTest")
-    resultsDirectory.set(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
+    JVM_TEST_MODULES.forEach { dependsOn("$it:testDebugUnitTest") }
+    resultsDirectories.from(layout.buildDirectory.dir("test-results/testDebugUnitTest"))
+    JVM_TEST_MODULES.forEach { module ->
+        resultsDirectories.from(project(module).layout.buildDirectory.dir("test-results/testDebugUnitTest"))
+    }
     reportFile.set(rootProject.layout.buildDirectory.file("reports/opentasker/jvm-test-count.json"))
     minimumTests.set(JVM_TEST_FLOOR)
 }

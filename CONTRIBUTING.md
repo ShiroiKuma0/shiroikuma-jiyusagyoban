@@ -37,6 +37,12 @@ Instrumented tests need a device or emulator:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
+Without one, still compile them. Nothing else in the everyday lane touches `src/androidTest`, so a break there otherwise goes unnoticed:
+
+```bash
+./gradlew :app:compileDebugAndroidTestKotlin
+```
+
 If instrumented tests fail with `NoSuchMethodError` on a method name ending in `$app()`, the app APK on the device is older than the test APK. Uninstall both packages and run again:
 
 ```bash
@@ -51,24 +57,34 @@ UI changes need their Compose screenshot references regenerated, or `validateDeb
 ./gradlew :app:validateDebugScreenshotTest
 ```
 
-There's also an aggregate gate, `./gradlew localQualityGate`, which runs lint, coverage floors, dependency policy, schema checks and the connected tests together. It's slow, and it pulls in `connectedDebugAndroidTest`, so it needs a device attached or an explicit `-x connectedDebugAndroidTest`. You don't need to run it for a normal pull request.
+The JVM suite above only covers `:app`. The `core/*` modules carry their own tests and nothing in the everyday lane runs them, so run those too:
+
+```bash
+./gradlew :core:storage:testDebugUnitTest :core:engine:testDebugUnitTest :core:common:testDebugUnitTest
+```
+
+There's also an aggregate gate, `./gradlew localQualityGate`, which runs lint, coverage floors, dependency policy, schema checks and the connected tests together. **You cannot run it on a clone.** It reaches `packageRelease` through `verifyReleaseAssetName` and `verifyPackagedTypeCompleteness`, and release packaging fails closed unless the four `OPEN_TASKER_RELEASE_*` signing variables are set, which only the maintainer has. It also pulls in `connectedDebugAndroidTest`, which needs a device. A pull request needs neither. The JVM suites, `lintDebug`, `compileDebugAndroidTestKotlin` and `assembleDebug` are the lane to run.
 
 Note that this repository does not use GitHub Actions. Builds, tests and releases all happen locally, so nothing will run automatically against your branch. Please say which commands you ran in the pull request description.
 
 ## Where things live
 
-Almost all the code is in `:app`. The `core/*` and `feature/*` Gradle modules exist, but with one exception their source sets still point back at files under `app/src/main/java`, so treat the package layout below as the real map rather than the module list.
+Most of the code is in `:app`, but the `core/*` modules now own their own sources rather than pointing back into it. Storage in particular moved out entirely, so look for a file by package under the module that owns it.
 
 | Path | What's in it |
 | --- | --- |
 | `app/src/main/java/com/opentasker/core/engine/` | Task execution, profile matching, the variable store, the foreground service |
 | `app/src/main/java/com/opentasker/core/actions/` | The action catalog and every built-in action implementation |
 | `app/src/main/java/com/opentasker/core/contexts/` | Trigger sources: time, location, app, network, NFC, notifications, calendar |
-| `app/src/main/java/com/opentasker/core/storage/` | Room entities, DAOs, migrations, the encrypted database setup |
 | `app/src/main/java/com/opentasker/core/transfer/` | Tasker XML import, OpenTasker bundle import and export |
 | `app/src/main/java/com/opentasker/ui/screens/` | All Compose UI |
 | `app/src/main/res/values/strings.xml` | User-visible copy. Everything on a screen resolves through here |
+| `core/storage/src/main/kotlin/` | Room entities, DAOs, migrations, the encrypted database setup, backup and restore |
+| `core/model/src/main/kotlin/` | The profile, task, action and context data model |
+| `core/engine/src/main/kotlin/` | Engine pieces already split out of `:app` |
+| `core/common/`, `feature/automation/` | Small modules. Most of what they'll own still lives in `:app` |
 | `app/src/test/` | JVM tests, including the source-guard tests described below |
+| `core/*/src/test/` | Each module's own JVM tests. `:app:testDebugUnitTest` does not run these |
 | `app/src/androidTest/` | Instrumented tests |
 | `docs/EXTERNAL_INTENTS.md` | The external broadcast protocol other apps use to trigger tasks |
 

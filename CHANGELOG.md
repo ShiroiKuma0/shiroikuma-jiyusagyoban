@@ -214,6 +214,7 @@
 - The install instructions and the store changelog now explain that v0.2.93 is
   signed with a new key, will not install over v0.2.92 or earlier, and needs a
   backup exported before the old copy is uninstalled.
+- The contributor guide now says plainly that the full local release gate can't run on a clone, because it packages a signed release, and names the commands that can. Lint now checks the storage module too (Room, SQLCipher, the Keystore key, backup and restore), which it had never looked at, and the JVM test floor counts the core modules' own tests, so deleting them would now fail the build.
 
 ## v0.2.93
 

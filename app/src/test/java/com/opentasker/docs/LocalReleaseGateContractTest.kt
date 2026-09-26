@@ -69,7 +69,7 @@ class LocalReleaseGateContractTest {
         assertTrue(build.contains("UnresolvedDependencyResult"))
         assertTrue(build.contains("RepositoriesMode.FAIL_ON_PROJECT_REPOS"))
         assertTrue(build.contains("<sha256 value="))
-        assertTrue(build.contains("private val JVM_TEST_FLOOR = 1200"))
+        assertTrue(build.contains("private val JVM_TEST_FLOOR = 1470"))
         assertTrue(build.contains("minimumTests.set(JVM_TEST_FLOOR)"))
         assertTrue(manifest.contains("android.permission.VIBRATE"))
     }
@@ -80,7 +80,15 @@ class LocalReleaseGateContractTest {
         val build = repoRoot.resolve("app/build.gradle.kts").readText()
         val script = repoRoot.resolve("tools/verify-local-release.ps1").readText()
 
-        assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1200").findAll(build).count())
+        assertEquals(1, Regex("JVM_TEST_FLOOR\\s*=\\s*1470").findAll(build).count())
+        // The count spans the core modules' suites too. While it read :app's results alone,
+        // deleting every module test moved the observed count by exactly zero.
+        assertTrue(build.contains("private val JVM_TEST_MODULES = listOf(\":core:storage\", \":core:engine\", \":core:common\")"))
+        assertTrue(build.contains("JVM_TEST_MODULES.forEach { dependsOn(\"\$it:testDebugUnitTest\") }"))
+        assertTrue(build.contains("resultsDirectories.from(project(module).layout.buildDirectory.dir(\"test-results/testDebugUnitTest\"))"))
+        // :app:lintDebug analysed :app alone, so the storage module (Room, SQLCipher, the Keystore
+        // key, backup and restore) was never linted.
+        assertTrue(build.contains("checkDependencies = true"))
         assertTrue(build.contains("reportFile.set(rootProject.layout.buildDirectory.file(\"reports/opentasker/jvm-test-count.json\"))"))
         assertTrue(script.contains("jvm-test-count.json"))
         assertTrue(script.contains("observedJvmTests"))

@@ -278,7 +278,7 @@ Play manifest policy check:
 ./gradlew -PopenTaskerDistribution=play :app:verifyPlayManifestPolicy
 ```
 
-Full local release gate (pinned Gradle bootstrap verification, blocking lint, the configured JVM test floor, JaCoCo coverage floors for scheduling/resilience/receivers/UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
+Full local release gate (pinned Gradle bootstrap verification, blocking lint, the configured JVM test floor, JaCoCo coverage floors for scheduling, engine variable expansion, receivers and UI utilities, Room schemas, Android-test compilation, resolved dependency/SBOM and OSV policy, configuration-cache reuse, plus Play and F-Droid release builds):
 
 Release-facing version, SDK, capability-count, schema, and required artifact-commit claims are generated and checked from [`tools/release-truth.json`](tools/release-truth.json) by the same gate.
 
