@@ -675,8 +675,10 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
         fun List<java.io.File>.total(attribute: String): Int = sumOf { report ->
             Regex("""\b$attribute="(\d+)"""").find(report.readText())?.groupValues?.get(1)?.toInt() ?: 0
         }
-        // A suite that reports nothing (its tests deleted, or its task excluded with -x) fails here
-        // by name, whatever the total says.
+        // A suite that reports nothing fails here by name, whatever the total says: its tests
+        // deleted (the task goes NO-SOURCE and clears its old results) or every one skipped. A
+        // task excluded with -x is only caught on a clean build directory, because Gradle keeps
+        // the results of its last run and they are read like new ones. The gate excludes nothing.
         val silent = suites.filter { (_, reports) -> reports.total("tests") - reports.total("skipped") <= 0 }
         check(silent.isEmpty()) {
             "No passing JVM tests reported from: ${silent.joinToString { it.first.path }}"
