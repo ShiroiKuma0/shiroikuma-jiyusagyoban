@@ -130,9 +130,31 @@ fun HuaweiDashboardScreen(
     ) {
         item("sync") { SyncHeader(state, progress, onSync) }
 
-        // The morning rating first, before anything the band measured. 白い熊's instruction
-        // (2026-08-23), and it is the right one: everything else on this page exists whether or not
-        // they look at it, while this exists only if they answer — and only until the day is over.
+        // THE THREE WINDOWS FIRST — above 今朝の体感, and with no heading of its own (白い熊,
+        // 2026-09-26: "should be above the This morning tab — and remove its title, just keep the
+        // three pills").
+        //
+        // This is the one thing on the report that is not a reading at all: three doors, pressed on
+        // the way somewhere else. A heading over three already-labelled pills said nothing the pills
+        // did not, and cost a line of the first screenful — so the row is now exactly as tall as it
+        // needs to be, which is most of the argument for it being first.
+        item("windows") {
+            SectionCard(accent = ChartPalette.HEART_RATE) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (kind in HuaweiWorkoutStore.Kind.entries) {
+                        ActionPill(
+                            label = HuaweiText.titleFor(kind)[lang],
+                            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            onClick = { onOpenWorkouts(kind) },
+                        )
+                    }
+                }
+            }
+        }
+
+        // Then the morning rating, before anything the band MEASURED. 白い熊's instruction
+        // (2026-08-23), and it is the right one: everything below exists whether or not they look
+        // at it, while this exists only if they answer — and only until the day is over.
         if (state.feltEnabled) {
             item("morning") {
                 HuaweiMorningCard(
@@ -150,18 +172,7 @@ fun HuaweiDashboardScreen(
             }
         }
 
-        // 機能訓練, directly under the morning rating (白い熊, 2026-09-03). The two belong together:
-        // both are things only 白い熊 can answer, both are answered once a day, and both are worth
-        // nothing if the day passes unanswered. Everything below them is what the band measured.
-        // The three windows the band's own recordings live in.
-        //
-        // This was the 機能訓練 calendar cut-out. It moved to the 機能訓練 window, where the sessions
-        // that now fill it are (白い熊, 2026-09-04) — a two-week calendar on the report was
-        // answering "which days did I do it", which is a question about rehab rather than about
-        // this morning, and it sat between two cards that ARE about this morning.
-        //
-        // What replaces it is the way through: one pill per window, in the order they cost effort.
-        // 「平常との差」 — the FIRST measured thing on the page, directly under the morning rating.
+        // 「平常との差」 — the first MEASURED thing on the page.
         //
         // 白い熊, 2026-09-12: "these need to be top … I need to orient myself on these indicators and
         // not have to dig for them." It sat fifth before, under 回復, which is where a reader finds
@@ -179,21 +190,6 @@ fun HuaweiDashboardScreen(
                     bestDescent = state.bestDescent,
                     onOpenMarker = onOpenMarker,
                 )
-            }
-        }
-
-        item("windows") {
-            SectionCard(accent = ChartPalette.HEART_RATE) {
-                SectionTitle(HuaweiText.windowsTitle[lang], ChartPalette.HEART_RATE)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (kind in HuaweiWorkoutStore.Kind.entries) {
-                        ActionPill(
-                            label = HuaweiText.titleFor(kind)[lang],
-                            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                            onClick = { onOpenWorkouts(kind) },
-                        )
-                    }
-                }
             }
         }
 
