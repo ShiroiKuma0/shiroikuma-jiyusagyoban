@@ -122,6 +122,11 @@ class WiFiNetworkMonitorTest {
         assertTrue("AppVisibilityTracker.addResumeListener(resumeListener)" in source)
         assertTrue("AppVisibilityTracker.removeResumeListener(resumeListener)" in source)
         assertTrue("appContext.unregisterReceiver(locationModeReceiver)" in source)
+        // A refresh that unregistered the callback and then failed to register it again must be
+        // retried by the next trigger, and stop() must not unregister a callback that is gone.
+        assertTrue("if (!withheld && !callbackLost) return" in source)
+        assertTrue("if (!callbackLost) cm.unregisterNetworkCallback(callback)" in source)
+        assertTrue("if (!callbackLost) connectivityManager?.unregisterNetworkCallback(callback)" in source)
     }
 
     @Test

@@ -83,6 +83,12 @@ class WiFiNetworkMonitor(
     }
     private val resumeListener: () -> Unit = { refreshIfNameWithheld() }
 
+    // Set while a refresh has unregistered the callback and not yet registered it again. If the
+    // registration throws, nothing is left listening while the lifecycle still says active, so
+    // start() would return early for good; the next refresh trigger retries it instead.
+    @Volatile
+    private var callbackLost = false
+
     fun start(): Boolean {
         return lifecycle.start {
             val cm = connectivityManager
@@ -119,7 +125,8 @@ class WiFiNetworkMonitor(
         lifecycle.stop {
             AppVisibilityTracker.removeResumeListener(resumeListener)
             runCatching { appContext.unregisterReceiver(locationModeReceiver) }
-            connectivityManager?.unregisterNetworkCallback(callback)
+            if (!callbackLost) connectivityManager?.unregisterNetworkCallback(callback)
+            callbackLost = false
             AppLogger.debug(TAG, "WiFi NetworkCallback unregistered")
         }
     }
@@ -139,12 +146,18 @@ class WiFiNetworkMonitor(
         val withheld = synchronized(stateLock) {
             lastState?.let { it.connected && it.ssidUnavailableReason.isNotEmpty() } == true
         }
-        if (!withheld) return
+        if (!withheld && !callbackLost) return
         lifecycle.whileActive {
             val cm = connectivityManager ?: return@whileActive
-            cm.unregisterNetworkCallback(callback)
-            registerAndSeed(cm)
-            AppLogger.debug(TAG, "WiFi NetworkCallback re-registered to re-read a withheld name")
+            if (!callbackLost) cm.unregisterNetworkCallback(callback)
+            callbackLost = true
+            try {
+                registerAndSeed(cm)
+                callbackLost = false
+                AppLogger.debug(TAG, "WiFi NetworkCallback re-registered to re-read a withheld name")
+            } catch (ex: RuntimeException) {
+                AppLogger.error(TAG, "Re-registering the WiFi NetworkCallback failed; the next refresh retries it", ex)
+            }
         }
     }
 
