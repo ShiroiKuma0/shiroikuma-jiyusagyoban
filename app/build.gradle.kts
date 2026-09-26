@@ -1913,10 +1913,22 @@ tasks.register("generateFdroidChangelog") {
         check(section.isNotBlank()) {
             "CHANGELOG.md has no '## v$versionName' section to generate a store changelog from"
         }
-        val bullets = section.lines()
-            .map(String::trim)
-            .filter { it.startsWith("- ") }
-            .map { it.removePrefix("- ").replace(Regex("[`*]"), "") }
+        // An entry runs from its "- " line through the indented lines under it. CHANGELOG.md wraps
+        // its entries, and reading only the first line cut a wrapped entry off mid-sentence.
+        val entries = mutableListOf<String>()
+        var inEntry = false
+        for (line in section.lines()) {
+            val text = line.trim()
+            when {
+                text.startsWith("- ") -> {
+                    entries += text.removePrefix("- ")
+                    inEntry = true
+                }
+                text.isEmpty() || !line.startsWith(" ") -> inEntry = false
+                inEntry -> entries[entries.lastIndex] += " $text"
+            }
+        }
+        val bullets = entries.map { it.replace(Regex("[`*]"), "") }
         check(bullets.isNotEmpty()) { "The '## v$versionName' CHANGELOG section has no entries" }
 
         val body = StringBuilder()
