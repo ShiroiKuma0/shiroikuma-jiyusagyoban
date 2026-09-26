@@ -8,11 +8,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Process-local activity visibility, for Android 17 audio eligibility decisions and for monitors
- * that need to re-check something when the user returns to the app.
+ * that need to re-check something when the user comes back to the app or closes a prompt over it.
  */
 object AppVisibilityTracker : Application.ActivityLifecycleCallbacks {
     private val startedActivityCount = AtomicInteger(0)
-    private val foregroundListeners = CopyOnWriteArraySet<() -> Unit>()
+    private val resumeListeners = CopyOnWriteArraySet<() -> Unit>()
 
     val isAppVisible: Boolean
         get() = startedActivityCount.get() > 0
@@ -21,27 +21,33 @@ object AppVisibilityTracker : Application.ActivityLifecycleCallbacks {
         application.registerActivityLifecycleCallbacks(this)
     }
 
-    /** Called on the main thread each time the app goes from no visible activity to one. */
-    fun addForegroundListener(listener: () -> Unit) {
-        foregroundListeners += listener
+    /**
+     * Called on the main thread each time one of the app's activities resumes: on the way back
+     * from the background, and when a permission prompt drawn over the app closes. The prompt
+     * pauses the activity without stopping it, so the app never stops being visible and a
+     * return-to-the-app signal would miss the grant.
+     */
+    fun addResumeListener(listener: () -> Unit) {
+        resumeListeners += listener
     }
 
-    fun removeForegroundListener(listener: () -> Unit) {
-        foregroundListeners -= listener
+    fun removeResumeListener(listener: () -> Unit) {
+        resumeListeners -= listener
     }
 
     override fun onActivityStarted(activity: Activity) {
-        if (startedActivityCount.incrementAndGet() == 1) {
-            foregroundListeners.forEach { listener -> runCatching(listener) }
-        }
+        startedActivityCount.incrementAndGet()
     }
 
     override fun onActivityStopped(activity: Activity) {
         startedActivityCount.updateAndGet { count -> (count - 1).coerceAtLeast(0) }
     }
 
+    override fun onActivityResumed(activity: Activity) {
+        resumeListeners.forEach { listener -> runCatching(listener) }
+    }
+
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
-    override fun onActivityResumed(activity: Activity) = Unit
     override fun onActivityPaused(activity: Activity) = Unit
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
     override fun onActivityDestroyed(activity: Activity) = Unit

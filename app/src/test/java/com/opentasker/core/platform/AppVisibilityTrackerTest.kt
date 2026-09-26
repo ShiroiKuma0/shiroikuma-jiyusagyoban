@@ -2,33 +2,41 @@ package com.opentasker.core.platform
 
 import android.app.Activity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppVisibilityTrackerTest {
     @Test
-    fun foregroundListenersFireOnlyWhenTheFirstActivityBecomesVisible() {
+    fun resumeListenersHearAPromptClosingOverTheApp() {
         var calls = 0
         val listener: () -> Unit = { calls++ }
-        val first = Activity()
-        val second = Activity()
-        AppVisibilityTracker.addForegroundListener(listener)
+        val activity = Activity()
+        AppVisibilityTracker.addResumeListener(listener)
         try {
-            AppVisibilityTracker.onActivityStarted(first)
-            AppVisibilityTracker.onActivityStarted(second)
-            assertEquals("a second visible activity is not a return to the app", 1, calls)
+            AppVisibilityTracker.onActivityStarted(activity)
+            AppVisibilityTracker.onActivityResumed(activity)
+            assertEquals("coming back to the app is a resume", 1, calls)
 
-            AppVisibilityTracker.onActivityStopped(second)
-            AppVisibilityTracker.onActivityStopped(first)
-            AppVisibilityTracker.onActivityStarted(first)
-            assertEquals(2, calls)
-            AppVisibilityTracker.onActivityStopped(first)
+            // Setup's permission prompt pauses the activity and resumes it with no stop between,
+            // so the app stays visible the whole time and only the resume says the grant is in.
+            AppVisibilityTracker.onActivityPaused(activity)
+            assertTrue(AppVisibilityTracker.isAppVisible)
+            AppVisibilityTracker.onActivityResumed(activity)
+            assertEquals("a prompt closing over the app is a resume", 2, calls)
 
-            AppVisibilityTracker.removeForegroundListener(listener)
-            AppVisibilityTracker.onActivityStarted(first)
-            AppVisibilityTracker.onActivityStopped(first)
+            AppVisibilityTracker.onActivityPaused(activity)
+            AppVisibilityTracker.onActivityStopped(activity)
+            assertFalse(AppVisibilityTracker.isAppVisible)
+
+            AppVisibilityTracker.removeResumeListener(listener)
+            AppVisibilityTracker.onActivityStarted(activity)
+            AppVisibilityTracker.onActivityResumed(activity)
+            AppVisibilityTracker.onActivityPaused(activity)
+            AppVisibilityTracker.onActivityStopped(activity)
             assertEquals("a removed listener must not be called", 2, calls)
         } finally {
-            AppVisibilityTracker.removeForegroundListener(listener)
+            AppVisibilityTracker.removeResumeListener(listener)
         }
     }
 }

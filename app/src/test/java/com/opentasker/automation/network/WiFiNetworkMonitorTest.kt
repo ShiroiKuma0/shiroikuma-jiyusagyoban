@@ -119,8 +119,8 @@ class WiFiNetworkMonitorTest {
         // A withheld name is re-read when Location changes or the user returns to the app, and
         // both triggers are removed again on stop.
         assertTrue("IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)" in source)
-        assertTrue("AppVisibilityTracker.addForegroundListener(foregroundListener)" in source)
-        assertTrue("AppVisibilityTracker.removeForegroundListener(foregroundListener)" in source)
+        assertTrue("AppVisibilityTracker.addResumeListener(resumeListener)" in source)
+        assertTrue("AppVisibilityTracker.removeResumeListener(resumeListener)" in source)
         assertTrue("appContext.unregisterReceiver(locationModeReceiver)" in source)
     }
 

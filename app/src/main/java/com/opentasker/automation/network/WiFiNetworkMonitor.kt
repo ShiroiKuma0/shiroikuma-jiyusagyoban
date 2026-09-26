@@ -74,12 +74,14 @@ class WiFiNetworkMonitor(
     // A withheld name only comes back with the next capability update, which a phone sitting on one
     // network may not get for hours, so the Inspector kept saying "turn Location on" after it was
     // on. Re-registering makes Android replay the current networks with location checked again;
-    // do that when whatever withheld the name may have changed: Location switched on, or the app
-    // coming to the foreground, where a permission may just have been granted.
+    // do that when whatever withheld the name may have changed: Location switched on, or one of
+    // the app's activities resuming. A resume follows both a return from the system settings and
+    // Setup's own precise-location prompt, which never stops the activity, and a permission grant
+    // sends no broadcast of its own.
     private val locationModeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = refreshIfNameWithheld()
     }
-    private val foregroundListener: () -> Unit = { refreshIfNameWithheld() }
+    private val resumeListener: () -> Unit = { refreshIfNameWithheld() }
 
     fun start(): Boolean {
         return lifecycle.start {
@@ -108,14 +110,14 @@ class WiFiNetworkMonitor(
                     ContextCompat.RECEIVER_NOT_EXPORTED,
                 )
             }.onFailure { AppLogger.warn(TAG, "Location change receiver unavailable", it) }
-            AppVisibilityTracker.addForegroundListener(foregroundListener)
+            AppVisibilityTracker.addResumeListener(resumeListener)
             true
         }
     }
 
     fun stop() {
         lifecycle.stop {
-            AppVisibilityTracker.removeForegroundListener(foregroundListener)
+            AppVisibilityTracker.removeResumeListener(resumeListener)
             runCatching { appContext.unregisterReceiver(locationModeReceiver) }
             connectivityManager?.unregisterNetworkCallback(callback)
             AppLogger.debug(TAG, "WiFi NetworkCallback unregistered")
