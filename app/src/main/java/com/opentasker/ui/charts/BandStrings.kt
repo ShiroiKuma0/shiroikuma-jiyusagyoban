@@ -129,6 +129,20 @@ object BandText {
     /** Under the chart: what it is, in as few words as it takes. One series needs no legend. */
     val curveCaption = Loc("Heart rate through the night", "一晩の心拍の推移")
 
+    // The per-night small multiples on the swing's page (白い熊, 2026-09-26: "a click-through
+    // history featuring the graphs for past days, so we can quickly visually compare").
+    val nightCurvesTitle = Loc("Each night on its own", "一夜ずつ")
+    val nightCurvesNote = Loc(
+        "The last %d nights, newest first, all on ONE scale in bpm — so a level carries from one "
+            + "chart to the next. The bar on the left scores how far that night's fall came short "
+            + "of your usual one, exactly as the report does.",
+        "直近 %d 夜、新しい順。目盛りは bpm で全て共通なので、ある高さが次の図でも同じ高さを指す。"
+            + "左の帯は、その夜の下がり幅が平常よりどれだけ足りなかったかを、報告と同じ尺度で示す。",
+    )
+    val nightCurvesDrop = Loc("%d → %d, a fall of %d bpm", "%d → %d、下がり幅 %d bpm")
+    val nightCurvesBed = Loc("bed", "就床")
+    val nightCurvesWoke = Loc("woke", "起床")
+
     // The commentary. Facts the chart already shows, said once in words — never an interpretation;
     // see HrCurveShape for why nothing here calls a night good or bad.
     val curveShape = Loc(
@@ -159,11 +173,6 @@ object BandText {
     val markerChartNote = Loc(
         "The shaded band is your usual range; the dashed line is your baseline. Last night is marked.",
         "帯は平常の範囲、破線は基準値。最後の点が昨夜。",
-    )
-    /** Tells a reader the rows open. Without it a tappable row looks like a label. */
-    val deviationTapHint = Loc(
-        "Tap any line for its history.",
-        "各行を押すとその履歴が開く。",
     )
 
     // The curve's descent, against 白い熊's own usual one — the "from where" 白い熊 asked for.
@@ -355,7 +364,7 @@ object BandText {
     )
     // Column headings, printed once. The values under them keep their own colour. Prefixed because
     // the day-table further down already owns the bare col* names for a different set of columns.
-    // --- the ⓘ panel's entries for the five columns added 2026-09-03 --------------------------
+    // --- the ⓘ panel's entries for the graded columns (five from 2026-09-03, eight from 09-26) --
     val bandsLowTitle = Loc("Lowest HR", "最低心拍")
     val bandsLowWhy = Loc(
         "The lowest per-minute rate recorded between falling asleep and waking — the floor of the "
@@ -389,23 +398,31 @@ object BandText {
             + "あり、今後も外れ続ける。色が言うのは読み値が臨床の尺度のどこに乗るかであって、その読み値が真実だと"
             + "どれだけ確信してよいかではない。",
     )
-    val bandsWithinTitle = Loc("Deep · Deep+REM · HRV", "深い・深＋レム・心拍変動")
+    val bandsWithinTitle = Loc(
+        "Deep · Deep+REM · HRV · Bed HR · HR swing · Breaths",
+        "深い・深＋レム・心拍変動・就床心拍・心拍の振れ・呼吸数",
+    )
     val bandsWithinWhy = Loc(
         "These three are banded against YOUR OWN preceding nights, not against a population range, "
             + "because no published ladder fits them. This band's \"deep\" is not polysomnography's "
             + "N3 — these nights run 30–40 % of sleep where the literature is 13–23 % — so an absolute "
             + "ladder would score every night ever recorded as extreme. RMSSD norms are so "
-            + "age-dependent that a population mean would paint the whole column one colour.",
+            + "age-dependent that a population mean would paint the whole column one colour. The "
+            + "going-to-bed rate, the night's swing and the breathing rate joined them in 2026-09: "
+            + "no published ladder exists for a wrist band's bedtime rate, for the spread of a "
+            + "binned night curve, or for an estimated respiratory rate either.",
         "この三つは公表された範囲ではなく、自分自身の直前の夜に対して段を付けてある。当てはまる公表尺度が無いから"
             + "である。このバンドの「深い」は睡眠ポリグラフの N3 ではない — ここでの夜は睡眠の 30〜40 % を占め、"
             + "文献は 13〜23 % である — ので、絶対尺度に掛ければ記録した全ての夜が極端と出る。RMSSD の基準値は"
-            + "年齢依存が強く、母集団平均では欄全体が一色になる。",
+            + "年齢依存が強く、母集団平均では欄全体が一色になる。就床心拍・心拍の振れ・呼吸数も 2026 年 9 月に"
+            + "加わった。手首のバンドの就床時心拍にも、区分けした夜の曲線の振れ幅にも、推定呼吸数にも、"
+            + "当てはまる公表尺度は無いからである。",
     )
     val bandsNotCounted = Loc(
-        "None of the five is COUNTED. The headline still counts three markers; a colour here says "
+        "NONE of these is COUNTED. The headline still counts three markers; a colour here says "
             + "where a value sits, never that the night was adverse.",
-        "この五つはいずれも数えていない。見出しが数えるのは今も三つの指標である。ここの色は値の位置を言うのみで、"
-            + "その夜が悪かったとは言わない。",
+        "ここに並ぶものはいずれも数えていない。見出しが数えるのは今も三つの指標である。ここの色は値の位置を"
+            + "言うのみで、その夜が悪かったとは言わない。",
     )
 
     val regColDate = Loc("Date", "日付")
@@ -421,12 +438,26 @@ object BandText {
     val regColHrv = Loc("HRV", "心拍変動")
     val regColSpo2 = Loc("SpO₂", "血中酸素")
 
+    // Added 2026-09-26: 白い熊, on the table — "it lacks the going-to-bed-hr, hr-through-the-night:
+    // it must have all the metrics, so it's more descriptive." Every quantity the strip and the
+    // 回復 card show is now a column, so the register is the whole night rather than most of it.
+    // Temperature stays out, and stays out for the reason above: this band has no sensor for it.
+    val regColBedHr = Loc("Bed HR", "就床心拍")
+    val regColSwing = Loc("HR swing", "心拍の振れ")
+    val regColResp = Loc("Breaths", "呼吸数")
+    /** The SHAPE, not a number — the only column that draws rather than prints. */
+    val regColCurve = Loc("Night curve", "夜の曲線")
+
     /**
      * The night table's headings, in the order the columns are drawn.
      *
-     * A list rather than nine call sites, because the header row and the value row have to stay the
-     * same length and the same order, and two hand-maintained sequences of nine drift the first time
-     * one is edited.
+     * A list rather than a dozen call sites, because the header row and the value row have to stay
+     * the same length and the same order, and two hand-maintained sequences drift the first time one
+     * is edited.
+     *
+     * **The order follows the night, not the sensor.** Going to bed, through the night, waking:
+     * bed HR and the swing sit beside the nocturnal rate they belong with, breathing beside the
+     * other whole-night quantities. Reading left to right is reading the night in order.
      *
      * **Every label is short on purpose.** The columns share ONE width and each heading gets ONE
      * line (白い熊, 2026-09-03), so `How you woke` became `Woke`, `Lowest HR` became `Low HR`, and
@@ -434,8 +465,8 @@ object BandText {
      * the column cannot spell it.
      */
     val registerColumns = listOf(
-        regColDate, regColFelt, regColHr, regColSleep,
-        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColSpo2,
+        regColDate, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
+        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
     //
