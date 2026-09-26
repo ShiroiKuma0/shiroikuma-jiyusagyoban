@@ -312,6 +312,37 @@ class ContextInspectorTest {
     }
 
     @Test
+    fun aWithheldWifiNameIsExplainedForNameContextsButNotForConnectedContexts() {
+        val withheld = DeviceStateEvents.wifiPatch(
+            "Unknown",
+            connected = true,
+            ssidUnavailableReason = "Android hides the Wi-Fi name from apps in the background.",
+        )
+        val source = ContextSourceSnapshot(
+            key = "state",
+            label = "Device state",
+            registered = true,
+            lastObservation = ContextEventObservation(ContextEvent("state", true, withheld), observedAtMs = 1000L),
+        )
+        fun profile(value: String) = Profile(
+            id = 7,
+            name = "Wi-Fi $value",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "wifi_ssid", "value" to value))),
+        )
+
+        val byName = inspectProfiles(listOf(profile("Home")), listOf(source)).single()
+        assertFalse(byName.matching)
+        assertEquals("Android hides the Wi-Fi name from apps in the background.", byName.contexts.single().reason)
+
+        // Being connected needs no name, so its explanation must not blame the missing one.
+        val connected = inspectProfiles(listOf(profile("connected")), listOf(source)).single()
+        assertTrue(connected.matching)
+        assertEquals("Latest value satisfies the configuration.", connected.contexts.single().reason)
+    }
+
+    @Test
     fun profileInspectionCanUseTransformedLocationDwellObservation() {
         val profile = Profile(
             id = 5,

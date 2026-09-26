@@ -300,7 +300,8 @@ private fun contextReason(
     if (observation == null) return "Waiting for the first ${snapshot.label} event."
     if (observation.event.type != sourceKey) return "Latest event came from ${observation.event.type}, not $sourceKey."
     if (spec.type == ContextType.STATE) {
-        observation.event.metadata["_setup_${stateContextKey(spec)}"]
+        stateSetupMarkerKey(spec)
+            ?.let { observation.event.metadata[it] }
             ?.takeIf(String::isNotBlank)
             ?.let { return it }
     }

@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.view.Display
 import androidx.core.content.ContextCompat
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -342,11 +343,36 @@ private fun wifiMatches(
         ?: state["wifi_ssid"].orEmpty()
 
     return when (normalizedExpected) {
-        "connected", "on", "true", "yes" -> connected == true
-        "disconnected", "off", "false", "no" -> connected == false
+        in WIFI_CONNECTED_WORDS -> connected == true
+        in WIFI_DISCONNECTED_WORDS -> connected == false
         else -> actualSsid == expected
     }
 }
+
+private val WIFI_CONNECTED_WORDS = setOf("connected", "on", "true", "yes")
+private val WIFI_DISCONNECTED_WORDS = setOf("disconnected", "off", "false", "no")
+
+/**
+ * Whether a STATE spec compares the Wi-Fi *name*. Android reveals the name only to an app with
+ * precise location access, while the connected and disconnected words need nothing, so Setup and
+ * the Inspector have to tell the two apart.
+ */
+internal fun stateSpecReadsWifiSsid(spec: ContextSpec): Boolean {
+    if (spec.type != ContextType.STATE) return false
+    val (key, _, value) = spec.config["predicate"]?.takeIf(String::isNotBlank)?.let(::parseStatePredicate)
+        ?: Triple(spec.config["key"].orEmpty(), "", spec.config["value"].orEmpty())
+    if (normalizeStateKey(key) != "wifi") return false
+    val expected = value.trim().lowercase()
+    return expected.isNotEmpty() && expected !in WIFI_CONNECTED_WORDS && expected !in WIFI_DISCONNECTED_WORDS
+}
+
+/** The private `_setup_*` marker a state source writes when it cannot evaluate [spec], if any. */
+internal fun stateSetupMarkerKey(spec: ContextSpec): String? =
+    if (stateSpecReadsWifiSsid(spec)) {
+        DeviceStateEvents.WIFI_SSID_SETUP_MARKER
+    } else {
+        stateContextKey(spec)?.let { "_setup_$it" }
+    }
 
 /**
  * Normalize a raw battery reading to a 0-100 percentage. `ACTION_BATTERY_CHANGED` reports

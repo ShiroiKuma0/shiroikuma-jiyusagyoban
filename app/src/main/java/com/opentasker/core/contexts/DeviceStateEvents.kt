@@ -22,10 +22,14 @@ object DeviceStateEvents {
     /** Everything published so far, so a late collector starts with the full picture. */
     val events: StateFlow<Map<String, String>> = state.asStateFlow()
 
+    /** Private marker explaining why a connected network's name is unknown; blank when it is known. */
+    const val WIFI_SSID_SETUP_MARKER = "_setup_wifi_ssid"
+
     fun publishWifi(
         ssid: String,
         connected: Boolean,
-    ) = publish(wifiPatch(ssid, connected))
+        ssidUnavailableReason: String = "",
+    ) = publish(wifiPatch(ssid, connected, ssidUnavailableReason))
 
     fun publishConnectivity(
         internet: Boolean,
@@ -40,12 +44,15 @@ object DeviceStateEvents {
     internal fun wifiPatch(
         ssid: String,
         connected: Boolean,
+        ssidUnavailableReason: String = "",
     ): Map<String, String> {
         val normalizedSsid = ssid.trim().ifBlank { "Unknown" }
         return mapOf(
             "wifi" to if (connected) normalizedSsid else "disconnected",
             "wifi_ssid" to if (connected) normalizedSsid else "",
             "wifi_connected" to connected.toString(),
+            // Written on every patch so a reason from an earlier connection cannot outlive it.
+            WIFI_SSID_SETUP_MARKER to if (connected) ssidUnavailableReason else "",
         )
     }
 

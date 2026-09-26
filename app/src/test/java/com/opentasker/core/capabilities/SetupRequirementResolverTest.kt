@@ -113,6 +113,30 @@ class SetupRequirementResolverTest {
     }
 
     @Test
+    fun aWifiNameContextNeedsPreciseAndBackgroundLocationButConnectedDoesNot() {
+        fun profile(value: String) = Profile(
+            id = 9,
+            name = "Wi-Fi",
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "wifi", "value" to value))),
+            enterTaskId = 1,
+        )
+
+        // Without these grants Android withholds the name and the profile can never match (issue #17).
+        assertEquals(
+            setOf(
+                SetupRequirement.NEARBY_WIFI,
+                SetupRequirement.FOREGROUND_LOCATION,
+                SetupRequirement.BACKGROUND_LOCATION,
+            ),
+            SetupRequirementResolver.resolve(listOf(profile("Home")), emptyList()),
+        )
+        assertEquals(
+            setOf(SetupRequirement.NEARBY_WIFI),
+            SetupRequirementResolver.resolve(listOf(profile("connected")), emptyList()),
+        )
+    }
+
+    @Test
     fun templateActionsResolveBeforeAnythingIsStored() {
         // Onboarding points Setup at a freshly installed template, which has no profile or task
         // rows yet, so the requirements have to come from the template itself.

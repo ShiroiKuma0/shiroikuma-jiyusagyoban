@@ -1,5 +1,6 @@
 package com.opentasker.core.capabilities
 
+import com.opentasker.core.contexts.stateSpecReadsWifiSsid
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -98,6 +99,13 @@ object SetupRequirementResolver {
                 }
                 ContextType.STATE -> {
                     if (tokens.containsAny("wifi", "ssid", "network")) add(SetupRequirement.NEARBY_WIFI)
+                    // Android withholds a network's name without precise location, and withholds it
+                    // from a backgrounded app without "allow all the time", so an SSID profile that
+                    // skipped these grants read Unknown forever (issue #17).
+                    if (stateSpecReadsWifiSsid(context)) {
+                        add(SetupRequirement.FOREGROUND_LOCATION)
+                        add(SetupRequirement.BACKGROUND_LOCATION)
+                    }
                     if (tokens.containsAny("bluetooth", "bt")) add(SetupRequirement.BLUETOOTH)
                     if (tokens.containsAny("activity", "physical_activity", "motion")) {
                         add(SetupRequirement.PHYSICAL_ACTIVITY)

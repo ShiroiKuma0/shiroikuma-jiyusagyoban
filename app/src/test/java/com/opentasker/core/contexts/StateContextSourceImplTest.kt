@@ -69,6 +69,38 @@ class StateContextSourceImplTest {
     }
 
     @Test
+    fun theSsidReasonIsWrittenWhileConnectedAndClearedByEveryOtherPatch() {
+        val withheld = DeviceStateEvents.wifiPatch("Unknown", connected = true, ssidUnavailableReason = "Allow precise location.")
+        assertEquals("Allow precise location.", withheld[DeviceStateEvents.WIFI_SSID_SETUP_MARKER])
+
+        // A disconnect or a readable name must overwrite the marker, or the reason from an earlier
+        // connection would survive the merge in the state map.
+        assertEquals("", DeviceStateEvents.wifiPatch("Unknown", connected = false, ssidUnavailableReason = "stale")[DeviceStateEvents.WIFI_SSID_SETUP_MARKER])
+        assertEquals("", DeviceStateEvents.wifiPatch("Home", connected = true)[DeviceStateEvents.WIFI_SSID_SETUP_MARKER])
+    }
+
+    @Test
+    fun onlySpecsThatCompareTheWifiNameReadTheSsid() {
+        fun state(vararg config: Pair<String, String>) = ContextSpec(ContextType.STATE, mapOf(*config))
+
+        assertTrue(stateSpecReadsWifiSsid(state("key" to "wifi", "value" to "Home")))
+        assertTrue(stateSpecReadsWifiSsid(state("key" to "wifi_ssid", "value" to "Home")))
+        assertTrue(stateSpecReadsWifiSsid(state("key" to "ssid", "operator" to "=", "value" to "{ssid}")))
+        assertTrue(stateSpecReadsWifiSsid(state("predicate" to "wifi=Home")))
+
+        assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi", "value" to "connected")))
+        assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi", "value" to "Disconnected")))
+        assertFalse(stateSpecReadsWifiSsid(state("predicate" to "wifi=off")))
+        assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi_connected", "value" to "true")))
+        assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi", "value" to "")))
+        assertFalse(stateSpecReadsWifiSsid(ContextSpec(ContextType.EVENT, mapOf("key" to "wifi", "value" to "Home"))))
+
+        assertEquals(DeviceStateEvents.WIFI_SSID_SETUP_MARKER, stateSetupMarkerKey(state("key" to "wifi", "value" to "Home")))
+        assertEquals("_setup_wifi", stateSetupMarkerKey(state("key" to "wifi", "value" to "connected")))
+        assertEquals("_setup_activity", stateSetupMarkerKey(state("key" to "activity", "value" to "walking")))
+    }
+
+    @Test
     fun unlockedPredicateMatchesTrueFalse() {
         val state = mapOf("unlocked" to "true")
         assertTrue(stateMatches("unlocked=true", state))
