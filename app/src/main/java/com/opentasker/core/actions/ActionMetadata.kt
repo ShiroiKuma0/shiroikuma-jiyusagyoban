@@ -1207,6 +1207,20 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "huawei.almanacwatch",
+            name = "Watch for a newer almanac",
+            description = "Check periodically whether a newer almanac has been published, and say so — for when a set had to be built on a stale one",
+            category = "System",
+            fields = listOf(
+                ActionField("have", "The vintage to beat", required = true, hint = "ISO date of the almanac the set was built on — %HUAWEI_PgnssAlmanacHave, written by the build"),
+                ActionField("task", "Run this when one appears", hint = "task name for the notification's tap; default 衛星 生成 -- [727]"),
+                ActionField("stop", "Stop watching", FieldType.CHECKBOX, hint = "cancel a watch that is running"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.gnss",
             name = "Huawei Band GNSS",
             description = "Serve the band its satellite assistance data, so a GPS fix takes seconds instead of minutes",
