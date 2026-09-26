@@ -26,11 +26,11 @@ import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
 
 // Kept close under the current count. A floor far below it lets a large batch of tests be
-// deleted silently; the headroom only absorbs intentional consolidation. The count now spans the
-// core modules as well as :app: 1,503, of which the three module suites are 41. The floor is set
-// so that losing those 41 drops under it, because while the gate read only :app's results
-// deleting every module test moved the observed count by exactly zero.
-private val JVM_TEST_FLOOR = 1470
+// deleted silently; the headroom only absorbs intentional consolidation. The count spans the core
+// modules as well as :app (1,518 passing on 2026-09-26, 41 of them in the module suites). The
+// floor cannot be what protects those 41, since :app alone soon clears any fixed number, so the
+// task also requires every suite in JVM_TEST_MODULES to report passing tests of its own.
+private val JVM_TEST_FLOOR = 1490
 
 /** The modules that own JVM tests `:app:testDebugUnitTest` does not run. */
 private val JVM_TEST_MODULES = listOf(":core:storage", ":core:engine", ":core:common")
@@ -651,8 +651,9 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
     /**
      * Every module's JVM results, not just `:app`'s. The gate read one directory, so the three
      * core-module suites counted for nothing and deleting all of them would have moved the floor by
-     * zero. Missing directories are tolerated so the task still runs when a module is filtered out
-     * of a build; the non-empty check below is what catches "nothing ran at all".
+     * zero. Each directory must report passing tests of its own (see the check below): an aggregate
+     * floor alone could not protect them, because `:app` keeps growing and soon clears it without
+     * them.
      */
     @get:org.gradle.api.tasks.InputFiles
     @get:org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
@@ -666,15 +667,23 @@ abstract class VerifyJvmTestCountTask : org.gradle.api.DefaultTask() {
 
     @org.gradle.api.tasks.TaskAction
     fun verify() {
-        val reports = resultsDirectories.files.flatMap { directory ->
-            directory.listFiles { file ->
+        val suites = resultsDirectories.files.map { directory ->
+            directory to directory.listFiles { file ->
                 file.isFile && file.name.startsWith("TEST-") && file.extension == "xml"
             }.orEmpty().asList()
         }
-        check(reports.isNotEmpty()) { "No JVM test XML reports were produced." }
-        fun count(attribute: String): Int = reports.sumOf { report ->
+        fun List<java.io.File>.total(attribute: String): Int = sumOf { report ->
             Regex("""\b$attribute="(\d+)"""").find(report.readText())?.groupValues?.get(1)?.toInt() ?: 0
         }
+        // A suite that reports nothing (its tests deleted, or its task excluded with -x) fails here
+        // by name, whatever the total says.
+        val silent = suites.filter { (_, reports) -> reports.total("tests") - reports.total("skipped") <= 0 }
+        check(silent.isEmpty()) {
+            "No passing JVM tests reported from: ${silent.joinToString { it.first.path }}"
+        }
+        val reports = suites.flatMap { it.second }
+        check(reports.isNotEmpty()) { "No JVM test XML reports were produced." }
+        fun count(attribute: String): Int = reports.total(attribute)
         // JUnit's tests= attribute includes skipped tests, so an assumption-skip or @Ignore could
         // satisfy the floor while asserting nothing.
         val tests = count("tests") - count("skipped")
