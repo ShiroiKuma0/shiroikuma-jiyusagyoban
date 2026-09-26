@@ -23,17 +23,23 @@ import com.opentasker.app.R
  */
 @Composable
 fun Modifier.expandCollapseToggle(expanded: Boolean, onToggle: () -> Unit): Modifier {
-    val stateLabel = if (expanded) {
-        stringResource(R.string.a11y_expanded)
-    } else {
-        stringResource(R.string.a11y_collapsed)
-    }
-    val actionLabel = if (expanded) {
-        stringResource(R.string.action_collapse)
-    } else {
-        stringResource(R.string.action_expand)
-    }
+    val (stateResource, actionResource) = disclosureLabels(expanded)
+    val stateLabel = stringResource(stateResource)
+    val actionLabel = stringResource(actionResource)
     return this
         .semantics { stateDescription = stateLabel }
         .clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onToggle)
 }
+
+/**
+ * The string resources a disclosure row reads out: its state now, then which way the next tap
+ * goes. An open row is "expanded" and offers to collapse; a closed one is "collapsed" and offers to
+ * expand. Getting either half backwards is the bug [expandCollapseToggle] exists to prevent, and
+ * the pair is plain data, so it is tested on the JVM.
+ */
+internal fun disclosureLabels(expanded: Boolean): Pair<Int, Int> =
+    if (expanded) {
+        R.string.a11y_expanded to R.string.action_collapse
+    } else {
+        R.string.a11y_collapsed to R.string.action_expand
+    }
