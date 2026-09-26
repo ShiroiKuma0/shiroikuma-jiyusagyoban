@@ -194,7 +194,15 @@ data class BackupSetupState(
 )
 
 internal sealed interface PermissionAction {
-    data class RuntimePermission(val permission: String) : PermissionAction
+    /**
+     * A runtime permission dialog for [permission], which decides the outcome. [requestedWith] is
+     * asked for in the same dialog, because Android 12+ ignores a fine-location request that does
+     * not also ask for coarse location.
+     */
+    data class RuntimePermission(
+        val permission: String,
+        val requestedWith: List<String> = emptyList(),
+    ) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
     data object ShizukuPermission : PermissionAction
 
@@ -408,8 +416,9 @@ fun PermissionOnboardingScreen(
     val pushRegistrationFailedMessage = stringResource(R.string.setup_push_registration_failed)
     val pushUnregisteredMessage = stringResource(R.string.setup_push_unregistered)
     var pendingPermission by rememberSaveable { mutableStateOf<String?>(null) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         pendingPermission?.let { permission ->
+            val granted = results[permission] == true
             val shouldShowRationale = context.findActivity()
                 ?.shouldShowRequestPermissionRationale(permission)
                 ?: false
@@ -672,7 +681,7 @@ fun PermissionOnboardingScreen(
                         is PermissionAction.RuntimePermission -> {
                             pendingPermission = action.permission
                             permissionHistory.recordRequest(action.permission)
-                            permissionLauncher.launch(action.permission)
+                            permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())
                         }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)

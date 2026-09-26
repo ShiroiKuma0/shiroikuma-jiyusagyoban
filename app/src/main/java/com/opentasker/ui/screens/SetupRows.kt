@@ -253,10 +253,24 @@ internal fun buildPermissionItems(
         ),
         PermissionSetupItem(
             title = context.getString(R.string.setup_foreground_location_title),
-            body = context.getString(R.string.setup_foreground_location_body),
-            granted = hasAnyLocationPermission(context),
+            body = context.getString(
+                if (!hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) &&
+                    hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+                ) {
+                    R.string.setup_foreground_location_body_approximate
+                } else {
+                    R.string.setup_foreground_location_body
+                },
+            ),
+            // Precise only: approximate location cannot read a Wi-Fi name or hold a small geofence,
+            // and counting it as ready left those contexts failing behind a green row.
+            granted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION),
             actionLabel = request,
-            action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
+            // Android 12+ ignores a request for fine location that does not also ask for coarse.
+            action = PermissionAction.RuntimePermission(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                requestedWith = listOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+            ),
             requiredFor = context.getString(R.string.setup_foreground_location_required_for),
             section = SetupSection.NEEDED,
             requirements = setOf(SetupRequirement.FOREGROUND_LOCATION),
@@ -458,10 +472,6 @@ internal const val SHIZUKU_PERMISSION_REQUEST_CODE = 4107
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-private fun hasAnyLocationPermission(context: Context): Boolean =
-    hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ||
-        hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)

@@ -15,6 +15,7 @@
 ### Fixed
 
 - Wi-Fi profiles that match a network name work again. On Android 12 and later the name always read as "Unknown", even with every location permission granted, because Android only hands it to an app that asks for it in a particular way. Turning Wi-Fi off also went unnoticed until OpenTasker restarted, so a "connected" profile never ended. Both are fixed, and when Android genuinely withholds the name (Location turned off, or location not allowed all the time) the Inspector now says which one instead of showing "Unknown". A profile that matches a network name now lists precise and background location in Setup, since it can't work without them (#17).
+- The location button in Setup works on Android 12 and later. It asked for precise location on its own, which Android ignores, so tapping it did nothing and location could only be granted from the system settings. It now asks the way Android expects, and it counts only precise location as ready, because approximate location can't read a Wi-Fi name or hold a small geofence.
 - A secret typed with different capitalisation than the one you stored is now
   removed from exports too. Matching was case-sensitive, so a secret saved as
   `sk-live-abc123` and written into an action, a "Run only if" guard or a label
