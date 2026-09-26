@@ -117,7 +117,10 @@ class HeldExecutionInstrumentedTest {
 
             assertFalse(result.held)
             assertFalse(result.logInserted)
-            assertTrue(result.skippedReason.orEmpty().contains("Counts:"))
+            // The skip names the limit it hit and the live counts behind it.
+            val reason = result.skippedReason.orEmpty()
+            assertTrue(reason, reason.contains("The app-wide limit on runs at once is full (1 running)."))
+            assertTrue(reason, reason.contains("Running now: 1 of 1 app-wide"))
             assertTrue(db.runLogDao().getRecent().isEmpty())
         } finally {
             db.close()
