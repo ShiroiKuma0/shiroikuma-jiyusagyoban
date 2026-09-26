@@ -1,6 +1,8 @@
 package com.opentasker.core.permissions
 
+import android.Manifest
 import android.content.Context
+import android.os.Build
 import androidx.core.content.edit
 
 data class RuntimePermissionRequestState(
@@ -46,8 +48,27 @@ object RuntimePermissionRecoveryPolicy {
 }
 
 /** Persists request attempts so process recreation cannot erase permanent-denial recovery state. */
-class RuntimePermissionRequestHistory(context: Context) {
+class RuntimePermissionRequestHistory(context: Context, sdkInt: Int = Build.VERSION.SDK_INT) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    init {
+        forgetIgnoredPreciseLocationRequests(sdkInt)
+    }
+
+    /**
+     * Setup used to ask for precise location on its own. Android 12+ ignores that request and
+     * reports a denial with no rationale, so two taps recorded a permanent denial nobody made, and
+     * the fixed request stayed hidden behind "Open app settings". Those records are dropped once;
+     * a real denial comes back after the next two attempts, as it did the first time.
+     */
+    private fun forgetIgnoredPreciseLocationRequests(sdkInt: Int) {
+        if (sdkInt < Build.VERSION_CODES.S || prefs.getBoolean(PRECISE_LOCATION_RECORDS_FORGOTTEN, false)) return
+        prefs.edit {
+            remove(attemptKey(Manifest.permission.ACCESS_FINE_LOCATION))
+            remove(settingsKey(Manifest.permission.ACCESS_FINE_LOCATION))
+            putBoolean(PRECISE_LOCATION_RECORDS_FORGOTTEN, true)
+        }
+    }
 
     fun recordRequest(permission: String): RuntimePermissionRequestState {
         val requested = RuntimePermissionRecoveryPolicy.afterRequest(state(permission))
@@ -96,5 +117,6 @@ class RuntimePermissionRequestHistory(context: Context) {
 
     companion object {
         private const val PREFS_NAME = "runtime_permission_request_history"
+        private const val PRECISE_LOCATION_RECORDS_FORGOTTEN = "forgotten:precise_location_alone"
     }
 }
