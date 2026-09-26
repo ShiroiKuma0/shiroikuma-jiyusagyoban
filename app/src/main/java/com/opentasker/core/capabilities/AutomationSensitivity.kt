@@ -219,6 +219,7 @@ object AutomationSensitivityRegistry {
         // and nothing personal is read, but a bundle that reaches six hosts unprompted is exactly
         // the kind of thing an import should be told about.
         "huawei.pgnss",
+        "huawei.almanacwatch",
     )
 
     private val deviceControlActionIds = setOf(

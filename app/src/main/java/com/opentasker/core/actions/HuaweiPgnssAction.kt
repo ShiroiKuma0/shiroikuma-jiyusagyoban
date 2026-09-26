@@ -9,7 +9,10 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.AlmanacWatch
 import com.opentasker.core.huawei.GnssForecastReminder
+import com.opentasker.core.huawei.pgnss.AlmanacCheck
+import com.opentasker.core.huawei.pgnss.PgnssSources
 import com.opentasker.core.huawei.pgnss.PgnssBuildConfig
 import com.opentasker.core.huawei.pgnss.PgnssBuildResult
 import com.opentasker.core.huawei.pgnss.PgnssCancelledException
@@ -149,6 +152,66 @@ class HuaweiPgnssAction : Action {
             store?.let { ctx.variables.set(it, result.summary) }
             recordHistory(outDir, built(result), ctx.logger)
             ctx.variables.set("${prefix}PgnssWindow", windowOf(result))
+            // THE ALMANAC'S OWN AGE, said where it can be acted on.
+            //
+            // It decides which satellites the band looks for and roughly where, and a stale one is
+            // the difference between a fix in seconds and no fix at all — measured 2026-09-25, when
+            // a three-day-old Galileo almanac put three satellites 2 227 km from where this set's
+            // own ephemeris had them, against 96 km for a current one. Until now the age lived in a
+            // note inside a summary, which is to say nowhere.
+            val ages = result.almanacAgeDays
+            // …AND THE DISTANCE BEHIND THE DATE. An age is a proxy; `0d/38 km` is the quantity it
+            // was standing in for, measured against CODE's own orbits over the whole window
+            // (see AlmanacCheck). A constellation whose almanac cannot be measured that way —
+            // GLONASS is not Keplerian — keeps the bare age rather than borrowing another's number.
+            val worstKm = result.almanacReadings.associate { it.system to it.worstKm }
+            ctx.variables.set(
+                "${prefix}PgnssAlmanac",
+                ages.entries.joinToString(" · ") { (k, v) ->
+                    val km = worstKm[k]
+                    if (km == null) "$k ${v}d" else "$k ${v}d/%.0f km".format(km)
+                },
+            )
+            val stalest = ages.maxByOrNull { it.value }
+            ctx.variables.set("${prefix}PgnssAlmanacDays", (stalest?.value ?: 0L).toString())
+            // The date the watch is asked to beat: what the Galileo almanac in THIS set was
+            // published on, which is the one whose staleness was measured to cost kilometres.
+            ctx.variables.set(
+                "${prefix}PgnssAlmanacHave",
+                java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+                    .minusDays(ages["galileo"] ?: 0L)
+                    .toString(),
+            )
+            if (stalest != null && stalest.value > PgnssSources.ALMANAC_STALE_DAYS) {
+                val which = ages.filter { it.value > PgnssSources.ALMANAC_STALE_DAYS }
+                    .entries.joinToString(", ") { (k, v) -> "$k ${v} days old" }
+                // A WARNING, never a refusal: a stale almanac still beats none (2026-08-29).
+                ctx.variables.set(
+                    "${prefix}PgnssAlert",
+                    "THE ALMANAC IS STALE — $which. It says which satellites to look for and " +
+                        "roughly where, so the fix will be slow. The source publishes daily; " +
+                        "press 概略暦を探し続ける on the panel and the publisher is checked every " +
+                        "${AlmanacWatch.EVERY_MINUTES} min in the background, telling you the " +
+                        "moment a current one appears so you can rebuild.",
+                )
+                GnssForecastReminder.staleAlmanac(ctx.app, which)
+            } else {
+                // A CURRENT ALMANAC CAN STILL BE A BAD ONE, and only the distance can say so.
+                // The age gate above would pass a same-day file that places a satellite wrongly —
+                // which is precisely the failure it was built to catch, arriving by another door.
+                AlmanacCheck.complaint(result.almanacReadings)?.let { complaint ->
+                    val loud = result.almanacReadings.any { it.loud }
+                    ctx.variables.set(
+                        "${prefix}PgnssAlert",
+                        (if (loud) "THE ALMANAC IS WRONG" else "THE ALMANAC IS OFF") +
+                            " — $complaint. It says which satellites to look for and roughly " +
+                            "where, so the fix will be slow even though the file is current. " +
+                            "Rebuilding may pick up a corrected one; the band's own search is " +
+                            "what this costs.",
+                    )
+                    if (loud) GnssForecastReminder.staleAlmanac(ctx.app, complaint)
+                }
+            }
             ctx.logger("Huawei predicted ephemeris: ${result.summary}")
             for (note in result.notes) ctx.logger("  $note")
             return ActionResult.Success
@@ -217,8 +280,24 @@ class HuaweiPgnssAction : Action {
         "${utc(PredictedSet.unixMillis(result.windowStartGps))} → " +
             "${utc(PredictedSet.unixMillis(result.windowEndGps))} UTC"
 
-    private fun built(result: PgnssBuildResult): String =
-        "built · ${windowOf(result)} · ${result.files.size} files, ${result.bytes / 1024} KB"
+    private fun built(result: PgnssBuildResult): String = buildString {
+        append("built · ${windowOf(result)} · ${result.files.size} files, ${result.bytes / 1024} KB")
+        // THE ALMANAC BELONGS IN THE LOG TOO, because this is the line read after a bad walk.
+        // Every 2026-09-25 built-log entry says "built · window · 6 files, 780 KB" and not one of
+        // them could have told anyone that the morning's set went out on a three-day-old Galileo
+        // almanac placing a satellite 2 227 km out. Now the line carries both numbers.
+        val ages = result.almanacAgeDays
+        if (ages.isNotEmpty()) {
+            val km = result.almanacReadings.associate { it.system to it.worstKm }
+            append(" · almanac ")
+            append(
+                ages.entries.joinToString(", ") { (k, v) ->
+                    val d = km[k]
+                    if (d == null) "$k ${v}d" else "$k ${v}d/%.0f km".format(d)
+                },
+            )
+        }
+    }
 
     private fun utc(millis: Long): String = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
         .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }

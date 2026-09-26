@@ -222,4 +222,87 @@ class GnssForecastReminderTest {
             "GnssForecastReminder.buildFailed(ctx.app, why)" in build,
         )
     }
+
+    /**
+     * IT SEARCHES, AND IT SAYS HOW OFTEN — and it can be called off from where it announces itself.
+     *
+     * The first version of this button read 「新しい概略暦を待つ」 / "Wait for a newer almanac", and
+     * 白い熊 read it exactly as written: as an invitation to sit and do nothing, with no hint that
+     * anything would happen, how often, or for how long (2026-09-25). It is the opposite — an alarm
+     * every half hour against the publisher — so every string it owns names the cadence, and every
+     * notification it raises carries the way to stop it. A background search that can only be
+     * stopped from a panel three taps away is a background search nobody can stop.
+     */
+    @Test
+    fun `the almanac watch says it is searching, how often, and how to stop`() {
+        assertEquals(30L, AlmanacWatch.EVERY_MINUTES)
+        assertEquals(24L, AlmanacWatch.GIVE_UP_HOURS)
+        val reminder = ProductionSources.read("com/opentasker/core/huawei/GnssForecastReminder.kt")
+        assertTrue(
+            "the ongoing notification must name the cadence in its own title",
+            "衛星：概略暦を探しています（\$everyMinutes 分ごと）" in reminder,
+        )
+        assertTrue(
+            "and it must say it is searching, not waiting",
+            "SEARCHING in the background" in reminder,
+        )
+        assertTrue(
+            "the stop lives on the notification, which is where the search is visible from",
+            "builder.addAction(0, \"探索をやめる / Stop searching\", AlmanacWatch.stopIntent(context))" in reminder,
+        )
+        assertTrue(
+            "nothing may go back to calling it waiting",
+            "新しい概略暦を待つ" !in reminder,
+        )
+        // …and the same for the one other place that names the button: the banner the build writes.
+        // It used to promise the watch would REBUILD, which it deliberately does not — a build is ten
+        // minutes of radio and then wants 白い熊 at the band to press 更新.
+        val build = ProductionSources.read("com/opentasker/core/actions/HuaweiPgnssAction.kt")
+        assertTrue(
+            "the stale banner must name the button as it now reads",
+            "press 概略暦を探し続ける on the panel" in build,
+        )
+        assertTrue(
+            "and must not promise a rebuild the watch never performs",
+            "this will rebuild when a " !in build,
+        )
+        val watch = ProductionSources.read("com/opentasker/core/huawei/AlmanacWatch.kt")
+        assertTrue(
+            "starting the watch is what raises that notification",
+            "GnssForecastReminder.watchingForAlmanac(app, haveVintage, GIVE_UP_HOURS, EVERY_MINUTES)" in watch,
+        )
+        assertTrue(
+            "and stopping it takes the notification down with it",
+            "GnssForecastReminder.almanacWatchStopped(app)" in watch,
+        )
+        val manifest = java.io.File(ProductionSources.repoRoot.toFile(), "app/src/main/AndroidManifest.xml").readText()
+        for (action in listOf("com.opentasker.huawei.ALMANAC_CHECK", "com.opentasker.huawei.ALMANAC_STOP")) {
+            assertTrue("$action is sent but not declared", "android:name=\"$action\"" in manifest)
+        }
+    }
+
+    /**
+     * EVERY WAY THE SEARCH CAN END MUST CLEAR THE STATE THE PANEL READS.
+     *
+     * The panel shows the keep-searching control only when it would help, which means it needs to
+     * know whether one is already running — and the watch ends in four different places, three of
+     * them on an alarm's thread with no `ActionContext` within reach. A state only the starting path
+     * could clear would go on claiming a search that finished hours ago: the same class of lie as
+     * the "FORECAST RAN OUT" banner still shouting over a live window on 2026-09-25.
+     */
+    @Test
+    fun `the search publishes its own state, and every exit clears it`() {
+        val watch = ProductionSources.read("com/opentasker/core/huawei/AlmanacWatch.kt")
+        assertTrue(
+            "the panel reads this name, so it may not drift",
+            "STATE_VAR = \"HUAWEI_PgnssWatching\"" in watch,
+        )
+        assertTrue(
+            "one write, in one place, so no exit can use a different spelling",
+            "PersistentGlobalScope.set(SUPER_GLOBAL_PROJECT_ID, STATE_VAR, state)" in watch,
+        )
+        // start sets it; stop, give-up and arrival all clear it — four call sites, no fewer.
+        assertEquals(1, Regex("""publish\(haveVintage\)""").findAll(watch).count())
+        assertEquals(3, Regex("""publish\(""\)""").findAll(watch).count())
+    }
 }

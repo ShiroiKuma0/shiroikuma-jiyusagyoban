@@ -66,6 +66,7 @@ class PgnssFetcher(
 
     /** What the run should say about where its inputs came from. Reset by each [fetchAll]. */
     private val notes = ArrayList<String>()
+    private val almanacAges = LinkedHashMap<String, Long>()
 
     /**
      * Fetch the lot.
@@ -144,6 +145,7 @@ class PgnssFetcher(
                 }
             },
             notes = notes.toList(),
+            almanacAgeDays = almanacAges.toMap(),
         )
     }
 
@@ -158,9 +160,59 @@ class PgnssFetcher(
      * build should fail loudly, exactly as it did before this existed — the point of the fallback
      * is to survive an outage, not to go on serving a memory for a month.
      */
+    /**
+     * The day an almanac file was PUBLISHED, read out of the name the publisher gave it.
+     *
+     * `galileo_2026-09-22.xml`, `MCCT_260918.agl`, `current_yuma.alm` — three publishers, three
+     * conventions, and the last carries no date at all because it is republished under one name,
+     * which is why GPS is never the stale one. Null where it cannot be read, and a null only means
+     * the age goes unreported; it never stops a build.
+     */
+    internal fun vintageOf(name: String): LocalDate? {
+        ISO_IN_NAME.find(name)?.let { return runCatching { LocalDate.parse(it.value) }.getOrNull() }
+        MCCT_IN_NAME.find(name)?.let { m ->
+            val (y, mo, d) = m.destructured
+            return runCatching { LocalDate.of(2000 + y.toInt(), mo.toInt(), d.toInt()) }.getOrNull()
+        }
+        if (name.contains("current", ignoreCase = true)) return LocalDate.now(ZoneOffset.UTC)
+        return null
+    }
+
+    private fun recordAge(kind: String, published: LocalDate) {
+        almanacAges[kind] = ChronoUnit.DAYS.between(published, LocalDate.now(ZoneOffset.UTC))
+            .coerceAtLeast(0L)
+    }
+
     internal fun almanac(kind: String, live: () -> File): File {
         val attempt = runCatching { live() }
         val dir = cacheDir
+        // THE FRESHER OF THE TWO WINS, and it is not always the live one.
+        //
+        // The live fetch walks back a day at a time and takes the first date that answers, so on a
+        // bad morning it comes home with a file three days old while the cache holds yesterday's.
+        // Preferring "live" unconditionally then makes every flaky morning permanently worse — and
+        // 2026-09-25 was such a morning: GSSC blinked on the 25th, 24th and 23rd at 07:30 and the
+        // build shipped the 22nd, whose worst Galileo satellites sat 2 227 km from where that same
+        // set's ephemeris put them. Compared on the date each was PUBLISHED, the only age that
+        // means anything here.
+        attempt.getOrNull()?.let { fresh ->
+            val cachedNow = dir?.listFiles()
+                ?.filter { it.name.startsWith("$kind.") }?.maxByOrNull { it.name }
+            val cachedVintage = cachedNow?.let { vintageOf(it.name.removePrefix("$kind.").drop(11)) }
+            val liveVintage = vintageOf(fresh.name)
+            if (cachedVintage != null && liveVintage != null && cachedVintage.isAfter(liveVintage)) {
+                val published = cachedNow.name.removePrefix("$kind.").drop(11)
+                val target = File(workDir, published)
+                cachedNow.copyTo(target, overwrite = true)
+                recordAge(kind, cachedVintage)
+                notes.add(
+                    "$kind almanac: the cached $published is NEWER than the ${fresh.name} the " +
+                        "source served — kept the cache",
+                )
+                return target
+            }
+            liveVintage?.let { recordAge(kind, it) }
+        }
         attempt.getOrNull()?.let { file ->
             if (dir != null) {
                 runCatching {
@@ -198,6 +250,7 @@ class PgnssFetcher(
         }
         val target = File(workDir, published)
         cached.copyTo(target, overwrite = true)
+        vintageOf(published)?.let { recordAge(kind, it) }
         notes.add(
             "$kind almanac from the cache: $published, taken $age " +
                 "${if (age == 1L) "day" else "days"} ago — ${why?.message ?: "the source did not answer"}",
@@ -387,7 +440,15 @@ class PgnssFetcher(
             val attempt = runCatching {
                 fetch(
                     "galileo_$date.xml", "$GSSC/$date.xml", ::looksLikeGalileoAlmanac,
-                    attempts = if (back == 0) TRANSPORT_ATTEMPTS else 1,
+                    // THE FIRST TWO DAYS ARE WORTH FIGHTING FOR, the ninth is not.
+                    //
+                    // It was day 0 only, and on 2026-09-25 that was the difference between a
+                    // current almanac and one from the 22nd: GSSC blinked on the 25th, the 24th
+                    // and the 23rd in one pass at 07:30 UTC — it had the 25th file by the time
+                    // 白い熊 walked — and the walk-back took the first date that answered without
+                    // ever saying how old it was. A day-old almanac is ordinary; three days cost
+                    // 2 227 km on three Galileo satellites.
+                    attempts = if (back <= 1) TRANSPORT_ATTEMPTS else 1,
                 )
             }
             attempt.getOrNull()?.let { return it }
@@ -829,6 +890,8 @@ class PgnssFetcher(
         private val EGM96_LINK = Regex("/getmodel/gfc/[0-9a-f]+/EGM96\\.gfc")
         private val WUM_ORB = Regex("WUM0MGXNRT_\\d{11}_02D_05M_ORB\\.SP3\\.gz")
         private val AGL_NAME = Regex("MCCT_\\d{6}\\.agl")
+        private val ISO_IN_NAME = Regex("""\d{4}-\d{2}-\d{2}""")
+        private val MCCT_IN_NAME = Regex("""MCCT_(\d{2})(\d{2})(\d{2})""")
 
         /** OkHttp configured for large, slow, redirect-crossing downloads. */
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
@@ -962,7 +1025,31 @@ data class PgnssSources(
     val brdcNav: List<File>,
     /** What the fetch wants said about itself — which almanac came from the cache, and how old. */
     val notes: List<String> = emptyList(),
-)
+    /**
+     * How old each almanac is, in days, by the date it was PUBLISHED — not by when we got it.
+     *
+     * Recorded as data because prose could not be acted on. 2026-09-25: a build shipped a Galileo
+     * almanac published three days earlier, and the difference is not cosmetic — against the
+     * ephemeris in its own set, a current almanac's worst satellite sits 96 km out and that one's
+     * sat **2 227 km** out. The build reported success and said nothing, and 白い熊 walked with no
+     * fix. See [PgnssSources.ALMANAC_STALE_DAYS].
+     */
+    val almanacAgeDays: Map<String, Long> = emptyMap(),
+) {
+    companion object {
+        /**
+         * Past this, an almanac is worth shouting about — measured, not chosen.
+         *
+         * Current: Galileo's worst satellite 96 km from the ephemeris in its own set. Three days
+         * old: 2 227 km, and three satellites there. One day is ordinary — sources publish daily
+         * and a build can easily precede the day's file — so the line falls between.
+         *
+         * **A warning, never a refusal.** A stale almanac still beats none: the 2026-08-29
+         * measurement had a partly-stale set fix in a minute where a trimmed one took three.
+         */
+        const val ALMANAC_STALE_DAYS = 1L
+    }
+}
 
 /**
  * A minimal anonymous FTP client: `LIST` and `RETR`, passive mode, binary.

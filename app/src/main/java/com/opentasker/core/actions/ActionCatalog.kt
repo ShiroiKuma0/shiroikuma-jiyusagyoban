@@ -250,6 +250,7 @@ object ActionCatalog {
         // IDEMPOTENT: it downloads fresh inputs and rewrites the six files from them. Repeating it
         // costs a second set of downloads and leaves the store in exactly the state one run does.
         define("huawei.pgnss", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiPgnssAction),
+        define("huawei.almanacwatch", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiAlmanacWatchAction),
         define("ui.click", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiClickAction),
         define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("band.compare", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandCompareAction),
