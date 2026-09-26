@@ -21,6 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -32,6 +36,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -133,7 +138,8 @@ fun DeviationStrip(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (r in rows) DeviationRow(r, onOpenMarker)
         }
-        if (onOpenMarker != null) NoteText(BandText.deviationTapHint[lang])
+        // The "tap any line for its history" hint is gone (白い熊, 2026-09-26). Every row already
+        // carries a chevron, which says the same thing in the place it applies and costs no line.
 
         if (hrCurve.size >= 2) {
             HrCurveChart(
@@ -225,13 +231,7 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
         // The tint as a bar rather than as the text colour: a 5 is a dark red by design, and dark
         // red body text on this surface is not readable. The same trap the morning card's number
         // buttons carry a note about, avoided the same way — measured, not special-cased.
-        Box(
-            Modifier
-                .width(6.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(tint)
-                .padding(vertical = 10.dp),
-        ) { Text(" ", style = MaterialTheme.typography.bodySmall) }
+        ScoreBar(tint)
         Spacer(Modifier.width(10.dp))
 
         Column(Modifier.weight(1f)) {
@@ -273,6 +273,23 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
             )
         }
     }
+}
+
+/**
+ * The 1–5 tint as a bar down the left edge of a row.
+ *
+ * Shared by the rows and by the night chart under them, so the chart's score lines up with theirs
+ * and reads as one more line of the same strip rather than as a second convention.
+ */
+@Composable
+private fun ScoreBar(tint: Color, height: Dp = 10.dp) {
+    Box(
+        Modifier
+            .width(6.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(tint)
+            .padding(vertical = height),
+    ) { Text(" ", style = MaterialTheme.typography.bodySmall) }
 }
 
 /**
@@ -331,13 +348,53 @@ private fun HrCurveChart(
             .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
     }
 
+    // THE CURVE IS SCORED TOO, and on the left where every row above it is scored (白い熊,
+    // 2026-09-26). Until now this block was the only thing on the strip with no colour at all — and
+    // on a night that fell 0 bpm against a usual 11 it sat there in the same neutral ink as a
+    // perfectly ordinary night, under six rows that were each given a tint for far less.
+    //
+    // Graded by VALENCE rather than by distance, which is the opposite of the rows: see
+    // [MarkerHistory.descentStep] for why the two differ and why that is not an inconsistency.
+    // Without a usual to compare against there is no score, and then no bar — never a green one.
+    val step = descent?.let { MarkerHistory.descentStep(it) }
+    val tint = step?.let { ChartPalette.scale(it) } ?: sectionNote
+    val barPx = with(LocalDensity.current) { 6.dp.toPx() }
+    val radiusPx = with(LocalDensity.current) { 2.dp.toPx() }
+    // THE BAR RUNS THE WHOLE ITEM, comments included (白い熊, 2026-09-26). PAINTED rather than laid
+    // out, which is the part that took two goes: as a sibling Box it can only be as tall as the
+    // layout can tell it to be, and `IntrinsicSize.Min` measures a Text's minimum height at
+    // INFINITE width — one line each — so the column's intrinsic height came out far short of what
+    // it actually draws and the bar stopped at the chart. Drawn behind the column it is exactly as
+    // tall as the column turns out to be, whatever that is, with no measurement to get wrong.
     Column(
         Modifier
             .fillMaxWidth()
             .padding(top = 2.dp)
+            .drawBehind {
+                drawRoundRect(
+                    color = tint,
+                    size = Size(barPx, size.height),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx),
+                )
+            }
+            .padding(start = 16.dp)
             .then(if (onOpen != null) Modifier.clickable { onOpen() } else Modifier),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
+        // THE HEADING GOES ABOVE THE GRAPH (白い熊, 2026-09-26). Under it, it read as a caption on
+        // somebody else's picture; above it, it names the block the way every row above names
+        // itself, and the chevron sits where the eye already is when it decides to press.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                BandText.curveCaption[lang],
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                color = sectionInk,
+            )
+            if (onOpen != null) {
+                Text("›", style = MaterialTheme.typography.titleMedium, color = sectionNote)
+            }
+        }
         BoundedLineChart(
             values = curve,
             // A FLOOR on the span, centred on the night's middle — not a fit. Fitting would
@@ -351,12 +408,6 @@ private fun HrCurveChart(
             marked = setOf(curve.indexOf(curve.min())),
             height = CHART_HEIGHT,
         )
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            NoteText(BandText.curveCaption[lang], Modifier.weight(1f))
-            if (onOpen != null) {
-                Text("›", style = MaterialTheme.typography.titleMedium, color = sectionNote)
-            }
-        }
         HrCurveCommentary(curve, descent, bestDescent)
     }
 }
@@ -469,9 +520,24 @@ private const val GUIDE_BPM = 5.0
 @Composable
 private fun SicknessNote(recovery: RecoveryResult) {
     val lang = LocalBandLanguage.current
-    val accent = ChartPalette.BAND_WARN
     val sleep = recovery.markers.firstOrNull { it.marker == RecoveryMarker.SLEEP }
     val bed = recovery.markers.firstOrNull { it.marker == RecoveryMarker.BEDTIME_HR }
+    // ON THE SAME LADDER AS EVERYTHING ELSE ON THIS CARD — and therefore RED.
+    //
+    // It was drawn in the generic amber, which put the loudest thing the strip ever says in a
+    // colour that appears nowhere else on it: six rows tinted 1–5 above, and then a warning in a
+    // sixth colour that meant nothing in particular (白い熊, 2026-09-26: "this is really red as
+    // it's bad info, so it must reflect proper coding").
+    //
+    // Scored as the WORSE of its own two limbs, never softer — the conjunction only fires when both
+    // are off, so it cannot be gentler than "below par" whatever the arithmetic says. Its ink is
+    // measured against the surface for the usual reason: step 5 is a dark red by design.
+    val step = maxOf(
+        4,
+        maxOf(sleep?.let(::unusualness) ?: 4, bed?.let(::unusualness) ?: 4),
+    )
+    val accent = ChartPalette.scale(step)
+    val ink = tintedInk(accent)
     Column(
         Modifier
             .fillMaxWidth()
@@ -486,7 +552,7 @@ private fun SicknessNote(recovery: RecoveryResult) {
             BandText.sicknessTitle[lang],
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = accent,
+            color = ink,
         )
         BodyText(
             BandText.sicknessBody[lang].format(
@@ -507,9 +573,12 @@ private fun SicknessNote(recovery: RecoveryResult) {
  * Step 5 of the scale is a deliberately dark red and step 1 a bright yellow, so neither is usable as
  * text on every background. Measured against the surface rather than special-cased by step, so a
  * future change to the palette cannot quietly reintroduce an unreadable row.
+ *
+ * Shared with [NightCurvesCard], which draws the same tints on the same surface and must not solve
+ * the same problem a second way.
  */
 @Composable
-private fun tintedInk(tint: Color): Color {
+internal fun tintedInk(tint: Color): Color {
     val surface = MaterialTheme.colorScheme.surface
     return if (PaletteCheck.contrast(tint.toArgb(), surface.toArgb()) >= 3.0) tint else sectionInk
 }
