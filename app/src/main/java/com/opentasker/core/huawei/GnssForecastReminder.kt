@@ -13,6 +13,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.opentasker.app.R
+import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.actions.NotificationActionReceiver
 import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.AlarmSchedulePrecision
@@ -79,6 +81,7 @@ object GnssForecastReminder {
     private const val REQUEST_WARN = 13101
     private const val REQUEST_END = 13102
     private const val REQUEST_DIALOG = 13103
+    private const val REQUEST_TASK = 13104
 
     internal const val ACTION_WARN = "com.opentasker.huawei.GNSS_FORECAST_WARN"
     internal const val ACTION_END = "com.opentasker.huawei.GNSS_FORECAST_END"
@@ -259,6 +262,91 @@ object GnssForecastReminder {
         )
     }
 
+    /**
+     * The search is running: said plainly, with its cadence and its way out.
+     *
+     * 白い熊, 2026-09-25: *"'Wait for a new almanac' is not a good description — it lends itself to a
+     * wait-and-do-nothing interpretation."* It does not wait; it goes and looks, every half hour,
+     * in the background. And a search that cannot be called off from where it announces itself is a
+     * search nobody can call off — hence the button.
+     */
+    fun watchingForAlmanac(context: Context, have: String, hours: Long, everyMinutes: Long) {
+        notify(
+            context.applicationContext,
+            title = "衛星：概略暦を探しています（$everyMinutes 分ごと）",
+            text = buildString {
+                append("いま積んでいるのは $have の概略暦です。\n")
+                append("背景で $everyMinutes 分ごとに発行元を見に行き、新しいものが出た時点で知らせます")
+                append("（最長 $hours 時間、その後は自分で止まります）。\n")
+                append("やめるときは下の「探索をやめる」。\n\n")
+                append("SEARCHING in the background: the publisher is checked every $everyMinutes ")
+                append("minutes for something newer than $have, for up to $hours h, and you are told ")
+                append("the moment one appears. Stop it with the button below.")
+            },
+            ongoing = true,
+            stopWatch = true,
+        )
+    }
+
+    /** Called off. Said once, so the ongoing notification cannot linger over a search that stopped. */
+    fun almanacWatchStopped(context: Context) {
+        notify(
+            context.applicationContext,
+            title = "衛星：概略暦の探索をやめました",
+            text = "もう探しません。必要になったら画面からまた始められます。\n\n" +
+                "The search has stopped. Start it again from the panel whenever you want it.",
+            ongoing = false,
+        )
+    }
+
+    /** It arrived. This is the notification the whole watch exists to post. */
+    fun almanacArrived(context: Context, have: String, newer: String, runTask: String) {
+        notify(
+            context.applicationContext,
+            title = "衛星：新しい概略暦が出ました（$newer）",
+            text = buildString {
+                append("$have → $newer。いま作り直せば、バンドは正しい空を探します。\n")
+                append("この通知を押すと「$runTask」が走ります。\n\n")
+                append("A newer almanac is published: $have → $newer. Rebuild now and the band will ")
+                append("search the right sky. Tapping this runs 「$runTask」.")
+            },
+            ongoing = true,
+            runTask = runTask,
+        )
+    }
+
+    /** Nothing appeared in the window. Said once rather than left hanging. */
+    fun almanacGaveUp(context: Context, have: String, hours: Long) {
+        notify(
+            context.applicationContext,
+            title = "衛星：新しい概略暦は出ませんでした",
+            text = "$hours 時間待ちましたが、$have より新しいものは出ていません。監視をやめます。\n\n" +
+                "Nothing newer than $have appeared in $hours h; the watch has stopped.",
+            ongoing = false,
+        )
+    }
+
+    /** A build that shipped a stale almanac — loud, because the fix will be slow and nothing else says so. */
+    fun staleAlmanac(context: Context, which: String) {
+        notify(
+            context.applicationContext,
+            title = "衛星：概略暦が古いまま作りました",
+            text = buildString {
+                append(which).append("\n")
+                append("概略暦は「どの衛星をどのあたりで探すか」を決めるので、測位は遅くなります。\n")
+                append("画面の「概略暦を探し続ける」を押しておけば、背景で ")
+                append(AlmanacWatch.EVERY_MINUTES)
+                append(" 分ごとに発行元を見に行き、出た時点で知らせます。\n\n")
+                append("The set was built on a stale almanac. It decides which satellites to look ")
+                append("for and roughly where, so the fix will be slow. Press 概略暦を探し続ける on ")
+                append("the panel and the publisher is checked every ")
+                append(AlmanacWatch.EVERY_MINUTES)
+                append(" minutes in the background until a current one appears.")
+            },
+            ongoing = true,
+        )
+    }
+
     /** The reminder itself, posted when one of the two alarms fires. */
     internal fun remind(context: Context, expired: Boolean, untilMs: Long) {
         notify(
@@ -316,6 +404,8 @@ object GnssForecastReminder {
         text: String,
         ongoing: Boolean,
         dialogFor: Long? = null,
+        runTask: String? = null,
+        stopWatch: Boolean = false,
     ) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -340,6 +430,32 @@ object GnssForecastReminder {
             .setOngoing(ongoing)
         // AND TAPPING IT OPENS THE WHOLE THING, big and in colour. A notification that does nothing
         // when pressed is a dead end at the exact moment someone wants to know more.
+        // A notification that can ACT. The almanac watch's whole point is that the rebuild is one
+        // tap from the news, at whatever hour the news arrives.
+        runTask?.takeIf { it.isNotBlank() }?.let { name ->
+            // Blocking on purpose and safely: this runs on an alarm's background thread, never on
+            // the main one, and it is a single indexed lookup.
+            val id = runCatching {
+                kotlinx.coroutines.runBlocking {
+                    OpenTaskerApp_NoHilt.readyDb?.taskDao()?.getByName(name)?.id
+                }
+            }.getOrNull()
+            if (id != null) {
+                builder.setContentIntent(
+                    PendingIntent.getBroadcast(
+                        context,
+                        REQUEST_TASK,
+                        Intent(context, NotificationActionReceiver::class.java)
+                            .setAction(NotificationActionReceiver.ACTION_NOTIFICATION_BUTTON)
+                            .putExtra(NotificationActionReceiver.EXTRA_TASK_ID, id)
+                            .putExtra(NotificationActionReceiver.EXTRA_BUTTON_LABEL, name),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                )
+            } else {
+                AppLogger.warn(TAG, "No task named \"$name\" — the notification cannot run it")
+            }
+        }
         dialogFor?.let { until ->
             builder.setContentIntent(
                 PendingIntent.getActivity(
@@ -357,6 +473,10 @@ object GnssForecastReminder {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
             )
+        }
+        // The way out lives ON the notification, because that is where the search is visible from.
+        if (stopWatch) {
+            builder.addAction(0, "探索をやめる / Stop searching", AlmanacWatch.stopIntent(context))
         }
         nm.notify(NOTIFICATION_ID, builder.build())
     }
