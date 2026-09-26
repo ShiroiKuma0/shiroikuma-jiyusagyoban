@@ -81,8 +81,8 @@ object SessionRegister {
         val temperature: MarkerReading,
         val adverseCount: Int,
         /**
-         * The five readings the night table prints beside the two banded markers, and the 1–5 step
-         * each is coloured with.
+         * The readings the night table prints beside the two banded markers, and the 1–5 step each
+         * is coloured with. Five of them since 2026-09-03; eight since 2026-09-26.
          *
          * ## Two different references, because there is no single honest one
          *
@@ -93,13 +93,14 @@ object SessionRegister {
          *    clinical pulse-oximetry ranges. See [RecoveryReference], including the caveats: a
          *    sleeping floor sits below a daytime resting rate, and a wrist oximeter's error is about
          *    twice the swing it measures.
-         *  * **Deep, deep+REM and RMSSD are WITHIN-PERSON**, banded against the nights before them,
+         *  * **Deep, deep+REM, RMSSD, the going-to-bed rate, the swing and breathing are
+         *    WITHIN-PERSON**, banded against the nights before them,
          *    because no population ladder fits them. This band's "deep" is not polysomnography's N3
          *    — 白い熊's nights run 30–40 % of sleep where the literature's N3 is 13–23 %, so an
          *    absolute ladder would score every night he has ever recorded as extreme. RMSSD norms
          *    are so age-dependent that a population mean would paint the whole column one colour.
          *
-         * **None of the five is COUNTED.** [adverseCount] is still the three markers it always was;
+         * **None of them is COUNTED.** [adverseCount] is still the three markers it always was;
          * a colour here says where a value sits, never that the night was adverse. The standing
          * ruling that deep/REM and blood oxygen are excluded from the counting rule is untouched —
          * showing a value and scoring a night are different acts.
@@ -109,10 +110,55 @@ object SessionRegister {
         val lowestHr: Double? = null,
         val spo2: Double? = null,
         val hrvMs: Double? = null,
-        /** The within-person steps for the three that have no published ladder. */
+        /**
+         * Going to bed, through the night, and breathing — the three the table used to leave out.
+         *
+         * 白い熊, 2026-09-26: *"this table doesn't have everything, it lacks the going-to-bed-hr,
+         * hr-through-the-night: it must have all the metrics, so it's more descriptive."* They were
+         * on the deviation strip and on the 回復 card and nowhere in the record, so a night could be
+         * read two ways depending on which screen was open — and the register is the one that is
+         * read AFTERWARDS, when the question is what a run of nights looked like.
+         *
+         * All three are banded WITHIN-PERSON like deep, deep+REM and RMSSD, and for the same
+         * reason: there is no published ladder for a wrist band's going-to-bed rate, for the spread
+         * of a binned night curve, or for an estimated respiratory rate. None of them is counted.
+         */
+        val bedtimeHr: Double? = null,
+        val hrSwing: Double? = null,
+        val respirationBpm: Double? = null,
+        /**
+         * The night's heart rate in twelfths — the SHAPE, drawn in its own cell.
+         *
+         * A number cannot be "heart rate through the night": the swing says how far the curve
+         * moved and nothing whatever about when, which is most of what a night looks like. So the
+         * table carries the curve itself, one tiny line per row, on a scale shared by every row so
+         * the column can be read downwards. (白い熊, 2026-09-26, having asked for this metric in
+         * the table and found a number where the shape belonged.)
+         */
+        val hrCurve: List<Double> = emptyList(),
+        /**
+         * The curve's own 1–5 step, by the DESCENT — the same grading the report's bar uses.
+         *
+         * NOT the swing's step, which is what the column was first coloured with and was wrong in a
+         * way 白い熊 spotted immediately (2026-09-26: *"the night-curve the last two days as a
+         * minimum must be red"*). The swing says how far the curve moved against usual; a night
+         * whose heart rate went UP 14 bpm and a night that fell 14 both score "ordinary" on it, and
+         * 09-26 — which never fell at all — came out blue in the table while the report's bar for
+         * the same night was dark red. Two numbers for one quantity, which is the failure this
+         * project trips over most.
+         *
+         * `MarkerHistory.descentStep` now, against the median descent of the nights BEFORE this one
+         * — the register's own "at the time" convention, so a night is scored against what was
+         * known when it happened rather than against a baseline that contains it.
+         */
+        val hrCurveStep: Int? = null,
+        /** The within-person steps for the six that have no published ladder. */
         val deepStep: Int? = null,
         val deepRemStep: Int? = null,
         val hrvStep: Int? = null,
+        val bedtimeHrStep: Int? = null,
+        val hrSwingStep: Int? = null,
+        val respirationStep: Int? = null,
     )
 
     /** One square of the grid. */
@@ -244,7 +290,51 @@ object SessionRegister {
                 RecoveryMarker.HRV, night.hrvMs, prior.mapNotNull { it.hrvMs },
                 Recovery.HRV_MEANINGFUL_MS, confidence, counted = false,
             ).scaleStep,
+            bedtimeHr = night.bedtimeHr,
+            hrSwing = night.hrSwing,
+            respirationBpm = night.respirationBpm,
+            hrCurve = night.hrCurve,
+            hrCurveStep = curveStep(night, prior),
+            // The going-to-bed rate and the swing are both heart rates in bpm, so they take the
+            // heart rate's own published smallest-worthwhile-change rather than a figure invented
+            // for them — the same call RecoveryBuild makes for the strip's swing row, so a colour
+            // means the same thing on both screens.
+            bedtimeHrStep = Recovery.band(
+                RecoveryMarker.BEDTIME_HR, night.bedtimeHr, prior.mapNotNull { it.bedtimeHr },
+                Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
+            ).scaleStep,
+            hrSwingStep = Recovery.band(
+                RecoveryMarker.HR_SWING, night.hrSwing, prior.mapNotNull { it.hrSwing },
+                Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
+            ).scaleStep,
+            respirationStep = Recovery.band(
+                RecoveryMarker.RESPIRATION, night.respirationBpm,
+                prior.mapNotNull { it.respirationBpm },
+                Recovery.RESPIRATION_MEANINGFUL_BPM, confidence, counted = false,
+            ).scaleStep,
         )
+    }
+
+    /** Bed-time level to the night's floor, from the binned curve — the report's own definition. */
+    private fun descentOf(n: RecoverySource.NightMetrics): MarkerHistory.Descent? =
+        n.hrCurve.takeIf { it.isNotEmpty() }?.let { MarkerHistory.Descent(it.first(), it.min()) }
+
+    /**
+     * How far this night's fall came short of the usual one, as a 1–5 step.
+     *
+     * The medians are taken over the froms and the tos SEPARATELY, exactly as
+     * [MarkerHistory.descent] does for the report — the two screens must not compute "usually" two
+     * ways. Null when there is no curve, or no earlier night to compare it against: an uncoloured
+     * cell is the honest answer there, never a reassuring middle step.
+     */
+    private fun curveStep(
+        night: RecoverySource.NightMetrics,
+        prior: List<RecoverySource.NightMetrics>,
+    ): Int? {
+        val last = descentOf(night) ?: return null
+        val earlier = prior.mapNotNull(::descentOf)
+        val usual = MarkerHistory.descent(earlier.map { it.from }, earlier.map { it.to }) ?: return null
+        return MarkerHistory.descentStep(MarkerHistory.DescentComparison(last, usual))
     }
 
     fun build(
