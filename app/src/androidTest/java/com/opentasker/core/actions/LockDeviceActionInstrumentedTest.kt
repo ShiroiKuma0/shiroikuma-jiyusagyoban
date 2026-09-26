@@ -11,6 +11,7 @@ import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.platform.LockDeviceAdminReceiver
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assume.assumeFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,6 +25,10 @@ import org.junit.runner.RunWith
  * device is not that it returns Success but that the screen actually locks. Activation normally
  * needs a user tap, which a test cannot make, so the admin is activated through the shell the way
  * a user would through Settings.
+ *
+ * The lock is real, so the test only runs where a test can undo it: a device with no PIN, pattern
+ * or password. On the S22 it locked the phone behind its PIN and every later test in the run timed
+ * out behind the keyguard.
  */
 @RunWith(AndroidJUnit4::class)
 class LockDeviceActionInstrumentedTest {
@@ -34,18 +39,26 @@ class LockDeviceActionInstrumentedTest {
     private val keyguard: KeyguardManager
         get() = context.getSystemService(KeyguardManager::class.java)
 
+    /** The lock-screen setting found before the lock test changed it; null when nothing changed. */
+    private var lockScreenDisabledBefore: String? = null
+
     @After
     fun tearDown() {
         removeAdmin()
-        // Put the device back the way the AVD ships it, or every later test runs behind a keyguard.
-        shell("locksettings set-disabled true")
-        shell("wm dismiss-keyguard")
+        // Put back what the test found, or every later test runs behind a keyguard. Forcing
+        // "disabled" here would also switch off the lock screen of any device that had one.
+        lockScreenDisabledBefore?.let { before ->
+            shell("locksettings set-disabled $before")
+            shell("wm dismiss-keyguard")
+        }
     }
 
     @Test
     fun theActionLocksTheScreenWhenTheAdminIsActive() {
-        // This AVD ships with the lock screen disabled, and lockNow cannot show a keyguard that
+        assumeFalse("a PIN, pattern or password lock can't be undone from a test", keyguard.isDeviceSecure)
+        // The AVD ships with the lock screen disabled, and lockNow cannot show a keyguard that
         // does not exist. Without this the action would look broken while working correctly.
+        lockScreenDisabledBefore = shellOutput("locksettings get-disabled").trim().takeIf { it == "true" || it == "false" } ?: "true"
         shell("locksettings set-disabled false")
         shell("wm dismiss-keyguard")
         waitUntil("the keyguard must start dismissed") { !keyguard.isKeyguardLocked }
@@ -105,12 +118,16 @@ class LockDeviceActionInstrumentedTest {
     }
 
     private fun shell(command: String) {
+        shellOutput(command)
+    }
+
+    private fun shellOutput(command: String): String {
         val descriptor = InstrumentationRegistry.getInstrumentation()
             .uiAutomation
             .executeShellCommand(command)
         // The command runs asynchronously and is only guaranteed to have completed once its output
         // stream reaches EOF, so draining this is what makes the next assertion meaningful.
-        ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        return ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes().decodeToString() }
     }
 
     private companion object {
