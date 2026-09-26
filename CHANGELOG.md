@@ -8,6 +8,114 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.93+2026-09-14.00-34.gaa1a372a+148 — 2026-09-26
+
+Built on upstream `aa1a372a`.
+
+### 衛星 — the almanac is measured in kilometres now, not dated in days
+
+An age was always a proxy. On 2026-09-25 a build shipped a Galileo almanac published on the 22nd
+whose worst satellite sat **2 227 km** from where that same set's own ephemeris put it — against
+96 km for a current one. The band searched the wrong sky, there was no fix before the walk, and
+everything needed to say so was already on the phone. Nothing measured it.
+
+`AlmanacCheck` propagates each Keplerian almanac with **the receiver's own broadcast formula** — the
+same one the band will use — and differences it against **CODE's precise orbit** for the same
+satellite, at the start, middle and end of the 72-hour window, scoring the worst. Grading against
+somebody else's arithmetic is the point: a check against our own ephemeris could only confirm our
+own conversions, and the conversions are what can be wrong.
+
+Measured against the repo's published fixtures, a healthy two-day-old almanac comes out at **2 km**
+(GPS) and **52 km** (Galileo), so the scale separates cleanly from the failure it exists to catch.
+The distance now appears beside the age on the panel (`galileo 0d/61 km`), in the build summary, and
+in **every `built-log.txt` line** — which is the line read after a bad walk, and which until now
+could not have told anyone the almanac was three days old. A *current* almanac that places badly
+raises its own alert, which the age gate would have waved through.
+
+Coverage is partial and says so. **GLONASS keeps the bare age**: its almanac is not Keplerian —
+ascending-node time and draconic period — and a number produced by pretending otherwise would be
+worse than none. BeiDou already has the stricter 5° geostationary-station gate.
+
+### 衛星 — a background search that says it is searching, and can be stopped
+
+`huawei.almanacwatch` sets an alarm every 30 minutes against the publisher, for up to 24 hours, and
+tells 白い熊 the moment something newer appears — with the rebuild one tap from the news, at whatever
+hour it arrives. It does **not** rebuild by itself: a build is ten minutes of radio and then wants
+白い熊 at the band to press 更新.
+
+The panel offers it **only while the almanac is actually stale**, and shows one of three things —
+the control, "searching, and the notification stops it", or nothing at all. That is possible because
+it lives inside the page rather than beside it: a scene BUTTON has no visibility rule, so as a
+native element it sat there lit under a panel with nothing stale about it.
+
+Its first name was 「新しい概略暦を待つ」, "wait for a newer almanac", which reads as
+sit-and-do-nothing and is the opposite of what it does. Every string it owns now names the cadence,
+and its ongoing notification carries a **stop button** — a background search that can only be called
+off from a panel three taps away is one nobody can call off. All four ways the watch can end clear
+the state the panel reads, so it cannot go on claiming a search that finished hours ago.
+
+### 衛星 — smaller things that were costing whole days
+
+- **The fresher of live and cache wins** for the three almanacs. A flaky morning could overwrite a
+  newer cached copy with an older live one, which is how a three-day-old Galileo almanac shipped at
+  all.
+- **CODE's `COD0OPSPRD_05D.SP3` and its ERP gain a two-day cache.** It is the one product with no
+  mirror reachable from here, so a DNS blink took the whole build down with it.
+- **A failed build can no longer pass as a success.** A rebuild that died on DNS used to walk on to
+  the serve, which overwrote the alert, handed the band the *previous* set, and announced 「予測暦
+  済」 — every link of which looked reasonable on its own.
+- **`NaN` is screened** before it can reach a 32-bit field, and the panel reports quiet time so a
+  ten-minute silence stops reading as a hang.
+
+### 健康 — the night's own curve is scored, and has a history
+
+The heart-rate curve was the only block on 平常との差 with **no colour at all**, sitting under six
+rows each tinted for far less — on a night that fell **0 bpm against a usual 11**. It now carries
+the same bar, painted behind the whole item so it runs past the chart and the sentences under it.
+
+It grades by **valence** where the rows above it grade by **distance**, and that is deliberate: a row
+that coloured a ten-hour night best-step yellow directly above a box explaining that the long night
+was the thing to notice teaches a reader to ignore the colours, while a heart rate that fails to
+fall overnight is worse in one direction only — and the card already prints that line with a
+warning. The ladder is symmetric about usual in units of the heart rate's own published
+smallest-worthwhile-change, and **exactly usual is 3**: calling it good would leave nothing to say
+about a night that beat it.
+
+Tapping the chart now stacks **a fortnight of nights as small multiples** — each night its own graph,
+newest first, on one shared bpm scale — beside the overlay that was already there. The two answer
+different questions: the overlay asks whether last night's descent is like the others, the small
+multiples show what a particular night looked like. Both score against the **same** usual drop,
+passed in rather than derived twice.
+
+### 健康 — the register is the whole night now
+
+Thirteen columns, in the order the night happened: Date · Woke · Night HR · **Bed HR** · **HR swing**
+· **Night curve** · Asleep · Deep · Deep+REM · Low HR · HRV · **Breaths** · SpO₂.
+
+`Night curve` is the one that **draws** rather than prints, and it is there because a swing in bpm is
+not heart-rate-through-the-night: 14 bpm that fell early and 14 bpm that rose at four in the morning
+are the same number and different nights. It is scored by its **descent** — the report's own grading,
+against the median descent of the nights before it — and explicitly not by the swing beside it,
+which cannot tell a fall from a rise.
+
+The four new quantities are banded **within-person**, like deep, deep+REM and RMSSD, because no
+published ladder fits a wrist band's bedtime rate, the spread of a binned night curve, or an
+estimated respiratory rate. **None of them is counted**; the headline still counts three markers.
+Temperature stays out and a test now enforces it — this band has no thermometer.
+
+### 健康 — the report reads in the order it is used
+
+- The **three workout windows are first**, above 今朝の体感, with no heading of their own. They are
+  the one thing on the page that is not a reading: three doors, pressed on the way somewhere else.
+- 「あらゆる夜と運動」 **moves to the top of 回復**. It is not a footnote to the weekly load total; it
+  is the whole night-by-night record the card summarises.
+- The **load reading is coloured** like every other item on that card. It was the only one printed in
+  the same grey as its own explanation, which reads as "this has no state" rather than "this is
+  fine".
+- The **illness flag wears the ladder's own red** instead of a generic amber that appeared nowhere
+  else on the card, scored as the worse of its two limbs and never softer than "below par".
+- The **tap hint is gone** — every row already carries a chevron, which says it where it applies.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+139 — 2026-09-25
 
 Built on upstream `aa1a372a`.
