@@ -1924,8 +1924,9 @@ tasks.register("generateFdroidChangelog") {
         check(section.isNotBlank()) {
             "CHANGELOG.md has no '## v$versionName' section to generate a store changelog from"
         }
-        // An entry runs from its "- " line through the indented lines under it. CHANGELOG.md wraps
-        // its entries, and reading only the first line cut a wrapped entry off mid-sentence.
+        // An entry runs from its "- " line to the next blank line, heading or entry. CHANGELOG.md
+        // wraps its entries, and reading only the first line cut a wrapped entry off mid-sentence.
+        // A wrapped line counts however it is indented, tabs or none, as Markdown reads it.
         val entries = mutableListOf<String>()
         var inEntry = false
         for (line in section.lines()) {
@@ -1935,7 +1936,7 @@ tasks.register("generateFdroidChangelog") {
                     entries += text.removePrefix("- ")
                     inEntry = true
                 }
-                text.isEmpty() || !line.startsWith(" ") -> inEntry = false
+                text.isEmpty() || text.startsWith("#") -> inEntry = false
                 inEntry -> entries[entries.lastIndex] += " $text"
             }
         }
