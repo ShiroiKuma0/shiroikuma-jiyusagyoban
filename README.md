@@ -1,6 +1,6 @@
 # OpenTasker
 
-[![Version](https://img.shields.io/badge/version-0.2.93-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
+[![Version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
@@ -215,9 +215,9 @@ There is no F-Droid or IzzyOnDroid listing yet, so releases come from this repos
 
 **With [Obtainium](https://github.com/ImranR98/Obtainium)** (recommended, it tracks new releases for you): tap the Obtainium badge above on the device, or add `https://github.com/SysAdminDoc/OpenTasker` as a GitHub source. Default settings are correct, nothing needs configuring.
 
-**By hand:** download the APK attached to the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. From the next release on, that file is named `OpenTasker-v<version>.apk`; `v0.2.87` and earlier predate the naming gate, and `v0.2.87` ships its APK as `app-release.apk`.
+**By hand:** download the APK attached to the [latest release](https://github.com/SysAdminDoc/OpenTasker/releases/latest) and install it. Since `v0.2.88` that file is named `OpenTasker-v<version>.apk`; `v0.2.87` and earlier predate the naming gate, and `v0.2.87` ships its APK as `app-release.apk`.
 
-**Upgrading from v0.2.92 or earlier?** v0.2.93 is signed with a new key, so Android refuses to install it over an older copy. The install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` until the old one is removed. Uninstalling also erases the automation database, so export a backup before you do anything else. Open Setup, export a copy of the database or an encrypted `.otbackup` snapshot to a folder you control, then uninstall the old build, install v0.2.93, and restore. A backup that only lives in app storage goes away with the app, so make sure the copy you keep is the exported one. Secret variable values stay bound to the device that created them and have to be re-entered after a restore. The previous key was published in this repository, which is why it was retired instead of reused.
+**Upgrading from v0.2.92 or earlier?** v0.2.93 and later are signed with a new key, so Android refuses to install them over an older copy. The install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` until the old one is removed. Uninstalling also erases the automation database, so export a backup before you do anything else. Open Setup, export a copy of the database or an encrypted `.otbackup` snapshot to a folder you control, then uninstall the old build, install the current release, and restore. A backup that only lives in app storage goes away with the app, so make sure the copy you keep is the exported one. Secret variable values stay bound to the device that created them and have to be re-entered after a restore. The previous key was published in this repository, which is why it was retired instead of reused.
 
 Releases tagged `v0.1.0`, `v0.3.0`, `v0.4.1` and `v0.4.2` are dead. All four carry versionCode 1 and were signed with a key that no longer exists, so they cannot be upgraded in place. Ignore them, and if you have one installed, uninstall before installing a current build. The live line is `v0.2.x`, and its newest tag is the one to take.
 
@@ -356,7 +356,7 @@ Issues and pull requests welcome. Open an issue to discuss a feature before buil
 
 ### Translations
 
-OpenTasker supports localization. The current release ships English only; English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources have genuinely translated values; incomplete or empty locale directories are rejected by the release gate. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
+OpenTasker supports localization. The current release ships English only; English source copy lives in `app/src/main/res/values/strings.xml`, `action_catalog_strings.xml`, and `dynamic_surface_strings.xml`. The app uses AGP's generated per-app language configuration with `en-US` as the default. An alternate locale is included in a release only after at least 80% of the default `<string>` resources are translated; incomplete or empty locale directories are rejected by the release gate. Debug builds enable Android's `en-XA` and `ar-XB` pseudolocales for expansion and right-to-left checks. To contribute a translation:
 
 1. Copy the three translatable XML files from `app/src/main/res/values/` to `app/src/main/res/values-<locale>/`
 2. Translate only the string values (not the `name` attributes)

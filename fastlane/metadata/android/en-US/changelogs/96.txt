@@ -1,0 +1,6 @@
+A Quick Settings tile no longer runs its task straight from the lock screen.
+Exporting a bundle no longer writes a secret you typed into a "Run only if" guard or an action label.
+Another app can no longer stop OpenTasker by sending it a malformed push or Locale message.
+Secret variable values and the backup passphrase now use the password keyboard.
+Wi-Fi profiles that match a network name work again.
+The location button in Setup works on Android 12 and later.

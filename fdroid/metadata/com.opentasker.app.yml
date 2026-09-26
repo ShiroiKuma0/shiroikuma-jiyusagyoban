@@ -21,8 +21,8 @@ RepoType: git
 Repo: https://github.com/SysAdminDoc/OpenTasker.git
 
 Builds:
-  - versionName: 0.2.93
-    versionCode: 95
+  - versionName: 0.2.94
+    versionCode: 96
     commit: 8989fab1d8fd089e69d2af27e1c470305549152b
     subdir: .
     gradle:
@@ -35,5 +35,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.2.93
-CurrentVersionCode: 95
+CurrentVersion: 0.2.94
+CurrentVersionCode: 96

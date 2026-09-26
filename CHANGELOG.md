@@ -1,9 +1,28 @@
 # Changelog
 
-## Unreleased
+## v0.2.94
 
 ### Security
 
+- A Quick Settings tile no longer runs its task straight from the lock screen.
+  Anyone holding your phone could tap one and run whatever it was bound to, which
+  might send a message or run a script. The tap now waits for you to unlock and
+  then runs, so nothing is lost except the shortcut for someone who should not
+  have it. Devices with no lock set are unaffected.
+- Exporting a bundle no longer writes a secret you typed into a "Run only if"
+  guard or an action label. Only action arguments were cleaned, so a guard like
+  `%Pin == 4321` carried the value into the exported file, the paste text, and a
+  shared profile. The whole guard is replaced rather than just the secret inside
+  it, so an action that was guarded before export cannot come back unguarded,
+  and the export warns you that something needs re-entering.
+- Another app can no longer stop OpenTasker by sending it a malformed push or
+  Locale message. Both of those entry points are open to any app by design, and
+  reading a value the sending app deliberately made unreadable took the whole
+  automation service down with it. Such a message is now discarded and noted.
+- Secret variable values and the backup passphrase now use the password keyboard.
+  They were masked on screen but typed as ordinary text, so the keyboard's
+  autocorrect and personal dictionary could learn them and offer them as a
+  suggestion in another app later.
 - Updated jsoup to 1.23.2, which fixes a denial of service in its XML parser
   (CVE-2026-75140). OpenTasker only ever fed that library HTML, so nothing here
   could reach the affected code, and a build check keeps it that way.
@@ -22,7 +41,6 @@
   as `sk-Live-ABC123` went out in the clear in the exported bundle, the paste
   text, a shared profile and the diagnostic report. It is the same credential
   either way.
-
 - Read data from HTML no longer accepts the selectors that can hang a task.
   `:matches()` and its variants, plus `[attr~=regex]`, are matched by a regular
   expression engine that certain patterns send into a search that runs for
@@ -31,73 +49,12 @@
   message naming the one you used and what to use instead. Every other selector
   is unchanged, including the `^=`, `$=` and `*=` attribute matches and
   `:contains()`.
-
 - Cards that open and close a section now tell a screen reader what they are
   and whether the section is already open. Seven of them, across Setup, the run
   log, the Inspector, the scene library and both automation lists, previously
   said only "double tap to activate", with the same words whether the next tap
   opened or closed. Finishing a backup, an import or a preflight is also spoken
   now instead of changing silently on screen.
-
-### Added
-
-- Importing from Tasker now understands three more of its actions. HTTP Request
-  arrives as an HTTP Request here, keeping the method, address, headers, body and
-  timeout; Set Clipboard and Write File arrive as themselves. A Write File set to
-  append becomes an append rather than a write, so importing one can no longer
-  wipe the file it was meant to add a line to. Anything the import cannot carry
-  across, such as query parameters or an attached file, is named in the import
-  review instead of being dropped quietly or put in the wrong box.
-
-- **Write Setting**, a new action that changes one Android setting by name, the way
-  Tasker's Custom Setting does. The Global and Secure tables need access that no app can
-  ask for and no settings screen offers: you grant it once from a computer, and a new
-  Setup row hands you the exact command, with the MIUI caveat noted. The System table
-  uses the Modify system settings access you may already have. Whatever you write is read
-  back afterwards, so a value Android quietly ignores is reported as a failure instead of
-  a success, and without the access the action refuses with the command in the message.
-  Settings that control what other apps are allowed to do are refused outright, whatever
-  the table: accessibility services, notification access, the keyboard, the package
-  verifier, installs from unknown sources and USB debugging among them. That access is
-  granted once and then stays, so a profile you import later must not be able to reach
-  those through it.
-- A profile can now trigger on a broadcast another app sends. Name the intent
-  action, and OpenTasker listens for that one action while the profile is
-  enabled and stops the moment you disable it. Extras come through as bounded
-  text, so a task can read `broadcast_extra_msg` the way it reads any other
-  variable, and anything too big or too complex to carry safely is dropped with
-  a note rather than half-copied. You can also filter on an extra's name or
-  value. Filtering on the sender is offered but rarely useful: Android only
-  names the sender when the sending app opts in to sharing its identity, and
-  almost nothing does, so the editor says as much where you type it.
-- The HTTP Request action can be restricted to a kind of connection: Wi-Fi,
-  mobile data, or anything unmetered. A restricted request is refused before
-  anything is sent, with a message naming what the connection actually is, and
-  the task preview says so too. It used to take a flow-control branch on a
-  connectivity variable, which raced the request it was guarding.
-- The overflow menu on any action in a task now offers "Run this action". It
-  runs that one action on its own, so tuning an HTTP call or a variable no
-  longer means running everything above it first. The run appears in the run log
-  under its own name. Flow-control markers are not offered, because an "if"
-  without its "end if" is not a smaller task.
-- Settings has an About section. It shows the version and build you are running,
-  links out to the source, the release notes and the licence, and offers a
-  "Report a problem" button that opens a new issue with your build and device
-  already filled in.
-- The Diagnostics screen can copy its redacted report to the clipboard. Sharing
-  it opened a chooser, which is awkward when what you want is to paste it into a
-  bug report.
-- A running import, export, or preview can be stopped. The review dialog's
-  button becomes Stop while work is in progress and says which step it is on,
-  instead of going grey and refusing to close.
-- Installing a starter template that needs a permission now opens Setup showing
-  just the grants that template is waiting on, instead of leaving the new
-  automation to fail on its first run with nothing explaining why.
-- Settings has a "Run onboarding again" action that reopens the starter
-  templates.
-
-### Fixed
-
 - The "all Bluetooth devices disconnected" and "some connected" triggers recover
   after you turn your Bluetooth profiles off and on again. OpenTasker stops
   listening while none are enabled, so anything that disconnected in the meantime
@@ -112,29 +69,10 @@
   Only a run that finished normally saved them, so a profile set to restart on
   every trigger lost the values on every restart but the last, and the run log
   still showed the write that had been thrown away.
-- Exporting a bundle no longer writes a secret you typed into a "Run only if"
-  guard or an action label. Only action arguments were cleaned, so a guard like
-  `%Pin == 4321` carried the value into the exported file, the paste text, and a
-  shared profile. The whole guard is replaced rather than just the secret inside
-  it, so an action that was guarded before export cannot come back unguarded,
-  and the export warns you that something needs re-entering.
 - Setup counts what it shows you. The progress line counted by section while the
   rows were marked required or optional by a different rule, so a fresh install
   read "1 of 3 ready" above four rows marked Required. The sentence under it no
   longer cuts off mid-word either.
-- A Quick Settings tile no longer runs its task straight from the lock screen.
-  Anyone holding your phone could tap one and run whatever it was bound to, which
-  might send a message or run a script. The tap now waits for you to unlock and
-  then runs, so nothing is lost except the shortcut for someone who should not
-  have it. Devices with no lock set are unaffected.
-- Secret variable values and the backup passphrase now use the password keyboard.
-  They were masked on screen but typed as ordinary text, so the keyboard's
-  autocorrect and personal dictionary could learn them and offer them as a
-  suggestion in another app later.
-- Another app can no longer stop OpenTasker by sending it a malformed push or
-  Locale message. Both of those entry points are open to any app by design, and
-  reading a value the sending app deliberately made unreadable took the whole
-  automation service down with it. Such a message is now discarded and noted.
 - Tapping a notification button, or triggering a task from another app, now
   starts the automation engine properly when OpenTasker was not already running.
   It used to run that one task and then sit there looking healthy while no
@@ -191,6 +129,62 @@
   onboarding, so backing out of it does not hide the flow forever.
 - The F-Droid metadata gate no longer fails on a stale store-screenshot version
   stamp. The v0.2.93 bump left it recording the previous release's code.
+
+### Added
+
+- Importing from Tasker now understands three more of its actions. HTTP Request
+  arrives as an HTTP Request here, keeping the method, address, headers, body and
+  timeout; Set Clipboard and Write File arrive as themselves. A Write File set to
+  append becomes an append rather than a write, so importing one can no longer
+  wipe the file it was meant to add a line to. Anything the import cannot carry
+  across, such as query parameters or an attached file, is named in the import
+  review instead of being dropped quietly or put in the wrong box.
+- **Write Setting**, a new action that changes one Android setting by name, the way
+  Tasker's Custom Setting does. The Global and Secure tables need access that no app can
+  ask for and no settings screen offers: you grant it once from a computer, and a new
+  Setup row hands you the exact command, with the MIUI caveat noted. The System table
+  uses the Modify system settings access you may already have. Whatever you write is read
+  back afterwards, so a value Android quietly ignores is reported as a failure instead of
+  a success, and without the access the action refuses with the command in the message.
+  Settings that control what other apps are allowed to do are refused outright, whatever
+  the table: accessibility services, notification access, the keyboard, the package
+  verifier, installs from unknown sources and USB debugging among them. That access is
+  granted once and then stays, so a profile you import later must not be able to reach
+  those through it.
+- A profile can now trigger on a broadcast another app sends. Name the intent
+  action, and OpenTasker listens for that one action while the profile is
+  enabled and stops the moment you disable it. Extras come through as bounded
+  text, so a task can read `broadcast_extra_msg` the way it reads any other
+  variable, and anything too big or too complex to carry safely is dropped with
+  a note rather than half-copied. You can also filter on an extra's name or
+  value. Filtering on the sender is offered but rarely useful: Android only
+  names the sender when the sending app opts in to sharing its identity, and
+  almost nothing does, so the editor says as much where you type it.
+- The HTTP Request action can be restricted to a kind of connection: Wi-Fi,
+  mobile data, or anything unmetered. A restricted request is refused before
+  anything is sent, with a message naming what the connection actually is, and
+  the task preview says so too. It used to take a flow-control branch on a
+  connectivity variable, which raced the request it was guarding.
+- The overflow menu on any action in a task now offers "Run this action". It
+  runs that one action on its own, so tuning an HTTP call or a variable no
+  longer means running everything above it first. The run appears in the run log
+  under its own name. Flow-control markers are not offered, because an "if"
+  without its "end if" is not a smaller task.
+- Settings has an About section. It shows the version and build you are running,
+  links out to the source, the release notes and the licence, and offers a
+  "Report a problem" button that opens a new issue with your build and device
+  already filled in.
+- The Diagnostics screen can copy its redacted report to the clipboard. Sharing
+  it opened a chooser, which is awkward when what you want is to paste it into a
+  bug report.
+- A running import, export, or preview can be stopped. The review dialog's
+  button becomes Stop while work is in progress and says which step it is on,
+  instead of going grey and refusing to close.
+- Installing a starter template that needs a permission now opens Setup showing
+  just the grants that template is waiting on, instead of leaving the new
+  automation to fail on its first run with nothing explaining why.
+- Settings has a "Run onboarding again" action that reopens the starter
+  templates.
 
 ### Changed
 
