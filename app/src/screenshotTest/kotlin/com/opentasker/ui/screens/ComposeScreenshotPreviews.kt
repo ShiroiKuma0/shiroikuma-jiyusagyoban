@@ -286,6 +286,7 @@ private fun TasksPreviewContent(theme: PreviewTheme) {
             onEditAction = { _, _, _ -> },
             onDeleteAction = { _, _ -> },
             onMoveAction = { _, _, _ -> },
+            onRunAction = { _, _ -> },
             contentPadding = PreviewPadding,
         )
     }
@@ -331,6 +332,7 @@ private fun DiagnosticsPreviewContent(theme: PreviewTheme) {
             contentPadding = PreviewPadding,
             onRefresh = {},
             onShare = {},
+            onCopy = {},
         )
     }
 }
