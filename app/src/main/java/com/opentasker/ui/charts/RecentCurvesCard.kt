@@ -53,7 +53,10 @@ fun RecentCurvesCard(
     val style = LocalChartStyle.current
     val measurer = rememberTextMeasurer()
     val accent = ChartPalette.HEART_RATE
-    val usable = curves.filter { it.second.size >= 2 }
+    // The state now carries a fortnight, for the small multiples under this card. The OVERLAY still
+    // takes five: more lines in one frame is a thicket, which is the whole reason the per-night
+    // charts exist beside it rather than instead of it.
+    val usable = curves.filter { it.second.size >= 2 }.takeLast(RecoveryBuild.RECENT_CURVES)
     if (usable.size < 2) return
 
     // Change from the night's own start, so five nights share an origin — see the class note.

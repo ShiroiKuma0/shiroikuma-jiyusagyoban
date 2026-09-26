@@ -82,6 +82,14 @@ fun RecoveryCard(
     SectionCard(onClick = onClick) {
         SectionTitle(BandText.recoveryTitle[lang]) { InfoCircle(diameter = 28.dp, onClick = onClick) }
 
+        // THE WAY INTO THE REGISTER, FIRST (白い熊, 2026-09-26: "move every-night-and-session to top
+        // of this tab"). It used to sit under the load block, on the argument that it explained the
+        // weekly total — which is true and beside the point: it is not a footnote to one number on
+        // this card, it is the whole night-by-night record the card summarises, and a reader who
+        // wants it should not have to travel the summary to find it. The card reads top-down as
+        // "here is everything, and here is last night out of it".
+        RegisterButton(registerNights, registerRated, onOpenRegister)
+
         if (recovery == null || !recovery.hasHeadline) {
                 NoteText(
                     BandText.recoveryCollecting[lang].format(
@@ -119,15 +127,6 @@ fun RecoveryCard(
             sri?.let { SriRow(it) }
             load?.let { LoadRow(it) }
             peak30Cadence?.let { PeakCadenceRow(it, peakCadenceDay) }
-            // The way into the register. It sits under the load block because that is the number it
-            // explains: the weekly figure is a total, and this is what it is made of.
-            //
-            // A full-width pill carrying its own counts, not a line of link text. As a caption it was
-            // the smallest thing on a long card and read as a footnote, so the whole night-by-night
-            // record — every rating, every measured value — sat behind something easy to never
-            // notice. The counts are the point: they say there IS something in there.
-            // (白い熊, 2026-08-11: "it should be prominent".)
-            RegisterButton(registerNights, registerRated, onOpenRegister)
             // Regime notes go LAST and in amber: they qualify everything above them, so they read
             // as a caveat on the card rather than as another marker on it.
         regime?.let { RegimeNotes(it) }
@@ -404,13 +403,17 @@ private fun LoadRow(load: RecoveryBuild.LoadReading) {
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.width(10.dp))
-            load.band?.let {
-                Text(
-                    loadBandLabel(it)[lang],
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                    color = sectionNote,
-                )
-            }
+            // COLOURED, like every other reading on this card (白い熊, 2026-09-26: "all items
+            // should also be color-coded"). It was the one row whose band was printed in the note
+            // ink — the same grey as the explanation beneath it — so the eye running down the card
+            // found chips on the markers, the sleep score and the regularity, and then nothing on
+            // the load, which reads as "this one has no state" rather than as "this one is fine".
+            //
+            // Amber for the two ends and green for the middle, because BOTH ends are worth knowing
+            // about: a ratio far below usual is detraining and far above is the spike an acute-to-
+            // chronic ratio exists to flag. Hue is never the only channel here either — the word
+            // and the number sit beside it.
+            load.band?.let { ValueChip(loadBandLabel(it)[lang], loadBandTint(it)) }
             Spacer(Modifier.weight(1f))
             load.weekly?.let {
                 Text(
@@ -518,6 +521,20 @@ fun markerLabel(m: RecoveryMarker): Loc = when (m) {
     RecoveryMarker.BEDTIME_HR -> BandText.markerBedtimeHr
     RecoveryMarker.RESPIRATION -> BandText.markerRespiration
     RecoveryMarker.HR_SWING -> BandText.markerHrSwing
+}
+
+/**
+ * The load band's colour, on the same three-tint vocabulary the rest of this card speaks.
+ *
+ * Green covers Polar's own two workable bands — maintaining and productive. Amber covers the two
+ * departures at either END of the ratio, which is why this is not the 1–5 ladder: a load ratio has
+ * no single better direction. Detraining loses fitness and overreaching is the spike an
+ * acute-to-chronic ratio exists to flag; both are worth a glance and neither is a verdict, so
+ * neither gets the colour this card reserves for an adverse marker.
+ */
+fun loadBandTint(b: LoadBand): Color = when (b) {
+    LoadBand.MAINTAINING, LoadBand.PRODUCTIVE -> ChartPalette.BAND_GOOD
+    LoadBand.DETRAINING, LoadBand.OVERREACHING -> ChartPalette.BAND_WARN
 }
 
 fun loadBandLabel(b: LoadBand): Loc = when (b) {

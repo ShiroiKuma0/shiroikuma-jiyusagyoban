@@ -186,9 +186,22 @@ class HuaweiChartsActivity : ComponentActivity() {
                                     contentPadding = insets,
                                     onBack = { selected = null },
                                     // The swing's page carries the curves themselves: that is what
-                                    // "the history of this shape" actually means.
+                                    // "the history of this shape" actually means. Twice over, and
+                                    // the two answer different questions — the overlay asks whether
+                                    // last night's descent is like the others, the small multiples
+                                    // show each night as its own picture so a particular one can be
+                                    // looked at (白い熊, 2026-09-26).
                                     extra = if (openMarker == com.opentasker.ui.charts.RecoveryMarker.HR_SWING) {
-                                        { com.opentasker.ui.charts.RecentCurvesCard(state.recentCurves, markerZone) }
+                                        {
+                                            com.opentasker.ui.charts.RecentCurvesCard(state.recentCurves, markerZone)
+                                            com.opentasker.ui.charts.NightCurvesCard(
+                                                state.recentCurves,
+                                                // The SAME "usually" the report's own bar and
+                                                // sentence compare against — never a second median.
+                                                state.descent?.usual?.drop,
+                                                markerZone,
+                                            )
+                                        }
                                     } else {
                                         null
                                     },

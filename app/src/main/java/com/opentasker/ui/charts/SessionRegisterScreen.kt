@@ -1,6 +1,10 @@
 package com.opentasker.ui.charts
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -630,15 +634,22 @@ private object NightColumns {
      */
     val CELL = 96.dp
 
-    /** What the rules and dividers inside the scrolling block span. */
-    val TOTAL = CELL * 9
+    /**
+     * What the rules and dividers inside the scrolling block span.
+     *
+     * Twelve since 2026-09-26, when going-to-bed heart rate, the night's swing and breathing joined
+     * the table. Derived from the heading list rather than written down, so a column added to
+     * [BandText.registerColumns] cannot leave the month rules and the note lines short of the table
+     * they are supposed to span.
+     */
+    val TOTAL = CELL * BandText.registerColumns.size
 }
 
 @Composable
 private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
     val lang = LocalBandLanguage.current
     val n = row.night
-    // A Column so a written note can sit UNDER the five columns rather than inside one of them.
+    // A Column so a written note can sit UNDER the columns rather than inside one of them.
     // There is no width for it up there — the table is five weighted cells on a phone — and a note is
     // a sentence, not a value: it belongs across the row it annotates, in the ink the rest of this
     // screen uses for explanation.
@@ -678,10 +689,11 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         // Heart rate, the low, sleep and blood oxygen are graded against PUBLISHED ranges — see
         // [RecoveryReference], which also carries the two caveats worth knowing (a sleeping floor
         // sits under a daytime resting rate; a wrist oximeter's error is about twice the swing it
-        // measures). Deep, deep+REM and RMSSD are graded WITHIN-PERSON, against the nights before
+        // measures). The other six — deep, deep+REM, RMSSD, the going-to-bed rate, the night's
+        // swing and breathing — are graded WITHIN-PERSON, against the nights before
         // them, because no published ladder fits a consumer band's staging or an age-dependent
         // RMSSD — [SessionRegister.NightReading] sets out why at length, and the ⓘ panel says which
-        // is which on screen. None of the five is counted; a colour is not a verdict on the night.
+        // is which on screen. None of them is counted; a colour is not a verdict on the night.
         ValueCell(
             n?.nocturnalHr?.value?.let {
                 "${it.roundToInt()}" +
@@ -689,6 +701,14 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             },
             n?.nocturnalHr?.value?.let { RecoveryReference.nocturnalHrStep(it) },
         )
+        // Going to bed and the night's own spread, beside the nocturnal rate they belong with —
+        // the night in the order it happened (白い熊, 2026-09-26).
+        ValueCell(n?.bedtimeHr?.let { "${it.roundToInt()}" }, n?.bedtimeHrStep)
+        ValueCell(n?.hrSwing?.let { "${it.roundToInt()}" }, n?.hrSwingStep)
+        // …and the shape itself, which is the half a number cannot carry. Scored by its own
+        // DESCENT — the report's grading — and deliberately not by the swing beside it: see
+        // [SessionRegister.NightReading.hrCurveStep] for the night that made the difference visible.
+        CurveCell(n?.hrCurve.orEmpty(), n?.hrCurveStep)
         ValueCell(
             n?.sleep?.value?.let { hoursAndMinutes(it) },
             n?.sleep?.value?.let { RecoveryReference.sleepStep(it) },
@@ -702,6 +722,9 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         // RMSSD, in the milliseconds it is measured in — the unit is part of the reading, and a bare
         // "38" in a table of heart rates would be read as a heart rate.
         ValueCell(n?.hrvMs?.let { "${it.roundToInt()} ms" }, n?.hrvStep)
+        // One decimal, because the whole useful range of this quantity is about three breaths wide
+        // and rounding it to an integer would paint most nights the same number.
+        ValueCell(n?.respirationBpm?.let { String.format("%.1f", it) }, n?.respirationStep)
         ValueCell(
             n?.spo2?.let { "${it.roundToInt()}%" },
             n?.spo2?.let { RecoveryReference.spo2Step(it) },
@@ -745,6 +768,74 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
  * colour in the other rather than a second convention to hold in mind. (白い熊, 2026-08-11: "we need
  * same box cell display for the bottom table".)
  */
+/**
+ * One night's heart-rate curve, drawn inside a table cell.
+ *
+ * ## Why a column draws instead of printing
+ *
+ * `HR swing` says how far the curve moved and says nothing at all about WHEN, and when is most of
+ * what a night's heart rate looks like: 14 bpm that fell early and recovered, and 14 bpm that rose
+ * at 4 a.m., are the same number and different nights. 白い熊 asked for
+ * heart-rate-through-the-night in this table, and a scalar is not that.
+ *
+ * ## What makes the column readable downwards
+ *
+ * **Each line is drawn against its OWN night's range**, not a shared one. That is the opposite of
+ * the choice the full charts make, and deliberately: a cell is 86 dp wide and 30 dp tall, and a
+ * shared absolute axis would flatten every curve into the same horizontal smudge at that size. What
+ * this column answers is "what SHAPE was that night" — fell early, fell late, never fell — and the
+ * shape is what survives the normalisation. The magnitude is in the two cells beside it, in bpm,
+ * where it can be read exactly.
+ *
+ * **The fill and the ink come from the DESCENT's step** — how far that night's fall came short of
+ * the usual one — which is the same grading the report's own bar carries, so the same night is the
+ * same colour on both screens. It is explicitly NOT the swing's step: a night that rose 14 bpm and
+ * one that fell 14 score alike on the swing, and the first of those is the one worth seeing.
+ */
+@Composable
+private fun CurveCell(curve: List<Double>, step: Int?) {
+    val skin = scaleSkin(step, Color.Transparent, sectionNote)
+    Box(
+        Modifier
+            .width(NightColumns.CELL)
+            .padding(end = 4.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(skin.fill)
+            .padding(horizontal = 5.dp, vertical = 5.dp),
+    ) {
+        if (curve.size < 2) {
+            Text(
+                "—",
+                style = MaterialTheme.typography.bodyLarge,
+                color = skin.ink,
+                maxLines = 1,
+            )
+        } else {
+            val lo = curve.min()
+            val hi = curve.max()
+            // A dead-flat night would divide by zero; drawn down the middle, which is what flat is.
+            val span = (hi - lo).takeIf { it > 0.0 } ?: 1.0
+            Canvas(Modifier.fillMaxWidth().height(CURVE_CELL_HEIGHT)) {
+                val stepX = size.width / (curve.size - 1)
+                val path = Path()
+                curve.forEachIndexed { i, v ->
+                    val x = stepX * i
+                    val y = size.height * (1f - ((v - lo) / span).toFloat())
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(
+                    path,
+                    skin.ink,
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                )
+            }
+        }
+    }
+}
+
+/** Tall enough for a descent to have a shape, short enough not to change the row's height. */
+private val CURVE_CELL_HEIGHT = 30.dp
+
 @Composable
 private fun ValueCell(text: String?, step: Int?) {
     val skin = scaleSkin(step, Color.Transparent, sectionNote)

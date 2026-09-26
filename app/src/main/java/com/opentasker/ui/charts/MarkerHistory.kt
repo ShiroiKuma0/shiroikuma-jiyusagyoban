@@ -99,4 +99,40 @@ object MarkerHistory {
      * meaningfully then neither did the drop.
      */
     const val MEANINGFUL_DROP_BPM = Recovery.HR_MEANINGFUL_BPM
+
+    /**
+     * The night curve's own 1–5 step — and this one grades by VALENCE, not by distance.
+     *
+     * ## Why it differs from the strip's rows above it
+     *
+     * [DeviationStrip]'s rows are deliberately graded by how FAR from usual a value sits and never
+     * by which way, because a row that coloured "10h 36m asleep" best-step yellow directly above a
+     * box explaining that the long night was the thing to notice teaches a reader to ignore the
+     * colours. Distance is the honest grading where the direction is genuinely ambiguous.
+     *
+     * The nightly descent is not ambiguous. A heart rate that fails to fall overnight is worse than
+     * one that falls, in one direction only, and the card already says so in words — the shallow
+     * line is printed with `warn = true`. So here the colour agrees with the sentence beside it
+     * instead of arguing with it. 白い熊 asked for exactly this on 2026-09-26, of a night that fell
+     * **0 bpm against a usual 11**: *"it was really bad — so it must have its color scoring on the
+     * left also, indicating red or worse."*
+     *
+     * The unit is the heart rate's own published smallest-worthwhile-change, because a drop is a
+     * difference of two heart rates, and the ladder is SYMMETRIC about usual: one of them short is
+     * below par and two is the bottom; one deeper is good and two is great. A night that fell by
+     * exactly the usual amount is **3, normal** — it is the definition of normal, and a scale that
+     * called it good would have nothing left to say about a night that beat it.
+     *
+     * [shortfallBpm] is positive when the night fell SHORT of the usual drop.
+     */
+    fun descentStep(shortfallBpm: Double): Int = when {
+        shortfallBpm >= 2 * MEANINGFUL_DROP_BPM -> 5
+        shortfallBpm >= MEANINGFUL_DROP_BPM -> 4
+        shortfallBpm > -MEANINGFUL_DROP_BPM -> 3
+        shortfallBpm > -2 * MEANINGFUL_DROP_BPM -> 2
+        else -> 1
+    }
+
+    /** The same step for a whole comparison: how far last night's drop fell short of the usual one. */
+    fun descentStep(d: DescentComparison): Int = descentStep(-d.dropDelta)
 }

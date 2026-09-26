@@ -65,6 +65,32 @@ private fun night(dayIndex: Int, hr: Double, sleepMinutes: Double) = SessionRegi
     deepStep = if (dayIndex % 7 == 3) null else 1 + (dayIndex % 5),
     deepRemStep = if (dayIndex % 7 == 3) null else 1 + ((dayIndex + 2) % 5),
     hrvStep = if (dayIndex % 7 == 3) null else 1 + ((dayIndex + 4) % 5),
+    // …and the three added 2026-09-26, the last of which DRAWS rather than prints.
+    // floorMod, not `%`: the fixture window starts BEFORE its first day, so `dayIndex` is negative
+    // for part of it and Kotlin's remainder keeps the sign — which indexed a list at -1 and took the
+    // whole preview source set down with an ExceptionInInitializerError.
+    bedtimeHr = if (dayIndex % 7 == 3) null else hr + 4 + Math.floorMod(dayIndex, 4),
+    hrSwing = if (dayIndex % 7 == 3) null else 8.0 + Math.floorMod(dayIndex, 6) * 2,
+    respirationBpm = if (dayIndex % 7 == 3) null else 15.4 + Math.floorMod(dayIndex, 5) * 0.4,
+    hrSwingStep = if (dayIndex % 7 == 3) null else 1 + Math.floorMod(dayIndex + 1, 5),
+    // The DESCENT's step, which is what the curve cell is coloured by — walked across all five so
+    // the render shows a night that never fell (5) beside one that fell further than usual (1).
+    hrCurveStep = if (dayIndex % 7 == 3) null else 1 + Math.floorMod(dayIndex, 5),
+    bedtimeHrStep = if (dayIndex % 7 == 3) null else 1 + Math.floorMod(dayIndex + 3, 5),
+    respirationStep = if (dayIndex % 7 == 3) null else 1 + Math.floorMod(dayIndex, 5),
+    // Four shapes that differ in WHEN rather than in how far, which is the whole reason this column
+    // is a picture: fell early, fell late, never fell, fell and rose again. A render where every
+    // night had the same shape would show nothing about whether the cell is legible at 86 dp.
+    hrCurve = if (dayIndex % 7 == 3) emptyList()
+    else CURVE_SHAPES[Math.floorMod(dayIndex, CURVE_SHAPES.size)],
+)
+
+/** Four nights that differ in shape rather than in span — see the fixture's note above. */
+private val CURVE_SHAPES = listOf(
+    listOf(76.0, 72.0, 68.0, 65.0, 63.0, 62.0, 62.5, 63.0, 65.0, 68.0, 71.0, 74.0),
+    listOf(74.0, 74.5, 73.0, 73.5, 72.0, 71.0, 70.0, 68.0, 65.0, 62.0, 61.0, 63.0),
+    listOf(70.0, 69.5, 70.0, 69.0, 70.5, 69.5, 70.0, 69.0, 70.5, 70.0, 69.5, 70.5),
+    listOf(78.0, 73.0, 68.0, 64.0, 62.0, 66.0, 71.0, 69.0, 65.0, 63.0, 67.0, 72.0),
 )
 
 /** `yyyyMMdd` for a day index into the fixture window. */
