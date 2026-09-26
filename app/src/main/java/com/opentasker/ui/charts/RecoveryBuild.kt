@@ -297,12 +297,22 @@ object RecoveryBuild {
             descent = descentOf(history, latest),
             bestDescent = bestDescentOf(history),
             recentCurves = history.filter { it.hrCurve.isNotEmpty() }
-                .takeLast(RECENT_CURVES).map { it.endMs to it.hrCurve },
+                .takeLast(CURVE_HISTORY).map { it.endMs to it.hrCurve },
         )
     }
 
-    /** How many nights' curves the swing's history page stacks. Enough to see a habit, few enough to read. */
+    /** How many nights' curves the OVERLAY stacks. Enough to see a habit, few enough to read. */
     const val RECENT_CURVES = 5
+
+    /**
+     * How many nights the swing's page carries curves for, as SMALL MULTIPLES under that overlay.
+     *
+     * Far more than the overlay can hold, and for the opposite reason: five lines in one frame is
+     * the most that is still legible, while five separate charts is barely a history. A fortnight
+     * is the span over which 白い熊 actually asks "was it like this last week", and each tile is
+     * cheap — one small chart, scrolled past if it is not wanted. (白い熊, 2026-09-26.)
+     */
+    const val CURVE_HISTORY = 14
 
     /**
      * One series per marker, from the same nights the strip is banded against.

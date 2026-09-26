@@ -300,8 +300,31 @@ private val SWING_NIGHTS = listOf(
     14.0, 14.0, 8.5, 12.5, 16.0, 17.0, 11.0, 15.0, 13.5, 6.0,
 )
 
+/**
+ * A fortnight of curves, ending on the two real nights above.
+ *
+ * Long enough that the small multiples are a history rather than a handful, and mixed on purpose:
+ * ordinary descents, one that barely falls and one that falls further than usual, so the left bars
+ * are not all the same colour and the scoring is actually visible in the render.
+ */
+private fun HISTORY_CURVES(end: Long, day: Long): List<Pair<Long, List<Double>>> {
+    val shapes = listOf(
+        listOf(78.0, 76.0, 74.0, 70.0, 68.0, 66.0, 64.0, 63.0, 64.0, 66.0, 69.0, 72.0),
+        listOf(75.0, 74.0, 71.0, 68.0, 66.0, 64.0, 65.0, 64.0, 66.0, 68.0, 70.0, 73.0),
+        listOf(80.0, 77.0, 75.0, 72.0, 70.0, 67.0, 66.0, 65.0, 67.0, 70.0, 73.0, 76.0),
+        listOf(73.0, 72.0, 71.5, 71.0, 70.5, 70.0, 70.5, 71.0, 71.5, 72.0, 72.5, 73.0),
+        listOf(79.0, 75.0, 71.0, 67.0, 64.0, 61.0, 59.0, 58.0, 60.0, 63.0, 67.0, 71.0),
+        listOf(76.0, 74.0, 72.0, 69.0, 67.0, 65.0, 64.0, 64.0, 65.0, 67.0, 70.0, 74.0),
+        listOf(77.0, 76.0, 74.0, 73.0, 71.0, 70.0, 69.0, 70.0, 71.0, 73.0, 75.0, 77.0),
+        listOf(74.0, 71.0, 68.0, 65.0, 63.0, 62.0, 61.0, 62.0, 64.0, 66.0, 69.0, 72.0),
+        CURVE_0911,
+        CURVE_0912,
+    )
+    return shapes.mapIndexed { i, c -> (end - (shapes.lastIndex - i) * day) to c }
+}
+
 @PreviewTest
-@Preview(name = "A row's history page", widthDp = 413, heightDp = 1700, showBackground = true)
+@Preview(name = "A row's history page", widthDp = 413, heightDp = 3400, showBackground = true)
 @Composable
 fun MarkerHistoryPreview() {
     val day = 86_400_000L
@@ -327,14 +350,13 @@ fun MarkerHistoryPreview() {
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                     onBack = {},
                     extra = {
-                        RecentCurvesCard(
-                            listOf(
-                                (end - 4 * day) to listOf(78.0, 76.0, 74.0, 70.0, 68.0, 66.0, 64.0, 63.0, 64.0, 66.0, 69.0, 72.0),
-                                (end - 3 * day) to listOf(75.0, 74.0, 71.0, 68.0, 66.0, 64.0, 65.0, 64.0, 66.0, 68.0, 70.0, 73.0),
-                                (end - 2 * day) to listOf(80.0, 77.0, 75.0, 72.0, 70.0, 67.0, 66.0, 65.0, 67.0, 70.0, 73.0, 76.0),
-                                (end - day) to CURVE_0911,
-                                end to CURVE_0912,
-                            ),
+                        RecentCurvesCard(HISTORY_CURVES(end, day), java.time.ZoneId.systemDefault())
+                        // The per-night graphs 白い熊 asked for on 2026-09-26. Drawn here with the
+                        // SAME usual drop the strip's own bar uses, because the whole point of
+                        // passing it in rather than deriving it twice is that they must agree.
+                        NightCurvesCard(
+                            HISTORY_CURVES(end, day),
+                            USUAL.drop,
                             java.time.ZoneId.systemDefault(),
                         )
                     },
