@@ -36,6 +36,16 @@ class SetupLocationRequestContractTest {
     }
 
     @Test
+    fun theInspectorCallsLocationReadyOnWhatSetupCallsReady() {
+        val inspector = ProductionSources.read("com/opentasker/ui/screens/ContextInspectorScreen.kt")
+
+        assertTrue(
+            "the Inspector marked approximate location ready while Setup's row said it was missing",
+            "ready = LocationPolicyDisclosures.sourceReady(precise = precise, providerEnabled = providerEnabled)," in inspector,
+        )
+    }
+
+    @Test
     fun theSetupScreenLaunchesEveryRequestedPermissionTogether() {
         val screen = ProductionSources.read("com/opentasker/ui/screens/PermissionOnboardingScreen.kt")
 

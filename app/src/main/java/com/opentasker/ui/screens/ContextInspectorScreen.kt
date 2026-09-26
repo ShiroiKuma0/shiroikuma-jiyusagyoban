@@ -1074,7 +1074,7 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val background = Build.VERSION.SDK_INT < 29 || hasPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         val providerEnabled = hasEnabledLocationProvider(context)
         ContextSourceSetup(
-            ready = foreground && providerEnabled,
+            ready = LocationPolicyDisclosures.sourceReady(precise = precise, providerEnabled = providerEnabled),
             detail = LocationPolicyDisclosures.sourceSetupDetail(
                 foreground = foreground,
                 precise = precise,

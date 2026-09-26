@@ -15,6 +15,13 @@ object LocationPolicyDisclosures {
             "$settingsPath Users can decline and keep using foreground-only automations. Public reliability still needs device verification."
     }
 
+    /**
+     * Whether the Location context source is ready, in the same terms as Setup's location row:
+     * precise access, with a location provider switched on. Approximate fixes still flow, but they
+     * are too coarse for a small geofence, and Setup already calls that missing.
+     */
+    fun sourceReady(precise: Boolean, providerEnabled: Boolean): Boolean = precise && providerEnabled
+
     fun sourceSetupDetail(
         foreground: Boolean,
         precise: Boolean,

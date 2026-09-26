@@ -23,6 +23,13 @@ class LocationPolicyDisclosuresTest {
     }
 
     @Test
+    fun theLocationSourceIsReadyOnlyWithPreciseAccessAndAProviderOn() {
+        assertTrue(LocationPolicyDisclosures.sourceReady(precise = true, providerEnabled = true))
+        assertFalse("approximate access is what Setup calls missing", LocationPolicyDisclosures.sourceReady(precise = false, providerEnabled = true))
+        assertFalse(LocationPolicyDisclosures.sourceReady(precise = true, providerEnabled = false))
+    }
+
+    @Test
     fun sourceSetupDetailMentionsAndroid14LocationForegroundServiceGateWhenReady() {
         val detail = LocationPolicyDisclosures.sourceSetupDetail(
             foreground = true,
