@@ -2,6 +2,7 @@ package com.opentasker.automation.network
 
 import com.opentasker.automation.MonitorLifecycle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,6 +94,34 @@ class WiFiNetworkMonitorTest {
 
         assertEquals(WifiSnapshot(connected = false, ssid = null), tracker.snapshot())
         assertEquals(WifiSnapshot(connected = false, ssid = null), tracker.seedDisconnected())
+    }
+
+    /**
+     * The callback cannot be driven on the JVM (Network and NetworkCapabilities are framework
+     * stubs), so the wiring the tracker tests rely on is pinned here: dropping the location flag or
+     * the publish in onLost would otherwise leave every behavioural test green.
+     */
+    @Test
+    fun theCallbackAsksForLocationInfoAndPublishesEveryTransitionThroughTheTracker() {
+        val source = com.opentasker.ProductionSources.read("com/opentasker/automation/network/WiFiNetworkMonitor.kt")
+
+        assertTrue(
+            "API 31+ callbacks must ask for location info or every SSID arrives redacted",
+            "WifiCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO)" in source,
+        )
+        assertTrue("synchronized(stateLock) { publish(tracker.onLost(network)) }" in source)
+        assertTrue("synchronized(stateLock) { publish(tracker.onCapabilities(network, ssid)) }" in source)
+        assertFalse(
+            "state must come from the networks the callback named, never the default network",
+            // A property access, so the KDoc that explains why may still name it.
+            ".activeNetwork" in source,
+        )
+        // A withheld name is re-read when Location changes or the user returns to the app, and
+        // both triggers are removed again on stop.
+        assertTrue("IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)" in source)
+        assertTrue("AppVisibilityTracker.addForegroundListener(foregroundListener)" in source)
+        assertTrue("AppVisibilityTracker.removeForegroundListener(foregroundListener)" in source)
+        assertTrue("appContext.unregisterReceiver(locationModeReceiver)" in source)
     }
 
     @Test

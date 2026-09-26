@@ -3,11 +3,16 @@ package com.opentasker.core.platform
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Process-local activity visibility used only for Android 17 audio eligibility decisions. */
+/**
+ * Process-local activity visibility, for Android 17 audio eligibility decisions and for monitors
+ * that need to re-check something when the user returns to the app.
+ */
 object AppVisibilityTracker : Application.ActivityLifecycleCallbacks {
     private val startedActivityCount = AtomicInteger(0)
+    private val foregroundListeners = CopyOnWriteArraySet<() -> Unit>()
 
     val isAppVisible: Boolean
         get() = startedActivityCount.get() > 0
@@ -16,8 +21,19 @@ object AppVisibilityTracker : Application.ActivityLifecycleCallbacks {
         application.registerActivityLifecycleCallbacks(this)
     }
 
+    /** Called on the main thread each time the app goes from no visible activity to one. */
+    fun addForegroundListener(listener: () -> Unit) {
+        foregroundListeners += listener
+    }
+
+    fun removeForegroundListener(listener: () -> Unit) {
+        foregroundListeners -= listener
+    }
+
     override fun onActivityStarted(activity: Activity) {
-        startedActivityCount.incrementAndGet()
+        if (startedActivityCount.incrementAndGet() == 1) {
+            foregroundListeners.forEach { listener -> runCatching(listener) }
+        }
     }
 
     override fun onActivityStopped(activity: Activity) {

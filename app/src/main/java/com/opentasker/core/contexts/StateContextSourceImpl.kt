@@ -359,9 +359,12 @@ private val WIFI_DISCONNECTED_WORDS = setOf("disconnected", "off", "false", "no"
  */
 internal fun stateSpecReadsWifiSsid(spec: ContextSpec): Boolean {
     if (spec.type != ContextType.STATE) return false
-    val (key, _, value) = spec.config["predicate"]?.takeIf(String::isNotBlank)?.let(::parseStatePredicate)
-        ?: Triple(spec.config["key"].orEmpty(), "", spec.config["value"].orEmpty())
+    val (key, operator, value) = spec.config["predicate"]?.takeIf(String::isNotBlank)?.let(::parseStatePredicate)
+        ?: Triple(spec.config["key"].orEmpty(), spec.config["operator"].orEmpty(), spec.config["value"].orEmpty())
     if (normalizeStateKey(key) != "wifi") return false
+    // wifiMatches only compares names with "=", so any other operator never reads the name and
+    // must not ask for location or blame a withheld name for a context that cannot match anyway.
+    if (operator.trim().ifEmpty { "=" } != "=") return false
     val expected = value.trim().lowercase()
     return expected.isNotEmpty() && expected !in WIFI_CONNECTED_WORDS && expected !in WIFI_DISCONNECTED_WORDS
 }

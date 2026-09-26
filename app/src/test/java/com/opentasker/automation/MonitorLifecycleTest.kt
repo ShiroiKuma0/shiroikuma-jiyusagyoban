@@ -34,4 +34,19 @@ class MonitorLifecycleTest {
         assertEquals(2, attempts)
         assertFalse(lifecycle.isActive())
     }
+
+    @Test
+    fun whileActiveRunsOnlyBetweenStartAndStop() {
+        val lifecycle = MonitorLifecycle()
+        var runs = 0
+
+        lifecycle.whileActive { runs++ }
+        lifecycle.start { true }
+        lifecycle.whileActive { runs++ }
+        lifecycle.whileActive { error("a refresh failure must not escape") }
+        lifecycle.stop {}
+        lifecycle.whileActive { runs++ }
+
+        assertEquals(1, runs)
+    }
 }

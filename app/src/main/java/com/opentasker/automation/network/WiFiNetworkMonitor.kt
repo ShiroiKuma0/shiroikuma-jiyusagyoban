@@ -1,7 +1,10 @@
 package com.opentasker.automation.network
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.ConnectivityManager
@@ -17,6 +20,7 @@ import androidx.core.location.LocationManagerCompat
 import com.opentasker.automation.MonitorLifecycle
 import com.opentasker.core.contexts.DeviceStateEvents
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.platform.AppVisibilityTracker
 
 class WiFiNetworkMonitor(
     context: Context,
@@ -63,6 +67,20 @@ class WiFiNetworkMonitor(
         }
     }
 
+    private val request: NetworkRequest = NetworkRequest.Builder()
+        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+        .build()
+
+    // A withheld name only comes back with the next capability update, which a phone sitting on one
+    // network may not get for hours, so the Inspector kept saying "turn Location on" after it was
+    // on. Re-registering makes Android replay the current networks with location checked again;
+    // do that when whatever withheld the name may have changed: Location switched on, or the app
+    // coming to the foreground, where a permission may just have been granted.
+    private val locationModeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) = refreshIfNameWithheld()
+    }
+    private val foregroundListener: () -> Unit = { refreshIfNameWithheld() }
+
     fun start(): Boolean {
         return lifecycle.start {
             val cm = connectivityManager
@@ -72,33 +90,59 @@ class WiFiNetworkMonitor(
                 return@start false
             }
 
-            val request = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .build()
-
             try {
-                synchronized(stateLock) { tracker.reset() }
-                cm.registerNetworkCallback(request, callback)
-                // Android replays onAvailable for every Wi-Fi network already up, so the one
-                // answer the callback can never give is "nothing is connected". Seeding more than
-                // that here would race the replay with a staler reading.
-                if (!hasWifiNetwork(cm)) {
-                    synchronized(stateLock) { tracker.seedDisconnected()?.let(::publish) }
-                }
+                registerAndSeed(cm)
                 AppLogger.debug(TAG, "WiFi NetworkCallback registered")
-                true
             } catch (ex: RuntimeException) {
                 AppLogger.error(TAG, "Failed to register WiFi NetworkCallback", ex)
                 synchronized(stateLock) { publish(WifiSnapshot(connected = false, ssid = null)) }
-                false
+                return@start false
             }
+            // Refresh triggers only; the monitor works without them, so a failure here must not
+            // report the start as failed while the network callback stays registered.
+            runCatching {
+                ContextCompat.registerReceiver(
+                    appContext,
+                    locationModeReceiver,
+                    IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION),
+                    ContextCompat.RECEIVER_NOT_EXPORTED,
+                )
+            }.onFailure { AppLogger.warn(TAG, "Location change receiver unavailable", it) }
+            AppVisibilityTracker.addForegroundListener(foregroundListener)
+            true
         }
     }
 
     fun stop() {
         lifecycle.stop {
+            AppVisibilityTracker.removeForegroundListener(foregroundListener)
+            runCatching { appContext.unregisterReceiver(locationModeReceiver) }
             connectivityManager?.unregisterNetworkCallback(callback)
             AppLogger.debug(TAG, "WiFi NetworkCallback unregistered")
+        }
+    }
+
+    private fun registerAndSeed(cm: ConnectivityManager) {
+        synchronized(stateLock) { tracker.reset() }
+        cm.registerNetworkCallback(request, callback)
+        // Android replays onAvailable for every Wi-Fi network already up, so the one answer the
+        // callback can never give is "nothing is connected". Seeding more than that here would race
+        // the replay with a staler reading.
+        if (!hasWifiNetwork(cm)) {
+            synchronized(stateLock) { tracker.seedDisconnected()?.let(::publish) }
+        }
+    }
+
+    private fun refreshIfNameWithheld() {
+        val withheld = synchronized(stateLock) {
+            lastState?.let { it.connected && it.ssidUnavailableReason.isNotEmpty() } == true
+        }
+        if (!withheld) return
+        lifecycle.whileActive {
+            val cm = connectivityManager ?: return@whileActive
+            cm.unregisterNetworkCallback(callback)
+            registerAndSeed(cm)
+            AppLogger.debug(TAG, "WiFi NetworkCallback re-registered to re-read a withheld name")
         }
     }
 
@@ -117,15 +161,25 @@ class WiFiNetworkMonitor(
     }
 
     /**
-     * An unknown answer counts as "Wi-Fi present", so the seed stays silent rather than announcing
-     * a disconnect it cannot prove.
+     * Whether a network the callback's request would report is up. It has to be the request's own
+     * test: a broader one (any Wi-Fi transport) counted networks the callback never reports, such
+     * as another app's local-only link, and then the "disconnected" seed was never published at
+     * all. An unknown answer counts as "Wi-Fi present", so the seed stays silent rather than
+     * announcing a disconnect it cannot prove.
      */
     @Suppress("DEPRECATION")
     private fun hasWifiNetwork(cm: ConnectivityManager): Boolean = runCatching {
         cm.allNetworks.any { network ->
             val capabilities = cm.getNetworkCapabilities(network) ?: return@any false
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
-                !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            if (Build.VERSION.SDK_INT >= 30) {
+                request.canBeSatisfiedBy(capabilities)
+            } else {
+                // The request's default capabilities, spelled out for API 26 to 29.
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED) &&
+                    capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
+            }
         }
     }.getOrDefault(true)
 

@@ -93,6 +93,10 @@ class StateContextSourceImplTest {
         assertFalse(stateSpecReadsWifiSsid(state("predicate" to "wifi=off")))
         assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi_connected", "value" to "true")))
         assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi", "value" to "")))
+        // Names are only compared with "=", so another operator never reads the name.
+        assertFalse(stateSpecReadsWifiSsid(state("key" to "wifi", "operator" to ">=", "value" to "Home")))
+        assertFalse(stateSpecReadsWifiSsid(state("predicate" to "wifi>=Home")))
+        assertTrue(stateSpecReadsWifiSsid(state("key" to "wifi", "operator" to " ", "value" to "Home")))
         assertFalse(stateSpecReadsWifiSsid(ContextSpec(ContextType.EVENT, mapOf("key" to "wifi", "value" to "Home"))))
 
         assertEquals(DeviceStateEvents.WIFI_SSID_SETUP_MARKER, stateSetupMarkerKey(state("key" to "wifi", "value" to "Home")))

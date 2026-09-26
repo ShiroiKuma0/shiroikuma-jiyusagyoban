@@ -30,4 +30,10 @@ internal class MonitorLifecycle {
 
     @Synchronized
     fun isActive(): Boolean = active
+
+    /** Runs [block] only while registered, holding off a concurrent start or stop until it ends. */
+    @Synchronized
+    fun whileActive(block: () -> Unit) {
+        if (active) runCatching(block)
+    }
 }
