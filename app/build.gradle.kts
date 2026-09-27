@@ -40,7 +40,7 @@ import com.opentasker.build.VerifyRoomSchemaTask
 // The count spans the core modules as well as :app. The floor cannot be what protects the module
 // suites, since :app alone soon clears any fixed number, so the task also requires every suite in
 // JVM_TEST_MODULES to report passing tests of its own.
-private val JVM_TEST_FLOOR = 1332
+private val JVM_TEST_FLOOR = 2400
 
 /** The modules that own JVM tests `:app:testDebugUnitTest` does not run. */
 private val JVM_TEST_MODULES = listOf(":core:storage", ":core:engine", ":core:common")
