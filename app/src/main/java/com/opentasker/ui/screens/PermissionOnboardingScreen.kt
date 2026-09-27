@@ -105,7 +105,15 @@ private data class PermissionSetupItem(
 )
 
 private sealed interface PermissionAction {
-    data class RuntimePermission(val permission: String) : PermissionAction
+    /**
+     * A runtime permission dialog for [permission], which decides the outcome. [requestedWith] is
+     * asked for in the same dialog, because Android 12+ ignores a fine-location request that does
+     * not also ask for coarse location.
+     */
+    data class RuntimePermission(
+        val permission: String,
+        val requestedWith: List<String> = emptyList(),
+    ) : PermissionAction
     data class SettingsIntent(val intent: Intent) : PermissionAction
     /** Try each OEM settings component in order, falling back to a web guide URL. */
     data class OemSettings(
@@ -131,7 +139,7 @@ fun PermissionOnboardingScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshTick by remember { mutableIntStateOf(0) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         refreshTick++
     }
     // Device-admin add must be started for-result from the Activity (NOT as a new task, which makes the
@@ -276,7 +284,7 @@ fun PermissionOnboardingScreen(
                                     onMessage,
                                 )
                             } else {
-                                permissionLauncher.launch(action.permission)
+                                permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())
                             }
                         is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
                         is PermissionAction.Custom -> action.run()
@@ -612,10 +620,23 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Foreground location",
-            body = LocationPolicyDisclosures.foregroundSetupBody,
-            granted = hasAnyLocationPermission(context),
+            body = if (!hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) &&
+                hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
+            ) {
+                LocationPolicyDisclosures.foregroundSetupBodyApproximate
+            } else {
+                LocationPolicyDisclosures.foregroundSetupBody
+            },
+            // Precise only: approximate location cannot read a WiFi name or hold a small geofence, and
+            // counting it as ready left those contexts failing behind a green row while the Inspector
+            // (LocationPolicyDisclosures.sourceReady) still called location missing.
+            granted = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION),
             actionLabel = "Request",
-            action = PermissionAction.RuntimePermission(Manifest.permission.ACCESS_FINE_LOCATION),
+            // Android 12+ ignores a request for fine location that does not also ask for coarse.
+            action = PermissionAction.RuntimePermission(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                requestedWith = listOf(Manifest.permission.ACCESS_COARSE_LOCATION),
+            ),
             requiredFor = "Location and WiFi contexts",
         ),
         PermissionSetupItem(
@@ -738,10 +759,6 @@ private const val ANDROID_17_API = 37
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-private fun hasAnyLocationPermission(context: Context): Boolean =
-    hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ||
-        hasPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
