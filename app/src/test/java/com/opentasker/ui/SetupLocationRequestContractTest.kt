@@ -8,16 +8,20 @@ import org.junit.Test
 /**
  * Setup's location row asked for fine location on its own, which Android 12+ ignores unless coarse
  * is requested in the same dialog, so the button silently did nothing on current phones. It also
- * counted approximate location as ready, while a Wi-Fi name and a small geofence both need precise,
- * so the row turned green and the Inspector still said "allow precise location" (issue #17 review).
+ * counted approximate location as ready, while a WiFi name and a small geofence both need precise,
+ * so the row turned green and the Inspector still said "allow precise location" (upstream #17).
+ *
+ * Upstream's version of this gate reads `SetupRows.kt`, the row catalogue it split out of the Setup
+ * screen. This fork rewrote that screen and keeps its rows inline, so the same assertions are
+ * pointed at `PermissionOnboardingScreen.kt`, where the fork's location row actually lives.
  */
 class SetupLocationRequestContractTest {
     @Test
     fun theLocationRowAsksForPreciseLocationTheWayAndroidAccepts() {
         val row = ProductionSources.block(
-            "com/opentasker/ui/screens/SetupRows.kt",
-            "R.string.setup_foreground_location_title",
-            "requirements = setOf(SetupRequirement.FOREGROUND_LOCATION)",
+            "com/opentasker/ui/screens/PermissionOnboardingScreen.kt",
+            "title = \"Foreground location\"",
+            "title = \"Nearby WiFi devices\"",
         )
 
         assertTrue(
@@ -26,11 +30,11 @@ class SetupLocationRequestContractTest {
         )
         assertTrue(
             "coarse must be requested in the same dialog as fine",
-            "requestedWith = listOf(Manifest.permission.ACCESS_COARSE_LOCATION)" in row,
+            "requestedWith = listOf(Manifest.permission.ACCESS_COARSE_LOCATION)," in row,
         )
         assertTrue(
             "approximate-only access explains what is missing",
-            "R.string.setup_foreground_location_body_approximate" in row,
+            "LocationPolicyDisclosures.foregroundSetupBodyApproximate" in row,
         )
         assertFalse("hasAnyLocationPermission" in row)
     }
@@ -45,12 +49,21 @@ class SetupLocationRequestContractTest {
         )
     }
 
+    /**
+     * RETIRED upstream half: `val granted = results[permission] == true`. Upstream's callback
+     * resolves one pending permission and reports on it; the fork's Setup screen refreshes every row
+     * from the system on each result and on every ON_RESUME, so it keeps no pending permission to
+     * report on. What still has to hold is that the companion permission reaches the same dialog.
+     */
     @Test
     fun theSetupScreenLaunchesEveryRequestedPermissionTogether() {
         val screen = ProductionSources.read("com/opentasker/ui/screens/PermissionOnboardingScreen.kt")
 
         assertTrue(screen.contains("ActivityResultContracts.RequestMultiplePermissions()"))
-        assertTrue(screen.contains("permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())"))
-        assertTrue("the primary permission still decides the outcome", screen.contains("val granted = results[permission] == true"))
+        assertTrue(
+            screen.contains(
+                "permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())",
+            ),
+        )
     }
 }
