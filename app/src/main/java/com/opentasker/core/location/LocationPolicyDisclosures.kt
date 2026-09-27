@@ -5,6 +5,11 @@ object LocationPolicyDisclosures {
         "Needed for live Location contexts and WiFi SSID visibility on modern Android. " +
             "Approximate access can emit lower-precision fixes; background precision cannot exceed the foreground precision the user grants."
 
+    /** Shown in place of [foregroundSetupBody] when only approximate location is actually granted. */
+    const val foregroundSetupBodyApproximate: String =
+        "Only approximate location is allowed right now. WiFi network names and small geofences need " +
+            "precise location, so tap Request and choose Precise."
+
     fun backgroundSetupBody(apiLevel: Int): String {
         val settingsPath = if (apiLevel >= 30) {
             "Android 11+ grants background location from app settings instead of the foreground permission dialog."
