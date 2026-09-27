@@ -8,6 +8,65 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+001 — 2026-09-27
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, nineteen commits on from the base this fork
+last sat on. `appVersionCode` moved 95 → 96, so the build counter resets to `+001`; `versionCode`
+960001 still clears the last built 950148, which is the one case that reset is allowed.
+
+### 上流 — four security fixes, and the Wi-Fi name that would not read
+
+Everything in this section is upstream's work, arriving here by rebase:
+
+- **A Quick Settings tile no longer runs its task straight from the lock screen.** Anyone holding
+  the phone could tap one and run whatever it was bound to. The tap now waits for an unlock and then
+  runs; a device with no lock set is unaffected.
+- **Exporting a bundle no longer writes a secret out of a "Run only if" guard or an action label.**
+  Only action arguments were being cleaned, so a guard like `%Pin == 4321` carried the value into
+  the exported file, the paste text and a shared profile. The whole guard is replaced rather than
+  the secret inside it, so an action that was guarded before export cannot come back unguarded.
+- **A malformed push or Locale message from another app can no longer stop the automation
+  service.** Both entry points are open to any app by design, and reading a value the sender had
+  deliberately made unreadable took the service down with it.
+- **Secret variable values and the backup passphrase now use the password keyboard.** They were
+  masked on screen but typed as ordinary text, so the keyboard's personal dictionary could learn
+  them and offer one back in another app.
+- **A Wi-Fi profile that matches a network name works again on Android 12 and later.** The name
+  always read "Unknown" even with every location permission granted, because Android hands it only
+  to an app that asks in a particular way; turning Wi-Fi off also went unnoticed until a restart, so
+  a "connected" profile never ended. Both are fixed, and where Android genuinely withholds the name
+  the Inspector now says which of the two reasons applies instead of showing "Unknown".
+
+### 設定 — the location fix arrived in two halves and only one of them could land
+
+Upstream's Android 12+ location work is two changes that have to agree with each other. The
+Inspector half merged into this fork cleanly: it now asks `LocationPolicyDisclosures.sourceReady()`,
+which counts **precise** location and nothing less. The Setup half lived in upstream's
+`SetupRows.kt` — the row catalogue it split out of the Setup screen, and a file this fork deletes,
+because its own rewritten Setup screen keeps the rows inline.
+
+So the merge compiled, and the whole test suite passed, with the Inspector demanding precise
+location while Setup's own row still turned green on approximate: exactly the disagreement
+upstream's commit exists to remove, reintroduced by the act of merging it. That is the failure mode
+worth naming — not the conflict that stops the rebase, but the half of a two-part fix that lands
+alone and leaves the tree consistent-looking and wrong.
+
+The Setup half is therefore ported here by hand. A permission row can now name companions to be
+requested **in the same dialog**, because Android 12+ silently ignores a fine-location request that
+does not also ask for coarse — which is why the Request button on that row had simply done nothing
+on a current phone, leaving the system settings as the only route. The row counts only precise
+location as ready, since approximate can neither read a Wi-Fi name nor hold a small geofence, and
+when approximate is all that is granted the row says so and says what to tap.
+
+### 試験 — a floor 45 % below the count is not a floor
+
+The JVM test gate exists so that a large batch of tests cannot be deleted silently. This fork's
+floor read 1332 against **2448** actually passing — far enough below the count that a thousand
+tests could have vanished under it without a word. Upstream's own commit in this sync widens the
+gate to count the three `core` module suites as well as `:app`, and to fail by name any suite that
+reports nothing at all; that structure is kept, and the number is raised to 2400, close under the
+real count the way upstream keeps theirs.
+
 ## 0.2.93+2026-09-14.00-34.gaa1a372a+148 — 2026-09-26
 
 Built on upstream `aa1a372a`.
