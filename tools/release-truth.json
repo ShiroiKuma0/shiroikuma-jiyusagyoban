@@ -14,10 +14,10 @@
     "buildTools": "36.0.0"
   },
   "dependencies": {
-    "kotlin": "2.4.10",
+    "kotlin": "2.4.20",
     "gradle": "9.7.1",
     "agp": "9.3.2",
-    "ksp": "2.3.11",
+    "ksp": "2.3.12",
     "room": "2.8.4",
     "composeBom": "2026.08.00",
     "work": "2.11.2"

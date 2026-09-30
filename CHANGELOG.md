@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Security
+
+- The build moves to Kotlin 2.4.20 and KSP 2.3.12. Kotlin 2.4.20 fixes CVE-2026-53914, where the compiler could be fed a tampered build cache. OpenTasker has only ever built with a local cache, so no released APK was exposed, and now a build from source isn't either.
+
 ### Fixed
 
 - Setup and Settings no longer crash the app as they open on Android 8 to 12 phones that can pair companion devices, which includes Galaxy phones (#20). If one of Setup's checks fails on a particular phone, its row now says "Couldn't check" and the rest of the screen carries on.

@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/SysAdminDoc/OpenTasker/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-brightgreen.svg)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/kotlin-2.4.10-7f52ff.svg)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.4.20-7f52ff.svg)](https://kotlinlang.org)
 [![Obtainium](https://img.shields.io/badge/Obtainium-add%20app-1c1c1c.svg)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.opentasker.app%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FSysAdminDoc%2FOpenTasker%22%2C%22author%22%3A%22SysAdminDoc%22%2C%22name%22%3A%22OpenTasker%22%7D)
 
 <p align="center">
@@ -313,10 +313,10 @@ Treat a wrapper upgrade as one atomic change: run `gradlew wrapper --gradle-vers
 
 | Property | Value |
 |----------|-------|
-| Kotlin | 2.4.10 |
+| Kotlin | 2.4.20 |
 | Gradle | 9.7.1 |
 | AGP | 9.3.2 |
-| KSP | 2.3.11 |
+| KSP | 2.3.12 |
 | Build Tools | 36.0.0 |
 | Macrobenchmark | 1.5.0-rc02 |
 | JDK | 17 or 21 |
