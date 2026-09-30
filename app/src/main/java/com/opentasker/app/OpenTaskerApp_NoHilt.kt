@@ -87,10 +87,26 @@ class OpenTaskerApp_NoHilt : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 言語島's player runs in a process of its own (`:gengoshima`) so a player fault cannot
+        // take the automation engine down with it. Everything below belongs to the MAIN process
+        // only: run in the player's, it would open a second Room instance, reconcile the execution
+        // journal against rows the running engine is still writing — marking live tasks as
+        // interrupted — and schedule the workers twice. The player needs none of it.
+        if (isSideProcess()) return
         installStrictModeInDebug()
         if (DirectBootTriggerStore.isUserUnlocked(this)) {
             initializeAfterUnlock()
         }
+    }
+
+    /** True in any process but the app's main one — today only 言語島's player (`:gengoshima`). */
+    private fun isSideProcess(): Boolean {
+        val name = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            getProcessName()
+        } else {
+            runCatching { java.io.File("/proc/self/cmdline").readText().trim('\u0000', ' ', '\n') }.getOrNull()
+        }
+        return name != null && name.contains(':')
     }
 
     @Suppress("DEPRECATION")
