@@ -244,4 +244,29 @@ class AutomationFlowGraphTest {
         assertTrue(graph.accessibilitySummary().contains("3 action"))
         assertTrue(actions[0].accessibilityLabel().contains("condition if %calendar = meeting"))
     }
+
+    @Test
+    fun contextNodesShowStructuralKeysButStillMaskPluginSecrets() {
+        // Seen on a device: every State context read "key=<redacted>" because the field that names
+        // the state trips the credential heuristic (A-370).
+        val task = Task(id = 7, name = "Guard", actions = listOf(ActionSpec(type = "log", args = mapOf("message" to "x"))))
+        val profile = Profile(
+            id = 8,
+            name = "Low battery guard",
+            enabled = true,
+            contexts = listOf(
+                ContextSpec(ContextType.STATE, mapOf("key" to "battery_level", "operator" to "<=", "value" to "20")),
+                ContextSpec(ContextType.EVENT, mapOf("event" to "broadcast", "extraKey" to "msg")),
+                ContextSpec(ContextType.PLUGIN, mapOf("package" to "com.example.plugin", "api_key" to "sk-live-123")),
+            ),
+            enterTaskId = task.id,
+        )
+
+        val details = AutomationFlowGraphBuilder.build(profile, listOf(task)).contextNodes.map { it.detail.orEmpty() }
+
+        assertEquals("key=battery_level, operator=<=, value=20", details[0])
+        assertTrue(details[1], details[1].contains("extraKey=msg"))
+        assertTrue(details[2], details[2].contains("api_key=<redacted>"))
+        assertFalse(details[2], details[2].contains("sk-live-123"))
+    }
 }

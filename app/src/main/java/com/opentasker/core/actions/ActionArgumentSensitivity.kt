@@ -90,18 +90,25 @@ object ActionArgumentSensitivity {
     /**
      * Deterministic, redacted, single-line summary of [args] suitable for list rows, flow nodes,
      * and previews. Returns an empty string when there is nothing to show so callers can fall
-     * back to their own placeholder copy.
+     * back to their own placeholder copy. [structuralKeys] names fields the caller knows are
+     * structure rather than data, shown as written even when the name heuristic would mask them.
      */
     fun summarize(
         actionType: String?,
         args: Map<String, String>,
         limit: Int = DEFAULT_SUMMARY_LIMIT,
         maxValueLength: Int = DEFAULT_MAX_VALUE_LENGTH,
+        structuralKeys: Set<String> = emptySet(),
     ): String {
         if (args.isEmpty()) return ""
         val ordered = args.entries.sortedBy { it.key }
         val visible = ordered.take(limit).joinToString(", ") { (key, value) ->
-            "$key=${maskValue(actionType, key, value, args, maxValueLength)}"
+            val shown = if (key in structuralKeys) {
+                value.collapseWhitespace().ellipsize(maxValueLength)
+            } else {
+                maskValue(actionType, key, value, args, maxValueLength)
+            }
+            "$key=$shown"
         }
         val hidden = ordered.size - limit
         return if (hidden > 0) "$visible, +$hidden more" else visible

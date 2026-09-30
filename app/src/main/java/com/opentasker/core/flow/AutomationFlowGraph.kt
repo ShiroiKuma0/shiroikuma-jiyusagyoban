@@ -10,6 +10,7 @@ import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.AutomationInvariant
 import com.opentasker.core.model.ContextSpec
+import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 
@@ -289,7 +290,10 @@ private fun ContextSpec.toNode(
         id = id,
         kind = AutomationFlowNodeKind.CONTEXT,
         title = strings.contextTitle(index + 1, type.name.lowercase().replaceFirstChar { it.uppercase() }),
-        detail = strings.contextDetail(invert, config.summaryOrNull(actionType = null)),
+        detail = strings.contextDetail(
+            invert,
+            config.summaryOrNull(actionType = null, structuralKeys = STRUCTURAL_CONTEXT_KEYS[type].orEmpty()),
+        ),
         muted = invert,
         changed = "profile:$profileId:context:$index" in changedNodeKeys,
         target = AutomationFlowTarget.Context(profileId, index),
@@ -334,15 +338,31 @@ private fun ActionSpec.edgeLabel(index: Int, strings: AutomationFlowStrings): St
  * as it is in the task list and the run log. Pass a null [actionType] for context configs, which
  * have no registered field metadata and fall back to the shared name heuristic.
  */
-private fun Map<String, String>.summaryOrNull(actionType: String?, limit: Int = 3): String? {
+private fun Map<String, String>.summaryOrNull(
+    actionType: String?,
+    limit: Int = 3,
+    structuralKeys: Set<String> = emptySet(),
+): String? {
     if (isEmpty()) return null
     return ActionArgumentSensitivity.summarize(
         actionType = actionType,
         args = this,
         limit = limit,
         maxValueLength = ARG_PREVIEW_LENGTH,
+        structuralKeys = structuralKeys,
     ).takeUnless(String::isBlank)
 }
+
+/**
+ * Built-in context fields that name what the context watches, never a secret, but trip the
+ * credential heuristic by name: a State context's `key` is the state itself (`battery_level`), and
+ * a broadcast trigger's `extraKey` is an intent extra's name. Masking them left every State
+ * context in Flow reading `key=<redacted>`. Plugin configs get no exemption.
+ */
+private val STRUCTURAL_CONTEXT_KEYS: Map<ContextType, Set<String>> = mapOf(
+    ContextType.STATE to setOf("key"),
+    ContextType.EVENT to setOf("extraKey"),
+)
 
 private const val ARG_PREVIEW_LENGTH = 36
 
