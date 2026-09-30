@@ -17,7 +17,17 @@ data class ExpectedTrigger(
 data class ExpectedTriggerLedgerState(
     val current: ExpectedTrigger? = null,
     val deferredOverdue: ExpectedTrigger? = null,
+    /** Recovery alarms booked since a tick last reached the engine. */
+    val recoveryAttempts: Int = 0,
 )
+
+/**
+ * How long each consecutive recovery alarm waits, and how many there are. A recovery fires the same
+ * receiver that just failed, so a flat five-second retry woke the device every five seconds for as
+ * long as the failure lasted. After the last step the receiver stops booking them; the engine
+ * watchdog still re-arms time delivery on its own schedule.
+ */
+internal val RECOVERY_BACKOFF_MILLIS: List<Long> = listOf(5_000L, 30_000L, 300_000L)
 
 data class MissedTrigger(
     val kind: ExpectedTriggerKind,
@@ -51,10 +61,26 @@ class ExpectedTriggerTracker(initialState: ExpectedTriggerLedgerState = Expected
         } else {
             state.deferredOverdue
         }
-        state = ExpectedTriggerLedgerState(
+        // copy, not a fresh state: booking the recovery alarm itself comes through here, and a
+        // fresh state would reset the backoff on every attempt.
+        state = state.copy(
             current = ExpectedTrigger(kind, expectedAtMillis),
             deferredOverdue = deferred,
         )
+    }
+
+    /** The delay before the next recovery alarm, or null once the backoff is used up. */
+    fun claimRecoveryDelay(): Long? {
+        val delay = RECOVERY_BACKOFF_MILLIS.getOrNull(state.recoveryAttempts) ?: return null
+        state = state.copy(recoveryAttempts = state.recoveryAttempts + 1)
+        return delay
+    }
+
+    /** A tick reached the engine, so the next failure starts the backoff from the beginning. */
+    fun resetRecovery(): Boolean {
+        if (state.recoveryAttempts == 0) return false
+        state = state.copy(recoveryAttempts = 0)
+        return true
     }
 
     fun markDelivered(actualAtMillis: Long) {
@@ -147,6 +173,12 @@ class ExpectedTriggerLedger(private val store: ExpectedTriggerStateStore) {
 
     fun requeue(missed: MissedTrigger) = mutate { it.requeue(missed) }
 
+    fun claimRecoveryDelay(): Long? = mutate { it.claimRecoveryDelay() }
+
+    fun resetRecovery() {
+        mutate(persistWhen = { changed -> changed }) { it.resetRecovery() }
+    }
+
     private fun <T> mutate(persistWhen: (T) -> Boolean = { true }, block: (ExpectedTriggerTracker) -> T): T =
         synchronized(FILE_LOCK) {
             val tracker = ExpectedTriggerTracker(store.load())
@@ -168,6 +200,7 @@ class SharedPreferencesExpectedTriggerStateStore(context: Context) : ExpectedTri
     override fun load(): ExpectedTriggerLedgerState = ExpectedTriggerLedgerState(
         current = readTrigger(KEY_CURRENT_AT, KEY_CURRENT_KIND, KEY_CURRENT_DELIVERED, KEY_CURRENT_REPORTED),
         deferredOverdue = readTrigger(KEY_DEFERRED_AT, KEY_DEFERRED_KIND, KEY_DEFERRED_DELIVERED, KEY_DEFERRED_REPORTED),
+        recoveryAttempts = preferences.getInt(KEY_RECOVERY_ATTEMPTS, 0).coerceAtLeast(0),
     )
 
     /**
@@ -186,6 +219,7 @@ class SharedPreferencesExpectedTriggerStateStore(context: Context) : ExpectedTri
         preferences.edit()
             .writeTrigger(KEY_CURRENT_AT, KEY_CURRENT_KIND, KEY_CURRENT_DELIVERED, KEY_CURRENT_REPORTED, state.current)
             .writeTrigger(KEY_DEFERRED_AT, KEY_DEFERRED_KIND, KEY_DEFERRED_DELIVERED, KEY_DEFERRED_REPORTED, state.deferredOverdue)
+            .putInt(KEY_RECOVERY_ATTEMPTS, state.recoveryAttempts)
             .apply()
     }
 
@@ -232,5 +266,6 @@ class SharedPreferencesExpectedTriggerStateStore(context: Context) : ExpectedTri
         private const val KEY_DEFERRED_KIND = "deferred_kind"
         private const val KEY_DEFERRED_DELIVERED = "deferred_delivered"
         private const val KEY_DEFERRED_REPORTED = "deferred_reported"
+        private const val KEY_RECOVERY_ATTEMPTS = "recovery_attempts"
     }
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A time trigger that can't be delivered no longer wakes the phone every five seconds to retry. Recovery now waits 5 seconds, then 30, then 5 minutes, and after that leaves it to the engine's own watchdog.
+
 ## v0.2.94
 
 ### Security

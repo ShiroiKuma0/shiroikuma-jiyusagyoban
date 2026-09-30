@@ -20,8 +20,11 @@ class TimeEventScheduler(context: Context) {
         scheduleAt(nextMinuteBoundaryMillis(nowMillis), ExpectedTriggerKind.MINUTE_TICK, nowMillis)
     }
 
-    fun scheduleRecovery(nowMillis: Long = System.currentTimeMillis()) {
-        scheduleAt(recoveryTriggerAtMillis(nowMillis), ExpectedTriggerKind.RECOVERY, nowMillis)
+    fun scheduleRecovery(
+        nowMillis: Long = System.currentTimeMillis(),
+        delayMillis: Long = RECOVERY_DELAY_MS,
+    ) {
+        scheduleAt(recoveryTriggerAtMillis(nowMillis, delayMillis), ExpectedTriggerKind.RECOVERY, nowMillis)
     }
 
     private fun scheduleAt(
@@ -76,7 +79,10 @@ class TimeEventScheduler(context: Context) {
         internal fun nextMinuteBoundaryMillis(nowMillis: Long): Long =
             ((nowMillis / MINUTE_MS) + 1L) * MINUTE_MS
 
-        internal fun recoveryTriggerAtMillis(nowMillis: Long): Long = nowMillis + RECOVERY_DELAY_MS
+        internal fun recoveryTriggerAtMillis(
+            nowMillis: Long,
+            delayMillis: Long = RECOVERY_DELAY_MS,
+        ): Long = nowMillis + delayMillis
 
         internal fun scheduleMode(precision: AlarmSchedulePrecision): AlarmSchedulePrecision = precision
     }

@@ -1,11 +1,59 @@
 package com.opentasker.core.scheduling
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExpectedTriggerLedgerTest {
+    @Test
+    fun recoveryBacksOffThenStops() {
+        // A recovery alarm fires the receiver that just failed; a flat five-second retry woke the
+        // device every five seconds for as long as the failure lasted (A-320).
+        val tracker = ExpectedTriggerTracker()
+
+        assertEquals(5_000L, tracker.claimRecoveryDelay())
+        assertEquals(30_000L, tracker.claimRecoveryDelay())
+        assertEquals(300_000L, tracker.claimRecoveryDelay())
+        assertNull(tracker.claimRecoveryDelay())
+        assertNull(tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun aDeliveredTickRestartsTheBackoff() {
+        val tracker = ExpectedTriggerTracker()
+        assertFalse("nothing to reset yet", tracker.resetRecovery())
+        tracker.claimRecoveryDelay()
+        tracker.claimRecoveryDelay()
+
+        assertTrue(tracker.resetRecovery())
+        assertEquals(5_000L, tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun bookingTheRecoveryAlarmDoesNotResetTheBackoff() {
+        // Scheduling the recovery records an expected trigger. That used to rebuild the whole
+        // state, which would have put every attempt back at five seconds.
+        val tracker = ExpectedTriggerTracker()
+        val first = tracker.claimRecoveryDelay()!!
+        tracker.recordExpected(ExpectedTriggerKind.RECOVERY, expectedAtMillis = first, nowMillis = 0L)
+
+        assertEquals(30_000L, tracker.claimRecoveryDelay())
+    }
+
+    @Test
+    fun theBackoffSurvivesAcrossLedgerInstances() {
+        // Each tick builds a new receiver and a new ledger over the same store.
+        val store = InMemoryExpectedTriggerStateStore()
+        ExpectedTriggerLedger(store).claimRecoveryDelay()
+        ExpectedTriggerLedger(store).claimRecoveryDelay()
+
+        assertEquals(300_000L, ExpectedTriggerLedger(store).claimRecoveryDelay())
+        ExpectedTriggerLedger(store).resetRecovery()
+        assertEquals(5_000L, ExpectedTriggerLedger(store).claimRecoveryDelay())
+    }
+
     @Test
     fun overdueTriggerIsConsumedOnceWithDelay() {
         val tracker = ExpectedTriggerTracker()

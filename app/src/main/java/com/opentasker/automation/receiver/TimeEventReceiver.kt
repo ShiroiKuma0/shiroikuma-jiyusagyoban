@@ -32,7 +32,8 @@ class TimeEventReceiver : BroadcastReceiver() {
 
         when (classifyTimeEventAction(intent.action)) {
             TimeEventAction.TIME_TICK -> {
-                ExpectedTriggerLedger(context).markDelivered(System.currentTimeMillis())
+                val ledger = ExpectedTriggerLedger(context)
+                ledger.markDelivered(System.currentTimeMillis())
                 val scheduler = TimeEventScheduler(context)
                 val rearmed = runCatching { scheduler.scheduleNextMinute() }
                     .onFailure { AppLogger.error(TAG, "Could not re-arm the next time tick", it) }
@@ -44,6 +45,7 @@ class TimeEventReceiver : BroadcastReceiver() {
                             .setAction(AutomationService.ACTION_TIME_TICK_TRIGGER),
                     )
                 }.onSuccess {
+                    ledger.resetRecovery()
                     AppLogger.debug(TAG, "Delivered alarm-backed time tick to the engine")
                 }.onFailure { error ->
                     // Only skip the recovery when the ordinary tick was re-armed. If that failed
@@ -63,8 +65,16 @@ class TimeEventReceiver : BroadcastReceiver() {
                         )
                     } else {
                         AppLogger.error(TAG, "Could not deliver alarm-backed time tick", error)
-                        runCatching { scheduler.scheduleRecovery() }
-                            .onFailure { AppLogger.error(TAG, "Could not schedule time-tick recovery", it) }
+                        // The recovery alarm fires this same receiver, so a failure that persists
+                        // fed itself every five seconds without end. Back off, then stop; the
+                        // engine watchdog keeps re-arming time delivery on its own schedule.
+                        val delay = ledger.claimRecoveryDelay()
+                        if (delay == null) {
+                            AppLogger.warn(TAG, "Stopped booking time-tick recovery after repeated failures; the engine watchdog re-arms it")
+                        } else {
+                            runCatching { scheduler.scheduleRecovery(delayMillis = delay) }
+                                .onFailure { AppLogger.error(TAG, "Could not schedule time-tick recovery", it) }
+                        }
                     }
                 }
             }
