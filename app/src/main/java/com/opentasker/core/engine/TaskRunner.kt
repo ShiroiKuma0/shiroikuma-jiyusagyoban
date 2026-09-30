@@ -911,6 +911,14 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // the sample article's first page and 19 on its second. This is minutes of honest work, not a
     // hung action — measured, it was 64 s into the first page when the default budget killed it.
     actionType == "ocr.article" -> ARTICLE_ACTION_TIMEOUT_MS
+    // A render waits on 音声 synthesising sentence after sentence, a few seconds each; the action
+    // stops itself on a stall (its `stall` argument), so this is only the outer ceiling.
+    actionType == "onse.render" -> ARTICLE_ACTION_TIMEOUT_MS
+    // Claude thinks before it answers; one call on a long island can take minutes. The client
+    // carries its own 12-minute ceiling, so this only has to sit above it.
+    actionType == "claude.message" -> ARTICLE_ACTION_TIMEOUT_MS
+    // A whole island translated and then voiced sentence by sentence; the run bounds itself.
+    actionType == "gengoshima.generate" -> HUAWEI_PGNSS_TIMEOUT_MS
     // The Huawei band's own ceilings are far above the 60 s default and are already enforced
     // inside the actions themselves. A pairing run waits on TWO human confirmations and then has
     // to stay connected for ninety seconds afterwards; a sync's configurable limit caps at 1800 s.

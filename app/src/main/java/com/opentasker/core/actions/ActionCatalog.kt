@@ -251,6 +251,12 @@ object ActionCatalog {
         // costs a second set of downloads and leaves the store in exactly the state one run does.
         define("huawei.pgnss", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiPgnssAction),
         define("huawei.almanacwatch", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiAlmanacWatchAction),
+        define("onse.render", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::OnseRenderAction),
+        define("claude.message", ActionCategory.NET, ActionRetrySafety.NEVER, ::ClaudeMessageAction),
+        define("gengoshima.entry", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaEntryAction),
+        define("gengoshima.generate", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaGenerateAction),
+        define("gengoshima.listen", ActionCategory.MEDIA, ActionRetrySafety.IDEMPOTENT, ::GengoshimaListenAction),
+        define("gengoshima.islands", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaIslandsAction),
         define("ui.click", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiClickAction),
         define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("band.compare", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandCompareAction),

@@ -23,6 +23,8 @@
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 言語島's player: a media-playback foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- system.set_locale: dev-flagged, so adb-grantable once (pm grant, survives reboots). -->
     <uses-permission
         android:name="android.permission.CHANGE_CONFIGURATION"
@@ -190,6 +192,9 @@
         <package android:name="shiroikuma.kojiki" />
         <package android:name="shiroikuma.ongaku" />
         <package android:name="shiroikuma.kakutoku" />
+        <package android:name="shiroikuma.onse" />
+        <package android:name="shiroikuma.doksho" />
+        <package android:name="shiroikuma.kaku" />
         <package android:name="shiroikuma.denwa" />
         <package android:name="shiroikuma.yotehyo" />
         <package android:name="shiroikuma.shosekietsuran" />
@@ -297,6 +302,65 @@
         <!-- 「運動（Huawei）」 — the walks grid. Its own window and task affinity for the same reason
              the watch-face picker has one: asking the band runs for tens of seconds over Bluetooth
              and the grid has to still be there afterwards. -->
+        <!-- 言語島's sentence entry. Its own task affinity, so it opens as a window of its own and
+             closing it returns to wherever 白い熊 was; closing is also what starts generation. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaEntryActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima"
+            android:label="言語島"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 言語島's player, in a process of its own so a player fault cannot take the automation
+             engine with it. Exported with the MediaSessionService filter because that is how a
+             headset, the steering wheel and the lock screen reach it. -->
+        <service
+            android:name="com.opentasker.core.gengoshima.GengoshimaPlaybackService"
+            android:process=":gengoshima"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
+        <!-- 言語島's island editor. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaIslandsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.islands"
+            android:label="言語島"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 言語島's listening screen: over the lock screen, the one on the car mount. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaPlayerActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.player"
+            android:label="言語島"
+            android:showWhenLocked="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 言語島's progress window: translucent, over whatever app is in front, reopened from the
+             run's notification. Its own affinity, so returning to it never drags the entry screen or
+             the main window along. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaProgressActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.progress"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden" />
+
         <activity
             android:name="com.opentasker.ui.charts.huawei.HuaweiWalksActivity"
             android:exported="false"
