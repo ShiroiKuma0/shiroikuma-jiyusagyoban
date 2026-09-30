@@ -13,7 +13,12 @@
 - The context editor says which field is wrong. A time like 25:00 or a latitude out of range greyed out Save with nothing marked.
 - Setup and Diagnostics no longer flash "Ready" or a red "Needs attention" for a moment before they have checked anything.
 - Times in the run log, the Inspector and Diagnostics follow your phone's date order and 12- or 24-hour clock instead of always reading like 2026-09-26 18:40:00.
+- A backup taken while tasks are running is a clean copy. It used to copy the database file while other writes could still land in it, so a busy moment could leave a backup that failed its integrity check or quietly mixed two moments.
 - A restore keeps the database it replaced, including whatever the app wrote just before it closed, and Setup offers to roll back to it. That copy and the file from a restore that failed were missing from every list and count, so they sat at full size until app data was cleared.
+
+### Changed
+
+- Text throughout the app drops its long dashes. Ranges read "1 to 5", and separators use a dot.
 
 ## v0.2.94
 
@@ -185,10 +190,7 @@
   longer means running everything above it first. The run appears in the run log
   under its own name. Flow-control markers are not offered, because an "if"
   without its "end if" is not a smaller task.
-- Settings has an About section. It shows the version and build you are running,
-  links out to the source, the release notes and the licence, and offers a
-  "Report a problem" button that opens a new issue with your build and device
-  already filled in.
+- Settings has an About section with the version and build you're running and links to the source, the release notes and the licence. Its "Report a problem" button opens a new issue with your build and device already filled in.
 - The Diagnostics screen can copy its redacted report to the clipboard. Sharing
   it opened a chooser, which is awkward when what you want is to paste it into a
   bug report.

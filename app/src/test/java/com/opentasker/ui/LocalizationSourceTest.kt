@@ -485,6 +485,32 @@ class LocalizationSourceTest {
     }
 
     /**
+     * Anything a user reads avoids em and en dashes (A-308), and a separator or a range reads
+     * better as a middle dot, a colon or "to" anyway. Every string and plural item in the default
+     * resources is checked, so a new one cannot bring them back.
+     */
+    @Test
+    fun userVisibleStringsUseNoEmOrEnDashes() {
+        val files = Files.list(resRoot.resolve("values")).use { paths ->
+            paths.filter { it.fileName.toString().endsWith(".xml") }.toList()
+        }
+        val offenders = files.flatMap { file ->
+            val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
+            listOf("string", "item").flatMap { tag ->
+                val nodes = document.getElementsByTagName(tag)
+                (0 until nodes.length).map { index -> nodes.item(index) }
+            }.filter { node ->
+                node.textContent.any { it == '—' || it == '–' }
+            }.map { node ->
+                val name = node.attributes?.getNamedItem("name")?.nodeValue
+                    ?: node.parentNode?.attributes?.getNamedItem("name")?.nodeValue
+                "${file.fileName}: $name"
+            }
+        }
+        assertTrue("Em or en dashes in user-visible strings: $offenders", offenders.isEmpty())
+    }
+
+    /**
      * True only for a `values-<locale>` directory: a two- or three-letter language, optionally with
      * an `-rXX` region, or a BCP-47 `b+` qualifier.
      */
