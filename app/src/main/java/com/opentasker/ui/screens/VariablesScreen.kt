@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -352,7 +352,6 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, projects: List<Project
     }
     if (confirm) {
         AlertDialog(
-            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
             onDismissRequest = { confirm = false },
             title = { Text("Delete $dead dead global${if (dead == 1) "" else "s"}?") },
             text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans + ${report.dangling.size} dangling (dead-project) globals. ${report.proper.size} proper globals stay; every live project copy is untouched.") },
@@ -566,7 +565,6 @@ private fun EditVariableDialog(
     var value by remember { mutableStateOf(variable.value) }
 
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("%${variable.name}") },
         text = {

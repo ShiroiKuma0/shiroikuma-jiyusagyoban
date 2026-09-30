@@ -50,7 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -282,7 +282,6 @@ private fun IdentifyDialog(
     val known = showing?.let { f -> library.firstOrNull { it.assetId == f.assetId } }
     var typed by remember(showing?.assetId) { mutableStateOf(names[showing?.assetId] ?: "") }
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDone,
         title = { Text(HuaweiText.facesIdentifyTitle[lang]) },
         text = {
@@ -360,7 +359,6 @@ private fun IdentifyDialog(
 private fun ConfirmRemoveDialog(label: String, onKeep: () -> Unit, onRemove: () -> Unit) {
     val lang = LocalBandLanguage.current
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onKeep,
         title = { Text(HuaweiText.facesRemoveConfirmTitle[lang]) },
         text = {
