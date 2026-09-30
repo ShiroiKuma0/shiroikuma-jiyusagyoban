@@ -79,10 +79,15 @@ class TimeEventScheduler(context: Context) {
         internal fun nextMinuteBoundaryMillis(nowMillis: Long): Long =
             ((nowMillis / MINUTE_MS) + 1L) * MINUTE_MS
 
+        /**
+         * Never later than the next minute boundary. The recovery alarm shares the minute tick's
+         * PendingIntent, so booking it replaces that tick, and a 5-minute backoff would otherwise
+         * leave time triggers unevaluated for 5 minutes after one failed delivery.
+         */
         internal fun recoveryTriggerAtMillis(
             nowMillis: Long,
             delayMillis: Long = RECOVERY_DELAY_MS,
-        ): Long = nowMillis + delayMillis
+        ): Long = minOf(nowMillis + delayMillis, nextMinuteBoundaryMillis(nowMillis))
 
         internal fun scheduleMode(precision: AlarmSchedulePrecision): AlarmSchedulePrecision = precision
     }
