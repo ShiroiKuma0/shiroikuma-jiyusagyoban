@@ -6,6 +6,7 @@
 
 - A time trigger that can't be delivered no longer wakes the phone every five seconds to retry. Recovery now waits 5 seconds, then 30, then 5 minutes, and after that leaves it to the engine's own watchdog.
 - On Android 17, a Temporary State action that changed the volume or the ringer now puts it back afterwards. The restore ran without the automation service's permission to change audio in the background, so Android refused it and the phone stayed at the temporary level.
+- The home screen widget, the launch screen and the notification accent use the app's current colors. They were still on the old sage palette.
 - Flow shows what a State context watches. Every one read `key=<redacted>`, because the field that names the state looked like a secret to the display filter.
 - The import review counts what it is importing. A bundle of three profiles and three tasks read "across 6 profiles", and now says 3 profiles and 3 tasks.
 - Picking a project no longer hides a profile whose task lives in another project behind the first-run screen, and the header counts match the list under them.
