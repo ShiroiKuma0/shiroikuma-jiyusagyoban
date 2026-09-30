@@ -12,10 +12,11 @@ import java.util.concurrent.CountDownLatch
 // execution journal) are likewise renumbered 23..27.
 // v28 adds the Huawei band's OWN tables. Additive only: the Hume band's tables are not
 // touched, because both devices run in parallel until their data has been compared.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 32
+// v33 adds 言語島's four tables (gengoshima_*), additive only.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 33
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
@@ -39,6 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun huaweiSleepDao(): HuaweiSleepDao
     abstract fun huaweiBeatDao(): HuaweiBeatDao
     abstract fun huaweiWorkoutDao(): HuaweiWorkoutDao
+    abstract fun gengoshimaDao(): GengoshimaDao
 }
 
 /** Process-local handoff from the application bootstrap to workers in the storage module. */
