@@ -190,7 +190,7 @@
   longer means running everything above it first. The run appears in the run log
   under its own name. Flow-control markers are not offered, because an "if"
   without its "end if" is not a smaller task.
-- Settings has an About section with the version and build you're running and links to the source, the release notes and the licence. Its "Report a problem" button opens a new issue with your build and device already filled in.
+- Settings has an About section with the version and build you're running, plus links to the source code and its licence. The release notes are a tap away too, and "Report a problem" opens a new issue with your build and device already filled in.
 - The Diagnostics screen can copy its redacted report to the clipboard. Sharing
   it opened a chooser, which is awkward when what you want is to paste it into a
   bug report.
