@@ -601,6 +601,43 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * 言語島's four tables. Additive only: nothing existing is touched. The statements are Room's own
+     * generated SQL from `33.json`, copied verbatim so the migrated schema cannot differ from a fresh
+     * one — which `scripts/check-room-migration.py --all` replays to confirm.
+     */
+    val MIGRATION_32_33 = object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_islands` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `position` INTEGER NOT NULL, `nameEn` TEXT NOT NULL, `nameJa` TEXT NOT NULL, `register` TEXT NOT NULL, `status` TEXT NOT NULL, `intervalDays` REAL NOT NULL, `ease` REAL NOT NULL, `nextReview` INTEGER, `lastReview` INTEGER, `dirName` TEXT, `createdAt` INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_islands_position` ON `gengoshima_islands` (`position`)",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_sentences` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `islandId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `en` TEXT NOT NULL, `ja` TEXT NOT NULL, `tokensJson` TEXT NOT NULL, `state` TEXT NOT NULL, `jaEdited` INTEGER NOT NULL, `audioPath` TEXT NOT NULL, `audioHash` TEXT NOT NULL, `durationMs` INTEGER NOT NULL, `error` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_sentences_islandId_position` ON `gengoshima_sentences` (`islandId`, `position`)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_sentences_state` ON `gengoshima_sentences` (`state`)",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `mode` TEXT NOT NULL, `islandIds` TEXT NOT NULL, `sentencesPlayed` INTEGER NOT NULL, `listenedMs` INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_sessions_startedAt` ON `gengoshima_sessions` (`startedAt`)",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_plays` (`sessionId` INTEGER NOT NULL, `sentenceId` INTEGER NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`sessionId`, `sentenceId`))",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_plays_sentenceId` ON `gengoshima_plays` (`sentenceId`)",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -634,6 +671,7 @@ object DatabaseMigrations {
             MIGRATION_29_30,
             MIGRATION_30_31,
             MIGRATION_31_32,
+            MIGRATION_32_33,
         )
     }
 }

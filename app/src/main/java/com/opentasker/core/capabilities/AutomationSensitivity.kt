@@ -38,6 +38,9 @@ data class AutomationRiskSummary(
  */
 object AutomationSensitivityRegistry {
     private val localOnlyActionIds = setOf(
+        "gengoshima.listen",
+        "gengoshima.islands",
+        "gengoshima.entry",
         "var.set",
         "var.persist",
         "data.read",
@@ -222,6 +225,10 @@ object AutomationSensitivityRegistry {
         // the kind of thing an import should be told about.
         "huawei.pgnss",
         "huawei.almanacwatch",
+        // Sends its prompt — whatever text the task put in it — to Anthropic's API.
+        "claude.message",
+        // Sends 言語島's English sentences to Anthropic's API to be translated.
+        "gengoshima.generate",
     )
 
     private val deviceControlActionIds = setOf(
@@ -327,6 +334,10 @@ object AutomationSensitivityRegistry {
 
     private val destructiveActionIds = setOf(
         "backup.prune",
+        // Writes (and overwrites) an audio file at every path it is given, through another app.
+        "onse.render",
+        // Renames and deletes files under %Gengoshima_Dir to keep the tree equal to the database.
+        "gengoshima.generate",
         "script.termux.run",
         "script.shizuku.run",
         "app.kill",

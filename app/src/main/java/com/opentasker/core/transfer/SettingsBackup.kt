@@ -206,7 +206,18 @@ object SettingsBackup {
          * moment it is asked, which on this phone is not a safe assumption — so it ships SELECTED
          * and 白い熊 gets to untick it, rather than being quietly left out of their own backup.
          */
-        MAPS("maps", "健康 base maps — the cutouts 地図 drew, one per area");
+        MAPS("maps", "健康 base maps — the cutouts 地図 drew, one per area"),
+
+        /**
+         * 言語島: the islands, every English sentence 白い熊 wrote, its Japanese, the reading
+         * overrides and the listening history — and the audio, as real files.
+         *
+         * The sentences are authored and exist nowhere else. The audio could be voiced again, but
+         * only at the cost of an API call per island and several seconds a sentence, and a restored
+         * phone should be able to listen at once; it is small (about 30 KB a sentence) and already
+         * compressed, so it rides as files, the way the base maps do.
+         */
+        GENGOSHIMA("gengoshima", "言語島 — islands · sentences · translations · history · audio");
 
         companion object {
             fun byId(id: String): Cat? = entries.firstOrNull { it.id == id }
@@ -321,6 +332,15 @@ object SettingsBackup {
 
     /** Where the measurement dumps live inside the ZIP. */
     private const val HEALTH_DIR = "health_data"
+
+    /** 言語島's tables, carried the same generic way as [HEALTH_TABLES]. */
+    private val GENGOSHIMA_TABLES = listOf(
+        "gengoshima_islands", "gengoshima_sentences", "gengoshima_sessions", "gengoshima_plays",
+    )
+    private const val GENGOSHIMA_DIR = "gengoshima"
+
+    /** 言語島's audio tree, relative to `%Gengoshima_Dir`. */
+    private const val GENGOSHIMA_AUDIO_DIR = "gengoshima_audio"
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
@@ -438,6 +458,16 @@ object SettingsBackup {
                     Cat.TASK_ICONS -> exportDirFiles(zip, File(context.filesDir, "task_icons"), ICONS_DIR)
                     Cat.HEALTH_DATA -> exportTables(zip, db, isCancelled)
                     Cat.MAPS -> exportCutouts(zip, db, isCancelled)
+                    Cat.GENGOSHIMA -> {
+                        exportTables(zip, db, isCancelled, GENGOSHIMA_TABLES, GENGOSHIMA_DIR)
+                        // Finished files only: a half-written `.part` and 整理's own temporary
+                        // names are not audio anyone can play.
+                        val audio = File(com.opentasker.core.gengoshima.GengoshimaSettings.last(context).dir)
+                        exportDirFiles(zip, audio, GENGOSHIMA_AUDIO_DIR, { rel ->
+                            val name = rel.substringAfterLast('/')
+                            name.startsWith(".") || name.endsWith(".part")
+                        })
+                    }
                     else -> {
                         writeEntry(zip, "${cat.id}.json", exportPrefs(context, PREF_FILES.getValue(cat), db))
                         // The loose files that ride with a preferences category — fonts with the
@@ -483,6 +513,8 @@ object SettingsBackup {
         zip: ZipOutputStream,
         db: AppDatabase,
         isCancelled: (() -> Boolean)?,
+        tables: List<String> = HEALTH_TABLES,
+        dir: String = HEALTH_DIR,
     ) {
         val sql = db.openHelper.writableDatabase
         // Only the tables that are REALLY there.
@@ -498,8 +530,8 @@ object SettingsBackup {
                 while (c.moveToNext()) add(c.getString(0))
             }
         }
-        for (table in HEALTH_TABLES.filter { it in present }) {
-            zip.putNextEntry(ZipEntry("$HEALTH_DIR/$table.ndjson"))
+        for (table in tables.filter { it in present }) {
+            zip.putNextEntry(ZipEntry("$dir/$table.ndjson"))
             var offset = 0
             while (true) {
                 if (isCancelled?.invoke() == true) throw ExportCancelledException()
@@ -697,11 +729,16 @@ object SettingsBackup {
      * still carries it. A row already present is replaced rather than duplicated, which makes an
      * import of an overlapping archive idempotent instead of doubling a night.
      */
-    private fun importTables(entries: Map<String, ByteArray>, db: AppDatabase): Int {
+    private fun importTables(
+        entries: Map<String, ByteArray>,
+        db: AppDatabase,
+        tables: List<String> = HEALTH_TABLES,
+        dir: String = HEALTH_DIR,
+    ): Int {
         val sql = db.openHelper.writableDatabase
         var total = 0
-        for (table in HEALTH_TABLES) {
-            val raw = entries["$HEALTH_DIR/$table.ndjson"] ?: continue
+        for (table in tables) {
+            val raw = entries["$dir/$table.ndjson"] ?: continue
             // Lines are ACCUMULATED until they parse, not assumed to be objects one at a time.
             //
             // A JSON object is self-delimiting, so this reads a compact dump and a pretty-printed
@@ -872,6 +909,7 @@ object SettingsBackup {
                 // the `else` branch it would look for `maps.json`, which nothing ever writes, so an
                 // archive with base maps in it would restore everything except them — silently.
                 Cat.MAPS -> entries.keys.any { it.startsWith("$MAPS_DIR/") }
+                Cat.GENGOSHIMA -> entries.keys.any { it.startsWith("$GENGOSHIMA_DIR/") || it.startsWith("$GENGOSHIMA_AUDIO_DIR/") }
                 // A category is present if its preferences are — OR if only its files are. An
                 // archive holding just the captured satellite reference is a real archive: it is
                 // how a phone that has never built a set is seeded without restoring anything else.
@@ -913,6 +951,14 @@ object SettingsBackup {
                 Cat.MAPS -> {
                     val n = importCutouts(entries, db)
                     if (n > 0) lines += "${cat.label}: $n"
+                }
+                Cat.GENGOSHIMA -> {
+                    val rows = importTables(entries, db, GENGOSHIMA_TABLES, GENGOSHIMA_DIR)
+                    // The audio goes back under THIS phone's %Gengoshima_Dir; the next 整理 moves
+                    // each file to wherever the restored rows now say it belongs.
+                    val audio = File(com.opentasker.core.gengoshima.GengoshimaSettings.last(context).dir)
+                    val files = importDirFiles(entries, GENGOSHIMA_AUDIO_DIR, audio)
+                    if (rows > 0 || files > 0) lines += "${cat.label}: $rows rows" + if (files > 0) " · $files files" else ""
                 }
                 else -> {
                     // The files first, and NOT behind the preferences dump. Reading the JSON first
