@@ -42,7 +42,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -1674,7 +1674,6 @@ private fun ColorPickerDialog(title: String, initial: Int, onDismiss: () -> Unit
     fun syncHex() { hexText = hex6((r shl 16) or (g shl 8) or b) }
 
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -1737,7 +1736,6 @@ private fun FontPickerDialog(
     onDelete: (String) -> Unit,
 ) {
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Font") },
         text = {

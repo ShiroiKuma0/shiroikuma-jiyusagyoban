@@ -58,7 +58,7 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ButtonDefaults
@@ -745,7 +745,6 @@ fun ActiveAutomationUi(
 
     if (exitBusy) {
         AlertDialog(
-            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
             onDismissRequest = { /* the exit tasks are already running — no way back from here */ },
             title = { Text("Shutting down") },
             text = {
@@ -762,7 +761,6 @@ fun ActiveAutomationUi(
     // gone can't be read — and its whole value is naming what should already have stopped but hadn't.
     exitReport?.let { report ->
         AlertDialog(
-            modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
             onDismissRequest = { exitReport = null },
             title = { Text(if (report.clean) "Ready to exit" else "Still running") },
             text = {

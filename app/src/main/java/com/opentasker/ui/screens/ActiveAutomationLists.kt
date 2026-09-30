@@ -86,7 +86,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -1251,7 +1251,6 @@ private fun TaskCard(
             if (showRename) {
                 var name by remember { mutableStateOf(task.name) }
                 AlertDialog(
-                    modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
                     onDismissRequest = { showRename = false },
                     title = { Text("Rename task") },
                     text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true) },
@@ -1666,7 +1665,6 @@ private fun RowScope.ArgPill(
         )
         if (showConfirm) {
             AlertDialog(
-                modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
                 onDismissRequest = { showConfirm = false; onCancel() },
                 title = { Text("Save changes?") },
                 text = { Text("“$argKey” was edited but not saved.") },
