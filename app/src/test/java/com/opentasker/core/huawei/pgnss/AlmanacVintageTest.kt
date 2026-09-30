@@ -30,6 +30,36 @@ class AlmanacVintageTest {
         assertEquals(LocalDate.now(ZoneOffset.UTC), fetcher.vintageOf("current_yuma.alm"))
     }
 
+    /**
+     * The walk-back stops at the cached vintage: nothing the server has at or before it can win.
+     * On 2026-09-29 GSSC was down and the build spent ten minutes timing out on the 29th down to the
+     * 24th, then used the cached 25th. Asked with the cache as new as today, not one request goes out.
+     */
+    @Test
+    fun `the Galileo walk-back stops at what the cache already holds`() {
+        val today = LocalDate.now(ZoneOffset.UTC)
+        var asked = 0
+        val f = PgnssFetcher(File("/tmp"), cacheDir = null, progress = { asked++ })
+        val e = runCatching { f.fetchGalileoAlmanac(today, newerThan = today) }.exceptionOrNull()
+        assertTrue("it must refuse, got $e", e?.message?.contains("newer than the cached") == true)
+        assertEquals("no request may go out", 0, asked)
+    }
+
+    @Test
+    fun `the cached vintage is read from the published name, and a stale cache is none`() {
+        val dir = kotlin.io.path.createTempDirectory("alm").toFile()
+        try {
+            val today = LocalDate.now(ZoneOffset.UTC)
+            File(dir, "galileo.$today.galileo_2026-09-25.xml").writeText("x")
+            assertEquals(LocalDate.of(2026, 9, 25), PgnssFetcher(File("/tmp"), cacheDir = dir).cachedVintage("galileo"))
+            dir.listFiles()!!.forEach { it.delete() }
+            File(dir, "galileo.${today.minusDays(60)}.galileo_2026-07-01.xml").writeText("x")
+            assertNull(PgnssFetcher(File("/tmp"), cacheDir = dir).cachedVintage("galileo"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
     /** An unreadable name costs the age, never the build. */
     @Test
     fun `a name that carries no date is not a failure`() {
