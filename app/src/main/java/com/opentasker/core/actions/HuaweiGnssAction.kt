@@ -86,7 +86,7 @@ class HuaweiGnssAction : Action {
             }
         }
         if (!root.isDirectory && !mirror.isDirectory) {
-            return fail(ctx, prefix, store, "no such folder, on disk or in the app's store: $dir")
+            return fail(ctx, prefix, store, "no such directory, on disk or in the app's store: $dir")
         }
 
         // Only the band's own names, and only regular files. A directory swept blindly would offer
