@@ -232,10 +232,11 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
     val permissionHistory = RuntimePermissionRequestHistory(context)
 
     private val refreshTick = MutableStateFlow(0L)
-    val permissionItems: StateFlow<List<PermissionSetupItem>> = refreshTick
+    val permissionItems: StateFlow<List<PermissionSetupItem>?> = refreshTick
         .map { buildPermissionItems(context, permissionHistory) }
         .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        // null until the first read: an empty list is a real answer only after one.
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val directBootEnabled: StateFlow<Boolean> = DirectBootTriggerStore.observe(context)
         .flowOn(Dispatchers.IO)
@@ -392,7 +393,8 @@ fun PermissionOnboardingScreen(
     val advancedProtectionEnabled by AdvancedProtectionReader.enabled.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val permissionHistory = setupViewModel.permissionHistory
-    val items by setupViewModel.permissionItems.collectAsState()
+    val loadedItems by setupViewModel.permissionItems.collectAsState()
+    val items = loadedItems.orEmpty()
     val directBootEnabled by setupViewModel.directBootEnabled.collectAsState()
     val themeMode by setupViewModel.themeMode.collectAsState()
     val updateCheckState by setupViewModel.updateCheckState.collectAsState()
@@ -470,8 +472,6 @@ fun PermissionOnboardingScreen(
     // Needed. Two definitions of required, disagreeing on screen.
     val requiredItems = remember(visibleItems) { visibleItems.filterNot { it.optional } }
     val grantedCount = requiredItems.count { it.granted }
-    val pendingCount = requiredItems.size - grantedCount
-    val progress = if (requiredItems.isEmpty()) 0f else grantedCount.toFloat() / requiredItems.size.toFloat()
 
     LazyColumn(
         modifier = Modifier
@@ -499,52 +499,11 @@ fun PermissionOnboardingScreen(
             }
         }
         if (!settingsOnly) item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shape = RoundedCornerShape(DesignSystem.Radii.md),
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.setup_progress_ready_count, grantedCount, requiredItems.size),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                stringResource(R.string.setup_checklist_body),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                // No line cap: at two lines this sentence cut off mid-word on a
-                                // 411dp phone, so the one line explaining what an incomplete
-                                // setup actually costs you ended at "until setup is co...".
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            PermissionStatusPill(
-                                if (pendingCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.status_pending, pendingCount),
-                                if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.setup_progress_percent, (progress * 100).toInt()),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    )
-                    Text(
-                        stringResource(R.string.setup_status_order),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SetupProgressCard(
+                loaded = loadedItems != null,
+                grantedCount = grantedCount,
+                requiredCount = requiredItems.size,
+            )
         }
 
         if (settingsOnly) {
@@ -1881,3 +1840,75 @@ private fun formatSnapshotTimestamp(epochMs: Long): String =
     java.time.Instant.ofEpochMilli(epochMs)
         .atZone(java.time.ZoneId.systemDefault())
         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", java.util.Locale.US))
+
+/**
+ * The ready count at the top of Setup. Before the first permission read there are no rows, and an
+ * empty list counted as "0 of 0 ready", a green Ready pill and 0% for a moment on every open.
+ */
+@Composable
+internal fun SetupProgressCard(loaded: Boolean, grantedCount: Int, requiredCount: Int) {
+    val pendingCount = requiredCount - grantedCount
+    val progress = if (requiredCount == 0) 0f else grantedCount.toFloat() / requiredCount.toFloat()
+    val accent = if (pendingCount == 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(DesignSystem.Radii.md),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (loaded) {
+                            stringResource(R.string.setup_progress_ready_count, grantedCount, requiredCount)
+                        } else {
+                            stringResource(R.string.setup_progress_loading)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(R.string.setup_checklist_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // No line cap: at two lines this sentence cut off mid-word on a
+                        // 411dp phone, so the one line explaining what an incomplete
+                        // setup actually costs you ended at "until setup is co...".
+                    )
+                    if (loaded) {
+                        Spacer(Modifier.height(6.dp))
+                        PermissionStatusPill(
+                            if (pendingCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.status_pending, pendingCount),
+                            accent,
+                        )
+                    }
+                }
+                if (loaded) {
+                    Text(
+                        stringResource(R.string.setup_progress_percent, (progress * 100).toInt()),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = accent,
+                    )
+                }
+            }
+            if (loaded) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = accent,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+            }
+            Text(
+                stringResource(R.string.setup_status_order),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}

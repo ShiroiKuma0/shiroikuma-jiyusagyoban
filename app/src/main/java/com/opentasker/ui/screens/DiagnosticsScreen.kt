@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
@@ -71,7 +72,9 @@ fun DiagnosticsScreen(
     val context = LocalContext.current
     val formatter = remember(context) { displayDateTimeFormat(context) }
     val health = state.health
-    val healthy = health?.healthy == true
+    // null until the first health read. It used to collapse to false, so every open flashed a red
+    // "Needs attention" above rows that still said Loading.
+    val healthy = health?.healthy
 
     LazyColumn(
         modifier = Modifier
@@ -129,15 +132,23 @@ fun DiagnosticsScreen(
 
 @Composable
 private fun DiagnosticSummaryCard(
-    healthy: Boolean,
+    healthy: Boolean?,
     reason: String?,
     onRefresh: () -> Unit,
     onShare: () -> Unit,
     onCopy: () -> Unit,
 ) {
-    val statusColor = if (healthy) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
+    val statusColor = when (healthy) {
+        true -> MaterialTheme.colorScheme.tertiary
+        false -> MaterialTheme.colorScheme.error
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     val statusLabel = stringResource(
-        if (healthy) R.string.diagnostics_status_healthy else R.string.diagnostics_status_attention,
+        when (healthy) {
+            true -> R.string.diagnostics_status_healthy
+            false -> R.string.diagnostics_status_attention
+            null -> R.string.diagnostics_status_checking
+        },
     )
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -153,7 +164,11 @@ private fun DiagnosticSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(
-                if (healthy) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                when (healthy) {
+                    true -> Icons.Filled.CheckCircle
+                    false -> Icons.Filled.Error
+                    null -> Icons.Filled.HourglassEmpty
+                },
                 contentDescription = statusLabel,
                 tint = statusColor,
             )

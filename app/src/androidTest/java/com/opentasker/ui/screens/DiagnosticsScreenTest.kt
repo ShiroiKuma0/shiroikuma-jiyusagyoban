@@ -1,9 +1,11 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +25,27 @@ import org.junit.Test
 class DiagnosticsScreenTest {
     @get:Rule
     val composeTestRule = createAccessibilityComposeRule()
+
+    @Test
+    fun anUnreadHealthStatusIsNotReportedAsNeedingAttention() {
+        // A-327: a null health collapsed to "unhealthy", so every open flashed a red
+        // "Needs attention" above rows that still said Loading.
+        composeTestRule.setContent {
+            OpenTaskerTheme {
+                DiagnosticsScreen(
+                    state = DiagnosticsUiState(health = null),
+                    contentPadding = PaddingValues(0.dp),
+                    onRefresh = {},
+                    onShare = {},
+                    onCopy = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Checking engine health…").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Needs attention").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Engine healthy").assertCountEquals(0)
+    }
 
     @Test
     fun healthCrashesLogsAndTheShareAndCopyActionsAreReachable() {

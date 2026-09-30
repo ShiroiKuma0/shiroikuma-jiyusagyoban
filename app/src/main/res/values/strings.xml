@@ -177,6 +177,7 @@
     <string name="setup_section_reliability">Reliability</string>
     <string name="setup_progress_percent">%1$d%%</string>
     <string name="setup_progress_ready_count">%1$d of %2$d ready</string>
+    <string name="setup_progress_loading">Checking what\'s set up…</string>
     <string name="title_execution_history">Execution history</string>
     <string name="title_starter_templates">Starter templates</string>
 
@@ -1250,6 +1251,7 @@
     <string name="diagnostics_summary_body">Inspect background delivery, captured crashes, and the bounded in-app log without connecting to a server.</string>
     <string name="diagnostics_status_healthy">Engine healthy</string>
     <string name="diagnostics_status_attention">Needs attention</string>
+    <string name="diagnostics_status_checking">Checking engine health…</string>
     <string name="diagnostics_refresh">Refresh diagnostics</string>
     <string name="diagnostics_share">Share redacted report</string>
     <string name="diagnostics_copy">Copy redacted report</string>
