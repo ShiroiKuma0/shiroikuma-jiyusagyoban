@@ -8,6 +8,42 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+011 — 2026-09-30
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
+
+### 言語島 — Japanese language islands
+
+A new project, **日本語 -- [227]**, for Mikel Hyperpolyglot's language-island method: your own
+English sentences, grouped into topic islands, translated by Claude into natural spoken Japanese and
+read aloud by the sister app 白い熊 音声 (VOICEVOX No.7).
+
+- **Writing** (「言語島 文入力」): islands as chips, Enter adds a sentence to the end of the island,
+  and while you type, anything already written in any island shows in red. Each island has a
+  register — who you are talking to and how formally — with quick picks 丁寧 / くだけた / 敬語.
+- **Translating and voicing** (「訳して音声を作る」): a window over any app follows the three steps —
+  translate, voice, tidy the directories — with a live log: Claude's thinking, each Japanese line
+  as it is written, each audio file as it lands, and the time left. It ends on the outcome and a
+  Close button; the notification brings it back from anywhere while it runs.
+- **Listening** (「言語島 聴く」): Listen, Shadow (each sentence several times, with room to say it
+  back) or Recall (the English first, then the Japanese). One giant screen, over the lock screen;
+  furigana over every kanji; tap a word to look it up in 白い熊の辞書. The steering wheel and a
+  headset move by sentence. The player runs in a process of its own, so it cannot stop the
+  automation engine.
+- **Editing** (「言語島 編集」): reorder, move and delete; edit the English (translated again) or the
+  Japanese (kept exactly, only re-voiced); tap a word to set how it is read (生 → なま).
+- **One OGG per sentence**, in directories named after the islands, all of it configurable in
+  「日本語の設定」. The database is the original; the directory tree follows it.
+- **Backup:** a new category carries the islands, the sentences, the listening history and the audio.
+
+### Also
+
+- **Every dialog now has the yellow border** — 23 of them did not.
+- **"Directory", never "folder"**, everywhere the app talks about one.
+- **白い熊 音声** can be driven from any task (「音声で読ませる」); when it cannot be started, a
+  notification says what to set and opens it.
+- **Ask Claude** from any task (`claude.message`).
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+002 — 2026-09-30
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
