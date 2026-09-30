@@ -1847,7 +1847,7 @@ private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotS
     if (failure != null) {
         return context.getString(
             R.string.setup_snapshots_status_failed,
-            formatSnapshotTimestamp(failure),
+            formatSnapshotTimestamp(context, failure),
             status.lastFailureMessage ?: context.getString(R.string.setup_snapshots_status_unknown_error),
         )
     }
@@ -1855,16 +1855,15 @@ private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotS
         ?: return context.getString(R.string.setup_snapshots_status_pending)
     return context.getString(
         R.string.setup_snapshots_status_ok,
-        formatSnapshotTimestamp(success),
+        formatSnapshotTimestamp(context, success),
         status.snapshotCount,
         storage,
     )
 }
 
-private fun formatSnapshotTimestamp(epochMs: Long): String =
-    java.time.Instant.ofEpochMilli(epochMs)
-        .atZone(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", java.util.Locale.US))
+/** In the phone's own date order and clock, like every other visible time (A-363). */
+private fun formatSnapshotTimestamp(context: Context, epochMs: Long): String =
+    displayDateTimeFormat(context, withSeconds = false).format(Date(epochMs))
 
 /**
  * The ready count at the top of Setup. Before the first permission read there are no rows, and an
