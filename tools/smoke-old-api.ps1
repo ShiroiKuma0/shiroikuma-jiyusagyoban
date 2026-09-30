@@ -221,7 +221,8 @@ function Add-CompanionFeature([string]$Serial) {
 
 function Get-UiNodes([string]$Serial) {
     Invoke-Adb $Serial shell uiautomator dump /sdcard/ot-smoke.xml | Out-Null
-    $raw = (Invoke-Adb $Serial shell cat /sdcard/ot-smoke.xml).Text
+    # exec-out, not shell: a dump is one long line, and a shell read cut it at 4,096 bytes on API 26.
+    $raw = (Invoke-Adb $Serial exec-out cat /sdcard/ot-smoke.xml).Text
     if ($raw -notmatch '<hierarchy') { return @() }
     ([xml]$raw.Substring($raw.IndexOf('<?xml'))).SelectNodes('//node')
 }
