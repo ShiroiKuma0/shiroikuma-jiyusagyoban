@@ -1123,7 +1123,14 @@ object PredictedSet {
         // Measured here because this is the one place holding both halves: the parsed almanacs and
         // the precise orbits the plan read. An age is a proxy — a Galileo almanac three days old
         // cost 2 227 km and a fix on 2026-09-25 — and this is the quantity that proxy stood for.
-        val readings = AlmanacCheck.measure(yuma, gssc, plan.sats, plan.stamps)
+        //
+        // Measured on the BYTES, read back out of the file, not on what was parsed going in. The
+        // 2 227 km was never the age: the writer dropped each Galileo record's own t0a, and a check
+        // on the parsed records — each from its own epoch — read 75 km over a file with six
+        // satellites 2 200 km out (2026-09-29). Only the file reaches the band.
+        val (writtenGps, writtenGalileo) =
+            PgnssExtraFile.readAlmanacs(out, Math.floorDiv(epoch, 604800L).toInt())
+        val readings = AlmanacCheck.measure(writtenGps, writtenGalileo, plan.sats, plan.stamps)
         AlmanacCheck.summarise(readings).takeIf { it.isNotEmpty() }?.let(stats::add)
         return ExtraResult(out, readings)
     }
