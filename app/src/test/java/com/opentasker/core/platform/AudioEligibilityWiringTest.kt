@@ -24,6 +24,20 @@ class AudioEligibilityWiringTest {
     }
 
     @Test
+    fun theTemporaryStateRestoreSeesTheServicesEligibility() {
+        // The restore runs from WorkManager, outside the service. It reads the eligibility the
+        // service publishes; with the default context it claimed none and Android 17 refused it.
+        val service = source("com/opentasker/core/engine/AutomationService.kt")
+        assertTrue(service.contains("ServiceAudioEligibility.current = value"))
+        assertTrue(service.contains("ServiceAudioEligibility.current = audioForegroundServiceEligibility"))
+        assertTrue(service.contains("ServiceAudioEligibility.current = AudioForegroundServiceEligibility.NONE"))
+
+        val restore = source("com/opentasker/core/actions/TemporaryStateAction.kt")
+        assertTrue(restore.contains("action.run(temporaryStateRestoreContext(applicationContext), restoreArgs)"))
+        assertTrue(restore.contains("AudioRuntimeEligibility(foregroundService = ServiceAudioEligibility.current)"))
+    }
+
+    @Test
     fun everyExecutionSamplesVisibilityAndExactAlarmPermission() {
         val helper = source("com/opentasker/core/engine/TaskExecutionHelper.kt")
 

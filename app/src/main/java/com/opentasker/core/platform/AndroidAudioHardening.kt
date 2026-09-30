@@ -16,6 +16,18 @@ enum class AudioUsageEligibility {
     ALARM,
 }
 
+/**
+ * The automation service's current foreground-service audio eligibility, for code in the same
+ * process that runs outside the service. The temporary-state restore runs from WorkManager and
+ * builds its own action context; left at the default it claimed no eligibility at all, so on
+ * Android 17 the restore of a volume or ringer change was refused even while the service held
+ * while-in-use eligibility, leaving the device at the temporary value for good.
+ */
+object ServiceAudioEligibility {
+    @Volatile
+    var current: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE
+}
+
 data class AudioRuntimeEligibility(
     val appVisible: Boolean = false,
     val foregroundService: AudioForegroundServiceEligibility = AudioForegroundServiceEligibility.NONE,

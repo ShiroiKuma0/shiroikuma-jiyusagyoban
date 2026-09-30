@@ -19,6 +19,8 @@ import com.opentasker.core.engine.ActionRegistry
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.platform.AudioRuntimeEligibility
+import com.opentasker.core.platform.ServiceAudioEligibility
 import com.opentasker.core.storage.StorageJson
 import java.util.concurrent.TimeUnit
 
@@ -222,7 +224,7 @@ class TemporaryStateRevertWorker(
         val restoreArgs = runCatching { StorageJson.decodeFromString<Map<String, String>>(restoreJson) }
             .getOrElse { return Result.failure() }
         val action = ActionRegistry.get(targetActionId) ?: return Result.failure()
-        return when (val result = action.run(ActionContext(applicationContext, VariableStore(), logger = { AppLogger.info(TAG, it) }), restoreArgs)) {
+        return when (val result = action.run(temporaryStateRestoreContext(applicationContext), restoreArgs)) {
             ActionResult.Success, ActionResult.Skip -> Result.success()
             is ActionResult.Failure -> {
                 AppLogger.error(TAG, "Temporary state restore failed: ${result.message}")
@@ -232,7 +234,20 @@ class TemporaryStateRevertWorker(
     }
 
     companion object {
-        private const val TAG = "TemporaryStateRevert"
+        internal const val TAG = "TemporaryStateRevert"
         private const val MAX_RETRY_ATTEMPTS = 2
     }
 }
+
+/**
+ * The context a scheduled restore runs its action in. It carries the automation service's live
+ * audio eligibility: the original change ran with it, and a restore that claimed none was refused
+ * on Android 17 while the service was still eligible, stranding the device at the temporary value.
+ */
+internal fun temporaryStateRestoreContext(app: Context): ActionContext =
+    ActionContext(
+        app = app,
+        variables = VariableStore(),
+        logger = { AppLogger.info(TemporaryStateRevertWorker.TAG, it) },
+        audioEligibility = AudioRuntimeEligibility(foregroundService = ServiceAudioEligibility.current),
+    )

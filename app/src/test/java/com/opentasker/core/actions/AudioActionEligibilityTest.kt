@@ -8,6 +8,7 @@ import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.AudioRuntimeEligibility
+import com.opentasker.core.platform.ServiceAudioEligibility
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -27,6 +28,33 @@ class AudioActionEligibilityTest {
     @After
     fun clearAndroid17HardeningOverride() {
         AndroidAudioHardening.sdkIntOverrideForTests = null
+        ServiceAudioEligibility.current = AudioForegroundServiceEligibility.NONE
+    }
+
+    @Test
+    fun temporaryStateRestoreActsWithTheServicesWhileInUseEligibility() = runBlocking {
+        // The original change ran inside the service with while-in-use eligibility. The restore
+        // runs from WorkManager and used to claim none, so Android 17 refused it (A-322).
+        ServiceAudioEligibility.current = AudioForegroundServiceEligibility.WHILE_IN_USE
+
+        val result = VolumeAction().run(
+            temporaryStateRestoreContext(noServicesContext),
+            mapOf("stream" to "music", "level" to "5"),
+        )
+
+        assertAttempted(result)
+    }
+
+    @Test
+    fun temporaryStateRestoreWithoutAnEligibleServiceIsRefusedByName() = runBlocking {
+        ServiceAudioEligibility.current = AudioForegroundServiceEligibility.BACKGROUND_STARTED
+
+        val result = VolumeAction().run(
+            temporaryStateRestoreContext(noServicesContext),
+            mapOf("stream" to "music", "level" to "5"),
+        )
+
+        assertBlocked(result, "volume control")
     }
 
     @Test

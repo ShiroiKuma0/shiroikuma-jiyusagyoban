@@ -55,6 +55,7 @@ import com.opentasker.core.model.ProfileLifecycleStrings
 import com.opentasker.core.model.Task
 import com.opentasker.core.platform.AudioForegroundServiceEligibility
 import com.opentasker.core.platform.PromotedOngoingNotificationSupport
+import com.opentasker.core.platform.ServiceAudioEligibility
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.minimumTimestamp
@@ -201,13 +202,21 @@ class AutomationService : Service() {
     private val nextActiveTaskToken = AtomicLong()
     private val profileReloadMutex = Mutex()
     @Volatile private var lastRunLogPruneAt = 0L
+    // Mirrored into ServiceAudioEligibility so work that runs outside the service, the
+    // temporary-state restore in particular, acts with the eligibility the service really holds.
     @Volatile private var audioForegroundServiceEligibility = AudioForegroundServiceEligibility.BACKGROUND_STARTED
+        set(value) {
+            field = value
+            ServiceAudioEligibility.current = value
+        }
     @Volatile private var engineLoaded = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        // The property's initial value bypasses its setter, so publish it once here.
+        ServiceAudioEligibility.current = audioForegroundServiceEligibility
         // A recreated service starts a new causal attribution lifetime; do not connect a fresh
         // Android process callback to a profile execution from a prior service instance.
         ExecutionCausality.reset()
@@ -344,6 +353,7 @@ class AutomationService : Service() {
     }
 
     override fun onDestroy() {
+        ServiceAudioEligibility.current = AudioForegroundServiceEligibility.NONE
         val matcherJobSnapshot = matcherJobs.values.toList()
         val taskJobSnapshot = profileTaskSlots.snapshot()
         matcherJobSnapshot.forEach { it.cancel() }
