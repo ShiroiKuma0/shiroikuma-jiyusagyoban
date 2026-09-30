@@ -130,6 +130,14 @@ class ActiveAutomationModuleSplitTest {
     }
 
     @Test
+    fun viewModelKeepsTheHeadroomItsSplitBought() {
+        // A-353 moved the run log and backup lanes into their own controllers; new lanes go there too.
+        val viewModelLines = Files.readAllLines(screensSourceRoot.resolve("ActiveAutomationViewModel.kt")).size
+
+        assertTrue("ActiveAutomationViewModel.kt should stay under 2,000 lines, was $viewModelLines", viewModelLines < 2_000)
+    }
+
+    @Test
     fun everyScreenSourceStaysBelowTheInterimResponsibilityCeiling() {
         Files.list(screensSourceRoot).use { paths ->
             paths.filter { it.fileName.toString().endsWith(".kt") }.forEach { source ->

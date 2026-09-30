@@ -118,7 +118,10 @@ class LocalizationSourceTest {
         )
 
         val viewModel = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt").readText()
-        assertTrue("UI failures must be logged with their raw throwable", "AppLogger.error" in viewModel)
+        val uiMessages = sourceRoot.resolve("com/opentasker/ui/screens/UiMessages.kt").readText()
+        val loggedError = uiMessages.substringAfter("internal fun loggedUiErrorMessage(", "").substringBefore("\n}")
+        assertTrue("UI failures must be logged with their raw throwable", "AppLogger.error" in loggedError)
+        assertTrue("The view model must map failures through the logging helper", "loggedUiErrorMessage(error, fallbackRes)" in viewModel)
         // Asserted across the package rather than one file: the failure-to-copy mapping lives in
         // UiMessages.kt, and pinning it to a filename made an extraction look like a regression.
         val screenSources = screenFiles.joinToString("\n") { it.readText() }
@@ -134,7 +137,12 @@ class LocalizationSourceTest {
         val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
 
         assertTrue("Snackbar channel must carry resource IDs", "Channel<UiMessage>" in viewModel)
-        assertFalse("ViewModel must not emit raw snackbar literals", Regex("events\\.send\\(\\s*\"").containsMatchIn(viewModel))
+        // The run log and backup lanes send on the same channel from their own files (A-353).
+        listOf("ActiveAutomationViewModel.kt", "RunLogController.kt", "BackupController.kt").forEach { file ->
+            val source = sourceRoot.resolve("com/opentasker/ui/screens/$file").readText()
+            assertTrue("$file must send on the snackbar channel", "events.send(" in source)
+            assertFalse("$file must not emit raw snackbar literals", Regex("events\\.send\\(\\s*\"").containsMatchIn(source))
+        }
         assertTrue("Compose collector must resolve the message in the current locale", "message.resolve(context)" in ui)
         assertTrue("Undo-capable messages must expose a snackbar action", "message.action?.let" in ui)
     }

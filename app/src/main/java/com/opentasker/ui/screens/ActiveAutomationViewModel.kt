@@ -27,7 +27,6 @@ import com.opentasker.core.diagnostics.CrashLogRecord
 import com.opentasker.core.diagnostics.EngineHealthReader
 import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.RunLogExportFormat
-import com.opentasker.core.diagnostics.RunLogExporter
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.readActiveTransport
 import com.opentasker.core.engine.ActiveExecution
@@ -75,33 +74,20 @@ import com.opentasker.core.sharing.ProfileShareDraft
 import com.opentasker.core.sharing.ProfileShareLibrary
 import com.opentasker.core.sharing.ProfileShareManifest
 import com.opentasker.core.storage.AppDatabase
-import com.opentasker.core.storage.ConfigurationSnapshotPolicy
-import com.opentasker.core.storage.ConfigurationSnapshotSettings
-import com.opentasker.core.storage.ConfigurationSnapshotWorker
-import com.opentasker.core.storage.configureConfigurationSnapshotDestination
 import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.StorageDecodeResult
-import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.ProjectDeletionSnapshot
-import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.EditHistoryEntity
-import com.opentasker.core.storage.RunLogRetentionPolicy
-import com.opentasker.core.storage.RunLogRetentionSettings
-import com.opentasker.core.storage.RunLogQuery
 import com.opentasker.core.storage.RunLogSnapshot
-import com.opentasker.core.storage.RunLogTaskOption
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.core.storage.StorageJson
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.VariableEditHistoryIdentity
 import com.opentasker.core.storage.ProjectEntity
-import com.opentasker.core.storage.minimumTimestamp
-import com.opentasker.core.storage.loadPage
 import com.opentasker.core.storage.normalized
-import com.opentasker.core.storage.openSnapshot
 import com.opentasker.core.storage.toEntity
 import com.opentasker.core.templates.ProfileTemplate
 import com.opentasker.core.templates.BlueprintCatalogStore
@@ -130,8 +116,6 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -145,7 +129,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -262,15 +245,6 @@ data class TaskDeletionPreview(
     val hasDependents: Boolean get() = references.isNotEmpty()
 }
 
-/**
- * A validated restore candidate awaiting an explicit Stage decision, plus whatever restore it
- * would replace, so the user is never silently overwriting an earlier staged restore.
- */
-data class RestoreReviewState(
-    val candidate: RestoreCandidate,
-    val replacesPending: RestoreCandidate? = null,
-)
-
 data class DiagnosticsUiState(
     val health: EngineHealthStatus? = null,
     val admission: ExecutionAdmissionSnapshot? = null,
@@ -297,9 +271,7 @@ class ActiveAutomationViewModel(
         blueprintInstallationStore = blueprintInstallationStore,
         invariantStore = invariantStore,
     )
-    private val runLogRetentionSettings = RunLogRetentionSettings(appContext)
     private val fallbackTaskSettings = FallbackTaskSettings(appContext)
-    private val databaseBackupManager = DatabaseBackupManager(appContext, db)
     private val writeSettingsGuard = WriteSettingsGuard(db, appContext)
     private val editHistoryTransitions = EditHistoryTransitions(
         db,
@@ -310,16 +282,12 @@ class ActiveAutomationViewModel(
         variableRepository,
     )
 
-    private fun message(@StringRes resId: Int, vararg args: Any): UiMessage =
-        UiMessage(resId, args.toList())
+    private fun message(@StringRes resId: Int, vararg args: Any): UiMessage = uiMessage(resId, *args)
 
     private fun pluralMessage(@PluralsRes resId: Int, quantity: Int, vararg args: Any): UiMessage =
-        UiMessage(resId, args.toList(), quantity)
+        uiPluralMessage(resId, quantity, *args)
 
-    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage {
-        AppLogger.error("OpenTasker.UI", "Operation failed", error)
-        return uiErrorMessage(error, fallbackRes)
-    }
+    private fun errorMessage(error: Throwable, fallbackRes: Int): UiMessage = loggedUiErrorMessage(error, fallbackRes)
 
     private suspend fun recordEdit(entityType: String, entityId: Long, previousJson: String, nextJson: String) =
         db.editHistoryDao().recordEdit(entityType, entityId, previousJson, nextJson)
@@ -400,24 +368,6 @@ class ActiveAutomationViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
-    val runLogs: StateFlow<ImmutableList<RunLogEntry>> = db.runLogDao()
-        .getRecentFlow()
-        .map { entities -> entities.map { it.toDomain() }.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
-
-    private val _runLogFilters = MutableStateFlow(RunLogFilterState())
-    val runLogFilters: StateFlow<RunLogFilterState> = _runLogFilters.asStateFlow()
-
-    private val _runLogPage = MutableStateFlow(RunLogPageUiState())
-    val runLogPage: StateFlow<RunLogPageUiState> = _runLogPage.asStateFlow()
-
-    val runLogTaskOptions: StateFlow<ImmutableList<RunLogTaskOption>> = db.runLogDao()
-        .getTaskOptionsFlow()
-        .map { it.toImmutableList() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
-
-    private var runLogPageJob: Job? = null
-
     /** Runs in flight right now, so the Run Log can show and stop them. */
     val activeExecutions: StateFlow<ImmutableList<ActiveExecution>> = ActiveExecutionRegistry.active
         .map { it.toImmutableList() }
@@ -438,19 +388,14 @@ class ActiveAutomationViewModel(
     private val events = Channel<UiMessage>(Channel.BUFFERED)
     val messages = events.receiveAsFlow()
 
-    private val _runLogRetentionPolicy = MutableStateFlow(runLogRetentionSettings.load())
-    val runLogRetentionPolicy: StateFlow<RunLogRetentionPolicy> = _runLogRetentionPolicy.asStateFlow()
+    /** Run Log paging, filters, export and retention (A-353). */
+    internal val runLog = RunLogController(db, appContext, viewModelScope, events)
+
+    /** Backup, restore staging and configuration snapshots for the Setup card (A-353). */
+    internal val backup = BackupController(appContext, viewModelScope, events, DatabaseBackupManager(appContext, db))
 
     private val _globalFallbackTaskId = MutableStateFlow(fallbackTaskSettings.loadTaskId())
     val globalFallbackTaskId: StateFlow<Long?> = _globalFallbackTaskId.asStateFlow()
-
-    private val _runLogRetentionPreview = MutableStateFlow<RunLogRetentionPreview?>(null)
-    val runLogRetentionPreview: StateFlow<RunLogRetentionPreview?> = _runLogRetentionPreview.asStateFlow()
-
-    // Starts with a cheap placeholder; the real state (which enumerates the filesystem) is
-    // loaded off the main thread in init and refreshed after each backup operation.
-    private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
-    val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
 
     private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
     val diagnosticsState: StateFlow<DiagnosticsUiState> = _diagnosticsState.asStateFlow()
@@ -521,17 +466,8 @@ class ActiveAutomationViewModel(
     val preflightBusy: StateFlow<Boolean> = preflightTransfer.busy
 
     init {
-        refreshRunLogPage()
-        viewModelScope.launch {
-            runCatching { pruneRunLogs(_runLogRetentionPolicy.value) }
-        }
         viewModelScope.launch {
             runCatching { reconcileGlobalFallbackTask() }
-        }
-        viewModelScope.launch {
-            ConfigurationSnapshotSettings(appContext).changes().collect {
-                runCatching { refreshBackupSetupState(busy = false) }
-            }
         }
         refreshDiagnostics()
         viewModelScope.launch {
@@ -1509,173 +1445,6 @@ class ActiveAutomationViewModel(
         }
     }
 
-    private var runLogQueryDebounceJob: Job? = null
-
-    fun updateRunLogFilters(filters: RunLogFilterState) {
-        val previous = _runLogFilters.value
-        if (previous == filters) return
-        _runLogFilters.value = filters
-        runLogQueryDebounceJob?.cancel()
-        // Typing changes only the query, and each character otherwise cost a snapshot, a count and
-        // a page query. Everything else (status, task, date) is a discrete choice and reloads at
-        // once.
-        if (filters.copy(query = previous.query) == previous) {
-            runLogQueryDebounceJob = viewModelScope.launch {
-                delay(RUN_LOG_QUERY_DEBOUNCE_MS)
-                refreshRunLogPage()
-            }
-        } else {
-            refreshRunLogPage()
-        }
-    }
-
-    fun refreshRunLogPage() {
-        runLogPageJob?.cancel()
-        // Keep what is on screen while reloading. Replacing it with an empty state made every
-        // refresh - including one per keystroke in the search field - blank the list and flash the
-        // loading state.
-        _runLogPage.value = _runLogPage.value.copy(loading = true, failed = false)
-        val filters = _runLogFilters.value
-        runLogPageJob = viewModelScope.launch {
-            try {
-                val (snapshot, page) = withContext(Dispatchers.IO) {
-                    val opened = db.runLogDao().openSnapshot(filters.toStorageQuery())
-                    opened to db.runLogDao().loadPage(opened)
-                }
-                _runLogPage.value = RunLogPageUiState(
-                    entries = page.entries.map { it.toDomain() }.toImmutableList(),
-                    totalCount = snapshot.totalCount,
-                    hasMore = page.hasMore,
-                    loading = false,
-                    snapshot = snapshot,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _runLogPage.value = _runLogPage.value.copy(loading = false, failed = true)
-                events.send(errorMessage(error, R.string.ui_error_run_logs_load))
-            }
-        }
-    }
-
-    fun loadNextRunLogPage() {
-        val current = _runLogPage.value
-        val snapshot = current.snapshot ?: return
-        if (current.loading || !current.hasMore) return
-        val cursor = current.entries.lastOrNull()?.let { com.opentasker.core.storage.RunLogKey(it.timestamp, it.id) }
-            ?: return
-        _runLogPage.value = current.copy(loading = true)
-        runLogPageJob = viewModelScope.launch {
-            try {
-                val page = withContext(Dispatchers.IO) { db.runLogDao().loadPage(snapshot, cursor) }
-                val existingIds = current.entries.mapTo(mutableSetOf()) { it.id }
-                val appended = page.entries.map { it.toDomain() }.filterNot { it.id in existingIds }
-                _runLogPage.value = current.copy(
-                    entries = (current.entries + appended).toImmutableList(),
-                    hasMore = page.hasMore,
-                    loading = false,
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _runLogPage.value = current.copy(loading = false)
-                events.send(errorMessage(error, R.string.ui_error_run_logs_more))
-            }
-        }
-    }
-
-    fun exportRunLogs(uri: Uri, format: RunLogExportFormat, allRetained: Boolean = false) {
-        viewModelScope.launch {
-            try {
-                val exported = withContext(Dispatchers.IO) {
-                    val snapshot = if (allRetained) {
-                        db.runLogDao().openSnapshot(RunLogQuery())
-                    } else {
-                        _runLogPage.value.snapshot ?: db.runLogDao().openSnapshot(_runLogFilters.value.toStorageQuery())
-                    }
-                    val output = appContext.contentResolver.openOutputStream(uri, "w")
-                        ?: error("Could not open the export destination")
-                    output.use { RunLogExporter(db.runLogDao()).export(snapshot, format, it) }
-                }
-                events.send(pluralMessage(R.plurals.ui_message_run_logs_exported, exported, exported))
-            } catch (error: Exception) {
-                events.send(errorMessage(error, R.string.ui_error_run_log_export))
-            }
-        }
-    }
-
-    fun requestRunLogRetention(policy: RunLogRetentionPolicy) {
-        viewModelScope.launch {
-            val normalized = policy.normalized()
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    val dao = db.runLogDao()
-                    RunLogRetentionPreview(
-                        policy = normalized,
-                        storedCount = dao.count(),
-                        prunableCount = dao.countPrunable(
-                            maxEntries = normalized.maxEntries,
-                            minimumTimestamp = normalized.minimumTimestamp(System.currentTimeMillis()),
-                        ),
-                        oldestTimestamp = dao.oldestTimestamp(),
-                    )
-                }
-            }.onSuccess { preview ->
-                if (preview.prunableCount == 0) updateRunLogRetention(preview.policy)
-                else _runLogRetentionPreview.value = preview
-            }.onFailure { events.send(errorMessage(it, R.string.ui_error_retention_preview)) }
-        }
-    }
-
-    fun dismissRunLogRetentionPreview() {
-        _runLogRetentionPreview.value = null
-    }
-
-    fun confirmRunLogRetention() {
-        val preview = _runLogRetentionPreview.value ?: return
-        _runLogRetentionPreview.value = null
-        updateRunLogRetention(preview.policy)
-    }
-
-    fun updateRunLogRetention(policy: RunLogRetentionPolicy) {
-        viewModelScope.launch {
-            val normalized = policy.normalized()
-            runCatching {
-                runLogRetentionSettings.save(normalized)
-                _runLogRetentionPolicy.value = normalized
-                pruneRunLogs(normalized)
-            }
-                .onSuccess { deleted ->
-                    events.send(
-                        if (deleted > 0) {
-                            pluralMessage(R.plurals.ui_message_retention_updated_pruned, deleted, deleted)
-                        } else {
-                            message(R.string.ui_message_retention_updated)
-                        },
-                    )
-                    refreshRunLogPage()
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
-        }
-    }
-
-    /**
-     * Deletes ordinary run history on request. Pinned rows and held rows waiting to be replayed
-     * survive, because a log purge has no Undo and those are the rows a user cannot recreate.
-     */
-    fun clearRunLog() {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { db.runLogDao().clearUnpinned() }
-            }
-                .onSuccess { deleted ->
-                    refreshRunLogPage()
-                    events.send(message(R.string.run_log_cleared, deleted))
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_retention_update)) }
-        }
-    }
-
     fun updateGlobalFallbackTask(taskId: Long?) {
         val normalized = taskId?.takeIf { it > 0L }
         fallbackTaskSettings.saveTaskId(normalized)
@@ -1696,9 +1465,6 @@ class ActiveAutomationViewModel(
         fallbackTaskSettings.saveTaskId(null)
         _globalFallbackTaskId.value = null
     }
-
-    private suspend fun pruneRunLogs(policy: RunLogRetentionPolicy): Int =
-        db.runLogDao().applyRetention(policy, System.currentTimeMillis())
 
     /**
      * Puts the same redacted report Share sends onto the clipboard.
@@ -1739,189 +1505,6 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createDatabaseBackup() {
-        launchBackupOperation {
-            databaseBackupManager.backup()
-                .onSuccess { backup ->
-                    events.send(message(R.string.ui_message_backup_created, backup.name))
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup)) }
-        }
-    }
-
-    fun exportDatabaseBackup(uri: Uri) {
-        launchBackupOperation {
-            val backup = databaseBackupManager.backup().getOrElse {
-                events.send(errorMessage(it, R.string.ui_error_backup))
-                return@launchBackupOperation
-            }
-            databaseBackupManager.exportBackup(backup, uri)
-                .onSuccess { events.send(message(R.string.ui_message_backup_exported, backup.name)) }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_export)) }
-        }
-    }
-
-    private val _restoreReview = MutableStateFlow<RestoreReviewState?>(null)
-    val restoreReview: StateFlow<RestoreReviewState?> = _restoreReview.asStateFlow()
-
-    /**
-     * Validates and summarizes the selected database, then waits for an explicit Stage decision.
-     * Nothing is staged here: selection used to replace the pending journal outright, so a user
-     * could not inspect the candidate, tell it apart from an earlier staged restore, or back out.
-     */
-    fun importDatabaseBackup(uri: Uri) {
-        launchBackupOperation {
-            databaseBackupManager.inspectRestore(uri)
-                .onSuccess { candidate ->
-                    _restoreReview.value = RestoreReviewState(
-                        candidate = candidate,
-                        replacesPending = databaseBackupManager.pendingRestoreSummary(),
-                    )
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_import)) }
-        }
-    }
-
-    fun confirmStageRestore() {
-        launchBackupOperation {
-            databaseBackupManager.stageInspectedRestore()
-                .onSuccess {
-                    _restoreReview.value = null
-                    events.send(message(R.string.ui_message_restore_staged))
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_restore_stage)) }
-        }
-    }
-
-    fun dismissRestoreReview() {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { databaseBackupManager.discardInspectedRestore() }
-            _restoreReview.value = null
-        }
-    }
-
-    /** Opens the restore review on the database the last restore replaced (A-323). */
-    fun reviewRestoreRollback() {
-        launchBackupOperation {
-            val rollback = withContext(Dispatchers.IO) { databaseBackupManager.lastRestoreRollback() }
-                ?: return@launchBackupOperation events.send(message(R.string.ui_message_no_restore_rollback))
-            databaseBackupManager.inspectManagedBackup(rollback.file)
-                .onSuccess { candidate ->
-                    _restoreReview.value = RestoreReviewState(candidate, databaseBackupManager.pendingRestoreSummary())
-                }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_import)) }
-        }
-    }
-
-    /** Removes only the validated pending journal; backups and the live database are untouched. */
-    fun cancelPendingRestore() {
-        launchBackupOperation {
-            val cancelled = withContext(Dispatchers.IO) { databaseBackupManager.cancelPendingRestore() }
-            events.send(message(if (cancelled) R.string.ui_message_restore_cancelled else R.string.ui_message_no_staged_restore))
-        }
-    }
-
-    /**
-     * Runs one backup, export, or restore-staging step with the Setup card held busy.
-     *
-     * Unlike the import/export lanes this one is deliberately **not** cancellable, and the Setup
-     * card offers no Stop for it. Every local write stages into a temporary file, validates it, and
-     * publishes it atomically, and the handler that removes the staged copy on failure catches
-     * cancellation too, so a stopped write would gain nothing over a finished one.
-     *
-     * Two writes leave app-private storage: this lane's Export button and the scheduled snapshot
-     * worker, both into a user-chosen SAF destination. Opening such a destination for writing
-     * truncates it before the first byte, and a provider gives no way to put back what was there,
-     * so stopping partway is strictly worse than finishing. The snapshot worker at least deletes
-     * the archive it created; Export writes into a document the user picked and cannot.
-     *
-     * The defect this lane actually had was a UI that stayed busy forever when an operation ended
-     * early. The `finally` below fixes that, and it refreshes under [NonCancellable] because a
-     * cancelled coroutine cannot enter a plain `withContext`, which would have left the busy flag
-     * set for exactly the case the `finally` exists to cover.
-     *
-     * See `docs/DECISIONS.md` and `BackupCancellationContractTest`.
-     */
-    private fun launchBackupOperation(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            _backupSetupState.value = _backupSetupState.value.copy(busy = true)
-            try {
-                block()
-            } finally {
-                withContext(NonCancellable) { refreshBackupSetupState(busy = false) }
-            }
-        }
-    }
-
-    private suspend fun refreshBackupSetupState(busy: Boolean) {
-        // Backup enumeration and pending-restore checks hit the filesystem; keep them off
-        // the main thread (debug StrictMode flags them otherwise).
-        val loaded = withContext(Dispatchers.IO) {
-            val settings = ConfigurationSnapshotSettings(appContext)
-            BackupSetupState(
-                busy = busy,
-                latestBackupName = databaseBackupManager.latestBackup()?.name,
-                pendingRestore = databaseBackupManager.hasPendingRestore(),
-                pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
-                lastRestoreRollback = databaseBackupManager.lastRestoreRollback(),
-                snapshotPolicy = settings.load(),
-                snapshotStatus = settings.loadStatus(),
-            )
-        }
-        _backupSetupState.value = loaded
-    }
-
-    /** Persists the snapshot schedule and brings the periodic worker in line with it. */
-    fun updateSnapshotPolicy(policy: ConfigurationSnapshotPolicy) {
-        launchBackupOperation {
-            val saved = withContext(Dispatchers.IO) {
-                val settings = ConfigurationSnapshotSettings(appContext)
-                settings.save(policy)
-                val stored = settings.load()
-                ConfigurationSnapshotWorker.sync(appContext, stored)
-                stored
-            }
-            events.send(
-                if (saved.enabled) {
-                    message(R.string.ui_message_snapshots_enabled, saved.maxSnapshots, saved.maxAgeDays)
-                } else {
-                    message(R.string.ui_message_snapshots_disabled)
-                },
-            )
-        }
-    }
-
-    /** Persists the SAF grant and Keystore-wrapped passphrase before enabling the schedule. */
-    fun updateSnapshotDestination(uri: Uri, passphrase: CharArray, enableSchedule: Boolean) {
-        launchBackupOperation {
-            try {
-                runCatching {
-                    withContext(Dispatchers.IO) {
-                        configureConfigurationSnapshotDestination(appContext, uri, passphrase, enableSchedule)
-                    }
-                }.onSuccess { policy ->
-                    events.send(
-                        if (policy.enabled) {
-                            message(R.string.ui_message_snapshots_enabled, policy.maxSnapshots, policy.maxAgeDays)
-                        } else {
-                            message(R.string.ui_message_snapshot_destination_saved)
-                        },
-                    )
-                }.onFailure { error ->
-                    withContext(Dispatchers.IO) {
-                        ConfigurationSnapshotSettings(appContext).recordFailure(
-                            System.currentTimeMillis(),
-                            appContext.getString(R.string.setup_snapshots_destination_save_failed),
-                        )
-                    }
-                    events.send(errorMessage(error, R.string.ui_error_snapshot_destination))
-                }
-            } finally {
-                passphrase.fill('\u0000')
-            }
-        }
-    }
-
     fun runTaskNow(task: Task) {
         viewModelScope.launch {
             if (_runActionBusy.value) { events.send(message(R.string.ui_message_run_busy)); return@launch }
@@ -1947,7 +1530,7 @@ class ActiveAutomationViewModel(
                 }
                 events.send(message(R.string.ui_message_run_status, task.name, status, result.report.durationMs))
                 // A manual run can be held, which adds a row the run-log page should show.
-                refreshRunLogPage()
+                runLog.refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_task)) }
             _runActionBusy.value = false
         }
@@ -1992,7 +1575,7 @@ class ActiveAutomationViewModel(
                 // The label comes from the action's own name or its metadata, never from its
                 // arguments, so a credential in an argument cannot reach this snackbar.
                 events.send(message(R.string.ui_message_action_run_status, label, status, result.report.durationMs))
-                refreshRunLogPage()
+                runLog.refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_action)) }
             _runActionBusy.value = false
         }
@@ -2016,18 +1599,9 @@ class ActiveAutomationViewModel(
                     else -> appContext.getString(R.string.ui_run_status_failed)
                 }
                 events.send(message(R.string.ui_message_run_replayed, entry.taskName, status, result.report.durationMs))
-                refreshRunLogPage()
+                runLog.refreshRunLogPage()
             }.onFailure { events.send(errorMessage(it, R.string.ui_error_run_log_replay)) }
             _runActionBusy.value = false
-        }
-    }
-
-    fun setRunLogStarred(entry: RunLogEntry, starred: Boolean = !entry.starred) {
-        viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) { db.runLogDao().setStarred(entry.id, starred) }
-            }.onSuccess { refreshRunLogPage() }
-                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
         }
     }
 
@@ -2355,8 +1929,6 @@ class ActiveAutomationViewModel(
         }
     }
 }
-
-private const val RUN_LOG_QUERY_DEBOUNCE_MS = 300L
 
 internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
 

@@ -28,6 +28,7 @@
 - The Install section of the README lists the release signing certificate in the form AppVerifier reads, and a release build now refuses to publish an APK signed with any other key.
 - Text throughout the app drops its long dashes. Ranges read "1 to 5", and separators use a dot.
 - Before a release is tagged, `tools/smoke-old-api.ps1` installs it over the previous release on Android 8 and Android 10 emulators set up like a Galaxy phone and opens every screen. Any crash stops the release. This is the check that would have caught #20.
+- The main screen's view model hands the Run Log and the Setup card's backups to two classes of their own, and a test holds it under 2,000 lines. Nothing changes on screen. It was two lines short of its size limit, so the next feature on any screen would have failed the build.
 
 ## v0.2.94
 

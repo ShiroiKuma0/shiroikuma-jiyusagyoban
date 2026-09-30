@@ -225,17 +225,17 @@ fun ActiveAutomationUi(
     val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val projects by viewModel.projects.collectAsState()
-    val runLogs by viewModel.runLogs.collectAsState()
-    val runLogPage by viewModel.runLogPage.collectAsState()
-    val runLogFilters by viewModel.runLogFilters.collectAsState()
-    val runLogTaskOptions by viewModel.runLogTaskOptions.collectAsState()
+    val runLogs by viewModel.runLog.runLogs.collectAsState()
+    val runLogPage by viewModel.runLog.runLogPage.collectAsState()
+    val runLogFilters by viewModel.runLog.runLogFilters.collectAsState()
+    val runLogTaskOptions by viewModel.runLog.runLogTaskOptions.collectAsState()
     val activeExecutions by viewModel.activeExecutions.collectAsState()
     val globalVariables by viewModel.globalVariables.collectAsState()
-    val runLogRetentionPolicy by viewModel.runLogRetentionPolicy.collectAsState()
+    val runLogRetentionPolicy by viewModel.runLog.runLogRetentionPolicy.collectAsState()
     val globalFallbackTaskId by viewModel.globalFallbackTaskId.collectAsState()
-    val runLogRetentionPreview by viewModel.runLogRetentionPreview.collectAsState()
-    val backupSetupState by viewModel.backupSetupState.collectAsState()
-    val restoreReview by viewModel.restoreReview.collectAsState()
+    val runLogRetentionPreview by viewModel.runLog.runLogRetentionPreview.collectAsState()
+    val backupSetupState by viewModel.backup.backupSetupState.collectAsState()
+    val restoreReview by viewModel.backup.restoreReview.collectAsState()
     val diagnosticsState by viewModel.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -318,16 +318,16 @@ fun ActiveAutomationUi(
         viewModel.addProfileShareScreenshots(uris)
     }
     val databaseBackupExportLauncher = rememberCreateDocumentLauncher("application/octet-stream") {
-        viewModel.exportDatabaseBackup(it)
+        viewModel.backup.exportDatabaseBackup(it)
     }
-    val databaseBackupImportLauncher = rememberOpenDocumentLauncher { viewModel.importDatabaseBackup(it) }
+    val databaseBackupImportLauncher = rememberOpenDocumentLauncher { viewModel.backup.importDatabaseBackup(it) }
     var exportAllRunLogs by rememberSaveable { mutableStateOf(false) }
     val runLogJsonExportLauncher = rememberCreateDocumentLauncher("application/json") {
-        viewModel.exportRunLogs(it, RunLogExportFormat.JSON, exportAllRunLogs)
+        viewModel.runLog.exportRunLogs(it, RunLogExportFormat.JSON, exportAllRunLogs)
         exportAllRunLogs = false
     }
     val runLogCsvExportLauncher = rememberCreateDocumentLauncher("text/csv") {
-        viewModel.exportRunLogs(it, RunLogExportFormat.CSV, exportAllRunLogs)
+        viewModel.runLog.exportRunLogs(it, RunLogExportFormat.CSV, exportAllRunLogs)
         exportAllRunLogs = false
     }
     val taskDialog = taskDialogId.takeIf { it != NO_DIALOG_ENTITY_ID }
@@ -684,13 +684,13 @@ fun ActiveAutomationUi(
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
                 onUndoableMessage = showUndoableMessage,
                 backupState = backupSetupState,
-                onCreateBackup = viewModel::createDatabaseBackup,
+                onCreateBackup = viewModel.backup::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
                 onImportBackup = { databaseBackupImportLauncher.launch(DATABASE_BACKUP_MIME_TYPES) },
-                onCancelPendingRestore = viewModel::cancelPendingRestore,
-                onReviewRestoreRollback = viewModel::reviewRestoreRollback,
-                onSnapshotPolicyChanged = viewModel::updateSnapshotPolicy,
-                onSnapshotDestinationSelected = viewModel::updateSnapshotDestination,
+                onCancelPendingRestore = viewModel.backup::cancelPendingRestore,
+                onReviewRestoreRollback = viewModel.backup::reviewRestoreRollback,
+                onSnapshotPolicyChanged = viewModel.backup::updateSnapshotPolicy,
+                onSnapshotDestinationSelected = viewModel.backup::updateSnapshotDestination,
                 profiles = profiles,
                 tasks = tasks,
                 globalFallbackTaskId = globalFallbackTaskId,
@@ -907,12 +907,12 @@ fun ActiveAutomationUi(
                 failed = runLogPage.failed,
                 filters = runLogFilters,
                 taskOptions = runLogTaskOptions.map { it.taskId to it.taskName },
-                onFiltersChange = viewModel::updateRunLogFilters,
-                onLoadMore = viewModel::loadNextRunLogPage,
-                onRefresh = viewModel::refreshRunLogPage,
+                onFiltersChange = viewModel.runLog::updateRunLogFilters,
+                onLoadMore = viewModel.runLog::loadNextRunLogPage,
+                onRefresh = viewModel.runLog::refreshRunLogPage,
                 retentionPolicy = runLogRetentionPolicy,
-                onRetentionPolicyChange = viewModel::requestRunLogRetention,
-                onClearRunLog = viewModel::clearRunLog,
+                onRetentionPolicyChange = viewModel.runLog::requestRunLogRetention,
+                onClearRunLog = viewModel.runLog::clearRunLog,
                 onShareDiagnostic = viewModel::shareDiagnosticReport,
                 onExportJson = {
                     exportAllRunLogs = false
@@ -926,7 +926,7 @@ fun ActiveAutomationUi(
                 activeExecutions = activeExecutions,
                 onCancelExecution = viewModel::cancelExecution,
                 onReplayHeldRun = viewModel::replayHeldRun,
-                onToggleRunLogStar = { entry -> viewModel.setRunLogStarred(entry) },
+                onToggleRunLogStar = { entry -> viewModel.runLog.setRunLogStarred(entry) },
             )
 
             OpenTaskerScreen.Diagnostics -> DiagnosticsScreen(
@@ -944,12 +944,12 @@ fun ActiveAutomationUi(
     runLogRetentionPreview?.let { preview ->
         RunLogRetentionPreviewDialog(
             preview = preview,
-            onDismiss = viewModel::dismissRunLogRetentionPreview,
+            onDismiss = viewModel.runLog::dismissRunLogRetentionPreview,
             onExportJson = {
                 exportAllRunLogs = true
                 runLogJsonExportLauncher.launch(runLogExportName(RunLogExportFormat.JSON))
             },
-            onConfirm = viewModel::confirmRunLogRetention,
+            onConfirm = viewModel.runLog::confirmRunLogRetention,
         )
     }
 
@@ -987,8 +987,8 @@ fun ActiveAutomationUi(
         RestoreReviewDialog(
             state = review,
             busy = backupSetupState.busy,
-            onDismiss = viewModel::dismissRestoreReview,
-            onStage = viewModel::confirmStageRestore,
+            onDismiss = viewModel.backup::dismissRestoreReview,
+            onStage = viewModel.backup::confirmStageRestore,
         )
     }
 

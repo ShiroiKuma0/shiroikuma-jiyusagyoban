@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import com.opentasker.app.R
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.CorruptStoredRecordException
 import com.opentasker.core.storage.StorageDecodeIssue
 
@@ -49,6 +50,18 @@ internal class UiRejection(
         /** For copy already resolved from resources, such as an automation-lint finding. */
         fun ofResolved(text: String) = UiRejection(R.string.ui_error_reason, listOf(text), text)
     }
+}
+
+/** A snackbar message, shared by the view model and the lanes split out of it. */
+internal fun uiMessage(@StringRes resId: Int, vararg args: Any): UiMessage = UiMessage(resId, args.toList())
+
+internal fun uiPluralMessage(@PluralsRes resId: Int, quantity: Int, vararg args: Any): UiMessage =
+    UiMessage(resId, args.toList(), quantity)
+
+/** Logs the raw throwable for Diagnostics, then maps it to user-facing copy. */
+internal fun loggedUiErrorMessage(error: Throwable, @StringRes fallbackRes: Int): UiMessage {
+    AppLogger.error("OpenTasker.UI", "Operation failed", error)
+    return uiErrorMessage(error, fallbackRes)
 }
 
 /**

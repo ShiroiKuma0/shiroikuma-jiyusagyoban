@@ -73,11 +73,12 @@ class RestoreReviewContractTest {
 
     @Test
     fun theReviewIsShownBeforeAnythingIsStaged() {
+        // The Setup card's backup lane moved out of ActiveAutomationViewModel.kt in A-353.
         val viewModel = listOf(
             Path.of("src/main/java"),
             Path.of("app/src/main/java"),
         ).first(Files::exists)
-            .resolve("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
+            .resolve("com/opentasker/ui/screens/BackupController.kt")
             .readText()
 
         val import = viewModel.substring(
