@@ -39,7 +39,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -1430,7 +1430,6 @@ private fun SceneEditorDialog(
     val canSave = name.isNotBlank() && !nameClash && parsedWidth != null && parsedHeight != null && parsedWidth > 0 && parsedHeight > 0
 
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Create Scene" else "Edit Scene") },
         text = {
