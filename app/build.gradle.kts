@@ -1292,6 +1292,14 @@ abstract class StageReleaseAssetTask : DefaultTask() {
     @get:Input
     abstract val apkSignerPath: Property<String>
 
+    /**
+     * The certificate README.md publishes for AppVerifier, as 64 lowercase hex digits. Staging
+     * refuses an APK signed by anything else, so the published fingerprint and the key that signs
+     * releases cannot drift apart without a failed release.
+     */
+    @get:Input
+    abstract val expectedCertificateSha256: Property<String>
+
     @TaskAction
     fun stage() {
         check(stagingIsSupported.get()) {
@@ -1315,6 +1323,12 @@ abstract class StageReleaseAssetTask : DefaultTask() {
                 "is unsigned. Set OPEN_TASKER_RELEASE_KEYSTORE, " +
                 "OPEN_TASKER_RELEASE_KEYSTORE_PASSWORD, OPEN_TASKER_RELEASE_KEY_ALIAS and " +
                 "OPEN_TASKER_RELEASE_KEY_PASSWORD and rebuild before staging anything."
+        }
+        val signers = signerCertificateDigests(source)
+        check(signers == listOf(expectedCertificateSha256.get())) {
+            "Release APK ${source.name} is signed by ${signers.ifEmpty { listOf("no certificate apksigner could read") }.joinToString()}, " +
+                "but README.md publishes ${expectedCertificateSha256.get()}. Sign with the release key, or " +
+                "update the README fingerprint only if the release key really changed."
         }
         check(destinationDirectory.mkdirs()) {
             "Could not create release asset directory ${destinationDirectory.absolutePath}"
@@ -1344,6 +1358,26 @@ abstract class StageReleaseAssetTask : DefaultTask() {
         }
         return exitCode == 0
     }
+
+    /** Every distinct signer certificate apksigner reports, as lowercase SHA-256 hex. */
+    private fun signerCertificateDigests(apk: File): List<String> {
+        val process = ProcessBuilder(File(apkSignerPath.get()).absolutePath, "verify", "--print-certs", apk.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        process.waitFor()
+        return Regex("certificate SHA-256 digest: ([0-9a-f]{64})").findAll(output)
+            .map { it.groupValues[1] }
+            .distinct()
+            .toList()
+    }
+}
+
+/** The certificate README.md publishes under the package name, as lowercase hex without colons. */
+fun publishedCertificateSha256(readme: String): String {
+    val published = Regex("""com\.opentasker\.app\r?\n((?:[0-9A-F]{2}:){31}[0-9A-F]{2})""").find(readme)
+        ?: error("README.md must publish the release certificate on the line after com.opentasker.app")
+    return published.groupValues[1].replace(":", "").lowercase()
 }
 
 val releaseRuntimeCoordinates = providers.provider {
@@ -1776,6 +1810,10 @@ val stageReleaseAsset = tasks.register<StageReleaseAssetTask>("stageReleaseAsset
     stagingDirectory.set(releaseAssetStagingDirectory)
     versionName.set(appVersionName)
     stagingIsSupported.set(!releaseBuildIsUnsigned)
+    expectedCertificateSha256.set(
+        providers.fileContents(rootProject.layout.projectDirectory.file("README.md")).asText
+            .map { readme -> publishedCertificateSha256(readme) },
+    )
     apkSignerPath.set(
         androidComponents.sdkComponents.sdkDirectory.map { sdk ->
             val toolsDir = sdk.dir("build-tools/${android.buildToolsVersion}").asFile

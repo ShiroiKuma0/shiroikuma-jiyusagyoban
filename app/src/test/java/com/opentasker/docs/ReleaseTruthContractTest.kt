@@ -100,6 +100,26 @@ class ReleaseTruthContractTest {
         assertTrue(gate.contains("\$ExpectedGradleDistributionSha256 = \"$distributionHash\""))
     }
 
+    /**
+     * AppVerifier users compare an installed APK against the certificate the project publishes, so
+     * the README is the published claim. Staging refuses an APK signed by any other certificate,
+     * which keeps the claim and the release key from drifting apart (A-376, Discussion #18).
+     */
+    @Test
+    fun readmePublishesTheReleaseCertificateThatStagingEnforces() {
+        val readme = read("README.md")
+        val gradle = read("app/build.gradle.kts")
+
+        assertTrue(
+            "README.md must publish the release certificate under the package name, as AppVerifier reads it",
+            readme.contains("```\ncom.opentasker.app\n$RELEASE_CERTIFICATE_SHA256\n```"),
+        )
+        assertTrue(
+            "stageReleaseAsset must compare the APK's certificate with the one README.md publishes",
+            gradle.contains("expectedCertificateSha256.set(") && gradle.contains("publishedCertificateSha256(readme)"),
+        )
+    }
+
     @Test
     fun generatedReleaseTruthManifestOwnsArtifactAndCapabilityClaims() {
         val truth = read("tools/release-truth.json")
@@ -426,6 +446,10 @@ class ReleaseTruthContractTest {
             "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"
         const val OFFICIAL_GRADLE_9_7_1_WRAPPER_JAR_SHA256 =
             "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d"
+
+        /** `apksigner verify --print-certs` on the v0.2.93 and v0.2.94 release assets. */
+        const val RELEASE_CERTIFICATE_SHA256 =
+            "DB:A1:AA:88:E3:7B:90:15:5F:CA:31:35:CA:3B:78:1D:E9:2C:22:51:07:E4:7C:98:06:E7:5B:F8:80:55:FD:D8"
     }
 }
 

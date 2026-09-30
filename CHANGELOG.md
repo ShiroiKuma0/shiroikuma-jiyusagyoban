@@ -19,6 +19,7 @@
 
 ### Changed
 
+- The Install section of the README lists the release signing certificate in the form AppVerifier reads, and a release build now refuses to publish an APK signed with any other key.
 - Text throughout the app drops its long dashes. Ranges read "1 to 5", and separators use a dot.
 
 ## v0.2.94
