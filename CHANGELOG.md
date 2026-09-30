@@ -11,6 +11,7 @@
 - The import review counts what it is importing. A bundle of three profiles and three tasks read "across 6 profiles", and now says 3 profiles and 3 tasks.
 - Picking a project no longer hides a profile whose task lives in another project behind the first-run screen, and the header counts match the list under them.
 - The context editor says which field is wrong. A time like 25:00 or a latitude out of range greyed out Save with nothing marked.
+- Times in the run log, the Inspector and Diagnostics follow your phone's date order and 12- or 24-hour clock instead of always reading like 2026-09-26 18:40:00.
 
 ## v0.2.94
 

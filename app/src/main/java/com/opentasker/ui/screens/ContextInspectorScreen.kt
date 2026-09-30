@@ -106,7 +106,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -1139,7 +1138,7 @@ private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long
 }
 
 private fun formatAbsoluteTime(context: Context, observedAtMs: Long, nowMs: Long): String {
-    val formatted = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(observedAtMs))
+    val formatted = displayDateTimeFormat(context).format(Date(observedAtMs))
     return context.getString(R.string.inspector_time_absolute, formatted, formatRelativeTime(context, observedAtMs, nowMs))
 }
 

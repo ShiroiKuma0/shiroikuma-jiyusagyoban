@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -58,7 +59,6 @@ import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.ui.theme.DesignSystem
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @Composable
 fun DiagnosticsScreen(
@@ -68,7 +68,8 @@ fun DiagnosticsScreen(
     onShare: () -> Unit,
     onCopy: () -> Unit,
 ) {
-    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
+    val context = LocalContext.current
+    val formatter = remember(context) { displayDateTimeFormat(context) }
     val health = state.health
     val healthy = health?.healthy == true
 

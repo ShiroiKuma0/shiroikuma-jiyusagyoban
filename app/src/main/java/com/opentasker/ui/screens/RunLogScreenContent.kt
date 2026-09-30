@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
@@ -80,9 +81,7 @@ import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.displayLabel
 import com.opentasker.ui.utils.expandCollapseToggle
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 internal const val RUN_LOG_LIST_TAG = "run_log_list"
 internal const val RUN_LOG_CLEAR_TAG = "run_log_clear"
@@ -571,8 +570,9 @@ private fun RunLogCard(
     onReplayHeldRun: (RunLogEntry) -> Unit,
     onToggleRunLogStar: (RunLogEntry) -> Unit,
 ) {
-    val time = remember(entry.timestamp) {
-        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(entry.timestamp))
+    val context = LocalContext.current
+    val time = remember(entry.timestamp, context) {
+        displayDateTimeFormat(context).format(Date(entry.timestamp))
     }
     val diagnostics = remember(entry.message) { entry.message.toRunLogDiagnostics() }
     var tracesExpanded by rememberSaveable(entry.id) { mutableStateOf(false) }

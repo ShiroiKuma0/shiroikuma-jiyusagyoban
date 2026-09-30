@@ -6,11 +6,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.opentasker.app.R
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 @Composable
 internal fun RunLogRetentionPreviewDialog(
@@ -19,8 +18,9 @@ internal fun RunLogRetentionPreviewDialog(
     onExportJson: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val context = LocalContext.current
     val oldest = preview.oldestTimestamp?.let { timestamp ->
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
+        displayDateTimeFormat(context, withSeconds = false).format(Date(timestamp))
     } ?: stringResource(R.string.label_none)
     AlertDialog(
         onDismissRequest = onDismiss,
