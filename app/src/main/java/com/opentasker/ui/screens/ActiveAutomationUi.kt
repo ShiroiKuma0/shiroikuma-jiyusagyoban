@@ -576,7 +576,7 @@ fun ActiveAutomationUi(
                         selectedProjectId = selectedProjectId,
                         onSelectProject = { selectedProjectId = it },
                         onCreateProject = { name, onCreated -> viewModel.createProject(name, onCreated) },
-                        onRenameProject = viewModel::renameProject,
+                        onRenameProject = { project, name, onRenamed -> viewModel.renameProject(project, name, onRenamed) },
                         onReorderProject = viewModel::reorderProject,
                         onDeleteProject = viewModel::deleteProject,
                     )
@@ -864,8 +864,8 @@ fun ActiveAutomationUi(
                 projectId = selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID,
                 focusVariableName = focusedVariableName,
                 focusVariableProjectId = focusedVariableProjectId,
-                onUpdate = { previousName, name, value, isSecret, successMessage, projectId ->
-                    viewModel.updateVariable(previousName, name, value, isSecret, successMessage, projectId)
+                onUpdate = { previousName, name, value, isSecret, successMessage, projectId, onSaved ->
+                    viewModel.updateVariable(previousName, name, value, isSecret, successMessage, projectId, onSaved)
                 },
                 onDelete = { name, successMessage, projectId ->
                     viewModel.deleteVariable(name, successMessage, projectId)
@@ -878,10 +878,10 @@ fun ActiveAutomationUi(
                 scenes = projectScenes,
                 tasks = projectTasks,
                 focusSceneId = focusedSceneId.takeIf { it != NO_DIALOG_ENTITY_ID },
-                onCreateScene = { name, width, height ->
-                    viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID)
+                onCreateScene = { name, width, height, onSaved ->
+                    viewModel.createScene(name, width, height, selectedProjectId ?: com.opentasker.core.model.DEFAULT_PROJECT_ID, onSaved)
                 },
-                onUpdateScene = { scene, messageRes -> viewModel.updateScene(scene, messageRes) },
+                onUpdateScene = { scene, messageRes, onSaved -> viewModel.updateScene(scene, messageRes, onSaved = onSaved) },
                 onRemoveElement = { scene, index -> viewModel.removeSceneElement(scene, index) },
                 onUndoSceneEdit = { viewModel.undoLastSceneEdit(it.id) },
                 onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },

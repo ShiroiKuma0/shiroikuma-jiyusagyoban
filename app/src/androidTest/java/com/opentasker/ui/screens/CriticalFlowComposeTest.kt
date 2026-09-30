@@ -620,8 +620,11 @@ class CriticalFlowComposeTest {
                 SceneLibraryScreen(
                     scenes = emptyList(),
                     tasks = emptyList(),
-                    onCreateScene = { name, width, height -> createdScene = "$name:$width:$height" },
-                    onUpdateScene = { _, _ -> },
+                    onCreateScene = { name, width, height, onSaved ->
+                        createdScene = "$name:$width:$height"
+                        onSaved()
+                    },
+                    onUpdateScene = { _, _, _ -> },
                     onRemoveElement = { _, _ -> },
                     onDeleteScene = {},
                     contentPadding = PaddingValues(0.dp),

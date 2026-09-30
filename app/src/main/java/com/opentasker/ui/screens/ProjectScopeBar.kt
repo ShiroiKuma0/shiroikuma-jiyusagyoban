@@ -50,7 +50,7 @@ fun ProjectScopeBar(
     selectedProjectId: Long?,
     onSelectProject: (Long?) -> Unit,
     onCreateProject: (String, onCreated: () -> Unit) -> Unit,
-    onRenameProject: (Project, String) -> Unit,
+    onRenameProject: (Project, String, onRenamed: () -> Unit) -> Unit,
     onReorderProject: (Project, Int) -> Unit,
     onDeleteProject: (Project, Project) -> Unit,
     modifier: Modifier = Modifier,
@@ -133,7 +133,7 @@ private fun ProjectManagerDialog(
     projects: List<Project>,
     onDismiss: () -> Unit,
     onCreateProject: (String, onCreated: () -> Unit) -> Unit,
-    onRenameProject: (Project, String) -> Unit,
+    onRenameProject: (Project, String, onRenamed: () -> Unit) -> Unit,
     onReorderProject: (Project, Int) -> Unit,
     onDeleteProject: (Project, Project) -> Unit,
 ) {
@@ -169,7 +169,7 @@ private fun ProjectManagerDialog(
                 ) {
                     Text(stringResource(R.string.projects_create))
                 }
-                projects.forEach { project ->
+                projects.forEachIndexed { index, project ->
                     val isDefault = project.id == DEFAULT_PROJECT_ID
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -184,10 +184,9 @@ private fun ProjectManagerDialog(
                                 modifier = Modifier.weight(1f),
                             )
                             TextButton(
-                                onClick = {
-                                    onRenameProject(project, editingName)
-                                    editingId = null
-                                },
+                                // Closed only once the rename lands: a duplicate name is rejected
+                                // and the field has to stay open to fix it.
+                                onClick = { onRenameProject(project, editingName) { editingId = null } },
                             ) { Text(stringResource(R.string.action_save)) }
                         } else {
                             // The row's four controls leave the name a narrow column, so ellipsize
@@ -198,10 +197,10 @@ private fun ProjectManagerDialog(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            IconButton(onClick = { onReorderProject(project, -1) }) {
+                            IconButton(onClick = { onReorderProject(project, -1) }, enabled = index > 0) {
                                 Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.projects_move_up))
                             }
-                            IconButton(onClick = { onReorderProject(project, 1) }) {
+                            IconButton(onClick = { onReorderProject(project, 1) }, enabled = index < projects.lastIndex) {
                                 Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.projects_move_down))
                             }
                             IconButton(

@@ -772,7 +772,13 @@ class ActiveAutomationViewModel(
         }
     }
 
-    fun createScene(name: String, widthDp: Int, heightDp: Int, projectId: Long = DEFAULT_PROJECT_ID) = launchWithMessage(R.string.ui_message_scene_created) {
+    fun createScene(
+        name: String,
+        widthDp: Int,
+        heightDp: Int,
+        projectId: Long = DEFAULT_PROJECT_ID,
+        onSaved: () -> Unit = {},
+    ) = launchWithMessage(R.string.ui_message_scene_created, onSaved = onSaved) {
         db.sceneDao().insert(
             Scene(
                 name = name.trim(),
@@ -819,7 +825,8 @@ class ActiveAutomationViewModel(
         scene: Scene,
         @StringRes successMessageRes: Int = R.string.ui_message_scene_updated,
         successAction: UiMessageAction? = null,
-    ) = launchWithMessage(successMessageRes, successAction) {
+        onSaved: () -> Unit = {},
+    ) = launchWithMessage(successMessageRes, successAction, onSaved) {
         db.withTransaction {
             val previous = scene.id.takeIf { it > 0L }?.let { db.sceneDao().getById(it) }
             if (previous != null) {
@@ -1002,7 +1009,7 @@ class ActiveAutomationViewModel(
         db.projectDao().insert(ProjectEntity(name = normalized, position = nextPosition))
     }
 
-    fun renameProject(project: Project, name: String) = launchWithMessage(R.string.ui_message_project_renamed) {
+    fun renameProject(project: Project, name: String, onSaved: () -> Unit = {}) = launchWithMessage(R.string.ui_message_project_renamed, onSaved = onSaved) {
         require(project.id != DEFAULT_PROJECT_ID) { "The Default project cannot be renamed." }
         val normalized = validateProjectName(name)
         require(db.projectDao().getAll().none { it.id != project.id && it.name.equals(normalized, ignoreCase = true) }) {
@@ -1011,14 +1018,21 @@ class ActiveAutomationViewModel(
         db.projectDao().update(ProjectEntity(project.id, normalized, project.position))
     }
 
-    fun reorderProject(project: Project, direction: Int) = launchWithMessage(R.string.ui_message_project_reordered) {
-        val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
-        val index = ordered.indexOfFirst { it.id == project.id }
-        val targetIndex = (index + direction.coerceIn(-1, 1)).coerceIn(0, ordered.lastIndex)
-        if (index < 0 || targetIndex == index) return@launchWithMessage
-        val other = ordered[targetIndex]
-        db.projectDao().update(other.copy(position = project.position))
-        db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
+    fun reorderProject(project: Project, direction: Int) {
+        viewModelScope.launch {
+            runCatching {
+                val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
+                val index = ordered.indexOfFirst { it.id == project.id }
+                val targetIndex = projectReorderTarget(index, direction, ordered.size) ?: return@runCatching false
+                val other = ordered[targetIndex]
+                db.projectDao().update(other.copy(position = project.position))
+                db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
+                true
+            }
+                // "Moved" only when something moved: the first row's Move up used to report success.
+                .onSuccess { moved -> if (moved) events.send(UiMessage(R.string.ui_message_project_reordered)) }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_generic)) }
+        }
     }
 
     fun deleteProject(project: Project, targetProject: Project) = launchWithMessage(
@@ -2125,6 +2139,7 @@ class ActiveAutomationViewModel(
         isSecret: Boolean,
         successMessage: UiMessage,
         projectId: Long = DEFAULT_PROJECT_ID,
+        onSaved: () -> Unit = {},
     ) {
         viewModelScope.launch {
             runCatching {
@@ -2191,6 +2206,7 @@ class ActiveAutomationViewModel(
                         }
                     }
                 }
+                onSaved()
                 events.send(successMessage)
             }.onFailure { error ->
                 events.send(errorMessage(error, R.string.ui_error_variable_save))
@@ -2343,6 +2359,12 @@ class ActiveAutomationViewModel(
 private const val RUN_LOG_QUERY_DEBOUNCE_MS = 300L
 
 internal const val PROFILE_SHARE_MAX_SCREENSHOTS = 6
+
+/** Where a project at [index] lands when moved by [direction], or null when it can't move that way. */
+internal fun projectReorderTarget(index: Int, direction: Int, count: Int): Int? {
+    if (index !in 0 until count || direction == 0) return null
+    return (index + direction.coerceIn(-1, 1)).takeIf { it in 0 until count }
+}
 
 internal fun defaultProfileShareSlug(name: String): String {
     val slug = name

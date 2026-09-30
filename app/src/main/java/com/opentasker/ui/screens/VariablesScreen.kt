@@ -64,7 +64,15 @@ fun VariablesScreen(
     projectId: Long = DEFAULT_PROJECT_ID,
     focusVariableName: String? = null,
     focusVariableProjectId: Long = DEFAULT_PROJECT_ID,
-    onUpdate: (previousName: String?, name: String, value: String, isSecret: Boolean, successMessage: UiMessage, projectId: Long) -> Unit,
+    onUpdate: (
+        previousName: String?,
+        name: String,
+        value: String,
+        isSecret: Boolean,
+        successMessage: UiMessage,
+        projectId: Long,
+        onSaved: () -> Unit,
+    ) -> Unit,
     onDelete: (name: String, successMessage: UiMessage, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
     contentLoaded: Boolean = true,
@@ -184,9 +192,9 @@ fun VariablesScreen(
             variable = null,
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { showCreateDialog = false },
+            // The dialog closes only once the save lands, so a rejected secret isn't lost.
             onSave = { name, value, isSecret ->
-                onUpdate(null, name, value, isSecret, createdMsg, projectId)
-                showCreateDialog = false
+                onUpdate(null, name, value, isSecret, createdMsg, projectId) { showCreateDialog = false }
             },
         )
     }
@@ -235,8 +243,7 @@ fun VariablesScreen(
             existingNames = variables.mapTo(hashSetOf()) { it.name },
             onDismiss = { editTargetName = null },
             onSave = { name, newValue, isSecret ->
-                onUpdate(target.name, name, newValue, isSecret, updatedMsg, target.projectId)
-                editTargetName = null
+                onUpdate(target.name, name, newValue, isSecret, updatedMsg, target.projectId) { editTargetName = null }
             },
         )
     }

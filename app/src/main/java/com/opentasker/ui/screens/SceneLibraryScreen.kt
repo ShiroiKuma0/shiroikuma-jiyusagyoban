@@ -41,8 +41,8 @@ fun SceneLibraryScreen(
     scenes: List<Scene>,
     tasks: List<Task>,
     focusSceneId: Long? = null,
-    onCreateScene: (String, Int, Int) -> Unit,
-    onUpdateScene: (Scene, Int) -> Unit,
+    onCreateScene: (name: String, widthDp: Int, heightDp: Int, onSaved: () -> Unit) -> Unit,
+    onUpdateScene: (scene: Scene, messageRes: Int, onSaved: () -> Unit) -> Unit,
     onRemoveElement: (Scene, Int) -> Unit,
     onUndoSceneEdit: (Scene) -> Unit = {},
     onRedoSceneEdit: (Scene) -> Unit = {},
@@ -80,9 +80,9 @@ fun SceneLibraryScreen(
     if (showCreateDialog) {
         SceneEditorDialog(
             onDismiss = { showCreateDialog = false },
+            // Editors close once the save lands, not before: a rejected save keeps what was typed.
             onSave = { name, widthDp, heightDp ->
-                onCreateScene(name, widthDp, heightDp)
-                showCreateDialog = false
+                onCreateScene(name, widthDp, heightDp) { showCreateDialog = false }
             },
         )
     }
@@ -108,9 +108,10 @@ fun SceneLibraryScreen(
                 onUpdateScene(
                     updatedScene,
                     if (state.index == null) R.string.ui_message_element_added else R.string.ui_message_element_updated,
-                )
-                elementEditorSceneId = null
-                elementEditorIndex = null
+                ) {
+                    elementEditorSceneId = null
+                    elementEditorIndex = null
+                }
             },
         )
     }
@@ -191,7 +192,7 @@ fun SceneLibraryScreen(
                     onDeleteElement = { index, _ ->
                         onRemoveElement(scene, index)
                     },
-                    onUpdateScene = onUpdateScene,
+                    onUpdateScene = { scene, messageRes -> onUpdateScene(scene, messageRes) {} },
                     canUndo = historyAvailability.canUndoScene(scene.id),
                     canRedo = historyAvailability.canRedoScene(scene.id),
                     onUndo = { onUndoSceneEdit(scene) },
