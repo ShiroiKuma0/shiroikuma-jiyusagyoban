@@ -8,6 +8,32 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+002 — 2026-09-30
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
+
+### 衛星 — six Galileo satellites were 2 200 km from themselves
+
+- **Every Galileo almanac record is now written at one epoch.** ESA publishes each satellite with
+  its own reference time, and on 2026-09-29 six of them were ten minutes behind the rest. The file
+  the band takes has room for only one, so those six were read ten minutes ahead of where they
+  were — 2 227 to 2 243 km along their orbits — and the band looked for them in empty sky. Each
+  record is now carried to the shared time before it is written; the six came out at 47–66 km on
+  the first set built with it. The fault was in every set this project has built, and it is what
+  the 2026-09-25 "three-day-old almanac" failure actually was.
+- **The almanac check grades the file, not the input.** It measured what was downloaded, each
+  satellite at its own time, and so read 75 km over a file with six satellites 2 200 km out. It now
+  decodes the bytes the band receives and measures those.
+- **A down Galileo source costs seconds, not ten minutes.** The download walked back day by day,
+  timing out on each, to dates older than the copy already cached — which could never win. It now
+  stops at the cached copy's date.
+
+### 衛星予測 画面 — a banner from yesterday
+
+- **The panel no longer shows "The band's forecast has 2 h left" a day after it ran out.** Both
+  band-forecast banners are recomputed from the band's window each time the panel draws, instead of
+  repeating the hour count written when the transfer ran. (A workspace change, shipped as a bundle.)
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+001 — 2026-09-27
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, nineteen commits on from the base this fork
