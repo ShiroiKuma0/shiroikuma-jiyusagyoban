@@ -48,6 +48,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogger
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.SerializationException
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.plugins.locale.LocaleGrantStore
@@ -654,21 +655,33 @@ class ActiveAutomationViewModel(
         }
     }
 
+    // The create dialog stays open until the insert lands, so a second tap on Save used to insert
+    // a second scene. One create runs at a time; nothing suspends between the insert and onSaved
+    // closing the dialog, so no tap can slip in after the flag clears.
+    private val sceneCreateInFlight = AtomicBoolean(false)
+
     fun createScene(
         name: String,
         widthDp: Int,
         heightDp: Int,
         projectId: Long = DEFAULT_PROJECT_ID,
         onSaved: () -> Unit = {},
-    ) = launchWithMessage(R.string.ui_message_scene_created, onSaved = onSaved) {
-        db.sceneDao().insert(
-            Scene(
-                name = name.trim(),
-                widthDp = widthDp.coerceIn(120, 1440),
-                heightDp = heightDp.coerceIn(80, 2560),
-                projectId = projectId,
-            ).toEntity()
-        )
+    ) {
+        if (!sceneCreateInFlight.compareAndSet(false, true)) return
+        launchWithMessage(R.string.ui_message_scene_created, onSaved = onSaved) {
+            try {
+                db.sceneDao().insert(
+                    Scene(
+                        name = name.trim(),
+                        widthDp = widthDp.coerceIn(120, 1440),
+                        heightDp = heightDp.coerceIn(80, 2560),
+                        projectId = projectId,
+                    ).toEntity()
+                )
+            } finally {
+                sceneCreateInFlight.set(false)
+            }
+        }
     }
 
     fun duplicateScene(scene: Scene) {
@@ -903,13 +916,16 @@ class ActiveAutomationViewModel(
     fun reorderProject(project: Project, direction: Int) {
         viewModelScope.launch {
             runCatching {
-                val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
-                val index = ordered.indexOfFirst { it.id == project.id }
-                val targetIndex = projectReorderTarget(index, direction, ordered.size) ?: return@runCatching false
-                val other = ordered[targetIndex]
-                db.projectDao().update(other.copy(position = project.position))
-                db.projectDao().update(ProjectEntity(project.id, project.name, other.position))
-                true
+                // Positions come from the stored rows, not the Project the UI passed, which can be a
+                // tap behind; two quick moves used to leave two projects on one position. Writing
+                // every row's index also repairs any duplicates that bug already left.
+                db.withTransaction {
+                    val ordered = db.projectDao().getAll().sortedWith(compareBy<ProjectEntity> { it.position }.thenBy { it.id })
+                    val index = ordered.indexOfFirst { it.id == project.id }
+                    val targetIndex = projectReorderTarget(index, direction, ordered.size) ?: return@withTransaction false
+                    projectPositionUpdates(ordered, index, targetIndex).forEach { db.projectDao().update(it) }
+                    true
+                }
             }
                 // "Moved" only when something moved: the first row's Move up used to report success.
                 .onSuccess { moved -> if (moved) events.send(UiMessage(R.string.ui_message_project_reordered)) }
@@ -1844,6 +1860,12 @@ internal fun projectReorderTarget(index: Int, direction: Int, count: Int): Int? 
     if (index !in 0 until count || direction == 0) return null
     return (index + direction.coerceIn(-1, 1)).takeIf { it in 0 until count }
 }
+
+/** The rows whose position changes when [ordered]`[index]` moves to [targetIndex], numbered 0 up. */
+internal fun projectPositionUpdates(ordered: List<ProjectEntity>, index: Int, targetIndex: Int): List<ProjectEntity> =
+    ordered.toMutableList()
+        .apply { add(targetIndex, removeAt(index)) }
+        .mapIndexedNotNull { position, entity -> entity.copy(position = position).takeIf { entity.position != position } }
 
 internal fun defaultProfileShareSlug(name: String): String {
     val slug = name
