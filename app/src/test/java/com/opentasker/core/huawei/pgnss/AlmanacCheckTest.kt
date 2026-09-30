@@ -173,8 +173,8 @@ class AlmanacCheckTest {
             "com/opentasker/core/huawei/pgnss/PredictedSet.kt",
         )
         assertTrue(
-            "measured where both halves are in hand",
-            "AlmanacCheck.measure(yuma, gssc, plan.sats, plan.stamps)" in build,
+            "measured where both halves are in hand — on the almanacs read back out of the bytes",
+            "AlmanacCheck.measure(writtenGps, writtenGalileo, plan.sats, plan.stamps)" in build,
         )
     }
 }

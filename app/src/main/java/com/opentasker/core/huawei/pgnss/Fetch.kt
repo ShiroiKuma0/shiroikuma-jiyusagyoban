@@ -97,7 +97,9 @@ class PgnssFetcher(
             // died with "no Galileo almanac XML in the last 10 days". Nothing else was wrong. 白い熊:
             // *"How will we know when it's back?"* — with this, nobody has to.
             yuma = almanac("gps-yuma") { fetchYuma() },
-            galileoXml = almanac("galileo") { fetchGalileoAlmanac(today) },
+            galileoXml = almanac("galileo") {
+                fetchGalileoAlmanac(today, newerThan = cachedVintage("galileo"))
+            },
             glonassAgl = almanac("glonass") { fetchGlonassAlmanac(today) },
             // AT LEAST ONE navigation file, not specifically today's — and today's from the
             // stations themselves when no merged file covers it.
@@ -176,6 +178,21 @@ class PgnssFetcher(
         }
         if (name.contains("current", ignoreCase = true)) return LocalDate.now(ZoneOffset.UTC)
         return null
+    }
+
+    /**
+     * The publication date of the almanac of [kind] held in the cache — or null if there is none,
+     * or if it is past [MAX_ALMANAC_AGE_DAYS] and [almanac] would refuse it anyway, in which case the
+     * server has to be walked back in full.
+     */
+    internal fun cachedVintage(kind: String): LocalDate? {
+        val rest = cacheDir?.listFiles()
+            ?.filter { it.name.startsWith("$kind.") }
+            ?.maxByOrNull { it.name }
+            ?.name?.removePrefix("$kind.") ?: return null
+        val cachedOn = runCatching { LocalDate.parse(rest.take(10)) }.getOrNull() ?: return null
+        if (ChronoUnit.DAYS.between(cachedOn, LocalDate.now(ZoneOffset.UTC)) > MAX_ALMANAC_AGE_DAYS) return null
+        return vintageOf(rest.drop(11))
     }
 
     private fun recordAge(kind: String, published: LocalDate) {
@@ -428,10 +445,22 @@ class PgnssFetcher(
     )
 
     /** The ESA GSSC Galileo almanac XML, named for the day it was issued; walk back until one exists. */
-    fun fetchGalileoAlmanac(today: LocalDate, lookBackDays: Int = 10): File {
+    fun fetchGalileoAlmanac(today: LocalDate, lookBackDays: Int = 10, newerThan: LocalDate? = null): File {
         var last: Throwable? = null
         for (back in 0 until lookBackDays) {
-            val date = today.minusDays(back.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            val day = today.minusDays(back.toLong())
+            // NOTHING OLDER THAN WHAT IS ALREADY HELD. The walk-back exists to find the newest file
+            // the server has; once it reaches the vintage in the cache, every further day can only
+            // lose to the cache in [almanac] — and each one is a timeout when GSSC is down. On
+            // 2026-09-29 the build sat ten minutes on step 7/11 walking to the 24th and then used
+            // the cached 25th anyway.
+            if (newerThan != null && !day.isAfter(newerThan)) {
+                throw IOException(
+                    "no Galileo almanac newer than the cached $newerThan on the server",
+                    last,
+                )
+            }
+            val date = day.format(DateTimeFormatter.ISO_LOCAL_DATE)
             // RETRY THE FIRST DATE ONLY. This loop is already a retry — ten candidate days — and
             // wrapping each of them in three transport attempts multiplies the two: a GSSC outage
             // on 2026-09-15 cost nineteen minutes of thirty-second timeouts to reach a conclusion
