@@ -35,7 +35,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.opentasker.ui.components.ThemedDropdownMenu
@@ -364,7 +364,6 @@ private fun ProjectEditDialog(
     // Project names are unique across the workspace.
     val nameClash = name.isNotBlank() && name.trim().lowercase() in siblingNames
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "New project" else "Edit project") },
         text = {
@@ -407,7 +406,6 @@ private fun DeleteProjectDialog(
     onDeleteItems: () -> Unit,
 ) {
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Delete \"${project.name}\"?") },
         text = {
@@ -447,7 +445,6 @@ fun ProjectPickerDialog(
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
