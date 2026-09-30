@@ -1786,6 +1786,19 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /** Opens the restore review on the database the last restore replaced (A-323). */
+    fun reviewRestoreRollback() {
+        launchBackupOperation {
+            val rollback = withContext(Dispatchers.IO) { databaseBackupManager.lastRestoreRollback() }
+                ?: return@launchBackupOperation events.send(message(R.string.ui_message_no_restore_rollback))
+            databaseBackupManager.inspectManagedBackup(rollback.file)
+                .onSuccess { candidate ->
+                    _restoreReview.value = RestoreReviewState(candidate, databaseBackupManager.pendingRestoreSummary())
+                }
+                .onFailure { events.send(errorMessage(it, R.string.ui_error_backup_import)) }
+        }
+    }
+
     /** Removes only the validated pending journal; backups and the live database are untouched. */
     fun cancelPendingRestore() {
         launchBackupOperation {
@@ -1836,6 +1849,7 @@ class ActiveAutomationViewModel(
                 latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
                 pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
+                lastRestoreRollback = databaseBackupManager.lastRestoreRollback(),
                 snapshotPolicy = settings.load(),
                 snapshotStatus = settings.loadStatus(),
             )

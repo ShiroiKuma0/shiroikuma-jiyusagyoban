@@ -162,7 +162,11 @@ class OpenTaskerApp_NoHilt : Application() {
     private fun prepareDatabase() {
         when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
             is PendingRestoreApplyResult.Applied -> {
-                AppLogger.info("OpenTasker", "Applied pending database restore from ${restoreResult.databaseFile.name}")
+                AppLogger.info(
+                    "OpenTasker",
+                    "Applied pending database restore to ${restoreResult.databaseFile.name}; " +
+                        "the database it replaced is kept as ${restoreResult.previousBackup?.name ?: "nothing (none existed or it failed validation)"}",
+                )
             }
             is PendingRestoreApplyResult.Failed -> {
                 AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)

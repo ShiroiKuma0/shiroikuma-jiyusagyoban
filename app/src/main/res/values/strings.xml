@@ -348,6 +348,8 @@
     <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$d profiles, %4$d tasks, %5$d scenes. Restart OpenTasker to apply it.</string>
     <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
     <string name="setup_backup_restore_cancel">Cancel staged restore</string>
+    <string name="setup_backup_rollback_kept">The database from before your restore on %1$s is still here if you need to go back to it.</string>
+    <string name="setup_backup_rollback_action">Roll back</string>
     <string name="setup_snapshots_label">Automatic off-device snapshots</string>
     <string name="setup_snapshots_helper">Write encrypted recovery archives to a folder you choose. OpenTasker never uploads them, and a restore is applied only after review.</string>
     <string name="setup_snapshots_retention">Keeping up to %1$d snapshots for %2$d days.</string>
@@ -1578,6 +1580,7 @@
     <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
     <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
     <string name="ui_message_no_staged_restore">There is no staged restore to cancel</string>
+    <string name="ui_message_no_restore_rollback">There\'s no earlier database to go back to.</string>
     <string name="ui_message_run_status">%1$s %2$s (%3$dms)</string>
     <string name="ui_message_action_run_status">%1$s %2$s (%3$dms)</string>
     <string name="ui_message_run_replayed">Replayed %1$s: %2$s (%3$dms)</string>

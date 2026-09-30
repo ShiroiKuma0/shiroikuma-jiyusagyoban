@@ -101,6 +101,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.storage.RestoreCandidate
+import com.opentasker.core.storage.RestoreRollback
 import androidx.compose.runtime.collectAsState
 import com.opentasker.core.actions.hasWriteSecureSettings
 import com.opentasker.core.actions.secureSettingsGrantCommand
@@ -111,6 +112,7 @@ import com.opentasker.core.permissions.RuntimePermissionRequestHistory
 import com.opentasker.ui.theme.ThemeMode
 import com.opentasker.ui.theme.ThemePreference
 import com.opentasker.ui.theme.DesignSystem
+import java.util.Date
 import kotlinx.coroutines.launch
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
@@ -191,6 +193,8 @@ data class BackupSetupState(
     val pendingRestoreSummary: RestoreCandidate? = null,
     val snapshotPolicy: ConfigurationSnapshotPolicy = ConfigurationSnapshotPolicy(),
     val snapshotStatus: ConfigurationSnapshotStatus = ConfigurationSnapshotStatus(),
+    /** The database the last restore replaced, while it is still on disk. */
+    val lastRestoreRollback: RestoreRollback? = null,
 )
 
 internal sealed interface PermissionAction {
@@ -373,6 +377,7 @@ fun PermissionOnboardingScreen(
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit = {},
+    onReviewRestoreRollback: () -> Unit = {},
     onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit = {},
     onSnapshotDestinationSelected: (Uri, CharArray, Boolean) -> Unit = { _, passphrase, _ ->
         passphrase.fill('\u0000')
@@ -561,6 +566,7 @@ fun PermissionOnboardingScreen(
                     onExportBackup = onExportBackup,
                     onImportBackup = onImportBackup,
                     onCancelPendingRestore = onCancelPendingRestore,
+                    onReviewRestoreRollback = onReviewRestoreRollback,
                     onSnapshotPolicyChanged = onSnapshotPolicyChanged,
                     onSnapshotDestinationSelected = onSnapshotDestinationSelected,
                 )
@@ -1352,16 +1358,18 @@ private fun ThemeChoice(
 }
 
 @Composable
-private fun BackupSetupCard(
+internal fun BackupSetupCard(
     state: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
     onImportBackup: () -> Unit,
     onCancelPendingRestore: () -> Unit,
+    onReviewRestoreRollback: () -> Unit,
     onSnapshotPolicyChanged: (ConfigurationSnapshotPolicy) -> Unit,
     onSnapshotDestinationSelected: (Uri, CharArray, Boolean) -> Unit,
+    initiallyExpanded: Boolean = false,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
     val summary = when {
         state.pendingRestore -> stringResource(R.string.setup_backup_restore_staged)
         state.latestBackupName != null -> stringResource(R.string.setup_backup_available)
@@ -1431,6 +1439,23 @@ private fun BackupSetupCard(
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(stringResource(R.string.setup_backup_restore_cancel))
+                    }
+                }
+                state.lastRestoreRollback?.let { rollback ->
+                    val context = LocalContext.current
+                    val formatter = remember(context) { displayDateTimeFormat(context, withSeconds = false) }
+                    Text(
+                        stringResource(R.string.setup_backup_rollback_kept, formatter.format(Date(rollback.restoredAtMs))),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = onReviewRestoreRollback,
+                        enabled = !state.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(stringResource(R.string.setup_backup_rollback_action))
                     }
                 }
                 SnapshotScheduleControls(

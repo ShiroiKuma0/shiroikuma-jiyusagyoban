@@ -145,6 +145,40 @@ object DatabaseSecurity {
         }
     }
 
+    /**
+     * Replays the `-wal` copied beside [copy] into [copy] itself, so the backup is one file again.
+     *
+     * Opening the copy read-write lets SQLite recover the WAL, and a TRUNCATE checkpoint then
+     * writes every committed frame into the main file. [copy] must be a private staging file that
+     * nothing else has open, and an encrypted one must be under this install's database key.
+     */
+    internal fun foldWalIntoCopy(copy: File, context: Context) {
+        val checkpoint = "PRAGMA wal_checkpoint(TRUNCATE)"
+        val status = if (isPlaintext(copy)) {
+            SQLiteDatabase.openDatabase(copy.absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { database ->
+                database.rawQuery(checkpoint, null).use { readWalCheckpointStatus(it, copy.name) }
+            }
+        } else {
+            loadCipher()
+            CipherDatabase.openDatabase(
+                copy.absolutePath,
+                DatabaseKeyStore.getOrCreate(context),
+                null,
+                CipherDatabase.OPEN_READWRITE,
+                null,
+            ).use { database ->
+                database.rawQuery(checkpoint, null).use { readWalCheckpointStatus(it, copy.name) }
+            }
+        }
+        if (!status.readyForMainFileCopy) {
+            throw IOException(
+                "Could not fold the copied WAL into ${copy.name} " +
+                    "(busy=${status.busy}, log=${status.logFrames}, checkpointed=${status.checkpointedFrames})",
+            )
+        }
+        deleteDatabaseSidecars(copy)
+    }
+
     internal fun deleteDatabaseSidecars(databaseFile: File) {
         listOf(
             File("${databaseFile.path}-wal"),

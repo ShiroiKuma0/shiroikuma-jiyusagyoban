@@ -1,7 +1,10 @@
 package com.opentasker.core.storage
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
+import androidx.core.content.edit
+import androidx.room.withTransaction
 import com.opentasker.core.logging.AppLogger
 import java.io.File
 import java.io.FileOutputStream
@@ -49,11 +52,7 @@ class DatabaseBackupManager(
             val backupFile = File(backupDir, "${databaseName.removeSuffix(".db")}_backup_${timestamp()}.db")
             val tempFile = File(backupDir, "${backupFile.name}.tmp")
             try {
-                sourceFile.inputStream().use { input ->
-                    FileOutputStream(tempFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
+                copyConsistentSnapshot(sourceFile, tempFile)
                 validateDatabaseFile(tempFile)
                 publishValidatedBackup(context, tempFile, backupFile)
             } catch (error: Exception) {
@@ -72,18 +71,34 @@ class DatabaseBackupManager(
         }
     }
 
+    /**
+     * Copies the live database into [destination] as one file that matches a single commit (A-324).
+     *
+     * The copy used to run with no lock, so a task run committing mid-copy could let SQLite's
+     * auto-checkpoint rewrite main-file pages the copy had not reached yet. It now runs inside a
+     * Room write transaction. Nothing can commit while that is held, and the only checkpoint that
+     * can still write the main file is a passive one finishing a commit from just before the lock,
+     * whose pages the WAL holds too. So a WAL with frames in it is copied as well and folded into
+     * the copy once the lock is released, which leaves the pair right even if a page changed under
+     * the main-file copy. Retrying until the WAL was empty instead would starve behind a busy writer.
+     */
+    private suspend fun copyConsistentSnapshot(sourceFile: File, destination: File) {
+        val sourceWal = File("${sourceFile.path}-wal")
+        deleteDatabaseSidecars(destination)
+        val walCopied = db.withTransaction {
+            sourceFile.copyTo(destination, overwrite = true)
+            val walHasFrames = sourceWal.length() > 0L
+            if (walHasFrames) sourceWal.copyTo(File("${destination.path}-wal"), overwrite = true)
+            walHasFrames
+        }
+        if (walCopied) DatabaseSecurity.foldWalIntoCopy(destination, context)
+    }
+
     private suspend fun checkpointWalBeforeCopy(sourceFile: File) {
         var lastStatus: WalCheckpointStatus? = null
         repeat(WAL_CHECKPOINT_ATTEMPTS) { attempt ->
             val status = db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
-                if (!cursor.moveToFirst()) {
-                    throw IOException("Database WAL checkpoint returned no status for '$databaseName'")
-                }
-                WalCheckpointStatus(
-                    busy = cursor.getInt(0),
-                    logFrames = cursor.getInt(1),
-                    checkpointedFrames = cursor.getInt(2),
-                )
+                readWalCheckpointStatus(cursor, databaseName)
             }
             lastStatus = status
             if (status.readyForMainFileCopy) return
@@ -320,10 +335,23 @@ class DatabaseBackupManager(
             }
     }
 
+    /**
+     * Every restorable file in the backup directory, newest first: backups, the copy a restore
+     * replaced, and a pending restore that failed to apply. The last two used to be invisible here,
+     * so no listing, retention pass or storage line ever saw them and each one sat at full size
+     * until app data was cleared (A-323).
+     */
     fun listBackups(): List<File> =
-        backupDir.listFiles { file ->
-            file.name.startsWith("${databaseName.removeSuffix(".db")}_backup_") && file.name.endsWith(".db")
-        }?.sortedByDescending { it.lastModified() } ?: emptyList()
+        backupDir.listFiles { file -> isManagedBackupName(databaseName, file.name) }
+            ?.sortedByDescending { it.lastModified() } ?: emptyList()
+
+    /** The copy of the database the last restore replaced, while it still exists. */
+    fun lastRestoreRollback(): RestoreRollback? {
+        val prefs = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
+        val name = prefs.getString(restoreRollbackKey(databaseName), null) ?: return null
+        val file = File(backupDir, name).takeIf { it.isFile && isManagedBackupName(databaseName, it.name) } ?: return null
+        return RestoreRollback(file, prefs.getLong(restoredAtKey(databaseName), file.lastModified()))
+    }
 
     fun hasPendingRestore(): Boolean = pendingRestoreFile(context, databaseName).exists()
 
@@ -465,8 +493,11 @@ class DatabaseBackupManager(
                 validateDatabaseFile(context, pending)
                 dbFile.parentFile?.mkdirs()
                 rollback = if (dbFile.exists()) {
-                    File(backupDir(context), "${databaseName.removeSuffix(".db")}_pre_restore_${timestamp()}.db")
-                        .also { dbFile.copyTo(it, overwrite = true) }
+                    writeRollbackCopy(
+                        context,
+                        dbFile,
+                        File(backupDir(context), "${databaseName.removeSuffix(".db")}_pre_restore_${timestamp()}.db"),
+                    )
                 } else {
                     null
                 }
@@ -490,6 +521,15 @@ class DatabaseBackupManager(
                 replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
                 if (!pending.delete()) throw IOException("Could not finalize the pending restore journal")
+                context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit(commit = true) {
+                    if (rollback != null) {
+                        putString(restoreRollbackKey(databaseName), rollback.name)
+                        putLong(restoredAtKey(databaseName), System.currentTimeMillis())
+                    } else {
+                        remove(restoreRollbackKey(databaseName))
+                        remove(restoredAtKey(databaseName))
+                    }
+                }
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
                 temp?.delete()
@@ -533,6 +573,49 @@ class DatabaseBackupManager(
             File(backupDir(context).apply { mkdirs() }, "${databaseName.removeSuffix(".db")}_restore_pending.db")
 
         private fun backupDir(context: Context): File = File(context.filesDir, "backups")
+
+        private const val RESTORE_PREFS = "database_restore"
+        private val MANAGED_BACKUP_KINDS = listOf("backup", "pre_restore", "restore_failed")
+
+        private fun restoreRollbackKey(databaseName: String) = "rollback_name:$databaseName"
+
+        private fun restoredAtKey(databaseName: String) = "restored_at_ms:$databaseName"
+
+        internal fun isManagedBackupName(databaseName: String, fileName: String): Boolean {
+            val base = databaseName.removeSuffix(".db")
+            return fileName.endsWith(".db") && MANAGED_BACKUP_KINDS.any { kind -> fileName.startsWith("${base}_${kind}_") }
+        }
+
+        /**
+         * Copies the live database into [rollback] before a restore replaces it (A-323). This runs
+         * before Room opens, so the WAL can still hold the previous run's last writes; the main file
+         * alone missed them, and the WAL is deleted as soon as the replacement lands. A failed copy
+         * stops the restore, as it always did. A copy that won't fold or validate is dropped with a
+         * warning instead, because the file offered as the way back has to restore, and the user
+         * asked to replace this database anyway.
+         */
+        private fun writeRollbackCopy(context: Context, dbFile: File, rollback: File): File? {
+            deleteDatabaseSidecars(rollback)
+            dbFile.copyTo(rollback, overwrite = true)
+            val wal = File("${dbFile.path}-wal")
+            val walCopied = wal.length() > 0L
+            if (walCopied) wal.copyTo(File("${rollback.path}-wal"), overwrite = true)
+            return try {
+                if (walCopied) DatabaseSecurity.foldWalIntoCopy(rollback, context)
+                validateDatabaseFile(context, rollback)
+                deleteDatabaseSidecars(rollback)
+                rollback
+            } catch (error: Exception) {
+                AppLogger.warn(
+                    "DatabaseBackupManager",
+                    "The copy of the database this restore replaces failed validation, so none is kept: ${error.message}",
+                    error,
+                )
+                rollback.delete()
+                deleteDatabaseSidecars(rollback)
+                null
+            }
+        }
 
         internal const val MAX_BACKUP_BYTES = 104_857_600L
         private const val MAX_BACKUP_IMPORT_BYTES = MAX_BACKUP_BYTES
@@ -772,6 +855,9 @@ data class RestoreCandidate(
         get() = error == null && schemaVersion in 1..OPEN_TASKER_DATABASE_SCHEMA_VERSION
 }
 
+/** The database a restore replaced, kept so Setup can offer to go back to it. */
+data class RestoreRollback(val file: File, val restoredAtMs: Long)
+
 sealed interface PendingRestoreApplyResult {
     data object NoPending : PendingRestoreApplyResult
     data class Applied(val databaseFile: File, val previousBackup: File?) : PendingRestoreApplyResult
@@ -800,6 +886,17 @@ internal data class WalCheckpointStatus(
 ) {
     val readyForMainFileCopy: Boolean =
         busy == 0 && (logFrames <= 0 || checkpointedFrames >= logFrames)
+}
+
+internal fun readWalCheckpointStatus(cursor: Cursor, databaseName: String): WalCheckpointStatus {
+    if (!cursor.moveToFirst()) {
+        throw IOException("Database WAL checkpoint returned no status for '$databaseName'")
+    }
+    return WalCheckpointStatus(
+        busy = cursor.getInt(0),
+        logFrames = cursor.getInt(1),
+        checkpointedFrames = cursor.getInt(2),
+    )
 }
 
 internal fun walCheckpointIncompleteMessage(

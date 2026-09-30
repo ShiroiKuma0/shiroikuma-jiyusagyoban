@@ -1,13 +1,21 @@
 package com.opentasker.core.storage
 
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import org.junit.Assert.assertArrayEquals
@@ -278,6 +286,213 @@ class DatabaseBackupManagerInstrumentedTest {
         }
     }
 
+    /**
+     * Every task run inserts a run_logs row, and the copy used to run with no lock held, so an
+     * auto-checkpoint could rewrite main-file pages halfway through it (A-324). The writer commits
+     * a whole batch per transaction while backups run, so a copy that matches one moment holds
+     * whole batches only, numbered with no gaps, and everything committed before backup() began.
+     */
+    @Test
+    fun backupsTakenWhileRunsKeepLoggingAreConsistentSnapshots() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+        try {
+            backUpWhileLogging(context, db, TEST_DATABASE).forEach { (committedBefore, backup) ->
+                SQLiteDatabase.openDatabase(backup.path, null, SQLiteDatabase.OPEN_READONLY).use { copy ->
+                    assertConsistentSnapshot(backup, committedBefore) { sql -> copy.rawQuery(sql, null) }
+                }
+            }
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
+    /** The same under SQLCipher, where folding a copied WAL has to open the copy with the key. */
+    @Test
+    fun encryptedBackupsTakenWhileRunsKeepLoggingAreConsistentSnapshots() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanupEncrypted(context)
+
+        val db = encryptedDatabase(context, DatabaseSecurity.prepareEncryptedDatabase(context, ENCRYPTED_TEST_DATABASE))
+        try {
+            backUpWhileLogging(context, db, ENCRYPTED_TEST_DATABASE).forEach { (committedBefore, backup) ->
+                assertFalse("${backup.name} must still be ciphertext", DatabaseSecurity.isPlaintext(backup))
+                DatabaseSecurity.openEncryptedReadOnly(backup, context).use { copy ->
+                    assertConsistentSnapshot(backup, committedBefore) { sql -> copy.rawQuery(sql, null) }
+                }
+            }
+        } finally {
+            db.close()
+            cleanupEncrypted(context)
+        }
+    }
+
+    /**
+     * Takes backups while a writer keeps committing. Each writer transaction adds batch n and drops
+     * the oldest batch once [LOGGING_WINDOW] are stored, so the file stays a steady size while the
+     * WAL keeps filling and checkpointing. Returns each backup with the batch count committed
+     * before its backup() call began.
+     */
+    private suspend fun backUpWhileLogging(
+        context: android.content.Context,
+        db: AppDatabase,
+        databaseName: String,
+    ): List<Pair<Long, java.io.File>> = coroutineScope {
+        val manager = DatabaseBackupManager(context, db, databaseName)
+        val taskId = db.taskDao().insert(Task(name = "Busy task").toEntity())
+        val padding = "x".repeat(LOGGING_ROW_PADDING)
+        val committed = AtomicLong(0)
+        val writing = AtomicBoolean(true)
+        val writer = launch(Dispatchers.IO) {
+            var batch = 0L
+            while (writing.get()) {
+                batch++
+                db.withTransaction {
+                    repeat(LOGGING_BATCH_ROWS) { row ->
+                        db.runLogDao().insert(
+                            RunLogEntry(
+                                taskId = taskId,
+                                taskName = LOGGING_TASK_NAME,
+                                durationMs = batch,
+                                success = true,
+                                message = "$row $padding",
+                            ).toEntity(),
+                        )
+                    }
+                    if (batch > LOGGING_WINDOW) {
+                        // Ids are AUTOINCREMENT and one writer adds a batch per transaction, so the
+                        // oldest batch is exactly the lowest LOGGING_BATCH_ROWS ids.
+                        db.openHelper.writableDatabase.execSQL(
+                            "DELETE FROM run_logs WHERE id < (SELECT MIN(id) FROM run_logs) + $LOGGING_BATCH_ROWS",
+                        )
+                    }
+                }
+                committed.set(batch)
+            }
+        }
+        try {
+            while (committed.get() < LOGGING_WINDOW) delay(20)
+            List(LOGGING_BACKUPS) {
+                val committedBefore = committed.get()
+                committedBefore to manager.backup().getOrThrow()
+            }
+        } finally {
+            writing.set(false)
+            writer.join()
+        }
+    }
+
+    private fun assertConsistentSnapshot(backup: java.io.File, committedBefore: Long, query: (String) -> Cursor) {
+        query("PRAGMA integrity_check").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("${backup.name} integrity", "ok", cursor.getString(0))
+        }
+        val batches = query(
+            "SELECT durationMs, COUNT(*) FROM run_logs WHERE taskName = '$LOGGING_TASK_NAME' " +
+                "GROUP BY durationMs ORDER BY durationMs",
+        ).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getLong(0) to cursor.getInt(1)) }
+        }
+        assertTrue("${backup.name} holds no batches", batches.isNotEmpty())
+        val first = batches.first().first
+        val last = batches.last().first
+        assertEquals("${backup.name} skips a batch", (first..last).toList(), batches.map { it.first })
+        assertTrue(
+            "${backup.name} holds part of a batch: ${batches.filter { it.second != LOGGING_BATCH_ROWS }}",
+            batches.all { it.second == LOGGING_BATCH_ROWS },
+        )
+        assertEquals("${backup.name} window", minOf(last, LOGGING_WINDOW.toLong()), batches.size.toLong())
+        assertTrue("${backup.name} ends at batch $last, before $committedBefore", last >= committedBefore)
+    }
+
+    /**
+     * A restore copies the database it replaces before Room opens, so the WAL can still hold the
+     * previous run's last writes. The copy used to take the main file alone, then the WAL was
+     * deleted, and neither the copy nor a failed restore's file was ever listed, counted or pruned
+     * (A-323).
+     */
+    @Test
+    fun restoreKeepsAValidRollbackWithTheOldWalAndListsIt() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        val dbFile = context.getDatabasePath(TEST_DATABASE)
+        val crashed = java.io.File(dbFile.parentFile, "opentasker-backup-test-crashed.db")
+
+        var db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+        try {
+            db.profileDao().insert(Profile(name = "In the backup", enterTaskId = 1).toEntity())
+            val backup = DatabaseBackupManager(context, db, TEST_DATABASE).backup().getOrThrow()
+            db.profileDao().insert(Profile(name = "Only in the WAL", enterTaskId = 1).toEntity())
+            // A process that dies here leaves the last commit in the WAL. Copy that state aside
+            // while it is quiet, close Room (which would checkpoint it away), then put it back.
+            dbFile.copyTo(crashed, overwrite = true)
+            val wal = java.io.File("${dbFile.path}-wal")
+            assertTrue("the last commit must still be in the WAL for this test to mean anything", wal.length() > 0L)
+            wal.copyTo(java.io.File("${crashed.path}-wal"), overwrite = true)
+            db.close()
+            context.deleteDatabase(TEST_DATABASE)
+            crashed.renameTo(dbFile)
+            java.io.File("${crashed.path}-wal").renameTo(wal)
+
+            backup.copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
+            val applied = DatabaseBackupManager.applyPendingRestoreIfPresent(context, TEST_DATABASE)
+            assertTrue("restore must apply", applied is PendingRestoreApplyResult.Applied)
+            val rollback = requireNotNull((applied as PendingRestoreApplyResult.Applied).previousBackup)
+
+            assertFalse("the rollback must stand alone", java.io.File("${rollback.path}-wal").exists())
+            SQLiteDatabase.openDatabase(rollback.path, null, SQLiteDatabase.OPEN_READONLY).use { copy ->
+                val names = copy.rawQuery("SELECT name FROM profiles ORDER BY id", null).use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+                }
+                assertEquals(listOf("In the backup", "Only in the WAL"), names)
+            }
+
+            db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            assertEquals(listOf("In the backup"), db.profileDao().getAll().map { it.name })
+            assertTrue("the rollback validates", manager.inspectManagedBackup(rollback).isSuccess)
+            assertTrue("the rollback is listed", rollback.name in manager.listBackups().map { it.name })
+            assertEquals(rollback.name, manager.lastRestoreRollback()?.file?.name)
+            assertEquals(manager.listBackups().size, manager.snapshotStorage().first)
+        } finally {
+            db.close()
+            crashed.delete()
+            java.io.File("${crashed.path}-wal").delete()
+            context.getSharedPreferences("database_restore", 0).edit().clear().commit()
+            cleanup(context)
+        }
+    }
+
+    @Test
+    fun retentionPrunesOldRestoreCopiesToo() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+        try {
+            val manager = DatabaseBackupManager(context, db, TEST_DATABASE)
+            val source = manager.backup().getOrThrow()
+            val dir = source.parentFile!!
+            val old = System.currentTimeMillis() - 10L * 24 * 60 * 60 * 1000
+            val copies = listOf("pre_restore", "restore_failed").map { kind ->
+                java.io.File(dir, "opentasker-backup-test_${kind}_2026-01-01_00-00-00.db").also { copy ->
+                    source.copyTo(copy, overwrite = true)
+                    copy.setLastModified(old)
+                }
+            }
+            assertTrue(manager.listBackups().map { it.name }.containsAll(copies.map { it.name }))
+
+            assertEquals(2, manager.deleteOldBackups(olderThanDays = 3))
+            assertTrue(copies.none { it.exists() })
+            assertTrue("the fresh backup stays", source.exists())
+        } finally {
+            db.close()
+            cleanup(context)
+        }
+    }
+
     private fun backupFiles(context: android.content.Context): List<java.io.File> =
         context.filesDir.resolve("backups")
             .listFiles { file -> file.name.startsWith(TEST_DATABASE.removeSuffix(".db")) }
@@ -311,5 +526,10 @@ class DatabaseBackupManagerInstrumentedTest {
     private companion object {
         const val TEST_DATABASE = "opentasker-backup-test.db"
         const val ENCRYPTED_TEST_DATABASE = "opentasker-portable-backup-test.db"
+        const val LOGGING_TASK_NAME = "batch"
+        const val LOGGING_BATCH_ROWS = 50
+        const val LOGGING_ROW_PADDING = 1_000
+        const val LOGGING_WINDOW = 200
+        const val LOGGING_BACKUPS = 8
     }
 }
