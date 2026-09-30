@@ -148,7 +148,9 @@ object PgnssExtraFile {
         b[0x551] = 32
         w.putShort(0x552, 0)
         for (prn in 1..32) {
-            val a = gps[prn] ?: continue
+            // Each record keeps its own toa, but the WEEK is the header's alone — so a record from
+            // another week is carried onto it rather than read a week out. See [atEpoch].
+            val a = gps[prn]?.let { atEpoch(it, gpsWeek) } ?: continue
             val p = 0x554 + (prn - 1) * 32
             w.putShort(p, (prn - 1).toShort())                                    // 0-BASED index
             w.putShort(p + 2, unsignedField(a.e / pow2(-21), 16).toShort())
@@ -189,16 +191,27 @@ object PgnssExtraFile {
         }
 
         // ---- 0x0c58  Galileo almanac ---------------------------------------------------------------
+        // ONE EPOCH FOR THE WHOLE BLOCK, because the format has room for no other.
+        //
+        // The header carries a single t0a and week; the records carry none. GSSC's XML gives every
+        // satellite its OWN t0a, and they are not always equal: on 2026-09-29 E19, E21, E23, E25,
+        // E26 and E27 were published 600 s earlier than the other twenty-two. This used to write
+        // the latest t0a in the header and every record's elements unchanged, so those six were
+        // read ten minutes ahead of themselves — 2 227 to 2 243 km along-track, against 21 to 48
+        // for the rest — and the band searched six empty patches of sky. The same fault was blamed
+        // on the almanac's AGE on 2026-09-25. So every record is carried to the newest epoch in
+        // the set before it is written, which is what the header then truthfully says.
         val svids = galileo.keys.sorted()
-        val galT0a = galileo.values.maxOf { it.t0a }
-        val galWeek = galileo.values.maxOf { it.week }
+        val newest = galileo.values.maxBy { it.week * WEEK_SECONDS + it.t0a }
+        val galT0a = newest.t0a
+        val galWeek = newest.week
         b[0xC58] = svids.size.toByte()
         b[0xC59] = (galWeek and 0xFF).toByte()
         w.putShort(0xC5A, 1)
         w.putShort(0xC5C, unsignedField(galT0a / 600.0, 16).toShort())
         w.putShort(0xC5E, 0)
         for ((k, svid) in svids.withIndex()) {
-            val a = galileo.getValue(svid)
+            val a = atEpoch(galileo.getValue(svid), galWeek, galT0a)
             val p = 0xC60 + k * 22
             w.putShort(p, (svid - 1).toShort())                                    // 0-BASED index
             w.putShort(p + 2, signedField(a.dSqrtA / pow2(-9), 16).toShort())
@@ -496,6 +509,119 @@ object PgnssExtraFile {
      * we are reproducing. The fault it exists to catch was 27.6°.
      */
     const val MAX_GEO_OFFSET_DEG = 5.0
+
+    /** Galileo publishes sqrtA as an offset from this. */
+    private const val GALILEO_SQRT_A = 5440.588203
+
+    /**
+     * A Galileo almanac record carried to another reference epoch, so it can be written under a
+     * header t0a that is not its own.
+     *
+     * The receiver evaluates `M = M0 + n·tk` and `Ω = Ω0 + (Ω̇ − ωe)·tk − ωe·t0a` with tk measured
+     * from the HEADER's epoch. Holding the satellite's position fixed across a change of reference
+     * by Δt therefore needs M0 + n·Δt and Ω0 + Ω̇·Δt — the Earth-rotation parts cancel, because
+     * `tk + t0a` is the same instant either way (unlike BeiDou's week-folded carry, where they do
+     * not). The shape, inclination and argument of perigee do not move. The clock is a line and is
+     * moved along it. Angles stay in semicircles, wrapped into [-1, 1) so the 16-bit fields hold.
+     */
+    internal fun atEpoch(a: GalileoAlmanacEntry, week: Int, t0a: Double): GalileoAlmanacEntry {
+        val dt = (week - a.week) * WEEK_SECONDS + (t0a - a.t0a)
+        if (dt == 0.0) return a
+        val sqrtA = GALILEO_SQRT_A + a.dSqrtA
+        val n = sqrt(MU / (sqrtA * sqrtA * sqrtA * sqrtA * sqrtA * sqrtA))
+        return a.copy(
+            week = week,
+            t0a = t0a,
+            m0 = wrapSemicircles(a.m0 + n * dt / Math.PI),
+            omega0 = wrapSemicircles(a.omega0 + a.omegaDot * dt),
+            af0 = a.af0 + a.af1 * dt,
+        )
+    }
+
+    /** The GPS twin of [atEpoch]: each record keeps its toa, only the header's WEEK is shared. */
+    internal fun atEpoch(a: GpsAlmanacEntry, week: Int): GpsAlmanacEntry {
+        if (a.week == week) return a
+        val dt = (week - a.week) * WEEK_SECONDS
+        val n = sqrt(MU / (a.sqrtA * a.sqrtA * a.sqrtA * a.sqrtA * a.sqrtA * a.sqrtA))
+        // Radians here, as YUMA publishes them; [semicircles] wraps on the way into the file.
+        return a.copy(
+            week = week,
+            m0 = a.m0 + n * dt,
+            omega0 = a.omega0 + a.omegaDot * dt,
+            af0 = a.af0 + a.af1 * dt,
+        )
+    }
+
+    private fun wrapSemicircles(x: Double): Double = (x + 1.0).mod(2.0) - 1.0
+
+    /**
+     * The GPS and Galileo almanacs read back OUT of a written file, exactly as the band will read
+     * them: every Galileo record at the header's single t0a and week, every GPS record at its own
+     * toa and the header's week.
+     *
+     * This is what [AlmanacCheck] grades. It used to grade the parsed input instead — each record
+     * from its own epoch — so a writer that dropped those epochs produced a file with six Galileo
+     * satellites 2 200 km out and a check that read 75 km (2026-09-29). A check of what we meant
+     * to write cannot see what we wrote.
+     *
+     * [nearWeek] is any full GPS week within 128 of the file's, to lift the header's low byte.
+     */
+    fun readAlmanacs(bytes: ByteArray, nearWeek: Int): Pair<Map<Int, GpsAlmanacEntry>, Map<Int, GalileoAlmanacEntry>> {
+        require(bytes.size == SIZE) { "EXTRA is ${bytes.size} bytes, expected $SIZE" }
+        val r = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+        fun u16(p: Int) = r.getShort(p).toInt() and 0xFFFF
+        fun s16(p: Int) = r.getShort(p).toDouble()
+        fun u32(p: Int) = r.getInt(p).toLong() and 0xFFFFFFFFL
+        fun s32(p: Int) = r.getInt(p).toDouble()
+
+        val gpsWeek = liftWeek(bytes[0x550].toInt() and 0xFF, nearWeek)
+        val gps = LinkedHashMap<Int, GpsAlmanacEntry>()
+        for (k in 0 until 32) {
+            val p = 0x554 + k * 32
+            val sqrtA = u32(p + 12) * pow2(-11)
+            if (sqrtA == 0.0) continue
+            val prn = u16(p) + 1
+            gps[prn] = GpsAlmanacEntry(
+                prn = prn,
+                week = gpsWeek,
+                toa = u16(p + 4) * 4096.0,
+                e = u16(p + 2) * pow2(-21),
+                i0 = (s16(p + 6) * pow2(-19) + 0.30) * Math.PI,
+                omegaDot = s16(p + 8) * pow2(-38) * Math.PI,
+                sqrtA = sqrtA,
+                omega0 = s32(p + 16) * pow2(-23) * Math.PI,
+                omega = s32(p + 20) * pow2(-23) * Math.PI,
+                m0 = s32(p + 24) * pow2(-23) * Math.PI,
+                af0 = s16(p + 28) * pow2(-20),
+                af1 = s16(p + 30) * pow2(-38),
+                health = u16(p + 10),
+            )
+        }
+
+        val galWeek = liftWeek(bytes[0xC59].toInt() and 0xFF, nearWeek)
+        val galT0a = u16(0xC5C) * 600.0
+        val galileo = LinkedHashMap<Int, GalileoAlmanacEntry>()
+        for (k in 0 until (bytes[0xC58].toInt() and 0xFF)) {
+            val p = 0xC60 + k * 22
+            val svid = u16(p) + 1
+            galileo[svid] = GalileoAlmanacEntry(
+                svid = svid,
+                week = galWeek,
+                t0a = galT0a,
+                dSqrtA = s16(p + 2) * pow2(-9),
+                deltaI = s16(p + 4) * pow2(-14),
+                omegaDot = s16(p + 6) * pow2(-33),
+                health = u16(p + 8),
+                e = u16(p + 10) * pow2(-16),
+                omega0 = s16(p + 12) * pow2(-15),
+                omega = s16(p + 14) * pow2(-15),
+                m0 = s16(p + 16) * pow2(-15),
+                af0 = s16(p + 18) * pow2(-19),
+                af1 = s16(p + 20) * pow2(-38),
+            )
+        }
+        return gps to galileo
+    }
 
     fun almanacPosition(el: KeplerElements, tk: Double, toaSow: Double, mu: Double = MU): DoubleArray {
         val a = abs(el.sqrtA) * abs(el.sqrtA)
