@@ -1101,7 +1101,7 @@ class ActiveAutomationViewModel(
 
     fun previewLocalProfileShare(appVersion: String) {
         bundleTransfer.launch { reportStage ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     reportStage(TransferStage.Plan)
                     val bundle = bundleRepository.exportBundle(
@@ -1118,8 +1118,8 @@ class ActiveAutomationViewModel(
     }
 
     fun previewTaskerOrMacroDroid(uri: Uri, appVersion: String) {
-        automationTransfer.launch { report ->
-            runCatching {
+        automationTransfer.launch(FILE_PREVIEW_STEPS) { report ->
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Preflight)
                     val raw = readBoundedTaskerOrMacroDroid(appContext, uri)
@@ -1147,7 +1147,7 @@ class ActiveAutomationViewModel(
 
     internal fun confirmTaskerImport(state: TaskerImportReviewState) {
         automationTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     bundleRepository.importBundle(state.bundle)
@@ -1169,7 +1169,7 @@ class ActiveAutomationViewModel(
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
         bundleTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     val bundle = bundleRepository.exportBundle(
@@ -1207,7 +1207,7 @@ class ActiveAutomationViewModel(
      */
     fun exportTaskerXml(uri: Uri) {
         automationTransfer.launch { reportStage ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     reportStage(TransferStage.Write)
                     val report = TaskerXmlExporter.export(
@@ -1259,8 +1259,8 @@ class ActiveAutomationViewModel(
     }
 
     private fun previewTaskerXmlText(rawText: String, appVersion: String) {
-        automationTransfer.launch { reportStage ->
-            runCatching {
+        automationTransfer.launch(FILE_PREVIEW_STEPS) { reportStage ->
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     reportStage(TransferStage.Preflight)
                     val rawXml = PastedImportSource.requireTaskerXmlWithinBudget(rawText)
@@ -1279,7 +1279,7 @@ class ActiveAutomationViewModel(
 
     private fun previewOpenTaskerBundleSource(load: suspend () -> OpenTaskerBundle) {
         bundleTransfer.launch { reportStage ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     reportStage(TransferStage.Decode)
                     buildProfileShareReview(load())
@@ -1386,7 +1386,7 @@ class ActiveAutomationViewModel(
         val review = _openTaskerBundleReview.value ?: return
         if (review.plan.variableConflicts.any { it.name !in review.variableResolutions }) return
         bundleTransfer.launch { reportStage ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     reportStage(TransferStage.Write)
                     bundleRepository.importBundle(review.bundle, review.variableResolutions)
@@ -1548,9 +1548,12 @@ class ActiveAutomationViewModel(
         if (!preflightBusy.value) _preflightReview.value = null
     }
 
+    /** Stops a preflight rerun; the last report stays on screen. */
+    fun stopPreflight() = preflightTransfer.cancel()
+
     private fun startPreflight(target: PreflightTarget, requested: PreflightInputs) {
         preflightTransfer.launch { reportStage ->
-            runCatching {
+            runTransferCatching {
                 // Read the live connection here rather than in the runner: the preview is pure
                 // and stays that way, and an HTTP Request limited to Wi-Fi should say so while
                 // the user is looking at it.

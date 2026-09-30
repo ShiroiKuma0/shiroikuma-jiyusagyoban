@@ -18,6 +18,9 @@ import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
 import com.opentasker.core.diagnostics.AdvancedProtectionReader
@@ -36,6 +39,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Application singleton keeps startup deterministic while Hilt is not active.
+/** The steps of preparing the database that can take long enough to see. */
+enum class StartupStage {
+    Opening,
+    Restoring,
+    Encrypting,
+}
+
 class OpenTaskerApp_NoHilt : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -69,6 +79,11 @@ class OpenTaskerApp_NoHilt : Application() {
         /** The database if preparation has finished, without waiting. */
         val readyDb: AppDatabase?
             get() = _db
+
+        private val _startupStage = MutableStateFlow(StartupStage.Opening)
+
+        /** What preparation is doing, so the launch screen can say so instead of just spinning. */
+        val startupStage: StateFlow<StartupStage> = _startupStage.asStateFlow()
 
         /**
          * Suspends until the database is ready, without blocking the caller's thread.
@@ -160,6 +175,7 @@ class OpenTaskerApp_NoHilt : Application() {
 
     /** Applies any staged restore, migrates a legacy plaintext file, then publishes the database. */
     private fun prepareDatabase() {
+        if (DatabaseBackupManager.pendingRestoreFile(this).exists()) _startupStage.value = StartupStage.Restoring
         when (val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this)) {
             is PendingRestoreApplyResult.Applied -> {
                 AppLogger.info(
@@ -174,7 +190,10 @@ class OpenTaskerApp_NoHilt : Application() {
             PendingRestoreApplyResult.NoPending -> Unit
         }
 
-        val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME)
+        _startupStage.value = StartupStage.Opening
+        val databaseKey = DatabaseSecurity.prepareEncryptedDatabase(this, DatabaseBackupManager.DATABASE_NAME) {
+            _startupStage.value = StartupStage.Encrypting
+        }
         _db = Room.databaseBuilder(
             this,
             AppDatabase::class.java,

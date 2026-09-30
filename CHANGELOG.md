@@ -21,6 +21,7 @@
 - Setup and Diagnostics no longer flash "Ready" or a red "Needs attention" for a moment before they have checked anything.
 - The Inspector no longer flashes "Context inspector unavailable" as it opens. It waits for your profiles to load and says there are none only when that's true.
 - Diagnostics says so when its health check fails or hasn't answered after 15 seconds, and offers Retry. It used to read "Loading" forever.
+- Stopping an import or a preflight no longer reports it as failed. Stop used to show an error and write one to the log for something you asked for.
 - Times in the run log, the Inspector and Diagnostics follow your phone's date order and 12- or 24-hour clock instead of always reading like 2026-09-26 18:40:00.
 - A backup taken while tasks are running is a clean copy. It used to copy the database file while other writes could still land in it, so a busy moment could leave a backup that failed its integrity check or quietly mixed two moments.
 - A restore keeps the database it replaced, including whatever the app wrote just before it closed, and Setup offers to roll back to it. That copy and the file from a restore that failed were missing from every list and count, so they sat at full size until app data was cleared.
@@ -31,6 +32,8 @@
 - Text throughout the app drops its long dashes. Ranges read "1 to 5", and separators use a dot.
 - Before a release is tagged, `tools/smoke-old-api.ps1` installs it over the previous release on Android 8 and Android 10 emulators set up like a Galaxy phone and opens every screen. Any crash stops the release. This is the check that would have caught #20.
 - The main screen's view model hands the Run Log and the Setup card's backups to two classes of their own, and a test holds it under 2,000 lines. Nothing changes on screen. It was two lines short of its size limit, so the next feature on any screen would have failed the build.
+- The launch screen says what it's waiting for, like restoring a backup or encrypting an older database, instead of only spinning.
+- A running backup shows a progress bar under its button. So does a preflight rerun, and its Close button turns into Stop until the run finishes. Reading an automation file fills its bar in two steps instead of looping. Backups still can't be stopped partway, because a stopped Export would leave a broken file where you asked for the backup.
 
 ## v0.2.94
 

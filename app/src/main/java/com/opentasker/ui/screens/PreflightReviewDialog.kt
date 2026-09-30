@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ internal fun PreflightReviewDialog(
     busy: Boolean,
     onDismiss: () -> Unit,
     onRerun: (Map<String, String>) -> Unit,
+    onStop: () -> Unit,
 ) {
     var syntheticVariables by rememberSaveable {
         mutableStateOf(state.inputs.eventVariables.entries.joinToString("\n") { (key, value) -> "$key=$value" })
@@ -106,6 +108,7 @@ internal fun PreflightReviewDialog(
                         ),
                     )
                 }
+                if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Text(
                     stringResource(R.string.preflight_side_effects_suppressed),
                     color = MaterialTheme.colorScheme.tertiary,
@@ -152,7 +155,13 @@ internal fun PreflightReviewDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        // Like the import dialogs, Close turns into Stop while a run is going. Close did nothing
+        // then, so a rerun that took a while could only be waited out.
+        confirmButton = {
+            TextButton(onClick = if (busy) onStop else onDismiss) {
+                Text(stringResource(if (busy) R.string.action_stop else R.string.action_close))
+            }
+        },
     )
 }
 

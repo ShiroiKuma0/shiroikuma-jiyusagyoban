@@ -26,11 +26,12 @@ object DatabaseSecurity {
     private var cipherLoaded = false
 
     @Synchronized
-    fun prepareEncryptedDatabase(context: Context, databaseName: String): ByteArray {
+    fun prepareEncryptedDatabase(context: Context, databaseName: String, onEncrypting: () -> Unit = {}): ByteArray {
         loadCipher()
         val databaseKey = DatabaseKeyStore.getOrCreate(context)
         val databaseFile = context.getDatabasePath(databaseName)
         if (databaseFile.exists() && isPlaintext(databaseFile)) {
+            onEncrypting()
             migratePlaintextDatabase(databaseFile, databaseKey)
         }
         return databaseKey

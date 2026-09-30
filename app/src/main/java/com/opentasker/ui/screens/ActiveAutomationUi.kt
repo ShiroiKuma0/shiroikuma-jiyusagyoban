@@ -1060,6 +1060,7 @@ fun ActiveAutomationUi(
             busy = preflightBusy,
             onDismiss = viewModel::clearPreflightReview,
             onRerun = viewModel::rerunPreflight,
+            onStop = viewModel::stopPreflight,
         )
     }
 

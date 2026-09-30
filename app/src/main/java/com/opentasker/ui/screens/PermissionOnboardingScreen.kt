@@ -1457,6 +1457,8 @@ internal fun BackupSetupCard(
                 ) {
                     Text(if (state.busy) stringResource(R.string.setup_backup_working) else stringResource(R.string.setup_backup_create))
                 }
+                // No Stop here on purpose: see the 2026-09-03 entry in docs/DECISIONS.md.
+                if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedButton(
                         onClick = onExportBackup,

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,33 @@ enum class TransferStage {
 }
 
 data class TransferProgress(val stage: TransferStage, val fraction: Float? = null)
+
+/** Reading a picked or pasted automation file: check it, then decode it. */
+internal val FILE_PREVIEW_STEPS = listOf(TransferStage.Preflight, TransferStage.Decode)
+
+/**
+ * How far along [stage] is when a lane runs [steps] in order: the share of steps already done. A
+ * lane with one step, or a stage outside its list, has nothing to measure, so the bar stays
+ * indeterminate rather than sitting at a made-up number.
+ */
+internal fun stepFraction(steps: List<TransferStage>, stage: TransferStage): Float? {
+    if (steps.size < 2) return null
+    val done = steps.indexOf(stage).takeIf { it >= 0 } ?: return null
+    return done.toFloat() / steps.size
+}
+
+/**
+ * [runCatching] for a lane's body that lets Stop through. Plain runCatching caught the
+ * CancellationException Stop throws too, so stopping an import showed "Couldn't read" and logged
+ * an error for something the user asked for.
+ */
+internal inline fun <T> runTransferCatching(block: () -> T): Result<T> = try {
+    Result.success(block())
+} catch (stopped: CancellationException) {
+    throw stopped
+} catch (error: Throwable) {
+    Result.failure(error)
+}
 
 /**
  * Owns one import/export lane: its busy flag, its progress, and the job running it.
@@ -40,15 +68,18 @@ class ImportExportCoordinator(private val scope: CoroutineScope) {
 
     /**
      * Runs [block] unless this lane is already busy. The block reports the stage it has reached so
-     * the UI can show something more useful than a spinner. Returns false when the lane was busy
-     * and nothing was started.
+     * the UI can show something more useful than a spinner, and when the caller names its [steps]
+     * the bar shows how many are done. Returns false when the lane was busy and nothing was started.
      */
-    fun launch(block: suspend (report: (TransferStage) -> Unit) -> Unit): Boolean {
+    fun launch(
+        steps: List<TransferStage> = emptyList(),
+        block: suspend (report: (TransferStage) -> Unit) -> Unit,
+    ): Boolean {
         if (_busy.value) return false
         _busy.value = true
         job = scope.launch {
             try {
-                block { stage -> _progress.value = TransferProgress(stage) }
+                block { stage -> _progress.value = TransferProgress(stage, stepFraction(steps, stage)) }
             } finally {
                 _busy.value = false
                 _progress.value = null

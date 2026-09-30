@@ -6,6 +6,16 @@ import android.os.Bundle
 import android.window.OnBackInvokedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.opentasker.core.logging.AppLogger
 import androidx.activity.compose.setContent
@@ -20,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.produceState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,12 +45,28 @@ import com.opentasker.ui.theme.ThemePreference
 /**
  * Shown while startup finishes preparing the database. Applying a staged restore copies up to
  * 100 MB and may run a cipher migration, so this is the honest state for that launch rather than a
- * frozen main thread.
+ * frozen main thread. It names the step, because a bare spinner through the slow ones looked hung.
  */
 @Composable
-private fun StartupPreparingScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+internal fun StartupPreparingScreen(stage: StartupStage) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         CircularProgressIndicator()
+        Text(
+            stringResource(
+                when (stage) {
+                    StartupStage.Opening -> R.string.startup_stage_opening
+                    StartupStage.Restoring -> R.string.startup_stage_restoring
+                    StartupStage.Encrypting -> R.string.startup_stage_encrypting
+                },
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
     }
 }
 
@@ -74,7 +99,8 @@ class MainActivity : ComponentActivity() {
                     val database by produceState(OpenTaskerApp_NoHilt.readyDb) {
                         if (value == null) value = OpenTaskerApp_NoHilt.awaitDb()
                     }
-                    database?.let { ActiveAutomationUi(db = it) } ?: StartupPreparingScreen()
+                    val stage by OpenTaskerApp_NoHilt.startupStage.collectAsState()
+                    database?.let { ActiveAutomationUi(db = it) } ?: StartupPreparingScreen(stage)
                 }
             }
         }
