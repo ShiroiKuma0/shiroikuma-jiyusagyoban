@@ -17,7 +17,7 @@ import org.junit.Test
  * throwing check to its own row.
  */
 class SetupProbesTest {
-    private val logged = mutableListOf<Pair<String, RuntimeException>>()
+    private val logged = mutableListOf<Pair<String, Throwable>>()
     private val probes = SetupProbes { name, error -> logged += name to error }
 
     @Test
@@ -47,6 +47,19 @@ class SetupProbesTest {
         assertEquals(listOf("grant"), third)
         assertEquals(SetupRowStatus.READY, row(granted = second == true, unavailable = second == null).status())
         assertEquals(setOf("usage access"), probes.failures)
+    }
+
+    @Test
+    fun anApiMissingFromTheDevicesBuildCostsOneRowToo() {
+        // A method or class an old or trimmed OEM image doesn't ship throws a LinkageError, not a
+        // RuntimeException, and would otherwise take the screen down the way #20 did.
+        val missing = NoSuchMethodError("android.app.NotificationManager.canPostPromotedNotifications")
+
+        val result = probes.read("promoted notifications", false) { throw missing }
+
+        assertFalse(result)
+        assertEquals(setOf("promoted notifications"), probes.failures)
+        assertEquals(listOf("promoted notifications" to missing), logged)
     }
 
     @Test

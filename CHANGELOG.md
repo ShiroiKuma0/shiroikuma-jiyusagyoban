@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- Setup and Settings no longer crash the app as they open on Android 8 to 12 phones that can pair companion devices, which includes Galaxy phones (#20). If one of Setup's checks fails on a particular phone, its row now says "Couldn't check" and the rest of the screen carries on.
+- Setup and Settings no longer crash the app as they open on Android 8 to 12 phones that can pair companion devices, which includes Galaxy phones (#20). If one of Setup's checks fails on a particular phone, even because that phone's Android build lacks the call it makes, its row now says "Couldn't check" and the rest of the screen carries on. The same goes for the list of paired devices.
 - A time trigger that can't be delivered no longer wakes the phone every five seconds to retry. Recovery now waits 5 seconds, then 30, then 5 minutes, and after that leaves it to the engine's own watchdog.
 - On Android 17, a Temporary State action that changed the volume or the ringer now puts it back afterwards. The restore ran without the automation service's permission to change audio in the background, so Android refused it and the phone stayed at the temporary level.
 - The home screen widget, the launch screen and the notification accent use the app's current colors. They were still on the old sage palette.

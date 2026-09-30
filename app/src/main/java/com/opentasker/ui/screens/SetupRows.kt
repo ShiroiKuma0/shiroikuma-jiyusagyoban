@@ -493,7 +493,7 @@ internal const val SHIZUKU_PERMISSION_REQUEST_CODE = 4107
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-internal fun logFailedCheck(name: String, error: RuntimeException) {
+internal fun logFailedCheck(name: String, error: Throwable) {
     AppLogger.warn("OpenTasker.Setup", "Setup couldn't check $name on this device", error)
 }
 

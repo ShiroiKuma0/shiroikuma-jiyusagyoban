@@ -11,7 +11,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * in an unguarded IO coroutine that both screens share, so opening either one crashed the app.
  * The manifest fix removes that throw; this keeps the next OEM surprise to one row.
  */
-internal class SetupProbes(private val onFailure: (name: String, error: RuntimeException) -> Unit) {
+internal class SetupProbes(private val onFailure: (name: String, error: Throwable) -> Unit) {
     private val failed = linkedSetOf<String>()
 
     /** Names of the checks that threw, in the order they ran. */
@@ -23,9 +23,17 @@ internal class SetupProbes(private val onFailure: (name: String, error: RuntimeE
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: RuntimeException) {
+        failedWith(name, error, fallback)
+    } catch (error: LinkageError) {
+        // An API this build of Android doesn't have after all: NoSuchMethodError or
+        // NoClassDefFoundError from an old or trimmed OEM image. Still one row, not the screen.
+        failedWith(name, error, fallback)
+    }
+
+    private fun <T> failedWith(name: String, error: Throwable, fallback: T): T {
         failed += name
         onFailure(name, error)
-        fallback
+        return fallback
     }
 
     /** Whether something is granted, or null when the check itself failed. */

@@ -308,7 +308,9 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
 
     fun refreshAssociations() {
         viewModelScope.launch(Dispatchers.IO) {
-            _associations.value = CompanionDeviceAssociation.list(context)
+            _associations.value = SetupProbes(::logFailedCheck).read("paired devices", emptyList()) {
+                CompanionDeviceAssociation.list(context)
+            }
         }
     }
 
