@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,7 +92,6 @@ fun SelectionBar(
 @Composable
 fun ConfirmDeleteSelected(count: Int, noun: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onDismiss,
         title = { Text("Delete $count $noun${if (count == 1) "" else "s"}?") },
         text = { Text("This permanently removes the selected ${noun}s.") },

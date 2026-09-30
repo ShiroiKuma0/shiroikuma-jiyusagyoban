@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -400,7 +400,6 @@ private fun LanguageDialog(
     onClose: () -> Unit,
 ) {
     AlertDialog(
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = { if (!lang.busy) onClose() },
         title = { Text(LANG_TITLE[ui]) },
         text = {
@@ -557,7 +556,6 @@ private fun SyncDialog(
 ) {
     AlertDialog(
         // Same frame as every other dialog in the app; see the note on the faces one.
-        modifier = Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp)),
         onDismissRequest = onClose,
         title = { Text(SYNC_TITLE[lang]) },
         text = {
