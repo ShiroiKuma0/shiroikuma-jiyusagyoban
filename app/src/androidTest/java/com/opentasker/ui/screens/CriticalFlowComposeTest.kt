@@ -295,6 +295,50 @@ class CriticalFlowComposeTest {
     }
 
     @Test
+    fun aProfileWhoseTaskLivesInAnotherProjectStillShowsItsCard() {
+        // A-329: under the "Home" scope the profile was there but its task lived in "Default", and
+        // gating the first-run screen on tasks alone replaced the profile with "Build your first
+        // automation". The card must also name the task rather than call it missing.
+        val otherProjectTask = Task(id = 3, name = "Lights", projectId = 1)
+        val profile = Profile(id = 4, name = "Evening lights", enterTaskId = otherProjectTask.id, projectId = 2)
+        composeTestRule.setContent {
+            TestTheme {
+                ProfilesScreen(
+                    profiles = listOf(profile),
+                    tasks = emptyList(),
+                    allTasks = listOf(otherProjectTask),
+                    runLogs = emptyList(),
+                    storageDecodeIssues = emptyList(),
+                    onCreateTaskFirst = {},
+                    onCreateProfile = {},
+                    onBrowseTemplates = {},
+                    onPreviewProfileShare = {},
+                    onPreflightProfile = {},
+                    onExportOpenTaskerBundle = {},
+                    onImportOpenTaskerBundle = {},
+                    onImportOpenTaskerBundleText = {},
+                    openTaskerBundleBusy = false,
+                    onImportTaskerXml = {},
+                    onExportTaskerXml = {},
+                    taskerImportBusy = false,
+                    onEditProfile = {},
+                    onDeleteProfile = {},
+                    onToggleProfile = { _, _ -> },
+                    onAddContext = {},
+                    onEditContextLogic = {},
+                    onEditContext = { _, _, _ -> },
+                    onDeleteContext = { _, _ -> },
+                    contentPadding = PaddingValues(0.dp),
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Evening lights").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Runs: Lights").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Build your first automation").assertCountEquals(0)
+    }
+
+    @Test
     fun contextEditorMarksTheFieldThatBlocksSave() {
         // A-328: 25:00 greyed out Save while every field looked fine.
         composeTestRule.setContent {

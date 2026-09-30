@@ -113,6 +113,8 @@ internal fun ProfilesScreen(
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    /** Every task, whatever the project scope, so a card can name a task from another project. */
+    allTasks: List<Task> = tasks,
 ) {
     // An unread database and an empty one look identical from here; without this gate a cold
     // start with existing data flashes the first-run screen before Room's first emission.
@@ -120,7 +122,9 @@ internal fun ProfilesScreen(
         ContentLoadingState(contentPadding)
         return
     }
-    if (tasks.isEmpty()) {
+    // Both lists arrive scoped to the selected project, and a profile can run a task that lives
+    // in another project. Gating on tasks alone hid such a profile behind the first-run screen.
+    if (tasks.isEmpty() && profiles.isEmpty()) {
         EmptyState(
             title = stringResource(R.string.empty_first_automation_title),
             body = stringResource(R.string.empty_first_automation_body),
@@ -245,7 +249,7 @@ internal fun ProfilesScreen(
             }
         }
         items(filteredProfiles, key = { it.id }) { profile ->
-            val enterTaskName = tasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: stringResource(R.string.workspace_missing_task, profile.enterTaskId)
+            val enterTaskName = allTasks.firstOrNull { it.id == profile.enterTaskId }?.name ?: stringResource(R.string.workspace_missing_task, profile.enterTaskId)
             ProfileCard(
                 profile = profile,
                 enterTaskName = enterTaskName,

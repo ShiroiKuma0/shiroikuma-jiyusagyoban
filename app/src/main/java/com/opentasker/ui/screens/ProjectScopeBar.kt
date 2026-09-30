@@ -39,7 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
+import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Project
+import com.opentasker.core.model.Task
 import com.opentasker.ui.theme.DesignSystem
 
 @Composable
@@ -284,4 +286,15 @@ private fun ProjectTargetMenu(
             )
         }
     }
+}
+
+/**
+ * The tasks a profile editor offers: the selected project's, like the create dialog, plus any task
+ * the profile already runs. A profile may run a task that lives in another project, and leaving
+ * that task out of the list would make the editor unable to show, or keep, the binding.
+ */
+internal fun profileEditorTasks(profile: Profile, projectTasks: List<Task>, allTasks: List<Task>): List<Task> {
+    val referenced = setOfNotNull(profile.enterTaskId, profile.exitTaskId, profile.fallbackTaskId)
+    val listed = projectTasks.mapTo(HashSet()) { it.id }
+    return projectTasks + allTasks.filter { it.id in referenced && it.id !in listed }
 }

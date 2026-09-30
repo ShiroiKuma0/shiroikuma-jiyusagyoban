@@ -8,6 +8,7 @@
 - On Android 17, a Temporary State action that changed the volume or the ringer now puts it back afterwards. The restore ran without the automation service's permission to change audio in the background, so Android refused it and the phone stayed at the temporary level.
 - Flow shows what a State context watches. Every one read `key=<redacted>`, because the field that names the state looked like a secret to the display filter.
 - The import review counts what it is importing. A bundle of three profiles and three tasks read "across 6 profiles", and now says 3 profiles and 3 tasks.
+- Picking a project no longer hides a profile whose task lives in another project behind the first-run screen, and the header counts match the list under them.
 - The context editor says which field is wrong. A time like 25:00 or a latitude out of range greyed out Save with nothing marked.
 
 ## v0.2.94

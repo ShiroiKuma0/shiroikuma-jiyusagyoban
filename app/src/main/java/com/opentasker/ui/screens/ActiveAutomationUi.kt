@@ -539,10 +539,12 @@ fun ActiveAutomationUi(
         showMoreDestinations = false
     }
     val headerDetail = when (screen) {
-        OpenTaskerScreen.Profiles -> stringResource(R.string.header_profiles_detail, profiles.count { it.enabled }, profiles.size)
-        OpenTaskerScreen.Tasks -> stringResource(R.string.header_tasks_detail, tasks.sumOf { it.actions.size }, tasks.size)
+        // Counted over the same project-scoped lists the screens render, or the header disagreed
+        // with the list under it whenever a project was selected.
+        OpenTaskerScreen.Profiles -> stringResource(R.string.header_profiles_detail, projectProfiles.count { it.enabled }, projectProfiles.size)
+        OpenTaskerScreen.Tasks -> stringResource(R.string.header_tasks_detail, projectTasks.sumOf { it.actions.size }, projectTasks.size)
         OpenTaskerScreen.Vars -> stringResource(R.string.header_variables_detail, globalVariables.size)
-        OpenTaskerScreen.Flow -> stringResource(R.string.header_flow_detail, profiles.size, tasks.size)
+        OpenTaskerScreen.Flow -> stringResource(R.string.header_flow_detail, projectProfiles.size, projectTasks.size)
         OpenTaskerScreen.Scenes -> stringResource(R.string.header_scenes_detail, scenes.sumOf { it.elements.size }, scenes.size)
         OpenTaskerScreen.Inspector -> stringResource(R.string.header_inspector_detail)
         OpenTaskerScreen.Setup -> stringResource(R.string.header_setup_detail)
@@ -740,6 +742,7 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = projectProfiles,
                 tasks = projectTasks,
+                allTasks = tasks,
                 runLogs = runLogs,
                 storageDecodeIssues = storageDecodeIssues,
                 onCreateTaskFirst = {
@@ -1189,7 +1192,7 @@ fun ActiveAutomationUi(
     profileDialog?.let { profile ->
         ProfileEditorDialog(
             profile = profile,
-            tasks = tasks,
+            tasks = remember(profile, projectTasks, tasks) { profileEditorTasks(profile, projectTasks, tasks) },
             onDismiss = { clearProfileDialog() },
             onSave = { name, enabled, enterTaskId, exitTaskId, cooldown, priority, gracePeriod, automationMode, group, lifetime, expiresAtMs, maxActiveExecutions, burstLimit, overflowPolicy, fallbackTaskId ->
                 viewModel.updateProfile(profile.copy(
