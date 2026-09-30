@@ -15,7 +15,7 @@
 - Flow shows what a State context watches. Every one read `key=<redacted>`, because the field that names the state looked like a secret to the display filter.
 - The import review counts what it is importing. A bundle of three profiles and three tasks read "across 6 profiles", and now says 3 profiles and 3 tasks.
 - Picking a project no longer hides a profile whose task lives in another project behind the first-run screen, and the header counts match the list under them.
-- Three removals no longer happen silently. Deleting a watched setting in the Inspector or revoking a Locale grant in Settings shows what was removed, with Undo. Removing a companion device names it and says how to add it back, or says so if Android refused.
+- Three removals no longer happen silently. Deleting a watched setting in the Inspector or revoking a Locale grant in Settings shows what was removed, with Undo. Removing a companion device names it and says how to add it back, or says so if Android refused. Undo puts back only what's still missing when you tap it, so a watched setting added in between isn't lost, and a grant whose task was deleted stays gone.
 - Variable, scene and project-name editors stay open until the save is accepted. A refused save, like a duplicate name or a secret the keystore wouldn't take, used to close the dialog and lose what you typed. Move up is off on the first project and Move down on the last, where they used to report a move that never happened.
 - The context editor says which field is wrong. A time like 25:00 or a latitude out of range greyed out Save with nothing marked.
 - Setup and Diagnostics no longer flash "Ready" or a red "Needs attention" for a moment before they have checked anything.

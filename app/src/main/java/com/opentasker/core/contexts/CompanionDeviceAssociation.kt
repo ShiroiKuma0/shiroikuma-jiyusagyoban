@@ -12,6 +12,8 @@ import android.content.IntentSender
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.RequiresApi
+import com.opentasker.app.R
 import com.opentasker.core.logging.AppLogger
 import java.util.regex.Pattern
 
@@ -34,9 +36,7 @@ object CompanionDeviceAssociation {
         val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return emptyList()
         return unlessRefused("Listing paired devices", emptyList()) {
             if (Build.VERSION.SDK_INT >= 33) {
-                manager.myAssociations.map { info ->
-                    CompanionAssociation(info.id.toString(), "Association ${info.id}")
-                }
+                manager.myAssociations.map { info -> CompanionAssociation(info.id.toString(), label(context, info)) }
             } else {
                 @Suppress("DEPRECATION")
                 manager.associations.map { address -> CompanionAssociation(address, address) }
@@ -61,8 +61,10 @@ object CompanionDeviceAssociation {
 
     /**
      * The service refuses a call with IllegalStateException (Android 8 to 12, when the manifest
-     * lacks the companion_device_setup feature) or SecurityException (an association that isn't
-     * ours). Either one used to crash whichever screen asked, which was Setup and Settings (#20).
+     * lacks the companion_device_setup feature), SecurityException (an association that isn't
+     * ours) or IllegalArgumentException (an id it no longer knows, such as a second tap on Remove
+     * before the list refreshes). Any of them used to crash whichever screen asked, which was
+     * Setup and Settings (#20).
      */
     private inline fun <T> unlessRefused(what: String, refused: T, call: () -> T): T = try {
         call()
@@ -72,7 +74,16 @@ object CompanionDeviceAssociation {
     } catch (error: SecurityException) {
         AppLogger.warn(TAG, "$what was refused", error)
         refused
+    } catch (error: IllegalArgumentException) {
+        AppLogger.warn(TAG, "$what was refused", error)
+        refused
     }
+
+    /** The name Android shows for the device, or a translated fallback naming the association. */
+    @RequiresApi(33)
+    private fun label(context: Context, info: AssociationInfo): String =
+        info.displayName?.toString()?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.setup_companion_association_label, info.id)
 
     fun associate(
         activity: Activity,
@@ -106,7 +117,7 @@ object CompanionDeviceAssociation {
                     override fun onAssociationCreated(associationInfo: AssociationInfo) {
                         callback(
                             CompanionAssociationResult.Created(
-                                CompanionAssociation(associationInfo.id.toString(), "Association ${associationInfo.id}"),
+                                CompanionAssociation(associationInfo.id.toString(), label(activity, associationInfo)),
                             ),
                         )
                     }

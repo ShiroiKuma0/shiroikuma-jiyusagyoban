@@ -1751,6 +1751,7 @@
     <string name="setup_companion_revoke">Revoke</string>
     <string name="setup_companion_associated">Companion device association updated.</string>
     <string name="setup_companion_failed">Unable to start companion device association.</string>
+    <string name="setup_companion_association_label">Paired device %1$d</string>
     <string name="setup_companion_removed">Removed %1$s. Use Associate a device to add it back.</string>
     <string name="setup_companion_remove_failed">Couldn\'t remove %1$s.</string>
     <string name="setup_locale_grants_title">Locale execution grants</string>

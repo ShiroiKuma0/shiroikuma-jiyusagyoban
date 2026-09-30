@@ -61,6 +61,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.FilterChip
+import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotStatus
 import androidx.compose.material3.Switch
@@ -71,7 +72,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -322,8 +322,13 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         }
     }
 
+    /**
+     * Undo for a revoke. Checked against the database when tapped: a task deleted since took its
+     * grants with it, and the Settings card's own task list stops updating once it scrolls away.
+     */
     fun restoreLocaleGrant(grant: LocaleGrant) {
         viewModelScope.launch(Dispatchers.IO) {
+            if (OpenTaskerApp_NoHilt.awaitDb().taskDao().getById(grant.taskId) == null) return@launch
             val store = LocaleGrantStore(context)
             store.restore(grant)
             _localeGrants.value = store.grants()
@@ -1156,7 +1161,6 @@ internal fun LocaleGrantManagementCard(
 ) {
     val resources = LocalResources.current
     val taskNames = remember(tasks) { tasks.associateBy(Task::id) }
-    val latestTaskNames by rememberUpdatedState(taskNames)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
@@ -1203,8 +1207,7 @@ internal fun LocaleGrantManagementCard(
                                     ?: resources.getString(R.string.setup_locale_grant_unknown_task, grant.taskId)
                                 onRevoke(grant)
                                 onUndoableMessage(resources.getString(R.string.setup_locale_grant_revoked, label)) {
-                                    // A task deleted meanwhile took its grants with it; don't bring one back.
-                                    if (grant.taskId in latestTaskNames) onRestore(grant)
+                                    onRestore(grant)
                                 }
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),

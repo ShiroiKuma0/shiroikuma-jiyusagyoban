@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,17 +46,33 @@ import com.opentasker.core.model.InvariantOperator
 import com.opentasker.core.model.InvariantStatePredicate
 import com.opentasker.ui.theme.DesignSystem
 
+/**
+ * [current] with [deleted] put back at [index], or null when an identical rule is already there.
+ * Rules are compared by content, not id: normalizing hands the lowest free id to the next new rule,
+ * so a rule added after the delete can hold the deleted one's id. The restored rule then gets a
+ * fresh id rather than a duplicate.
+ */
+internal fun withRestoredInvariant(
+    current: List<AutomationInvariant>,
+    deleted: AutomationInvariant,
+    index: Int,
+): List<AutomationInvariant>? {
+    if (current.any { it.copy(id = deleted.id) == deleted }) return null
+    val restored = if (current.any { it.id == deleted.id }) deleted.copy(id = 0L) else deleted
+    return current.toMutableList().apply { add(index.coerceIn(0, size), restored) }
+}
+
 @Composable
 internal fun AutomationInvariantPanel(
     invariants: List<AutomationInvariant>,
     report: AutomationLintReport,
     onUpdate: (List<AutomationInvariant>) -> Unit,
+    onRestore: (deleted: AutomationInvariant, index: Int) -> Unit,
     onUndoableMessage: UndoableMessage,
     modifier: Modifier = Modifier,
 ) {
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     val resources = LocalResources.current
-    val latestInvariants by rememberUpdatedState(invariants)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -102,10 +117,10 @@ internal fun AutomationInvariantPanel(
                         onDelete = {
                             val index = invariants.indexOf(invariant)
                             onUpdate(invariants.filterNot { it.id == invariant.id })
+                            // Undo can come long after this card has left the screen, so it goes through
+                            // onRestore, which reads the saved list when tapped, not this card's copy.
                             onUndoableMessage(resources.getString(R.string.automation_invariant_deleted, invariant.name)) {
-                                if (latestInvariants.none { it.id == invariant.id }) {
-                                    onUpdate(latestInvariants.toMutableList().apply { add(index.coerceIn(0, size), invariant) })
-                                }
+                                onRestore(invariant, index)
                             }
                         },
                     )

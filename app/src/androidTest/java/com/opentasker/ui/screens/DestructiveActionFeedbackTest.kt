@@ -48,6 +48,7 @@ class DestructiveActionFeedbackTest {
                     invariants = invariants,
                     report = AutomationLintReport(),
                     onUpdate = { invariants = it },
+                    onRestore = { deleted, index -> withRestoredInvariant(invariants, deleted, index)?.let { invariants = it } },
                     onUndoableMessage = undoable,
                 )
             }

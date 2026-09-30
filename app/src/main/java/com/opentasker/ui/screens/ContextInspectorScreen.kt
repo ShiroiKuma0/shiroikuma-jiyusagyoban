@@ -171,6 +171,12 @@ class ContextInspectorViewModel(
         _invariants.value = invariantStore.save(value)
     }
 
+    /** Undo for a delete, applied to the saved list as it is when Undo is tapped. */
+    fun restoreInvariant(deleted: AutomationInvariant, index: Int) {
+        val restored = withRestoredInvariant(invariantStore.load(), deleted, index) ?: return
+        _invariants.value = invariantStore.save(restored)
+    }
+
     val lintReport: StateFlow<AutomationLintReport> = combine(profiles, tasks, invariants) { profiles, tasks, invariants ->
         AutomationLint.analyze(
             profiles,
@@ -413,6 +419,7 @@ fun ContextInspectorScreen(
                 invariants = invariants,
                 report = lintReport,
                 onUpdate = viewModel::updateInvariants,
+                onRestore = viewModel::restoreInvariant,
                 onUndoableMessage = onUndoableMessage,
             )
         }
