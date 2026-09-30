@@ -31,10 +31,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
@@ -50,9 +52,12 @@ internal fun AutomationInvariantPanel(
     invariants: List<AutomationInvariant>,
     report: AutomationLintReport,
     onUpdate: (List<AutomationInvariant>) -> Unit,
+    onUndoableMessage: UndoableMessage,
     modifier: Modifier = Modifier,
 ) {
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val resources = LocalResources.current
+    val latestInvariants by rememberUpdatedState(invariants)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -94,7 +99,15 @@ internal fun AutomationInvariantPanel(
                             })
                         },
                         onEdit = { editingId = invariant.id },
-                        onDelete = { onUpdate(invariants.filterNot { it.id == invariant.id }) },
+                        onDelete = {
+                            val index = invariants.indexOf(invariant)
+                            onUpdate(invariants.filterNot { it.id == invariant.id })
+                            onUndoableMessage(resources.getString(R.string.automation_invariant_deleted, invariant.name)) {
+                                if (latestInvariants.none { it.id == invariant.id }) {
+                                    onUpdate(latestInvariants.toMutableList().apply { add(index.coerceIn(0, size), invariant) })
+                                }
+                            }
+                        },
                     )
                 }
             }

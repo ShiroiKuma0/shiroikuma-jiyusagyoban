@@ -36,6 +36,12 @@ class LocaleGrantStore(context: Context) {
         prefs.edit().remove(KEY_PREFIX + token).apply()
     }
 
+    /** Put back a grant [revoke] removed, with the same token and task, for Setup's Undo. */
+    fun restore(grant: LocaleGrant) {
+        if (grant.token.isBlank() || grant.taskId <= 0L) return
+        prefs.edit().putLong(KEY_PREFIX + grant.token, grant.taskId).apply()
+    }
+
     /** Revoke every grant bound to [taskId] (e.g. when the task is deleted). */
     fun revokeAllForTask(taskId: Long) {
         val toRemove = prefs.all

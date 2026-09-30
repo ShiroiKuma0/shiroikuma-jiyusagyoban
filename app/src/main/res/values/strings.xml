@@ -680,6 +680,7 @@
     <string name="automation_invariant_add">Watch a setting</string>
     <string name="automation_invariant_edit">Edit watched setting</string>
     <string name="automation_invariant_delete">Stop watching this setting</string>
+    <string name="automation_invariant_deleted">Stopped watching %1$s</string>
     <string name="automation_invariant_guard">Only when: %1$s %2$s %3$s</string>
     <string name="automation_invariant_forbidden_write">Warn if this changes: %1$s</string>
     <string name="automation_invariant_add_title">Watch a device setting</string>
@@ -1747,12 +1748,15 @@
     <string name="setup_companion_revoke">Revoke</string>
     <string name="setup_companion_associated">Companion device association updated.</string>
     <string name="setup_companion_failed">Unable to start companion device association.</string>
+    <string name="setup_companion_removed">Removed %1$s. Use Associate a device to add it back.</string>
+    <string name="setup_companion_remove_failed">Couldn\'t remove %1$s.</string>
     <string name="setup_locale_grants_title">Locale execution grants</string>
     <string name="setup_locale_grants_body">These grants let Locale-compatible hosts fire one selected task. Revoke a grant to block future fires without deleting the task.</string>
     <string name="setup_locale_grants_empty">No Locale execution grants are issued.</string>
     <string name="setup_locale_grant_unknown_task">Deleted or unavailable task (ID %1$d)</string>
     <string name="setup_locale_grant_task_id">Task ID %1$d</string>
     <string name="setup_locale_grant_revoke">Revoke</string>
+    <string name="setup_locale_grant_revoked">Revoked the grant for %1$s</string>
     <string name="action_preflight">Preflight</string>
     <string name="dialog_preflight_review">Preflight review</string>
     <string name="preflight_notice">Preview only: no network, file, setting, shell, notification, scene, or durable variable action will run.</string>

@@ -284,6 +284,7 @@ class ContextInspectorViewModelFactory(
 fun ContextInspectorScreen(
     db: AppDatabase,
     contentPadding: PaddingValues,
+    onUndoableMessage: UndoableMessage,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
@@ -398,6 +399,7 @@ fun ContextInspectorScreen(
                 invariants = invariants,
                 report = lintReport,
                 onUpdate = viewModel::updateInvariants,
+                onUndoableMessage = onUndoableMessage,
             )
         }
     }

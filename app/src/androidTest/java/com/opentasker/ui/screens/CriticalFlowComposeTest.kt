@@ -85,6 +85,7 @@ class CriticalFlowComposeTest {
                 PermissionOnboardingScreen(
                     contentPadding = PaddingValues(0.dp),
                     onMessage = {},
+                    onUndoableMessage = { _, _ -> },
                     backupState = BackupSetupState(busy = false),
                     onCreateBackup = {},
                     onExportBackup = {},
@@ -108,6 +109,7 @@ class CriticalFlowComposeTest {
                 PermissionOnboardingScreen(
                     contentPadding = PaddingValues(0.dp),
                     onMessage = {},
+                    onUndoableMessage = { _, _ -> },
                     backupState = BackupSetupState(busy = false),
                     onCreateBackup = {},
                     onExportBackup = {},
@@ -140,6 +142,7 @@ class CriticalFlowComposeTest {
                 PermissionOnboardingScreen(
                     contentPadding = PaddingValues(0.dp),
                     onMessage = {},
+                    onUndoableMessage = { _, _ -> },
                     backupState = BackupSetupState(busy = false),
                     onCreateBackup = {},
                     onExportBackup = {},
@@ -161,6 +164,7 @@ class CriticalFlowComposeTest {
                 PermissionOnboardingScreen(
                     contentPadding = PaddingValues(0.dp),
                     onMessage = {},
+                    onUndoableMessage = { _, _ -> },
                     backupState = BackupSetupState(
                         busy = false,
                         latestBackupName = null,

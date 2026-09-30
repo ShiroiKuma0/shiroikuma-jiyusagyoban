@@ -44,15 +44,18 @@ object CompanionDeviceAssociation {
         }
     }
 
-    fun disassociate(context: Context, association: CompanionAssociation) {
-        val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return
-        unlessRefused("Removing a paired device", Unit) {
+    /** False when the device couldn't be removed, so Setup can say so instead of claiming it was. */
+    fun disassociate(context: Context, association: CompanionAssociation): Boolean {
+        val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return false
+        return unlessRefused("Removing a paired device", false) {
             if (Build.VERSION.SDK_INT >= 33) {
-                association.id.toIntOrNull()?.let(manager::disassociate)
+                val id = association.id.toIntOrNull() ?: return@unlessRefused false
+                manager.disassociate(id)
             } else {
                 @Suppress("DEPRECATION")
                 manager.disassociate(association.id)
             }
+            true
         }
     }
 

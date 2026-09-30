@@ -71,12 +71,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -318,6 +320,14 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         }
     }
 
+    fun restoreLocaleGrant(grant: LocaleGrant) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val store = LocaleGrantStore(context)
+            store.restore(grant)
+            _localeGrants.value = store.grants()
+        }
+    }
+
     fun chooseUnifiedPushDistributor(activityContext: Context, onResult: (Boolean) -> Unit) {
         UnifiedPushConnector.chooseDistributor(activityContext) { selected ->
             refreshExternalState()
@@ -379,6 +389,7 @@ private class PermissionOnboardingViewModelFactory(
 fun PermissionOnboardingScreen(
     contentPadding: PaddingValues,
     onMessage: (String) -> Unit,
+    onUndoableMessage: UndoableMessage,
     backupState: BackupSetupState,
     onCreateBackup: () -> Unit,
     onExportBackup: () -> Unit,
@@ -616,6 +627,7 @@ fun PermissionOnboardingScreen(
                 CompanionSetupCard(
                     associations = associations,
                     onRefresh = setupViewModel::refreshAssociations,
+                    onDisassociate = { association -> CompanionDeviceAssociation.disassociate(context, association) },
                     onMessage = onMessage,
                 )
             }
@@ -623,7 +635,9 @@ fun PermissionOnboardingScreen(
                 LocaleGrantManagementCard(
                     tasks = tasks,
                     grants = localeGrants,
-                    onRevoke = setupViewModel::revokeLocaleGrant,
+                    onRevoke = { grant -> setupViewModel.revokeLocaleGrant(grant.token) },
+                    onRestore = setupViewModel::restoreLocaleGrant,
+                    onUndoableMessage = onUndoableMessage,
                 )
             }
             item { SettingsSectionLabel(stringResource(R.string.settings_section_about)) }
@@ -891,13 +905,15 @@ private fun GlobalFallbackTaskCard(
 }
 
 @Composable
-private fun CompanionSetupCard(
+internal fun CompanionSetupCard(
     associations: List<CompanionAssociation>,
     onRefresh: () -> Unit,
+    onDisassociate: (CompanionAssociation) -> Boolean,
     onMessage: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val activity = context.findActivity()
+    val resources = LocalResources.current
     val associatedMessage = stringResource(R.string.setup_companion_associated)
     val failureMessage = stringResource(R.string.setup_companion_failed)
     val launcher = rememberLauncherForActivityResult(
@@ -936,8 +952,16 @@ private fun CompanionSetupCard(
                         Text(association.label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         OutlinedButton(
                             onClick = {
-                                CompanionDeviceAssociation.disassociate(context, association)
+                                // Nothing to undo with: pairing again goes through the system picker,
+                                // so the message says how to get the device back.
+                                val removed = onDisassociate(association)
                                 onRefresh()
+                                onMessage(
+                                    resources.getString(
+                                        if (removed) R.string.setup_companion_removed else R.string.setup_companion_remove_failed,
+                                        association.label,
+                                    ),
+                                )
                             },
                         ) {
                             Text(stringResource(R.string.setup_companion_revoke))
@@ -1121,12 +1145,16 @@ private fun pushFailureReasonRes(reason: String?): Int = when (reason) {
 }
 
 @Composable
-private fun LocaleGrantManagementCard(
+internal fun LocaleGrantManagementCard(
     tasks: List<Task>,
     grants: List<LocaleGrant>,
-    onRevoke: (String) -> Unit,
+    onRevoke: (LocaleGrant) -> Unit,
+    onRestore: (LocaleGrant) -> Unit,
+    onUndoableMessage: UndoableMessage,
 ) {
+    val resources = LocalResources.current
     val taskNames = remember(tasks) { tasks.associateBy(Task::id) }
+    val latestTaskNames by rememberUpdatedState(taskNames)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
@@ -1169,7 +1197,13 @@ private fun LocaleGrantManagementCard(
                         }
                         OutlinedButton(
                             onClick = {
-                                onRevoke(grant.token)
+                                val label = taskNames[grant.taskId]?.name
+                                    ?: resources.getString(R.string.setup_locale_grant_unknown_task, grant.taskId)
+                                onRevoke(grant)
+                                onUndoableMessage(resources.getString(R.string.setup_locale_grant_revoked, label)) {
+                                    // A task deleted meanwhile took its grants with it; don't bring one back.
+                                    if (grant.taskId in latestTaskNames) onRestore(grant)
+                                }
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {

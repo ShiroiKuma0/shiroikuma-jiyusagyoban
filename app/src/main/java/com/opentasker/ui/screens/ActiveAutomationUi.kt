@@ -241,6 +241,10 @@ fun ActiveAutomationUi(
     val snackbarHostState = remember { SnackbarHostState() }
     val unsupportedActionTypeMessage = stringResource(R.string.ui_error_action_type_unsupported)
     val scope = rememberCoroutineScope()
+    val undoLabel = stringResource(R.string.action_undo)
+    val showUndoableMessage = remember(scope, snackbarHostState, undoLabel) {
+        undoableMessages(scope, snackbarHostState, undoLabel)
+    }
     var screenOrdinal by rememberSaveable { mutableIntStateOf(0) }
     var selectedProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showGlobalSearchDialog by rememberSaveable { mutableStateOf(false) }
@@ -678,6 +682,7 @@ fun ActiveAutomationUi(
             PermissionOnboardingScreen(
                 contentPadding = innerPadding,
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                onUndoableMessage = showUndoableMessage,
                 backupState = backupSetupState,
                 onCreateBackup = viewModel::createDatabaseBackup,
                 onExportBackup = { databaseBackupExportLauncher.launch(databaseBackupExportName()) },
@@ -887,7 +892,11 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Setup -> permissionScreen(false)
             OpenTaskerScreen.Settings -> permissionScreen(true)
 
-            OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)
+            OpenTaskerScreen.Inspector -> ContextInspectorScreen(
+                db = db,
+                contentPadding = innerPadding,
+                onUndoableMessage = showUndoableMessage,
+            )
 
             OpenTaskerScreen.RunLog -> RunLogScreenContent(
                 logs = runLogPage.entries,
