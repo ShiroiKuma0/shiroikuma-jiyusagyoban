@@ -75,6 +75,10 @@ fun DiagnosticsScreen(
     // null until the first health read. It used to collapse to false, so every open flashed a red
     // "Needs attention" above rows that still said Loading.
     val healthy = health?.healthy
+    // A read that failed or never answered is not "still loading". With no earlier read to fall
+    // back on, the sections below would only show placeholders and an empty crash list that
+    // claims nothing crashed, so they wait for a read that works (A-360).
+    val nothingRead = state.loadFailed && state.loadedAtMillis == 0L
 
     LazyColumn(
         modifier = Modifier
@@ -86,12 +90,28 @@ fun DiagnosticsScreen(
         item {
             DiagnosticSummaryCard(
                 healthy = healthy,
+                checkFailed = state.loadFailed && health == null,
                 reason = health?.assessment?.reason,
                 onRefresh = onRefresh,
                 onShare = onShare,
                 onCopy = onCopy,
             )
         }
+        if (state.loadFailed) {
+            item {
+                InlineNotice(
+                    title = stringResource(R.string.diagnostics_load_failed_title),
+                    body = stringResource(R.string.diagnostics_load_failed_body),
+                    color = MaterialTheme.colorScheme.error,
+                    action = {
+                        TextButton(onClick = onRefresh) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    },
+                )
+            }
+        }
+        if (nothingRead) return@LazyColumn
         item {
             SectionTitle(stringResource(R.string.diagnostics_engine_health))
             EngineHealthCard(health, formatter)
@@ -133,21 +153,23 @@ fun DiagnosticsScreen(
 @Composable
 private fun DiagnosticSummaryCard(
     healthy: Boolean?,
+    checkFailed: Boolean,
     reason: String?,
     onRefresh: () -> Unit,
     onShare: () -> Unit,
     onCopy: () -> Unit,
 ) {
-    val statusColor = when (healthy) {
-        true -> MaterialTheme.colorScheme.tertiary
-        false -> MaterialTheme.colorScheme.error
-        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    val statusColor = when {
+        healthy == true -> MaterialTheme.colorScheme.tertiary
+        healthy == false || checkFailed -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val statusLabel = stringResource(
-        when (healthy) {
-            true -> R.string.diagnostics_status_healthy
-            false -> R.string.diagnostics_status_attention
-            null -> R.string.diagnostics_status_checking
+        when {
+            healthy == true -> R.string.diagnostics_status_healthy
+            healthy == false -> R.string.diagnostics_status_attention
+            checkFailed -> R.string.diagnostics_status_unavailable
+            else -> R.string.diagnostics_status_checking
         },
     )
     Card(
@@ -164,10 +186,10 @@ private fun DiagnosticSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Icon(
-                when (healthy) {
-                    true -> Icons.Filled.CheckCircle
-                    false -> Icons.Filled.Error
-                    null -> Icons.Filled.HourglassEmpty
+                when {
+                    healthy == true -> Icons.Filled.CheckCircle
+                    healthy == false || checkFailed -> Icons.Filled.Error
+                    else -> Icons.Filled.HourglassEmpty
                 },
                 contentDescription = statusLabel,
                 tint = statusColor,

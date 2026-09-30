@@ -1256,6 +1256,9 @@
     <string name="diagnostics_status_healthy">Engine healthy</string>
     <string name="diagnostics_status_attention">Needs attention</string>
     <string name="diagnostics_status_checking">Checking engine health…</string>
+    <string name="diagnostics_status_unavailable">Couldn\'t check engine health</string>
+    <string name="diagnostics_load_failed_title">Diagnostics couldn\'t be read</string>
+    <string name="diagnostics_load_failed_body">The health check failed or took too long to answer. Retry, and if it keeps failing, restart the app.</string>
     <string name="diagnostics_refresh">Refresh diagnostics</string>
     <string name="diagnostics_share">Share redacted report</string>
     <string name="diagnostics_copy">Copy redacted report</string>

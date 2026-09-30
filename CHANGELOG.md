@@ -19,6 +19,8 @@
 - Variable, scene and project-name editors stay open until the save is accepted. A refused save, like a duplicate name or a secret the keystore wouldn't take, used to close the dialog and lose what you typed. Move up is off on the first project and Move down on the last, where they used to report a move that never happened.
 - The context editor says which field is wrong. A time like 25:00 or a latitude out of range greyed out Save with nothing marked.
 - Setup and Diagnostics no longer flash "Ready" or a red "Needs attention" for a moment before they have checked anything.
+- The Inspector no longer flashes "Context inspector unavailable" as it opens. It waits for your profiles to load and says there are none only when that's true.
+- Diagnostics says so when its health check fails or hasn't answered after 15 seconds, and offers Retry. It used to read "Loading" forever.
 - Times in the run log, the Inspector and Diagnostics follow your phone's date order and 12- or 24-hour clock instead of always reading like 2026-09-26 18:40:00.
 - A backup taken while tasks are running is a clean copy. It used to copy the database file while other writes could still land in it, so a busy moment could leave a backup that failed its integrity check or quietly mixed two moments.
 - A restore keeps the database it replaced, including whatever the app wrote just before it closed, and Setup offers to roll back to it. That copy and the file from a restore that failed were missing from every list and count, so they sat at full size until app data was cleared.

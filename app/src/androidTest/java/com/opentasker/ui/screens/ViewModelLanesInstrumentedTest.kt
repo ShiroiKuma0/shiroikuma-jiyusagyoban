@@ -22,7 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The run log and backup lanes still load, filter, clear and report after leaving the view model (A-353). */
+/** The run log, backup and diagnostics lanes still load, report and recover after leaving the view model (A-353, A-360). */
 @RunWith(AndroidJUnit4::class)
 class ViewModelLanesInstrumentedTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -73,6 +73,20 @@ class ViewModelLanesInstrumentedTest {
         assertEquals(R.string.ui_message_backup_created, message.resId)
         val state = withTimeout(TIMEOUT_MS) { backup.backupSetupState.first { !it.busy && it.latestBackupName != null } }
         assertEquals(message.args.single(), state.latestBackupName)
+    }
+
+    @Test
+    fun theDiagnosticsLaneMarksAFailedReadAndLetsRetryThrough() = runBlocking<Unit> {
+        // Every query on a closed database throws, standing in for a health read that fails (A-360).
+        db.close()
+        val diagnostics = DiagnosticsController(db, context, scope, events)
+
+        withTimeout(TIMEOUT_MS) { diagnostics.diagnosticsState.first { it.loadFailed } }
+        assertEquals(R.string.ui_error_diagnostics_refresh, withTimeout(TIMEOUT_MS) { events.receive() }.resId)
+
+        // Retry after a failure starts a new read instead of being dropped by the in-flight guard.
+        diagnostics.refreshDiagnostics()
+        assertEquals(R.string.ui_error_diagnostics_refresh, withTimeout(TIMEOUT_MS) { events.receive() }.resId)
     }
 
     private fun cleanup() {

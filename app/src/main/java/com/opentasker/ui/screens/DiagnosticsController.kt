@@ -16,17 +16,18 @@ import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
+import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class DiagnosticsUiState(
     val health: EngineHealthStatus? = null,
@@ -36,6 +37,8 @@ data class DiagnosticsUiState(
     val loadedAtMillis: Long = 0L,
     /** Resolves admission rows to profile names; they previously showed raw Room ids. */
     val profileNames: Map<Long, String> = emptyMap(),
+    /** The last read failed or didn't answer in time; the screen offers Retry instead of "Loading". */
+    val loadFailed: Boolean = false,
 )
 
 /**
@@ -63,10 +66,16 @@ internal class DiagnosticsController(
     }
 
     fun refreshDiagnostics() {
-        if (diagnosticsRefreshJob?.isActive == true) return
+        // A read in flight is left to finish unless it has already been given up on. Then Retry
+        // starts a fresh one instead of queueing behind a call that may never return (A-360).
+        if (diagnosticsRefreshJob?.isActive == true && !_diagnosticsState.value.loadFailed) return
+        diagnosticsRefreshJob?.cancel()
+        _diagnosticsState.value = _diagnosticsState.value.copy(loadFailed = false)
         diagnosticsRefreshJob = scope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
+            // Awaited rather than run inline, so the timeout fires on time even when a blocking
+            // call inside the read ignores cancellation.
+            val read = async(Dispatchers.IO) {
+                runCatching {
                     DiagnosticsUiState(
                         health = EngineHealthReader.read(appContext),
                         admission = ExecutionAdmissionRegistry.snapshot(appContext),
@@ -78,9 +87,14 @@ internal class DiagnosticsController(
                         profileNames = db.profileDao().getAll().associate { it.id to it.name },
                     )
                 }
-            }.onSuccess { state ->
+            }
+            val result = withTimeoutOrNull(DIAGNOSTICS_READ_TIMEOUT_MS) { read.await() }
+                ?: Result.failure(TimeoutException("Diagnostics read took longer than $DIAGNOSTICS_READ_TIMEOUT_MS ms"))
+            result.onSuccess { state ->
                 _diagnosticsState.value = state
             }.onFailure { error ->
+                read.cancel()
+                _diagnosticsState.value = _diagnosticsState.value.copy(loadFailed = true)
                 events.send(loggedUiErrorMessage(error, R.string.ui_error_diagnostics_refresh))
             }
         }
@@ -125,3 +139,5 @@ internal class DiagnosticsController(
         }
     }
 }
+
+private const val DIAGNOSTICS_READ_TIMEOUT_MS = 15_000L

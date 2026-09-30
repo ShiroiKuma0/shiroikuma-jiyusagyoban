@@ -92,6 +92,7 @@ import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.StorageDecodeIssue
+import com.opentasker.core.storage.StorageDecodeResult
 import com.opentasker.ui.utils.expandCollapseToggle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -134,16 +135,22 @@ class ContextInspectorViewModel(
         _simulationProfile.value = null
     }
 
+    // Null until Room's first emission. An empty seed made a cold start look exactly like having
+    // no profiles, so the Inspector flashed its first-run empty state on every open (A-360).
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
-        .map { entities -> entities.map { it.toDomainDecodeResult() } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .map<_, List<StorageDecodeResult<Profile>>?> { entities -> entities.map { it.toDomainDecodeResult() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    private val profiles: StateFlow<List<Profile>> = profileDecodeResults
+    private val loadedProfiles: StateFlow<List<Profile>?> = profileDecodeResults
         .map { results ->
-            results.mapNotNull { result -> result.value.takeIf { result.issue == null } }
-                .sortedBy { it.name.lowercase(Locale.US) }
+            results?.mapNotNull { result -> result.value.takeIf { result.issue == null } }
+                ?.sortedBy { it.name.lowercase(Locale.US) }
         }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val profiles: StateFlow<List<Profile>> = loadedProfiles
+        .map { it.orEmpty() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val taskDecodeResults = db.taskDao()
@@ -181,16 +188,18 @@ class ContextInspectorViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val storageDecodeIssues: StateFlow<List<StorageDecodeIssue>> = profileDecodeResults
-        .map { results -> results.mapNotNull { it.issue } }
+        .map { results -> results.orEmpty().mapNotNull { it.issue } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val snapshot: StateFlow<ContextInspectionSnapshot> = combine(
-        profiles,
+    /** Null until the profiles have loaded, so the screen can tell "still reading" from "none". */
+    val snapshot: StateFlow<ContextInspectionSnapshot?> = combine(
+        loadedProfiles,
         latestEvents,
         sourceErrors,
         refreshTick,
         CausalLoopDiagnostics.latest,
     ) { profiles, observations, errors, now, causalLoop ->
+        if (profiles == null) return@combine null
         val sources = buildContextSourceSnapshots(appContext, observations, errors)
         ContextInspectionSnapshot(
             generatedAtMs = now,
@@ -213,7 +222,7 @@ class ContextInspectorViewModel(
             causalLoop = causalLoop,
         )
     }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyContextInspectionSnapshot(clock()))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun refresh() {
         refreshTick.value = clock()
@@ -290,13 +299,23 @@ fun ContextInspectorScreen(
     val context = LocalContext.current.applicationContext
     val factory = remember(db, context) { ContextInspectorViewModelFactory(db, context) }
     val viewModel: ContextInspectorViewModel = viewModel(factory = factory)
-    val snapshot by viewModel.snapshot.collectAsState()
+    val loadedSnapshot by viewModel.snapshot.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val lintFindings by viewModel.lintFindings.collectAsState()
     val invariants by viewModel.invariants.collectAsState()
     val lintReport by viewModel.lintReport.collectAsState()
     val simulationProfile by viewModel.simulationProfile.collectAsState()
     var selectedProfileId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    DisposableEffect(viewModel) {
+        viewModel.startObserving()
+        onDispose { viewModel.stopObserving() }
+    }
+
+    val snapshot = loadedSnapshot ?: run {
+        ContentLoadingState(contentPadding)
+        return
+    }
     val selectedProfile = snapshot.profiles.firstOrNull { it.profileId == selectedProfileId }
         ?: snapshot.profiles.firstOrNull()
 
@@ -304,11 +323,6 @@ fun ContextInspectorScreen(
         if (selectedProfileId == null || snapshot.profiles.none { it.profileId == selectedProfileId }) {
             selectedProfileId = snapshot.profiles.firstOrNull()?.profileId
         }
-    }
-
-    DisposableEffect(viewModel) {
-        viewModel.startObserving()
-        onDispose { viewModel.stopObserving() }
     }
 
     if (snapshot.sources.isEmpty() && snapshot.profiles.isEmpty() && storageDecodeIssues.isEmpty() && invariants.isEmpty()) {
@@ -1125,9 +1139,6 @@ private val ContextObservationStatus.resourceId: Int
         ContextObservationStatus.Stale -> R.string.inspector_observation_stale
         ContextObservationStatus.Error -> R.string.inspector_observation_error
     }
-
-private fun emptyContextInspectionSnapshot(nowMs: Long): ContextInspectionSnapshot =
-    ContextInspectionSnapshot(generatedAtMs = nowMs, sources = emptyList(), profiles = emptyList())
 
 private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long): String {
     val seconds = ((nowMs - observedAtMs) / 1000L).coerceAtLeast(0)
