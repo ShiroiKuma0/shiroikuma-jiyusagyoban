@@ -12,7 +12,6 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
-import com.opentasker.core.shizuku.ShizukuShell
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -257,22 +256,6 @@ class BackupDoorExportAction : Action {
         val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
         val name = basename.ifEmpty { "shiroikuma-" + pkg.substringAfterLast('.') }
         return File(dir, "${name}_$stamp.zip")
-    }
-
-    /**
-     * Put the target on the temporary power allowlist so its foreground service may start from our
-     * background call. Returns a line for the run log, or null when nothing was attempted.
-     */
-    private fun grantTempAllowance(pkg: String, durationMs: Long): String? {
-        if (!ShizukuShell.available()) {
-            return "Shizuku unavailable — no foreground-start allowance for $pkg; a refusal is likely " +
-                "unless it was recently open"
-        }
-        val result = runCatching {
-            ShizukuShell.exec("cmd deviceidle tempwhitelist -d $durationMs $pkg")
-        }.getOrNull() ?: return "could not grant $pkg a temporary foreground-start allowance"
-        return if (result.exitCode == 0) null
-        else "tempwhitelist refused for $pkg: ${result.stderr.trim().take(120)}"
     }
 
     /**

@@ -515,6 +515,9 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.health.connect.client)
     implementation(libs.androidx.datastore.preferences)
+    // 言語島's player: ExoPlayer in a MediaSessionService, in a process of its own.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
     implementation(libs.androidx.profileinstaller)
 
     implementation(libs.kotlinx.serialization.json)
