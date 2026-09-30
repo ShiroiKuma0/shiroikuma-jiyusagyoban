@@ -127,6 +127,7 @@
     <string name="status_detected">Detected</string>
     <string name="status_optional">Optional</string>
     <string name="status_needs_setup">Needs setup</string>
+    <string name="status_unavailable">Couldn\'t check</string>
     <string name="status_granted">Granted</string>
     <string name="status_required">Required</string>
     <string name="status_pending">%1$d pending</string>

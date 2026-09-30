@@ -12,6 +12,7 @@ import android.content.IntentSender
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import com.opentasker.core.logging.AppLogger
 import java.util.regex.Pattern
 
 data class CompanionAssociation(
@@ -27,26 +28,47 @@ sealed interface CompanionAssociationResult {
 
 /** Small API-level adapter for user-confirmed CompanionDeviceManager associations. */
 object CompanionDeviceAssociation {
+    private const val TAG = "OpenTasker.Companion"
+
     fun list(context: Context): List<CompanionAssociation> {
         val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return emptyList()
-        return if (Build.VERSION.SDK_INT >= 33) {
-            manager.myAssociations.map { info ->
-                CompanionAssociation(info.id.toString(), "Association ${info.id}")
+        return unlessRefused("Listing paired devices", emptyList()) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                manager.myAssociations.map { info ->
+                    CompanionAssociation(info.id.toString(), "Association ${info.id}")
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                manager.associations.map { address -> CompanionAssociation(address, address) }
             }
-        } else {
-            @Suppress("DEPRECATION")
-            manager.associations.map { address -> CompanionAssociation(address, address) }
         }
     }
 
     fun disassociate(context: Context, association: CompanionAssociation) {
         val manager = context.getSystemService(CompanionDeviceManager::class.java) ?: return
-        if (Build.VERSION.SDK_INT >= 33) {
-            association.id.toIntOrNull()?.let(manager::disassociate)
-        } else {
-            @Suppress("DEPRECATION")
-            manager.disassociate(association.id)
+        unlessRefused("Removing a paired device", Unit) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                association.id.toIntOrNull()?.let(manager::disassociate)
+            } else {
+                @Suppress("DEPRECATION")
+                manager.disassociate(association.id)
+            }
         }
+    }
+
+    /**
+     * The service refuses a call with IllegalStateException (Android 8 to 12, when the manifest
+     * lacks the companion_device_setup feature) or SecurityException (an association that isn't
+     * ours). Either one used to crash whichever screen asked, which was Setup and Settings (#20).
+     */
+    private inline fun <T> unlessRefused(what: String, refused: T, call: () -> T): T = try {
+        call()
+    } catch (error: IllegalStateException) {
+        AppLogger.warn(TAG, "$what was refused", error)
+        refused
+    } catch (error: SecurityException) {
+        AppLogger.warn(TAG, "$what was refused", error)
+        refused
     }
 
     fun associate(
@@ -61,6 +83,18 @@ object CompanionDeviceAssociation {
                     .build(),
             )
             .build()
+        return unlessRefused("Pairing a device", false) {
+            startAssociation(manager, request, activity, callback)
+            true
+        }
+    }
+
+    private fun startAssociation(
+        manager: CompanionDeviceManager,
+        request: AssociationRequest,
+        activity: Activity,
+        callback: (CompanionAssociationResult) -> Unit,
+    ) {
         if (Build.VERSION.SDK_INT >= 33) {
             manager.associate(
                 request,
@@ -95,6 +129,5 @@ object CompanionDeviceAssociation {
                 Handler(Looper.getMainLooper()),
             )
         }
-        return true
     }
 }

@@ -90,6 +90,15 @@
     <uses-feature
         android:name="android.hardware.nfc"
         android:required="false" />
+    <!--
+        Android 8 to 12 refuse every CompanionDeviceManager call from an app that doesn't declare
+        this feature, on any device that has it, with an IllegalStateException. Setup and Settings
+        list paired devices on open, so both crashed on Galaxy phones running Android 10 (#20).
+        Not required: a device without it just has nothing to pair.
+    -->
+    <uses-feature
+        android:name="android.software.companion_device_setup"
+        android:required="false" />
 
     <permission
         android:name="com.opentasker.permission.AUTOMATION"

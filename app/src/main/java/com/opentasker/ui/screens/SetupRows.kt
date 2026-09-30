@@ -86,14 +86,25 @@ internal fun buildPermissionItems(
         TermuxScriptState.Ready -> R.string.setup_termux_status_ready
     })
     val oem = OemBatteryGuidance.forDevice(Build.MANUFACTURER, Build.BRAND)
+    // Every platform check below runs through probes, so one that throws on some OEM build marks
+    // its own row "Couldn't check" instead of crashing Setup and Settings (#20).
+    val probes = SetupProbes(::logFailedCheck)
+    val exactAlarms = probes.granted("exact alarms") { ExactAlarmSupport.canScheduleExactAlarms(context) }
+    val battery = probes.granted("battery optimization") { ignoresBatteryOptimizations(context) }
+    val usageAccess = probes.granted("usage access") { UsageAccess.hasUsageStatsAccess(context) }
+    val notificationAccess = probes.granted("notification access") { hasNotificationListenerAccess(context) }
+    val overlay = probes.granted("display over other apps") { Settings.canDrawOverlays(context) }
+    val writeSettings = probes.granted("modify system settings") { Settings.System.canWrite(context) }
+    val deviceAdmin = probes.granted("device admin") { LockDeviceAdminReceiver.isActive(context) }
+    val dndAccess = probes.granted("Do Not Disturb access") { hasNotificationPolicyAccess(context) }
+    val secureSettings = probes.granted("secure settings") { hasWriteSecureSettings(context) }
     val request = context.getString(R.string.setup_action_request)
     val openSettings = context.getString(R.string.setup_action_open_settings)
     val promotedSupported = PromotedOngoingNotificationSupport.isPlatformSupported()
-    val promotedGranted = !promotedSupported || (
-        context.getSystemService(NotificationManager::class.java)
-            ?.let { manager -> PromotedOngoingNotificationSupport.canPostPromotedNotifications(manager) }
-            == true
-        )
+    val promotedGranted = !promotedSupported || probes.read("promoted notifications", false) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager != null && PromotedOngoingNotificationSupport.canPostPromotedNotifications(manager)
+    }
     return listOfNotNull(
         PermissionSetupItem(
             title = context.getString(R.string.setup_notifications_card_title),
@@ -123,7 +134,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_exact_alarm_card_title),
             body = context.getString(R.string.setup_exact_alarm_card_body),
-            granted = ExactAlarmSupport.canScheduleExactAlarms(context),
+            granted = exactAlarms == true,
+            unavailable = exactAlarms == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(ExactAlarmSupport.settingsIntent(context)),
             requiredFor = context.getString(R.string.setup_exact_alarm_required_for),
@@ -131,7 +143,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_battery_title),
             body = context.getString(R.string.setup_battery_card_body, oem.summary),
-            granted = ignoresBatteryOptimizations(context),
+            granted = battery == true,
+            unavailable = battery == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)),
             requiredFor = context.getString(R.string.setup_battery_required_for),
@@ -160,7 +173,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_usage_card_title),
             body = context.getString(R.string.setup_usage_card_body),
-            granted = UsageAccess.hasUsageStatsAccess(context),
+            granted = usageAccess == true,
+            unavailable = usageAccess == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)),
             requiredFor = context.getString(R.string.setup_usage_required_for),
@@ -170,7 +184,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_notification_access_title),
             body = context.getString(R.string.setup_notification_access_body),
-            granted = hasNotificationListenerAccess(context),
+            granted = notificationAccess == true,
+            unavailable = notificationAccess == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
             requiredFor = context.getString(R.string.setup_notification_access_required_for),
@@ -200,7 +215,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_overlay_access_title),
             body = context.getString(R.string.setup_overlay_access_body),
-            granted = Settings.canDrawOverlays(context),
+            granted = overlay == true,
+            unavailable = overlay == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
@@ -212,7 +228,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_write_settings_title),
             body = context.getString(R.string.setup_write_settings_body),
-            granted = Settings.System.canWrite(context),
+            granted = writeSettings == true,
+            unavailable = writeSettings == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(
                 Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}")),
@@ -225,13 +242,14 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_device_admin_title),
             body = context.getString(R.string.setup_device_admin_body),
-            granted = LockDeviceAdminReceiver.isActive(context),
-            actionLabel = if (LockDeviceAdminReceiver.isActive(context)) {
+            granted = deviceAdmin == true,
+            unavailable = deviceAdmin == null,
+            actionLabel = if (deviceAdmin == true) {
                 context.getString(R.string.setup_device_admin_turn_off)
             } else {
                 context.getString(R.string.setup_device_admin_turn_on)
             },
-            action = if (LockDeviceAdminReceiver.isActive(context)) {
+            action = if (deviceAdmin == true) {
                 PermissionAction.RemoveDeviceAdmin
             } else {
                 PermissionAction.SettingsIntent(
@@ -377,7 +395,8 @@ internal fun buildPermissionItems(
         PermissionSetupItem(
             title = context.getString(R.string.setup_dnd_title),
             body = context.getString(R.string.setup_dnd_body),
-            granted = hasNotificationPolicyAccess(context),
+            granted = dndAccess == true,
+            unavailable = dndAccess == null,
             actionLabel = openSettings,
             action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)),
             requiredFor = context.getString(R.string.setup_dnd_required_for),
@@ -390,7 +409,8 @@ internal fun buildPermissionItems(
                 R.string.setup_secure_settings_body,
                 secureSettingsGrantCommand(context.packageName),
             ),
-            granted = hasWriteSecureSettings(context),
+            granted = secureSettings == true,
+            unavailable = secureSettings == null,
             // There is nothing to open: no settings page exposes this, and no runtime dialog can
             // ask for it. Handing over the exact command is the whole of what this row can do.
             actionLabel = context.getString(R.string.setup_secure_settings_copy),
@@ -472,6 +492,10 @@ internal const val SHIZUKU_PERMISSION_REQUEST_CODE = 4107
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+internal fun logFailedCheck(name: String, error: RuntimeException) {
+    AppLogger.warn("OpenTasker.Setup", "Setup couldn't check $name on this device", error)
+}
 
 private fun ignoresBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)

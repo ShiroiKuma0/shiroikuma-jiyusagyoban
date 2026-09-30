@@ -183,6 +183,8 @@ internal data class PermissionSetupItem(
     val allowActionWhenGranted: Boolean = false,
     val section: SetupSection = SetupSection.ENGINE,
     val requirements: Set<SetupRequirement> = emptySet(),
+    /** The check behind [granted] threw on this device, so [granted] is a fallback, not an answer. */
+    val unavailable: Boolean = false,
 )
 
 data class BackupSetupState(
@@ -338,10 +340,15 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
     private fun refreshExternalState() {
         externalRefreshJob?.cancel()
         externalRefreshJob = viewModelScope.launch(Dispatchers.IO) {
-            _associations.value = CompanionDeviceAssociation.list(context)
-            _pushToken.value = PushTriggerTokenStore(context).token()
-            _pushRegistration.value = UnifiedPushEndpointStore(context).state()
-            _localeGrants.value = LocaleGrantStore(context).grants()
+            // Each read stands alone: this runs on every open of Setup and Settings, and one
+            // uncaught throw here took both screens down with the app (#20).
+            val probes = SetupProbes(::logFailedCheck)
+            _associations.value = probes.read("paired devices", emptyList()) { CompanionDeviceAssociation.list(context) }
+            _pushToken.value = probes.read("the push token", "") { PushTriggerTokenStore(context).token() }
+            _pushRegistration.value = probes.read("UnifiedPush registration", UnifiedPushRegistrationState()) {
+                UnifiedPushEndpointStore(context).state()
+            }
+            _localeGrants.value = probes.read("plugin grants", emptyList()) { LocaleGrantStore(context).grants() }
         }
     }
 
@@ -1532,17 +1539,21 @@ private fun PermissionSetupCard(
     item: PermissionSetupItem,
     onRunAction: () -> Unit,
 ) {
-    val stateLabel = when {
-        item.optional && item.granted -> stringResource(R.string.status_detected)
-        item.optional -> stringResource(R.string.status_optional)
-        item.granted -> stringResource(R.string.status_ready)
-        else -> stringResource(R.string.status_needs_setup)
-    }
-    val stateColor = when {
-        item.optional && item.granted -> MaterialTheme.colorScheme.tertiary
-        item.optional -> MaterialTheme.colorScheme.secondary
-        item.granted -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.error
+    val status = item.status()
+    val stateLabel = stringResource(
+        when (status) {
+            SetupRowStatus.DETECTED -> R.string.status_detected
+            SetupRowStatus.OPTIONAL -> R.string.status_optional
+            SetupRowStatus.READY -> R.string.status_ready
+            SetupRowStatus.NEEDS_SETUP -> R.string.status_needs_setup
+            SetupRowStatus.UNAVAILABLE -> R.string.status_unavailable
+        },
+    )
+    val stateColor = when (status) {
+        SetupRowStatus.DETECTED, SetupRowStatus.READY -> MaterialTheme.colorScheme.tertiary
+        SetupRowStatus.OPTIONAL -> MaterialTheme.colorScheme.secondary
+        SetupRowStatus.NEEDS_SETUP -> MaterialTheme.colorScheme.error
+        SetupRowStatus.UNAVAILABLE -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -1558,11 +1569,12 @@ private fun PermissionSetupCard(
                     Icon(
                         when {
                             item.granted -> Icons.Filled.CheckCircle
-                            item.optional -> Icons.Filled.Info
+                            item.optional || item.unavailable -> Icons.Filled.Info
                             else -> Icons.Filled.Error
                         },
                         contentDescription = when {
                             item.granted -> stringResource(R.string.status_granted)
+                            item.unavailable -> stateLabel
                             item.optional -> stringResource(R.string.status_optional)
                             else -> stringResource(R.string.status_required)
                         },
