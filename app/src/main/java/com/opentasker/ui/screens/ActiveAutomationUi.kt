@@ -236,7 +236,7 @@ fun ActiveAutomationUi(
     val runLogRetentionPreview by viewModel.runLog.runLogRetentionPreview.collectAsState()
     val backupSetupState by viewModel.backup.backupSetupState.collectAsState()
     val restoreReview by viewModel.backup.restoreReview.collectAsState()
-    val diagnosticsState by viewModel.diagnosticsState.collectAsState()
+    val diagnosticsState by viewModel.diagnostics.diagnosticsState.collectAsState()
     val storageDecodeIssues by viewModel.storageDecodeIssues.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val unsupportedActionTypeMessage = stringResource(R.string.ui_error_action_type_unsupported)
@@ -530,7 +530,7 @@ fun ActiveAutomationUi(
             // with Diagnostics selected.
             lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (true) {
-                    viewModel.refreshDiagnostics()
+                    viewModel.diagnostics.refreshDiagnostics()
                     delay(DIAGNOSTICS_REFRESH_INTERVAL_MS)
                 }
             }
@@ -913,7 +913,7 @@ fun ActiveAutomationUi(
                 retentionPolicy = runLogRetentionPolicy,
                 onRetentionPolicyChange = viewModel.runLog::requestRunLogRetention,
                 onClearRunLog = viewModel.runLog::clearRunLog,
-                onShareDiagnostic = viewModel::shareDiagnosticReport,
+                onShareDiagnostic = viewModel.diagnostics::shareDiagnosticReport,
                 onExportJson = {
                     exportAllRunLogs = false
                     runLogJsonExportLauncher.launch(runLogExportName(RunLogExportFormat.JSON))
@@ -932,9 +932,9 @@ fun ActiveAutomationUi(
             OpenTaskerScreen.Diagnostics -> DiagnosticsScreen(
                 state = diagnosticsState,
                 contentPadding = innerPadding,
-                onRefresh = viewModel::refreshDiagnostics,
-                onShare = viewModel::shareDiagnosticReport,
-                onCopy = viewModel::copyDiagnosticReport,
+                onRefresh = viewModel.diagnostics::refreshDiagnostics,
+                onShare = viewModel.diagnostics::shareDiagnosticReport,
+                onCopy = viewModel.diagnostics::copyDiagnosticReport,
             )
         }
             }

@@ -1,9 +1,6 @@
 package com.opentasker.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.annotation.SuppressLint
 import androidx.annotation.PluralsRes
@@ -20,12 +17,6 @@ import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.capabilities.AutomationInvariantStore
 import com.opentasker.core.capabilities.ImportedProfileEnablePolicy
 import com.opentasker.core.contexts.NfcTagWriteSession
-import com.opentasker.core.diagnostics.DiagnosticExport
-import com.opentasker.core.diagnostics.AdvancedProtectionReader
-import com.opentasker.core.diagnostics.CrashLogHandler
-import com.opentasker.core.diagnostics.CrashLogRecord
-import com.opentasker.core.diagnostics.EngineHealthReader
-import com.opentasker.core.diagnostics.EngineHealthStatus
 import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.readActiveTransport
@@ -33,7 +24,6 @@ import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.ActiveExecutionRegistry
 import com.opentasker.core.engine.ExecutionEnvelope
 import com.opentasker.core.engine.ExecutionAdmissionRegistry
-import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.engine.PreflightInputs
 import com.opentasker.core.engine.PreflightReport
 import com.opentasker.core.engine.PreflightRunner
@@ -57,7 +47,6 @@ import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
-import com.opentasker.core.logging.AppLogEntry
 import com.opentasker.core.logging.AppLogger
 import kotlinx.serialization.SerializationException
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
@@ -116,14 +105,12 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -244,16 +231,6 @@ data class TaskDeletionPreview(
 ) {
     val hasDependents: Boolean get() = references.isNotEmpty()
 }
-
-data class DiagnosticsUiState(
-    val health: EngineHealthStatus? = null,
-    val admission: ExecutionAdmissionSnapshot? = null,
-    val crashLogs: List<CrashLogRecord> = emptyList(),
-    val appLogs: List<AppLogEntry> = emptyList(),
-    val loadedAtMillis: Long = 0L,
-    /** Resolves admission rows to profile names; they previously showed raw Room ids. */
-    val profileNames: Map<Long, String> = emptyMap(),
-)
 
 class ActiveAutomationViewModel(
     private val db: AppDatabase,
@@ -394,12 +371,11 @@ class ActiveAutomationViewModel(
     /** Backup, restore staging and configuration snapshots for the Setup card (A-353). */
     internal val backup = BackupController(appContext, viewModelScope, events, DatabaseBackupManager(appContext, db))
 
+    /** The health read and the redacted report for the Diagnostics screen. */
+    internal val diagnostics = DiagnosticsController(db, appContext, viewModelScope, events)
+
     private val _globalFallbackTaskId = MutableStateFlow(fallbackTaskSettings.loadTaskId())
     val globalFallbackTaskId: StateFlow<Long?> = _globalFallbackTaskId.asStateFlow()
-
-    private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
-    val diagnosticsState: StateFlow<DiagnosticsUiState> = _diagnosticsState.asStateFlow()
-    private var diagnosticsRefreshJob: Job? = null
 
     private val _taskerImportReview = MutableStateFlow<TaskerImportReviewState?>(null)
     internal val taskerImportReview: StateFlow<TaskerImportReviewState?> = _taskerImportReview.asStateFlow()
@@ -468,36 +444,6 @@ class ActiveAutomationViewModel(
     init {
         viewModelScope.launch {
             runCatching { reconcileGlobalFallbackTask() }
-        }
-        refreshDiagnostics()
-        viewModelScope.launch {
-            AdvancedProtectionReader.changes.collect {
-                refreshDiagnostics()
-            }
-        }
-    }
-
-    fun refreshDiagnostics() {
-        if (diagnosticsRefreshJob?.isActive == true) return
-        diagnosticsRefreshJob = viewModelScope.launch {
-            runCatching {
-                withContext(Dispatchers.IO) {
-                    DiagnosticsUiState(
-                        health = EngineHealthReader.read(appContext),
-                        admission = ExecutionAdmissionRegistry.snapshot(appContext),
-                        crashLogs = CrashLogHandler.listCrashLogs(appContext),
-                        appLogs = AppLogger.snapshot().takeLast(100).map { entry ->
-                            entry.copy(message = DiagnosticExport.redactSensitive(entry.message))
-                        },
-                        loadedAtMillis = System.currentTimeMillis(),
-                        profileNames = db.profileDao().getAll().associate { it.id to it.name },
-                    )
-                }
-            }.onSuccess { state ->
-                _diagnosticsState.value = state
-            }.onFailure { error ->
-                events.send(errorMessage(error, R.string.ui_error_diagnostics_refresh))
-            }
         }
     }
 
@@ -1464,45 +1410,6 @@ class ActiveAutomationViewModel(
         if (db.taskDao().getById(storedId) != null) return
         fallbackTaskSettings.saveTaskId(null)
         _globalFallbackTaskId.value = null
-    }
-
-    /**
-     * Puts the same redacted report Share sends onto the clipboard.
-     *
-     * Share opens a chooser, which is the wrong shape for pasting into a bug report, so issue
-     * reports arrived as screenshots of this screen instead of its text.
-     */
-    fun copyDiagnosticReport() {
-        viewModelScope.launch {
-            try {
-                val report = DiagnosticExport.buildReport(appContext, db)
-                val clipboard = appContext.getSystemService(ClipboardManager::class.java)
-                    ?: throw IllegalStateException("Clipboard service is unavailable")
-                clipboard.setPrimaryClip(
-                    ClipData.newPlainText(appContext.getString(R.string.diagnostics_copy), report),
-                )
-                events.send(message(R.string.ui_message_diagnostics_copied))
-            } catch (ex: Exception) {
-                events.send(errorMessage(ex, R.string.ui_error_copy_diagnostics))
-            }
-        }
-    }
-
-    fun shareDiagnosticReport() {
-        viewModelScope.launch {
-            try {
-                val report = DiagnosticExport.buildReport(appContext, db)
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_SUBJECT, appContext.getString(R.string.diagnostics_share_subject))
-                    putExtra(Intent.EXTRA_TEXT, report)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                appContext.startActivity(Intent.createChooser(intent, appContext.getString(R.string.diagnostics_share_chooser)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (ex: Exception) {
-                events.send(errorMessage(ex, R.string.ui_error_share_diagnostics))
-            }
-        }
     }
 
     fun runTaskNow(task: Task) {

@@ -122,13 +122,13 @@ class ProjectLinksTest {
     fun `the diagnostics copy button reaches the clipboard`() {
         val screen = ProductionSources.read("com/opentasker/ui/screens/DiagnosticsScreen.kt")
         val shell = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationUi.kt")
-        val viewModel = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
 
         assertTrue("Diagnostics must show a copy control", "IconButton(onClick = onCopy)" in screen)
-        assertTrue("the copy control must be wired", "onCopy = viewModel::copyDiagnosticReport" in shell)
+        assertTrue("the copy control must be wired", "onCopy = viewModel.diagnostics::copyDiagnosticReport" in shell)
 
+        // The Diagnostics lane moved out of ActiveAutomationViewModel.kt into its own controller.
         val body = ProductionSources.block(
-            "com/opentasker/ui/screens/ActiveAutomationViewModel.kt",
+            "com/opentasker/ui/screens/DiagnosticsController.kt",
             "fun copyDiagnosticReport()",
             "fun shareDiagnosticReport()",
         )

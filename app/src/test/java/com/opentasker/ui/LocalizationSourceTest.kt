@@ -137,8 +137,8 @@ class LocalizationSourceTest {
         val ui = sourceRoot.resolve("com/opentasker/ui/screens/ActiveAutomationUi.kt").readText()
 
         assertTrue("Snackbar channel must carry resource IDs", "Channel<UiMessage>" in viewModel)
-        // The run log and backup lanes send on the same channel from their own files (A-353).
-        listOf("ActiveAutomationViewModel.kt", "RunLogController.kt", "BackupController.kt").forEach { file ->
+        // The run log, backup and diagnostics lanes send on the same channel from their own files.
+        listOf("ActiveAutomationViewModel.kt", "RunLogController.kt", "BackupController.kt", "DiagnosticsController.kt").forEach { file ->
             val source = sourceRoot.resolve("com/opentasker/ui/screens/$file").readText()
             assertTrue("$file must send on the snackbar channel", "events.send(" in source)
             assertFalse("$file must not emit raw snackbar literals", Regex("events\\.send\\(\\s*\"").containsMatchIn(source))
