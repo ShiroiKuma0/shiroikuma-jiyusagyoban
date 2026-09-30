@@ -1036,10 +1036,10 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "ocr.models",
             name = "Set OCR Models",
-            description = "Point 文字認識 at the folder holding its ONNX weight files. They are not in the APK — about 100 MB that never changes — so this is where that location is declared. Blank re-runs discovery over the usual folders",
+            description = "Point 文字認識 at the directory holding its ONNX weight files. They are not in the APK — about 100 MB that never changes — so this is where that location is declared. Blank re-runs discovery over the usual directories",
             category = "Text",
             fields = listOf(
-                ActionField("folder", "Model folder", FieldType.TEXT, hint = "blank = look in the usual places. e.g. /sdcard/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル"),
+                ActionField("folder", "Model directory", FieldType.TEXT, hint = "blank = look in the usual places. e.g. /sdcard/〇/[227] 日本語/[227][66] 辞書/[227][66][362] 文字認識モデル"),
             )
         )
     )
@@ -1068,7 +1068,7 @@ fun registerActionMetadata() {
             category = "Text",
             fields = listOf(
                 ActionField("images", "Screenshots", FieldType.TEXT, hint = "one path per line (or separated by |), in reading order. A repeated passage where two screenshots overlap is dropped automatically"),
-                ActionField("out", "Output folder", FieldType.TEXT, hint = "blank = /sdcard/tmp. The file is named <yyyy-MM-dd_HH-mm-ss>-<headline>.html"),
+                ActionField("out", "Output directory", FieldType.TEXT, hint = "blank = /sdcard/tmp. The file is named <yyyy-MM-dd_HH-mm-ss>-<headline>.html"),
                 ActionField("title", "Title", FieldType.TEXT, hint = "blank = the biggest type on the page. Also the filename"),
                 ActionField("script", "Script", FieldType.TEXT, hint = "blank = jpn (Japanese + English). Also: latin (German/Czech/Polish), eslav (Russian)"),
                 ActionField("model", "Model", FieldType.TEXT, hint = "blank = mobile, the fast 16 MB model — an article is dozens of recognition passes, and the text is corrected by hand afterwards. server = the accurate 81 MB one. settings = follow the app-wide toggle"),
@@ -1207,6 +1207,95 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "claude.message",
+            name = "Ask Claude",
+            description = "Send a prompt to Anthropic's Claude and keep the answer in a variable",
+            category = "Network",
+            fields = listOf(
+                ActionField("api_key", "Anthropic API key", required = true, hint = "sk-ant-… — usually a variable set in the project's 01 settings task"),
+                ActionField("prompt", "Prompt", FieldType.MULTILINE, hint = "the question; or give a file below"),
+                ActionField("prompt_file", "Prompt from file", hint = "absolute path, read when Prompt is empty"),
+                ActionField("system", "System prompt", FieldType.MULTILINE, hint = "who Claude is and how to answer"),
+                ActionField("model", "Model", hint = "default claude-opus-5-5"),
+                ActionField("effort", "Effort", hint = "low / medium / high / xhigh / max — default high"),
+                ActionField("max_tokens", "Max tokens", FieldType.NUMBER, hint = "default 16000"),
+                ActionField("schema", "Answer as JSON matching", FieldType.MULTILINE, hint = "a JSON Schema object; every object in it needs \"additionalProperties\": false"),
+                ActionField("fallbacks", "Fall back if declined", FieldType.CHECKBOX, hint = "on by default: a request a safety classifier declines is re-run on Anthropic's recommended fallback model"),
+                ActionField("response_var", "Variable", hint = "default claude — also writes _stop, _model, _tokens, _error"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.entry",
+            name = "言語島: write sentences",
+            description = "Open 言語島's sentence entry; its 「訳して音声を作る」 button starts translation and voicing",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.listen",
+            name = "言語島: listen",
+            description = "Open 言語島's player — Listen, Shadow or Recall, over the lock screen, a tapped word looked up in 白い熊の辞書",
+            category = "Media",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.islands",
+            name = "言語島: edit islands",
+            description = "Open 言語島's island editor — reorder, move, delete, edit English or Japanese, set a word's reading",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.generate",
+            name = "言語島: translate and voice",
+            description = "Translate 言語島's new sentences with Claude, have 白い熊 音声 voice them, and tidy the directories",
+            category = "App",
+            fields = listOf(
+                ActionField("wait", "Wait until done", FieldType.CHECKBOX, hint = "on by default; off starts it in the background"),
+                ActionField("window", "Show the progress window", FieldType.CHECKBOX, hint = "on by default: the steps as they happen, and the outcome with a Close button"),
+                ActionField("store", "Variable prefix", hint = "default gengoshima — writes the summary and _translated, _voiced, _failed"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "onse.render",
+            name = "Voice sentences with 白い熊 音声",
+            description = "Have 白い熊 音声 read Japanese sentences aloud into OGG files, one per line, and report how long it took",
+            category = "App",
+            fields = listOf(
+                ActionField("texts", "Sentences", required = true, hint = "one per line; what VOICEVOX reads — write a word in katakana to force its reading"),
+                ActionField("dir", "Directory to write into", required = true, hint = "absolute path; the files are <prefix>001.ogg, <prefix>002.ogg, …"),
+                ActionField("prefix", "File name prefix"),
+                ActionField("speaker", "Voice (style id)", hint = "default 31 — No.7 / 読み聞かせ"),
+                ActionField("speed", "Speed", hint = "default 1.15"),
+                ActionField("pitch", "Pitch", hint = "−0.15…+0.15, default 0"),
+                ActionField("intonation", "Intonation", hint = "default 1.0"),
+                ActionField("gap_pre", "Silence before (s)", hint = "default 0.1"),
+                ActionField("gap_post", "Silence after (s)", hint = "default 0.1"),
+                ActionField("bitrate_kbps", "Opus bitrate (kbps)", hint = "default 32"),
+                ActionField("token", "Automation token", hint = "only if 白い熊 音声 asks for one"),
+                ActionField("stall", "Give up after this much silence (s)", FieldType.NUMBER, hint = "default 90 — the longest wait between two replies; the first also loads the voice"),
+                ActionField("store", "Variable prefix", hint = "default onse — writes onse_result, onse_ok, onse_files, onse_durations, onse_errors, onse_wake_ms, onse_first_ms, onse_elapsed_ms"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "huawei.almanacwatch",
             name = "Watch for a newer almanac",
             description = "Check periodically whether a newer almanac has been published, and say so — for when a set had to be built on a stale one",
@@ -1226,9 +1315,9 @@ fun registerActionMetadata() {
             description = "Serve the band its satellite assistance data, so a GPS fix takes seconds instead of minutes",
             category = "System",
             fields = listOf(
-                ActionField("dir", "Folder holding the files", required = true, hint = "the band asks by NAME, so the files must be called HW_AGNSS_RTCM_33 and HW_PGNSS_* — put them there with an http.get task"),
+                ActionField("dir", "Directory holding the files", required = true, hint = "the band asks by NAME, so the files must be called HW_AGNSS_RTCM_33 and HW_PGNSS_* — put them there with an http.get task"),
                 ActionField("files", "Which files to offer", hint = "comma-separated names. Default: all seven. Serving only HW_AGNSS_RTCM_33 is legitimate — it is the one that expires in hours"),
-                ActionField("stage_from", "Seed the app's store from", hint = "one-off: copies files from this folder into the app's own storage. adb push cannot reach internal storage, and the predicted-ephemeris files cannot be downloaded, so this is their way in"),
+                ActionField("stage_from", "Seed the app's store from", hint = "one-off: copies files from this directory into the app's own storage. adb push cannot reach internal storage, and the predicted-ephemeris files cannot be downloaded, so this is their way in"),
                 ActionField("cancel_var", "Cancel variable", hint = "set it to 1 to call the wait off — for a long watch left running in the background"),
                 ActionField("wait", "Seconds to wait for the band to ask", hint = "default 20. The band asks on its own when its data is stale"),
                 ActionField("announce", "Send the ready signal anyway", FieldType.CHECKBOX, hint = "on by default. The band opens the transfer 24 ms after this signal, so it may be the whole trigger"),
@@ -1249,10 +1338,10 @@ fun registerActionMetadata() {
             description = "Build the band's 72-hour satellite forecast on the phone and put it where the GNSS action serves from. Huawei's own endpoint for this needs a credential issued to Health, so the set is made here instead — from free orbit products, about 25 MB downloaded fresh every run and several minutes of arithmetic",
             category = "System",
             fields = listOf(
-                ActionField("dir", "Folder to write the set into", hint = "default gnss — the SAME folder the Huawei Band GNSS action reads. Six files land here: HW_PGNSS_GPS, _BDS, _GLONASS, _GALILEO, _QZS and _EXTRA"),
-                ActionField("work", "Scratch folder", hint = "where the downloads land. Default: the app's cache. Emptied at the end of every run, successful or not — a kept orbit product is a WRONG orbit product a day later"),
+                ActionField("dir", "Directory to write the set into", hint = "default gnss — the SAME directory the Huawei Band GNSS action reads. Six files land here: HW_PGNSS_GPS, _BDS, _GLONASS, _GALILEO, _QZS and _EXTRA"),
+                ActionField("work", "Scratch directory", hint = "where the downloads land. Default: the app's cache. Emptied at the end of every run, successful or not — a kept orbit product is a WRONG orbit product a day later"),
                 ActionField("cancel_var", "Cancel variable", hint = "set it to 1 to stop the build — it is minutes of work and needs a way out that is not force-stopping the app"),
-                ActionField("copy_to", "Also copy the set to", hint = "empty = do not copy. Give it a folder such as /sdcard/tmp and the six files land there under a datetime stamp, with a built.txt naming the window they carry — which is what scripts/pgnss-grade.py needs to grade the orbits"),
+                ActionField("copy_to", "Also copy the set to", hint = "empty = do not copy. Give it a directory such as /sdcard/tmp and the six files land there under a datetime stamp, with a built.txt naming the window they carry — which is what scripts/pgnss-grade.py needs to grade the orbits"),
                 ActionField("force", "Run it anyway", FieldType.CHECKBOX, hint = "off by default. Without it the build is refused below 20 % battery: it is several minutes of every core. Charging is never required"),
                 ActionField("prefix", "Variable prefix", hint = "default HUAWEI_ — writes <prefix>PgnssSteps, PgnssPhase, PgnssDetail, PgnssCount, PgnssPct, PgnssElapsed, PgnssEta, PgnssLog, PgnssResult and PgnssFailed"),
                 ActionField("store", "Store the summary in"),
@@ -2275,7 +2364,7 @@ fun registerActionMetadata() {
                 ActionField("title", "Title", hint = "default 保存"),
                 ActionField("preselect", "Apps ticked", hint = "saved (default) = every app ticked · none = nothing ticked, pick one or two"),
                 ActionField("dir", "Destination", hint = "shown as a tappable pill above the list, e.g. %BR_Dir; blank = no pill"),
-                ActionField("dir_var", "Destination variable", hint = "where a folder chosen from the pill is written — this run only, never over the setting (default BR_RunDir)"),
+                ActionField("dir_var", "Destination variable", hint = "where a directory chosen from the pill is written — this run only, never over the setting (default BR_RunDir)"),
             )
         )
     )
@@ -2826,7 +2915,7 @@ fun registerActionMetadata() {
             description = "Start a voice recording (AAC/m4a). No-op if already recording.",
             category = "Media",
             fields = listOf(
-                ActionField("dir", "Output directory", hint = "e.g. %Pkey_Dir or /sdcard/Recordings; blank = app folder"),
+                ActionField("dir", "Output directory", hint = "e.g. %Pkey_Dir or /sdcard/Recordings; blank = app directory"),
             )
         )
     )
