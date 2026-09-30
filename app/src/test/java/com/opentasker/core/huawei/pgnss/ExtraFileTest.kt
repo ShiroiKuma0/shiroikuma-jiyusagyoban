@@ -465,6 +465,57 @@ class ExtraFileTest {
         return Math.sqrt(s)
     }
 
+    // ── one epoch for the Galileo block ────────────────────────────────────────────────────────
+
+    /**
+     * A record published under an earlier t0a must be CARRIED to the header's, not relabelled.
+     *
+     * 2026-09-29: GSSC published E19, E21, E23, E25, E26 and E27 600 s behind the other twenty-two,
+     * the writer put the newest t0a in the header and every record's elements in unchanged, and
+     * those six sat 2 227–2 243 km along-track from themselves. The second half of this test is the
+     * teeth: the same record read at the header epoch WITHOUT carrying it must be that far out.
+     */
+    @Test
+    fun aGalileoRecordWithAnEarlierT0aIsCarriedToTheHeaderEpoch() {
+        val late = galileo.getValue(2)
+        val early = late.copy(svid = 3, t0a = late.t0a - 600.0, m0 = 0.25, omega0 = 0.5)
+        val out = PgnssExtraFile.build(
+            1_472_133_618L, reference, gps, mapOf(2 to late, 3 to early), glonass, klobuchar, utc, emptyBds,
+        )
+        val (_, written) = PgnssExtraFile.readAlmanacs(out, 2434)
+        val back = written.getValue(3)
+        assertEquals("the header carries the newest epoch", late.t0a, back.t0a, 0.0)
+
+        val t = late.week * 604800.0 + late.t0a + 3 * 3600.0
+        fun at(a: GalileoAlmanacEntry) = PgnssExtraFile.almanacPosition(
+            AlmanacCheck.elementsOf(a), t - (a.week * 604800.0 + a.t0a), a.t0a,
+        )
+        val truth = at(early)
+        // The 16-bit angle fields are 2^-15 semicircles, about 2.8 km at Galileo's radius.
+        assertTrue("carried record is ${distance(truth, at(back)) / 1000} km out", distance(truth, at(back)) < 6_000.0)
+        val relabelled = early.copy(t0a = late.t0a)
+        assertTrue("the uncarried record must be the 2 200 km fault", distance(truth, at(relabelled)) > 1_500_000.0)
+    }
+
+    /** What [AlmanacCheck] grades is read back out of the bytes, so the read-back must be exact. */
+    @Test
+    fun theWrittenAlmanacsReadBackAsWritten() {
+        val (g, e) = PgnssExtraFile.readAlmanacs(build(), 2434)
+        val want = gps.getValue(1)
+        val got = g.getValue(1)
+        assertEquals(want.week, got.week)
+        assertEquals(want.toa, got.toa, 0.0)
+        assertEquals(want.sqrtA, got.sqrtA, 1e-3)
+        assertEquals(want.m0, got.m0, 1e-6)
+        assertEquals(want.omega0, got.omega0, 1e-6)
+        val wantE = galileo.getValue(2)
+        val gotE = e.getValue(2)
+        assertEquals(wantE.week, gotE.week)
+        assertEquals(wantE.t0a, gotE.t0a, 0.0)
+        assertEquals(wantE.m0, gotE.m0, 1e-4)
+        assertEquals(wantE.dSqrtA, gotE.dSqrtA, 1e-3)
+    }
+
     // ── the golden diff ────────────────────────────────────────────────────────────────────────
 
     /**

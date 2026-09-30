@@ -436,13 +436,25 @@ def build(epoch_gps, ref, yuma, gssc, agl, iono, utc, bds, log):
     log["glo"] = (len(agl), agl[1]["date"] if 1 in agl else None)
 
     # ---- 0x0c58  Galileo almanac ---------------------------------------------------------
+    # ONE EPOCH FOR THE BLOCK: the header has room for a single t0a and week, and GSSC gives each
+    # satellite its own -- on 2026-09-29 six were 600 s behind the rest and landed ~2 230 km
+    # along-track off. Every record is carried to the newest epoch first (ExtraFile.atEpoch).
     sv = sorted(gssc)
-    t0a = max(v["t0a"] for v in gssc.values())
-    gwk = max(v["week"] for v in gssc.values())
+    newest = max(gssc.values(), key=lambda v: v["week"] * 604800 + v["t0a"])
+    t0a, gwk = newest["t0a"], newest["week"]
+    def at_epoch(a):
+        dt = (gwk - a["week"]) * 604800 + (t0a - a["t0a"])
+        if dt == 0:
+            return a
+        sa = 5440.588203 + a["dsqrtA"]
+        n = math.sqrt(MU / sa ** 6)
+        wrap = lambda x: (x + 1.0) % 2.0 - 1.0
+        return dict(a, week=gwk, t0a=t0a, m0=wrap(a["m0"] + n * dt / math.pi),
+                    omega0=wrap(a["omega0"] + a["omegadot"] * dt), af0=a["af0"] + a["af1"] * dt)
     struct.pack_into("<BBHHH", b, 0xC58, len(sv), gwk & 0xFF, 1,
                      uns(t0a / 600, 16), 0)
     for k, s in enumerate(sv):
-        a = gssc[s]
+        a = at_epoch(gssc[s])
         struct.pack_into("<HhhhHHhhhhh", b, 0xC60 + k * 22,
                          s - 1,                                      # 0-BASED index
                          sgn(a["dsqrtA"] / 2 ** -9, 16),
