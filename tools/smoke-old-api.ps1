@@ -1,3 +1,5 @@
+#Requires -Version 7
+
 <#
 .SYNOPSIS
     Launches an OpenTasker APK on the oldest supported Android releases, over the previous
@@ -59,6 +61,8 @@ $CompanionFeature = 'android.software.companion_device_setup'
 $Primary = @('Profiles', 'Tasks', 'Run Log', 'Setup')
 $Secondary = @('Variables', 'Flow', 'Scenes', 'Inspector', 'Diagnostics', 'Settings')
 $AdbTimeoutSeconds = 180
+# Serial -> the emulator process this run started on it.
+$script:Owned = @{}
 
 function Write-Step([string]$Message) { Write-Host "[smoke] $Message" }
 
@@ -89,6 +93,8 @@ function Invoke-Adb {
 function Wait-Boot([string]$Serial, [int]$TimeoutSeconds = 600) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
+        $process = $script:Owned[$Serial]
+        if ($process -and $process.HasExited) { throw "The emulator on $Serial exited while booting (code $($process.ExitCode))" }
         if ((Invoke-Adb $Serial get-state).Text -eq 'device' -and
             (Invoke-Adb $Serial shell getprop sys.boot_completed).Text -eq '1') {
             Start-Sleep -Seconds 3
@@ -97,6 +103,24 @@ function Wait-Boot([string]$Serial, [int]$TimeoutSeconds = 600) {
         Start-Sleep -Seconds 3
     }
     throw "$Serial did not finish booting in $TimeoutSeconds s"
+}
+
+# `adb reboot` returns while the old boot still answers boot_completed=1, so wait for it to go away
+# first; otherwise Wait-Boot returns at once and the next step lands on a device mid-shutdown.
+function Restart-Device([string]$Serial) {
+    Invoke-Adb $Serial reboot | Out-Null
+    $deadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $deadline -and (Invoke-Adb $Serial shell getprop sys.boot_completed).Text -eq '1') {
+        Start-Sleep -Seconds 2
+    }
+    Wait-Boot $Serial
+}
+
+# SO_EXCLUSIVEADDRUSE, because a plain bind on Windows can succeed on a port another process holds.
+function Test-PortFree([int]$Port) {
+    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
+    $listener.ExclusiveAddressUse = $true
+    try { $listener.Start(); return $true } catch { return $false } finally { $listener.Stop() }
 }
 
 function Resolve-PreviousApk {
@@ -129,20 +153,34 @@ function Ensure-Avd([int]$Api) {
 
 function Start-SmokeEmulator([string]$Avd, [int]$Port) {
     $serial = "emulator-$Port"
-    if ((& $Adb devices) -match "^$serial\s") {
-        throw "$serial is already attached. Pick another -BasePort; this script only drives emulators it started."
+    if ((& $Adb devices) -match "^$serial\s" -or -not (Test-PortFree $Port) -or -not (Test-PortFree ($Port + 1))) {
+        throw "$serial or its ports are already in use. Pick another -BasePort; this script only drives emulators it started."
     }
     Write-Step "Booting $Avd headless on $serial"
     $arguments = @('-avd', $Avd, '-port', "$Port", '-no-window', '-no-audio', '-no-boot-anim', '-no-snapshot', '-writable-system', '-gpu', 'swiftshader_indirect')
     $process = Start-Process -FilePath $Emulator -ArgumentList $arguments -WindowStyle Hidden -PassThru
-    $instance = [pscustomobject]@{ Serial = $serial; Process = $process }
-    try { Wait-Boot $serial } catch { Stop-SmokeEmulator $instance; throw }
+    $script:Owned[$serial] = $process
+    $instance = [pscustomobject]@{ Serial = $serial; Process = $process; Verified = $false }
+    try {
+        Wait-Boot $serial
+        # Whatever answers on this serial must be the AVD this run launched, not an emulator that
+        # won the port race; every later adb call, including the final kill, trusts the serial.
+        $name = ((Invoke-Adb $serial emu avd name).Text -split "`r?`n")[0].Trim()
+        if ($name -ne $Avd) { throw "$serial answers as '$name', not $Avd" }
+        $instance.Verified = $true
+    } catch {
+        Stop-SmokeEmulator $instance
+        throw
+    }
     return $instance
 }
 
 function Stop-SmokeEmulator($Instance) {
-    Invoke-Adb $Instance.Serial emu kill | Out-Null
-    if (-not $Instance.Process.WaitForExit(30000)) { Stop-Process -Id $Instance.Process.Id -Force }
+    # A console kill only for an emulator this run verified as its own; otherwise end just the
+    # process tree it started (emulator.exe and its qemu child), whoever holds the serial.
+    if ($Instance.Verified) { Invoke-Adb $Instance.Serial emu kill | Out-Null }
+    if (-not $Instance.Process.WaitForExit(30000)) { $Instance.Process.Kill($true) }
+    $script:Owned.Remove($Instance.Serial)
 }
 
 # The stock google_apis image lacks the companion-device feature every Galaxy has. Without it,
@@ -170,14 +208,12 @@ function Add-CompanionFeature([string]$Serial) {
         # so the push is the real test.
         Invoke-Adb $Serial shell avbctl disable-verification | Out-Null
         Invoke-Adb $Serial disable-verity | Out-Null
-        Invoke-Adb $Serial reboot | Out-Null
-        Wait-Boot $Serial
+        Restart-Device $Serial
         $remount = Enable-SystemWrites $Serial
         $push = Invoke-Adb $Serial push $file $target
         if ($push.Code -ne 0) { throw "Could not write /system on ${Serial}: $($remount.Text) $($push.Text)" }
     }
-    Invoke-Adb $Serial reboot | Out-Null
-    Wait-Boot $Serial
+    Restart-Device $Serial
     if (-not ((Invoke-Adb $Serial shell pm list features).Text -match [regex]::Escape($CompanionFeature))) {
         throw "$Serial still does not report $CompanionFeature"
     }
@@ -202,12 +238,14 @@ function Invoke-TapLabel([string]$Serial, [string]$Label) {
 }
 
 # Only this app's crashes count. A system app falling over on an emulator is not a verdict on the
-# candidate, so the buffer has to name our process.
+# candidate, so the buffer has to name our process: "Process: <pkg>," for a Java crash, or the
+# ">>> <pkg> <<<" tombstone header for a native one.
 function Get-AppCrashes([string]$Serial) {
     $text = (Invoke-Adb $Serial logcat -d -b crash).Text
-    if ($text -notmatch "Process: $([regex]::Escape($Package)),") { return @() }
+    $marker = "Process: $([regex]::Escape($Package)),|>>> $([regex]::Escape($Package)) <<<"
+    if ($text -notmatch $marker) { return @() }
     $lines = $text -split "`n"
-    $start = [Array]::FindIndex($lines, [Predicate[string]] { param($line) $line -match "Process: $([regex]::Escape($Package))," })
+    $start = [Array]::FindIndex($lines, [Predicate[string]] { param($line) $line -match $marker })
     $lines[[Math]::Max(0, $start - 1)..[Math]::Min($lines.Count - 1, $start + 12)]
 }
 
@@ -281,6 +319,7 @@ function Invoke-Smoke([int]$Api, [int]$Port, [string]$PreviousApk, [string]$Cand
 }
 
 $levels = @($ApiLevels -split ',' | Where-Object { $_.Trim() } | ForEach-Object { [int]$_.Trim() })
+if ($levels.Count -eq 0) { throw 'No API levels to run; pass -ApiLevels, for example 26,29' }
 $candidateApk = (Resolve-Path -LiteralPath $Candidate).Path
 $previousApk = Resolve-PreviousApk
 Write-Step "Candidate: $candidateApk"
