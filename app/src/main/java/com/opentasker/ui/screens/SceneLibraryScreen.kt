@@ -42,7 +42,7 @@ fun SceneLibraryScreen(
     tasks: List<Task>,
     focusSceneId: Long? = null,
     onCreateScene: (name: String, widthDp: Int, heightDp: Int, onSaved: () -> Unit) -> Unit,
-    onUpdateScene: (scene: Scene, messageRes: Int, onSaved: () -> Unit) -> Unit,
+    onUpdateScene: (Scene, Int, onSaved: () -> Unit) -> Unit,
     onRemoveElement: (Scene, Int) -> Unit,
     onUndoSceneEdit: (Scene) -> Unit = {},
     onRedoSceneEdit: (Scene) -> Unit = {},

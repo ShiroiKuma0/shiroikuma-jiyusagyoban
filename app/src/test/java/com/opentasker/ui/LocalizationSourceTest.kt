@@ -174,7 +174,11 @@ class LocalizationSourceTest {
         assertFalse("Variable edits must stay resource-backed until collection", Regex("val (created|updated|deleted)Msg = stringResource").containsMatchIn(variables))
         assertTrue("Profile toggle must choose a resource at its call site", "R.string.ui_message_profile_enabled" in ui)
         assertTrue("Profile toggle must localize the disabled branch", "R.string.ui_message_profile_disabled" in ui)
-        assertTrue("Scene edits must pass resource IDs", "onUpdateScene: (Scene, Int)" in sceneScreen && "onUpdateScene: (Scene, Int)" in sceneCards)
+        val sceneEditTakesResourceId = Regex("""onUpdateScene: \(Scene, Int[,)]""")
+        assertTrue(
+            "Scene edits must pass resource IDs",
+            sceneEditTakesResourceId.containsMatchIn(sceneScreen) && sceneEditTakesResourceId.containsMatchIn(sceneCards),
+        )
 
         val resources = defaultStringResourceNames()
         listOf(
