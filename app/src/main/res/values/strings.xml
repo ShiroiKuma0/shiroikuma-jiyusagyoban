@@ -1053,6 +1053,18 @@
         <item quantity="one">%1$d profile</item>
         <item quantity="other">%1$d profiles</item>
     </plurals>
+    <plurals name="semantic_diff_summary_tasks">
+        <item quantity="one">%1$d task</item>
+        <item quantity="other">%1$d tasks</item>
+    </plurals>
+    <plurals name="semantic_diff_summary_scenes">
+        <item quantity="one">%1$d scene</item>
+        <item quantity="other">%1$d scenes</item>
+    </plurals>
+    <plurals name="semantic_diff_summary_variables">
+        <item quantity="one">%1$d variable</item>
+        <item quantity="other">%1$d variables</item>
+    </plurals>
     <string name="semantic_diff_no_changes">Nothing that affects how this runs has changed.</string>
     <plurals name="semantic_diff_flow_note">
         <item quantity="one">%1$d flow node is highlighted in Flow.</item>

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.icu.text.ListFormatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,11 +74,14 @@ internal fun SemanticDiffSummary(document: SemanticDiffDocument) {
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.xs)) {
+        val kinds = document.changedEntityCounts.map { (entity, count) ->
+            pluralStringResource(entity.summaryPlural(), count, count)
+        }
         Text(
             stringResource(
                 R.string.semantic_diff_summary,
                 pluralStringResource(R.plurals.semantic_diff_summary_changes, document.changeCount, document.changeCount),
-                pluralStringResource(R.plurals.semantic_diff_summary_profiles, document.entries.size, document.entries.size),
+                ListFormatter.getInstance().format(kinds),
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -161,6 +165,13 @@ private fun kindLabel(kind: SemanticDiffKind): String = stringResource(
         SemanticDiffKind.CHANGED -> R.string.semantic_diff_changed
     },
 )
+
+private fun SemanticDiffEntity.summaryPlural(): Int = when (this) {
+    SemanticDiffEntity.PROFILE -> R.plurals.semantic_diff_summary_profiles
+    SemanticDiffEntity.TASK -> R.plurals.semantic_diff_summary_tasks
+    SemanticDiffEntity.SCENE -> R.plurals.semantic_diff_summary_scenes
+    SemanticDiffEntity.VARIABLE -> R.plurals.semantic_diff_summary_variables
+}
 
 @Composable
 private fun entityLabel(entity: SemanticDiffEntity): String = stringResource(

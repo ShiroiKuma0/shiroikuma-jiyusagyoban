@@ -47,6 +47,18 @@ data class SemanticDiffDocument(
     val changeCount: Int get() = changes.size
     val flowNodeKeys: Set<String> get() = entries.flatMapTo(linkedSetOf()) { it.flowNodeKeys }
     val isEmpty: Boolean get() = entries.none(SemanticDiffEntry::isChanged)
+
+    /**
+     * How many records of each kind changed, in declaration order, omitting kinds with none. The
+     * summary used to count every entry as a profile, so a bundle of three profiles and three tasks
+     * read "across 6 profiles".
+     */
+    val changedEntityCounts: List<Pair<SemanticDiffEntity, Int>>
+        get() = SemanticDiffEntity.entries.mapNotNull { entity ->
+            entries.count { it.entity == entity && it.isChanged }
+                .takeIf { it > 0 }
+                ?.let { entity to it }
+        }
 }
 
 /**

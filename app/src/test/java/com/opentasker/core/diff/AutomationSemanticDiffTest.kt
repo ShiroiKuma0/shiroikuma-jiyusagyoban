@@ -167,4 +167,30 @@ class AutomationSemanticDiffTest {
 
         assertTrue(document.isEmpty)
     }
+
+    @Test
+    fun changedCountsNameEachKindInsteadOfCallingEverythingAProfile() {
+        // Seen importing three profiles and three tasks: the summary read "across 6 profiles" (A-371).
+        fun entry(entity: SemanticDiffEntity, changed: Boolean = true) = SemanticDiffEntry(
+            entity = entity,
+            name = entity.name,
+            changes = if (changed) listOf(SemanticDiffChange(SemanticDiffKind.ADDED, "name", after = "x")) else emptyList(),
+        )
+        val mixed = SemanticDiffDocument(
+            listOf(
+                entry(SemanticDiffEntity.TASK), entry(SemanticDiffEntity.PROFILE), entry(SemanticDiffEntity.TASK),
+                entry(SemanticDiffEntity.PROFILE), entry(SemanticDiffEntity.TASK), entry(SemanticDiffEntity.PROFILE),
+                entry(SemanticDiffEntity.SCENE, changed = false),
+            ),
+        )
+
+        assertEquals(
+            listOf(SemanticDiffEntity.PROFILE to 3, SemanticDiffEntity.TASK to 3),
+            mixed.changedEntityCounts,
+        )
+        assertEquals(
+            listOf(SemanticDiffEntity.PROFILE to 1),
+            SemanticDiffDocument(listOf(entry(SemanticDiffEntity.PROFILE))).changedEntityCounts,
+        )
+    }
 }
