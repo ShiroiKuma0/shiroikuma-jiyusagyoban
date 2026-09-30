@@ -1370,6 +1370,8 @@
     <string name="action_field_error_invalid_boolean">Choose on or off.</string>
     <string name="action_field_error_invalid_task">Choose an existing task.</string>
     <string name="action_field_error_invalid_app">Enter or choose a valid app package.</string>
+    <string name="action_field_error_invalid_time">Use a 24-hour time such as 07:30.</string>
+    <string name="action_field_error_invalid_component">Use an activity name such as com.example.app.PlayerActivity, or end it with * to match a group.</string>
     <string name="action_field_error_invalid_file">Enter or choose a valid file path.</string>
     <string name="action_field_error_conflicting_value">This field cannot be combined with the other selected input.</string>
     <string name="action_field_error_body_not_allowed">The selected HTTP method does not accept a request body.</string>

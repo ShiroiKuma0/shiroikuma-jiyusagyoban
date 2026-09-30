@@ -20,6 +20,8 @@ object ActionFieldPolicy {
         CONFLICTING_VALUE,
         BODY_NOT_ALLOWED,
         INVALID_DEFINITION,
+        INVALID_TIME,
+        INVALID_COMPONENT,
     }
 
     data class Issue(

@@ -775,6 +775,8 @@ private fun ActionFieldErrorText(issue: ActionFieldPolicy.Issue) {
         ActionFieldPolicy.Error.CONFLICTING_VALUE -> stringResource(R.string.action_field_error_conflicting_value)
         ActionFieldPolicy.Error.BODY_NOT_ALLOWED -> stringResource(R.string.action_field_error_body_not_allowed)
         ActionFieldPolicy.Error.INVALID_DEFINITION -> stringResource(R.string.action_field_error_invalid_definition)
+        ActionFieldPolicy.Error.INVALID_TIME -> stringResource(R.string.action_field_error_invalid_time)
+        ActionFieldPolicy.Error.INVALID_COMPONENT -> stringResource(R.string.action_field_error_invalid_component)
     }
     Text(text, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
 }

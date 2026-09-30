@@ -1,6 +1,8 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.core.actions.ActionFieldPolicy
 import com.opentasker.core.model.ContextType
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,5 +72,30 @@ class ContextValidationTest {
         assertTrue(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "not a package")))
         assertTrue(contextHasInvalidValues(ContextType.PLUGIN, mapOf("package" to "plugin")))
         assertFalse(contextHasInvalidValues(ContextType.EVENT, mapOf("package" to "")))
+    }
+
+    @Test
+    fun eachInvalidFieldIsNamedWithTheReasonTheEditorShowsUnderIt() {
+        // A-328: a single Boolean greyed out Save while every field looked fine.
+        assertEquals(
+            mapOf("start" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_TIME)),
+            contextInvalidFields(ContextType.TIME, mapOf("start" to "25:00", "end" to "09:00")),
+        )
+        assertEquals(
+            mapOf(
+                "latitude" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.ABOVE_MAXIMUM, 90.0),
+                "longitude" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_NUMBER),
+                "radiusMeters" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.BELOW_MINIMUM, 0.0),
+            ),
+            contextInvalidFields(
+                ContextType.LOCATION,
+                mapOf("latitude" to "91", "longitude" to "east", "radiusMeters" to "-5"),
+            ),
+        )
+        assertEquals(
+            setOf("package", "component"),
+            contextInvalidFields(ContextType.APPLICATION, mapOf("package" to "not a package", "component" to "bad name!")).keys,
+        )
+        assertTrue(contextInvalidFields(ContextType.TIME, mapOf("start" to "08:30", "end" to "17:00")).isEmpty())
     }
 }

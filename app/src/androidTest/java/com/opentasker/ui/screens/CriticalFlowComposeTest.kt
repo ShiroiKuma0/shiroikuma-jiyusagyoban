@@ -36,6 +36,7 @@ import com.opentasker.core.apps.InstalledApp
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.CollisionMode
+import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
@@ -291,6 +292,27 @@ class CriticalFlowComposeTest {
         composeTestRule.onAllNodes(hasText("None") and hasClickAction()).onLast().performClick()
         composeTestRule.onNodeWithText("Save").performClick()
         assertNull(savedExitTaskId)
+    }
+
+    @Test
+    fun contextEditorMarksTheFieldThatBlocksSave() {
+        // A-328: 25:00 greyed out Save while every field looked fine.
+        composeTestRule.setContent {
+            TestTheme {
+                ContextConfigDialog(
+                    state = ContextEditState(
+                        profile = Profile(id = 3, name = "Profile", enterTaskId = 7),
+                        type = ContextType.TIME,
+                        index = 0,
+                        existing = ContextSpec(ContextType.TIME, mapOf("start" to "25:00", "end" to "09:00")),
+                    ),
+                    onDismiss = {},
+                    onSave = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Use a 24-hour time such as 07:30.").assertIsDisplayed()
     }
 
     @Test
