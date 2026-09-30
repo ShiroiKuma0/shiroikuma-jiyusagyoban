@@ -23,7 +23,7 @@ class BackupSetupCardTest {
                 BackupSetupCard(
                     state = BackupSetupState(
                         busy = false,
-                        latestBackupName = "opentasker_pre_restore_2026-09-26_08-00-00.db",
+                        latestBackupName = "opentasker_backup_2026-09-25_08-00-00.db",
                         lastRestoreRollback = RestoreRollback(
                             File("opentasker_pre_restore_2026-09-26_08-00-00.db"),
                             restoredAtMs = 1_790_000_000_000L,

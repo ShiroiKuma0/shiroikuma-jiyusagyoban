@@ -456,7 +456,14 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue("the rollback validates", manager.inspectManagedBackup(rollback).isSuccess)
             assertTrue("the rollback is listed", rollback.name in manager.listBackups().map { it.name })
             assertEquals(rollback.name, manager.lastRestoreRollback()?.file?.name)
-            assertEquals(manager.listBackups().size, manager.snapshotStorage().first)
+            // Counted from the directory itself, not from listBackups(), which is what the storage
+            // line reads: the rollback has to be in the Setup count and its bytes in the total.
+            val copyName = Regex("""_(backup|pre_restore|restore_failed)_[^/]*\.db$""")
+            val onDisk = rollback.parentFile!!.listFiles { file -> copyName.containsMatchIn(file.name) }.orEmpty()
+            val (count, bytes) = manager.snapshotStorage()
+            assertEquals(onDisk.size, count)
+            assertEquals(onDisk.sumOf { it.length() }, bytes)
+            assertTrue("a restore copy is never the latest backup", manager.latestBackup()?.name != rollback.name)
         } finally {
             db.close()
             crashed.delete()

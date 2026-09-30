@@ -23,7 +23,7 @@ class DatabaseBackupManagerWalCheckpointTest {
 
         assertTrue(message.contains("WAL checkpoint did not complete"))
         assertTrue(message.contains("opentasker.db"))
-        assertTrue(message.contains("retry backup after current database reads finish"))
+        assertTrue(message.contains("copying the WAL with it"))
         assertTrue(message.contains("busy=1"))
     }
 }

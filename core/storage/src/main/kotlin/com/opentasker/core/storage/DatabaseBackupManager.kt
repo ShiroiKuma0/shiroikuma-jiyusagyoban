@@ -94,6 +94,12 @@ class DatabaseBackupManager(
         if (walCopied) DatabaseSecurity.foldWalIntoCopy(destination, context)
     }
 
+    /**
+     * Best effort. An emptied WAL makes the copy smaller, but the copy no longer depends on it:
+     * [copyConsistentSnapshot] copies whatever WAL is left and folds it in. So a busy writer that
+     * keeps this from finishing costs size, not the backup. It used to fail the backup after four
+     * tries, which is exactly the steady-write case A-324 was about.
+     */
     private suspend fun checkpointWalBeforeCopy(sourceFile: File) {
         var lastStatus: WalCheckpointStatus? = null
         repeat(WAL_CHECKPOINT_ATTEMPTS) { attempt ->
@@ -107,7 +113,8 @@ class DatabaseBackupManager(
             }
         }
 
-        throw IOException(
+        AppLogger.info(
+            tag,
             walCheckpointIncompleteMessage(
                 databaseName = databaseName,
                 sourcePath = sourceFile.absolutePath,
@@ -345,6 +352,12 @@ class DatabaseBackupManager(
         backupDir.listFiles { file -> isManagedBackupName(databaseName, file.name) }
             ?.sortedByDescending { it.lastModified() } ?: emptyList()
 
+    /**
+     * The newest ordinary backup. Never a restore's safety copy: after a restore that failed to
+     * apply, the newest file here is the one that failed, and Setup called it "Latest backup".
+     */
+    fun latestBackup(): File? = listBackups().firstOrNull { isRegularBackupName(databaseName, it.name) }
+
     /** The copy of the database the last restore replaced, while it still exists. */
     fun lastRestoreRollback(): RestoreRollback? {
         val prefs = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
@@ -384,8 +397,7 @@ class DatabaseBackupManager(
      */
     fun pruneSnapshots(policy: ConfigurationSnapshotPolicy, nowMs: Long = System.currentTimeMillis()): Int {
         val backups = listBackups()
-        val expired = selectExpiredSnapshots(backups.map { it.toSnapshotFile() }, policy, nowMs)
-            .mapTo(hashSetOf(), SnapshotFile::name)
+        val expired = expiredBackupNames(databaseName, backups.map { it.toSnapshotFile() }, policy, nowMs)
         if (expired.isEmpty()) return 0
         return backups.filter { it.name in expired }.count { backup ->
             deleteBackupWithSidecars(backup).also { deleted ->
@@ -581,6 +593,27 @@ class DatabaseBackupManager(
 
         private fun restoredAtKey(databaseName: String) = "restored_at_ms:$databaseName"
 
+        /** An ordinary backup, as opposed to the copies a restore leaves behind. */
+        internal fun isRegularBackupName(databaseName: String, fileName: String): Boolean =
+            fileName.endsWith(".db") && fileName.startsWith("${databaseName.removeSuffix(".db")}_backup_")
+
+        /**
+         * The retention window's verdict, except that the newest ordinary backup always survives.
+         * Restore copies share the window, and [selectExpiredSnapshots] keeps only the newest file
+         * of any kind, so a fresh failed-restore copy could otherwise push out the last good backup.
+         */
+        internal fun expiredBackupNames(
+            databaseName: String,
+            backups: List<SnapshotFile>,
+            policy: ConfigurationSnapshotPolicy,
+            nowMs: Long,
+        ): Set<String> {
+            val newestRegular = backups.filter { isRegularBackupName(databaseName, it.name) }
+                .maxByOrNull(SnapshotFile::lastModifiedMs)?.name
+            return selectExpiredSnapshots(backups, policy, nowMs).mapTo(hashSetOf(), SnapshotFile::name) -
+                setOfNotNull(newestRegular)
+        }
+
         internal fun isManagedBackupName(databaseName: String, fileName: String): Boolean {
             val base = databaseName.removeSuffix(".db")
             return fileName.endsWith(".db") && MANAGED_BACKUP_KINDS.any { kind -> fileName.startsWith("${base}_${kind}_") }
@@ -606,13 +639,15 @@ class DatabaseBackupManager(
                 deleteDatabaseSidecars(rollback)
                 rollback
             } catch (error: Exception) {
+                // Kept, with its WAL, because it is still the only copy of what the restore is about
+                // to replace, and a damaged copy can be recovered by hand where a deleted one cannot.
+                // It is not offered as a rollback, since staging it would fail the same validation.
                 AppLogger.warn(
                     "DatabaseBackupManager",
-                    "The copy of the database this restore replaces failed validation, so none is kept: ${error.message}",
+                    "The copy of the database this restore replaces failed validation. It is kept as " +
+                        "${rollback.name} but not offered as a rollback: ${error.message}",
                     error,
                 )
-                rollback.delete()
-                deleteDatabaseSidecars(rollback)
                 null
             }
         }
@@ -904,6 +939,6 @@ internal fun walCheckpointIncompleteMessage(
     sourcePath: String,
     status: WalCheckpointStatus,
 ): String =
-    "Database WAL checkpoint did not complete for '$databaseName' at $sourcePath; " +
-        "retry backup after current database reads finish " +
+    "Database WAL checkpoint did not complete for '$databaseName' at $sourcePath before the backup; " +
+        "copying the WAL with it " +
         "(busy=${status.busy}, log=${status.logFrames}, checkpointed=${status.checkpointedFrames})"

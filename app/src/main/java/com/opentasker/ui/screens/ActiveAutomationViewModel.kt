@@ -1846,7 +1846,7 @@ class ActiveAutomationViewModel(
             val settings = ConfigurationSnapshotSettings(appContext)
             BackupSetupState(
                 busy = busy,
-                latestBackupName = databaseBackupManager.listBackups().firstOrNull()?.name,
+                latestBackupName = databaseBackupManager.latestBackup()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
                 pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
                 lastRestoreRollback = databaseBackupManager.lastRestoreRollback(),
