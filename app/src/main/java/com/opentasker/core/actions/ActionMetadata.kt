@@ -1248,6 +1248,16 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "gengoshima.stats",
+            name = "言語島: statistics",
+            description = "Open 言語島's statistics — the listening calendar, time of day, per-island progress, what is due",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "gengoshima.islands",
             name = "言語島: edit islands",
             description = "Open 言語島's island editor — reorder, move, delete, edit English or Japanese, set a word's reading",
