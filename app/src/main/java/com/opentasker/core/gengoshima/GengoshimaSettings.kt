@@ -38,6 +38,8 @@ data class GengoshimaSettings(
     val islandFileName: String = "000 島全体",
     val numberWidth: Int = 3,
     val nameMaxChars: Int = 40,
+    /** Silence before the first sentence and between sentences in 「000 島全体」, in seconds. */
+    val islandPause: Double = 0.5,
 ) {
     /** What decides a sentence's audio besides its text: any change here re-voices it. */
     val voiceKey: String get() = "$speaker|$speed|$pitch|$intonation|$gap|$bitrateKbps"
@@ -71,6 +73,7 @@ data class GengoshimaSettings(
                 islandFileName = s("IslandFileName", d.islandFileName),
                 numberWidth = i("NumberWidth", d.numberWidth).coerceIn(1, 6),
                 nameMaxChars = i("NameMaxChars", d.nameMaxChars).coerceIn(4, 120),
+                islandPause = (v("IslandPause").toDoubleOrNull() ?: d.islandPause).coerceIn(0.0, 10.0),
             )
         }
 
