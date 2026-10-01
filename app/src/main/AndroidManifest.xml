@@ -327,6 +327,16 @@
             </intent-filter>
         </service>
 
+        <!-- 言語島's statistics. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaStatsActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.stats"
+            android:label="言語島"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <!-- 言語島's island editor. -->
         <activity
             android:name="com.opentasker.ui.gengoshima.GengoshimaIslandsActivity"

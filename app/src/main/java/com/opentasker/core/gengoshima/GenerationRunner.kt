@@ -87,6 +87,7 @@ object GenerationRunner {
             Step("訳す / Translate"),
             Step("音声 / Voice"),
             Step("整理 / Tidy the directories"),
+            Step("辞書用の一本 / Whole-island files for 辞書"),
         ),
     )
 
@@ -151,6 +152,9 @@ object GenerationRunner {
                     AudioTree.reconcile(dao.islands(), dao.allSentences(), settings, dao::updateIsland, dao::updateSentence)
                 }.onSuccess { AppLogger.info(TAG, "言語島 整理: moved ${it.moved}, deleted ${it.deleted}, lost ${it.lost}") }
                     .onFailure { AppLogger.warn(TAG, "言語島 整理 failed: ${it.message}") }
+                // A reorder or a deletion changes the joined island too.
+                runCatching { IslandExport.buildAll(dao.islands(), dao.allSentences(), settings) }
+                    .onFailure { AppLogger.warn(TAG, "言語島 辞書用 failed: ${it.message}") }
             } finally {
                 mutex.unlock()
             }
@@ -179,6 +183,17 @@ object GenerationRunner {
             }.getOrNull()
             tidy?.let {
                 step(2, StepState.DONE, "移動 ${it.moved} · 削除 ${it.deleted}" + if (it.lost > 0) " · 消えていた ${it.lost}" else "")
+            }
+            // After 整理, so every sentence is at its final path and in its final order.
+            step(3, StepState.RUN, "つないでいます / joining", -1)
+            runCatching {
+                IslandExport.buildAll(dao.islands(), dao.allSentences(), settings) { name -> step(3, StepState.RUN, "つないでいます / joining — $name") }
+            }.onSuccess {
+                step(3, StepState.DONE, "${it.islands} 島 · 書き換え ${it.rewritten}")
+                if (it.rewritten > 0) log("✓ 辞書用: ${it.rewritten} 島を書き換え")
+            }.onFailure {
+                step(3, StepState.FAIL, it.message.orEmpty())
+                log("✕ 辞書用: ${it.message}")
             }
             val summary = Summary(translated.count, voiced, failed + translated.failed, tidy, translated.error ?: renderError)
             finish(summary)
