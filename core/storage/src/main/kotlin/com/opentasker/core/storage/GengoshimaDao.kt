@@ -188,6 +188,16 @@ interface GengoshimaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPlays(plays: List<GengoshimaPlayEntity>)
 
+    @Query("SELECT * FROM gengoshima_sessions ORDER BY startedAt")
+    fun observeSessions(): Flow<List<GengoshimaSessionEntity>>
+
+    /** Every play of every sentence, summed over all sessions. */
+    @Query("SELECT sentenceId AS sentenceId, SUM(count) AS plays FROM gengoshima_plays GROUP BY sentenceId")
+    fun observePlays(): Flow<List<SentencePlays>>
+
+    @Query("SELECT * FROM gengoshima_sentences ORDER BY islandId, position, id")
+    fun observeAllSentences(): Flow<List<GengoshimaSentenceEntity>>
+
     // ── editing ─────────────────────────────────────────────────────────────────────────────────
 
     @Query("DELETE FROM gengoshima_sentences WHERE id = :id")
@@ -202,6 +212,9 @@ interface GengoshimaDao {
     @Query("SELECT islandId AS islandId, COUNT(*) AS total, SUM(CASE WHEN state = 'ready' THEN 1 ELSE 0 END) AS ready FROM gengoshima_sentences GROUP BY islandId")
     fun observeCounts(): Flow<List<IslandCount>>
 }
+
+/** How often one sentence has been played, over every session. */
+data class SentencePlays(val sentenceId: Long, val plays: Int)
 
 /** Sentences per island, and how many of them can be played. */
 data class IslandCount(val islandId: Long, val total: Int, val ready: Int)

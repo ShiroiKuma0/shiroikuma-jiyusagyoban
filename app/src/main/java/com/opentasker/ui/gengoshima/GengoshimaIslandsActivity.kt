@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -59,6 +60,7 @@ import com.opentasker.core.gengoshima.Translator
 import com.opentasker.core.storage.GengoshimaDao
 import com.opentasker.core.storage.GengoshimaIslandEntity
 import com.opentasker.core.storage.GengoshimaSentenceEntity
+import com.opentasker.ui.charts.ActionPill
 import com.opentasker.ui.components.AlertDialog
 import com.opentasker.ui.components.SelectionChip
 import com.opentasker.ui.theme.OpenTaskerTheme
@@ -209,15 +211,30 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
     var deleting by remember { mutableStateOf<GengoshimaSentenceEntity?>(null) }
     var deletingIsland by remember { mutableStateOf(false) }
     var reading by remember { mutableStateOf<Pair<GengoshimaSentenceEntity, Int>?>(null) }
+    var studyMessage by remember { mutableStateOf<String?>(null) }
+    studyMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { studyMessage = null },
+            title = { Text("辞書で学ぶ / Study in 辞書") },
+            text = { Text(msg) },
+            confirmButton = { Button(onClick = { studyMessage = null }) { Text("閉じる") } },
+        )
+    }
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Column(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)).padding(10.dp)) {
                 Text(island.nameEn, fontSize = 16.sp)
                 Text("話し方 / Register: ${island.register.ifBlank { "（丁寧・既定 / polite, default）" }}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row {
-                    TextButton(onClick = { editIsland = true }) { Text("島を直す / edit island") }
-                    TextButton(onClick = { deletingIsland = true }) { Text("島を消す / delete island", color = MaterialTheme.colorScheme.error) }
+                // The app's action pills (健康's language): glyph + what pressing does, all yellow.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    ActionPill("島を直す / edit island", Icons.Filled.Edit, onClick = { editIsland = true })
+                    ActionPill("辞書で学ぶ / study in 辞書", Icons.Filled.MenuBook, onClick = { studyMessage = studyInJisho(context, island) })
+                    ActionPill("島を消す / delete island", Icons.Filled.Delete, onClick = { deletingIsland = true })
                 }
             }
         }
@@ -489,3 +506,30 @@ private fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, on
         dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
+
+/**
+ * Open the island's whole-island file in 白い熊の辞書's study player, its subtitles beside it — every
+ * word tappable for the pop-up dictionary and Anki. Returns a message to show, or null when 辞書
+ * opened it.
+ */
+private fun studyInJisho(context: Context, island: GengoshimaIslandEntity): String? {
+    val s = GengoshimaSettings.last(context)
+    val ogg = com.opentasker.core.gengoshima.IslandExport.oggFile(island, s)
+    if (!ogg.isFile) {
+        return "この島の「${s.islandFileName}」はまだありません — 「訳して音声を作る」を一度走らせてください。\n" +
+            "This island's whole-island file does not exist yet — run 「訳して音声を作る」 once."
+    }
+    val intent = Intent(STUDY_AUDIO)
+        .setPackage("shiroikuma.jisho")
+        .putExtra("path", ogg.absolutePath)
+        .putExtra("title", island.nameJa.ifBlank { island.nameEn })
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    if (context.packageManager.queryIntentActivities(intent, 0).isEmpty()) {
+        return "白い熊の辞書 はまだこの受け口（STUDY_AUDIO）を持っていません。辞書側の更新を待ってください。\n" +
+            "白い熊の辞書 does not accept STUDY_AUDIO yet; it needs an update on its side.\n\n${ogg.absolutePath}"
+    }
+    return runCatching { context.startActivity(intent); null }.getOrElse { "開けませんでした / could not open: ${it.message}" }
+}
+
+/** The intent 白い熊の辞書 answers with its study player (hand-off: hand-off-study-audio.md in its repo). */
+private const val STUDY_AUDIO = "shiroikuma.jisho.intent.action.STUDY_AUDIO"

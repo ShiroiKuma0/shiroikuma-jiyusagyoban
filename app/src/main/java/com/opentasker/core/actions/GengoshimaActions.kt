@@ -40,6 +40,17 @@ class GengoshimaListenAction : Action {
     }
 }
 
+/** Open 言語島's statistics: the listening calendar, time of day, per-island progress, what is due. */
+class GengoshimaStatsAction : Action {
+    override val id = "gengoshima.stats"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaStatsActivity.intent(ctx.app))
+        return ActionResult.Success
+    }
+}
+
 /** Open 言語島's island editor: reorder, move, delete, edit the English or Japanese, set readings. */
 class GengoshimaIslandsAction : Action {
     override val id = "gengoshima.islands"
