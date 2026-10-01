@@ -8,6 +8,22 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+017 — 2026-10-01
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
+
+### 言語島 — statistics, review rotation, and islands for 白い熊の辞書
+
+- **Statistics** (「言語島 統計」): days in a row, time listened, a calendar of the days you listened
+  (tap one for its sessions and times), when in the day you listen, and how far along each island
+  is.
+- **Spaced review:** hearing every sentence of an island in one session counts as a review, and the
+  island comes round again after 1 day, 3 days, then further apart. The player can pick
+  「今日の島」 — the islands due today.
+- **A sentence counts as heard only when it was** — skipping through no longer counts.
+- **Each island as one file** (「000 島全体」 OGG + subtitles) for 白い熊の辞書's study player, with a
+  natural pause before and between the sentences; 「辞書で学ぶ」 in the island editor opens it there.
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+011 — 2026-09-30
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
@@ -40,8 +56,8 @@ read aloud by the sister app 白い熊 音声 (VOICEVOX No.7).
 
 - **Every dialog now has the yellow border** — 23 of them did not.
 - **"Directory", never "folder"**, everywhere the app talks about one.
-- **白い熊 音声** can be driven from any task (「音声で読ませる」); when it cannot be started, a
-  notification says what to set and opens it.
+- **白い熊 音声** can be driven from any task ("Voice sentences with 白い熊 音声"); when it cannot be
+  started, a notification says what to set and opens it.
 - **Ask Claude** from any task (`claude.message`).
 
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+002 — 2026-09-30
