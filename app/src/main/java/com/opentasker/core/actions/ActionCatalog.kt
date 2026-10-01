@@ -257,6 +257,7 @@ object ActionCatalog {
         define("gengoshima.generate", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaGenerateAction),
         define("gengoshima.listen", ActionCategory.MEDIA, ActionRetrySafety.IDEMPOTENT, ::GengoshimaListenAction),
         define("gengoshima.islands", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaIslandsAction),
+        define("gengoshima.stats", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaStatsAction),
         define("ui.click", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiClickAction),
         define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("band.compare", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandCompareAction),

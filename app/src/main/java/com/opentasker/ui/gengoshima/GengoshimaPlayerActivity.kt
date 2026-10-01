@@ -149,12 +149,54 @@ private object ListenLog {
     val plays = HashMap<Long, Int>()
     var listenedMs: Long = 0
     var lastItemStart: Long = 0
+    /** The item being heard now: its sentence and its length. */
+    var currentSentence: Long? = null
+    var currentDurationMs: Long = 0
+
+    /**
+     * Close the item that was playing: credit the time actually spent on it, and count it as HEARD
+     * only if most of it was. Skipping with "next" must not count (白い熊's first sessions: seven
+     * sentences "played" in three seconds, which also passed as a full review of the island).
+     */
+    /** Time the current item has actually been PLAYING — a pause mid-sentence is not listening. */
+    var heardMs: Long = 0
+    var playingSince: Long? = null
+
+    fun playing(isPlaying: Boolean, now: Long) {
+        if (isPlaying) {
+            if (playingSince == null) playingSince = now
+        } else {
+            playingSince?.let { heardMs += now - it }
+            playingSince = null
+        }
+    }
+
+    fun closeItem(now: Long) {
+        val sid = currentSentence ?: return
+        val spent = heardMs + (playingSince?.let { now - it } ?: 0L)
+        val length = currentDurationMs.takeIf { it > 0 } ?: 60_000L
+        listenedMs += minOf(spent, length)
+        if (spent >= length * 6 / 10) plays[sid] = (plays[sid] ?: 0) + 1
+        currentSentence = null
+    }
+
+    fun openItem(sid: Long?, durationMs: Long, now: Long, isPlaying: Boolean) {
+        currentSentence = sid
+        currentDurationMs = durationMs
+        lastItemStart = now
+        heardMs = 0
+        playingSince = if (isPlaying) now else null
+    }
 
     fun reset() {
         sessionId = null
         plays.clear()
         listenedMs = 0
         lastItemStart = 0
+        currentSentence = null
+        currentDurationMs = 0
+        heardMs = 0
+        playingSince = null
     }
 }
 
@@ -215,6 +257,7 @@ private fun startSession(mode: ListenMode, islands: List<Long>) {
 /** Write the session's end, its played counts and minutes. Called on stop and on window close. */
 private fun finishSession(c: MediaController? = null) {
     val id = ListenLog.sessionId ?: return
+    ListenLog.closeItem(System.currentTimeMillis())
     val db = OpenTaskerApp_NoHilt.readyDb ?: return
     kotlinx.coroutines.runBlocking {
         val dao = db.gengoshimaDao()
@@ -230,6 +273,17 @@ private fun finishSession(c: MediaController? = null) {
             ),
         )
         dao.upsertPlays(ListenLog.plays.map { (sid, n) -> GengoshimaPlayEntity(id, sid, n) })
+        // An island every sentence of which was heard in this session counts as one review of it
+        // (spaced rotation — see Rotation). Half an island reviews nothing: it is one monologue.
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.LocalDate.now(zone)
+        ListenLog.islandIds.split(",").mapNotNull { it.toLongOrNull() }.forEach { islandId ->
+            val island = dao.island(islandId) ?: return@forEach
+            val ready = dao.sentences(islandId).filter { it.state == GengoshimaSentenceEntity.STATE_READY }.map { it.id }
+            if (ready.isNotEmpty() && ready.all { it in ListenLog.plays }) {
+                dao.updateIsland(com.opentasker.core.gengoshima.Rotation.review(island, ListenLog.mode.name.lowercase(), today, zone))
+            }
+        }
     }
     ListenLog.reset()
 }
@@ -269,10 +323,23 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
                     Checkbox(checked = on && n > 0, onCheckedChange = { chosen[i.id] = it }, enabled = n > 0)
                     Column {
                         Text("${i.position}. ${i.nameJa.ifBlank { i.nameEn }}", fontSize = 18.sp)
-                        Text("${i.nameEn} · $n 文", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "${i.nameEn} · $n 文" + (i.nextReview?.let { " · 次 ${java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()}" } ?: " · 未復習 / never reviewed"),
+                            fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
+        }
+        // Spaced rotation's pick: every island due today, and every island never yet reviewed.
+        val zone = remember { java.time.ZoneId.systemDefault() }
+        val today = remember { java.time.LocalDate.now(zone) }
+        val due = islands.filter { (ready[it.id] ?: 0) > 0 && com.opentasker.core.gengoshima.Rotation.isDue(it, today, zone) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { islands.forEach { chosen[it.id] = it in due } }, enabled = due.isNotEmpty()) {
+                Text("今日の島 (${due.size}) / due today")
+            }
+            OutlinedButton(onClick = { islands.forEach { chosen[it.id] = true } }) { Text("全部 / all") }
         }
         Text("やり方 / Mode", fontWeight = FontWeight.Bold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -344,6 +411,7 @@ internal fun queue(
                                 putString(EXTRA_TOKENS, sentence.tokensJson)
                                 putInt(EXTRA_REPEAT, r)
                                 putInt(EXTRA_REPEATS, reps)
+                                putLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS, sentence.durationMs)
                             },
                         )
                         .build(),
@@ -370,27 +438,27 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val t = System.currentTimeMillis()
-                // The item that just finished counts as listened; the one starting counts as played.
-                ListenLog.listenedMs += (t - ListenLog.lastItemStart).coerceIn(0, 60_000)
-                ListenLog.lastItemStart = t
-                mediaItem?.mediaMetadata?.extras?.getLong(EXTRA_SENTENCE_ID)?.let { sid ->
-                    ListenLog.plays[sid] = (ListenLog.plays[sid] ?: 0) + 1
-                }
+                ListenLog.closeItem(t)
+                val ex = mediaItem?.mediaMetadata?.extras
+                ListenLog.openItem(ex?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, t, c.isPlaying)
                 index = c.currentMediaItemIndex
             }
 
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                ListenLog.playing(playing, System.currentTimeMillis())
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 ended = state == Player.STATE_ENDED
+                if (ended) ListenLog.closeItem(System.currentTimeMillis())
             }
         }
         c.addListener(listener)
-        // The first item never transitions IN, so it is counted here.
-        c.currentMediaItem?.mediaMetadata?.extras?.getLong(EXTRA_SENTENCE_ID)?.let { sid ->
-            if (ListenLog.plays.isEmpty()) ListenLog.plays[sid] = 1
+        // The first item never transitions IN, so it is opened here.
+        if (ListenLog.currentSentence == null && ListenLog.plays.isEmpty()) {
+            val ex = c.currentMediaItem?.mediaMetadata?.extras
+            ListenLog.openItem(ex?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, System.currentTimeMillis(), c.isPlaying)
         }
         onDispose { c.removeListener(listener) }
     }
