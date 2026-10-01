@@ -38,6 +38,7 @@ data class AutomationRiskSummary(
  */
 object AutomationSensitivityRegistry {
     private val localOnlyActionIds = setOf(
+        "gengoshima.stats",
         "gengoshima.listen",
         "gengoshima.islands",
         "gengoshima.entry",
