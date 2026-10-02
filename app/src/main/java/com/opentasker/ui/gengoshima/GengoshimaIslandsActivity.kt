@@ -319,7 +319,10 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
             deleting = null
             scope.launch {
                 dao.deleteSentence(s.id)
+                // 暗記 still holds its note: the next sync is told, by uuid.
+                dao.insertTombstone(com.opentasker.core.storage.GengoshimaTombstoneEntity(s.uuid, "sentence", System.currentTimeMillis()))
                 if (s.audioPath.isNotEmpty()) File(s.audioPath).delete()
+                if (s.enAudioPath.isNotEmpty()) File(s.enAudioPath).delete()
                 renumber(dao, island.id)
             }
         }
@@ -338,6 +341,9 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                     dir.listFiles()?.filter { it.name.endsWith(".ogg") || it.name.endsWith(".part") || it.name.endsWith(".srt") }?.forEach { it.delete() }
                     dir.delete()
                 }
+                val now = System.currentTimeMillis()
+                dao.sentences(island.id).forEach { dao.insertTombstone(com.opentasker.core.storage.GengoshimaTombstoneEntity(it.uuid, "sentence", now)) }
+                dao.insertTombstone(com.opentasker.core.storage.GengoshimaTombstoneEntity(island.uuid, "island", now))
                 dao.deleteSentencesOf(island.id)
                 dao.deleteIsland(island.id)
                 dao.islands().forEachIndexed { k, i -> if (i.position != k + 1) dao.updateIsland(i.copy(position = k + 1)) }
