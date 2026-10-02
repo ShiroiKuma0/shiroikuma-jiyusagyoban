@@ -1,16 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark variants, matching the AMOLED scheme's cards in ui/theme/Theme.kt; see values/colors.xml. -->
+<!-- Dark widget colours, mirroring the app's graphite/sage dark scheme in ui/theme/Theme.kt. -->
 <resources>
-    <!-- WorkshopNavy, the card colour on black -->
-    <color name="widget_background">#0C172E</color>
-    <!-- WorkshopOutline -->
-    <color name="widget_border">#2B3D59</color>
-    <!-- BrandCyan -->
-    <color name="widget_primary">#13A8D5</color>
-    <!-- Text -->
-    <color name="widget_text_primary">#F7FAFF</color>
-    <!-- TextSecondary -->
-    <color name="widget_text_secondary">#A7B3C6</color>
-    <!-- Splash and pre-composition window fill: black, the AMOLED background. -->
+    <color name="widget_background">#151817</color>
+    <color name="widget_border">#39413D</color>
+    <color name="widget_primary">#B7C7B0</color>
+    <color name="widget_text_primary">#F4F1EA</color>
+    <color name="widget_text_secondary">#A9AEA8</color>
+    <!-- Splash and pre-composition window fill. Black in dark mode, matching the dark schemes. -->
     <color name="window_background">#000000</color>
 </resources>
