@@ -74,6 +74,7 @@ import com.opentasker.core.storage.RunLogRetentionOptions
 import com.opentasker.core.storage.RunLogRetentionPolicy
 import com.opentasker.core.storage.displayLabel
 import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.Date
 
 internal const val RUN_LOG_LIST_TAG = "run_log_list"

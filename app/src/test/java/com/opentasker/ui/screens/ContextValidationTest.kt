@@ -1,8 +1,6 @@
 package com.opentasker.ui.screens
 
-import com.opentasker.core.actions.ActionFieldPolicy
 import com.opentasker.core.model.ContextType
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,30 +69,5 @@ class ContextValidationTest {
         // RETIRED: upstream's strict single-package validation, which arrived with its typed
         // FieldType.APP policy. The fork's package fields stay free text on purpose — they accept a
         // %variable and, on the Event context, a comma-separated package allowlist.
-    }
-
-    @Test
-    fun eachInvalidFieldIsNamedWithTheReasonTheEditorShowsUnderIt() {
-        // A-328: a single Boolean greyed out Save while every field looked fine.
-        assertEquals(
-            mapOf("start" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_TIME)),
-            contextInvalidFields(ContextType.TIME, mapOf("start" to "25:00", "end" to "09:00")),
-        )
-        assertEquals(
-            mapOf(
-                "latitude" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.ABOVE_MAXIMUM, 90.0),
-                "longitude" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_NUMBER),
-                "radiusMeters" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.BELOW_MINIMUM, 0.0),
-            ),
-            contextInvalidFields(
-                ContextType.LOCATION,
-                mapOf("latitude" to "91", "longitude" to "east", "radiusMeters" to "-5"),
-            ),
-        )
-        assertEquals(
-            setOf("package", "component"),
-            contextInvalidFields(ContextType.APPLICATION, mapOf("package" to "not a package", "component" to "bad name!")).keys,
-        )
-        assertTrue(contextInvalidFields(ContextType.TIME, mapOf("start" to "08:30", "end" to "17:00")).isEmpty())
     }
 }

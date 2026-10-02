@@ -49,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.R
 import com.opentasker.core.actions.ActionField
-import com.opentasker.core.actions.ActionFieldPolicy
 import com.opentasker.core.actions.FieldType
 import com.opentasker.core.contexts.CalendarSunEventPresets
 import com.opentasker.core.contexts.DaySchedule
@@ -169,8 +168,7 @@ internal fun ContextConfigDialog(
         (state.type == ContextType.DAY && saveConfig["days"].isNullOrBlank())
     // Block saving contexts that parse to a spec that can never match: a garbled TIME window
     // or an out-of-range coordinate would otherwise save silently and fail only at runtime.
-    val invalidFields = contextInvalidFields(state.type, config)
-    val hasInvalidValues = invalidFields.isNotEmpty()
+    val hasInvalidValues = contextHasInvalidValues(state.type, config)
     val onLabel = stringResource(R.string.label_on)
     val offLabel = stringResource(R.string.label_off)
 
@@ -293,36 +291,20 @@ internal fun ContextConfigDialog(
  * button should stay disabled (mirrors the DAY context's canonicalize-or-block behavior).
  * Only non-blank values are checked; required-but-blank is handled by [missingRequired].
  */
-internal fun contextHasInvalidValues(type: ContextType, config: Map<String, String>): Boolean =
-    contextInvalidFields(type, config).isNotEmpty()
-
-/**
- * What is wrong with each field of a context, by config key. It used to be one Boolean, so a value
- * like `25:00` greyed out Save and Simulate while every field looked fine and nothing said which
- * one to fix (A-328).
- */
-internal fun contextInvalidFields(type: ContextType, config: Map<String, String>): Map<String, ActionFieldPolicy.Issue> {
-    val issues = linkedMapOf<String, ActionFieldPolicy.Issue>()
-    fun checkClock(key: String) {
+internal fun contextHasInvalidValues(type: ContextType, config: Map<String, String>): Boolean {
+    fun invalidClock(key: String): Boolean {
         val raw = config[key]?.trim().orEmpty()
-        if (raw.isBlank()) return
+        if (raw.isBlank()) return false
         val parts = raw.split(":")
-        val hour = parts.getOrNull(0)?.toIntOrNull()
-        val minute = parts.getOrNull(1)?.toIntOrNull()
-        if (parts.size != 2 || hour == null || minute == null || hour !in 0..23 || minute !in 0..59) {
-            issues[key] = ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_TIME)
-        }
+        val hour = parts.getOrNull(0)?.toIntOrNull() ?: return true
+        val minute = parts.getOrNull(1)?.toIntOrNull() ?: return true
+        return parts.size != 2 || hour !in 0..23 || minute !in 0..59
     }
-    fun checkRange(key: String, min: Double, max: Double) {
+    fun outOfRange(key: String, min: Double, max: Double): Boolean {
         val raw = config[key]?.trim().orEmpty()
-        if (raw.isBlank()) return
-        val value = raw.toDoubleOrNull()
-        issues[key] = when {
-            value == null -> ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_NUMBER)
-            value < min -> ActionFieldPolicy.Issue(ActionFieldPolicy.Error.BELOW_MINIMUM, min)
-            value > max -> ActionFieldPolicy.Issue(ActionFieldPolicy.Error.ABOVE_MAXIMUM, max)
-            else -> return
-        }
+        if (raw.isBlank()) return false
+        val value = raw.toDoubleOrNull() ?: return true
+        return value < min || value > max
     }
     return when (type) {
         ContextType.TIME -> invalidClock("start") || invalidClock("end")
@@ -334,7 +316,6 @@ internal fun contextInvalidFields(type: ContextType, config: Map<String, String>
             outOfRange("latitude", -90.0, 90.0) || outOfRange("longitude", -180.0, 180.0)
         else -> false
     }
-    return issues
 }
 
 private fun contextFields(type: ContextType): List<ActionField> = when (type) {
