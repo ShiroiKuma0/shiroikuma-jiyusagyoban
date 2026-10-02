@@ -230,6 +230,8 @@ object AutomationSensitivityRegistry {
         "claude.message",
         // Sends 言語島's English sentences to Anthropic's API to be translated.
         "gengoshima.generate",
+        "gengoshima.anki_sync",
+        "gengoshima.anki_adopt",
     )
 
     private val deviceControlActionIds = setOf(
@@ -337,8 +339,11 @@ object AutomationSensitivityRegistry {
         "backup.prune",
         // Writes (and overwrites) an audio file at every path it is given, through another app.
         "onse.render",
-        // Renames and deletes files under %Gengoshima_Dir to keep the tree equal to the database.
+        // Renames and deletes files under %Gengoshima_Dir to keep the tree equal to the database;
+        // the 暗記 ones also create, change and delete notes in 白い熊 暗記.
         "gengoshima.generate",
+        "gengoshima.anki_sync",
+        "gengoshima.anki_adopt",
         "script.termux.run",
         "script.shizuku.run",
         "app.kill",
