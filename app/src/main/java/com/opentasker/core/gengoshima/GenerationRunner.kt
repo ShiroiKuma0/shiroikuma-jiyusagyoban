@@ -233,6 +233,7 @@ object GenerationRunner {
         try {
             val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
             val adoptError = if (mode == Mode.ADOPT) adoptFromAnki(app, dao, settings, notes) else null
+            repairImportedText(dao)
             val editor = mode == Mode.EDITOR
             val translated = if (editor) Translated(0, 0, null) else translateAll(dao, settings, notes)
             val (voiced, failed, renderError) = if (editor) Voiced(0, 0, null) else voiceAll(app, dao, settings, notes)
@@ -748,6 +749,35 @@ object GenerationRunner {
         } finally {
             zip.delete()
         }
+    }
+
+    /**
+     * Text taken from 暗記 that still holds an HTML character reference — the import before +023
+     * resolved `&#39;` but not `&#x27;`, so 20 sentences read "I&#x27;m". Resolved in place: the
+     * sentence stays as it is otherwise (no re-translation), its English is re-voiced because its
+     * words changed, and 暗記 gets the corrected note. Only adopted sentences (with a note id) are
+     * touched — something 白い熊 typed is never rewritten — and a fixed one never matches again.
+     */
+    private suspend fun repairImportedText(dao: GengoshimaDao) {
+        val now = System.currentTimeMillis()
+        var fixed = 0
+        for (row in dao.allSentences()) {
+            if (row.ankiNid == null || !(AnkiIslands.hasEntity(row.en) || AnkiIslands.hasEntity(row.ja))) continue
+            val en = AnkiIslands.plain(row.en)
+            val ja = AnkiIslands.plain(row.ja)
+            if (en == row.en && ja == row.ja) continue
+            // The Japanese recording says the Japanese: only if THAT changed must it be voiced again.
+            val reVoice = ja != row.ja
+            dao.updateSentence(
+                row.copy(
+                    en = en, ja = ja, updatedAt = now,
+                    state = if (reVoice) GengoshimaSentenceEntity.STATE_ANNOTATE else row.state,
+                ),
+            )
+            log("  ✎ $en")
+            fixed++
+        }
+        if (fixed > 0) log("✓ 取り込んだ文の記号を直しました / fixed the escaped characters in $fixed 文")
     }
 
     /**
