@@ -114,4 +114,13 @@ class AnkiIslandsTest {
         // A misfiled recognition card: the production deck still names the island.
         assertEquals("ロシア", AnkiIslands.islandOf(notes[0], s))
     }
+
+    @Test
+    fun hexReferencesAndDoubleEscapingComeOutPlain() {
+        assertEquals("I'm half Russian", AnkiIslands.plain("I&#x27;m half Russian"))
+        assertEquals("I'm", AnkiIslands.plain("I&amp;#x27;m"))
+        assertEquals("Tom & Jerry", AnkiIslands.plain("Tom &amp;amp; Jerry"))
+        assertTrue(AnkiIslands.hasEntity("don&#x27;t"))
+        assertFalse(AnkiIslands.hasEntity("Tom & Jerry"))
+    }
 }
