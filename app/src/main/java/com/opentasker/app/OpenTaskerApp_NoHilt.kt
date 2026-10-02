@@ -12,6 +12,9 @@ import com.opentasker.core.contexts.CompanionDeviceAssociation
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.theme.ThemeStore
 import com.opentasker.core.storage.AppDatabase
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.PendingRestoreApplyResult
@@ -296,6 +299,7 @@ class OpenTaskerApp_NoHilt : Application() {
             }
             PendingRestoreApplyResult.NoPending -> Unit
         }
+        _startupStage.value = StartupStage.Opening
 
         // Plain, unencrypted Room: the fork does not take upstream's SQLCipher database (see
         // DatabaseSecurity's fork note), and it registers every migration manually, having never
