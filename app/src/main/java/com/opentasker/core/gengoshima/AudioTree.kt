@@ -135,7 +135,7 @@ object AudioTree {
      *    name first, so swapping 001 and 002 cannot overwrite either.
      * 3. A file nothing references (`*.ogg` / `*.part` in an island directory, bar the whole-island
      *    file) is deleted, and so is an island directory no island owns — but only when it holds
-     *    nothing except such files, so a folder 白い熊 put there by hand is never touched.
+     *    nothing except such files, so a directory 白い熊 put there by hand is never touched.
      * 4. A sentence whose file has gone missing loses its path, so the next generation re-voices it.
      *
      * [save] is called for every row whose path or directory changed.
