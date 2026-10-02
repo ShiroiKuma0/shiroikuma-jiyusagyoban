@@ -157,7 +157,8 @@ class ImportExportCoordinatorTest {
         ).first { it.exists() }.readText()
         val lanes = Regex("""Transfer\.launch(?:\([^)]*\))? \{[^\n]*\n\s+(\w+) \{""").findAll(source).toList()
 
-        assertTrue("expected the transfer lanes in the view model", lanes.size >= 9)
+        // Fork: the fork's view model runs six transfer lanes, not upstream's nine.
+        assertTrue("expected the transfer lanes in the view model", lanes.size >= 6)
         lanes.forEach { lane ->
             assertEquals("a lane catches Stop as a failure: ${lane.value.trim()}", "runTransferCatching", lane.groupValues[1])
         }

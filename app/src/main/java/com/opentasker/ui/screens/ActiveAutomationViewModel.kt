@@ -897,7 +897,7 @@ class ActiveAutomationViewModel(
 
     fun previewTaskerXml(uri: Uri, appVersion: String) {
         automationTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Preflight)
                     val raw = readBoundedTaskerOrMacroDroid(appContext, uri)
@@ -925,7 +925,7 @@ class ActiveAutomationViewModel(
 
     internal fun confirmTaskerImport(state: TaskerImportReviewState) {
         automationTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     bundleRepository.importBundle(state.bundle)
@@ -944,7 +944,7 @@ class ActiveAutomationViewModel(
 
     fun exportOpenTaskerBundle(uri: Uri, appVersion: String) {
         bundleTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     val bundle = bundleRepository.exportBundle(
@@ -987,7 +987,7 @@ class ActiveAutomationViewModel(
         variableKeys: Set<String> = emptySet(),
     ) {
         bundleTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     val bundle = bundleRepository.exportSelection(
@@ -1023,7 +1023,7 @@ class ActiveAutomationViewModel(
 
     fun previewOpenTaskerBundle(uri: Uri) {
         bundleTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Preflight)
                     val rawJson = readBoundedOpenTaskerBundle(appContext, uri)
@@ -1054,7 +1054,7 @@ class ActiveAutomationViewModel(
         projectChoices: Map<String, ProjectImportChoice> = emptyMap(),
     ) {
         bundleTransfer.launch { report ->
-            runCatching {
+            runTransferCatching {
                 withContext(Dispatchers.IO) {
                     report(TransferStage.Write)
                     bundleRepository.importBundle(
