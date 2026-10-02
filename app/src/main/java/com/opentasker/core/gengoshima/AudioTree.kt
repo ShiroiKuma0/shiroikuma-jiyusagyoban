@@ -77,7 +77,8 @@ object AudioTree {
 
     fun islandDirName(island: GengoshimaIslandEntity, s: GengoshimaSettings): String {
         val ja = field(island.nameJa, s.nameMaxChars)
-        val en = field(island.nameEn, s.nameMaxChars)
+        // An island named the same in both (one taken from 暗記's decks) is not named twice.
+        val en = field(island.nameEn, s.nameMaxChars).takeIf { it != ja }.orEmpty()
         return fill(
             s.islandDirPattern,
             mapOf(
@@ -101,6 +102,20 @@ object AudioTree {
         ).ifEmpty { number(sentence.position, s.numberWidth) }
         return capBytes(base) + ".ogg"
     }
+
+    /** The English reading's file — the same fields, its own pattern (default `{no} {ja} [en]`). */
+    fun sentenceEnFileName(sentence: GengoshimaSentenceEntity, s: GengoshimaSettings): String {
+        val ja = field(sentence.ja, s.nameMaxChars)
+        val en = field(sentence.en, s.nameMaxChars)
+        val base = fill(
+            s.sentenceFileEnPattern,
+            mapOf("no" to number(sentence.position, s.numberWidth), "ja" to ja.ifEmpty { en }, "en" to en),
+        ).ifEmpty { number(sentence.position, s.numberWidth) + " en" }
+        return capBytes(base) + ".ogg"
+    }
+
+    fun sentenceEnFile(island: GengoshimaIslandEntity, sentence: GengoshimaSentenceEntity, s: GengoshimaSettings): File =
+        File(islandDir(island, s), sentenceEnFileName(sentence, s))
 
     fun islandDir(island: GengoshimaIslandEntity, s: GengoshimaSettings): File =
         File(s.dir, islandDirName(island, s))
@@ -162,25 +177,39 @@ object AudioTree {
 
         // 2. files, in two phases
         val byIsland = islands.associateBy { it.id }
-        data class Move(val sentence: GengoshimaSentenceEntity, val from: File, val to: File)
+        // Japanese and English alike: each is a (current path, wanted path) pair on the same row.
+        data class Move(val sentenceId: Long, val english: Boolean, val from: File, val to: File)
         val moves = ArrayList<Move>()
         val keep = HashSet<String>()
+        val rows = sentences.associateBy { it.id }.toMutableMap()
         for (sentence in sentences) {
-            if (sentence.audioPath.isEmpty()) continue
             val island = byIsland[sentence.islandId] ?: continue
-            val from = current(sentence.audioPath, island)
-            val to = sentenceFile(island, sentence, s)
-            if (!from.exists()) {
-                lost++
-                saveSentence(sentence.copy(audioPath = "", audioHash = "", state = GengoshimaSentenceEntity.STATE_TRANSLATED))
-                continue
+            for (english in listOf(false, true)) {
+                val path = if (english) sentence.enAudioPath else sentence.audioPath
+                if (path.isEmpty()) continue
+                val from = current(path, island)
+                val to = if (english) sentenceEnFile(island, sentence, s) else sentenceFile(island, sentence, s)
+                val row = rows.getValue(sentence.id)
+                if (!from.exists()) {
+                    lost++
+                    val cleared = if (english) row.copy(enAudioPath = "", enAudioHash = "")
+                    else row.copy(audioPath = "", audioHash = "", state = GengoshimaSentenceEntity.STATE_TRANSLATED)
+                    rows[sentence.id] = cleared
+                    saveSentence(cleared)
+                    continue
+                }
+                keep += to.absolutePath
+                if (from.absolutePath != to.absolutePath) {
+                    moves += Move(sentence.id, english, from, to)
+                } else if (path != to.absolutePath) {
+                    val fixed = if (english) row.copy(enAudioPath = to.absolutePath) else row.copy(audioPath = to.absolutePath)
+                    rows[sentence.id] = fixed
+                    saveSentence(fixed)
+                }
             }
-            keep += to.absolutePath
-            if (from.absolutePath != to.absolutePath) moves += Move(sentence, from, to)
-            else if (sentence.audioPath != to.absolutePath) saveSentence(sentence.copy(audioPath = to.absolutePath))
         }
         val staged = moves.map { m ->
-            val tmp = File(m.from.parentFile, ".move-${m.sentence.id}.ogg")
+            val tmp = File(m.from.parentFile, ".move-${m.sentenceId}${if (m.english) "-en" else ""}.ogg")
             m.from.renameTo(tmp)
             m to tmp
         }
@@ -189,7 +218,10 @@ object AudioTree {
             if (m.to.exists()) m.to.delete()
             if (tmp.renameTo(m.to)) {
                 moved++
-                saveSentence(m.sentence.copy(audioPath = m.to.absolutePath))
+                val row = rows.getValue(m.sentenceId)
+                val updated = if (m.english) row.copy(enAudioPath = m.to.absolutePath) else row.copy(audioPath = m.to.absolutePath)
+                rows[m.sentenceId] = updated
+                saveSentence(updated)
             }
         }
 

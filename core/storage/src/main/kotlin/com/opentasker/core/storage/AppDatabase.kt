@@ -13,10 +13,11 @@ import java.util.concurrent.CountDownLatch
 // v28 adds the Huawei band's OWN tables. Additive only: the Hume band's tables are not
 // touched, because both devices run in parallel until their data has been compared.
 // v33 adds 言語島's four tables (gengoshima_*), additive only.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 33
+// v34 adds 言語島's uuids, English audio and Anki sync state, and gengoshima_tombstones.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 34
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
