@@ -43,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.core.gengoshima.GenerationRunner
@@ -143,6 +145,14 @@ internal fun ProgressPanelContent(
                 return@Column
             }
 
+            // Everything that grows scrolls in here; the outcome and the buttons below stay on screen
+            // however long the run (白い熊, 2026-10-02: six steps and a full log pushed 閉じる off it).
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             p.steps.forEachIndexed { i, step -> StepRow(i + 1, step) }
 
             if (running) {
@@ -178,6 +188,7 @@ internal fun ProgressPanelContent(
                         )
                     }
                 }
+            }
             }
 
             p.result?.let { result ->
