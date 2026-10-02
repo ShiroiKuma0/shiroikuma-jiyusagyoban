@@ -638,6 +638,36 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * 言語島, part two: permanent uuids (what 白い熊 暗記's notes and decks are keyed by), the English
+     * audio beside the Japanese, the per-sentence Anki sync state, and a table of deletions the sync
+     * still has to pass on. Additive; every DEFAULT is spelled out, as Room expects it in 34.json.
+     * Existing islands and sentences get a uuid here — random, as new rows get one in code.
+     */
+    val MIGRATION_33_34 = object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `gengoshima_islands` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `uuid` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `enAudioPath` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `enAudioHash` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `enDurationMs` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `ankiHash` TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `ankiNid` INTEGER DEFAULT NULL")
+            // A random version-4 uuid per existing row (spelled out twice: the replay script reads
+            // literal SQL, not Kotlin templates).
+            db.execSQL(
+                "UPDATE `gengoshima_islands` SET `uuid` = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE `uuid` = ''",
+            )
+            db.execSQL(
+                "UPDATE `gengoshima_sentences` SET `uuid` = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE `uuid` = ''",
+            )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_tombstones` (`uuid` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                    "`deletedAt` INTEGER NOT NULL, PRIMARY KEY(`uuid`))",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -672,6 +702,7 @@ object DatabaseMigrations {
             MIGRATION_30_31,
             MIGRATION_31_32,
             MIGRATION_32_33,
+            MIGRATION_33_34,
         )
     }
 }

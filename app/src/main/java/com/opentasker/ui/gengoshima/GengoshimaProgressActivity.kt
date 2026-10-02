@@ -63,6 +63,8 @@ class GengoshimaProgressActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // A run that finished in a process EMUI has since reaped is still there to read.
+        GenerationRunner.restore(applicationContext)
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
@@ -88,7 +90,9 @@ class GengoshimaProgressActivity : ComponentActivity() {
 private fun ProgressPanel(onHide: () -> Unit, onClose: () -> Unit) {
     val progress by GenerationRunner.progress.collectAsState()
     val running = progress?.running == true
-    BackHandler { if (running) onHide() else onClose() }
+    // Back only HIDES, finished or not (白い熊, 2026-10-02: in the car a finished run's outcome and its
+    // notification vanished — Back on a finished run used to mean 閉じる). Only the button forgets it.
+    BackHandler { onHide() }
 
     // The clock ticks on its own; the runner only speaks when something happens.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }

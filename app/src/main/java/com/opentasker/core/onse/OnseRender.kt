@@ -66,6 +66,10 @@ object OnseRender {
         val gapPre: String? = null,
         val gapPost: String? = null,
         val bitrateKbps: String? = null,
+        /** `ja` (VOICEVOX, the default) or `en` (Kokoro). With `en`, [speed] is Kokoro's speed. */
+        val lang: String? = null,
+        /** With `lang = en`: the Kokoro voice, e.g. am_michael. */
+        val enVoice: String? = null,
     )
 
     /** One `event=item` reply. */
@@ -167,6 +171,8 @@ object OnseRender {
                     voice.gapPre?.let { putExtra("gap_pre", it) }
                     voice.gapPost?.let { putExtra("gap_post", it) }
                     voice.bitrateKbps?.let { putExtra("bitrate_kbps", it) }
+                    voice.lang?.let { putExtra("lang", it) }
+                    voice.enVoice?.let { putExtra("en_voice", it) }
                     token?.takeIf { it.isNotEmpty() }?.let { putExtra("token", it) }
                 },
             )
@@ -212,6 +218,62 @@ object OnseRender {
             runCatching { app.unregisterReceiver(receiver) }
             inbox.close()
             withContext(Dispatchers.IO) { runCatching { batch.delete() } }
+        }
+    }
+
+    /** What 音声 says about itself (the contract's PING). */
+    data class Pong(
+        val ok: Boolean,
+        val result: String,
+        val version: String,
+        val enInstalled: Boolean,
+        val enVoices: List<String>,
+        val enDefault: String,
+        val batteryExempt: Boolean,
+    )
+
+    /**
+     * Wake 音声 and ask it what it can do — above all whether the English model is installed, so a
+     * run without it skips English cleanly instead of failing every sentence. Null when 音声 does not
+     * answer within [timeoutMs] (not installed, frozen, or refused a start).
+     */
+    suspend fun ping(context: Context, timeoutMs: Long = 6_000L): Pong? {
+        val app = context.applicationContext
+        if (withContext(Dispatchers.IO) { wake(app) } == null) return null
+        val requestId = UUID.randomUUID().toString()
+        val inbox = Channel<Intent>(Channel.UNLIMITED)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                if (intent?.getStringExtra("request_id") == requestId && intent.getStringExtra("event") == "pong") {
+                    inbox.trySend(intent)
+                }
+            }
+        }
+        ContextCompat.registerReceiver(app, receiver, IntentFilter(REPLY_ACTION), ContextCompat.RECEIVER_EXPORTED)
+        try {
+            app.sendBroadcast(
+                Intent("$PACKAGE.action.PING").apply {
+                    setPackage(PACKAGE)
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                    putExtra("request_id", requestId)
+                    putExtra("reply_action", REPLY_ACTION)
+                    putExtra("reply_package", app.packageName)
+                },
+            )
+            val pong = withTimeoutOrNull(timeoutMs) { inbox.receive() } ?: return null
+            fun x(k: String) = pong.getStringExtra(k).orEmpty()
+            return Pong(
+                ok = x("result") == "OK",
+                result = x("result"),
+                version = x("version"),
+                enInstalled = x("en_installed") == "true",
+                enVoices = x("en_voices").split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                enDefault = x("en_default"),
+                batteryExempt = x("battery_exempt") == "true",
+            )
+        } finally {
+            runCatching { app.unregisterReceiver(receiver) }
+            inbox.close()
         }
     }
 
