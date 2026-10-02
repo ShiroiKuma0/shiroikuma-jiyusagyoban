@@ -8,6 +8,38 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+024 — 2026-10-02
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94** plus 32 commits since `+023`'s base `2cfb01a1`
+(upstream has not bumped its version, so the build counter carries on and this installs as an update).
+
+### From upstream, taken
+
+- **Kotlin 2.4.20 and KSP 2.3.12** — fixes CVE-2026-53914, where a tampered build cache could feed
+  the compiler.
+- **No more crash on Android 8–12 phones that can pair companion devices** (upstream #20): the
+  manifest declares the feature and a refused call is logged instead of thrown.
+- **Time-trigger recovery backs off** — 5 s, then 30 s, then 5 min, then the engine watchdog —
+  instead of waking the phone every five seconds when a tick cannot be delivered; recovery is never
+  booked past the next minute tick.
+- **Consistent database backups while tasks run**: the copy is taken inside a write transaction and
+  the WAL is folded into it, so a busy moment can no longer produce a backup that fails its
+  integrity check. A restore keeps the database it replaced, and that copy and the file from a failed
+  restore are now counted by backup retention instead of sitting at full size.
+- **Temporary State restores the volume and ringer on Android 17** — the restore now runs with the
+  service's audio eligibility.
+- **Flow shows what a State context watches** instead of `key=<redacted>`.
+- **The import review counts each kind of record** — 3 profiles and 3 tasks, not "6 profiles".
+- **The launch screen says what it is waiting for** (opening, or restoring a backup).
+- **Stopping an import or a preflight is no longer reported as a failure.**
+
+### Kept as the fork's
+
+- The workspace, Setup, Inspector and Run Log screens stay the fork's own; upstream's split of its
+  main view model into separate backup, diagnostics and run-log controllers is not taken.
+- User-visible text keeps its em and en dashes — upstream removed them as a house style.
+- The widget, splash and notification colours stay on the fork's palette.
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+023 — 2026-10-02
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
