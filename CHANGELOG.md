@@ -8,6 +8,20 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+023 — 2026-10-02
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
+
+### 言語島 — fixes after the first full test with 白い熊 暗記
+
+- **閉じる is always on screen** in the progress window: the steps and the log scroll, the result and
+  the button stay put. A run with all six steps and a long log used to push 閉じる off the bottom.
+- **Apostrophes in the sentences taken from 暗記:** the import missed one kind of HTML code, so 20
+  sentences read "I&#x27;m" — in 言語島, in their 暗記 notes and in their English recordings. The
+  import now reads them correctly, and the existing ones are repaired on the next run: the English is
+  re-voiced and the notes are updated, with their review history kept.
+- **The suite's design record** is now in the repository: `docs/gengoshima.md`.
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+021 — 2026-10-02
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
