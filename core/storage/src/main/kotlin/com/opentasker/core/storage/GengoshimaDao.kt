@@ -1,5 +1,6 @@
 package com.opentasker.core.storage
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -44,6 +45,12 @@ data class GengoshimaIslandEntity(
     /** The directory name this island's files are under NOW, so 整理 can rename rather than rebuild. */
     val dirName: String? = null,
     val createdAt: Long,
+    /**
+     * The island's permanent identity, never reused — what 白い熊 暗記's decks are keyed by, so a
+     * rename renames the decks instead of making new ones (v34). Existing rows were given one by the
+     * migration.
+     */
+    @ColumnInfo(defaultValue = "") val uuid: String = java.util.UUID.randomUUID().toString(),
 )
 
 @Entity(
@@ -80,6 +87,19 @@ data class GengoshimaSentenceEntity(
     val error: String = "",
     val createdAt: Long,
     val updatedAt: Long,
+    /** Permanent identity; the Anki note carries it as the tag `li::uuid::<uuid>` (v34). */
+    @ColumnInfo(defaultValue = "") val uuid: String = java.util.UUID.randomUUID().toString(),
+    /** The ENGLISH reading of [en] (音声 lang=en, Kokoro), beside the Japanese one. Blank when none. */
+    @ColumnInfo(defaultValue = "") val enAudioPath: String = "",
+    @ColumnInfo(defaultValue = "") val enAudioHash: String = "",
+    @ColumnInfo(defaultValue = "0") val enDurationMs: Long = 0,
+    /**
+     * What this sentence looked like when 暗記 last took it — a hash of everything the note carries.
+     * A delta sync sends exactly the sentences whose current hash differs. Blank = never synced.
+     */
+    @ColumnInfo(defaultValue = "") val ankiHash: String = "",
+    /** The existing Anki note this sentence was adopted from (「暗記から取り込む」), until synced. */
+    @ColumnInfo(defaultValue = "NULL") val ankiNid: Long? = null,
 ) {
     companion object {
         const val STATE_NEW = "new"
@@ -102,6 +122,18 @@ data class GengoshimaSessionEntity(
     val islandIds: String,
     val sentencesPlayed: Int = 0,
     val listenedMs: Long = 0,
+)
+
+/**
+ * Something deleted that 白い熊 暗記 still holds: the next sync tells it, then the row goes. Kept for a
+ * sentence or a whole island, by uuid — the row it named no longer exists to ask (v34).
+ */
+@Entity(tableName = "gengoshima_tombstones")
+data class GengoshimaTombstoneEntity(
+    @PrimaryKey val uuid: String,
+    /** sentence / island */
+    val kind: String,
+    val deletedAt: Long,
 )
 
 /** How often one sentence was played in one session. Feeds per-sentence and per-island progress. */
@@ -187,6 +219,15 @@ interface GengoshimaDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPlays(plays: List<GengoshimaPlayEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTombstone(t: GengoshimaTombstoneEntity)
+
+    @Query("SELECT * FROM gengoshima_tombstones")
+    suspend fun tombstones(): List<GengoshimaTombstoneEntity>
+
+    @Query("DELETE FROM gengoshima_tombstones WHERE uuid IN (:uuids)")
+    suspend fun clearTombstones(uuids: List<String>)
 
     @Query("SELECT * FROM gengoshima_sessions ORDER BY startedAt")
     fun observeSessions(): Flow<List<GengoshimaSessionEntity>>
