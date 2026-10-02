@@ -19,7 +19,7 @@ private val RUNNING = Progress(
     steps = listOf(
         Step("訳す / Translate", StepState.DONE, "12 / 12"),
         Step("音声 / Voice", StepState.RUN, "作成中 / making 6 / 12 · 2秒 · 残り約 21秒 / ~21s left\n年を取ると、長時間働くのがきつくなってくるよね。"),
-        Step("整理 / Tidy the folders"),
+        Step("整理 / Tidy the directories"),
     ),
     percent = 41,
     log = listOf(
@@ -38,7 +38,7 @@ private val DONE = RUNNING.copy(
     steps = listOf(
         Step("訳す / Translate", StepState.DONE, "12 / 12"),
         Step("音声 / Voice", StepState.DONE, "12 / 12"),
-        Step("整理 / Tidy the folders", StepState.DONE, "移動 0 · 削除 0"),
+        Step("整理 / Tidy the directories", StepState.DONE, "移動 0 · 削除 0"),
     ),
     percent = 100,
     log = RUNNING.log + "✓ 音声 12 / 12",
@@ -52,7 +52,7 @@ private val FAILED = DONE.copy(
     steps = listOf(
         Step("訳す / Translate", StepState.FAIL, "no API key — set %Gengoshima_ApiKey in 日本語の設定 and run it"),
         Step("音声 / Voice", StepState.SKIP, "読ませるものはありません / nothing to voice"),
-        Step("整理 / Tidy the folders", StepState.DONE, "移動 0 · 削除 0"),
+        Step("整理 / Tidy the directories", StepState.DONE, "移動 0 · 削除 0"),
     ),
     log = listOf("✕ no API key — set %Gengoshima_ApiKey in 日本語の設定 and run it"),
     ok = false,
@@ -76,3 +76,23 @@ fun GengoshimaProgressDonePreview() = Frame(DONE)
 @Preview(name = "言語島 progress — failed", widthDp = 413, heightDp = 860, fontScale = 1.3f, showBackground = true)
 @Composable
 fun GengoshimaProgressFailedPreview() = Frame(FAILED)
+
+/** 白い熊's run of 2026-10-02: six steps and a full log, which pushed 閉じる off the screen. */
+private val SIX_STEPS = DONE.copy(
+    steps = listOf(
+        Step("訳す / Translate", StepState.DONE, "2 / 2"),
+        Step("音声 / Voice", StepState.DONE, "2 / 2"),
+        Step("英語の音声 / English voice", StepState.DONE, "2 / 2"),
+        Step("整理 / Tidy the directories", StepState.DONE, "移動 0 · 削除 4"),
+        Step("辞書用の一本 / Whole-island files for 辞書", StepState.DONE, "6 島 · 書き換え 1"),
+        Step("暗記と同期 / Sync with 暗記", StepState.DONE, "追加 0 · 更新 2 · 移動 0 · 削除 1"),
+    ),
+    log = List(14) { "  ♪ en ${it + 1}/14  3.9秒  I lived and worked seven years in Russia starting in 2009." } +
+        "✓ 暗記: 追加 0 · 更新 2 · 移動 0 · 削除 1",
+    result = "できました — 訳 2 · 音声 4 · 暗記 追加 0 · 更新 2 · 移動 0 · 削除 1",
+)
+
+@PreviewTest
+@Preview(name = "言語島 progress — six steps, long log", widthDp = 413, heightDp = 860, fontScale = 1.3f, showBackground = true)
+@Composable
+fun GengoshimaProgressSixStepsPreview() = Frame(SIX_STEPS)
