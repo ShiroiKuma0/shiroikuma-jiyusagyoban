@@ -185,14 +185,28 @@ object AnkiIslands {
     data class Note(val nid: Long, val english: String, val japanese: String, val decks: List<String>)
 
     /** Anki field HTML → the plain text 言語島 holds: line breaks become spaces, tags go, entities resolve. */
-    fun plain(html: String): String =
-        html.replace(Regex("(?i)<br\\s*/?>"), " ")
-            .replace(Regex("<[^>]*>"), "")
-            .replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
-            .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")
-            .replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() }
+    fun plain(html: String): String {
+        var text = html.replace(Regex("(?i)<br\\s*/?>"), " ").replace(Regex("<[^>]*>"), "")
+        // Hex references too (`&#x27;` is how the hand-made deck stored every apostrophe, and missing
+        // it left 20 sentences reading "I&#x27;m", 2026-10-02), and again until nothing changes, so
+        // a field escaped twice over comes out plain as well.
+        repeat(3) {
+            val next = unescape(text)
+            if (next == text) return@repeat
+            text = next
+        }
+        return text.replace(Regex("\\s+"), " ").trim()
+    }
+
+    private fun unescape(text: String): String =
+        text.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", "\"").replace("&apos;", "'")
+            .replace(Regex("&#[xX]([0-9a-fA-F]+);")) { String(Character.toChars(it.groupValues[1].toInt(16))) }
+            .replace(Regex("&#(\\d+);")) { String(Character.toChars(it.groupValues[1].toInt())) }
             .replace("&amp;", "&")
-            .replace(Regex("\\s+"), " ").trim()
+
+    /** Holds an HTML character reference [plain] would resolve — the mark of an import that missed it. */
+    fun hasEntity(text: String): Boolean = Regex("&(#[xX]?[0-9a-fA-F]+|amp|lt|gt|quot|apos|nbsp);").containsMatchIn(text)
 
     fun parseList(text: String): List<Note> {
         val root = json.parseToJsonElement(text).jsonObject
