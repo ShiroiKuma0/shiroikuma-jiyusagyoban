@@ -918,7 +918,8 @@ private fun actionTimeoutMs(actionType: String): Long = when {
     // carries its own 12-minute ceiling, so this only has to sit above it.
     actionType == "claude.message" -> ARTICLE_ACTION_TIMEOUT_MS
     // A whole island translated and then voiced sentence by sentence; the run bounds itself.
-    actionType == "gengoshima.generate" -> HUAWEI_PGNSS_TIMEOUT_MS
+    actionType == "gengoshima.generate" || actionType == "gengoshima.anki_sync" ||
+        actionType == "gengoshima.anki_adopt" -> HUAWEI_PGNSS_TIMEOUT_MS
     // The Huawei band's own ceilings are far above the 60 s default and are already enforced
     // inside the actions themselves. A pairing run waits on TWO human confirmations and then has
     // to stay connected for ninety seconds afterwards; a sync's configurable limit caps at 1800 s.

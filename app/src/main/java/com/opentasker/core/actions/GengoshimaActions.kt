@@ -71,8 +71,14 @@ class GengoshimaIslandsAction : Action {
  * `<store>_translated`, `<store>_voiced`, `<store>_failed`; off, the run is started in the background
  * and the action returns at once. The run's own notification reports either way.
  */
-class GengoshimaGenerateAction : Action {
-    override val id = "gengoshima.generate"
+open class GengoshimaGenerateAction(
+    private val mode: GenerationRunner.Mode = GenerationRunner.Mode.GENERATE,
+) : Action {
+    override val id = when (mode) {
+        GenerationRunner.Mode.GENERATE, GenerationRunner.Mode.EDITOR -> "gengoshima.generate"
+        GenerationRunner.Mode.FULL_SYNC -> "gengoshima.anki_sync"
+        GenerationRunner.Mode.ADOPT -> "gengoshima.anki_adopt"
+    }
     override val category = ActionCategory.APP
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -83,7 +89,7 @@ class GengoshimaGenerateAction : Action {
         val wait = arg("wait").lowercase() !in setOf("0", "false", "no", "off")
         // The progress window, as the entry screen's button opens it (on by default).
         val window = arg("window").lowercase() !in setOf("0", "false", "no", "off")
-        val started = GenerationRunner.start(ctx.app, settings)
+        val started = GenerationRunner.start(ctx.app, settings, mode)
         if (window) ctx.app.startActivity(GengoshimaProgressActivity.intent(ctx.app))
         if (!wait) {
             ctx.logger(if (started) "言語島: generation started" else "言語島: a run is already going")
@@ -101,3 +107,17 @@ class GengoshimaGenerateAction : Action {
         else ActionResult.Failure("言語島: ${summary.line()}")
     }
 }
+
+/**
+ * 「暗記と同期」: the usual run, ending in a FULL sync with 白い熊 暗記 — every sentence is sent, and any
+ * 言語島 note 暗記 holds that no sentence here owns any more is deleted. The automatic sync after each
+ * run only sends what changed; this is the one to run when the two may have drifted apart.
+ */
+class GengoshimaAnkiSyncAction : GengoshimaGenerateAction(GenerationRunner.Mode.FULL_SYNC)
+
+/**
+ * 「暗記から取り込む」: once, take the hand-made `Language Islands` deck in 白い熊 暗記 into 言語島 —
+ * islands from its decks, sentences from its notes, both recordings made fresh — and hand the notes
+ * back adopted, so their cards keep their review history. Safe to run again; it adds nothing twice.
+ */
+class GengoshimaAnkiAdoptAction : GengoshimaGenerateAction(GenerationRunner.Mode.ADOPT)

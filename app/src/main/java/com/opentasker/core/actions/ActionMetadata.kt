@@ -1282,6 +1282,34 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "gengoshima.anki_sync",
+            name = "言語島: sync everything with 暗記",
+            description = "The usual run, ending in a FULL sync with 白い熊 暗記 — every sentence sent, 言語島 notes no sentence owns any more deleted",
+            category = "App",
+            fields = listOf(
+                ActionField("wait", "Wait until done", FieldType.CHECKBOX, hint = "on by default; off starts it in the background"),
+                ActionField("window", "Show the progress window", FieldType.CHECKBOX, hint = "on by default"),
+                ActionField("store", "Variable prefix", hint = "default gengoshima"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.anki_adopt",
+            name = "言語島: take the islands from 暗記",
+            description = "Once: the Language Islands notes in 白い熊 暗記 become 言語島 islands and sentences, are voiced afresh, and are handed back adopted — review history kept",
+            category = "App",
+            fields = listOf(
+                ActionField("wait", "Wait until done", FieldType.CHECKBOX, hint = "on by default; off starts it in the background"),
+                ActionField("window", "Show the progress window", FieldType.CHECKBOX, hint = "on by default"),
+                ActionField("store", "Variable prefix", hint = "default gengoshima"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "onse.render",
             name = "Voice sentences with 白い熊 音声",
             description = "Have 白い熊 音声 read Japanese sentences aloud into OGG files, one per line, and report how long it took",

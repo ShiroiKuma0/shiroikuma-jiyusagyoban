@@ -107,4 +107,38 @@ class GengoshimaTest {
         assertEquals("彼は「\"はい\"」と言った。", last)
         assertEquals(0, Translator.completed("""{"island_name_ja":"仕""").first)
     }
+
+    @Test
+    fun theEnglishFileSitsBesideTheJapaneseUnderItsOwnPattern() {
+        assertEquals("001 私は白い熊です [en].ogg", AudioTree.sentenceEnFileName(sentence(1, 1, 1, "I am", "私は白い熊です。"), GengoshimaSettings()))
+    }
+
+    @Test
+    fun tidyingMovesTheEnglishFileWithItsSentence() = runBlocking {
+        val root = kotlin.io.path.createTempDirectory("gengoshima-en").toFile()
+        try {
+            val s = settings(root)
+            val dir = File(root, "001 New").apply { mkdirs() }
+            File(dir, "001 あ.ogg").writeText("JA")
+            File(dir, "001 あ [en].ogg").writeText("EN")
+            val isl = island(1, 1, "New", dir = "001 New")
+            // The sentence moved to position 2: both its files follow it.
+            val row = sentence(10, 1, 2, "a", "あ", File(dir, "001 あ.ogg").path).copy(enAudioPath = File(dir, "001 あ [en].ogg").path)
+            val saved = HashMap<Long, com.opentasker.core.storage.GengoshimaSentenceEntity>()
+            AudioTree.reconcile(listOf(isl), listOf(row), s, {}, { saved[it.id] = it })
+            assertEquals("JA", File(dir, "002 あ.ogg").readText())
+            assertEquals("EN", File(dir, "002 あ [en].ogg").readText())
+            assertEquals(File(dir, "002 あ [en].ogg").absolutePath, saved.getValue(10).enAudioPath)
+            assertEquals(File(dir, "002 あ.ogg").absolutePath, saved.getValue(10).audioPath)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun theEnglishHashChangesWithTheEnglishVoiceOnly() {
+        val a = GenerationRunner.enAudioHash("I am", GengoshimaSettings())
+        assertFalse(a == GenerationRunner.enAudioHash("I am", GengoshimaSettings(enVoice = "af_heart")))
+        assertEquals(a, GenerationRunner.enAudioHash("I am", GengoshimaSettings(speed = "1.3")))
+    }
 }

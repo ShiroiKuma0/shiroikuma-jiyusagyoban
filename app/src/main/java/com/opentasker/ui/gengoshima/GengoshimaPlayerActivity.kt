@@ -76,6 +76,7 @@ import com.opentasker.core.gengoshima.GengoshimaPlaybackService
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_EN
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_GAP_UNTIL
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_ISLAND_ID
+import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_LANG
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_PAUSE_AFTER_MS
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_REPEAT
 import com.opentasker.core.gengoshima.GengoshimaPlaybackService.Companion.EXTRA_REPEATS
@@ -301,6 +302,7 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
     val chosen = remember { mutableStateMapOf<Long, Boolean>() }
     var mode by remember { mutableStateOf(ListenMode.LISTEN) }
     var shuffle by remember { mutableStateOf(false) }
+    var englishAfter by remember { mutableStateOf(false) }
     val settings = remember { GengoshimaSettings.last(context) }
 
     Column(
@@ -351,6 +353,14 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
                 )
             }
         }
+        if (mode != ListenMode.RECALL) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SelectionChip(label = "日本語だけ", selected = !englishAfter, onSelect = { englishAfter = false })
+                SelectionChip(label = "英語も（日本語の後）/ English after", selected = englishAfter, onSelect = { englishAfter = true })
+            }
+        } else {
+            Text("思い出す: 英語 → 間 → 日本語 / Recall: English, a pause, then the Japanese", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         Text("順番 / Order", fontWeight = FontWeight.Bold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SelectionChip(label = "入力順", selected = !shuffle, onSelect = { shuffle = false })
@@ -363,7 +373,7 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
                     val order = if (shuffle) picked.shuffled() else picked
                     val sentences = order.flatMap { i -> dao.sentences(i.id).filter { it.state == GengoshimaSentenceEntity.STATE_READY && File(it.audioPath).exists() }.map { i to it } }
                     if (sentences.isEmpty()) return@launch
-                    onStart(queue(sentences, mode, settings), mode, order.map { it.id })
+                    onStart(queue(sentences, mode, settings, englishAfter), mode, order.map { it.id })
                 }
             },
             enabled = picked.isNotEmpty(),
@@ -376,47 +386,77 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
  * The queue, with every pause the mode needs written onto the item it follows.
  *
  * Shadow: each sentence [GengoshimaSettings.shadowRepeats] times, each followed by room to say it —
- * its own length times [GengoshimaSettings.shadowPauseFactor]. Recall: after each sentence, room to
- * recall the NEXT one from its English before it is heard.
+ * its own length times [GengoshimaSettings.shadowPauseFactor]. Recall: the ENGLISH audio first, a
+ * pause to say it in Japanese, then the Japanese (addendum C5, 2026-10-01); a sentence with no
+ * English audio yet falls back to the old way — the next line's English on screen during the pause.
+ * Listen and Shadow can add the English after the Japanese ([englishAfter]).
  */
 internal fun queue(
     sentences: List<Pair<GengoshimaIslandEntity, GengoshimaSentenceEntity>>,
     mode: ListenMode,
     s: GengoshimaSettings,
+    englishAfter: Boolean = false,
 ): List<MediaItem> {
     val out = ArrayList<MediaItem>()
+    fun item(island: GengoshimaIslandEntity, sentence: GengoshimaSentenceEntity, english: Boolean, r: Int, reps: Int, pause: Long) =
+        MediaItem.Builder()
+            .setMediaId("${sentence.id}#${if (english) "en" else r}")
+            .setUri(Uri.fromFile(File(if (english) sentence.enAudioPath else sentence.audioPath)))
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(sentence.ja)
+                    .setArtist(sentence.en)
+                    .setAlbumTitle(island.nameJa.ifBlank { island.nameEn })
+                    .setExtras(
+                        Bundle().apply {
+                            putLong(EXTRA_SENTENCE_ID, sentence.id)
+                            putLong(EXTRA_ISLAND_ID, island.id)
+                            putLong(EXTRA_PAUSE_AFTER_MS, pause)
+                            putString(EXTRA_EN, sentence.en)
+                            putString(EXTRA_TOKENS, sentence.tokensJson)
+                            putInt(EXTRA_REPEAT, r)
+                            putInt(EXTRA_REPEATS, reps)
+                            putString(EXTRA_LANG, if (english) "en" else "ja")
+                            putLong(
+                                com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS,
+                                if (english) sentence.enDurationMs else sentence.durationMs,
+                            )
+                        },
+                    )
+                    .build(),
+            )
+            .build()
+    fun hasEnglish(x: GengoshimaSentenceEntity) = x.enAudioPath.isNotEmpty() && File(x.enAudioPath).exists()
+    // Room to say it: the line's own length, stretched for recall, plus a second to start.
+    fun think(x: GengoshimaSentenceEntity) = (x.durationMs * s.shadowPauseFactor * 1.5).toLong() + 1_000L
     sentences.forEachIndexed { k, (island, sentence) ->
-        val reps = if (mode == ListenMode.SHADOW) s.shadowRepeats.coerceIn(1, 20) else 1
+        val en = hasEnglish(sentence)
         val next = sentences.getOrNull(k + 1)?.second
-        for (r in 1..reps) {
-            val pause = when (mode) {
-                ListenMode.LISTEN -> 0L
-                ListenMode.SHADOW -> (sentence.durationMs * s.shadowPauseFactor).toLong()
-                ListenMode.RECALL -> if (next == null) 0L else (next.durationMs * s.shadowPauseFactor * 1.5).toLong() + 1_000L
+        when (mode) {
+            ListenMode.RECALL -> {
+                if (en) out += item(island, sentence, english = true, r = 1, reps = 1, pause = think(sentence))
+                // After the Japanese: a short breath when the next line brings its own English, the
+                // old think-ahead pause when it does not.
+                val after = when {
+                    next == null -> 0L
+                    hasEnglish(next) -> 1_000L
+                    else -> think(next)
+                }
+                out += item(island, sentence, english = false, r = 1, reps = 1, pause = after)
             }
-            out += MediaItem.Builder()
-                .setMediaId("${sentence.id}#$r")
-                .setUri(Uri.fromFile(File(sentence.audioPath)))
-                .setMediaMetadata(
-                    MediaMetadata.Builder()
-                        .setTitle(sentence.ja)
-                        .setArtist(sentence.en)
-                        .setAlbumTitle(island.nameJa.ifBlank { island.nameEn })
-                        .setExtras(
-                            Bundle().apply {
-                                putLong(EXTRA_SENTENCE_ID, sentence.id)
-                                putLong(EXTRA_ISLAND_ID, island.id)
-                                putLong(EXTRA_PAUSE_AFTER_MS, pause)
-                                putString(EXTRA_EN, sentence.en)
-                                putString(EXTRA_TOKENS, sentence.tokensJson)
-                                putInt(EXTRA_REPEAT, r)
-                                putInt(EXTRA_REPEATS, reps)
-                                putLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS, sentence.durationMs)
-                            },
-                        )
-                        .build(),
-                )
-                .build()
+            ListenMode.LISTEN, ListenMode.SHADOW -> {
+                val reps = if (mode == ListenMode.SHADOW) s.shadowRepeats.coerceIn(1, 20) else 1
+                val withEn = englishAfter && en
+                for (r in 1..reps) {
+                    val pause = when {
+                        mode == ListenMode.SHADOW -> (sentence.durationMs * s.shadowPauseFactor).toLong()
+                        withEn -> 400L
+                        else -> 0L
+                    }
+                    out += item(island, sentence, english = false, r = r, reps = reps, pause = pause)
+                }
+                if (withEn) out += item(island, sentence, english = true, r = 1, reps = 1, pause = 600L)
+            }
         }
     }
     return out
@@ -440,7 +480,7 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
                 val t = System.currentTimeMillis()
                 ListenLog.closeItem(t)
                 val ex = mediaItem?.mediaMetadata?.extras
-                ListenLog.openItem(ex?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, t, c.isPlaying)
+                ListenLog.openItem(ex?.takeIf { it.getString(EXTRA_LANG) != "en" }?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, t, c.isPlaying)
                 index = c.currentMediaItemIndex
             }
 
@@ -458,7 +498,7 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
         // The first item never transitions IN, so it is opened here.
         if (ListenLog.currentSentence == null && ListenLog.plays.isEmpty()) {
             val ex = c.currentMediaItem?.mediaMetadata?.extras
-            ListenLog.openItem(ex?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, System.currentTimeMillis(), c.isPlaying)
+            ListenLog.openItem(ex?.takeIf { it.getString(EXTRA_LANG) != "en" }?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, System.currentTimeMillis(), c.isPlaying)
         }
         onDispose { c.removeListener(listener) }
     }
@@ -485,7 +525,8 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
     val sentenceIds = (0 until count).map { c.getMediaItemAt(it).mediaMetadata.extras?.getLong(EXTRA_SENTENCE_ID) ?: 0L }
     val distinct = sentenceIds.distinct()
     val sentenceNo = distinct.indexOf(extras.getLong(EXTRA_SENTENCE_ID)) + 1
-    val hideJa = ListenLog.mode == ListenMode.RECALL && inGap
+    // Recall hides the Japanese while the English is being heard and while 白い熊 answers it.
+    val hideJa = ListenLog.mode == ListenMode.RECALL && (inGap || extras.getString(EXTRA_LANG) == "en")
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp),

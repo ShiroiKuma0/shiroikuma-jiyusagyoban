@@ -29,7 +29,8 @@ data class GengoshimaSettings(
     val pitch: String = "0",
     val intonation: String = "1.0",
     val gap: String = "0.25",
-    val bitrateKbps: String = "32",
+    /** 48: 白い熊 heard the difference against lower rates (2026-10-01); 音声's own default too. */
+    val bitrateKbps: String = "48",
     val shadowRepeats: Int = 5,
     val shadowPauseFactor: Double = 1.2,
     val dir: String = "/sdcard/〇/[227] 日本語/[227][727] 言語島",
@@ -40,9 +41,22 @@ data class GengoshimaSettings(
     val nameMaxChars: Int = 40,
     /** Silence before the first sentence and between sentences in 「000 島全体」, in seconds. */
     val islandPause: Double = 0.5,
+    /** The English file's name pattern: `{no}`, `{ja}`, `{en}`. */
+    val sentenceFileEnPattern: String = "{no} {ja} [en]",
+    /** 音声's Kokoro voice for English — am_michael, 白い熊's pick from the audition. */
+    val enVoice: String = "am_michael",
+    val enSpeed: String = "1.0",
+    /** Sync to 白い熊 暗記 after every generation run. */
+    val ankiSync: Boolean = true,
+    val ankiRoot: String = "言語島々",
+    val ankiRecognition: String = "認識",
+    val ankiProduction: String = "製作",
 ) {
     /** What decides a sentence's audio besides its text: any change here re-voices it. */
     val voiceKey: String get() = "$speaker|$speed|$pitch|$intonation|$gap|$bitrateKbps"
+
+    /** The same for the English reading. */
+    val enVoiceKey: String get() = "en|$enVoice|$enSpeed|$gap|$bitrateKbps"
 
     companion object {
         private const val PREFS = "gengoshima"
@@ -74,6 +88,13 @@ data class GengoshimaSettings(
                 numberWidth = i("NumberWidth", d.numberWidth).coerceIn(1, 6),
                 nameMaxChars = i("NameMaxChars", d.nameMaxChars).coerceIn(4, 120),
                 islandPause = (v("IslandPause").toDoubleOrNull() ?: d.islandPause).coerceIn(0.0, 10.0),
+                sentenceFileEnPattern = s("SentenceFileEnPattern", d.sentenceFileEnPattern),
+                enVoice = s("EnVoice", d.enVoice),
+                enSpeed = s("EnSpeed", d.enSpeed),
+                ankiSync = v("AnkiSync").lowercase().let { it.isEmpty() || it in setOf("on", "1", "true", "yes") },
+                ankiRoot = s("AnkiRoot", d.ankiRoot),
+                ankiRecognition = s("AnkiRecognition", d.ankiRecognition),
+                ankiProduction = s("AnkiProduction", d.ankiProduction),
             )
         }
 

@@ -188,6 +188,8 @@ class GengoshimaPlaybackService : MediaSessionService() {
         const val EXTRA_REPEAT = "repeat"
         const val EXTRA_REPEATS = "repeats"
         const val EXTRA_DURATION_MS = "durationMs"
+        /** `ja` or `en`: which reading this queued item is. */
+        const val EXTRA_LANG = "lang"
 
         /** Session extra: wall-clock millis until which the player is deliberately silent. */
         const val EXTRA_GAP_UNTIL = "gapUntil"

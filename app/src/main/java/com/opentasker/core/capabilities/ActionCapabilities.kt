@@ -157,6 +157,8 @@ object ActionCapabilityRegistry {
         "claude.message" to ActionCapability(CapabilityLevel.RequiresSetup, "Sends a prompt to Anthropic's Claude and keeps the answer in a variable — needs an Anthropic API key, which the task supplies."),
         "gengoshima.entry" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's sentence entry: write English sentences into topic islands; its 「訳して音声を作る」 button starts their translation and voicing."),
         "gengoshima.generate" to ActionCapability(CapabilityLevel.RequiresSetup, "Translates 言語島's new sentences with Claude and has 白い熊 音声 voice them into OGG files — needs an Anthropic API key and 白い熊 音声 installed."),
+        "gengoshima.anki_sync" to ActionCapability(CapabilityLevel.RequiresSetup, "Runs 言語島's generation and then sends every sentence to 白い熊 暗記, deleting 言語島 notes no sentence owns — needs 白い熊 暗記 installed."),
+        "gengoshima.anki_adopt" to ActionCapability(CapabilityLevel.RequiresSetup, "Takes the Language Islands notes in 白い熊 暗記 into 言語島 once, voices them afresh and hands them back adopted — needs 白い熊 暗記, an Anthropic API key and 白い熊 音声."),
         "gengoshima.listen" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's player: islands played sentence by sentence (Listen, Shadow, Recall), furigana on screen, a tapped word looked up in 白い熊の辞書."),
         "gengoshima.stats" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's statistics: the listening calendar, time of day, per-island progress and which islands are due."),
         "gengoshima.islands" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's island editor: reorder, move and delete sentences, edit their English or Japanese, set a word's reading."),
