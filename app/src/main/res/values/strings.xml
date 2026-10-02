@@ -21,7 +21,7 @@
     <string name="success_prefix">Success: %1$s</string>
     <string name="widget_task_description">Run an 白い熊 自由作業盤 task with one tap</string>
     <string name="widget_task_already_running">That task is already running</string>
-    <string name="widget_task_missing">Task deleted. Tap to choose another.</string>
+    <string name="widget_task_missing">Task deleted — tap to choose another</string>
 
     <!-- Navigation -->
     <string name="locale_select_task_title">Select task for Locale plugin</string>
@@ -605,12 +605,12 @@
     <string name="variables_create">Create variable</string>
     <string name="variables_created">Variable created</string>
     <string name="variables_name_label">Global variable name</string>
-    <string name="variables_name_helper">Use 1 to 64 letters, numbers, underscores, or hyphens; lowercase names are promoted to globals.</string>
+    <string name="variables_name_helper">Use 1–64 letters, numbers, underscores, or hyphens; lowercase names are promoted to globals.</string>
     <string name="variables_name_duplicate">A variable with this name already exists.</string>
     <string name="variables_default_name">VARIABLE</string>
     <string name="variables_secret_label">Store as secret</string>
     <string name="variables_secret_helper">Encrypt with Android Keystore and redact values derived from it.</string>
-    <string name="variables_secret_unavailable">Secret unavailable. Enter it again.</string>
+    <string name="variables_secret_unavailable">Secret unavailable — re-entry required</string>
     <string name="variables_secret_reentry_helper">This secret cannot be decrypted, usually after restoring on another device or losing the Keystore key. Enter a replacement value to recover it.</string>
     <string name="variables_reveal_secret">Reveal secret value</string>
     <string name="variables_hide_secret">Hide secret value</string>
@@ -736,11 +736,11 @@
     <!-- Import -->
     <string name="import_disabled_notice">Imported profiles will be created disabled for review.</string>
     <string name="import_schema_info">Schema %1$d</string>
-    <string name="import_schema_app">Schema %1$d · exported by app %2$s</string>
+    <string name="import_schema_app">Schema %1$d — exported by app %2$s</string>
     <string name="import_incompatible">Cannot import</string>
     <string name="import_incompatible_body">Import schema is not compatible with this version of 白い熊 自由作業盤.</string>
     <string name="import_capability_review">Capability review</string>
-    <string name="import_capability_item">%1$s · %2$s: %3$s</string>
+    <string name="import_capability_item">%1$s — %2$s: %3$s</string>
     <string name="import_warnings">Import warnings</string>
     <string name="import_migration_warnings">Migration warnings</string>
     <string name="import_unsupported_actions">Unsupported source actions</string>
@@ -843,9 +843,9 @@
     <string name="action_add_step">Add Step</string>
     <string name="action_choose_image">Choose image</string>
     <string name="scene_image_repair_required">Choose a readable image URI before saving.</string>
-    <string name="action_task_binding_missing_id">Missing task ID %1$d. Choose another task or None.</string>
-    <string name="action_task_binding_missing_name">Legacy task “%1$s” was not found. Choose another task or None.</string>
-    <string name="action_task_binding_ambiguous_name">Legacy task “%1$s” is ambiguous. Choose the intended task by ID.</string>
+    <string name="action_task_binding_missing_id">Missing task ID %1$d — choose another task or None</string>
+    <string name="action_task_binding_missing_name">Legacy task “%1$s” was not found — choose another task or None</string>
+    <string name="action_task_binding_ambiguous_name">Legacy task “%1$s” is ambiguous — choose the intended task by ID</string>
     <string name="action_task_binding_invalid_value">No task called “%1$s”. Choose another task, or None.</string>
     <string name="action_task_picker_option">%1$s (%2$d)</string>
     <string name="action_skip_for_now">Continue without a template</string>
@@ -1132,7 +1132,7 @@
     <string name="semantic_diff_path_element_index">Element %1$d</string>
     <string name="semantic_diff_path_argument">Argument %1$s</string>
     <string name="semantic_diff_path_parameter">Parameter %1$s</string>
-    <string name="semantic_diff_value_missing">none</string>
+    <string name="semantic_diff_value_missing">—</string>
     <string name="semantic_diff_value_true">true</string>
     <string name="semantic_diff_value_false">false</string>
     <string name="semantic_diff_value_never">Never</string>
@@ -1377,7 +1377,7 @@
     <string name="diagnostics_active_executions">Active executions</string>
     <string name="diagnostics_pending_executions">Pending external executions</string>
     <string name="diagnostics_health_evidence">Health evidence</string>
-    <string name="diagnostics_health_signal">%1$s · %2$s: %3$s</string>
+    <string name="diagnostics_health_signal">%1$s — %2$s: %3$s</string>
     <string name="diagnostics_never">Never</string>
     <string name="diagnostics_none">None recorded</string>
     <string name="diagnostics_loading">Loading…</string>
@@ -1795,9 +1795,9 @@
     <string name="preflight_setup_required">Setup required: %1$s</string>
     <string name="preflight_setup_missing">Missing setup: %1$s</string>
     <string name="preflight_warnings">Warnings</string>
-    <string name="preflight_context_detail">%1$d. %2$s · %3$s</string>
+    <string name="preflight_context_detail">%1$d. %2$s — %3$s</string>
     <string name="preflight_task_detail">%1$s (%2$d steps)</string>
-    <string name="preflight_step_detail">%1$d. %2$s · %3$s (%4$s)</string>
+    <string name="preflight_step_detail">%1$d. %2$s — %3$s (%4$s)</string>
     <string name="preflight_status_simulated">simulated</string>
     <string name="preflight_status_skipped">skipped</string>
     <string name="preflight_status_blocked">blocked</string>
@@ -1817,7 +1817,7 @@
     <string name="synthetic_trigger_available">Available</string>
     <string name="synthetic_trigger_contexts">Contexts (%1$d)</string>
     <string name="synthetic_trigger_pinned_event">Pinned synthetic event</string>
-    <string name="synthetic_trigger_context_number">Context %1$d: %2$s</string>
+    <string name="synthetic_trigger_context_number">Context %1$d — %2$s</string>
     <string name="synthetic_trigger_source_event">Source event: %1$s</string>
     <string name="synthetic_trigger_template">Template: %1$s</string>
     <string name="synthetic_trigger_metadata">%1$s=%2$s</string>
