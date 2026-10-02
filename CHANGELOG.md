@@ -8,6 +8,26 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-26.12-46.g2cfb01a1+021 — 2026-10-02
+
+Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
+
+### 言語島 — English voice, and the islands in 白い熊 暗記
+
+- **English audio:** every sentence now also has an English recording (白い熊 音声's Kokoro voice
+  am_michael), saved next to the Japanese one as 「… [en].ogg」. Recordings are now 48 kbps.
+- **Player:** Recall plays the English, leaves a pause to say it in Japanese, then plays the
+  Japanese. Listen and Shadow can add the English after each Japanese sentence.
+- **Sync with 白い熊 暗記:** after every run, and when the island editor closes, only what changed
+  goes to 暗記 — new sentences become notes with a Recognition and a Production card, edited ones
+  are updated in place (their review history stays), deleted ones are removed, renamed islands
+  rename their decks. 「暗記と同期」 re-sends everything.
+- **「暗記から取り込む」:** takes the existing hand-made deck in once — its decks become islands,
+  its notes sentences, both voices are made fresh, and the notes keep their cards and history.
+- **The progress window keeps its result:** Back only hides it; the outcome and its notification
+  stay until 閉じる, even if the app is closed in between. Closing the editor after a change 暗記
+  needs opens the same window.
+
 ## 0.2.94+2026-09-26.12-46.g2cfb01a1+017 — 2026-10-01
 
 Built on upstream `2cfb01a1` — OpenTasker **0.2.94**, the same base as `+001`.
