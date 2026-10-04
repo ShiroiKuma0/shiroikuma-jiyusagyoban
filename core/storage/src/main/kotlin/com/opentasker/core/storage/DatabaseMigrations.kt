@@ -668,6 +668,19 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * 言語島's 未分類 inbox: sentences handed in by kxkb after a walk capture, waiting for an island.
+     * Additive; the SQL is Room's own from `35.json`.
+     */
+    val MIGRATION_34_35 = object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_inbox` (`uuid` TEXT NOT NULL, `en` TEXT NOT NULL, `recognized` TEXT NOT NULL, `language` TEXT NOT NULL, `capturedAt` INTEGER NOT NULL, `receivedAt` INTEGER NOT NULL, `islandId` INTEGER, `newIslandName` TEXT NOT NULL, `newIslandRegister` TEXT NOT NULL, `proposed` INTEGER NOT NULL, `state` TEXT NOT NULL, `sentenceId` INTEGER, PRIMARY KEY(`uuid`))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_gengoshima_inbox_state` ON `gengoshima_inbox` (`state`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -703,6 +716,7 @@ object DatabaseMigrations {
             MIGRATION_31_32,
             MIGRATION_32_33,
             MIGRATION_33_34,
+            MIGRATION_34_35,
         )
     }
 }

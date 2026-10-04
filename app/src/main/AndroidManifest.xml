@@ -312,7 +312,7 @@
              the watch-face picker has one: asking the band runs for tens of seconds over Bluetooth
              and the grid has to still be there afterwards. -->
         <!-- 言語島's sentence entry. Its own task affinity, so it opens as a window of its own and
-             closing it returns to wherever 白い熊 was; closing is also what starts generation. -->
+             closing it returns to wherever 白い熊 was; its 「訳して音声を作る」 button starts generation. -->
         <activity
             android:name="com.opentasker.ui.gengoshima.GengoshimaEntryActivity"
             android:exported="false"
@@ -320,6 +320,27 @@
             android:taskAffinity=".gengoshima"
             android:label="言語島"
             android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 言語島's 未分類 page: walk-captured sentences reviewed in kxkb, filed into islands.
+             Same window family as the entry. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaInboxActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima"
+            android:label="言語島 未分類"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
+        <!-- 言語島's board: every 言語島 task as a picture tile. Its own affinity, like 健康's board. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaBoardActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshimaboard"
+            android:label="言語島"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 

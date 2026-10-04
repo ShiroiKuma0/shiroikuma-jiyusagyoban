@@ -72,6 +72,10 @@ class KeyGrabberService : IKeyGrabberService.Stub {
         runCatching { if (libLoaded) nativeSetRinging(ringing) }
     }
 
+    override fun setConsumeShort(consume: Boolean) {
+        runCatching { if (libLoaded) nativeSetConsumeShort(consume) }
+    }
+
     override fun destroy() {
         stopInternal()
         // daemon(false) → Shizuku kills this process after unbind; nothing else to clean up.
@@ -115,6 +119,9 @@ class KeyGrabberService : IKeyGrabberService.Stub {
 
     /** Set the ringing flag (forces single-tap re-injection while a call rings, whatever the screen state). */
     private external fun nativeSetRinging(ringing: Boolean)
+
+    /** Set the capture flag (consumes screen-off single taps for 言語島's walk capture). */
+    private external fun nativeSetConsumeShort(consume: Boolean)
 
     companion object {
         private const val TAG = "OpenTaskerKeyGrab"

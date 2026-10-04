@@ -168,6 +168,15 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
             TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
         }
 
+        // Walk-captured sentences waiting for an island (kxkb → 未分類).
+        val inboxCount by dao.observeInboxCount().collectAsState(initial = 0)
+        if (inboxCount > 0) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            OutlinedButton(onClick = { context.startActivity(GengoshimaInboxActivity.intent(context)) }, modifier = Modifier.fillMaxWidth()) {
+                Text("未分類 ($inboxCount) — 島に入れる / file captured sentences")
+            }
+        }
+
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(islands, key = { it.id }) { i ->
                 SelectionChip(label = islandLabel(i), selected = i.id == selected, onSelect = { selected = i.id })
@@ -246,7 +255,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
     }
 }
 
-private fun islandLabel(i: GengoshimaIslandEntity): String =
+internal fun islandLabel(i: GengoshimaIslandEntity): String =
     "${AudioTree.number(i.position, 3)} ${i.nameJa.ifBlank { i.nameEn }}"
 
 @Composable
@@ -268,7 +277,7 @@ private fun SentenceRow(s: GengoshimaSentenceEntity) {
 }
 
 @Composable
-private fun NewIslandDialog(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
+internal fun NewIslandDialog(onDismiss: () -> Unit, onCreate: (String, String) -> Unit) {
     var en by remember { mutableStateOf("") }
     var register by remember { mutableStateOf("") }
     AlertDialog(

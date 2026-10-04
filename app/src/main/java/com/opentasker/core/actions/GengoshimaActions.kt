@@ -28,14 +28,35 @@ class GengoshimaEntryAction : Action {
     }
 }
 
-/** Open 言語島's player: pick islands, a mode and an order, then listen on one giant screen. */
+/**
+ * Open 言語島's player: pick islands, a mode and an order, then listen on one giant screen.
+ * `mode` (listen / shadow / recall, optional) is the mode the picker opens on.
+ */
 class GengoshimaListenAction : Action {
     override val id = "gengoshima.listen"
     override val category = ActionCategory.MEDIA
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
-        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaPlayerActivity.intent(ctx.app))
+        val raw = ctx.variables.expand(args["mode"].orEmpty()).trim()
+        val mode = com.opentasker.ui.gengoshima.ListenMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+        if (raw.isNotEmpty() && mode == null) return ActionResult.Failure("言語島: mode must be listen, shadow or recall, not '$raw'")
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaPlayerActivity.intent(ctx.app, mode))
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Open 言語島's board: every 言語島 task as a tile with its own picture, in the order 白い熊 dragged
+ * them into — capture review, the inbox, entry, the big play tile, practice, editing, sync, settings.
+ */
+class GengoshimaBoardAction : Action {
+    override val id = "gengoshima.board"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
+        com.opentasker.ui.gengoshima.GengoshimaBoardActivity.open(ctx.app)
         return ActionResult.Success
     }
 }
@@ -121,3 +142,42 @@ class GengoshimaAnkiSyncAction : GengoshimaGenerateAction(GenerationRunner.Mode.
  * back adopted, so their cards keep their review history. Safe to run again; it adds nothing twice.
  */
 class GengoshimaAnkiAdoptAction : GengoshimaGenerateAction(GenerationRunner.Mode.ADOPT)
+
+/**
+ * 言語島 walk capture, driven by 物理鍵 with the screen off (docs/sister-app-contract-kxkb-gengoshima.md).
+ *
+ * `op=mode` (vol-down triple) toggles capture mode — entering it starts sentence 1 at once; leaving it
+ * saves what is recording and offers every clip to 白い熊 kxkb. `op=sentence` (vol-down single while
+ * `gengoshima_capture=true`) starts a sentence or saves the one recording. All feedback is vibration,
+ * done by [com.opentasker.core.gengoshima.SentenceCapture]; `store` gets a one-line outcome.
+ */
+class GengoshimaCaptureAction : Action {
+    override val id = "gengoshima.capture"
+    override val category = ActionCategory.MEDIA
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val op = ctx.variables.expand(args["op"].orEmpty()).trim().lowercase()
+        val capture = com.opentasker.core.gengoshima.SentenceCapture
+        val line = when (op) {
+            "mode" -> capture.toggleMode(ctx.app)
+            "sentence" -> capture.sentence(ctx.app)
+            else -> return ActionResult.Failure("言語島 capture: op must be mode or sentence, not '$op'")
+        }
+        ctx.variables.expand(args["store"].orEmpty()).trim().removePrefix("%").takeIf { it.isNotEmpty() }
+            ?.let { ctx.variables.set(it, line) }
+        ctx.logger("言語島 capture: $line")
+        return ActionResult.Success
+    }
+}
+
+/** Open 言語島's 未分類 page: kxkb's reviewed sentences, each with Claude's proposed island. */
+class GengoshimaInboxAction : Action {
+    override val id = "gengoshima.inbox"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaInboxActivity.intent(ctx.app))
+        return ActionResult.Success
+    }
+}
