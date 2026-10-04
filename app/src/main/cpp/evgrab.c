@@ -71,6 +71,11 @@ static volatile int g_screen_on = 1;
 // re-injected regardless of screen state; the app suppresses its own volume panel for the same press.
 // Default off, so nothing changes until a phone-state signal actually arrives.
 static volatile int g_ringing = 0;
+// Capture mode, pushed from the app (setConsumeShort). 言語島's walk capture uses single vol-down taps as
+// sentence start/stop with the screen OFF, where the screen rule would re-inject them as volume changes.
+// While set, a screen-off single tap is consumed like a screen-on one. Ringing still wins (the dialer must
+// see the key). Default off.
+static volatile int g_consume_short = 0;
 static int g_wakefd = -1;
 static int g_evfd[MAX_DEV];
 static int g_ndev = 0;
@@ -124,7 +129,7 @@ static void reinject_short(int evcode) {
 static void fire_tap(JNIEnv *env, jobject thiz, jmethodID onKey, int code, int count) {
     int type = (count <= 1) ? TYPE_SHORT : (count == 2) ? TYPE_DOUBLE : TYPE_TRIPLE;
     (*env)->CallVoidMethod(env, thiz, onKey, (jint)code, (jint)type);
-    if (type == TYPE_SHORT && (!g_screen_on || g_ringing)) reinject_short(code);
+    if (type == TYPE_SHORT && (g_ringing || (!g_screen_on && !g_consume_short))) reinject_short(code);
 }
 
 static void release_grabs(void) {
@@ -331,6 +336,13 @@ Java_com_opentasker_core_input_KeyGrabberService_nativeSetRinging(JNIEnv *env, j
     (void)env;
     (void)thiz;
     g_ringing = ringing ? 1 : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_opentasker_core_input_KeyGrabberService_nativeSetConsumeShort(JNIEnv *env, jobject thiz, jboolean consume) {
+    (void)env;
+    (void)thiz;
+    g_consume_short = consume ? 1 : 0;
 }
 
 JNIEXPORT void JNICALL

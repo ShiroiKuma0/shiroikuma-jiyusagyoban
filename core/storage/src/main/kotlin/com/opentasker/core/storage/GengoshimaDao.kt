@@ -148,6 +148,41 @@ data class GengoshimaPlayEntity(
     val count: Int,
 )
 
+/**
+ * 言語島's 未分類 inbox (v35): sentences handed in by 白い熊 kxkb after review (walk capture —
+ * docs/sister-app-contract-kxkb-gengoshima.md), waiting to be filed into an island.
+ *
+ * The uuid is the capture uuid kxkb sends, so a retried hand-off is recognised. A row stays after it is
+ * filed (`state = filed`) for exactly that reason: "already there" must still be answered `OK`.
+ *
+ * The target is EITHER an existing island ([islandId]) OR a new one ([newIslandName] + [newIslandRegister]),
+ * first as Claude proposed it ([proposed] = 1), then as 白い熊 changed it on the 未分類 page.
+ */
+@Entity(tableName = "gengoshima_inbox", indices = [Index(value = ["state"])])
+data class GengoshimaInboxEntity(
+    @PrimaryKey val uuid: String,
+    val en: String,
+    /** What Whisper heard before review; for reference. */
+    val recognized: String,
+    val language: String,
+    val capturedAt: Long,
+    val receivedAt: Long,
+    val islandId: Long? = null,
+    val newIslandName: String = "",
+    val newIslandRegister: String = "",
+    /** 1 once Claude's proposal has been stored (so it is asked once, not on every open). */
+    val proposed: Int = 0,
+    /** pending / filed */
+    val state: String = STATE_PENDING,
+    /** The sentence row it became, once filed. */
+    val sentenceId: Long? = null,
+) {
+    companion object {
+        const val STATE_PENDING = "pending"
+        const val STATE_FILED = "filed"
+    }
+}
+
 @Dao
 interface GengoshimaDao {
 
@@ -228,6 +263,27 @@ interface GengoshimaDao {
 
     @Query("DELETE FROM gengoshima_tombstones WHERE uuid IN (:uuids)")
     suspend fun clearTombstones(uuids: List<String>)
+
+    // ── inbox (未分類) ─────────────────────────────────────────────────────────────────────────
+
+    /** Store what is new; a uuid already present (pending or filed) is left alone. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertInbox(rows: List<GengoshimaInboxEntity>): List<Long>
+
+    @Query("SELECT uuid FROM gengoshima_inbox WHERE uuid IN (:uuids)")
+    suspend fun inboxPresent(uuids: List<String>): List<String>
+
+    @Query("SELECT * FROM gengoshima_inbox WHERE state = 'pending' ORDER BY capturedAt, uuid")
+    fun observeInbox(): Flow<List<GengoshimaInboxEntity>>
+
+    @Query("SELECT * FROM gengoshima_inbox WHERE state = 'pending' ORDER BY capturedAt, uuid")
+    suspend fun inbox(): List<GengoshimaInboxEntity>
+
+    @Query("SELECT COUNT(*) FROM gengoshima_inbox WHERE state = 'pending'")
+    fun observeInboxCount(): Flow<Int>
+
+    @Update
+    suspend fun updateInbox(rows: List<GengoshimaInboxEntity>)
 
     @Query("SELECT * FROM gengoshima_sessions ORDER BY startedAt")
     fun observeSessions(): Flow<List<GengoshimaSessionEntity>>

@@ -122,6 +122,7 @@ class GengoshimaPlayerActivity : ComponentActivity() {
         // Over the lock screen, and awake — this is the screen on the mount in the car.
         setShowWhenLocked(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        requestedMode = modeOf(intent)
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
@@ -133,9 +134,19 @@ class GengoshimaPlayerActivity : ComponentActivity() {
     }
 
     companion object {
-        fun intent(context: Context): Intent =
+        /** The mode the picker opens on (the 言語島 board's Shadow / Recall tiles); null = Listen. */
+        const val EXTRA_MODE = "gengoshima_mode"
+
+        /** The picker's mode as last asked for by an intent, so a board tile can open it on Shadow. */
+        internal var requestedMode: ListenMode? = null
+
+        fun intent(context: Context, mode: ListenMode? = null): Intent =
             Intent(context, GengoshimaPlayerActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .apply { if (mode != null) putExtra(EXTRA_MODE, mode.name) }
+
+        internal fun modeOf(intent: Intent?): ListenMode? =
+            intent?.getStringExtra(EXTRA_MODE)?.let { n -> ListenMode.entries.firstOrNull { it.name.equals(n, true) } }
     }
 }
 
@@ -300,7 +311,7 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
     val counts by dao.observeCounts().collectAsState(initial = emptyList())
     val ready = counts.associate { it.islandId to it.ready }
     val chosen = remember { mutableStateMapOf<Long, Boolean>() }
-    var mode by remember { mutableStateOf(ListenMode.LISTEN) }
+    var mode by remember { mutableStateOf(GengoshimaPlayerActivity.requestedMode ?: ListenMode.LISTEN) }
     var shuffle by remember { mutableStateOf(false) }
     var englishAfter by remember { mutableStateOf(false) }
     val settings = remember { GengoshimaSettings.last(context) }
