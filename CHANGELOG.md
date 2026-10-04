@@ -8,6 +8,46 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+028 — 2026-10-04
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+024`.
+
+### 言語島 — sentences spoken on a walk
+
+- **Walk capture with the screen off.** 物理鍵: a vol-down triple press switches capture mode on (the
+  first sentence starts recording at once) and off; in between, a single vol-down press starts or saves
+  a sentence. The volume does not change while the mode is on — the key grabber has a new gate that
+  swallows screen-off single presses — and the old volume-panel profile stands aside. Feedback is
+  vibration only: one buzz to start, two when saved, three when the mode ends, one long on an error.
+  Vol-down triple used to open the video camera; vol-up triple still does.
+- **The recording is made for transcription**: one 16 kHz mono WAV per sentence, unprocessed (no
+  automatic gain), split by itself at 28 s, presses under 0.2 s dropped, written to disk as it records.
+- **The phone stays awake during capture mode.** Without it the phone deep-slept between sentences,
+  the press that should start a sentence was held back until the next press, and both fired together
+  — half a second of silence instead of a sentence.
+- **Clips go to 白い熊 kxkb** (0.23.1+339 or later) when the mode ends and on every start of the app,
+  ten at a time; a clip is deleted here only once kxkb confirms it is safely stored, and one kxkb
+  rejects is set aside, never thrown away. kxkb transcribes them at home and learns from every
+  correction, as in dictation.
+- **Reviewed sentences come back** through a new door kxkb alone may use, and only for this — it can
+  never reach the export or restore of this app's data. A re-sent sentence is recognised and not stored
+  twice.
+- **「言語島 未分類」**: the inbox. Claude proposes an island for each sentence (or a new one, named and
+  given a register); tap a sentence's island to change it, long-press to select several and move them
+  together, 「すべて確定」 files them in the order they were spoken. The entry screen shows 未分類 (n).
+- **「言語島 録音確認」** opens kxkb's Walk capture page directly (needs kxkb 0.23.1+341).
+- Database version 35 (one new table, added without touching the others). The contract with kxkb is in
+  `docs/sister-app-contract-kxkb-gengoshima.md`.
+
+### 言語島 — the board
+
+- **「言語島」 opens a board of every 言語島 task**, each with its own drawn picture: 録音確認 and 未分類,
+  文入力 and 訳して音声, a full-width **聴く** tile, シャドーイング and 思い出す, then 編集, 統計, 暗記と同期,
+  設定 and 暗記から取り込む. A tap runs the task; long-press and drag to reorder, and the order is kept —
+  and carried in the 言語島 backup.
+- **The player can open on a mode**: 「言語島: listen」 gained an optional *Open on* (listen / shadow /
+  recall), used by the new 「言語島 シャドーイング」 and 「言語島 思い出す」 tasks.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+024 — 2026-10-02
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94** plus 32 commits since `+023`'s base `2cfb01a1`

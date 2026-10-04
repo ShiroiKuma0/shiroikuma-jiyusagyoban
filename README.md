@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+024`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+028`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -45,6 +45,16 @@ The window is built for checking, not just reading. The screenshot on top with e
 
 Accuracy is measured, not asserted: **0.00 % character error on Japanese, English, German and Russian**, 5.6 % Czech and 6.9 % Polish, on a corpus with hand-written ground truth. Detection runs at a 1600 px long side instead of PP-OCR's 960 default, which halves the error on a full-width phone screenshot — and the errors it removes are exactly the small text. Both recognition tiers ship: the accurate 81 MB model by default, a 16 MB one that is ~2.5× faster behind a switch in settings, and a per-action override for tasks. The same engine is available to automation as `ocr.recognize`.
 
+
+---
+
+### 🏝️ 「言語島」 — language islands, spoken on a walk
+
+Mikel Hyperpolyglot's method, built in: your own English sentences grouped into topic **islands**, translated by Claude into natural spoken Japanese (each island a continuous monologue, translated with what came before it as context), voiced by 白い熊 音声, and practised in a big-screen player — **Listen, Shadow, Recall** — that runs over the lock screen and the car mount. 白い熊 暗記 gets every sentence as a card, kept in step both ways.
+
+**New sentences come from walking and talking.** With the screen off, a vol-down **triple** press starts capture mode and a single press marks where each sentence starts and ends — the volume never moves, and every step is a vibration (one to start, two to save, three to finish), so nothing ever needs a look. Each sentence is a raw 16 kHz recording handed to **白い熊 kxkb**, which transcribes it at home with offline Whisper; correcting a misheard word there teaches the keyboard exactly as dictation does. The reviewed sentences come back into a **未分類** inbox, where Claude proposes an island for each — tap one to change it, select many to move them together, file them all with one press.
+
+**One board for all of it**: every 言語島 task as a drawn picture tile, in the order of the work — review the walk, file it, write by hand, translate, the big play tile, then practice and upkeep — and every tile can be dragged where it suits.
 
 ---
 
@@ -381,7 +391,7 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (201 registered + 10 engine-handled)
+### Actions (214 registered + 10 engine-handled)
 
 **201 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
