@@ -48,6 +48,9 @@ object AutomationCallers {
     private val CALLERS = mapOf(
         "shiroikuma.oyokanri" to "9c585f4d118cb97ff653f949a8872875548403b9083ce6b9baa2e8f0c55ac6cc",
         "shiroikuma.jiyusagyoban" to "efd0d352192651593a92288ecdc64fc87262ec8648c24ed8f51a5587d46ac602",
+        // 白い熊 kxkb hands reviewed walk-capture sentences to 言語島 (`gengoshima_intake` only in
+        // practice; docs/sister-app-contract-kxkb-gengoshima.md). Pin from its release key.
+        "shiroikuma.kxkb" to "346ab2a36c617138f6259688aba61feb8a84f9fdf2d207b2636b07ddb2688acb",
     )
 
     /**

@@ -94,6 +94,10 @@ class ShizukuKeyEventListener {
      */
     @Volatile private var ringing = false
 
+    private fun pushConsumeShort(on: Boolean) {
+        runCatching { service?.setConsumeShort(on) }
+    }
+
     private fun pushScreen(on: Boolean) {
         screenOn = on
         runCatching { service?.setScreenOn(on) }
@@ -180,6 +184,7 @@ class ShizukuKeyEventListener {
                 runCatching { svc.setScreenOn(screenOn) }
                 ringing = readRinging()
                 runCatching { svc.setRinging(ringing) }
+                runCatching { svc.setConsumeShort(consumeShort) }  // seeded on every (re)bind
                 AppLogger.info(TAG, "grab mode active on $devs device(s)")
             }
         }
@@ -203,6 +208,7 @@ class ShizukuKeyEventListener {
 
     fun start(context: Context, scope: CoroutineScope) {
         if (job != null) return
+        live = this
         appContext = context.applicationContext
         appScope = scope
         // Track screen on/off and forward to the grabber (gates single-tap consume vs re-inject).
@@ -264,6 +270,7 @@ class ShizukuKeyEventListener {
     }
 
     fun stop() {
+        if (live === this) live = null
         job?.cancel(); job = null
         killSwitchJob?.cancel(); killSwitchJob = null
         screenReceiver?.let { recv -> runCatching { appContext?.unregisterReceiver(recv) } }; screenReceiver = null
@@ -464,6 +471,23 @@ class ShizukuKeyEventListener {
 
     companion object {
         private const val TAG = "OpenTasker"
+
+        /** The running listener (the engine owns one); null while the engine is down. */
+        @Volatile private var live: ShizukuKeyEventListener? = null
+
+        /**
+         * 言語島 walk capture: while on, the grabber consumes SCREEN-OFF single taps too, so a sentence
+         * start/stop press does not change the volume. Process-wide so it survives a grabber rebind (each
+         * bind seeds it) and reaches whichever listener instance is live. Set by `SentenceCapture`.
+         */
+        @Volatile var consumeShort = false
+            private set
+
+        fun setConsumeShort(on: Boolean) {
+            consumeShort = on
+            live?.pushConsumeShort(on)
+            AppLogger.info(TAG, "consumeShort=$on (言語島 capture)")
+        }
         private const val DEFAULT_LONG_MS = 500L
         private const val DEFAULT_DOUBLE_MS = 120L
         private const val DOUBLE_MIN_MS = 40L // ViewConfiguration.getDoubleTapMinTime() — the system floor
