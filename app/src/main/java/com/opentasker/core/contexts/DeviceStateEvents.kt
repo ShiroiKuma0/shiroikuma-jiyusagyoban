@@ -44,6 +44,9 @@ object DeviceStateEvents {
     /** Audio-record state, so a profile STATE context can gate on `recording=true` / `recording=false`. */
     fun publishRecording(active: Boolean) = publish(mapOf("recording" to active.toString()))
 
+    /** 言語島 walk-capture mode, so 物理鍵's profiles can route vol-down singles: `gengoshima_capture=true`. */
+    fun publishGengoshimaCapture(active: Boolean) = publish(mapOf("gengoshima_capture" to active.toString()))
+
     internal fun wifiPatch(
         ssid: String,
         connected: Boolean,
