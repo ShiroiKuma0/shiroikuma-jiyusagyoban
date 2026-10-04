@@ -336,9 +336,16 @@ object SettingsBackup {
     /** 言語島's tables, carried the same generic way as [HEALTH_TABLES]. */
     private val GENGOSHIMA_TABLES = listOf(
         "gengoshima_islands", "gengoshima_sentences", "gengoshima_sessions", "gengoshima_plays",
-        "gengoshima_tombstones",
+        "gengoshima_tombstones", "gengoshima_inbox",
     )
     private const val GENGOSHIMA_DIR = "gengoshima"
+
+    /**
+     * 言語島's own preferences, carried beside its tables: the board's tile arrangement — authored by
+     * 白い熊's dragging and un-recreatable by any device, like 健康's `huawei_board`.
+     */
+    private val GENGOSHIMA_PREFS = listOf("gengoshima_board")
+    private const val GENGOSHIMA_PREFS_ENTRY = "gengoshima.json"
 
     /** 言語島's audio tree, relative to `%Gengoshima_Dir`. */
     private const val GENGOSHIMA_AUDIO_DIR = "gengoshima_audio"
@@ -461,6 +468,7 @@ object SettingsBackup {
                     Cat.MAPS -> exportCutouts(zip, db, isCancelled)
                     Cat.GENGOSHIMA -> {
                         exportTables(zip, db, isCancelled, GENGOSHIMA_TABLES, GENGOSHIMA_DIR)
+                        writeEntry(zip, GENGOSHIMA_PREFS_ENTRY, exportPrefs(context, GENGOSHIMA_PREFS, db))
                         // Finished files only: a half-written `.part` and 整理's own temporary
                         // names are not audio anyone can play.
                         val audio = File(com.opentasker.core.gengoshima.GengoshimaSettings.last(context).dir)
@@ -910,7 +918,8 @@ object SettingsBackup {
                 // the `else` branch it would look for `maps.json`, which nothing ever writes, so an
                 // archive with base maps in it would restore everything except them — silently.
                 Cat.MAPS -> entries.keys.any { it.startsWith("$MAPS_DIR/") }
-                Cat.GENGOSHIMA -> entries.keys.any { it.startsWith("$GENGOSHIMA_DIR/") || it.startsWith("$GENGOSHIMA_AUDIO_DIR/") }
+                Cat.GENGOSHIMA -> GENGOSHIMA_PREFS_ENTRY in entries ||
+                    entries.keys.any { it.startsWith("$GENGOSHIMA_DIR/") || it.startsWith("$GENGOSHIMA_AUDIO_DIR/") }
                 // A category is present if its preferences are — OR if only its files are. An
                 // archive holding just the captured satellite reference is a real archive: it is
                 // how a phone that has never built a set is seeded without restoring anything else.
@@ -959,7 +968,12 @@ object SettingsBackup {
                     // each file to wherever the restored rows now say it belongs.
                     val audio = File(com.opentasker.core.gengoshima.GengoshimaSettings.last(context).dir)
                     val files = importDirFiles(entries, GENGOSHIMA_AUDIO_DIR, audio)
-                    if (rows > 0 || files > 0) lines += "${cat.label}: $rows rows" + if (files > 0) " · $files files" else ""
+                    // Absent from archives written before the board existed — that is not a miss.
+                    val keys = entries[GENGOSHIMA_PREFS_ENTRY]?.let { importPrefs(context, it, db) } ?: 0
+                    if (rows > 0 || files > 0 || keys > 0) {
+                        lines += "${cat.label}: $rows rows" + (if (files > 0) " · $files files" else "") +
+                            if (keys > 0) " · $keys keys" else ""
+                    }
                 }
                 else -> {
                     // The files first, and NOT behind the preferences dump. Reading the JSON first

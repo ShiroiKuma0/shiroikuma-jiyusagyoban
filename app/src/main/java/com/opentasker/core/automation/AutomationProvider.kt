@@ -65,6 +65,11 @@ class AutomationProvider : ContentProvider() {
             is AutomationCallers.Verdict.Refused -> return fail(verdict.why)
             AutomationCallers.Verdict.Allowed -> Unit
         }
+        // kxkb is a caller for ONE thing — handing 言語島 its reviewed sentences. It must never be able
+        // to export or restore this app's data, which the rest of this door does.
+        if (callingPackage == KXKB && method != com.opentasker.core.gengoshima.GengoshimaIntake.METHOD) {
+            return fail("ERROR:caller not allowed for $method")
+        }
         // Then the app's own switches — a token is ignored unless this app asks for one.
         AutomationAuth.refuse(ctx, extras?.getString(KEY_TOKEN))?.let { return fail(it) }
 
@@ -72,6 +77,16 @@ class AutomationProvider : ContentProvider() {
             METHOD_DESCRIBE -> ok(describe(ctx))
             METHOD_EXPORT -> start(ctx, extras, importing = false)
             METHOD_IMPORT -> start(ctx, extras, importing = true)
+            com.opentasker.core.gengoshima.GengoshimaIntake.METHOD -> ok(
+                // Synchronous by contract: the returned uuids are the receipt (kxkb keeps everything
+                // else queued). A few dozen rows — no service needed, unlike the export payload.
+                kotlinx.coroutines.runBlocking {
+                    com.opentasker.core.gengoshima.GengoshimaIntake.accept(
+                        com.opentasker.app.OpenTaskerApp_NoHilt.db.gengoshimaDao(),
+                        extras?.getString(KEY_ITEMS),
+                    )
+                },
+            )
             METHOD_CANCEL -> {
                 AutomationJobs.cancel(extras?.getString(KEY_JOB_ID))
                 ok("OK:cancelled")
@@ -151,6 +166,9 @@ class AutomationProvider : ContentProvider() {
         const val METHOD_EXPORT = "export"
         const val METHOD_IMPORT = "import"
         const val METHOD_CANCEL = "cancel"
+
+        /** The only caller limited to one method (`gengoshima_intake`). */
+        private const val KXKB = "shiroikuma.kxkb"
 
         const val KEY_RESULT = "result"
         const val KEY_FD = "fd"

@@ -1238,10 +1238,45 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "gengoshima.capture",
+            name = "言語島: walk capture",
+            description = "Eyes-free sentence capture for 物理鍵: mode toggles capture mode (start buzz / three buzzes off), sentence starts or saves one sentence (one buzz / two buzzes). Clips go to 白い熊 kxkb for review",
+            category = "Media",
+            fields = listOf(
+                ActionField("op", "What the press does", FieldType.DROPDOWN, options = listOf("mode", "sentence"), hint = "mode = vol-down triple (toggle capture mode); sentence = vol-down single (start / save)"),
+                ActionField("store", "Variable for the outcome", hint = "optional — a one-line result, e.g. saved <uuid>"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.inbox",
+            name = "言語島: file captured sentences",
+            description = "Open 言語島's 未分類 page — sentences reviewed in kxkb, each with Claude's proposed island; change one or many, then すべて確定",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "gengoshima.listen",
             name = "言語島: listen",
             description = "Open 言語島's player — Listen, Shadow or Recall, over the lock screen, a tapped word looked up in 白い熊の辞書",
             category = "Media",
+            fields = listOf(
+                ActionField("mode", "Open on", FieldType.DROPDOWN, options = listOf("listen", "shadow", "recall"), hint = "optional — the mode the picker starts on (default listen)"),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.board",
+            name = "言語島: board",
+            description = "Open 言語島's board — every 言語島 task as a picture tile; long-press and drag to reorder",
+            category = "App",
             fields = emptyList(),
         )
     )
