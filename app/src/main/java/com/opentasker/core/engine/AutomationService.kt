@@ -183,6 +183,8 @@ class AutomationService : Service() {
         // Shake / orientation / app-foreground monitors are NOT started here — reloadProfiles() gates
         // them on whether an enabled profile actually uses them (applyContextSourceGating).
         hardwareKeyListener.start(this, scope)
+        // 言語島 walk capture: clips kxkb has not yet taken (offline, locked, not installed) go again.
+        com.opentasker.core.gengoshima.ClipOffer.offerAsync(this)
         ContextCompat.registerReceiver(
             this,
             PackageContextEvents.receiver,

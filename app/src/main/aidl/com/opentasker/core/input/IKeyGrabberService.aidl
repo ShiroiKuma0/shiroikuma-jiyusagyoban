@@ -35,4 +35,10 @@ interface IKeyGrabberService {
      * unaffected.
      */
     void setRinging(boolean ringing) = 4;
+
+    /**
+     * 言語島 walk capture: while on, a SCREEN-OFF single tap is consumed too (it marks a sentence start/stop
+     * instead of changing the volume). Ringing still forces re-injection. Off → the screen rule decides.
+     */
+    void setConsumeShort(boolean consume) = 5;
 }

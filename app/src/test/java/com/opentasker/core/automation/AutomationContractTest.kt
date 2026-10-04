@@ -81,7 +81,18 @@ class AutomationContractTest {
         assertTrue("signatures are read", callers.contains("GET_SIGNING_CERTIFICATES"))
         assertTrue("and compared", callers.contains("MessageDigest.isEqual"))
         val pins = Regex("\"[0-9a-f]{64}\"").findAll(callers).count()
-        assertEquals("one pin per named caller", 2, pins)
+        // 応用管理, 自由作業盤, and kxkb (言語島 intake only — see the next test).
+        assertEquals("one pin per named caller", 3, pins)
+    }
+
+    /**
+     * kxkb is a caller for one method only: handing 言語島 its reviewed walk-capture sentences. It must
+     * never reach export or import, which would give a keyboard this app's whole data.
+     */
+    @Test
+    fun `kxkb is limited to gengoshima intake`() {
+        assertTrue(provider.contains("callingPackage == KXKB && method != com.opentasker.core.gengoshima.GengoshimaIntake.METHOD"))
+        assertTrue(provider.contains("const val KXKB = \"shiroikuma.kxkb\""))
     }
 
     /**
