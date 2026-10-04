@@ -180,6 +180,7 @@ def main():
     nsub, subgap = SUBS.get(args.system, (1, 0.0))
     rows, semi, skipped, clocks = {}, {}, set(), {}
     clock_age = []
+    clock_signed = []                    # (instant, satellite, age, signed metres)
     for i in range(BLOCKS):
         ts, off, blen = struct.unpack_from("<III", b, 12 * i)
         for sub in range(nsub):
@@ -219,7 +220,7 @@ def main():
                 # not the level. C10 that day read 8569 m against a fleet whose worst was 63 m, and
                 # that is the shape a real fault makes.
                 def clock_at(t):
-                    """|ours - the product's|, as range, at one instant. None where it cannot be asked."""
+                    """ours - the product's, as SIGNED range, at one instant. None where it cannot be asked."""
                     if not (tmin < t < tmax) or not pgb.spanned(truth[sat]["t"], t):
                         return None
                     want_c = pgb.interp(truth[sat]["t"], truth[sat]["c"], t)
@@ -227,13 +228,14 @@ def main():
                         return None
                     dtc = 0.0 if el["toc"] is None else (
                         ((t - offset) % 604800 - el["toc"] + 302400) % 604800 - 302400)
-                    return abs(float(el["af0"] + el["af1"] * dtc - want_c)) * 299792458.0
+                    return float(el["af0"] + el["af1"] * dtc - want_c) * 299792458.0
 
                 if args.system == "GLONASS":
                     c = clock_at(tsub)
                     if c is not None:
-                        clocks.setdefault(sat, []).append(c)
-                        clock_age.append((tsub - first, c))
+                        clocks.setdefault(sat, []).append(abs(c))
+                        clock_age.append((tsub - first, abs(c)))
+                        clock_signed.append((round(tsub), sat, tsub - first, c))
                     # No propagation: the record IS the state at its own tb, so the comparison is
                     # the position it carries against the product at the same instant.
                     if not (tmin < tsub < tmax) or not pgb.spanned(truth[sat]["t"], tsub):
@@ -259,8 +261,9 @@ def main():
                     rows.setdefault(sat, []).append((t - first, float(np.linalg.norm(got - want))))
                     c = clock_at(t)
                     if c is not None:
-                        clocks.setdefault(sat, []).append(c)
-                        clock_age.append((t - first, c))
+                        clocks.setdefault(sat, []).append(abs(c))
+                        clock_age.append((t - first, abs(c)))
+                        clock_signed.append((round(t), sat, t - first, c))
 
     if skipped:
         print(f"  samples dropped where the product has a hole: {' '.join(sorted(skipped))}")
@@ -317,6 +320,45 @@ def main():
                 if m.sum():
                     print(f"  {lo:>8}..{lo+6:<8} {m.sum():6} {np.median(cv[m]):10.2f} "
                           f"{np.percentile(cv[m], 95):10.2f} {cv[m].max():10.2f}")
+        # ── THE SAME CLOCKS WITH THE COMMON OFFSET TAKEN OUT ──────────────────────────────────────
+        #
+        # The absolute numbers above carry the truth product's own clock DATUM: every analysis centre
+        # ties its clocks to a different reference, and a file stitched from two products shows a
+        # step where they meet that is no fault of ours (2026-10-04: BeiDou read 12 m for eighteen
+        # hours and 0.8 m after, exactly at a product boundary). A receiver solves for one clock
+        # offset per system anyway, so what can hurt a fix is how far each satellite sits from the
+        # others at the same instant. Subtract the median across the constellation at every sampled
+        # instant and grade what is left. Instants with fewer than four satellites are skipped —
+        # a median of three is not a reference.
+        if clock_signed:
+            by_t = {}
+            for t, sat, age, c in clock_signed:
+                by_t.setdefault(t, []).append((sat, age, c))
+            rel, rel_sat = [], {}
+            for v in by_t.values():
+                if len(v) < 4:
+                    continue
+                mid = float(np.median([c for _, _, c in v]))
+                for sat, age, c in v:
+                    rel.append((age, abs(c - mid)))
+                    rel_sat.setdefault(sat, []).append(abs(c - mid))
+            if rel:
+                rh = np.array([a for a, _ in rel]) / 3600.0
+                rv = np.array([x for _, x in rel])
+                print(f"\n  CLOCK minus the constellation's common offset at each instant, as range "
+                      f"({len(rv)} samples) — the number that matters to a fix")
+                print(f"  {'satellite':>10} {'n':>5} {'median':>10} {'max':>12}")
+                for sat in sorted(rel_sat, key=lambda s: -max(rel_sat[s]))[:10]:
+                    v = np.array(rel_sat[sat])
+                    print(f"  {sat:>10} {len(v):5} {np.median(v):10.2f} {v.max():12.2f}")
+                print(f"  overall: median {np.median(rv):.2f} m, p95 {np.percentile(rv, 95):.2f} m, "
+                      f"max {rv.max():.2f} m")
+                print(f"\n  {'hours into window':>18} {'n':>6} {'median':>10} {'p95':>10} {'max':>10}")
+                for lo in range(0, 72, 6):
+                    m = (rh >= lo) & (rh < lo + 6)
+                    if m.sum():
+                        print(f"  {lo:>8}..{lo+6:<8} {m.sum():6} {np.median(rv[m]):10.2f} "
+                              f"{np.percentile(rv[m], 95):10.2f} {rv[m].max():10.2f}")
     else:
         print("\n  CLOCK: the orbit product carries no clocks — nothing to compare")
 
