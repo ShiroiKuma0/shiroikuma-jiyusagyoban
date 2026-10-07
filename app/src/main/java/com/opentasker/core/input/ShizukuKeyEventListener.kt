@@ -515,9 +515,8 @@ class ShizukuKeyEventListener {
         // these are dropped by the ringing gate — a key we cannot hand back must never be silently eaten.
         private val REINJECTED_CODES = setOf(114, 115)
 
-        // Multi-tap keys. Both volume keys now get double AND triple — double opens the camera on
-        // either key, triple opens video on either — so the two keys are symmetric and 白い熊 does
-        // not have to remember which one does what in the dark.
+        // Multi-tap keys. Both volume keys get double AND triple; what each gesture does is the
+        // 物理鍵 profiles' business, not this listener's — keep the assignments out of this comment.
         //
         // A single short on a multi-tap key waits PKEY_DOUBLEMS before firing, to disambiguate; a tap
         // fires immediately once the key's max count is reached. Giving vol-up triple therefore makes
