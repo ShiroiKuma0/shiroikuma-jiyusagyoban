@@ -213,15 +213,23 @@ object Records {
      * capture decided not only the VALUE but which satellites were shipped at all.
      *
      * [nav] is keyed by PRN; the result is keyed by the record's 0-based index, `prn - 1`, which is
-     * what [encodeBds] wants. The FIRST record of each satellite is used: TGD is a calibration and
-     * changes by a count or two a month, so any record would do and the first is the cheapest to
-     * defend.
+     * what [encodeBds] wants. The NEWEST record of each satellite is used, and only records from
+     * the last [TGD_MAX_AGE_S] before the newest record in the files are considered at all.
+     *
+     * It used to take the FIRST record, on the reasoning that TGD changes by a count or two a month
+     * so any record would do. Within one merged BRDC that holds; across IGN's hourly STATION files it
+     * does not, because those repeat whatever a receiver last decoded for a satellite it no longer
+     * hears — C46 from 2024 and C05 / C16 from April on 2026-10-11. The oldest record was then two
+     * years old, and a satellite with only such a record got a group delay nobody broadcasts any
+     * more instead of falling back to the capture.
      */
     fun bdsTails(nav: Map<Int, List<BdsNavRecord>>): Map<Int, ByteArray> {
         val out = LinkedHashMap<Int, ByteArray>()
+        val newest = nav.values.flatten().maxOfOrNull { it.toeAbs } ?: return out
         for ((prn, records) in nav) {
-            val first = records.minByOrNull { it.toeAbs } ?: continue
-            val counts = Math.round(first.tgd1 * 1e10)
+            val current = records.filter { it.toeAbs >= newest - TGD_MAX_AGE_S }
+                .maxByOrNull { it.toeAbs } ?: continue
+            val counts = Math.round(current.tgd1 * 1e10)
             // Out of the ICD's range means the field was misread, not that a satellite is unusual.
             if (counts < Short.MIN_VALUE || counts > Short.MAX_VALUE) continue
             val tail = ByteArray(4)
@@ -230,6 +238,9 @@ object Records {
         }
         return out
     }
+
+    /** How much older than the newest record a group delay may be: the three days of merged files, and one spare. */
+    private const val TGD_MAX_AGE_S = 4 * 86400.0
 
     fun encodeBds(
         idx: Int,
