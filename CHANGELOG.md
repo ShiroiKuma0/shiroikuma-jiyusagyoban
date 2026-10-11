@@ -8,6 +8,37 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+034 — 2026-10-11
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+031`.
+
+### Key list (鍵一覧, `key.bindings`)
+
+- **Split by screen state.** Under each key, the bindings sit in a rounded box for *Screen on* and one
+  for *Screen off* whenever any binding on that key depends on the screen. A binding that fires either
+  way is listed in both, so each box is the whole map for that state; the per-line `screen=on` is gone.
+- **Each press is written once.** A press with several bindings used to print one line per profile —
+  Vol-Down's press showed "Press" three times, reading as three different gestures. Now the press label
+  stands alone and each task under it is led by when it runs ("if recording=true"); the binding whose
+  conditions are exactly the negation of all the others reads "otherwise", and where no catch-all
+  exists the sheet ends that press with "otherwise → nothing".
+- **Press order and names.** Press → Long press → Long press, held (repeats) → Double press → Triple
+  press. "Single press" is now "Press" (短押し), and `long_repeat` — the key still held after a long
+  press, firing until release (the camera zoom) — has a real name instead of the raw constant.
+
+### Dialogs
+
+- **Formatted text gains a titled box:** `::: title` … `:::` draws a rounded accent border around the
+  lines between.
+- **The katakana middle dot no longer draws as a NO GLYPH box in italics.** The italic font has no
+  glyph for `・`, so inside an italic run it is now set upright — every note line and footer in the key
+  list had shown it as a box.
+
+### 物理鍵 (workspace, not the app)
+
+- **Volume-up double press with the screen off opens the camera on the Video tab again** — a new profile
+  物理鍵 ビデオ上暗 beside the screen-on 白い熊 画 toggle (bundle, no app change).
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+031 — 2026-10-11
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+028`.
