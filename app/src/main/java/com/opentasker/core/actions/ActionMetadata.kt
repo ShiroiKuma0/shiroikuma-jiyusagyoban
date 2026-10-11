@@ -917,7 +917,7 @@ fun registerActionMetadata() {
                 ActionField("ok", "OK label", hint = "default: OK"),
                 ActionField("cancel", "Cancel label", hint = "default: Cancel"),
                 ActionField("size", "Size", hint = "normal (default) / large / full — full nearly fills the screen and the body scrolls"),
-                ActionField("markup", "Formatted text", FieldType.CHECKBOX, hint = "read the body as markup: # title, ## section (underlined), ### / #### sub, - bullet, --- rule, **bold**, __underline__, *italic*"),
+                ActionField("markup", "Formatted text", FieldType.CHECKBOX, hint = "read the body as markup: # title, ## section (underlined), ### / #### sub, - bullet, --- rule, ::: title … ::: box, **bold**, __underline__, *italic*"),
                 ActionField("text_scale", "Font scale", hint = "1 = the theme's own size (default), 1.5 = half again as big. Clamped 0.5–3"),
                 ActionField("store", "Store OK in", hint = "variable set to true/false (optional)"),
                 ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
