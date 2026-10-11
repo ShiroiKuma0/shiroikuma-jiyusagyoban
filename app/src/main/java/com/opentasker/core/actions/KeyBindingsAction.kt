@@ -28,13 +28,48 @@ private val KEY_LABELS: List<Triple<String, String, String>> = listOf(
     Triple(HardwareKeyContextEvents.KEY_POWER, "電源キー", "Power"),
 )
 
-/** Press types, in listing order — shortest gesture first, then the holds. */
+/**
+ * Press types, in listing order: the one-press gestures first — a press, then the same press held —
+ * and the multi-taps after them (白い熊, 2026-10-11).
+ *
+ * `long_repeat` is not a double press with the second held: it is the key STILL held after `long`
+ * fired, repeating until release (the camera zoom). Hence its place right after `long`, and a name
+ * that says so instead of the raw constant.
+ */
 private val PRESS_LABELS: List<Triple<String, String, String>> = listOf(
-    Triple(HardwareKeyContextEvents.PRESS_SHORT, "単押し", "Single press"),
+    Triple(HardwareKeyContextEvents.PRESS_SHORT, "短押し", "Press"),
+    Triple(HardwareKeyContextEvents.PRESS_LONG, "長押し", "Long press"),
+    Triple(HardwareKeyContextEvents.PRESS_LONG_REPEAT, "長押し継続（反復）", "Long press, held (repeats)"),
     Triple(HardwareKeyContextEvents.PRESS_DOUBLE, "二度押し", "Double press"),
     Triple(HardwareKeyContextEvents.PRESS_TRIPLE, "三度押し", "Triple press"),
-    Triple(HardwareKeyContextEvents.PRESS_LONG, "長押し", "Long press"),
 )
+
+/** The screen states a key's bindings are split by, in listing order. */
+private enum class Screen { ON, OFF }
+
+private fun Screen.label(lang: SheetLang): String = when (this) {
+    Screen.ON -> lang.of("画面点灯時", "Screen on")
+    Screen.OFF -> lang.of("画面消灯時", "Screen off")
+}
+
+private val SCREEN_PREDICATE_RE = Regex("^\\s*screen\\s*=\\s*(on|off)\\s*$", RegexOption.IGNORE_CASE)
+
+/** The screen state a STATE context demands, or null if it is about something else. */
+private fun ContextSpec.screenState(): Screen? {
+    if (type != ContextType.STATE) return null
+    val on = SCREEN_PREDICATE_RE.find(config["predicate"].orEmpty())?.groupValues?.get(1)
+        ?.lowercase()?.let { it == "on" } ?: return null
+    return if (on != invert) Screen.ON else Screen.OFF
+}
+
+/**
+ * The screen states [profile] can fire in: one, if a context pins it, else both. A profile pinned to
+ * both at once (contradictory contexts) can never fire, and is listed under neither.
+ */
+private fun screensOf(profile: Profile): Set<Screen> {
+    val pinned = profile.contexts.mapNotNull { it.screenState() }.toSet()
+    return if (pinned.isEmpty()) Screen.entries.toSet() else if (pinned.size == 1) pinned else emptySet()
+}
 
 private const val ANY_KEY = "*"
 
@@ -61,11 +96,18 @@ private fun triggerOf(profile: Profile): KeyTrigger? {
     return KeyTrigger(keys, presses)
 }
 
-/** Everything that has to hold BESIDES the key press, phrased for a reader. */
-private fun conditionsOf(profile: Profile, lang: SheetLang): List<String> =
+/** One condition a binding needs besides its key press: [body] as 白い熊 wrote it, or its negation. */
+private data class Cond(val body: String, val invert: Boolean)
+
+/**
+ * Everything that has to hold BESIDES the key press. With [dropScreen] the screen condition is left
+ * out, because the box the binding is listed in already says it.
+ */
+private fun conditionsOf(profile: Profile, dropScreen: Boolean): List<Cond> =
     profile.contexts.filterNot {
-        it.type == ContextType.EVENT &&
-            it.config["event"]?.trim()?.lowercase() == HardwareKeyContextEvents.EVENT
+        (it.type == ContextType.EVENT &&
+            it.config["event"]?.trim()?.lowercase() == HardwareKeyContextEvents.EVENT) ||
+            (dropScreen && it.screenState() != null)
     }.map { spec ->
         val body = when (spec.type) {
             // A STATE context is written as a single predicate; print it as 白い熊 wrote it rather
@@ -74,8 +116,11 @@ private fun conditionsOf(profile: Profile, lang: SheetLang): List<String> =
                 ?: contextConfigSummary(spec.copy(invert = false))
             else -> contextConfigSummary(spec.copy(invert = false))
         }
-        if (spec.invert) lang.of("$body でない", "not $body") else body
+        Cond(body, spec.invert)
     }
+
+private fun Cond.phrase(lang: SheetLang): String =
+    if (invert) lang.of("$body でない", "not $body") else body
 
 /** Sort key so an unnamed press or key sinks below the ones with a defined order. */
 private fun orderOf(list: List<Triple<String, String, String>>, value: String): Int =
@@ -83,6 +128,69 @@ private fun orderOf(list: List<Triple<String, String, String>>, value: String): 
 
 private fun labelOf(list: List<Triple<String, String, String>>, value: String, lang: SheetLang): String =
     list.firstOrNull { it.first == value }?.let { lang.of(it.second, it.third) } ?: value
+
+/** [entries] are already in press order; each press is written once with all its bindings. */
+private fun appendPresses(out: StringBuilder, entries: List<Pair<String, Profile>>, lang: SheetLang, dropScreen: Boolean) {
+    for ((press, group) in entries.groupBy({ it.first }, { it.second })) appendPress(out, press, group, lang, dropScreen)
+}
+
+private fun taskOf(profile: Profile): String = profile.enterTaskName.ifBlank { profile.enterTaskId.toString() }
+
+/** The italic line under a binding: which profile to open to change it, and whether it is off. */
+private fun profileNote(profile: Profile, lang: SheetLang): String =
+    if (profile.enabled) profile.name else "${profile.name} ${lang.of("【無効】", "[disabled]")}"
+
+/**
+ * One press type, written ONCE however many bindings it has (白い熊, 2026-10-11: the same press
+ * listed three times read as three different gestures).
+ *
+ * A press with one binding is one line, `**press** → __task__`. A press with several — Vol-Down short
+ * is the 言語島 sentence while capturing, stop-recording while recording, and the plain action
+ * otherwise — becomes the press label alone, then one line per binding led by WHEN it runs. The
+ * binding whose conditions are exactly the negation of all the others' is labelled "otherwise",
+ * which is what it means; one with no conditions at all beside conditional ones runs every time,
+ * alongside whichever of them also matches, and says so.
+ */
+private fun appendPress(
+    out: StringBuilder, press: String, profiles: List<Profile>, lang: SheetLang, dropScreen: Boolean,
+) {
+    val label = if (press == ANY_KEY) lang.of("どの押し方でも", "Any press") else labelOf(PRESS_LABELS, press, lang)
+    val conds = profiles.associateWith { conditionsOf(it, dropScreen) }
+    // Two leading spaces = one further indent step, so a note hangs under the line it belongs to.
+    if (profiles.size == 1) {
+        val profile = profiles.single()
+        out.append("**").append(label).append("** → __").append(taskOf(profile)).append("__\n")
+        val c = conds.getValue(profile)
+        val whenText = if (c.isEmpty()) "" else lang.of("条件：", "only if ") +
+            c.joinToString(lang.of(" かつ ", " and ")) { it.phrase(lang) } + " ・ "
+        out.append("  *").append(whenText).append(profileNote(profile, lang)).append("*\n")
+        return
+    }
+    val positives = conds.values.flatten().filter { !it.invert }.map { it.body }.toSet()
+    fun isOtherwise(c: List<Cond>) =
+        c.isNotEmpty() && c.all { it.invert } && c.map { it.body }.toSet() == positives
+    val ordered = profiles.sortedWith(compareBy({
+        val c = conds.getValue(it)
+        when { isOtherwise(c) -> 2; c.isEmpty() -> 1; else -> 0 }
+    }, { it.name }))
+    out.append("**").append(label).append("**\n")
+    for (profile in ordered) {
+        val c = conds.getValue(profile)
+        val whenText = when {
+            isOtherwise(c) -> lang.of("それ以外", "otherwise")
+            c.isEmpty() -> lang.of("常に（上と併せて）", "always (as well)")
+            else -> lang.of("", "if ") + c.joinToString(lang.of(" かつ ", " and ")) { it.phrase(lang) } +
+                lang.of(" のとき", "")
+        }
+        out.append("  ").append(whenText).append(" → __").append(taskOf(profile)).append("__\n")
+        out.append("    *").append(profileNote(profile, lang)).append("*\n")
+    }
+    // With no catch-all binding, a press that matches none of the conditions does nothing — say it,
+    // or the list reads as if one of the tasks above must run.
+    if (ordered.none { conds.getValue(it).let { c -> c.isEmpty() || isOtherwise(c) } }) {
+        out.append("  ").append(lang.of("それ以外 → 何もしない", "otherwise → nothing")).append('\n')
+    }
+}
 
 /**
  * `Key Bindings` — write a ready-to-show listing of which physical-key gesture runs which task.
@@ -120,29 +228,25 @@ class KeyBindingsAction : Action {
             // One entry per (press, profile). A profile with no press narrower fires on every press,
             // so it is listed once under a heading that says exactly that.
             val entries = forKey.flatMap { (profile, trigger) ->
-                trigger.presses.ifEmpty { listOf(ANY_KEY) }.map { press -> Triple(press, profile, trigger) }
+                trigger.presses.ifEmpty { listOf(ANY_KEY) }.map { press -> press to profile }
             }.sortedWith(compareBy({ orderOf(PRESS_LABELS, it.first) }, { it.second.name }))
-            for ((press, profile, _) in entries) {
-                listed++
-                val task = profile.enterTaskName.ifBlank { profile.enterTaskId.toString() }
-                out.append("**")
-                    .append(
-                        if (press == ANY_KEY) lang.of("どの押し方でも", "Any press")
-                        else labelOf(PRESS_LABELS, press, lang),
-                    )
-                    .append("** → __").append(task).append("__\n")
-                // The second line is where a binding stops being obvious: which profile to open to
-                // change it, what else has to be true, and whether it is switched off at all.
-                // Brackets, not nested `**bold**`: the whole line is one italic run, and the markup
-                // reader takes the outermost `*…*` first, so a bold span inside it would be eaten.
-                val notes = buildList {
-                    add(profile.name)
-                    addAll(conditionsOf(profile, lang))
-                    if (!profile.enabled) add(lang.of("【無効】", "[disabled]"))
+            // Split by screen only where it decides something. A key whose every binding fires either
+            // way would print the same list twice; it stays one list.
+            val split = entries.any { screensOf(it.second).size == 1 }
+            if (!split) {
+                listed += entries.size
+                appendPresses(out, entries, lang, dropScreen = false)
+            } else {
+                // A binding that ignores the screen is a binding in BOTH boxes: each box is the whole
+                // map for that state, so it can be read on its own. It still counts once.
+                listed += entries.size
+                for (screen in Screen.entries) {
+                    val inBox = entries.filter { screen in screensOf(it.second) }
+                    if (inBox.isEmpty()) continue
+                    out.append("::: ").append(screen.label(lang)).append('\n')
+                    appendPresses(out, inBox, lang, dropScreen = true)
+                    out.append(":::\n\n")
                 }
-                // Two leading spaces = one further indent step, so the note hangs under its binding
-                // instead of sitting level with it.
-                out.append("  *").append(notes.joinToString(" ・ ")).append("*\n")
             }
             out.append('\n')
         }
