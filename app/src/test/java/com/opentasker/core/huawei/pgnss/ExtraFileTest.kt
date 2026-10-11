@@ -440,6 +440,25 @@ class ExtraFileTest {
     }
 
     /**
+     * IGN's hourly station files repeat whatever ephemeris a receiver last decoded for a satellite
+     * it no longer hears — a C46 from 2024 among them on 2026-10-11. One such record used to drag
+     * toa back to its week, reject every fit and carry the whole capture there, which put C01 and
+     * C03 8.4° off their stations and refused the build.
+     */
+    @Test
+    fun aRecordFromYearsAgoDoesNotMoveTheToa() {
+        val nav = mapOf(
+            12 to (0..47).map { bdsRecord(12, 1078, 3600.0 + 1800.0 * it, 0.5) },
+            46 to listOf(bdsRecord(46, 963, 3600.0, 0.5)),
+        )
+        val fit = PgnssExtraFile.buildBds(nav, reference, epochAfterTheArc, carryStale = false)
+        assertEquals(1078, fit.week)
+        assertTrue("C12 must still be fitted", 11 in fit.records)
+        assertTrue("residual ${fit.residuals[12]} m", fit.residuals.getValue(12) < 1_000.0)
+        assertFalse("the stale C46 must not be fitted", 45 in fit.records || 46 in fit.rejected)
+    }
+
+    /**
      * Omega has to be formed as `(OmegaDot - OMEGA_E) * tk - OMEGA_E * toa`, which stays continuous
      * as tk grows past a week. The algebraically "equivalent" form using seconds-of-week is NOT
      * equivalent across the roll — OMEGA_E * 604800 is 44.09 rad, not a multiple of 2*pi — and threw
