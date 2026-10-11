@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+031`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+034`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -356,9 +356,9 @@ back to detect-only, which sees the keys without consuming them.
 
 Two bindings in this workspace are invisible by construction. An **edge bar** is a transparent strip whose entire content is its gesture config, and that config has no editor field at all. A **physical-key map** is not a table anywhere — it is spread across one profile per gesture, several of them further qualified by a device state, so reading it means opening eight profiles one at a time.
 
-`scene.gestures` and `key.bindings` read those same rows back out and lay them on a near-fullscreen page: side, then bar, then gesture → task; or key, then press → task, with the condition that picks between two bindings on one press ("Vol-Down short is 録音停止 *while recording*, 下・単押し otherwise") and a mark on any profile switched off. Because the sheet is generated from the rows the gesture detector reads, it cannot disagree with what your finger actually does — and a bar with nothing bound is skipped rather than printed empty.
+`scene.gestures` and `key.bindings` read those same rows back out and lay them on a near-fullscreen page: side, then bar, then gesture → task; or key, then a rounded box for **screen on** and one for **screen off**, then press → task. Each press is written once: where one press runs different tasks in different situations, every task is led by *when* it runs, the catch-all reads "otherwise", and where there is none the sheet says "otherwise → nothing" ("Vol-Down press: 言語島 文 *if capturing*, 録音停止 *if recording*, 下・単押し otherwise"). A switched-off profile is marked. Because the sheet is generated from the rows the gesture detector reads, it cannot disagree with what your finger actually does — and a bar with nothing bound is skipped rather than printed empty.
 
-Showing it made `dialog.text` into a page rather than a paragraph: a `size` that drops the platform's fixed dialog width, **headings, bold, underline, rules and bullets**, an indent cascade taken from the headings themselves so an outline needs no counted spaces, and a `text_scale` for reading at arm's length. The look — accent section headers ruled to the width of their own text, a hairline between sections, an accent rail down each indented block — is the appearance page's own, so a generated sheet looks like the rest of the app. One `lang` argument switches every word the sheet supplies between Japanese and English (your own scene, task and profile names are never touched), so the same map can be read either way on a phone that never changes language.
+Showing it made `dialog.text` into a page rather than a paragraph: a `size` that drops the platform's fixed dialog width, **headings, bold, underline, rules, bullets and titled boxes**, an indent cascade taken from the headings themselves so an outline needs no counted spaces, and a `text_scale` for reading at arm's length. The look — accent section headers ruled to the width of their own text, a hairline between sections, an accent rail down each indented block — is the appearance page's own, so a generated sheet looks like the rest of the app. One `lang` argument switches every word the sheet supplies between Japanese and English (your own scene, task and profile names are never touched), so the same map can be read either way on a phone that never changes language.
 
 ---
 
