@@ -90,6 +90,8 @@ class ShowSceneAction : Action {
         val showWhenLocked = boolArg("showWhenLocked") ?: false
         // keepScreenOn: the overlay window blocks the screen timeout while shown (音楽 buttons).
         val keepScreenOn = boolArg("keepScreenOn") ?: false
+        // stretch: a tap-through card as wide as the screen, re-sized on every fold/rotation (衛星予測 画面).
+        val stretch = boolArg("stretch") ?: false
         if (showWhenLocked) {
             // Over the lockscreen: an Activity with setShowWhenLocked is the path EMUI honours (the
             // accessibility overlay sits UNDER the keyguard there, and FLAG_SHOW_WHEN_LOCKED on it is
@@ -106,7 +108,7 @@ class ShowSceneAction : Action {
             ctx.app.startActivity(intent)
             ctx.logger("Show scene \"${scene.name}\" over lockscreen (Activity)")
         } else if (SceneOverlayManager.canOverlay(ctx.app)) {
-            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter, insetDp, heightFraction, vAlign, widthFraction, hAlign, showWhenLocked, keepScreenOn)
+            SceneOverlayManager.show(ctx.app, scene, position, modal, timeoutMs, dismissOnOutside, fullWidth, fullscreen, edgeCenter, insetDp, heightFraction, vAlign, widthFraction, hAlign, showWhenLocked, keepScreenOn, stretch)
             ctx.logger("Show scene \"${scene.name}\" (overlay, ${if (modal) "modal" else "tap-through"})")
         } else {
             val intent = Intent(ctx.app, SceneActivity::class.java).apply {
