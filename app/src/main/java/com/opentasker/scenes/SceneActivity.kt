@@ -328,6 +328,7 @@ internal fun SceneOverlay(
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
     fillWidth: Boolean = false,
+    stretch: Boolean = false,
     onDismiss: () -> Unit,
     onRunTask: (String) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -354,7 +355,7 @@ internal fun SceneOverlay(
     } else {
         SceneCard(
             scene, scale = 1f, absorbTaps = false, fullWidth = fullWidth, fullscreen = fullscreen,
-            fillHeight = fillHeight, fillWidth = fillWidth,
+            fillHeight = fillHeight, fillWidth = fillWidth, stretch = stretch,
             // A tap-through panel's WINDOW is routinely far larger than anything it draws: fullWidth
             // stretches it to the whole screen (音量パネル's five sliders are right-anchored inside it,
             // so most of that width is empty), fillHeight/fillWidth to a screen fraction, and a HUD's
@@ -378,6 +379,7 @@ private fun SceneCard(
     fullscreen: Boolean = false,
     fillHeight: Boolean = false,
     fillWidth: Boolean = false,
+    stretch: Boolean = false,
     onBackgroundTap: (() -> Unit)? = null,
     onRunTask: (String) -> Unit,
     onSetVar: (sceneProjectId: Long?, name: String, value: String) -> Unit,
@@ -398,6 +400,9 @@ private fun SceneCard(
                 else if (fillHeight) Modifier.width((sw * scale).dp).fillMaxHeight()
                 // fillWidth (a bottom edge strip): keep the configured height, fill the fraction-width window.
                 else if (fillWidth) Modifier.fillMaxWidth().height((sh * scale).dp)
+                // stretch: the window's size — the screen's width less a margin, and the configured
+                // height or as much of it as fits.
+                else if (stretch) Modifier.fillMaxSize()
                 else Modifier.size((sw * scale).dp, (sh * scale).dp),
             )
             .clip(shape)
@@ -418,6 +423,12 @@ private fun SceneCard(
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val cardWidthDp = maxWidth.value  // the card's actual width in dp (= the real screen width when fullWidth)
+            // A stretched card carries every element with it: x and width scale by how much wider the
+            // card came out than the scene was drawn, y and height by how much shorter (when the
+            // screen could not hold its full height). Text keeps its size, so a layout drawn for the
+            // folded panel simply gets more room across and gives a little up down.
+            val hx = if (stretch) cardWidthDp / (sw * scale) else 1f
+            val vy = if (stretch) minOf(1f, maxHeight.value / (sh * scale)) else 1f
             scene.elements.forEach { element ->
                 // `xr` = the element's LEFT x measured from the card's RIGHT edge (right-anchored). Lets a
                 // fixed-width cluster hug the right of a full-width card, so it FILLS a folded screen and sits
@@ -437,14 +448,14 @@ private fun SceneCard(
                         }
                     }
                     xr != null -> (cardWidthDp - xr)
-                    else -> (element.xDp * scale)
+                    else -> (element.xDp * scale * hx)
                 }
                 // widthDp/heightDp <= 0 means "fill the card" — lets an element span a full-width bar scene.
                 Box(
                     Modifier
-                        .offset(xOffDp.dp, (element.yDp * scale).dp)
-                        .then(if (element.widthDp > 0) Modifier.width((element.widthDp * scale).dp) else Modifier.fillMaxWidth())
-                        .then(if (element.heightDp > 0) Modifier.height((element.heightDp * scale).dp) else Modifier.fillMaxHeight()),
+                        .offset(xOffDp.dp, (element.yDp * scale * vy).dp)
+                        .then(if (element.widthDp > 0) Modifier.width((element.widthDp * scale * hx).dp) else Modifier.fillMaxWidth())
+                        .then(if (element.heightDp > 0) Modifier.height((element.heightDp * scale * vy).dp) else Modifier.fillMaxHeight()),
                 ) {
                     SceneElementView(element, onRunTask) { name, value -> onSetVar(scene.projectId, name, value) }
                 }
@@ -1009,13 +1020,14 @@ internal fun SceneElementView(
             // config (newline-separated name=value, value %var-expanded) is injected as window.<name>
             // JS globals, so a settings task can tune the animation. Tap-through via pointer-events:none.
             val rawHtml = cfg["html"] ?: ""
-            val inject = (cfg["vars"] ?: "").lineSequence().mapNotNull { line ->
+            val bound = (cfg["vars"] ?: "").lineSequence().mapNotNull { line ->
                 val eq = line.indexOf('=')
                 if (eq <= 0) return@mapNotNull null
                 val name = line.substring(0, eq).trim()
-                val value = expandAgainstGlobals(line.substring(eq + 1).trim())
-                if (name.isEmpty() || value.isEmpty()) null else "window.$name=${jsString(value)};"
-            }.joinToString("")
+                if (name.isEmpty()) null else name to expandAgainstGlobals(line.substring(eq + 1).trim())
+            }.toList()
+            val inject = bound.filter { it.second.isNotEmpty() }
+                .joinToString("") { (name, value) -> "window.${name}=${jsString(value)};" }
             val html = when {
                 inject.isEmpty() -> rawHtml
                 rawHtml.contains("</head>", ignoreCase = true) ->
@@ -1049,6 +1061,12 @@ internal fun SceneElementView(
                         // Variables are set BEFORE the task starts so it can read them as ordinary
                         // globals — the same contract a scene button has, plus arguments.
                         webViewClient = object : android.webkit.WebViewClient() {
+                            override fun onPageFinished(view: android.webkit.WebView, url: String?) {
+                                val page = view.tag as? WebPage ?: return
+                                page.loaded = true
+                                page.push(view)
+                            }
+
                             override fun shouldOverrideUrlLoading(
                                 view: android.webkit.WebView,
                                 request: android.webkit.WebResourceRequest,
@@ -1075,9 +1093,21 @@ internal fun SceneElementView(
                     }
                 },
                 update = { wv ->
-                    if (wv.tag != html) {
-                        wv.tag = html
+                    // A variable change used to RELOAD the page, which put it back at the top every time
+                    // one changed — a build writing its progress several times a second made the 衛星予測
+                    // panel impossible to scroll (白い熊, 2026-10-11). A page that defines
+                    // `window.__sceneVarsChanged` now gets the new values set in place and that hook
+                    // called instead; a page without it is reloaded exactly as before. Empty values are
+                    // set as "" here (a reload omits them), so a cleared variable reads as cleared.
+                    val old = wv.tag as? WebPage
+                    if (old == null || old.raw != rawHtml) {
+                        wv.tag = WebPage(rawHtml, html)
                         wv.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                    } else if (old.wanted != html) {
+                        old.wanted = html
+                        old.assign = bound.joinToString("") { (name, value) -> "window.${name}=${jsString(value)};" }
+                        // Still loading: onPageFinished pushes whatever is wanted by then.
+                        if (old.loaded) old.push(wv)
                     }
                     // Only scenes that opt in are gated on the screen; every other WEB scene is left exactly
                     // as before (no onPause/onResume, no JS injected — so 通知明滅 keeps drawing over the lock).
@@ -1096,6 +1126,34 @@ internal fun SceneElementView(
 
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(element.type.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * What a scene WebView last loaded: the page itself, the page with its variables injected, and
+ * whether it has finished loading — only then can new values be set in place rather than reloaded.
+ */
+private class WebPage(val raw: String, private val loadedHtml: String) {
+    var loaded = false
+    /** The page with the CURRENT values injected, and the same values as assignments. */
+    var wanted = loadedHtml
+    var assign = ""
+    private var shown = loadedHtml
+
+    /** Bring the loaded page up to [wanted]: in place through the page's hook, or by a reload. */
+    fun push(wv: android.webkit.WebView) {
+        if (wanted == shown) return
+        val target = wanted
+        shown = target
+        wv.evaluateJavascript(
+            "(function(){if(typeof window.__sceneVarsChanged!=='function')return false;" +
+                assign + "window.__sceneVarsChanged();return true;})()",
+        ) { handled ->
+            if (handled != "true" && wv.tag === this) {
+                wv.tag = WebPage(raw, target)
+                wv.loadDataWithBaseURL(null, target, "text/html", "utf-8", null)
+            }
         }
     }
 }

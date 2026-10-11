@@ -68,6 +68,9 @@ object SceneOverlayManager {
      */
     private const val PASS_THROUGH_ALPHA = 0.8f
 
+    /** The gap a stretched card leaves at each side of the screen, so its border stays visible. */
+    private const val STRETCH_MARGIN_DP = 8
+
     /** Names of the scenes currently displayed as overlays — what's actually on screen right now. */
     fun shownSceneNames(): List<String> = ArrayList(shownNames.values)
 
@@ -83,6 +86,12 @@ object SceneOverlayManager {
         val heightFraction: Float = 0f,
         val widthFraction: Float = 0f,
         val timeoutMs: Long = 0L,
+        /**
+         * A stretched card: its width follows the screen, less this margin on each side, and its height
+         * is the scene's own unless that does not fit. 0 = not stretched.
+         */
+        val stretchMarginPx: Int = 0,
+        val stretchHeightPx: Int = 0,
         /**
          * Re-runs the original [show] call, verbatim. Non-null only when the window is hosted by the
          * accessibility service — the one host that can take our windows away without telling us.
@@ -108,6 +117,28 @@ object SceneOverlayManager {
     private fun realMetrics(wm: WindowManager): android.util.DisplayMetrics =
         android.util.DisplayMetrics().also { @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(it) }
 
+    /**
+     * The height a window may use without running under the status bar or off the bottom.
+     *
+     * A stretched card keeps the scene's height only while that fits: the 884 dp 衛星予測 画面 is
+     * 2154 px on a 2232 px screen, and placed below the status bar its bottom border and Close button
+     * ran off the screen (白い熊, 2026-10-11).
+     */
+    private fun usableHeight(wm: WindowManager, real: android.util.DisplayMetrics): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                val m = wm.currentWindowMetrics
+                val ins = m.windowInsets.getInsetsIgnoringVisibility(
+                    android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout(),
+                )
+                return m.bounds.height() - ins.top - ins.bottom
+            }
+        }
+        val app = appContext ?: return real.heightPixels
+        val id = app.resources.getIdentifier("status_bar_height", "dimen", "android")
+        return real.heightPixels - (if (id > 0) app.resources.getDimensionPixelSize(id) else 0)
+    }
+
     private fun resizeDynamicOverlays() {
         val ctx = appContext ?: return
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -124,6 +155,16 @@ object SceneOverlayManager {
                 ov.heightFraction > 0f -> {
                     val h = (ov.heightFraction * real.heightPixels).toInt()
                     if (ov.params.height != h) { ov.params.height = h; runCatching { ov.wm.updateViewLayout(ov.view, ov.params) } }
+                }
+                // A stretched card takes the new screen width, less its margins.
+                ov.stretchMarginPx > 0 -> {
+                    val w = real.widthPixels - 2 * ov.stretchMarginPx
+                    val h = minOf(ov.stretchHeightPx, usableHeight(ov.wm, real) - 2 * ov.stretchMarginPx)
+                    if (ov.params.width != w || ov.params.height != h) {
+                        ov.params.width = w
+                        ov.params.height = h
+                        runCatching { ov.wm.updateViewLayout(ov.view, ov.params) }
+                    }
                 }
                 // A fraction-width (bottom) strip re-sizes to its fraction of the new screen width.
                 ov.widthFraction > 0f -> {
@@ -156,7 +197,7 @@ object SceneOverlayManager {
      * card and placed by [position] ("top"/"center"/"bottom"). [timeoutMs] > 0 auto-dismisses.
      * Safe to call from any thread.
      */
-    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null, widthFraction: Float = 0f, hAlign: String? = null, showWhenLocked: Boolean = false, keepScreenOn: Boolean = false) {
+    fun show(context: Context, scene: Scene, position: String? = null, modal: Boolean = true, timeoutMs: Long = 0L, dismissOnOutside: Boolean = true, fullWidth: Boolean = false, fullscreen: Boolean = false, edgeCenter: Boolean = false, insetDp: Int = 0, heightFraction: Float = 0f, vAlign: String? = null, widthFraction: Float = 0f, hAlign: String? = null, showWhenLocked: Boolean = false, keepScreenOn: Boolean = false, stretch: Boolean = false) {
         val app = context.applicationContext
         main.post {
             appContext = app
@@ -223,6 +264,7 @@ object SceneOverlayManager {
                             fullscreen = fullscreen,
                             fillHeight = heightFraction > 0f,
                             fillWidth = widthFraction > 0f,
+                            stretch = stretch,
                             onDismiss = { hide(scene.id) },
                             onRunTask = { ref -> runTask(ref, scene.projectId) },
                             onSetVar = ::setVar,
@@ -235,6 +277,11 @@ object SceneOverlayManager {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 else -> @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
             }
+            // stretch: the card is as wide as the screen whatever fold state it is in — the scene's
+            // widthDp was drawn for the folded cover panel and left half of a part-unfolded screen
+            // empty (衛星予測 画面, 白い熊, 2026-10-11). Re-sized on every display change.
+            val stretchMarginPx = if (stretch && !modal && !fullscreen && !fullWidth && widthFraction <= 0f)
+                (STRETCH_MARGIN_DP * app.resources.displayMetrics.density).toInt() else 0
             val params = if (modal) {
                 // Full-screen, focusable: the scrim blocks the app underneath; the card is placed by
                 // the composable's [position] alignment. Focusable (no FLAG_NOT_FOCUSABLE) + ADJUST_RESIZE
@@ -296,11 +343,13 @@ object SceneOverlayManager {
                         fullscreen -> real.widthPixels
                         fullWidth -> WindowManager.LayoutParams.MATCH_PARENT
                         widthFraction > 0f -> (widthFraction * real.widthPixels).toInt()
+                        stretchMarginPx > 0 -> real.widthPixels - 2 * stretchMarginPx
                         else -> cardW
                     },
                     when {
                         fullscreen -> real.heightPixels
                         heightFraction > 0f -> (heightFraction * real.heightPixels).toInt()
+                        stretchMarginPx > 0 -> minOf(cardH, usableHeight(wm, real) - 2 * stretchMarginPx)
                         else -> cardH
                     },
                     type,
@@ -393,17 +442,19 @@ object SceneOverlayManager {
                         dismissOnOutside = dismissOnOutside, fullWidth = fullWidth, fullscreen = fullscreen,
                         edgeCenter = edgeCenter, insetDp = insetDp, heightFraction = heightFraction, vAlign = vAlign,
                         widthFraction = widthFraction, hAlign = hAlign, showWhenLocked = showWhenLocked,
-                        keepScreenOn = keepScreenOn,
+                        keepScreenOn = keepScreenOn, stretch = stretch,
                     )
                 }
             }
             runCatching { wm.addView(composeView, params) }
                 .onSuccess {
                     owner.onResume()
-                    val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs, respawn)
+                    val overlay = Overlay(composeView, owner, params, wm, fullscreen, heightFraction, widthFraction, timeoutMs, stretchMarginPx = stretchMarginPx,
+                        stretchHeightPx = (scene.heightDp.coerceAtLeast(1) * app.resources.displayMetrics.density).toInt(),
+                        respawn = respawn)
                     active[scene.id] = overlay
                     shownNames[scene.id] = scene.name
-                    if (fullscreen || heightFraction > 0f || widthFraction > 0f) ensureDisplayListener(app)
+                    if (fullscreen || heightFraction > 0f || widthFraction > 0f || stretchMarginPx > 0) ensureDisplayListener(app)
                     // Exclude the strip's whole area from the system edge gestures (back swipe, and on
                     // devices that honour it the bottom home/recents swipe) so the slide reaches the
                     // overlay instead of triggering the system gesture. Applied on every layout — a
