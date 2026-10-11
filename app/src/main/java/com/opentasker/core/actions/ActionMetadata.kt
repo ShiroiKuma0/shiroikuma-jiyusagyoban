@@ -1723,6 +1723,7 @@ fun registerActionMetadata() {
                 ActionField("widthFraction", "Width fraction", hint = "bottom edge strip: 0–1 of the screen width. Blank = wrap the scene"),
                 ActionField("hAlign", "Horizontal third", FieldType.DROPDOWN, hint = "bottom bar only: which side it sits on (default centre)", options = listOf("left", "center", "right")),
                 ActionField("fullWidth", "Full width", FieldType.CHECKBOX, hint = "span the whole screen width over the status bar, keeping the scene's height (the battery line / clock strip)"),
+                ActionField("stretch", "Stretch to screen width", FieldType.CHECKBOX, hint = "tap-through only: widen the card to the screen in every fold state, keeping its height — elements stretch sideways with it, text keeps its size"),
                 ActionField("fullscreen", "Fullscreen", FieldType.CHECKBOX, hint = "cover the whole screen and pass every touch through — a purely visual overlay (the music edge light)"),
                 ActionField("edgeCenter", "Centre vertically (legacy)", FieldType.CHECKBOX, hint = "left/right only: sit at the vertical centre instead of the media-HUD drop. Superseded by Vertical centre"),
                 ActionField("showWhenLocked", "Show over lockscreen", FieldType.CHECKBOX, hint = "render over the lockscreen without unlocking, waking the screen (shown as an Activity, so it covers the screen)"),
