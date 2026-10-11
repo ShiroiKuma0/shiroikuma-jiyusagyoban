@@ -125,6 +125,28 @@ class BdsGroupDelayTest {
         assertEquals(1, partial['E'])
         assertEquals(null, partial['G'])
     }
+
+    /**
+     * IGN's hourly station files repeat records a receiver decoded long ago — a C46 from 2024 on
+     * 2026-10-11. A satellite with a current record takes the current group delay, and one with only
+     * a stale record takes none, so the capture's value stands for it instead.
+     */
+    @Test
+    fun `a record from years ago gives no group delay`() {
+        val nav = Almanac.parseRinexBds(String(PgnssFixtures.bytes("e2e-brdc.rnx"), Charsets.ISO_8859_1))
+        val (prn, records) = nav.entries.first { it.value.isNotEmpty() }
+        val now = records.maxBy { it.toeAbs }
+        val week = 604800.0
+        val stale = now.copy(week = now.week - 120, toeAbs = now.toeAbs - 120 * week, tgd1 = 9e-9)
+        val tails = Records.bdsTails(
+            mapOf(
+                prn to records + now.copy(toeAbs = now.toeAbs - 2 * week, week = now.week - 2, tgd1 = 8e-9),
+                46 to listOf(stale.copy(prn = 46)),
+            ),
+        )
+        assertEquals("the current record's group delay", Math.round(now.tgd1 * 1e10).toInt(), counts(tails.getValue(prn - 1)))
+        assertFalse("C46 has only a 2024 record and must get none", 45 in tails)
+    }
 }
 
 /**
