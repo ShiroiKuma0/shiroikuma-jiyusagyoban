@@ -333,7 +333,7 @@ object PgnssExtraFile {
      *   EXTRAPOLATION of somebody else's stale almanac, not an independent source.
      */
     fun buildBds(
-        nav: Map<Int, List<BdsNavRecord>>,
+        allNav: Map<Int, List<BdsNavRecord>>,
         reference: ByteArray,
         epochGps: Long,
         carryStale: Boolean = true,
@@ -342,6 +342,17 @@ object PgnssExtraFile {
         val gpsSow = Math.floorMod(epochGps, 604800L)
         val gpsWeek = Math.floorDiv(epochGps, 604800L)
         val epochBdt = (gpsWeek - BDS_WEEK_OFFSET) * 604800L + gpsSow - BDS_SECOND_OFFSET
+
+        // Only records from around the build. A merged BRDC holds the day it names, but IGN's
+        // hourly STATION files also repeat whatever ephemeris each receiver last decoded for a
+        // satellite it no longer hears — on 2026-10-11 that was C46 from week 963 (2024) and C05 /
+        // C16 from April. One such record dragged the centre below months back, toa landed there,
+        // no satellite had a broadcast record within two hours of it, every fit was rejected, and
+        // every slot was carried from the 2026-08-25 capture to a toa years before the capture —
+        // which put C01 and C03 8.4° west of their stations and the build was refused.
+        val nav = allNav.mapValues { (_, rs) ->
+            rs.filter { it.toeAbs in (epochBdt - BDS_NAV_BEFORE_S)..(epochBdt + BDS_NAV_AFTER_S) }
+        }.filterValues { it.isNotEmpty() }
 
         // Place toa inside the arc the broadcast data actually covers. A freshly published RINEX day
         // holds only the hours already elapsed, so toa normally lands a few hours before the validity
@@ -509,6 +520,15 @@ object PgnssExtraFile {
      * we are reproducing. The fault it exists to catch was 27.6°.
      */
     const val MAX_GEO_OFFSET_DEG = 5.0
+
+    /**
+     * How far before the build a broadcast record may lie and still be fitted: the fetch asks for
+     * three days of merged files, so four days covers all of them with the epoch's own hours spare.
+     */
+    private const val BDS_NAV_BEFORE_S = 4 * 86400.0
+
+    /** And after it — a record cannot be issued in the future, so a day is only clock slack. */
+    private const val BDS_NAV_AFTER_S = 86400.0
 
     /** Galileo publishes sqrtA as an offset from this. */
     private const val GALILEO_SQRT_A = 5440.588203
