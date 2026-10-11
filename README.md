@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+028`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+031`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -218,6 +218,8 @@ Everything links by **name**, not by fragile ids: `scene.show`/`scene.hide` reso
 
 ### 🔥 Living overlays — the charging fire
 Scene overlays that are genuinely alive, and free when you can't see them. The **battery line** bursts into a **charging fire**: two red comets glide in from the ends, collide mid-line in a bloom, and breathe back out — red star-glints twinkling at the tips, embers spraying and raining below the line, and a lingering "residual fire" trail where a comet just passed. Everything is strictly **screen-off gated**: overlays stop computing the instant the display goes dark (opt-in per scene, so over-lockscreen effects keep working).
+
+A panel can also **follow the fold**: *Stretch to screen width* gives a tap-through card the full width of whichever screen the Mate XT is showing, re-sized as it folds and unfolds, and shrinks it to fit when the screen is shorter than the scene. HTML panels take new variable values **in place** instead of reloading, so a panel showing a running job stays exactly where it was scrolled.
 
 ### 🎵 白い熊 音楽 — the music-player pairing
 The `音楽端灯` project pairs the workspace with the **白い熊 音楽** player (`shiroikuma.ongaku`, the Felicity fork) through a clean two-way contract: the player broadcasts **play-state and track changes** (title, artist, path, favorite) into `%INTENT_*` variables, and overlay **良 / 削除 buttons** — shown only while the player is foreground and playing — fire its **automation intents**: toggle-favorite, and a **confirmed delete** (song title + artist in the dialog) that lets the player itself skip, SAF-delete the file, and clean its library. Named **play-playlist tasks** (start playlist X, optionally at track Y) work from home-screen shortcuts. The audio-reactive **edge meteors that used to live here now render natively inside 白い熊 音楽** — beat-locked from the player's own decoder tap (sample-accurate, works under Android Auto and Bluetooth offload) — so this app no longer holds an audio `Visualizer` at all, and playback audio offload is never blocked.
