@@ -8,6 +8,40 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+031 — 2026-10-11
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+028`.
+
+### Satellite update — the build no longer refuses itself
+
+- **A satellite set builds again when BKG's server is down.** With BKG's FTP host out (2026-10-11,
+  "530 Host is down") the build took today's broadcast ephemeris from IGN's hourly station files, and
+  those also repeat records a receiver decoded long ago for satellites it no longer hears — a C46 from
+  2024, a C05 and C16 from April. One such record dragged the BeiDou almanac's reference time months
+  back, every fit was rejected, every satellite was carried from the old capture, and the build refused
+  its own result: *"the almanac puts geostationary satellites off their stations — C01 is −8.4° from
+  140.00°E, C03 is −8.4° from 110.50°E"*. The almanac fit now uses only records from four days before
+  the build to one day after it; reproduced on the PC from the same files, every geostationary is back
+  within 0.15° of its station.
+- **BeiDou group delays come from each satellite's newest broadcast record**, and only from records
+  within four days of the newest in the files. They used to come from the oldest, which across station
+  files could be two years old; a satellite with nothing current now keeps the value from Huawei's
+  captured set instead.
+
+### Scenes
+
+- **The 衛星予測 panel stays where it is scrolled.** A page in a WEB scene element used to be reloaded
+  whenever one of its variables changed, so a running build — writing its progress several times a
+  second — put the panel back at the top before it could be read. A page can now take new values in
+  place (it defines `window.__sceneVarsChanged`, which the app calls after setting them); a page that
+  does not is reloaded exactly as before.
+- **Show Scene: "Stretch to screen width".** A tap-through card can take the whole width of the screen
+  (less 8 dp a side) in every fold state, re-sized on each fold and rotation, and its height shrinks to
+  fit between the status bar and the bottom when the scene is taller than the screen allows. Elements
+  widen and, if needed, compress with the card; text keeps its size. The satellite panel uses it: on a
+  part-unfolded Mate XT it is 2010 px wide instead of 926, and its Close button no longer runs off the
+  bottom.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+028 — 2026-10-04
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+024`.
