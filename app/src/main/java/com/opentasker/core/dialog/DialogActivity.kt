@@ -494,6 +494,7 @@ private fun DialogSize.surfaceModifier(): Modifier = when (this) {
  *
  *   `# text`   title      `## text` section (underlined)   `### text` / `#### text` sub-headings
  *   `- text`   bullet     `---`     horizontal rule
+ *   `::: text` … `:::`   a rounded box titled `text` around the lines between (one level, no nesting)
  *   inline: `**bold**`, `__underline__`, `*italic*`
  *
  * A line that matches nothing is body text, so plain text stays plain.
@@ -510,15 +511,51 @@ private sealed interface MarkupBlock {
     data class Body(val text: String, val extraIndent: Int) : MarkupBlock
     data object Rule : MarkupBlock
     data object Blank : MarkupBlock
+    /** A titled, bordered group — e.g. the screen-on and screen-off halves of one key in `key.bindings`. */
+    data class Boxed(val title: String, val lines: List<MarkupBlock>) : MarkupBlock
 }
 
-private fun parseMarkup(text: String): List<MarkupBlock> = text.lines().map { raw ->
+private const val BOX_FENCE = ":::"
+
+/**
+ * Lines, with every `::: title` … `:::` span folded into one [MarkupBlock.Boxed]. An unclosed box runs
+ * to the end of the text rather than swallowing its title as body text.
+ */
+private fun parseMarkup(text: String): List<MarkupBlock> {
+    val out = mutableListOf<MarkupBlock>()
+    var boxTitle: String? = null
+    val boxLines = mutableListOf<MarkupBlock>()
+    fun closeBox() {
+        val title = boxTitle ?: return
+        while (boxLines.lastOrNull() == MarkupBlock.Blank) boxLines.removeAt(boxLines.size - 1)
+        while (boxLines.firstOrNull() == MarkupBlock.Blank) boxLines.removeAt(0)
+        out += MarkupBlock.Boxed(title, boxLines.toList())
+        boxLines.clear()
+        boxTitle = null
+    }
+    for (raw in text.lines()) {
+        val trimmed = raw.trim()
+        when {
+            trimmed == BOX_FENCE -> closeBox()
+            trimmed.startsWith("$BOX_FENCE ") -> {
+                closeBox()
+                boxTitle = trimmed.removePrefix(BOX_FENCE).trim()
+            }
+            boxTitle != null -> boxLines += parseMarkupLine(raw)
+            else -> out += parseMarkupLine(raw)
+        }
+    }
+    closeBox()
+    return out
+}
+
+private fun parseMarkupLine(raw: String): MarkupBlock {
     val line = raw.trimEnd()
     val trimmed = line.trim()
     // Leading whitespace is an explicit extra step (2 spaces = 1 step); a tab counts as one step.
     val lead = line.takeWhile { it == ' ' || it == '\t' }
     val extra = lead.count { it == '\t' } + lead.count { it == ' ' } / 2
-    when {
+    return when {
         trimmed.isEmpty() -> MarkupBlock.Blank
         trimmed.length >= 3 && trimmed.all { it == '-' } -> MarkupBlock.Rule
         trimmed.startsWith("#### ") -> MarkupBlock.Heading(4, trimmed.removePrefix("#### "))
@@ -528,6 +565,22 @@ private fun parseMarkup(text: String): List<MarkupBlock> = text.lines().map { ra
         trimmed.startsWith("- ") -> MarkupBlock.Bullet(trimmed.removePrefix("- "), extra)
         else -> MarkupBlock.Body(trimmed, extra)
     }
+}
+
+/**
+ * Some fonts on the phone have no italic form of the katakana middle dot, and the synthesised slant
+ * falls back to a font without the glyph at all — every ` ・ ` in an italic note drew as a NO GLYPH
+ * box (白い熊's key list, 2026-10-11). Inside an italic run, the dot is set upright.
+ */
+private fun AnnotatedString.Builder.appendItalic(text: String) {
+    var last = 0
+    for ((i, c) in text.withIndex()) {
+        if (c != '・') continue
+        if (i > last) withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(text.substring(last, i)) }
+        append(c)
+        last = i + 1
+    }
+    if (last < text.length) withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(text.substring(last)) }
 }
 
 // Ordered alternation: `**` is tried before `*`, so bold never decays into two italics.
@@ -545,7 +598,7 @@ private fun inlineSpans(text: String): AnnotatedString {
                 bold.isNotEmpty() -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(bold) }
                 underline.isNotEmpty() ->
                     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(underline) }
-                else -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(m.groupValues[3]) }
+                else -> appendItalic(m.groupValues[3])
             }
             last = m.range.last + 1
         }
@@ -600,12 +653,17 @@ internal fun MarkupBody(text: String, scale: Float) {
                     Spacer(Modifier.height(9.dp * scale))
                     index++
                 }
+                is MarkupBlock.Boxed -> {
+                    MarkupBox(block, depth, scale)
+                    index++
+                }
                 else -> {
                     // Take the whole run of content belonging to this heading in one go, so the rail
                     // beside it is one continuous line rather than one stub per row.
                     val run = mutableListOf<MarkupBlock>()
                     while (index < blocks.size &&
                         blocks[index] !is MarkupBlock.Heading &&
+                        blocks[index] !is MarkupBlock.Boxed &&
                         blocks[index] != MarkupBlock.Rule
                     ) {
                         run += blocks[index]
@@ -697,6 +755,33 @@ private fun MarkupRun(run: List<MarkupBlock>, depth: Int, scale: Float) {
         )
         Spacer(Modifier.width(step - 2.dp))
         Column(Modifier.weight(1f)) { MarkupLines(run, scale) }
+    }
+}
+
+/**
+ * A `::: title` group: the dialog's own rounded accent border, drawn smaller, around its lines. It
+ * stands where the heading's content would start, so two boxes under one `##` read as the two halves
+ * of that section; its lines hang one step in from the box title, as content hangs under a heading.
+ */
+@Composable
+private fun MarkupBox(box: MarkupBlock.Boxed, depth: Int, scale: Float) {
+    val step = indentStep(scale)
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = step * (depth - 2).coerceAtLeast(0), top = 4.dp, bottom = 6.dp)
+            .border(1.5.dp, MaterialTheme.colorScheme.primary, shape)
+            .padding(horizontal = 12.dp * scale, vertical = 8.dp * scale),
+    ) {
+        Text(
+            inlineSpans(box.title),
+            style = MaterialTheme.typography.titleSmall.scaledBy(scale),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        Column(Modifier.fillMaxWidth().padding(start = step)) { MarkupLines(box.lines, scale) }
     }
 }
 
