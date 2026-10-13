@@ -29,8 +29,10 @@ codes are decoded via that dir's `.claude/skills/tasker-action-codes/references/
 A version-controlled **exploded** mirror of the whole 白い熊 自由作業盤 workspace lives at
 `~/〇/[666] 私資料/[666][60792] 白い熊 自由作業盤` — one JSON per task/profile/scene/widget-template,
 grouped by project (`<project>/{tasks,profiles,scenes}/`, `_widgets/`, `_orphans/`, `_globals/`). Consult
-the per-item JSON directly instead of asking 白い熊 to screenshot. Rebuild it from a fresh full export with
-`scripts/explode.py`. Canonical procedure: **`.claude/skills/workspace-mirror/SKILL.md`**.
+the per-item JSON directly instead of asking 白い熊 to screenshot. Since 2026-10-13 it also holds the app's
+internal data under `data/` (健康, 言語島, maps, fonts, icons, the satellite capture): “export all” is the
+`EXPORT_DATA` backup ZIP → `scripts/explode-data.py` (both halves) → commit; `scripts/implode.py` rebuilds an
+importable ZIP from any commit. The repo has no remote, ever. Canonical procedure: **`.claude/skills/workspace-mirror/SKILL.md`**.
 
 ## Fork workflow — READ THIS FIRST
 
