@@ -16,6 +16,10 @@ repo's own `README.md`. In short:
 - `_orphans/{tasks,profiles,scenes}/…` — Unfiled items (no projectId)
 - `_globals/{bundle,variables,groups,item-meta}.json` — top-level meta + UI metadata
 - `scripts/explode.py` — the exploder (full-export JSON → this tree)
+- `data/` — **everything else the app keeps** (2026-10-13): 健康 ratings/notes/measurements/workouts/
+  map cutouts/band settings and pairing, 言語島 islands/sentences/history/audio, fonts, icons, the
+  satellite capture. Built by `scripts/explode-data.py` from the backup ZIP; `scripts/implode.py`
+  rebuilds an importable ZIP from any commit. Layout in the repo README. The repo never gets a remote.
 
 Filenames are only handles (`/`→`／`, empty→`_anon-<id>`); the authoritative name is the JSON `"name"`.
 Each per-item file is the bundle's object **verbatim**.
@@ -30,6 +34,13 @@ calls UNSANDBOXED.
 # EXPORT the whole workspace → /sdcard/tmp/白い熊 自由作業盤.<stamp>.json (path echoed in data=)
 adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
   -a shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1"
+
+# EXPORT EVERYTHING — the full category backup ZIP (workspace + all app data) → /sdcard/tmp/<name>.zip.
+# Written as <name>.zip.part and renamed when complete; data= is "<path>|<bytes>". A long export may
+# answer "still running" — then wait for the .zip (never the .part) before pulling.
+adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
+  -a shiroikuma.jiyusagyoban.action.EXPORT_DATA --ei shiroikuma.jiyusagyoban.extra.PROTOCOL 1 \
+  --es shiroikuma.jiyusagyoban.extra.PATH shiroikuma-jiyusagyoban_$(date +%Y-%m-%d_%H-%M-%S).zip"
 
 # IMPORT a bundle JSON (bare filename resolves against /sdcard/tmp; overwrite-in-place, merge projects)
 adb shell "am broadcast -n shiroikuma.jiyusagyoban/com.opentasker.core.transfer.WorkspaceTransferReceiver \
@@ -79,7 +90,20 @@ So the standard dev cycle is fully hands-off:
 
 ## When to use
 
-### Fresh full export (broadcast bridge, or 白い熊 hands one over)
+### “Export all” — workspace AND data (since 2026-10-13, +045)
+EXPORT_DATA → `adb pull` the ZIP into `.scratch/` → `adb shell rm` the phone copy → one script
+explodes both halves (it calls `explode.py` on the ZIP's `workspace.json`) → commit:
+```bash
+D="$HOME/〇/[666] 私資料/[666][60792] 白い熊 自由作業盤"
+python3 "$D/scripts/explode-data.py" .scratch/shiroikuma-jiyusagyoban_<stamp>.zip
+git -C "$D" add -A
+git -C "$D" -c user.name="白い熊" commit -m "Sync export <appVersion> (<YYYY-MM-DD>)"
+```
+One ZIP, so the workspace and the data are the same moment. `gnss/almanac/` (a downloaded cache) is
+left out of git on purpose. To prove a restore path: `python3 "$D/scripts/implode.py" out.zip --verify
+<the pulled zip>` must report 0 problems.
+
+### Workspace-only export (broadcast bridge, or 白い熊 hands one over)
 Get the export (EXPORT_WORKSPACE + `adb pull` as above, or 白い熊's manual `Setup → Export` into
 `~/tmp/`). Re-explode + commit:
 ```bash
@@ -88,7 +112,7 @@ python3 "$D/scripts/explode.py" <export.json>   # or no arg: newest ~/tmp export
 git -C "$D" add -A
 git -C "$D" -c user.name="白い熊" commit -m "Sync export <appVersion> (<YYYY-MM-DD>)"
 ```
-`explode.py` **wipes & rewrites** the tree (everything but `.git/`, `scripts/`, and the dotfiles/docs),
+`explode.py` **wipes & rewrites** the tree (everything but `.git/`, `scripts/`, `data/` and the dotfiles/docs),
 so items deleted in the app show up as removed files in `git diff`.
 
 ### Claude shipped a bundle → 白い熊 OKs it → sync the mirror (REQUIRED workflow)
