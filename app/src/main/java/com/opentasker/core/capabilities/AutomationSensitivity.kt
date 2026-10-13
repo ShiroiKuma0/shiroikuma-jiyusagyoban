@@ -314,6 +314,8 @@ object AutomationSensitivityRegistry {
         "app.archive",
         "app.unarchive",
         "home.go",
+        // Presses HOME and re-launches another app's task into a Huawei window mode.
+        "window.mode",
         "url.open",
         "sms.send",
         "screenshot.take",

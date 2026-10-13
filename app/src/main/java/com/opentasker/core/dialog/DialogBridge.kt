@@ -1,5 +1,6 @@
 package com.opentasker.core.dialog
 
+import android.os.Bundle
 import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.ConcurrentHashMap
 
@@ -23,11 +24,26 @@ object DialogBridge {
     fun register(id: String): CompletableDeferred<DialogOutcome> =
         CompletableDeferred<DialogOutcome>().also { pending[id] = it }
 
+    /**
+     * The dialog's extras, for a dialog started through the shell (`am start` via Shizuku, so it can
+     * open in a Huawei window mode): the command line carries only the request id, and the activity
+     * collects the rest here. Kept in-process, so nothing but the id ever crosses the shell.
+     */
+    private val specs = ConcurrentHashMap<String, Bundle>()
+
+    fun putSpec(id: String, extras: Bundle) {
+        specs[id] = extras
+    }
+
+    fun takeSpec(id: String): Bundle? = specs.remove(id)
+
     fun complete(id: String, outcome: DialogOutcome) {
+        specs.remove(id)
         pending.remove(id)?.complete(outcome)
     }
 
     fun cancel(id: String) {
+        specs.remove(id)
         pending.remove(id)?.complete(DialogOutcome.Cancelled)
     }
 }

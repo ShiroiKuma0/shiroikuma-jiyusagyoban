@@ -74,6 +74,7 @@ object ActionCapabilityRegistry {
         "vpn.tunnel" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on."),
         "sms.send" to smsCapability(),
         "screenshot.take" to shizukuCapability("Screenshot"),
+        "window.mode" to shizukuCapability("Window mode"),
         "location.mode" to shizukuCapability("Location mode"),
         "ime.set" to shizukuCapability("Set keyboard"),
         "sound.play" to audioOutputCapability("Plays audio from a file path or content URI; a file outside the app's own directories needs All files access.")

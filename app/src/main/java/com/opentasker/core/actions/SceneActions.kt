@@ -173,6 +173,8 @@ private val GESTURE_LABELS: List<Triple<String, String, String>> = listOf(
     Triple("longSwipeDown", "ロングスワイプ ↓", "Long swipe ↓"),
     Triple("longSwipeLeft", "ロングスワイプ ←", "Long swipe ←"),
     Triple("longSwipeRight", "ロングスワイプ →", "Long swipe →"),
+    Triple("swipeUpRight", "スワイプ ↗", "Swipe ↗"),
+    Triple("swipeUpLeft", "スワイプ ↖", "Swipe ↖"),
     Triple("moveDebug", "初動（デバッグ）", "First move (debug)"),
 )
 

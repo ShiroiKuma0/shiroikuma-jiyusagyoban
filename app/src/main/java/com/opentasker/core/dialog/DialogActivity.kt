@@ -67,6 +67,7 @@ class DialogActivity : ComponentActivity() {
 
     private var requestId: String? = null
     private var settled = false
+    private var cancelWhenHidden = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +77,9 @@ class DialogActivity : ComponentActivity() {
             return
         }
         requestId = id
+        // Started through the shell (ShellDialogActivity, in a window mode): only the id came along.
+        DialogBridge.takeSpec(id)?.let { intent.putExtras(it) }
+        cancelWhenHidden = intent.getBooleanExtra(EXTRA_CANCEL_WHEN_HIDDEN, false)
         val type = intent.getStringExtra(EXTRA_TYPE) ?: TYPE_TEXT
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
@@ -197,6 +201,17 @@ class DialogActivity : ComponentActivity() {
         finish()
     }
 
+    /**
+     * A dialog that belongs to one moment on screen (the right half of a split being built) gives up
+     * the moment it is hidden. Covered by another app it could not be answered, yet its action kept
+     * waiting until the timeout — and a task in Abort new dropped every new run meanwhile, which is
+     * how a buried picker made the split gesture "stop reacting" (2026-10-13).
+     */
+    override fun onStop() {
+        super.onStop()
+        if (cancelWhenHidden && !isChangingConfigurations && !isFinishing) settle(DialogOutcome.Cancelled)
+    }
+
     override fun onDestroy() {
         // If the user left without choosing, don't leave the action hanging.
         if (!settled) {
@@ -209,6 +224,10 @@ class DialogActivity : ComponentActivity() {
     companion object {
         private const val TAG = "DialogActivity"
         const val EXTRA_ID = "id"
+        /** Boolean: answer Cancelled as soon as the dialog is hidden (see [onStop]). */
+        const val EXTRA_CANCEL_WHEN_HIDDEN = "cancel_when_hidden"
+        /** The exported, shell-only alias `am start` uses to open a dialog in a window mode. */
+        const val SHELL_ALIAS = "com.opentasker.core.dialog.ShellDialogActivity"
         const val EXTRA_TYPE = "type"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
