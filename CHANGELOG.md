@@ -8,6 +8,57 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+045 — 2026-10-13
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+034`.
+
+### Split screen and floating window (画面操作)
+
+- **New action `window.mode` (Window Mode, Shizuku).** Moves the full-screen app on top — or a named app —
+  into Huawei's floating window (mode 102) or the left/right half of split screen (100/101), without
+  Huawei Home, whose own gestures vanish under any other launcher. The app is started the way a
+  launcher starts it, so its **existing task moves as it is**: no restart, and no extra copy of its
+  launch screen stacked on every use (an app with a splash screen used to pop back to full screen).
+- **Edge-bar diagonals `swipeUpLeft` / `swipeUpRight`** (scene button config). They fire mid-drag once the
+  finger has risen `%Diagswipe_Pct` of the screen height, **or on release as a short flick** leaning
+  20°–60° off vertical; a flatter short swipe stays the left/right swipe (next / previous app). While a
+  drag is diagonal the long swipe is held off.
+- **`app.pick` gains `window=split_right`:** the app chooser opens **in the right half of the split** it is
+  filling, started through Shizuku via a shell-only entry (`ShellDialogActivity`, guarded by
+  `MANAGE_ACTIVITY_TASKS`; only the request id crosses the shell). Without Shizuku it falls back to the
+  full-screen chooser.
+- **Task dialogs can no longer get stuck behind an app.** A dialog placed in a window mode cancels the
+  moment it is hidden, and every dialog now starts in its own task: before, a chooser covered by
+  another app held its task until the 60 s timeout, a task in *Abort new* dropped every gesture
+  meanwhile, and a second dialog merely brought the hidden one forward and waited for nothing.
+
+### 言語島
+
+- **Czech sentences** (Room schema 36, `gengoshima_sentences.language`). The language decided in kxkb's
+  review travels with each sentence: the island proposer and translator are told it, a Czech sentence
+  is translated cs→ja and its source side is voiced with a Czech 白い熊 音声 voice
+  (`%Gengoshima_CsVoice` — `jirka` or `kasandra` — and `%Gengoshima_CsSpeed`; an explicit voice is
+  checked against 音声's installed list), 暗記's manifest carries the language, and the 未分類 page, the
+  islands editor and 文入力 show a language chip.
+- **A topic written in Japanese is the island's Japanese name as it stands**; only an English topic is
+  named by Claude (new islands, filing from 未分類, and the next translation run).
+- **閉じる is a header pill on every 言語島 screen** and returns to the board; 止める is gone (閉じる on the
+  playing screen stops playback). The picker's islands reorder by drag, and the order is kept.
+- **Walk capture arms instead of starting:** the vol-down triple press arms capture mode with two long
+  buzzes and records nothing; the first single press starts sentence 1, like every later one.
+
+### Backup
+
+- **adb bridge `EXPORT_DATA`:** the full category backup ZIP — workspace and every app-data category
+  (健康 measurements and notes, map cutouts, band settings, 言語島 with its audio, fonts, icons, the
+  satellite capture) — written to `/sdcard/tmp/` as `.part` and renamed when complete. It feeds the
+  local workspace mirror, which now keeps all of the app's data in git beside the workspace.
+
+### 物理鍵 and 画面操作 (workspace, not the app)
+
+- In capture mode, a vol-down press with the screen on and the camera in front is the shutter again.
+- `下中Split` opens its chooser in the right half; the `%Diagswipe_Pct` note covers the short flick.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+034 — 2026-10-11
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+031`.
