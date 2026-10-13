@@ -1035,6 +1035,18 @@
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout" />
 
         <!--
+          The same dialog, startable by the shell (Shizuku, `am start` with windowing mode 101), so the
+          split gesture's app picker can open in the right half it is filling. MANAGE_ACTIVITY_TASKS is
+          held by the shell and system components, never by an ordinary app; the command line carries
+          just the request id.
+        -->
+        <activity-alias
+            android:name="com.opentasker.core.dialog.ShellDialogActivity"
+            android:targetActivity="com.opentasker.core.dialog.DialogActivity"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_ACTIVITY_TASKS" />
+
+        <!--
           The automation data door.
 
           Exported on purpose and with no android:permission, because the gate is not a permission

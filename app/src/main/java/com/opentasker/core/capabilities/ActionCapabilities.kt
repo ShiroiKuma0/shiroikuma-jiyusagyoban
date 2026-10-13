@@ -70,6 +70,7 @@ object ActionCapabilityRegistry {
         "mobile.toggle" to shizukuCapability("Mobile data"),
         "sms.send" to smsCapability(),
         "screenshot.take" to shizukuCapability("Screenshot"),
+        "window.mode" to shizukuCapability("Window mode"),
         "location.mode" to shizukuCapability("Location mode"),
         "ime.set" to shizukuCapability("Set keyboard"),
         "sound.play" to audioOutputCapability("Plays audio from a file path or content URI; a file outside the app's own directories needs All files access.")

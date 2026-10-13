@@ -159,6 +159,7 @@ object ActionCatalog {
         define("tasks.sort", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SortGroupTasksAction),
         define("app.previous", ActionCategory.APP, ActionRetrySafety.NEVER, ::PreviousAppAction),
         define("app.next", ActionCategory.APP, ActionRetrySafety.NEVER, ::NextAppAction),
+        define("window.mode", ActionCategory.APP, ActionRetrySafety.NEVER, ::WindowModeAction),
         define("app.pick", ActionCategory.APP, ActionRetrySafety.NEVER, ::PickAppDialogAction),
         define("app.pickmulti", ActionCategory.APP, ActionRetrySafety.NEVER, ::PickAppsToVariableAction),
         define("apps.list", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::ListAppsAction),

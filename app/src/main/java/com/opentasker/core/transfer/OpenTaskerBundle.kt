@@ -983,7 +983,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
     // (the value is a task NAME going forward, or a legacy id string for older scenes).
     private val taskIdConfigKeys = setOf(
         "swipeUp", "swipeDown", "swipeLeft", "swipeRight",
-        "longSwipeUp", "longSwipeDown", "longSwipeLeft", "longSwipeRight", "doubleTap", "moveDebug",
+        "longSwipeUp", "longSwipeDown", "longSwipeLeft", "longSwipeRight", "swipeUpRight", "swipeUpLeft",
+        "doubleTap", "moveDebug",
     )
 
     /**
