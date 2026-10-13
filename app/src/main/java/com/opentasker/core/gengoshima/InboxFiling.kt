@@ -61,6 +61,7 @@ object InboxFiling {
                 GengoshimaIslandEntity(
                     position = dao.lastIslandPosition() + 1,
                     nameEn = name,
+                    nameJa = GengoshimaLanguage.islandNameFromTopic(name),
                     register = register,
                     createdAt = now,
                 ),
@@ -75,6 +76,7 @@ object InboxFiling {
                     islandId = islandId,
                     position = dao.lastSentencePosition(islandId) + 1,
                     en = row.en,
+                    language = GengoshimaLanguage.normalize(row.language),
                     createdAt = now,
                     updatedAt = now,
                 ),

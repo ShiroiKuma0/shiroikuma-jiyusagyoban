@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.gengoshima.AudioTree
 import com.opentasker.core.gengoshima.GenerationRunner
+import com.opentasker.core.gengoshima.GengoshimaLanguage
 import com.opentasker.core.gengoshima.GengoshimaSettings
 import com.opentasker.core.storage.GengoshimaIslandEntity
 import com.opentasker.core.storage.GengoshimaSentenceEntity
@@ -85,7 +86,7 @@ class GengoshimaEntryActivity : ComponentActivity() {
             OpenTaskerTheme(prefs = themePrefs) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     EntryScreen(
-                        onClose = { finish() },
+                        onClose = { closeToBoard() },
                         onGenerate = {
                             GenerationRunner.start(applicationContext, GengoshimaSettings.last(applicationContext))
                             startActivity(GengoshimaProgressActivity.intent(applicationContext))
@@ -128,6 +129,8 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
     var pendingAnywhere by remember { mutableStateOf(0) }
     LaunchedEffect(sentences) { pendingAnywhere = dao.pendingWork() }
     var newIsland by remember { mutableStateOf(false) }
+    // The language of what is typed next; it stays until switched, so a Czech run stays Czech.
+    var language by remember { mutableStateOf(GengoshimaLanguage.EN) }
 
     fun add() {
         val en = text.trim()
@@ -141,6 +144,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                     islandId = target.id,
                     position = dao.lastSentencePosition(target.id) + 1,
                     en = en,
+                    language = language,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -165,7 +169,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+            HeaderPill("閉じる", onClose)
         }
 
         // Walk-captured sentences waiting for an island (kxkb → 未分類).
@@ -195,12 +199,20 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                 onValueChange = { v -> if (v.endsWith("\n")) { text = v.trimEnd('\n'); add() } else text = v },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp),
-                label = { Text("英文 — Enter で追加 / English sentence, Enter adds it") },
+                label = {
+                    Text(
+                        if (language == GengoshimaLanguage.CS) "チェコ語の文 — Enter で追加 / Czech sentence, Enter adds it"
+                        else "英文 — Enter で追加 / English sentence, Enter adds it",
+                    )
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { add() }),
             )
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Button(onClick = { add() }, enabled = query.isNotEmpty()) { Text("追加 / Add") }
+                Spacer(Modifier.width(12.dp))
+                // What the next sentence is written in; tap to switch EN ⇄ CS.
+                LanguageChip(language, onClick = { language = GengoshimaLanguage.toggle(language) })
                 Spacer(Modifier.width(12.dp))
                 Text("${sentences.size} 文", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -244,6 +256,7 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                         GengoshimaIslandEntity(
                             position = dao.lastIslandPosition() + 1,
                             nameEn = en,
+                            nameJa = GengoshimaLanguage.islandNameFromTopic(en),
                             register = register,
                             createdAt = System.currentTimeMillis(),
                         ),
@@ -261,7 +274,13 @@ internal fun islandLabel(i: GengoshimaIslandEntity): String =
 @Composable
 private fun SentenceRow(s: GengoshimaSentenceEntity) {
     Column(Modifier.fillMaxWidth()) {
-        Text("${s.position}　${s.en}", fontSize = 17.sp)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            if (GengoshimaLanguage.normalize(s.language) == GengoshimaLanguage.CS) {
+                LanguageChip(s.language)
+                Spacer(Modifier.width(6.dp))
+            }
+            Text("${s.position}　${s.en}", fontSize = 17.sp)
+        }
         val (mark, color) = when (s.state) {
             GengoshimaSentenceEntity.STATE_READY -> "♪ " to MaterialTheme.colorScheme.primary
             GengoshimaSentenceEntity.STATE_TRANSLATED -> "… " to MaterialTheme.colorScheme.onSurfaceVariant

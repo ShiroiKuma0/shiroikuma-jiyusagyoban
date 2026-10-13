@@ -46,6 +46,11 @@ data class GengoshimaSettings(
     /** 音声's Kokoro voice for English — am_michael, 白い熊's pick from the audition. */
     val enVoice: String = "am_michael",
     val enSpeed: String = "1.0",
+    /** The Czech file's name pattern, beside the English one: `{no}`, `{ja}`, `{en}` (the Czech). */
+    val sentenceFileCsPattern: String = "{no} {ja} [cs]",
+    /** 音声's Czech voice; blank leaves 音声's own default (contract revision 2026-10-11). */
+    val csVoice: String = "",
+    val csSpeed: String = "1.0",
     /** Sync to 白い熊 暗記 after every generation run. */
     val ankiSync: Boolean = true,
     val ankiRoot: String = "言語島々",
@@ -57,6 +62,13 @@ data class GengoshimaSettings(
 
     /** The same for the English reading. */
     val enVoiceKey: String get() = "en|$enVoice|$enSpeed|$gap|$bitrateKbps"
+
+    /** The same for the Czech reading. */
+    val csVoiceKey: String get() = "cs|$csVoice|$csSpeed|$gap|$bitrateKbps"
+
+    /** The source-reading key for a sentence in [language]. */
+    fun sourceVoiceKey(language: String): String =
+        if (GengoshimaLanguage.normalize(language) == GengoshimaLanguage.CS) csVoiceKey else enVoiceKey
 
     companion object {
         private const val PREFS = "gengoshima"
@@ -91,6 +103,9 @@ data class GengoshimaSettings(
                 sentenceFileEnPattern = s("SentenceFileEnPattern", d.sentenceFileEnPattern),
                 enVoice = s("EnVoice", d.enVoice),
                 enSpeed = s("EnSpeed", d.enSpeed),
+                sentenceFileCsPattern = s("SentenceFileCsPattern", d.sentenceFileCsPattern),
+                csVoice = s("CsVoice", d.csVoice),
+                csSpeed = s("CsSpeed", d.csSpeed),
                 ankiSync = v("AnkiSync").lowercase().let { it.isEmpty() || it in setOf("on", "1", "true", "yes") },
                 ankiRoot = s("AnkiRoot", d.ankiRoot),
                 ankiRecognition = s("AnkiRecognition", d.ankiRecognition),

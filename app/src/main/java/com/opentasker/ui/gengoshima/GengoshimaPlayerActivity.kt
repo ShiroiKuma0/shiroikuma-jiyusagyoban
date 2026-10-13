@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,6 +91,8 @@ import com.opentasker.core.storage.GengoshimaPlayEntity
 import com.opentasker.core.storage.GengoshimaSentenceEntity
 import com.opentasker.core.storage.GengoshimaSessionEntity
 import com.opentasker.ui.components.SelectionChip
+import com.opentasker.ui.components.ReorderableRow
+import com.opentasker.ui.components.rememberListReorderState
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import java.io.File
@@ -127,7 +131,7 @@ class GengoshimaPlayerActivity : ComponentActivity() {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    PlayerRoot(onClose = { finish() })
+                    PlayerRoot(onClose = { closeToBoard() })
                 }
             }
         }
@@ -230,12 +234,13 @@ private fun PlayerRoot(onClose: () -> Unit) {
     // Reopened from the notification while something is queued: straight back to it.
     var playing by remember { mutableStateOf(c.mediaItemCount > 0) }
     if (playing) {
-        PlayingScreen(c, onStop = {
+        val back = {
             finishSession(c)
             c.stop()
             c.clearMediaItems()
             playing = false
-        }, onClose = onClose)
+        }
+        PlayingScreen(c, onClose = back)
     } else {
         PickerScreen(onStart = { items, mode, islands ->
             startSession(mode, islands)
@@ -322,13 +327,23 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("言語島 — 聴く", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+            HeaderPill("閉じる", onClose)
         }
         Text("島 / Islands", fontWeight = FontWeight.Bold)
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        // Long-press the handle and drag: the islands' order is their order everywhere — here, in the
+        // editor, the audio tree and 暗記 — so a drop renumbers them for good (白い熊, 2026-10-12).
+        val listState = rememberLazyListState()
+        val reorder = rememberListReorderState()
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
             items(islands, key = { it.id }) { i ->
                 val n = ready[i.id] ?: 0
                 val on = chosen[i.id] ?: (n > 0)
+                ReorderableRow(
+                    state = reorder, listState = listState, items = islands, item = i, keyOf = { it.id }, enabled = true,
+                    onReorder = { order ->
+                        scope.launch { order.forEachIndexed { k, row -> if (row.position != k + 1) dao.updateIsland(row.copy(position = k + 1)) } }
+                    },
+                ) {
                 Row(
                     Modifier.fillMaxWidth().clickable(enabled = n > 0) { chosen[i.id] = !on },
                     verticalAlignment = Alignment.CenterVertically,
@@ -341,6 +356,7 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
                 }
             }
         }
@@ -367,10 +383,10 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
         if (mode != ListenMode.RECALL) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SelectionChip(label = "日本語だけ", selected = !englishAfter, onSelect = { englishAfter = false })
-                SelectionChip(label = "英語も（日本語の後）/ English after", selected = englishAfter, onSelect = { englishAfter = true })
+                SelectionChip(label = "原文も（日本語の後）/ source after", selected = englishAfter, onSelect = { englishAfter = true })
             }
         } else {
-            Text("思い出す: 英語 → 間 → 日本語 / Recall: English, a pause, then the Japanese", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("思い出す: 原文 → 間 → 日本語 / Recall: the source (English or Czech), a pause, then the Japanese", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text("順番 / Order", fontWeight = FontWeight.Bold)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -476,7 +492,7 @@ internal fun queue(
 // ── playing ─────────────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () -> Unit) {
+private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var index by remember { mutableIntStateOf(c.currentMediaItemIndex) }
     var isPlaying by remember { mutableStateOf(c.isPlaying) }
@@ -556,8 +572,9 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
                     fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = { onStop() }) { Text("止める", fontSize = 18.sp) }
-            TextButton(onClick = { finishSession(); c.stop(); c.clearMediaItems(); onClose() }) { Text("閉じる", fontSize = 18.sp) }
+            // 閉じる stops and leaves the playing screen for the picker it came from, not the window;
+            // the old 止める did the same and is gone (白い熊, 2026-10-12).
+            HeaderPill("閉じる") { onClose() }
         }
 
         Column(
@@ -587,7 +604,7 @@ private fun PlayingScreen(c: MediaController, onStop: () -> Unit, onClose: () ->
             if (showEn || hideJa) {
                 Text(en, fontSize = 22.sp, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = { showEn = !showEn }) { Text(if (showEn) "英語を隠す / hide English" else "英語を出す / show English") }
+            TextButton(onClick = { showEn = !showEn }) { Text(if (showEn) "原文を隠す / hide source" else "原文を出す / show source") }
         }
 
         if (ended) Text("おしまい / finished", fontSize = 18.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterHorizontally))

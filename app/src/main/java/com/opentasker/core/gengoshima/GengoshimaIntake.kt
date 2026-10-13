@@ -34,7 +34,7 @@ object GengoshimaIntake {
                 uuid = uuid,
                 en = text,
                 recognized = str("recognized") ?: text,
-                language = str("language").orEmpty().ifBlank { "en" },
+                language = GengoshimaLanguage.normalize(str("language")),
                 capturedAt = (o["capturedAt"] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: now,
                 receivedAt = now,
             )
