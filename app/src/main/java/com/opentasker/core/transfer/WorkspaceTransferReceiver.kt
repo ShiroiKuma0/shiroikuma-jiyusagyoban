@@ -44,6 +44,10 @@ import java.util.Locale
  *   Items are resolved by (project, name); a shown scene is hidden first; variables are removed from
  *   BOTH the project bucket and the super bucket (pre-project-scoping residue); item notes are
  *   cleaned up. Unknown names are reported as warnings, never failures.
+ * - [ACTION_EXPORT_DATA]: the full category ZIP ([SettingsBackup], every category) to `/sdcard/tmp/`
+ *   ([EXTRA_PATH] optional `.zip` name, default `shiroikuma-jiyusagyoban_<stamp>.zip`). Written as
+ *   `<name>.part` and renamed when complete; a long export answers "still running" and the caller
+ *   waits for the final file. Feeds the workspace mirror's `data/` tree.
  * - [ACTION_RUN_TASK]: run a task by name — [EXTRA_TASK] (required) + [EXTRA_PROJECT] (optional
  *   project name to disambiguate). Runs through [executeAndLogTask] like a manual run and answers
  *   with success + duration. Exists so the dev loop can trigger a project's 起動/71 reload task
@@ -119,6 +123,31 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                             putInt(EXTRA_COUNT_PROFILES, bundle.profiles.size)
                             putInt(EXTRA_COUNT_SCENES, bundle.scenes.size)
                         })
+                    }
+                    ACTION_EXPORT_DATA -> {
+                        // The whole category ZIP — workspace AND app data (健康, 言語島, maps, prefs,
+                        // files) — for the workspace mirror's data/ tree (scripts/explode-data.py).
+                        // Written as `.part` and renamed only when complete, because a large export
+                        // outruns the broadcast budget: the caller is answered "still running" and
+                        // waits for the final name, which never names a half-written file.
+                        val file = if (path.isNotEmpty()) resolveInTmp(path) else resolveInTmp(SettingsBackup.exportFileName())
+                        require(file.name.endsWith(".zip")) { "$EXTRA_PATH must name a .zip" }
+                        file.parentFile?.mkdirs()
+                        val part = File(file.parentFile, file.name + ".part")
+                        try {
+                            part.outputStream().use { out ->
+                                SettingsBackup.export(
+                                    app, OpenTaskerApp_NoHilt.db, BuildConfig.VERSION_NAME,
+                                    SettingsBackup.Cat.entries.toSet(), out,
+                                )
+                            }
+                            check(part.renameTo(file)) { "cannot finalise ${file.name}" }
+                        } finally {
+                            part.delete()
+                        }
+                        pending.setResultCode(Activity.RESULT_OK)
+                        pending.setResultData("${file.absolutePath}|${file.length()}")
+                        pending.setResultExtras(Bundle().apply { putString(EXTRA_PATH, file.absolutePath) })
                     }
                     ACTION_IMPORT_BUNDLE -> {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
@@ -333,6 +362,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
         const val ACTION_EXPORT_WORKSPACE = "shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE"
         const val ACTION_IMPORT_BUNDLE = "shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE"
+        const val ACTION_EXPORT_DATA = "shiroikuma.jiyusagyoban.action.EXPORT_DATA"
         const val ACTION_DELETE_ITEMS = "shiroikuma.jiyusagyoban.action.DELETE_ITEMS"
         /**
          * How long the broadcast may be held open. Comfortably under Android's 60 s ceiling for a
