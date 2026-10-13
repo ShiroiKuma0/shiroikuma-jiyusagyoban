@@ -66,10 +66,15 @@ object OnseRender {
         val gapPre: String? = null,
         val gapPost: String? = null,
         val bitrateKbps: String? = null,
-        /** `ja` (VOICEVOX, the default) or `en` (Kokoro). With `en`, [speed] is Kokoro's speed. */
+        /**
+         * `ja` (VOICEVOX, the default), `en` (Kokoro) or `cs` (Czech, contract revision 2026-10-11).
+         * With `en` or `cs`, [speed] is that engine's speed.
+         */
         val lang: String? = null,
         /** With `lang = en`: the Kokoro voice, e.g. am_michael. */
         val enVoice: String? = null,
+        /** With `lang = cs`: the Czech voice; null leaves 音声's own. */
+        val csVoice: String? = null,
     )
 
     /** One `event=item` reply. */
@@ -173,6 +178,7 @@ object OnseRender {
                     voice.bitrateKbps?.let { putExtra("bitrate_kbps", it) }
                     voice.lang?.let { putExtra("lang", it) }
                     voice.enVoice?.let { putExtra("en_voice", it) }
+                    voice.csVoice?.let { putExtra("cs_voice", it) }
                     token?.takeIf { it.isNotEmpty() }?.let { putExtra("token", it) }
                 },
             )
@@ -230,7 +236,21 @@ object OnseRender {
         val enVoices: List<String>,
         val enDefault: String,
         val batteryExempt: Boolean,
-    )
+        /** Czech (revision 2026-10-11); false from a 音声 that predates it, which never says. */
+        val csInstalled: Boolean = false,
+        val csVoices: List<String> = emptyList(),
+        val csDefault: String = "",
+        /** Czech voices whose model is installed (revision 2026-10-12); empty from an older 音声. */
+        val csInstalledVoices: List<String> = emptyList(),
+    ) {
+        /**
+         * Whether [voice] can speak Czech now. `cs_installed` covers only 音声's SELECTED voice, so an
+         * explicit voice is checked against `cs_installed_voices`; a 音声 that predates that list
+         * (1.0+010, one voice) falls back to `cs_installed`.
+         */
+        fun csCanSpeak(voice: String): Boolean =
+            if (voice.isBlank() || csInstalledVoices.isEmpty()) csInstalled else voice in csInstalledVoices
+    }
 
     /**
      * Wake 音声 and ask it what it can do — above all whether the English model is installed, so a
@@ -270,6 +290,10 @@ object OnseRender {
                 enVoices = x("en_voices").split(',').map { it.trim() }.filter { it.isNotEmpty() },
                 enDefault = x("en_default"),
                 batteryExempt = x("battery_exempt") == "true",
+                csInstalled = x("cs_installed") == "true",
+                csVoices = x("cs_voices").split(',').map { it.trim() }.filter { it.isNotEmpty() },
+                csDefault = x("cs_default"),
+                csInstalledVoices = x("cs_installed_voices").split(',').map { it.trim() }.filter { it.isNotEmpty() },
             )
         } finally {
             runCatching { app.unregisterReceiver(receiver) }

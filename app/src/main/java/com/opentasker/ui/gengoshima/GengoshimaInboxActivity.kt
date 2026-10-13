@@ -53,6 +53,7 @@ import com.opentasker.core.gengoshima.IslandProposer
 import com.opentasker.core.storage.GengoshimaInboxEntity
 import com.opentasker.core.storage.GengoshimaIslandEntity
 import com.opentasker.ui.components.AlertDialog
+import com.opentasker.core.gengoshima.GengoshimaLanguage
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.launch
@@ -77,7 +78,7 @@ class GengoshimaInboxActivity : ComponentActivity() {
             OpenTaskerTheme(prefs = themePrefs) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     InboxScreen(
-                        onClose = { finish() },
+                        onClose = { closeToBoard() },
                         onGenerate = {
                             GenerationRunner.start(applicationContext, GengoshimaSettings.last(applicationContext))
                             startActivity(GengoshimaProgressActivity.intent(applicationContext))
@@ -129,8 +130,10 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
             val all = dao.islands()
             val samples = all.associate { it.id to dao.sentences(it.id) }
             val picks = IslandProposer.propose(all, samples, todo, GengoshimaSettings.last(context))
+            // Re-read: a language chip tapped while Claude was thinking must not be undone here.
+            val fresh = dao.inbox().associateBy { it.uuid }
             dao.updateInbox(
-                todo.map { r ->
+                todo.mapNotNull { fresh[it.uuid] }.map { r ->
                     val p = picks[r.uuid]
                     if (p == null) r.copy(proposed = 1)
                     else if (p.island_id != 0L) r.copy(islandId = p.island_id, newIslandName = "", newIslandRegister = "", proposed = 1)
@@ -171,7 +174,8 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("言語島 — 未分類 (${list.size})", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                val czech = list.count { GengoshimaLanguage.normalize(it.language) == GengoshimaLanguage.CS }
+                Text("言語島 — 未分類 (${list.size}" + (if (czech > 0) " · CS $czech" else "") + ")", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 Text(
                     when {
                         proposing -> "Claude が島を考えています… / Claude is choosing islands…"
@@ -182,7 +186,7 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+            HeaderPill("閉じる", onClose)
         }
 
         if (selected.isNotEmpty()) {
@@ -231,6 +235,11 @@ private fun InboxScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                         // A mark, not a colour: selection must read without hue (白い熊 is red-green colour-blind).
                         Text(if (isSel) "☑" else "☐", fontSize = 22.sp, modifier = Modifier.width(32.dp))
                     }
+                    // The sentence's language, as kxkb's review decided it; a tap corrects it here.
+                    LanguageChip(row.language, onClick = {
+                        scope.launch { dao.updateInbox(listOf(row.copy(language = GengoshimaLanguage.toggle(row.language)))) }
+                    })
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         row.en,
                         fontSize = 17.sp,

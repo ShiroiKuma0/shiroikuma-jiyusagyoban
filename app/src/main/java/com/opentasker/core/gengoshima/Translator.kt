@@ -13,7 +13,9 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * English sentences → natural spoken Japanese, one island per call.
+ * English or Czech sentences → natural spoken Japanese, one island per call. Each line carries its own
+ * language tag (`[en]` / `[cs]`, kxkb contract §7): an island may mix them, and a Czech line is
+ * translated from the Czech, cs→ja, never read as mangled English.
  *
  * An island is a MONOLOGUE: ~30 sentences in order, each following on from the last. So the call
  * carries the island's topic and register, and every sentence of it already translated, as context —
@@ -46,10 +48,14 @@ object Translator {
 
     internal val SYSTEM = """
         You translate for a learner of Japanese who studies with Mikel Hyperpolyglot's "language
-        islands" method: they write short monologues in English about their own life, one topic per
-        island, and memorise the Japanese by listening to it read aloud, shadowing it and recalling it.
+        islands" method: they write short monologues about their own life, one topic per island,
+        and memorise the Japanese by listening to it read aloud, shadowing it and recalling it.
 
-        Translate each English sentence into the Japanese a native speaker would actually SAY in
+        Each source sentence is marked with its language: [en] English or [cs] Czech. One island can
+        mix both. Translate every sentence from ITS OWN language — a [cs] line is Czech (with its
+        diacritics) and is translated from the Czech directly, never treated as broken English.
+
+        Translate each sentence into the Japanese a native speaker would actually SAY in
         that situation — natural, spoken, idiomatic, never a word-for-word rendering. Keep the
         register the island names, the same all the way through. The sentences of an island form one
         continuous monologue in the order given: each line follows on from the ones before it, so use
@@ -119,12 +125,15 @@ object Translator {
         val done = all.filter { it.id !in pendingIds && it.ja.isNotBlank() }
         if (done.isNotEmpty()) {
             append("The monologue so far (already translated — context only, do not return these):\n")
-            done.forEach { append("[").append(it.position).append("] ").append(it.en).append(" → ").append(it.ja).append('\n') }
+            done.forEach { append("[").append(it.position).append("] ").append(lang(it)).append(it.en).append(" → ").append(it.ja).append('\n') }
             append('\n')
         }
         append("Translate these, in this order (return each with its id):\n")
-        pending.forEach { append("id ").append(it.id).append(" [").append(it.position).append("] ").append(it.en).append('\n') }
+        pending.forEach { append("id ").append(it.id).append(" [").append(it.position).append("] ").append(lang(it)).append(it.en).append('\n') }
     }
+
+    /** The language tag in front of a source sentence: `[en] ` / `[cs] `. */
+    private fun lang(sentence: GengoshimaSentenceEntity) = "[${GengoshimaLanguage.normalize(sentence.language)}] "
 
     /**
      * How many sentences the model has FINISHED writing, read off the half-written answer.

@@ -681,6 +681,17 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * 言語島: the language a sentence was written or spoken in — `en` or `cs` — so a Czech walk
+     * sentence stays Czech after it is filed into an island (kxkb contract §7). Additive; every
+     * existing sentence was English.
+     */
+    val MIGRATION_35_36 = object : Migration(35, 36) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `language` TEXT NOT NULL DEFAULT 'en'")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -717,6 +728,7 @@ object DatabaseMigrations {
             MIGRATION_32_33,
             MIGRATION_33_34,
             MIGRATION_34_35,
+            MIGRATION_35_36,
         )
     }
 }

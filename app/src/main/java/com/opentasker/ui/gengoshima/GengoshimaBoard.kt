@@ -185,7 +185,7 @@ fun GengoshimaBoardScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+                HeaderPill("閉じる", onClose)
             }
         }
         items(order, key = { it.key }, span = { t -> GridItemSpan(if (t.wide) maxLineSpan else 1) }) { tile ->
