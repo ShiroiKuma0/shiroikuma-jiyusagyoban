@@ -164,6 +164,7 @@ object ActionCapabilityRegistry {
         "sun.times" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs location access only when latitude or longitude is left blank.", R.string.capability_sun_times_setup),
         "sms.send" to smsCapability(),
         "screenshot.take" to shizukuCapability("Screenshot"),
+        "window.mode" to shizukuCapability("Window mode"),
         "location.mode" to shizukuCapability("Location mode"),
         "ime.set" to shizukuCapability("Set keyboard"),
         "sound.play" to audioOutputCapability("Plays audio from a file path or content URI; a file outside the app's own directories needs All files access.")

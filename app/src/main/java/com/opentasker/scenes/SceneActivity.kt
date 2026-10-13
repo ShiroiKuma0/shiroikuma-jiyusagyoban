@@ -95,6 +95,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import android.content.Intent
@@ -585,13 +586,17 @@ internal fun SceneElementView(
             val longSwipeDown = cfgRef("longSwipeDown")
             val longSwipeLeft = cfgRef("longSwipeLeft")
             val longSwipeRight = cfgRef("longSwipeRight")
+            // The two Huawei-Home diagonals: up toward the top-right / top-left corner (画面操作's 下中 binds
+            // them to the floating window and split screen).
+            val swipeUpRight = cfgRef("swipeUpRight")
+            val swipeUpLeft = cfgRef("swipeUpLeft")
             val doubleTapId = cfgRef("doubleTap")
             val moveDebug = cfgRef("moveDebug")   // DEBUG: fires once on the first pointer move
             val tapId = tapRef
             val longPressId = longPressRef
             val hasSwipe = swipeUp != null || swipeDown != null || swipeLeft != null || swipeRight != null ||
                 longSwipeUp != null || longSwipeDown != null || longSwipeLeft != null || longSwipeRight != null ||
-                moveDebug != null
+                swipeUpRight != null || swipeUpLeft != null || moveDebug != null
             val slopPx = with(LocalDensity.current) { 36.dp.toPx() }
             // Edge-bar long-swipe threshold (dp). Lives with the edge-bar project (画面操作), set in its 01 設定
             // task as %Longswipe_Dp (a 画面操作 project-global since the 2026-07-05 demotion; the old
@@ -603,6 +608,17 @@ internal fun SceneElementView(
                 val globalVal = expandAgainstGlobals("%Longswipe_Dp").trim().toIntOrNull()
                     ?: expandAgainstGlobals("%LONGSWIPE_DP").trim().toIntOrNull()
                 (cfgVal ?: globalVal ?: 200).coerceIn(60, 400).dp.toPx()
+            }
+            // Diagonal threshold: how far UP the finger must rise, as a percentage of the screen height,
+            // before an up-right/up-left drag fires — Huawei Home's "about half way, not all the way up".
+            // %Diagswipe_Pct (画面操作 01 設定), a per-element `diagSwipePct` overriding it; default 40,
+            // clamped 10–90. Measured on the screen height, so folded and unfolded both mean "half way".
+            val screenHeightDp = LocalConfiguration.current.screenHeightDp
+            val diagPx = with(LocalDensity.current) {
+                val pct = v("diagSwipePct").trim().toIntOrNull()
+                    ?: expandAgainstGlobals("%Diagswipe_Pct").trim().toIntOrNull()
+                    ?: 40
+                (screenHeightDp * pct.coerceIn(10, 90) / 100f).dp.toPx()
             }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
             fun pick(dx: Float, dy: Float, up: String?, down: String?, left: String?, right: String?): String? =
@@ -618,10 +634,14 @@ internal fun SceneElementView(
                     // Swipe or double-tap bound → the full edge-gesture detector (it consumes the down so
                     // the tap-through overlay claims the move stream). Otherwise the lightweight tap
                     // detector, so a plain button's tap stays instant (no double-tap wait).
-                    .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id) {
+                    // Keyed on diagPx too: it follows the screen height, which a fold/unfold changes.
+                    .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id, diagPx) {
                         detectEdgeGestures(
                             slopPx = slopPx,
                             longSwipePx = longSwipePx,
+                            diagPx = diagPx,
+                            hasDiagonal = { right -> (if (right) swipeUpRight else swipeUpLeft) != null },
+                            onDiagonal = { right -> (if (right) swipeUpRight else swipeUpLeft)?.let(onRunTask) },
                             onSwipe = { dx, dy -> pick(dx, dy, swipeUp, swipeDown, swipeLeft, swipeRight)?.let(onRunTask) },
                             onLongSwipe = { dx, dy ->
                                 val t = pick(dx, dy, longSwipeUp, longSwipeDown, longSwipeLeft, longSwipeRight)
@@ -1181,16 +1201,26 @@ private fun sliderIcon(name: String?): ImageVector? = when (name?.trim()?.lowerc
 }
 
 /**
- * One detector for an edge strip's whole gesture set: 4-direction swipe, tap, double-tap, long-press.
+ * One detector for an edge strip's whole gesture set: 4-direction swipe, the two upward diagonals,
+ * tap, double-tap, long-press.
  * It consumes the DOWN so a FLAG_NOT_FOCUSABLE tap-through overlay actually claims the move stream
  * (without that the window slips moves away and only taps survive). A drag past [slopPx] fires [onSwipe]
  * with the accumulated delta; holding past the long-press timeout fires [onLongPress]; a quick release
  * fires [onTap] — unless [onDoubleTap] is bound and a second tap lands within the double-tap window.
  * Single taps stay instant when no double-tap is bound (no wait).
+ *
+ * A drag that heads up into the diagonal sector ([upDiagonal]) with a binding for that side fires
+ * [onDiagonal] the moment it has risen [diagPx], and while it is in that sector the long swipe is held
+ * off — otherwise the long-swipe-up (Recents, at 200dp) would always win the race, since a diagonal
+ * reaches 200dp of rise well before it reaches half the screen. Released short of [diagPx] it is an
+ * ordinary short swipe by its dominant axis, exactly as before.
  */
 private suspend fun PointerInputScope.detectEdgeGestures(
     slopPx: Float,
     longSwipePx: Float,
+    diagPx: Float,
+    hasDiagonal: (Boolean) -> Boolean,
+    onDiagonal: (Boolean) -> Unit,
     onSwipe: (Float, Float) -> Unit,
     onLongSwipe: (Float, Float) -> Boolean,
     onTap: (() -> Unit)?,
@@ -1223,18 +1253,30 @@ private suspend fun PointerInputScope.detectEdgeGestures(
             "swipe" -> {
                 // Keep tracking: cross the long threshold → fire the long-swipe (if one is bound for this
                 // direction); otherwise fire the short swipe on release. So a quick flick = short, a long
-                // drag = long, and a long drag with no long binding falls back to the short task.
-                var firedLong = false
+                // drag = long, and a long drag with no long binding falls back to the short task. A bound
+                // diagonal takes precedence over the long swipe while the drag stays in its sector.
+                var fired = false
                 while (true) {
                     val ev = awaitPointerEvent()
                     val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
                     if (!ch.pressed) break
                     val pc = ch.positionChange(); dx += pc.x; dy += pc.y; ch.consume()
-                    if (!firedLong && (kotlin.math.abs(dx) > longSwipePx || kotlin.math.abs(dy) > longSwipePx)) {
-                        firedLong = onLongSwipe(dx, dy)
+                    if (fired) continue
+                    val diagonal = upDiagonal(dx, dy)
+                    if (diagonal != null && hasDiagonal(diagonal)) {
+                        if (-dy > diagPx) { onDiagonal(diagonal); fired = true }
+                    } else if (kotlin.math.abs(dx) > longSwipePx || kotlin.math.abs(dy) > longSwipePx) {
+                        fired = onLongSwipe(dx, dy)
                     }
                 }
-                if (!firedLong) onSwipe(dx, dy)
+                // A SHORT flick into a bound diagonal fires it on release (白い熊 2026-10-13: the ↖/↗ had
+                // to be dragged up to %Diagswipe_Pct, and a quick flick fell through to 次app/前app). The
+                // release sector stops at 60° off vertical rather than 70°, so a sideways swipe along the
+                // bottom edge that drifts up a little still switches apps.
+                if (!fired) {
+                    val flick = upDiagonal(dx, dy, DIAGONAL_FLICK_MAX_RATIO)
+                    if (flick != null && hasDiagonal(flick)) onDiagonal(flick) else onSwipe(dx, dy)
+                }
             }
             null -> { onLongPress?.invoke(); drainPressed(down.id) }
             else -> {
@@ -1251,6 +1293,23 @@ private suspend fun PointerInputScope.detectEdgeGestures(
         }
     }
 }
+
+/**
+ * Which upward diagonal a drag of ([dx], [dy]) is: true = up-right, false = up-left, null = neither.
+ * The sector is 20°–70° off vertical (20°–60° for a short flick judged on release, via [maxRatio]). The lower edge is the one that matters: swiping from the bottom
+ * middle toward a corner of the unfolded Mate XT (2048×2232) runs about 25° off vertical, so the 45°
+ * that "diagonal" suggests would miss the very gesture it is for, while a swipe meant to go straight
+ * up seldom leans more than ~15°.
+ */
+private fun upDiagonal(dx: Float, dy: Float, maxRatio: Float = DIAGONAL_MAX_RATIO): Boolean? {
+    if (dy >= 0f) return null
+    val ratio = kotlin.math.abs(dx) / -dy
+    return if (ratio in DIAGONAL_MIN_RATIO..maxRatio) dx > 0f else null
+}
+
+private const val DIAGONAL_MIN_RATIO = 0.364f   // tan 20°
+private const val DIAGONAL_MAX_RATIO = 2.747f   // tan 70°
+private const val DIAGONAL_FLICK_MAX_RATIO = 1.732f   // tan 60° — the narrower sector for a short flick
 
 /** Consume the rest of a claimed gesture until the pointer lifts (so it doesn't leak to anything else). */
 private suspend fun AwaitPointerEventScope.drainPressed(id: PointerId) {
