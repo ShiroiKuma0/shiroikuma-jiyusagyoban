@@ -146,9 +146,42 @@ into their islands as `new` on 「すべて確定」. The normal 訳して音声
 
 ## 4. Capture on the phone (自由作業盤, for reference)
 
-- 物理鍵 vol-down **triple** toggles capture mode (it no longer reads the time).
+- 物理鍵 vol-down **triple** toggles capture mode (it no longer reads the time). Entering it only arms
+  it; nothing records until the first single press (2026-10-12).
 - In capture mode a **single** vol-down press starts a sentence and the next saves it; the grabber
-  consumes these presses so the volume does not change, screen on or off.
-- Vibrations: start = one 200 ms buzz · saved = two short · capture mode ended = three short · error
-  (mic lost, nothing saved) = one long 800 ms.
+  consumes these presses so the volume does not change, screen on or off. With the screen on and the
+  camera in front, the press is the camera's shutter instead (2026-10-12).
+- Vibrations: armed = two 200 ms · start = one 200 ms buzz · saved = two short · capture mode ended =
+  three short · error (mic lost, nothing saved) = one long 800 ms.
 - Ending capture mode while a sentence records saves it first.
+
+## 7. Amendment — the sentence's language is decided in the review (both sides, 2026-10-11)
+
+§1 says `en` is "a default, not a verdict; kxkb may re-decode in another language", and §2's item object has
+carried a `language` field from the start. Until now it was always `en`, because nothing could change it.
+kxkb's Walk capture page now can: every captured sentence carries a language pill (English ⇄ čeština) and
+the page has a "mark all" for a whole walk, and the language a sentence is set to is the language its clip
+is decoded in — the Whisper decode, the word marks, the Czech clause commas, and what the voice corpus
+learns from the sentence.
+
+So §2's `language`:
+
+- is present on every item and holds exactly `en` or `cs`;
+- is **authoritative** — 白い熊's verdict in the review, and the language the audio was really decoded in,
+  not the recorder's guess;
+- is normalised before it can be sent: an unknown or blank code on an offered clip becomes `en`, which the
+  review can then change. 言語島 never sees a third value.
+
+For 言語島 that makes the inbox a mixed-language queue: the row's language must be stored and shown, the
+island proposal must be told which language the sentence is in, a `cs` row translates cs→ja, and its
+source-side voice is a Czech voice.
+
+§1 is unchanged. A 自由作業盤 that wants to mark a whole walk at record time may send `"cs"` in the offer —
+kxkb honours it as the sentence's starting language — but nothing requires it, and the review has the last
+word either way. §2 still carries no audio: the clip belongs to kxkb's voice corpus once its uuid came back
+in `OK:`, and a 言語島 that needs the recording itself would need a new section here, agreed first.
+
+Switching a sentence's language DISCARDS its decode: a transcription belongs to the language it was made
+in, and a Czech sentence read as English is not a sentence to correct but one to decode again. The page
+asks before dropping one. Corrections already saved stay — they went into the voice corpus the moment they
+were saved — and the recording is untouched, which is all a re-decode needs.
