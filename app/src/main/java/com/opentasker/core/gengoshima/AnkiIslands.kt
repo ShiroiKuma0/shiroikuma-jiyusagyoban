@@ -76,8 +76,15 @@ object AnkiIslands {
     /** Everything the note carries; the position is not part of it — 暗記 never repositions a note. */
     fun ankiHash(s: GengoshimaSentenceEntity, island: GengoshimaIslandEntity): String =
         MessageDigest.getInstance("SHA-1")
-            .digest("${island.uuid}|${s.en}|${s.ja}|${s.audioHash}|${s.enAudioHash}".toByteArray())
+            .digest(("${island.uuid}|${s.en}|${s.ja}|${s.audioHash}|${s.enAudioHash}" + langSuffix(s)).toByteArray())
             .joinToString("") { "%02x".format(it) }
+
+    /**
+     * The language joins the hash only when it is not English, so every note synced before Czech
+     * existed keeps its hash and is not sent again for nothing.
+     */
+    private fun langSuffix(s: GengoshimaSentenceEntity): String =
+        GengoshimaLanguage.normalize(s.language).let { if (it == GengoshimaLanguage.EN) "" else "|$it" }
 
     // ── the sync manifest ───────────────────────────────────────────────────────────────────────
 
@@ -142,7 +149,10 @@ object AnkiIslands {
                             put("uuid", row.uuid)
                             put("island", island.uuid)
                             put("position", row.position)
+                            // The source sentence, English or Czech, in the one source field; its
+                            // language beside it, which 暗記 files as the tag li::lang::<code>.
                             put("english", row.en.trim())
+                            put("language", GengoshimaLanguage.normalize(row.language))
                             put("japanese", row.ja.trim())
                             File(row.audioPath).takeIf { it.isFile }?.let {
                                 val p = "audio/${row.uuid}-ja.ogg"

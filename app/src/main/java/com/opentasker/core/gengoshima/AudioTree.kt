@@ -103,14 +103,18 @@ object AudioTree {
         return capBytes(base) + ".ogg"
     }
 
-    /** The English reading's file — the same fields, its own pattern (default `{no} {ja} [en]`). */
+    /**
+     * The source reading's file — the same fields, its own pattern per language (default
+     * `{no} {ja} [en]`, and `{no} {ja} [cs]` for a Czech sentence, whose `{en}` is the Czech).
+     */
     fun sentenceEnFileName(sentence: GengoshimaSentenceEntity, s: GengoshimaSettings): String {
         val ja = field(sentence.ja, s.nameMaxChars)
         val en = field(sentence.en, s.nameMaxChars)
+        val cs = GengoshimaLanguage.normalize(sentence.language) == GengoshimaLanguage.CS
         val base = fill(
-            s.sentenceFileEnPattern,
+            if (cs) s.sentenceFileCsPattern else s.sentenceFileEnPattern,
             mapOf("no" to number(sentence.position, s.numberWidth), "ja" to ja.ifEmpty { en }, "en" to en),
-        ).ifEmpty { number(sentence.position, s.numberWidth) + " en" }
+        ).ifEmpty { number(sentence.position, s.numberWidth) + if (cs) " cs" else " en" }
         return capBytes(base) + ".ogg"
     }
 

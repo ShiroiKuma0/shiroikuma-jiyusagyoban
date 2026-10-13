@@ -99,4 +99,48 @@ class WalkCaptureTest {
     fun `rows without an island block filing`() {
         assertEquals(listOf("x"), InboxFiling.unfiled(listOf(row("x", 1), row("y", 2, island = 1))).map { it.uuid })
     }
+
+    @Test
+    fun `intake keeps Czech and normalises anything else to English`() {
+        val rows = GengoshimaIntake.parse(
+            """[{"uuid":"a","text":"Šel jsem k řece.","language":"cs"},
+               {"uuid":"b","text":"x","language":"CS "},
+               {"uuid":"c","text":"y","language":"de"},
+               {"uuid":"d","text":"z","language":""}]""",
+            now = 1,
+        )!!
+        assertEquals(listOf("cs", "cs", "en", "en"), rows.map { it.language })
+    }
+
+    @Test
+    fun `prompts tag every sentence with its language`() {
+        val island = GengoshimaIslandEntity(id = 1, position = 1, nameEn = "River", createdAt = 0)
+        val inbox = listOf(
+            GengoshimaInboxEntity("u", "Šel jsem k řece.", "", "cs", 1, 0),
+            GengoshimaInboxEntity("v", "I walked.", "", "en", 2, 0),
+        )
+        val proposal = IslandProposer.prompt(listOf(island), emptyMap(), inbox)
+        assertTrue(proposal, "u: [cs] Šel jsem k řece." in proposal)
+        assertTrue(proposal, "v: [en] I walked." in proposal)
+        val cs = com.opentasker.core.storage.GengoshimaSentenceEntity(
+            id = 9, islandId = 1, position = 1, en = "Šel jsem k řece.", language = "cs", createdAt = 0, updatedAt = 0,
+        )
+        val translation = Translator.prompt(island, listOf(cs), listOf(cs))
+        assertTrue(translation, "id 9 [1] [cs] Šel jsem k řece." in translation)
+    }
+
+    @Test
+    fun `the source reading keys on language but leaves English hashes as they were`() {
+        val s = GengoshimaSettings()
+        assertEquals(GenerationRunner.enAudioHash("Ahoj", s), GenerationRunner.enAudioHash("Ahoj", s, "en"))
+        assertTrue(GenerationRunner.enAudioHash("Ahoj", s) != GenerationRunner.enAudioHash("Ahoj", s, "cs"))
+    }
+
+    @Test
+    fun `a Japanese topic is the island's name as it stands`() {
+        assertEquals("健康", GengoshimaLanguage.islandNameFromTopic(" 健康 "))
+        assertEquals("ロシア", GengoshimaLanguage.islandNameFromTopic("ロシア"))
+        assertEquals("", GengoshimaLanguage.islandNameFromTopic("Health"))
+        assertEquals("", GengoshimaLanguage.islandNameFromTopic("Zdraví"))
+    }
 }

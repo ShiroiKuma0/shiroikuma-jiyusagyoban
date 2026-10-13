@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.gengoshima.AudioTree
 import com.opentasker.core.gengoshima.GenerationRunner
+import com.opentasker.core.gengoshima.GengoshimaLanguage
 import com.opentasker.core.gengoshima.GengoshimaSettings
 import com.opentasker.core.gengoshima.Translator
 import com.opentasker.core.storage.GengoshimaDao
@@ -94,7 +97,7 @@ class GengoshimaIslandsActivity : ComponentActivity() {
             OpenTaskerTheme(prefs = themePrefs) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     EditorRoot(
-                        onClose = { finish() },
+                        onClose = { closeToBoard() },
                         onGenerate = {
                             GenerationRunner.start(applicationContext, GengoshimaSettings.last(applicationContext))
                             startActivity(GengoshimaProgressActivity.intent(applicationContext))
@@ -140,7 +143,7 @@ private fun EditorRoot(onClose: () -> Unit, onGenerate: () -> Unit) {
                 fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+            HeaderPill("閉じる", onClose)
         }
         Column(Modifier.weight(1f)) {
             if (island == null) {
@@ -240,7 +243,14 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
         }
         items(sentences, key = { it.id }) { s ->
             Column(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)).padding(8.dp)) {
-                Text("${s.position}　${s.en}", fontSize = 16.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Only Czech is marked: English is the norm, and a chip on every line is noise.
+                    if (GengoshimaLanguage.normalize(s.language) == GengoshimaLanguage.CS) {
+                        LanguageChip(s.language)
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text("${s.position}　${s.en}", fontSize = 16.sp)
+                }
                 val tokens = Translator.tokens(s.tokensJson)
                 if (tokens.isNotEmpty() && tokens.joinToString("") { it.surface } == s.ja) {
                     // Each word a button: tap it to set how VOICEVOX should read it.
@@ -294,11 +304,23 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
         }
     }
     editing?.let { s ->
-        SentenceEditDialog(s, onDismiss = { editing = null }) { en, ja ->
+        SentenceEditDialog(s, onDismiss = { editing = null }) { en, ja, language ->
             editing = null
             scope.launch {
                 val now = System.currentTimeMillis()
                 when {
+                    // A new language means the source was read wrong: translate it again from the
+                    // right one, and drop the old source reading — it is the wrong voice, and its
+                    // file name carries the old language.
+                    language != GengoshimaLanguage.normalize(s.language) -> {
+                        if (s.enAudioPath.isNotEmpty()) File(s.enAudioPath).delete()
+                        dao.updateSentence(
+                            s.copy(
+                                en = en, language = language, jaEdited = false, state = GengoshimaSentenceEntity.STATE_NEW,
+                                enAudioPath = "", enAudioHash = "", enDurationMs = 0, updatedAt = now,
+                            ),
+                        )
+                    }
                     en != s.en -> dao.updateSentence(s.copy(en = en, jaEdited = false, state = GengoshimaSentenceEntity.STATE_NEW, updatedAt = now))
                     ja != s.ja -> dao.updateSentence(s.copy(ja = ja, jaEdited = true, state = GengoshimaSentenceEntity.STATE_ANNOTATE, updatedAt = now))
                 }
@@ -432,24 +454,29 @@ private val REGISTERS = listOf(
 )
 
 @Composable
-private fun SentenceEditDialog(s: GengoshimaSentenceEntity, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+private fun SentenceEditDialog(s: GengoshimaSentenceEntity, onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
     var en by remember { mutableStateOf(s.en) }
     var ja by remember { mutableStateOf(s.ja) }
+    var language by remember { mutableStateOf(GengoshimaLanguage.normalize(s.language)) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("文を直す / Edit sentence") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(en, { en = it }, label = { Text("英文 / English") })
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("原文の言語 / source language", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LanguageChip(language, onClick = { language = GengoshimaLanguage.toggle(language) })
+                }
+                OutlinedTextField(en, { en = it }, label = { Text("原文（${GengoshimaLanguage.japaneseName(language)}） / Source") })
                 OutlinedTextField(ja, { ja = it }, label = { Text("日本語 / Japanese") })
                 Text(
-                    "英文を直す → 訳し直し。日本語を直す → その通りに残し、単語分けと音声だけ作り直す。\n" +
-                        "Edit the English → translated again. Edit the Japanese → kept exactly; only re-split and re-voiced.",
+                    "原文か言語を直す → 訳し直し。日本語を直す → その通りに残し、単語分けと音声だけ作り直す。\n" +
+                        "Edit the source or its language → translated again. Edit the Japanese → kept exactly; only re-split and re-voiced.",
                     fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
-        confirmButton = { Button(onClick = { onSave(en.trim(), ja.trim()) }, enabled = en.isNotBlank()) { Text("保存") } },
+        confirmButton = { Button(onClick = { onSave(en.trim(), ja.trim(), language) }, enabled = en.isNotBlank()) { Text("保存") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
     )
 }

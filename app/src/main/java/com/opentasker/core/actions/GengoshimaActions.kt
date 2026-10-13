@@ -146,7 +146,7 @@ class GengoshimaAnkiAdoptAction : GengoshimaGenerateAction(GenerationRunner.Mode
 /**
  * 言語島 walk capture, driven by 物理鍵 with the screen off (docs/sister-app-contract-kxkb-gengoshima.md).
  *
- * `op=mode` (vol-down triple) toggles capture mode — entering it starts sentence 1 at once; leaving it
+ * `op=mode` (vol-down triple) toggles capture mode — entering it only arms it (two buzzes); leaving it
  * saves what is recording and offers every clip to 白い熊 kxkb. `op=sentence` (vol-down single while
  * `gengoshima_capture=true`) starts a sentence or saves the one recording. All feedback is vibration,
  * done by [com.opentasker.core.gengoshima.SentenceCapture]; `store` gets a one-line outcome.

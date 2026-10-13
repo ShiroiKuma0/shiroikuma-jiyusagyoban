@@ -82,6 +82,9 @@ API key must never be blanked.
 | `%Gengoshima_OpusKbps` | `48` | Bitrate (both languages) |
 | `%Gengoshima_EnVoice` | `am_michael` | Kokoro voice |
 | `%Gengoshima_EnSpeed` | `1.0` | English speed |
+| `%Gengoshima_SentenceFileCsPattern` | `{no} {ja} [cs]` | Czech source file name (`{en}` is the Czech) |
+| `%Gengoshima_CsVoice` | *(blank)* | 音声’s Czech voice: `jirka` (male) or `kasandra` (female, 音声 1.0+011); blank = 音声’s own selected voice |
+| `%Gengoshima_CsSpeed` | `1.0` | Czech speed |
 | `%Gengoshima_AnkiSync` | `on` | Sync to 暗記 after every run and every editor close |
 | `%Gengoshima_AnkiRoot` | `言語島々` | Root deck |
 | `%Gengoshima_AnkiRecognition` | `認識` | Recognition subtree |
@@ -108,8 +111,11 @@ Sentences come from walking and saying whatever comes to mind, screen off. Contr
 1. **Capture** — 物理鍵: vol-down triple → `言語島 録音切替` (`gengoshima.capture op=mode`) toggles capture
    mode; in it, vol-down single → profile `物理鍵 言語島文` → `言語島 文` (`op=sentence`) starts / saves
    a sentence. The key grabber's `setConsumeShort` gate swallows screen-off singles so the volume does not
-   move; `物理鍵 音量下単` carries `gengoshima_capture=true` inverted. Vibration only: start 1 · saved 2 ·
-   mode ended 3 · error long 1. `core/gengoshima/SentenceCapture.kt` — 16 kHz mono PCM16 WAV per
+   move; `物理鍵 音量下単` carries `gengoshima_capture=true` inverted. Entering the mode only ARMS it
+   (2026-10-12): the first sentence starts with a single press like the rest, so no walk opens with a
+   clip of the triple press. With the screen on and the camera in front (`%Pkey_CamPkg`), `言語島 文`
+   hands the press to `下・単押し` — the shutter — instead; screen off, or out of the camera, it marks
+   sentences again. Vibration only: armed 2 long · start 1 · saved 2 short · mode ended 3 · error long 1. `core/gengoshima/SentenceCapture.kt` — 16 kHz mono PCM16 WAV per
    sentence, UNPROCESSED or VOICE_RECOGNITION (no AGC), 28 s auto-split, < 0.2 s dropped, streamed to
    `filesDir/gengoshima_capture/` with a JSON sidecar.
 2. **To kxkb** — `ClipOffer` on mode end and every engine start: `voice_capture_offer`, ≤ 10 descriptors
@@ -121,18 +127,45 @@ Sentences come from walking and saying whatever comes to mind, screen off. Contr
    island or a new one per sentence; tap a chip to change one, long-press to select many and move them;
    「すべて確定」 (`InboxFiling`) creates the new islands and appends in spoken order; then 訳して音声を作る.
 
-## Data — Room v33 → v35
+## Czech sentences (2026-10-11) — the source is English OR Czech
+
+kxkb contract §7: each walk sentence carries `language` `en` | `cs`, decided in kxkb's review. 白い熊's
+decisions: **per sentence**, islands **mix freely** (the proposer files by topic only), Czech reaches 暗記
+in the same source field plus `language` (→ tag `li::lang::cs`, 暗記's side), and the language is
+settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on 文入力 (EN/CS chip, sticky).
+
+- `GengoshimaLanguage` — codes, `normalize` (anything else → `en`), chip text. `LanguageChip` — `EN`
+  outlined, `CS` solid yellow with black letters (fill + letters, never hue alone); 島 and 文入力 mark only
+  Czech lines.
+- Prompts tag every line `[en]`/`[cs]`: `IslandProposer` (understand Czech as Czech; names stay English)
+  and `Translator` (translate each line from its own language, cs→ja; glosses stay English).
+- The source reading (`enAudio*` columns, still so named) is voiced per language: an `en` batch to Kokoro,
+  a `cs` batch with 音声 `lang=cs` (+ `cs_voice`; Piper cs_CZ `jirka` (male, default, 音声 1.0+010) or
+  `kasandra` (female, 1.0+011, render contract revision 2026-10-12), each its own ≈67 MB model via 音声 main
+  screen → Czech voices → ⤓; kasandra reads markedly faster, ≈9.8 s vs 14.1 s for one passage, so
+  `%Gengoshima_CsSpeed` tuned for one voice won't suit the other). Gated on PING: an explicit
+  `%Gengoshima_CsVoice` must be in `cs_installed_voices`, a blank one (or a 1.0+010 without that list)
+  goes by `cs_installed`, which covers only 音声's selected Czech voice — a 音声 without Czech
+  leaves Czech sentences waiting, unvoiced, and says so in the step. Hash key `sourceVoiceKey(language)`;
+  English keys are unchanged, so nothing English re-voices.
+- Changing a filed sentence's language re-translates it and deletes its old source file.
+- The 未分類 title counts Czech rows: `未分類 (12 · CS 3)`.
+
+## Data — Room v33 → v36
 
 `core/storage/.../GengoshimaDao.kt`. **The database is authoritative; the audio tree is a view.**
 
 - `gengoshima_islands` — position, `nameEn`, `nameJa`, `register`, status, SM-2 fields, `dirName`
   (where its files are now), `uuid` (v34; what 暗記's decks are keyed by).
+  `nameEn` is the topic as typed (English, Czech or Japanese despite the name). A topic already in
+  Japanese (any kana/kanji) is the Japanese name as it stands; only a non-Japanese topic is named by
+  Claude, on its first translation (2026-10-12 — Claude had renamed a typed 健康 to 体の調子).
 - `gengoshima_sentences` — island, position, `en`, `ja`, `tokensJson`
   (`[{surface, base, reading, reading_override?, gloss}]`), state
   (`new → translated → ready`, `annotate` = Japanese edited by hand, `error`), `jaEdited`,
   `audioPath`/`audioHash`/`durationMs`; v34 adds `uuid` (the 暗記 note's tag), `enAudioPath`/
   `enAudioHash`/`enDurationMs`, `ankiHash` (what 暗記 last took) and `ankiNid` (the note it was
-  adopted from).
+  adopted from). v36 adds `language` (`en` | `cs`, default `en`) — the language `en` is in.
 - `gengoshima_sessions`, `gengoshima_plays` — listening history (a sentence counts as heard at
   ≥ 60 % played).
 - `gengoshima_tombstones` (v34) — uuids of deleted sentences/islands not yet told to 暗記.
@@ -140,7 +173,7 @@ Sentences come from walking and saying whatever comes to mind, screen off. Contr
   `en`, `recognized`, the target (`islandId` or `newIslandName`/`newIslandRegister`), `proposed`,
   `state` (`pending` → `filed`, kept so a re-send is still answered OK), `sentenceId`.
 
-Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`);
+Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`, `MIGRATION_35_36`);
 `python3 scripts/check-room-migration.py --all` passes. The backup category `gengoshima` carries all
 six tables.
 
@@ -239,7 +272,11 @@ terminal broadcast later (`GENGOSHIMA_ANKI_REPLY`), progress on `GENGOSHIMA_ANKI
   application skips its start-up there). Pauses are the service's, per item (`pauseAfterMs`), so the
   mode decides them; next/previous move by sentence. Recall: English, a think pause
   (`length × factor × 1.5 + 1 s`), then Japanese, which is hidden while you answer. Shows over the
-  lock screen; tapping a word looks it up in 辞書.
+  lock screen; tapping a word looks it up in 辞書. The picker's islands drag-reorder (long-press the
+  handle); a drop renumbers `position` for good, as the editor's arrows do.
+- **Header pills** (2026-10-12): 閉じる is an outlined pill (`HeaderPill`). On the board's windows — the
+  picker, 文入力, 未分類, the editor, statistics — it returns to the board (`closeToBoard`); on the
+  playing screen it stops and returns to the picker. 止める, which did the same, was removed.
 - **Editor** (`GengoshimaIslandsActivity`): reorder, move, delete, edit English or Japanese, per-word
   readings; island actions are pills (edit, 辞書で学ぶ, delete).
 - **Statistics** (`GengoshimaStatsActivity`): calendar, sessions with times, time of day, streaks,
