@@ -28,6 +28,6 @@
         "contextFamilies": 7,
         "bundleSchemaVersion": 5,
         "bundleSupportedSchemaVersions": "5..5",
-        "roomSchemaVersion": 30
+        "roomSchemaVersion": 36
     }
 }
