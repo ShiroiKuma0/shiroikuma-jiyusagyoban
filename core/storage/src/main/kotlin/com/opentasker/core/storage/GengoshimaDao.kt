@@ -100,6 +100,11 @@ data class GengoshimaSentenceEntity(
     @ColumnInfo(defaultValue = "") val ankiHash: String = "",
     /** The existing Anki note this sentence was adopted from (「暗記から取り込む」), until synced. */
     @ColumnInfo(defaultValue = "NULL") val ankiNid: Long? = null,
+    /**
+     * The language [en] is written in — `en` or `cs`. The column keeps its
+     * old name: it is the SOURCE sentence, English or Czech, translated into [ja] (v36).
+     */
+    @ColumnInfo(defaultValue = "'en'") val language: String = "en",
 ) {
     companion object {
         const val STATE_NEW = "new"

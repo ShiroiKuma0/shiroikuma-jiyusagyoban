@@ -103,7 +103,7 @@ object GenerationRunner {
             Step("暗記から取り込む / Take the notes from 暗記", key = K.ADOPT).takeIf { mode == Mode.ADOPT },
             Step("訳す / Translate", key = K.TRANSLATE).takeIf { mode != Mode.EDITOR },
             Step("音声 / Voice", key = K.VOICE).takeIf { mode != Mode.EDITOR },
-            Step("英語の音声 / English voice", key = K.ENGLISH).takeIf { mode != Mode.EDITOR },
+            Step("原文の音声 / source voice", key = K.ENGLISH).takeIf { mode != Mode.EDITOR },
             Step("整理 / Tidy the directories", key = K.TIDY),
             Step("辞書用の一本 / Whole-island files for 辞書", key = K.EXPORT),
             Step("暗記と同期 / Sync with 暗記", key = K.ANKI).takeIf { anki || mode != Mode.GENERATE },
@@ -344,6 +344,13 @@ object GenerationRunner {
         for (islandRow in islands) {
             if (total == 0) break
             var island = islandRow
+            // An island made before the Japanese-topic rule: its Japanese topic is its name, not Claude's.
+            if (island.nameJa.isBlank()) {
+                GengoshimaLanguage.islandNameFromTopic(island.nameEn).takeIf { it.isNotEmpty() }?.let {
+                    island = island.copy(nameJa = it)
+                    dao.updateIsland(island)
+                }
+            }
             val chunks = dao.sentences(island.id)
                 .filter { it.state == GengoshimaSentenceEntity.STATE_NEW && !it.jaEdited }
                 .chunked(CHUNK)
@@ -602,69 +609,109 @@ object GenerationRunner {
     }
 
     /**
-     * The English reading of every sentence (addendum C1, 2026-10-01): 音声's Kokoro voice, a second
-     * file beside the Japanese, for 暗記's Production cards and the player's English-first Recall.
+     * The source reading of every sentence (addendum C1, 2026-10-01): a second file beside the
+     * Japanese, for 暗記's Production cards and the player's source-first Recall. An English sentence
+     * is read by 音声's Kokoro voice, a Czech one by its Czech voice (contract revision 2026-10-11) —
+     * one batch per language, never an English voice reading Czech.
      *
-     * Asked of 音声 first (PING): without the English model every sentence would fail one by one, so
-     * the step is skipped instead, saying why. Kokoro is about twice as slow as real time on the
-     * phone (measured: first file ~10 s with the model load, then 5–8 s each), so this step is the
-     * long one; the window shows each file as it lands.
+     * Asked of 音声 first (PING): without a language's model every sentence of it would fail one by
+     * one, so that language is skipped instead, saying why — a 音声 that predates Czech answers no
+     * `cs_installed` and its Czech sentences simply wait, unvoiced, for the next run. Kokoro is about
+     * twice as slow as real time on the phone (measured: first file ~10 s with the model load, then
+     * 5–8 s each), so this step is the long one; the window shows each file as it lands.
      */
     private suspend fun voiceEnglish(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes): Voiced {
         val islands = dao.islands().associateBy { it.id }
-        data class Job(val sentence: GengoshimaSentenceEntity, val hash: String, val file: File)
+        data class Job(val sentence: GengoshimaSentenceEntity, val lang: String, val hash: String, val file: File)
         val jobs = dao.allSentences().mapNotNull { sentence ->
             if (sentence.en.isBlank() || sentence.state != GengoshimaSentenceEntity.STATE_READY) return@mapNotNull null
             val island = islands[sentence.islandId] ?: return@mapNotNull null
-            val hash = enAudioHash(sentence.en, s)
+            val lang = GengoshimaLanguage.normalize(sentence.language)
+            val hash = enAudioHash(sentence.en, s, lang)
             if (sentence.enAudioHash == hash && sentence.enAudioPath.isNotEmpty() && File(sentence.enAudioPath).exists()) return@mapNotNull null
-            Job(sentence, hash, AudioTree.sentenceEnFile(island, sentence, s))
+            Job(sentence, lang, hash, AudioTree.sentenceEnFile(island, sentence, s))
         }
         if (jobs.isEmpty()) {
             step(K.ENGLISH, StepState.SKIP, "読ませるものはありません / nothing to voice")
             return Voiced(0, 0, null)
         }
-        step(K.ENGLISH, StepState.RUN, "白い熊 音声 に英語の声があるか確かめています / asking 音声 for English", 0)
+        step(K.ENGLISH, StepState.RUN, "白い熊 音声 に原文の声があるか確かめています / asking 音声 for its voices", 0)
         val pong = OnseRender.ping(app)
-        if (pong == null || !pong.enInstalled) {
-            val why = if (pong == null) "白い熊 音声 did not answer" else "English model not installed in 白い熊 音声 (main screen → English voices → ⤓)"
-            step(K.ENGLISH, StepState.SKIP, "英語は飛ばしました / skipped — $why")
-            log("– 英語: $why")
+        if (pong == null) {
+            step(K.ENGLISH, StepState.SKIP, "原文は飛ばしました / skipped — 白い熊 音声 did not answer")
+            log("– 原文: 白い熊 音声 did not answer")
             return Voiced(0, 0, null)
         }
-        log("→ 白い熊 音声 (英語 ${s.enVoice}): ${jobs.size} 文")
-        grantTempAllowance(OnseRender.PACKAGE, (120L + jobs.size * 15L) * 1000L)?.let { AppLogger.info(TAG, it) }
-        val byId = jobs.associateBy { it.sentence.id.toString() }
-        var ok = 0
-        val start = System.currentTimeMillis()
-        val result = OnseRender.render(
-            context = app,
-            items = jobs.map { OnseRender.Item(it.sentence.id.toString(), it.sentence.en, it.file.absolutePath) },
-            batchDir = File(s.dir),
-            voice = OnseRender.Voice(lang = "en", enVoice = s.enVoice, speed = s.enSpeed, bitrateKbps = s.bitrateKbps),
-            onSent = { step(K.ENGLISH, StepState.RUN, "英語の声を読み込み、一文目を作っています / loading the English voice\n${jobs[0].sentence.en}") },
-        ) { reply ->
-            val job = byId[reply.id] ?: return@render
-            // Re-read: the Japanese step may have just written this row.
-            val row = dao.sentence(job.sentence.id) ?: return@render
-            if (reply.ok) {
-                ok++
-                dao.updateSentence(row.copy(enAudioPath = reply.outPath, enAudioHash = job.hash, enDurationMs = reply.durationMs))
-                log("  ♪ en ${reply.index}/${reply.total}  ${reply.durationMs / 100 / 10.0}秒  ${job.sentence.en}")
-            } else {
-                log("✕ en ${reply.index}/${reply.total}  ${job.sentence.en}: ${reply.error}")
+        val skipped = ArrayList<String>()
+        val batches = jobs.groupBy { it.lang }.filter { (lang, list) ->
+            val installed = if (lang == GengoshimaLanguage.CS) pong.csCanSpeak(s.csVoice) else pong.enInstalled
+            if (!installed) {
+                val why = if (lang == GengoshimaLanguage.CS) {
+                    "Czech voice ${s.csVoice.ifBlank { pong.csDefault }} not installed in 白い熊 音声 (main screen → Czech voices → ⤓) — ${list.size} 文 wait"
+                } else {
+                    "English model not installed in 白い熊 音声 (main screen → English voices → ⤓)"
+                }
+                skipped += "${GengoshimaLanguage.japaneseName(lang)}: $why"
+                log("– ${GengoshimaLanguage.japaneseName(lang)}: $why")
             }
-            val pct = reply.index * 100 / reply.total.coerceAtLeast(1)
-            val each = (System.currentTimeMillis() - start) / reply.index
-            val eta = each * (reply.total - reply.index) / 1000
-            val next = jobs.getOrNull(reply.index)?.sentence?.en
-            notes.progress("英語 / English ${reply.index} / ${reply.total}", pct)
-            step(K.ENGLISH, StepState.RUN, "${reply.index} / ${reply.total}" + (if (eta > 0) " · 残り約 ${eta}秒" else "") + (next?.let { "\n$it" } ?: ""), pct)
+            installed
         }
-        if (!result.ok && OnseWarning.needsAttention(result.result)) OnseWarning.post(app, result.result)
-        step(K.ENGLISH, if (result.ok && ok == jobs.size) StepState.DONE else StepState.FAIL,
-            "$ok / ${jobs.size}" + if (result.ok) "" else " — ${result.result.removePrefix("ERROR:")}", 100)
-        return Voiced(ok, jobs.size - ok, if (result.ok) null else "英語: " + result.result.removePrefix("ERROR:"))
+        val todo = batches.values.flatten()
+        if (todo.isEmpty()) {
+            step(K.ENGLISH, StepState.SKIP, "原文は飛ばしました / skipped — " + skipped.joinToString("; "))
+            return Voiced(0, 0, null)
+        }
+        grantTempAllowance(OnseRender.PACKAGE, (120L + todo.size * 15L) * 1000L)?.let { AppLogger.info(TAG, it) }
+        var ok = 0
+        var done = 0
+        val errors = ArrayList<String>()
+        val start = System.currentTimeMillis()
+        for ((lang, list) in batches) {
+            val cs = lang == GengoshimaLanguage.CS
+            val name = GengoshimaLanguage.japaneseName(lang)
+            log("→ 白い熊 音声 ($name ${if (cs) s.csVoice.ifBlank { pong.csDefault } else s.enVoice}): ${list.size} 文")
+            val byId = list.associateBy { it.sentence.id.toString() }
+            val before = done
+            val result = OnseRender.render(
+                context = app,
+                items = list.map { OnseRender.Item(it.sentence.id.toString(), it.sentence.en, it.file.absolutePath) },
+                batchDir = File(s.dir),
+                voice = if (cs) {
+                    OnseRender.Voice(lang = GengoshimaLanguage.CS, csVoice = s.csVoice.ifBlank { null }, speed = s.csSpeed, bitrateKbps = s.bitrateKbps)
+                } else {
+                    OnseRender.Voice(lang = GengoshimaLanguage.EN, enVoice = s.enVoice, speed = s.enSpeed, bitrateKbps = s.bitrateKbps)
+                },
+                onSent = { step(K.ENGLISH, StepState.RUN, "${name}の声を読み込み、一文目を作っています / loading the $lang voice\n${list[0].sentence.en}") },
+            ) { reply ->
+                val job = byId[reply.id] ?: return@render
+                // Re-read: the Japanese step may have just written this row.
+                val row = dao.sentence(job.sentence.id) ?: return@render
+                if (reply.ok) {
+                    ok++
+                    dao.updateSentence(row.copy(enAudioPath = reply.outPath, enAudioHash = job.hash, enDurationMs = reply.durationMs))
+                    log("  ♪ $lang ${reply.index}/${reply.total}  ${reply.durationMs / 100 / 10.0}秒  ${job.sentence.en}")
+                } else {
+                    log("✕ $lang ${reply.index}/${reply.total}  ${job.sentence.en}: ${reply.error}")
+                }
+                done = before + reply.index
+                val pct = done * 100 / todo.size.coerceAtLeast(1)
+                val each = (System.currentTimeMillis() - start) / done.coerceAtLeast(1)
+                val eta = each * (todo.size - done) / 1000
+                val next = list.getOrNull(reply.index)?.sentence?.en
+                notes.progress("原文 / source $done / ${todo.size}", pct)
+                step(K.ENGLISH, StepState.RUN, "$done / ${todo.size}" + (if (eta > 0) " · 残り約 ${eta}秒" else "") + (next?.let { "\n$it" } ?: ""), pct)
+            }
+            done = before + list.size
+            if (!result.ok) {
+                if (OnseWarning.needsAttention(result.result)) OnseWarning.post(app, result.result)
+                errors += "$name: " + result.result.removePrefix("ERROR:")
+            }
+        }
+        val clean = errors.isEmpty() && ok == todo.size
+        step(K.ENGLISH, if (clean) StepState.DONE else StepState.FAIL,
+            "$ok / ${todo.size}" + (if (errors.isEmpty()) "" else " — " + errors.joinToString("; ")) +
+                (if (skipped.isEmpty()) "" else "\n" + skipped.joinToString("\n")), 100)
+        return Voiced(ok, todo.size - ok, errors.takeIf { it.isNotEmpty() }?.joinToString("; "))
     }
 
     /** One 暗記 sync's outcome: [line] for the summary, [error] when it did not go through. */
@@ -868,8 +915,8 @@ object GenerationRunner {
         }
     }
 
-    fun enAudioHash(text: String, s: GengoshimaSettings): String =
-        MessageDigest.getInstance("SHA-1").digest("$text|${s.enVoiceKey}".toByteArray())
+    fun enAudioHash(text: String, s: GengoshimaSettings, language: String = GengoshimaLanguage.EN): String =
+        MessageDigest.getInstance("SHA-1").digest("$text|${s.sourceVoiceKey(language)}".toByteArray())
             .joinToString("") { "%02x".format(it) }
 
     /** The one notification a run keeps up to date, and replaces with its outcome at the end. */

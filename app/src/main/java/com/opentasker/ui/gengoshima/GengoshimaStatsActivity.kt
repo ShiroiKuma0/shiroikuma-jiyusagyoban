@@ -74,7 +74,7 @@ class GengoshimaStatsActivity : ComponentActivity() {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    StatsScreen(onClose = { finish() })
+                    StatsScreen(onClose = { closeToBoard() })
                 }
             }
         }
@@ -107,7 +107,7 @@ private fun StatsScreen(onClose: () -> Unit) {
     ) {
         Row {
             Text("言語島 — 統計", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClose) { Text("閉じる", fontSize = 18.sp) }
+            HeaderPill("閉じる", onClose)
         }
 
         Card("合計 / Totals") {

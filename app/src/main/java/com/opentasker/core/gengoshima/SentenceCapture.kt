@@ -26,12 +26,15 @@ import org.json.JSONObject
  * 言語島's walk capture: sentences spoken outside with the screen off, one WAV per sentence, for kxkb
  * to transcribe and 白い熊 to review at home (docs/sister-app-contract-kxkb-gengoshima.md).
  *
- * Driven by 物理鍵: vol-down triple → [toggleMode], vol-down single while the mode is on → [sentence].
+ * Driven by 物理鍵: vol-down triple → [toggleMode] (arms it; nothing records yet), vol-down single
+ * while the mode is on → [sentence]. With the screen on and the camera in front, 物理鍵 sends the
+ * single press to the camera's shutter instead (its task 言語島 文, 2026-10-12).
  * The feedback is vibration only, because nothing here may need the eyes:
  *
  * | event | pattern |
  * | --- | --- |
- * | sentence started (also on entering the mode) | one 200 ms buzz |
+ * | capture mode entered — armed, nothing recording yet | two 200 ms |
+ * | sentence started | one 200 ms buzz |
  * | sentence saved | two short |
  * | capture mode ended | three short |
  * | error — mic lost or refused, nothing saved | one long 800 ms |
@@ -75,6 +78,7 @@ object SentenceCapture {
     private const val MAX_DATA_BYTES = (MAX_MS * BYTES_PER_SEC / 1000).toInt()
     private const val MIN_DATA_BYTES = (MIN_MS * BYTES_PER_SEC / 1000).toInt()
 
+    private val BUZZ_MODE_START = longArrayOf(0, 200, 150, 200)
     private val BUZZ_START = longArrayOf(0, 200)
     private val BUZZ_SAVED = longArrayOf(0, 80, 120, 80)
     private val BUZZ_MODE_END = longArrayOf(0, 80, 120, 80, 120, 80)
@@ -103,7 +107,7 @@ object SentenceCapture {
 
     fun dir(ctx: Context) = File(ctx.filesDir, DIR).apply { mkdirs() }
 
-    /** Vol-down triple: enter the mode and start sentence 1, or save what is recording and leave. */
+    /** Vol-down triple: enter the mode (armed, nothing recording), or save what is recording and leave. */
     @Synchronized
     fun toggleMode(ctx: Context): String {
         val app = ctx.applicationContext
@@ -115,8 +119,17 @@ object SentenceCapture {
             "capture mode off" + (saved?.let { ", saved $it" } ?: "")
         } else {
             discardStale(app)
+            // Armed only: the first sentence starts with a single press like every other one, so a
+            // walk no longer opens with a clip of the triple press and the pause after it (白い熊,
+            // 2026-10-12). The mic is checked now, so a refusal is felt before the first sentence.
+            if (ContextCompat.checkSelfPermission(app, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                AppLogger.warn(TAG, "言語島 capture: RECORD_AUDIO not granted")
+                buzz(app, BUZZ_ERROR)
+                return "capture mode not entered, mic refused"
+            }
             setMode(true, app)
-            if (begin(app)) "capture mode on, recording" else "capture mode on, mic refused"
+            buzz(app, BUZZ_MODE_START)
+            "capture mode on, waiting for the first sentence"
         }
     }
 
