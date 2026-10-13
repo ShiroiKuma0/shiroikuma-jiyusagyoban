@@ -34,8 +34,11 @@ object IslandProposer {
 
     internal val SYSTEM = """
         You help a learner of Japanese who studies with Mikel Hyperpolyglot's "language islands"
-        method: short monologues in English about their own life, one topic per island, later
-        translated into Japanese and memorised by listening.
+        method: short monologues about their own life, one topic per island, later translated into
+        Japanese and memorised by listening. Most sentences are English; some are Czech. Every
+        sentence is marked with its language — [en] English, [cs] Czech — and a [cs] line is Czech
+        (with its diacritics), to be understood as Czech, never as broken English. An island may hold
+        sentences of both languages: choose by topic alone. Island names are always English.
 
         The learner spoke new sentences on a walk, whatever came to mind, so they are on mixed topics.
         For each new sentence, choose the existing island whose topic it continues best (its id). If
@@ -83,12 +86,16 @@ object IslandProposer {
                 append("id ").append(isl.id).append(": ").append(isl.nameEn)
                 if (isl.register.isNotBlank()) append(" — register: ").append(isl.register)
                 append('\n')
-                sentences[isl.id].orEmpty().take(SAMPLES).forEach { append("    · ").append(it.en).append('\n') }
+                sentences[isl.id].orEmpty().take(SAMPLES).forEach {
+                    append("    · [").append(GengoshimaLanguage.normalize(it.language)).append("] ").append(it.en).append('\n')
+                }
             }
             append('\n')
         }
         append("New sentences, in the order spoken:\n")
-        inbox.forEach { append(it.uuid).append(": ").append(it.en).append('\n') }
+        inbox.forEach {
+            append(it.uuid).append(": [").append(GengoshimaLanguage.normalize(it.language)).append("] ").append(it.en).append('\n')
+        }
     }
 
     /** Ask Claude; returns uuid → pick. Picks naming an island that does not exist become "new". */
