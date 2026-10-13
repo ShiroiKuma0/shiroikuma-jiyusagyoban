@@ -73,7 +73,7 @@ class RuntimeRegistriesTest {
             "scene.show",
             "scene", "keepScreenOn", "position", "modal", "dismissOnOutside", "timeout",
             "inset", "vAlign", "heightFraction", "widthFraction", "hAlign",
-            "fullWidth", "fullscreen", "edgeCenter", "showWhenLocked",
+            "fullWidth", "stretch", "fullscreen", "edgeCenter", "showWhenLocked",
         )
         assertFieldKeys("scene.hide", "scene")
     }

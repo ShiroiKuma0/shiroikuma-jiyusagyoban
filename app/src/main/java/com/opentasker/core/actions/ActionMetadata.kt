@@ -2689,6 +2689,7 @@ fun registerActionMetadata() {
                 ActionField("title", "Title", hint = "dialog title"),
                 ActionField("packages", "Packages", hint = "optional whitespace-joined restriction, e.g. %BR_Apps; empty = all user apps"),
                 ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "optional; cancel after this many seconds"),
+                ActionField("window", "Window", FieldType.DROPDOWN, options = listOf("fullscreen", "split_right"), hint = "split_right opens the picker in the right half of a split (needs Shizuku; falls back to full screen) and cancels it once hidden"),
             )
         )
     )
@@ -2720,6 +2721,21 @@ fun registerActionMetadata() {
             description = "Step forward through the recent-apps cycle. Needs Usage access.",
             category = "App",
             fields = emptyList()
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "window.mode",
+            name = "Window Mode",
+            description = "Move the full-screen app on top (or a named app) into a Huawei floating window or one half of split screen — Huawei Home's diagonal swipe-up gestures, for any launcher. For the app on top it presses HOME, then re-launches its own task in the new mode, its state kept; a named app is started straight into the mode, no HOME (so it can fill the other half of a split). Needs Shizuku; Huawei/EMUI only",
+            category = "App",
+            fields = listOf(
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "float = floating window; split_left / split_right = that half of split screen", options = listOf("float", "split_left", "split_right")),
+                ActionField("package", "Package", hint = "blank (default) = the full-screen app on top; or a package name, e.g. %picked for the second half of a split"),
+                ActionField("delay_ms", "Delay after HOME (ms)", hint = "default 300; 0–3000; unused with a named package"),
+                ActionField("store", "Store package in", hint = "variable (default: window_app)"),
+            )
         )
     )
 
