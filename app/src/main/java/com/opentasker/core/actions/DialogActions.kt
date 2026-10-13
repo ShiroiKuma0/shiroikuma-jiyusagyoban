@@ -8,6 +8,9 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.shizuku.ShizukuShell
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
@@ -19,18 +22,25 @@ import java.util.UUID
 internal suspend fun showDialog(
     ctx: ActionContext,
     timeoutSec: Int?,
+    window: String? = null,
     configure: Intent.() -> Unit,
 ): DialogOutcome {
     val id = UUID.randomUUID().toString()
     val deferred = DialogBridge.register(id)
     val intent = Intent(ctx.app, DialogActivity::class.java).apply {
         putExtra(DialogActivity.EXTRA_ID, id)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // MULTIPLE_TASK: the activity has no affinity, so a plain NEW_TASK start found an older dialog
+        // still open behind another app and merely brought it forward — the new request was never
+        // delivered and its action waited for a dialog that never appeared (measured 2026-10-13).
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         configure()
+        // A dialog placed in a window mode belongs to a moment on screen (the half a split is waiting
+        // to fill): once it is hidden it answers Cancelled, instead of holding the task until timeout.
+        if (window != null) putExtra(DialogActivity.EXTRA_CANCEL_WHEN_HIDDEN, true)
     }
-    try {
-        ctx.app.startActivity(intent)
-    } catch (e: Exception) {
+    val shown = (window == "split_right" && startInSplitRight(ctx, id, intent)) ||
+        runCatching { ctx.app.startActivity(intent) }.isSuccess
+    if (!shown) {
         DialogBridge.cancel(id)
         return DialogOutcome.Cancelled
     }
@@ -40,6 +50,28 @@ internal suspend fun showDialog(
     } else {
         deferred.await()
     }
+}
+
+/**
+ * Open the dialog in the RIGHT half of the split (Huawei mode 101). An app cannot ask for a Huawei
+ * window mode itself (the launch option is hidden API), but `am start --windowingMode` can, and the
+ * shell holds MANAGE_ACTIVITY_TASKS — the permission guarding [DialogActivity]'s exported alias
+ * `ShellDialogActivity`. Only the id crosses the shell; the extras wait in [DialogBridge]. False (and
+ * the caller falls back to an ordinary full-screen dialog) without Shizuku or when the start fails.
+ */
+private suspend fun startInSplitRight(ctx: ActionContext, id: String, intent: Intent): Boolean {
+    if (!ShizukuShell.available()) return false
+    DialogBridge.putSpec(id, intent.extras ?: return false)
+    val command = "am start --windowingMode 101 -f 0x18000000 " +
+        "-n '${ctx.app.packageName}/${DialogActivity.SHELL_ALIAS}' --es ${DialogActivity.EXTRA_ID} '$id'"
+    val result = runCatching { withContext(Dispatchers.IO) { ShizukuShell.exec(command) } }.getOrNull()
+    val out = result?.let { (it.stdout + "\n" + it.stderr) }.orEmpty()
+    if (result == null || result.exitCode != 0 || out.contains("Error")) {
+        DialogBridge.takeSpec(id)
+        ctx.logger("Split-right dialog failed (${out.trim().take(160)}); showing it full screen")
+        return false
+    }
+    return true
 }
 
 /** `Input Dialog` (Tasker 360) — prompt for text; store the result. */
@@ -147,7 +179,8 @@ class PickAppDialogAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "picked"
         val packages = args["packages"].orEmpty().split(Regex("\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
-        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+        val window = args["window"]?.trim()?.lowercase()?.takeIf { it.isNotEmpty() && it != "fullscreen" }
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull(), window) {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_SINGLESELECT)
             putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
             putExtra(DialogActivity.EXTRA_PACKAGES, packages.joinToString("\n"))
