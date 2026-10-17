@@ -61,7 +61,7 @@ class HuaweiSyncAction : Action {
         val timeoutSec = args["timeout_sec"]?.trim()?.toIntOrNull() ?: HuaweiSettings.timeoutSec(ctx.app)
         val maxRecords = args["max_records"]?.trim()?.toIntOrNull() ?: 4096
 
-        val status = runCatching { HuaweiSyncRunner.status(db) }.getOrNull()
+        val status = runCatching { HuaweiSyncRunner.status(db, address) }.getOrNull()
         val windows = HuaweiSyncArgs.resolve(
             from = HuaweiSyncArgs.parseFrom(args["from"]),
             lastSuccessAtSeconds = status?.lastSuccessAtMillis?.let { it / 1000 },
@@ -85,7 +85,7 @@ class HuaweiSyncAction : Action {
 
         // From the DATABASE and on every path — the failed case is exactly the one a Profile needs
         // to be able to reason about.
-        publishStatus(ctx, prefix, outcome)
+        publishStatus(ctx, prefix, outcome, address)
 
         return when (outcome) {
             is HuaweiSyncRunner.Outcome.Ok -> {
@@ -116,9 +116,10 @@ class HuaweiSyncAction : Action {
         ctx: ActionContext,
         prefix: String,
         outcome: HuaweiSyncRunner.Outcome,
+        address: String,
     ) = runCatching {
         val now = System.currentTimeMillis()
-        val status = HuaweiSyncRunner.status(OpenTaskerApp_NoHilt.db)
+        val status = HuaweiSyncRunner.status(OpenTaskerApp_NoHilt.db, address)
         ctx.variables.set("${prefix}Ok", (outcome is HuaweiSyncRunner.Outcome.Ok).toString())
         ctx.variables.set("${prefix}AgeHours", status.ageHours(now)?.let { "%.1f".format(it) } ?: "")
         ctx.variables.set("${prefix}LastSuccess", status.lastSuccessAtMillis?.let(::formatMillis) ?: "")

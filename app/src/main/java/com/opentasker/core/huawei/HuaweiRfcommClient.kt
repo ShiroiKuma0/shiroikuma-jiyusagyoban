@@ -78,11 +78,14 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
     private val adapter: BluetoothAdapter?
         get() = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
-    /** Bonded devices whose name looks like a Huawei band, for the picker. */
+    /** Bonded devices whose name looks like a Huawei band or watch ("HUAWEI WATCH D3-…"), for the picker. */
     @SuppressLint("MissingPermission")
     fun bondedBands(): List<Pair<String, String>> =
         adapter?.bondedDevices.orEmpty()
-            .filter { it.name?.contains("HUAWEI Band", ignoreCase = true) == true }
+            .filter { d ->
+                val name = d.name.orEmpty()
+                name.contains("HUAWEI Band", ignoreCase = true) || name.contains("HUAWEI WATCH", ignoreCase = true)
+            }
             .map { it.address to (it.name ?: it.address) }
 
     @SuppressLint("MissingPermission")
