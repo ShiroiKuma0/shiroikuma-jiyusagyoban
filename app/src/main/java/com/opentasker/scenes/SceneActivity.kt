@@ -620,6 +620,16 @@ internal fun SceneElementView(
                     ?: 40
                 (screenHeightDp * pct.coerceIn(10, 90) / 100f).dp.toPx()
             }
+            // How far off vertical a SHORT flick must lean before it counts as ↗/↖ instead of a plain
+            // swipe up (Home). It was the drag sector's 20°, and a Home swipe drifting only a little sideways
+            // fired the floating window (白い熊 2026-10-16). %Diagflick_Deg (画面操作 01 設定), a per-element
+            // `diagFlickDeg` overriding it; default 35, clamped 20–55 (the flick sector ends at 60°).
+            val flickMinRatio = run {
+                val deg = v("diagFlickDeg").trim().toIntOrNull()
+                    ?: expandAgainstGlobals("%Diagflick_Deg").trim().toIntOrNull()
+                    ?: 35
+                kotlin.math.tan(Math.toRadians(deg.coerceIn(20, 55).toDouble())).toFloat()
+            }
             // Pick the task for the swipe's dominant axis from a (up,down,left,right) set.
             fun pick(dx: Float, dy: Float, up: String?, down: String?, left: String?, right: String?): String? =
                 if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) { if (dx > 0) right else left }
@@ -635,11 +645,12 @@ internal fun SceneElementView(
                     // the tap-through overlay claims the move stream). Otherwise the lightweight tap
                     // detector, so a plain button's tap stays instant (no double-tap wait).
                     // Keyed on diagPx too: it follows the screen height, which a fold/unfold changes.
-                    .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id, diagPx) {
+                    .then(if (hasSwipe || doubleTapId != null) Modifier.pointerInput(element.id, diagPx, flickMinRatio) {
                         detectEdgeGestures(
                             slopPx = slopPx,
                             longSwipePx = longSwipePx,
                             diagPx = diagPx,
+                            flickMinRatio = flickMinRatio,
                             hasDiagonal = { right -> (if (right) swipeUpRight else swipeUpLeft) != null },
                             onDiagonal = { right -> (if (right) swipeUpRight else swipeUpLeft)?.let(onRunTask) },
                             onSwipe = { dx, dy -> pick(dx, dy, swipeUp, swipeDown, swipeLeft, swipeRight)?.let(onRunTask) },
@@ -1213,12 +1224,14 @@ private fun sliderIcon(name: String?): ImageVector? = when (name?.trim()?.lowerc
  * [onDiagonal] the moment it has risen [diagPx], and while it is in that sector the long swipe is held
  * off — otherwise the long-swipe-up (Recents, at 200dp) would always win the race, since a diagonal
  * reaches 200dp of rise well before it reaches half the screen. Released short of [diagPx] it is an
- * ordinary short swipe by its dominant axis, exactly as before.
+ * ordinary short swipe by its dominant axis, exactly as before — unless it leans at least
+ * [flickMinRatio] (tan of the angle off vertical) into a bound diagonal, which then fires on release.
  */
 private suspend fun PointerInputScope.detectEdgeGestures(
     slopPx: Float,
     longSwipePx: Float,
     diagPx: Float,
+    flickMinRatio: Float,
     hasDiagonal: (Boolean) -> Boolean,
     onDiagonal: (Boolean) -> Unit,
     onSwipe: (Float, Float) -> Unit,
@@ -1272,9 +1285,10 @@ private suspend fun PointerInputScope.detectEdgeGestures(
                 // A SHORT flick into a bound diagonal fires it on release (白い熊 2026-10-13: the ↖/↗ had
                 // to be dragged up to %Diagswipe_Pct, and a quick flick fell through to 次app/前app). The
                 // release sector stops at 60° off vertical rather than 70°, so a sideways swipe along the
-                // bottom edge that drifts up a little still switches apps.
+                // bottom edge that drifts up a little still switches apps. It starts at [flickMinRatio]
+                // (35° by default), not the drag's 20°: a short swipe up that leans a little is Home.
                 if (!fired) {
-                    val flick = upDiagonal(dx, dy, DIAGONAL_FLICK_MAX_RATIO)
+                    val flick = upDiagonal(dx, dy, DIAGONAL_FLICK_MAX_RATIO, flickMinRatio)
                     if (flick != null && hasDiagonal(flick)) onDiagonal(flick) else onSwipe(dx, dy)
                 }
             }
@@ -1296,15 +1310,21 @@ private suspend fun PointerInputScope.detectEdgeGestures(
 
 /**
  * Which upward diagonal a drag of ([dx], [dy]) is: true = up-right, false = up-left, null = neither.
- * The sector is 20°–70° off vertical (20°–60° for a short flick judged on release, via [maxRatio]). The lower edge is the one that matters: swiping from the bottom
+ * The sector is 20°–70° off vertical (35°–60° for a short flick judged on release, via [minRatio]
+ * and [maxRatio]). The lower edge is the one that matters: swiping from the bottom
  * middle toward a corner of the unfolded Mate XT (2048×2232) runs about 25° off vertical, so the 45°
  * that "diagonal" suggests would miss the very gesture it is for, while a swipe meant to go straight
  * up seldom leans more than ~15°.
  */
-private fun upDiagonal(dx: Float, dy: Float, maxRatio: Float = DIAGONAL_MAX_RATIO): Boolean? {
+private fun upDiagonal(
+    dx: Float,
+    dy: Float,
+    maxRatio: Float = DIAGONAL_MAX_RATIO,
+    minRatio: Float = DIAGONAL_MIN_RATIO,
+): Boolean? {
     if (dy >= 0f) return null
     val ratio = kotlin.math.abs(dx) / -dy
-    return if (ratio in DIAGONAL_MIN_RATIO..maxRatio) dx > 0f else null
+    return if (ratio in minRatio..maxRatio) dx > 0f else null
 }
 
 private const val DIAGONAL_MIN_RATIO = 0.364f   // tan 20°
