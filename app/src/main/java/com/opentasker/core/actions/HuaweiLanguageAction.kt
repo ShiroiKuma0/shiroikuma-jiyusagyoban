@@ -46,7 +46,7 @@ class HuaweiLanguageAction : Action {
         val store = args["store"]?.trim()?.ifEmpty { null }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val locale = args["locale"]?.trim()?.ifEmpty { null }
-            ?: HuaweiSettings.bandLocale(ctx.app)
+            ?: HuaweiSettings.bandLocale(ctx.app, address)
             ?: return fail(ctx, prefix, store, "no locale given — pass e.g. locale=ja-JP")
         val imperial = args["units"]?.trim()?.lowercase() == "imperial"
 

@@ -53,9 +53,9 @@ class HuaweiFilesAction : Action {
         // from ONE morning's evidence, not a measurement, and 白い熊 can always overrule it.
         val minGapMin = args["min_gap_min"]?.trim()?.toIntOrNull()?.coerceIn(0, 24 * 60) ?: DEFAULT_MIN_GAP_MIN
         val forced = args["force"]?.trim()?.lowercase() in setOf("1", "true", "yes", "on")
-        val sinceMs = System.currentTimeMillis() - HuaweiSettings.lastFilePull(ctx.app)
+        val sinceMs = System.currentTimeMillis() - HuaweiSettings.lastFilePull(ctx.app, address)
         val waitMin = minGapMin - (sinceMs / 60_000L)
-        if (!forced && minGapMin > 0 && HuaweiSettings.lastFilePull(ctx.app) > 0 && waitMin > 0) {
+        if (!forced && minGapMin > 0 && HuaweiSettings.lastFilePull(ctx.app, address) > 0 && waitMin > 0) {
             val text = "前回から ${sinceMs / 60_000L} 分。あと $waitMin 分待つこと。\n" +
                 "Last pull ${sinceMs / 60_000L} min ago — $waitMin min to go."
             ctx.variables.set("${prefix}FilesResult", text)
@@ -92,7 +92,7 @@ class HuaweiFilesAction : Action {
         // Marked before the fetch, not after: an attempt that fails still used the channel, and it
         // is the USE that degrades it. Marking on success would let a failing pull retry in a tight
         // loop, which is precisely the thing that produced the 8-block result.
-        HuaweiSettings.markFilePull(ctx.app)
+        HuaweiSettings.markFilePull(ctx.app, device = address)
         val result = HuaweiSyncRunner.fetchFiles(
             ctx.app, address, requests, from, now, outDir, stamp,
         )
