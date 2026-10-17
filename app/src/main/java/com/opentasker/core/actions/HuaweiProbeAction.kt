@@ -4,6 +4,7 @@ import com.opentasker.core.engine.Action
 import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.huawei.HuaweiCapabilities
 import com.opentasker.core.huawei.HuaweiCommands
 import com.opentasker.core.huawei.HuaweiCrypto
 import com.opentasker.core.huawei.HuaweiProtocol
@@ -35,6 +36,7 @@ class HuaweiProbeAction : Action {
         const val WEATHER_SWEEP_ARG = "weather_sweep"
         const val LISTEN_ARG = "listen_sec"
         const val WARMUP_ARG = "warmup"
+        const val FULL_ARG = "full"
     }
 
     override val id = "huawei.probe"
@@ -80,6 +82,98 @@ class HuaweiProbeAction : Action {
         val r = tlvs.firstOrNull { it.tag == HuaweiProtocol.TAG_RESULT } ?: return "no result tag"
         val code = HuaweiProtocol.bytesToInt(r.value)
         return "result $code" + if (code == HuaweiProtocol.RESULT_SUCCESS) " (OK)" else ""
+    }
+
+    /**
+     * Ask the device about every service id `0x01..0xFF`, then every command `0x01..0xFF` of each
+     * supported service (one request per service, so no frame grows past a slice), then the expand
+     * bitmap. Every request is a question — SupportedServices / SupportedCommands / ExpandCapability,
+     * the same three Health sends on every connect — so nothing on the device is set by asking.
+     */
+    private suspend fun fullCensus(
+        session: com.opentasker.core.huawei.HuaweiSession,
+        ctx: ActionContext,
+        address: String,
+        out: String,
+        line: (String) -> Unit,
+    ) {
+        val cfg = HuaweiCommands
+        val allIds = ByteArray(255) { (it + 1).toByte() }
+        line("=== FULL census — every service, every command, the expand bitmap ===")
+        line("auth version ${HuaweiSettings.authVersion(ctx.app, address)} · device support type ${session.deviceSupportType}")
+        val btUuids = runCatching {
+            @Suppress("MissingPermission")
+            val dev = (ctx.app.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager)
+                .adapter.getRemoteDevice(address)
+            @Suppress("MissingPermission")
+            dev.uuids?.joinToString(" ") { it.uuid.toString() } ?: "none cached"
+        }.getOrElse { "unreadable: ${it.message}" }
+        line("SDP service UUIDs the phone has cached: $btUuids")
+
+        var services = runCatching {
+            HuaweiCapabilities.parseServices(
+                allIds,
+                session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_SERVICES, HuaweiProtocol.tlv(1, allIds), timeoutMs = 10_000)),
+            )
+        }.getOrElse { line("all-ids service census failed (${it.message}); asking in batches of 32"); emptyMap() }
+        if (services.isEmpty()) {
+            val merged = LinkedHashMap<Int, Boolean>()
+            for (from in 1..255 step 32) {
+                val ids = ByteArray(minOf(32, 256 - from)) { (from + it).toByte() }
+                runCatching {
+                    merged += HuaweiCapabilities.parseServices(
+                        ids,
+                        session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_SERVICES, HuaweiProtocol.tlv(1, ids), timeoutMs = 8_000)),
+                    )
+                }.onFailure { line("  services 0x%02X..: failed: ${it.message}".format(from)) }
+            }
+            services = merged
+        }
+        val supported = services.filterValues { it }.keys.sorted()
+        val band = cfg.SUPPORTED_SERVICES.map { it.toInt() and 0xFF }.toSet()
+        line("services answered ${services.size}, supported ${supported.size}")
+        line("supported: " + supported.joinToString(" ") { "0x%02X".format(it) })
+        line("supported and NOT in the Band's list: " +
+            supported.filter { it !in band }.joinToString(" ") { "0x%02X".format(it) }.ifEmpty { "none" })
+        line("")
+
+        val allCmds = (1..255).toList()
+        val commands = LinkedHashMap<Int, Map<Int, Boolean>>()
+        for (svc in supported) {
+            runCatching {
+                val inner = HuaweiCapabilities.commandsRequestInner(mapOf(svc to allCmds))
+                HuaweiCapabilities.parseCommands(
+                    inner,
+                    session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_COMMANDS, HuaweiProtocol.tlv(0x81, inner), timeoutMs = 8_000)),
+                )
+            }.onSuccess { commands += it }
+                .onFailure { line("  commands of 0x%02X: failed: ${it.message}".format(svc)) }
+        }
+        line("--- commands per supported service ---")
+        for (svc in supported) {
+            val yes = commands[svc]?.filterValues { it }?.keys?.sorted()
+            line("  0x%02X  %s".format(svc, yes?.joinToString(" ") { "%02X".format(it) } ?: "(no answer)"))
+        }
+        line("")
+
+        val expand = runCatching {
+            HuaweiCapabilities.parseExpand(
+                session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_EXPAND_CAPABILITY, cfg.expandCapability(), timeoutMs = 8_000)),
+            )
+        }.getOrElse { line("expand capability failed: ${it.message}"); null }
+        val caps = HuaweiCapabilities(services, commands, expand, System.currentTimeMillis())
+        if (expand != null) {
+            line("expand bitmap (${expand.size} B): ${HuaweiCrypto.upperHex(expand)}")
+            line("bits set (LSB of byte 0 = bit 0): " +
+                (0 until expand.size * 8).filter { caps.expandBit(it) == true }.joinToString(" "))
+        }
+        line("")
+
+        HuaweiSettings.saveCapabilities(ctx.app, caps, address)
+        val json = out.removeSuffix(".txt") + "_capabilities.json"
+        runCatching { File(json).writeText(caps.toJson()) }
+            .onSuccess { line("capabilities saved for $address and written to $json") }
+            .onFailure { line("capabilities saved for $address; JSON not written: ${it.message}") }
     }
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -256,6 +350,17 @@ class HuaweiProbeAction : Action {
                 }
             }.onFailure { line("command census failed: ${it.message}") }
             line()
+
+            // The FULL census (2026-10-17, for the Watch D3): every service id there is, every
+            // command of every service that says yes, and the expand bitmap — decoded, saved per
+            // device, and written beside the report as JSON. The ordinary census above asks only
+            // the Band's 46 services, and a device answers only what it is asked, so anything a
+            // new device adds would never show up there. Reads only; then the probe stops, because
+            // everything below it is the Band's own sweep list.
+            if (args[FULL_ARG]?.trim().equals("true", ignoreCase = true)) {
+                fullCensus(session, ctx, address, out) { line(it) }
+                return@withSession report.toString()
+            }
 
             // The direct question: which count commands on the fitness service answer at all, and
             // with what. A count is the safe probe — it reads nothing and changes nothing.

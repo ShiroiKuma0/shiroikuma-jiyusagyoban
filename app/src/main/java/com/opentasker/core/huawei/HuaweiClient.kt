@@ -52,7 +52,7 @@ class HuaweiClient(private val session: HuaweiSession) {
      * Failures are the caller's to ignore: a band that refuses one of these is still perfectly
      * usable for the request/response work that has always worked.
      */
-    suspend fun announceCompanion() {
+    suspend fun announceCompanion(): HuaweiCapabilities {
         val zone = java.util.TimeZone.getDefault()
         val offsetMinutes = zone.getOffset(System.currentTimeMillis()) / 60_000
         runCatching { session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_PRODUCT_INFO, HuaweiCommands.productInfo()) }
@@ -62,10 +62,36 @@ class HuaweiClient(private val session: HuaweiSession) {
                 HuaweiCommands.setTime(System.currentTimeMillis() / 1000, offsetMinutes / 60, offsetMinutes % 60),
             )
         }
-        runCatching { session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES, HuaweiCommands.supportedServices()) }
-        runCatching { session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_COMMANDS, HuaweiCommands.supportedCommands()) }
-        runCatching { session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_EXPAND_CAPABILITY, HuaweiCommands.expandCapability()) }
+        val caps = readCapabilities()
         runCatching { session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount()) }
+        return caps
+    }
+
+    /**
+     * The three capability questions Health asks on every connect — the same frames, in the same
+     * order — with the device's answers KEPT rather than discarded (2026-10-17). A question the
+     * device does not answer leaves its part of the snapshot empty; nothing here throws.
+     */
+    suspend fun readCapabilities(timeoutMs: Long = 6_000): HuaweiCapabilities {
+        val cfg = HuaweiCommands
+        val services = runCatching {
+            HuaweiCapabilities.parseServices(
+                cfg.SUPPORTED_SERVICES,
+                session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_SERVICES, cfg.supportedServices(), timeoutMs = timeoutMs)),
+            )
+        }.getOrDefault(emptyMap())
+        val commands = runCatching {
+            HuaweiCapabilities.parseCommands(
+                cfg.SUPPORTED_COMMANDS,
+                session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_COMMANDS, cfg.supportedCommands(), timeoutMs = timeoutMs)),
+            )
+        }.getOrDefault(emptyMap())
+        val expand = runCatching {
+            HuaweiCapabilities.parseExpand(
+                session.decrypt(session.request(cfg.SVC_DEVICE_CONFIG, cfg.CMD_EXPAND_CAPABILITY, cfg.expandCapability(), timeoutMs = timeoutMs)),
+            )
+        }.getOrNull()
+        return HuaweiCapabilities(services, commands, expand, System.currentTimeMillis())
     }
 
     /** Step 1: LinkParams. Establishes the crypto parameters everything else depends on. */
@@ -224,7 +250,7 @@ class HuaweiClient(private val session: HuaweiSession) {
         return setLocale(locale, imperial)
     }
 
-    suspend fun configure(deviceName: String, epochSeconds: Long, zoneHours: Int, zoneMinutes: Int, locale: String? = null) {
+    suspend fun configure(deviceName: String, epochSeconds: Long, zoneHours: Int, zoneMinutes: Int, locale: String? = null): HuaweiCapabilities {
         suspend fun attempt(service: Int, command: Int, payload: ByteArray) {
             runCatching { session.request(service, command, payload, timeoutMs = 6_000) }
         }
@@ -233,9 +259,7 @@ class HuaweiClient(private val session: HuaweiSession) {
         val time = cfg.setTime(epochSeconds, zoneHours, zoneMinutes)
         attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SET_TIME, time)
         attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SET_TIME, time)
-        attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_SERVICES, cfg.supportedServices())
-        attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SUPPORTED_COMMANDS, cfg.supportedCommands())
-        attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_EXPAND_CAPABILITY, cfg.expandCapability())
+        val caps = readCapabilities()
 
         // The four that actually close the wizard.
         attempt(cfg.SVC_DEVICE_CONFIG, cfg.CMD_SETTING_RELATED, cfg.settingRelated())
@@ -256,6 +280,7 @@ class HuaweiClient(private val session: HuaweiSession) {
         session.send(cfg.SVC_ACCOUNT, cfg.ACC_COUNTRY_CODE, cfg.countryCode("CZ", 0x07))
         attempt(cfg.SVC_ACCOUNT, cfg.ACC_SEND_ACCOUNT, cfg.sendAccount())
         attempt(cfg.SVC_ACCOUNT, cfg.ACC_UNKNOWN_04, cfg.accountStep04())
+        return caps
     }
 
     /**

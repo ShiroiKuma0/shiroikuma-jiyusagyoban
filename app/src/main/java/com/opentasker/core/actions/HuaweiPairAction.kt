@@ -50,7 +50,10 @@ class HuaweiPairAction : Action {
             onPhase = { ctx.variables.set("${prefix}Phase", it) },
         )
 
-        val bound = HuaweiSettings.isBound(ctx.app)
+        val makeActive = args["make_active"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        if (makeActive && outcome is HuaweiSyncRunner.Outcome.Ok) HuaweiSettings.setAddress(ctx.app, address)
+
+        val bound = HuaweiSettings.isBound(ctx.app, address)
         ctx.variables.set("${prefix}Bound", bound.toString())
 
         return when (outcome) {

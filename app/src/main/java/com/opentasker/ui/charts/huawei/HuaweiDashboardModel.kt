@@ -159,7 +159,7 @@ class HuaweiDashboardModel(
         val samples = db.huaweiSampleDao()
         val oldest = samples.oldestAny()
         val newest = samples.newestAny()
-        val status = runCatching { HuaweiSyncRunner.status(db) }.getOrNull()
+        val status = runCatching { HuaweiSyncRunner.status(db, HuaweiSettings.address(appContext)) }.getOrNull()
         val bound = HuaweiSettings.isBound(appContext)
 
         // Loaded before the early return: a night can exist when no per-minute sample does, and
@@ -645,7 +645,7 @@ class HuaweiDashboardModel(
         if (!HuaweiSyncState.arm()) return
         HuaweiSyncRunner.scope.launch {
             runCatching {
-                val status = HuaweiSyncRunner.status(db)
+                val status = HuaweiSyncRunner.status(db, HuaweiSettings.address(appContext))
                 HuaweiSyncRunner.sync(
                     appContext, db,
                     HuaweiSyncRunner.Request(

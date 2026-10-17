@@ -50,6 +50,14 @@ class BandPruneWorker(
         private const val TAG = "BandPruneWorker"
         private const val WORK_NAME = "band_prune"
 
+        /**
+         * Stops the daily prune and removes it from WorkManager's schedule. Hume's rows are the start
+         * of the history the 健康 report shows; nothing may trim them any more (白い熊, 2026-10-17).
+         */
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        }
+
         fun enqueue(context: Context) {
             val request = PeriodicWorkRequestBuilder<BandPruneWorker>(24, TimeUnit.HOURS).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
