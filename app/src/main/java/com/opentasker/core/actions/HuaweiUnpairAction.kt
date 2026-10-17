@@ -40,8 +40,8 @@ class HuaweiUnpairAction : Action {
         val store = args["store"]?.trim()?.ifEmpty { null }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
 
-        val hadBind = HuaweiSettings.isBound(ctx.app)
-        HuaweiSettings.clearBind(ctx.app)
+        val hadBind = HuaweiSettings.isBound(ctx.app, address)
+        HuaweiSettings.clearBind(ctx.app, address)
 
         val bond = removeBond(ctx.app, address)
         val text = buildString {

@@ -210,7 +210,9 @@ class OpenTaskerApp_NoHilt : Application() {
             // Upstream's opt-in release check polls SysAdminDoc/OpenTasker and compares its tag to
             // appVersionName. This fork ships its own build tail on top of that name, so upstream's
             // newest tag is never the newest 自由作業盤 — the check is not wired in here.
-            com.opentasker.core.engine.BandPruneWorker.enqueue(this)
+            // The Hume band is retired and its rows are now history the 健康 report keeps showing, so the
+            // 400-day prune would start eating it (from August 2027). Cancelled, never enqueued again.
+            com.opentasker.core.engine.BandPruneWorker.cancel(this)
             EngineWatchdogWorker.enqueue(this)
             unlockedInitialized = true
         }

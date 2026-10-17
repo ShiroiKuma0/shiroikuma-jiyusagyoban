@@ -16,6 +16,15 @@ import androidx.core.content.edit
  *
  * They are stored in the app's private preferences and must never appear in a bundle, an export, a
  * log line, or a commit.
+ *
+ * ## Per device (2026-10-17, for the Watch D3)
+ *
+ * Everything that belongs to ONE device — its name, the bind, its locale, its face names, when its
+ * file channel was last used, what it said it supports — is kept per Bluetooth address, so a second
+ * device can be paired without destroying the first one's bind. Every such function takes a `device`
+ * address, defaulting to the ACTIVE one ([address]). The Band 11 Pro's values stay where they always
+ * were, in the original prefs file ([BAND_ADDRESS]); any other device gets its own file. The
+ * window/sync preferences (language, overlap, lookback, timeout, the 地図 token) are not per device.
  */
 object HuaweiSettings {
     private const val PREFS = "huawei_band_settings"
@@ -36,11 +45,17 @@ object HuaweiSettings {
     private const val KEY_BAND_LOCALE = "band_locale"
     private const val KEY_FACE_NAMES = "face_names"
 
+    private const val KEY_CAPABILITIES = "capabilities"
+
     /**
      * 白い熊's Band 11 Pro. A **public** address, unlike the Hume band's random one — so it survives
-     * a factory reset, and the key derivation that depends on it stays stable.
+     * a factory reset, and the key derivation that depends on it stays stable. Its settings live in
+     * the original prefs file; it is the active device until another one is chosen with [setAddress].
      */
-    const val DEFAULT_ADDRESS = "A4:AA:FE:34:29:0F"
+    const val BAND_ADDRESS = "A4:AA:FE:34:29:0F"
+
+    /** The active device when none has been chosen — the Band, the only device before 2026-10-17. */
+    const val DEFAULT_ADDRESS = BAND_ADDRESS
 
     /** Re-request this much of what we already hold. Overlap is free: the dedupe key discards it. */
     const val DEFAULT_OVERLAP_MINUTES = 30
@@ -50,32 +65,46 @@ object HuaweiSettings {
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** The prefs that hold [device]'s own settings: the original file for the Band, its own otherwise. */
+    private fun devicePrefs(context: Context, device: String) =
+        if (device.trim().equals(BAND_ADDRESS, ignoreCase = true)) {
+            prefs(context)
+        } else {
+            context.applicationContext.getSharedPreferences(devicePrefsName(device), Context.MODE_PRIVATE)
+        }
+
+    /** `huawei_device_A1B2C3D4E5F6` — the address, upper-case, colons dropped. */
+    internal fun devicePrefsName(device: String): String =
+        "huawei_device_" + device.trim().uppercase().filter { it.isLetterOrDigit() }
+
+    /** The ACTIVE device: the one every task without an explicit `address` talks to. */
     fun address(context: Context): String =
         prefs(context).getString(KEY_ADDRESS, null)?.trim()?.ifEmpty { null } ?: DEFAULT_ADDRESS
 
+    /** Make [value] the active device. The previous device's bind and settings are kept. */
     fun setAddress(context: Context, value: String) =
-        prefs(context).edit { putString(KEY_ADDRESS, value.trim()) }
+        prefs(context).edit { putString(KEY_ADDRESS, value.trim().uppercase()) }
 
     /**
      * The band's own name, e.g. "HUAWEI Band 11 Pro-90F". Needed verbatim by SetUpDeviceStatus
      * during provisioning — the band expects to be told its own name.
      */
-    fun deviceName(context: Context): String? =
-        prefs(context).getString(KEY_DEVICE_NAME, null)?.ifEmpty { null }
+    fun deviceName(context: Context, device: String = address(context)): String? =
+        devicePrefs(context, device).getString(KEY_DEVICE_NAME, null)?.ifEmpty { null }
 
-    fun setDeviceName(context: Context, value: String) =
-        prefs(context).edit { putString(KEY_DEVICE_NAME, value) }
+    fun setDeviceName(context: Context, value: String, device: String = address(context)) =
+        devicePrefs(context, device).edit { putString(KEY_DEVICE_NAME, value) }
 
     /** 16 lowercase hex characters, minted once and reused so the band keeps recognising us. */
-    fun authIdSelf(context: Context): String? =
-        prefs(context).getString(KEY_AUTH_ID, null)?.ifEmpty { null }
+    fun authIdSelf(context: Context, device: String = address(context)): String? =
+        devicePrefs(context, device).getString(KEY_AUTH_ID, null)?.ifEmpty { null }
 
-    fun authToken(context: Context): ByteArray? =
-        prefs(context).getString(KEY_AUTH_TOKEN, null)
+    fun authToken(context: Context, device: String = address(context)): ByteArray? =
+        devicePrefs(context, device).getString(KEY_AUTH_TOKEN, null)
             ?.ifEmpty { null }
             ?.let { runCatching { HuaweiCrypto.hex(it) }.getOrNull() }
 
-    fun authVersion(context: Context): Int = prefs(context).getInt(KEY_AUTH_VERSION, 1)
+    fun authVersion(context: Context, device: String = address(context)): Int = devicePrefs(context, device).getInt(KEY_AUTH_VERSION, 1)
 
     // ── names for the faces this library did not install ──────────────────────────────────────
     //
@@ -89,8 +118,8 @@ object HuaweiSettings {
     // face that is not in the library means nothing on another phone.
 
     /** Every id that has been named, to the name given. */
-    fun faceNames(context: Context): Map<String, String> =
-        prefs(context).getString(KEY_FACE_NAMES, null)
+    fun faceNames(context: Context, device: String = address(context)): Map<String, String> =
+        devicePrefs(context, device).getString(KEY_FACE_NAMES, null)
             ?.let { runCatching { JSONObject(it) }.getOrNull() }
             ?.let { obj ->
                 obj.keys().asSequence().mapNotNull { k ->
@@ -100,20 +129,20 @@ object HuaweiSettings {
             ?: emptyMap()
 
     /** Name an id, or forget it when [name] is blank. */
-    fun setFaceName(context: Context, assetId: String, name: String) {
-        val next = faceNames(context).toMutableMap()
+    fun setFaceName(context: Context, assetId: String, name: String, device: String = address(context)) {
+        val next = faceNames(context, device).toMutableMap()
         if (name.isBlank()) next.remove(assetId) else next[assetId] = name.trim()
-        prefs(context).edit { putString(KEY_FACE_NAMES, JSONObject(next as Map<*, *>).toString()) }
+        devicePrefs(context, device).edit { putString(KEY_FACE_NAMES, JSONObject(next as Map<*, *>).toString()) }
     }
 
-    fun deviceSupportType(context: Context): Int =
-        prefs(context).getInt(KEY_DEVICE_SUPPORT_TYPE, 4)
+    fun deviceSupportType(context: Context, device: String = address(context)): Int =
+        devicePrefs(context, device).getInt(KEY_DEVICE_SUPPORT_TYPE, 4)
 
-    fun boundAt(context: Context): Long = prefs(context).getLong(KEY_BOUND_AT, 0L)
+    fun boundAt(context: Context, device: String = address(context)): Long = devicePrefs(context, device).getLong(KEY_BOUND_AT, 0L)
 
     /** True once a bind has completed, so routine syncs can skip straight to the auth pass. */
-    fun isBound(context: Context): Boolean =
-        authIdSelf(context) != null && authToken(context) != null
+    fun isBound(context: Context, device: String = address(context)): Boolean =
+        authIdSelf(context, device) != null && authToken(context, device) != null
 
     fun saveBind(
         context: Context,
@@ -122,7 +151,8 @@ object HuaweiSettings {
         authVersion: Int,
         deviceSupportType: Int,
         boundAt: Long,
-    ) = prefs(context).edit {
+        device: String = address(context),
+    ) = devicePrefs(context, device).edit {
         putString(KEY_AUTH_ID, authIdSelf)
         putString(KEY_AUTH_TOKEN, HuaweiCrypto.upperHex(authToken))
         putInt(KEY_AUTH_VERSION, authVersion)
@@ -134,7 +164,7 @@ object HuaweiSettings {
      * Forget the bind. Needed when the band has been factory-reset or handed to another companion —
      * the stored token is then meaningless and reusing it just fails the auth pass.
      */
-    fun clearBind(context: Context) = prefs(context).edit {
+    fun clearBind(context: Context, device: String = address(context)) = devicePrefs(context, device).edit {
         remove(KEY_AUTH_ID)
         remove(KEY_AUTH_TOKEN)
         remove(KEY_BOUND_AT)
@@ -168,11 +198,25 @@ object HuaweiSettings {
      * says so. Any companion that touches the band can still push its own locale over it — that is
      * how this band ended up in English — and the answer is to flip it back by hand.
      */
-    fun bandLocale(context: Context): String? =
-        prefs(context).getString(KEY_BAND_LOCALE, null)?.ifEmpty { null }
+    fun bandLocale(context: Context, device: String = address(context)): String? =
+        devicePrefs(context, device).getString(KEY_BAND_LOCALE, null)?.ifEmpty { null }
 
-    fun setBandLocale(context: Context, value: String) =
-        prefs(context).edit { putString(KEY_BAND_LOCALE, value) }
+    fun setBandLocale(context: Context, value: String, device: String = address(context)) =
+        devicePrefs(context, device).edit { putString(KEY_BAND_LOCALE, value) }
+
+    // ── what the device says it supports ──────────────────────────────────────────────────────
+    //
+    // The replies to SupportedServices (0x01/0x02), SupportedCommands (0x01/0x03) and
+    // ExpandCapability (0x01/0x37), as the device gave them on its last connect, as hex. Until
+    // 2026-10-17 they were asked for and thrown away; kept now so a sync step can be skipped on a
+    // device that never offered it, instead of sending the Band's command list to a watch.
+
+    /** The last capability snapshot of [device], or null if none was ever recorded. */
+    fun capabilities(context: Context, device: String = address(context)): HuaweiCapabilities? =
+        devicePrefs(context, device).getString(KEY_CAPABILITIES, null)?.let { HuaweiCapabilities.fromJson(it) }
+
+    fun saveCapabilities(context: Context, caps: HuaweiCapabilities, device: String = address(context)) =
+        devicePrefs(context, device).edit { putString(KEY_CAPABILITIES, caps.toJson()) }
 
     fun overlapMinutes(context: Context): Int =
         prefs(context).getInt(KEY_OVERLAP_MIN, DEFAULT_OVERLAP_MINUTES)
@@ -193,7 +237,7 @@ object HuaweiSettings {
      * Nothing here can make the band serve more, so the only lever is not asking too often — and the
      * only way to not ask too often is to remember when we last asked.
      */
-    fun lastFilePull(context: Context): Long = prefs(context).getLong(KEY_LAST_FILE_PULL, 0L)
+    fun lastFilePull(context: Context, device: String = address(context)): Long = devicePrefs(context, device).getLong(KEY_LAST_FILE_PULL, 0L)
 
     /**
      * Which `HuaweiBeatMetrics` version produced the stored `beat_` samples.
@@ -207,8 +251,8 @@ object HuaweiSettings {
     fun setBeatMetricsVersion(context: Context, value: Int) =
         prefs(context).edit { putInt(KEY_BEAT_METRICS_VERSION, value) }
 
-    fun markFilePull(context: Context, atMs: Long = System.currentTimeMillis()) =
-        prefs(context).edit { putLong(KEY_LAST_FILE_PULL, atMs) }
+    fun markFilePull(context: Context, atMs: Long = System.currentTimeMillis(), device: String = address(context)) =
+        devicePrefs(context, device).edit { putLong(KEY_LAST_FILE_PULL, atMs) }
 
     fun chizuToken(context: Context): String? =
         prefs(context).getString(KEY_CHIZU_TOKEN, null)?.ifEmpty { null }

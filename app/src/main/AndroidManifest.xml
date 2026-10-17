@@ -901,6 +901,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_WORKSPACE" />
+                <action android:name="shiroikuma.jiyusagyoban.action.EXPORT_DATA" />
                 <action android:name="shiroikuma.jiyusagyoban.action.IMPORT_BUNDLE" />
                 <action android:name="shiroikuma.jiyusagyoban.action.DELETE_ITEMS" />
                 <action android:name="shiroikuma.jiyusagyoban.action.RUN_TASK" />

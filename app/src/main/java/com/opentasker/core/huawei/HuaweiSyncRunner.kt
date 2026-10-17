@@ -110,10 +110,10 @@ object HuaweiSyncRunner {
             val api = HuaweiClient(session)
             val link = api.linkParams()
             api.deviceStatus()
-            val authId = HuaweiSettings.authIdSelf(context)
+            val authId = HuaweiSettings.authIdSelf(context, address)
                 ?: throw IllegalStateException("not bound — pair the band first")
             api.securityNegotiation(link.deviceSupportType, authId, android.os.Build.MODEL)
-            val token = HuaweiSettings.authToken(context)
+            val token = HuaweiSettings.authToken(context, address)
                 ?: throw IllegalStateException("no stored token — pair the band first")
             api.authenticate(authId, token, Random.nextLong(1L, Long.MAX_VALUE))
             // The six Huawei Health sends on EVERY reconnect, without which the band never speaks.
@@ -131,6 +131,7 @@ object HuaweiSyncRunner {
             // All six are reads or declarations Health issues on every ordinary connect; none
             // writes a setting, a clock, a language or any wizard state. They cost ~200 ms.
             runCatching { api.announceCompanion() }
+                .onSuccess { HuaweiSettings.saveCapabilities(context, it, address) }
             block(session, api)
         }
     }
@@ -164,8 +165,8 @@ object HuaweiSyncRunner {
         // [HuaweiClient.pushLocale]. Still stored on the ACK rather than on proof, because there
         // may be no proof to be had: what we store is "the language this phone asked for", and the
         // dialog is careful to present it as exactly that.
-        api.pushLocale(HuaweiSettings.deviceName(context) ?: "HUAWEI Band", locale, imperial)
-            .also { if (it) HuaweiSettings.setBandLocale(context, locale) }
+        api.pushLocale(HuaweiSettings.deviceName(context, address) ?: "HUAWEI Band", locale, imperial)
+            .also { if (it) HuaweiSettings.setBandLocale(context, locale, address) }
     }
 
     /**
@@ -1437,8 +1438,15 @@ object HuaweiSyncRunner {
         }
     }
 
-    suspend fun status(db: AppDatabase): HuaweiStatus {
-        val rows = db.huaweiSyncDao().recent(200).map {
+    /**
+     * The sync history as a status. With [address], only that device's syncs count — so pairing a
+     * second device (the Watch D3) can neither move the Band's next window nor be credited with the
+     * Band's last success. Null = every device, as before.
+     */
+    suspend fun status(db: AppDatabase, address: String? = null): HuaweiStatus {
+        val rows = db.huaweiSyncDao().recent(200)
+            .filter { address == null || it.address.equals(address.trim(), ignoreCase = true) }
+            .map {
             HuaweiStatus.Companion.Row(
                 startedAt = it.startedAt,
                 finishedAt = it.finishedAt,
@@ -1487,14 +1495,14 @@ object HuaweiSyncRunner {
             configure = true, bond = true, serveSec = serveSec, onPhase = onPhase,
         ).also {
             if (it is Outcome.Ok && !deviceName.isNullOrBlank()) {
-                HuaweiSettings.setDeviceName(context, deviceName)
+                HuaweiSettings.setDeviceName(context, deviceName, address)
             }
         }
 
     /** Provision a band that is already bonded — the configuration set without the pairing. */
     suspend fun provision(context: Context, db: AppDatabase, address: String, deviceName: String): Outcome =
         run(context, db, Request(address, emptyList(), timeoutSec = 120, source = "pair"), configure = true)
-            .also { if (it is Outcome.Ok) HuaweiSettings.setDeviceName(context, deviceName) }
+            .also { if (it is Outcome.Ok) HuaweiSettings.setDeviceName(context, deviceName, address) }
 
     suspend fun sync(context: Context, db: AppDatabase, request: Request): Outcome =
         run(context, db, request, configure = false)
@@ -1583,8 +1591,8 @@ object HuaweiSyncRunner {
                     // An unbonded band cannot honour a token we stored earlier: the pairing it was
                     // issued under is gone. Clearing it here is what makes a re-pair a genuinely
                     // clean first run rather than a re-auth against a credential the band forgot.
-                    if (!client.isBonded(request.address) && HuaweiSettings.isBound(context)) {
-                        HuaweiSettings.clearBind(context)
+                    if (!client.isBonded(request.address) && HuaweiSettings.isBound(context, request.address)) {
+                        HuaweiSettings.clearBind(context, request.address)
                     }
                     phase("pairing", "accept on the band, then on the phone")
                     client.ensureBonded(request.address, request.timeoutSec * 1000L) { state ->
@@ -1604,12 +1612,12 @@ object HuaweiSyncRunner {
                 phase("handshake")
                 val link = api.linkParams()
                 api.deviceStatus()
-                val authId = HuaweiSettings.authIdSelf(context) ?: mintAuthId()
+                val authId = HuaweiSettings.authIdSelf(context, request.address) ?: mintAuthId()
                 api.securityNegotiation(link.deviceSupportType, authId, android.os.Build.MODEL)
 
                 val requestId = Random.nextLong(1L, Long.MAX_VALUE)
-                val storedToken = HuaweiSettings.authToken(context)
-                if (HuaweiSettings.isBound(context) && storedToken != null) {
+                val storedToken = HuaweiSettings.authToken(context, request.address)
+                if (HuaweiSettings.isBound(context, request.address) && storedToken != null) {
                     // A stored token the band no longer honours means it was factory-reset or
                     // handed to another companion.
                     //
@@ -1632,18 +1640,18 @@ object HuaweiSyncRunner {
                             )
                         }
                         phase("handshake", "re-binding — the band forgot this phone")
-                        HuaweiSettings.clearBind(context)
+                        HuaweiSettings.clearBind(context, request.address)
                         val fresh = api.bind(authId, api.fetchPin(link.authVersion), requestId)
                         HuaweiSettings.saveBind(
                             context, authId, fresh, link.authVersion, link.deviceSupportType,
-                            System.currentTimeMillis(),
+                            System.currentTimeMillis(), request.address,
                         )
                     }
                 } else {
                     val token = api.bind(authId, api.fetchPin(link.authVersion), requestId)
                     HuaweiSettings.saveBind(
                         context, authId, token, link.authVersion, link.deviceSupportType,
-                        System.currentTimeMillis(),
+                        System.currentTimeMillis(), request.address,
                     )
                 }
 
@@ -1660,8 +1668,8 @@ object HuaweiSyncRunner {
                     val offsetMin = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
                     val hours = kotlin.math.abs(offsetMin) / 60
                     val zoneByte = if (offsetMin < 0) 128 + hours else hours
-                    api.configure(
-                        HuaweiSettings.deviceName(context) ?: "HUAWEI Band",
+                    val caps = api.configure(
+                        HuaweiSettings.deviceName(context, request.address) ?: "HUAWEI Band",
                         System.currentTimeMillis() / 1000, zoneByte, 0,
                         // NO locale. Pairing used to re-assert the stored one, on the reasoning that
                         // any companion which touches the band can push its own language over it.
@@ -1672,6 +1680,7 @@ object HuaweiSyncRunner {
                         // phone, it stays in that phone's language until one of those tasks is run.
                         null,
                     )
+                    HuaweiSettings.saveCapabilities(context, caps, request.address)
 
                     // The band is NOT finished when the configuration set is. It carries on asking
                     // — PhoneInfo, permission checks, account commands — for well over a minute, and
