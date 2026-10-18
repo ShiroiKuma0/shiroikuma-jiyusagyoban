@@ -365,6 +365,8 @@ class HuaweiDashboardModel(
                 HuaweiKeys.STEPS -> com.opentasker.core.band.BandMetric.STEPS_MINUTE
                 HuaweiKeys.HEART_RATE -> com.opentasker.core.band.BandMetric.HEART_RATE
                 HuaweiKeys.SPO2 -> com.opentasker.core.band.BandMetric.SPO2
+                // The Watch D3's skin temperature feeds the same nightly cue the Hume band's did.
+                HuaweiKeys.SKIN_TEMP -> com.opentasker.core.band.BandMetric.TEMPERATURE
                 else -> null
             } ?: return@mapNotNull null
             chart.copy(spec = chart.spec.copy(key = humeKey))

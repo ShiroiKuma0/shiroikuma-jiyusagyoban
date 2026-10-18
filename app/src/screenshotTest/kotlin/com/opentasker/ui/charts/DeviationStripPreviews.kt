@@ -53,8 +53,10 @@ private fun theNight(): RecoveryResult = Recovery.assemble(
         RecoveryMarker.FELT, 3.0, listOf(1.0, 2.0, 3.0, 2.0, 2.0, 2.0, 3.0),
         Recovery.FELT_MEANINGFUL_STEPS, counted = true,
     ),
-    temperature = reading(
-        RecoveryMarker.TEMPERATURE, 0.0, emptyList(), Recovery.TEMP_MEANINGFUL_C,
+    // The Watch D3's first nights: 33.8 °C is 2026-10-18's real median; no baseline yet, so yellow.
+    temperature = Recovery.band(
+        RecoveryMarker.TEMPERATURE, 33.8, listOf(33.7), Recovery.TEMP_MEANINGFUL_C,
+        Recovery.temperatureConfidence(listOf(33.7)), counted = false, oneSidedHigh = true,
     ),
     temperatureSustained = false,
     lateEffortMinutesBeforeSleep = null,
@@ -105,8 +107,10 @@ private fun theNightAfter(): RecoveryResult = Recovery.assemble(
         RecoveryMarker.FELT, 2.0, listOf(1.0, 2.0, 3.0, 2.0, 2.0, 2.0, 3.0),
         Recovery.FELT_MEANINGFUL_STEPS, counted = true,
     ),
-    temperature = reading(
-        RecoveryMarker.TEMPERATURE, 0.0, emptyList(), Recovery.TEMP_MEANINGFUL_C,
+    // INVENTED nights around the real 33.8 °C: a warm night, graded against twenty before it.
+    temperature = Recovery.band(
+        RecoveryMarker.TEMPERATURE, 34.5, listOf(33.8, 33.6, 34.0, 33.7, 33.9, 33.8, 33.5, 33.9, 33.7, 33.8, 34.1, 33.6, 33.8, 33.9, 33.7, 33.8, 33.6, 33.9, 34.0, 33.8), Recovery.TEMP_MEANINGFUL_C,
+        Recovery.temperatureConfidence(listOf(33.8, 33.6, 34.0, 33.7, 33.9, 33.8, 33.5, 33.9, 33.7, 33.8, 34.1, 33.6, 33.8, 33.9, 33.7, 33.8, 33.6, 33.9, 34.0, 33.8)), counted = false, oneSidedHigh = true,
     ),
     temperatureSustained = false,
     lateEffortMinutesBeforeSleep = null,
@@ -150,8 +154,10 @@ private fun ordinaryNight(): RecoveryResult = Recovery.assemble(
         RecoveryMarker.FELT, 2.0, listOf(1.0, 2.0, 3.0, 2.0, 2.0, 2.0, 3.0),
         Recovery.FELT_MEANINGFUL_STEPS, counted = true,
     ),
-    temperature = reading(
-        RecoveryMarker.TEMPERATURE, 0.0, emptyList(), Recovery.TEMP_MEANINGFUL_C,
+    // INVENTED nights around the real 33.8 °C: an ordinary one.
+    temperature = Recovery.band(
+        RecoveryMarker.TEMPERATURE, 33.9, listOf(33.8, 33.6, 34.0, 33.7, 33.9, 33.8, 33.5, 33.9, 33.7, 33.8, 34.1, 33.6, 33.8, 33.9, 33.7, 33.8, 33.6, 33.9, 34.0, 33.8), Recovery.TEMP_MEANINGFUL_C,
+        Recovery.temperatureConfidence(listOf(33.8, 33.6, 34.0, 33.7, 33.9, 33.8, 33.5, 33.9, 33.7, 33.8, 34.1, 33.6, 33.8, 33.9, 33.7, 33.8, 33.6, 33.9, 34.0, 33.8)), counted = false, oneSidedHigh = true,
     ),
     temperatureSustained = false,
     lateEffortMinutesBeforeSleep = null,

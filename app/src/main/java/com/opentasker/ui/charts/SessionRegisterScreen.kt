@@ -677,6 +677,12 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             maxLines = 1,
             softWrap = false,
         )
+        // Skin temperature first (白い熊, 2026-10-18), with one decimal: the whole signal is a few
+        // tenths of a degree. Yellow while its baseline is still being collected, then the 1–5 steps.
+        ValueCell(
+            n?.temperature?.value?.let { String.format("%.1f", it) },
+            n?.temperature?.displayStep,
+        )
         // The step ALONE — no word. "Below par" cannot share one line with its number at any width
         // this table can afford, and the legend directly above the table names all five in full, so
         // the cell can be the thing the legend is a key TO rather than a second copy of it.

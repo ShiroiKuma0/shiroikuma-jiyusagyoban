@@ -190,9 +190,20 @@ object RecoverySource {
     fun sleepMinutes(session: SleepSession): Double =
         (session.totalMinutes - session.awake).toDouble()
 
-    /** Median skin temperature inside the sleep window. Never a raw absolute — only a deviation. */
+    /**
+     * Median skin temperature inside the sleep window. Never a raw absolute — only a deviation.
+     *
+     * Readings below [SKIN_TEMP_ON_WRIST_C] are left out: they are the watch off the wrist, not 白い熊
+     * (the D3 off the wrist on 2026-10-18 read 29.9 and 30.6 °C; worn, its lowest was 31.3, outdoors).
+     */
+    /** Below this a wrist reading is the watch off the wrist, or lying on the charger. */
+    const val SKIN_TEMP_ON_WRIST_C = 31.0
+    const val SKIN_TEMP_MAX_C = 42.0
+
     fun skinTemp(session: SleepSession, tempPoints: List<ChartPoint>): Double? {
-        val inSession = tempPoints.filter { it.tMs in session.startMs..session.endMs }
+        val inSession = tempPoints.filter {
+            it.tMs in session.startMs..session.endMs && it.value in SKIN_TEMP_ON_WRIST_C..SKIN_TEMP_MAX_C
+        }
         return HealthIndexSource.median(inSession.map { it.value })
     }
 

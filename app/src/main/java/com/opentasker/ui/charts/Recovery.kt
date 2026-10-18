@@ -102,6 +102,9 @@ enum class RecoveryMarker {
     RESPIRATION,
 }
 
+/** The step whose colour (yellow) a collecting skin temperature is drawn in — see [MarkerReading.temperatureCollecting]. */
+const val COLLECTING_STEP = 1
+
 /** Which side of usual a marker landed on. */
 enum class RecoveryBand { LOW, USUAL, HIGH, UNKNOWN }
 
@@ -122,7 +125,22 @@ data class MarkerReading(
     val band: RecoveryBand,
     /** True when this marker is one of the three the headline counts. */
     val counted: Boolean,
+    /** How many earlier nights the baseline had to draw on — what "collecting" counts towards. */
+    val nights: Int = 0,
 ) {
+    /**
+     * Skin temperature with a value but no baseline yet: its first [Recovery.MIN_NIGHTS_FOR_ANY]
+     * nights. Drawn YELLOW rather than grey (白い熊, 2026-10-18: "color the boxes yellow now for five
+     * nights, since we don't have a base measure") — a colour that says "measured, not yet judged",
+     * never a grade. It is not [scaleStep], and nothing reads it as one.
+     */
+    val temperatureCollecting: Boolean
+        get() = marker == RecoveryMarker.TEMPERATURE && value != null && band == RecoveryBand.UNKNOWN
+
+    /** The tint step a display uses: [scaleStep], or the collecting yellow (step 1's colour). */
+    val displayStep: Int?
+        get() = scaleStep ?: if (temperatureCollecting) COLLECTING_STEP else null
+
     val delta: Double? get() = if (value != null && baseline != null) value - baseline else null
 
     /** Fired in the direction that means "worse", which is the only direction the count cares about. */
@@ -156,9 +174,10 @@ data class MarkerReading(
      * and no threshold is invented — the scale only says which side of the band the value fell, and
      * how far.
      *
-     * Temperature never reaches 1 or 2. It is banded one-sided because only elevation is meaningful at
-     * the wrist; a cool night is unremarkable, not good, and colouring it as a best-step night would
-     * assert something the measurement cannot support.
+     * Temperature takes the whole 1–5 scale since 2026-10-18 (白い熊: "we want grading from 1 to 5,
+     * not from 3 to 5"): warmer than usual is 4 and 5, cooler is 2 and 1. Its BAND stays one-sided —
+     * only elevation is [adverse] and only elevation can raise the sustained-warmth note — so a cool
+     * night is coloured, never counted.
      */
     val scaleStep: Int?
         get() {
@@ -186,7 +205,6 @@ data class MarkerReading(
                 RecoveryMarker.HRV, RecoveryMarker.HR_SWING -> deviations < 0
             }
             val far = kotlin.math.abs(deviations) >= 2.0
-            if (!worse && marker == RecoveryMarker.TEMPERATURE) return 3
             return when {
                 worse && far -> 5
                 worse -> 4
@@ -368,6 +386,16 @@ object Recovery {
     const val HRV_MEANINGFUL_MS = 5.0
 
     const val MIN_NIGHTS_FOR_ANY = 5
+
+    /**
+     * Skin temperature's baseline counts only the nights that HAVE a skin temperature.
+     *
+     * Every other marker shares one confidence, from the number of nights on record; temperature
+     * cannot, because the Watch D3 is the first Huawei device with the sensor and the nights before
+     * it — the Band's, the Hume band's — have none. Sharing would declare a baseline "established"
+     * on one night of temperature.
+     */
+    fun temperatureConfidence(history: List<Double>): RecoveryConfidence = confidenceFor(history.size)
     const val MIN_NIGHTS_FOR_Z = 14
 
     /** Rolling baseline length once established. Long enough to be stable, short enough to track drift. */
@@ -420,7 +448,7 @@ object Recovery {
     ): MarkerReading {
         val baseline = median(history)
         if (value == null || baseline == null || confidence == RecoveryConfidence.COLLECTING) {
-            return MarkerReading(marker, value, baseline, null, null, null, RecoveryBand.UNKNOWN, counted)
+            return MarkerReading(marker, value, baseline, null, null, null, RecoveryBand.UNKNOWN, counted, history.size)
         }
         // PROVISIONAL uses the absolute threshold alone: the dispersion estimate is not yet worth
         // trusting, and pretending otherwise is how a short history manufactures alarms.
@@ -440,7 +468,7 @@ object Recovery {
         }
         // A one-sided marker can leave "usual" upward only — see TEMPERATURE.
         val band = if (oneSidedHigh && raw == RecoveryBand.LOW) RecoveryBand.USUAL else raw
-        return MarkerReading(marker, value, baseline, lo, hi, z, band, counted)
+        return MarkerReading(marker, value, baseline, lo, hi, z, band, counted, history.size)
     }
 
     /** The heart-rate marker, with its own measured dispersion floor applied. */
@@ -554,7 +582,11 @@ object Recovery {
         hrvRunNights: Int = 0,
     ): RecoveryResult {
         val confidence = confidenceFor(nightsOfHistory)
-        val tempShown = if (temperatureSustained) temperature else temperature.copy(band = RecoveryBand.USUAL)
+        // Only a WARM night waits for the night before it; a reading not yet judged stays unjudged, so
+        // a collecting temperature is still drawn as collecting (it used to be turned into "usual").
+        val tempShown =
+            if (temperatureSustained || temperature.band != RecoveryBand.HIGH) temperature
+            else temperature.copy(band = RecoveryBand.USUAL)
         val markers = listOfNotNull(
             nocturnalHr, sleep, felt, tempShown, bedtimeHr, respiration, deep, hrv, hrSwing,
         )
