@@ -11,7 +11,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.opentasker.core.huawei.HuaweiEcg
+import com.opentasker.ui.charts.huawei.HuaweiArrhythmiaCard
+import com.opentasker.ui.charts.huawei.HuaweiArrhythmiaDetailScreen
 import com.opentasker.ui.charts.huawei.HuaweiBloodPressureCard
+import com.opentasker.ui.charts.huawei.HuaweiPwaCheck
 import com.opentasker.ui.charts.huawei.HuaweiBloodPressureDetailScreen
 import com.opentasker.ui.charts.huawei.HuaweiBpReading
 import com.opentasker.ui.charts.huawei.HuaweiEcgCard
@@ -68,6 +71,17 @@ private val BP = BloodPressureChart(
     headline = "124/83", systolicRange = "121–132", diastolicRange = "80–88",
 )
 
+
+/** 白い熊's real arrhythmia checks, 2026-10-17 22:36 → 2026-10-18 13:30 (all normal), as synced. */
+private val PWA_REAL = listOf(
+    1792269403L, 1792270237L, 1792273236L, 1792275636L, 1792276238L, 1792277436L, 1792278635L, 1792279236L, 1792279835L, 1792280434L, 1792281035L, 1792283435L, 1792284036L, 1792284634L, 1792285235L, 1792285834L, 1792286435L, 1792287035L, 1792287634L, 1792288235L, 1792288834L, 1792290634L, 1792291846L, 1792292437L, 1792293035L, 1792293635L, 1792294238L, 1792295435L, 1792296035L, 1792296635L, 1792297236L, 1792297835L, 1792299035L, 1792302638L, 1792309236L, 1792315837L
+).map { HuaweiPwaCheck(it * 1000L, 0) }.reversed()
+
+/** The same, with one INVENTED not-normal check, so the outline and its wording can be seen. */
+private val PWA_WITH_ONE = (PWA_REAL + HuaweiPwaCheck(1_792_281_635_000L, 1)).sortedByDescending { it.tMs }
+
+private const val PWA_NOW = 1_792_334_400_000L     // 2026-10-18 17:20
+
 @Composable
 private fun Frame(lang: BandLanguage, content: @Composable () -> Unit) {
     OpenTaskerTheme {
@@ -91,7 +105,7 @@ fun D3CardsEnglish() = Frame(BandLanguage.EN) {
 @Preview(name = "D3 blood pressure page — 日本語", widthDp = 413, heightDp = 1100, showBackground = true)
 @Composable
 fun D3BloodPressureJapanese() = Frame(BandLanguage.JA) {
-    HuaweiBloodPressureDetailScreen(BP, READINGS, PaddingValues(10.dp), onBack = {})
+    HuaweiBloodPressureDetailScreen(BP, READINGS, PaddingValues(10.dp), onBack = {}, nowMs = END)
 }
 
 @PreviewTest
@@ -99,4 +113,18 @@ fun D3BloodPressureJapanese() = Frame(BandLanguage.JA) {
 @Composable
 fun D3EcgEnglish() = Frame(BandLanguage.EN) {
     HuaweiEcgDetailScreen(listOf(SINUS, SETTLING), PaddingValues(10.dp), onBack = {})
+}
+
+@PreviewTest
+@Preview(name = "D3 arrhythmia card — English", widthDp = 413, heightDp = 260, showBackground = true)
+@Composable
+fun D3ArrhythmiaCardEnglish() = Frame(BandLanguage.EN) {
+    HuaweiArrhythmiaCard(PWA_REAL, nowMs = PWA_NOW) {}
+}
+
+@PreviewTest
+@Preview(name = "D3 arrhythmia page — 日本語 (one invented not-normal)", widthDp = 413, heightDp = 1300, showBackground = true)
+@Composable
+fun D3ArrhythmiaJapanese() = Frame(BandLanguage.JA) {
+    HuaweiArrhythmiaDetailScreen(PWA_WITH_ONE, PaddingValues(10.dp), onBack = {}, nowMs = PWA_NOW)
 }
