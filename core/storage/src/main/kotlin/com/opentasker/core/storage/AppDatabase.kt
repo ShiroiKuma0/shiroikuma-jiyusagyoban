@@ -14,10 +14,10 @@ import java.util.concurrent.CountDownLatch
 // touched, because both devices run in parallel until their data has been compared.
 // v33 adds 言語島's four tables (gengoshima_*), additive only.
 // v34 adds 言語島's uuids, English audio and Anki sync state, and gengoshima_tombstones.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 36
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 37
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class, GengoshimaInboxEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiEcgEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class, GengoshimaInboxEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
@@ -40,6 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun huaweiSyncDao(): HuaweiSyncDao
     abstract fun huaweiSleepDao(): HuaweiSleepDao
     abstract fun huaweiBeatDao(): HuaweiBeatDao
+    abstract fun huaweiEcgDao(): HuaweiEcgDao
     abstract fun huaweiWorkoutDao(): HuaweiWorkoutDao
     abstract fun gengoshimaDao(): GengoshimaDao
 }

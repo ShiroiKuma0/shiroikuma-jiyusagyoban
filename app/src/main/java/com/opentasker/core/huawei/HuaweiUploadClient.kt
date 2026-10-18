@@ -225,7 +225,8 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
         assetId: String,
         version: String,
         bytes: ByteArray,
-        metaJson: String,
+        metaJson: String?,
+        mode: Int = HuaweiCommands.WF_MODE_INSTALL,
         timeoutMs: Long = 240_000,
         silenceMs: Long = SILENCE_TIMEOUT_MS,
         engageMs: Long = ENGAGE_TIMEOUT_MS,
@@ -296,7 +297,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
 
         session.sendLarge(
             cfg.SVC_WATCHFACE, cfg.WF_CONTROL,
-            cfg.watchFaceAnnounce(assetId, version, width, height, metaJson),
+            cfg.watchFaceAnnounce(assetId, version, width, height, metaJson, mode),
         )
 
         var sent = 0
@@ -347,7 +348,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
                                 installSent = true
                                 session.send(
                                     cfg.SVC_WATCHFACE, cfg.WF_CONTROL,
-                                    cfg.watchFaceInstall(assetId, version, width, height),
+                                    cfg.watchFaceInstall(assetId, version, width, height, mode),
                                 )
                             }
                         }
@@ -471,6 +472,47 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
     private var chunk = DEFAULT_CHUNK
 
     private fun sha256(b: ByteArray) = MessageDigest.getInstance("SHA-256").digest(b)
+
+    /**
+     * Upload one small file that is not a watch face — the Watch D3's country feature file
+     * ([HuaweiD3Reconnect.FEATURE_FILE]). The face exchange without the face: offer
+     * (`0x28/0x02` name, size, slot), then the watch drives — hash, parameters, blocks, done.
+     *
+     * @return a one-line account for the sync summary.
+     */
+    suspend fun uploadFile(name: String, bytes: ByteArray, fileId: Int, timeoutMs: Long = 15_000): String {
+        val cfg = HuaweiCommands
+        session.send(cfg.SVC_FILE_UPLOAD, cfg.UPLOAD_REQUEST, cfg.uploadRequest(name, bytes.size, fileId, null, null))
+        var sent = 0
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            for (f in session.poll(POLL_MS.coerceAtMost(1_000))) {
+                if (f.serviceId != cfg.SVC_FILE_UPLOAD) continue
+                val tl = session.decrypt(f)
+                fun t(n: Int) = tl.firstOrNull { it.tag == n }?.value
+                when (f.commandId) {
+                    cfg.UPLOAD_REQUEST -> t(HuaweiProtocol.TAG_RESULT)?.let { HuaweiProtocol.bytesToInt(it) }
+                        ?.takeIf { it != HuaweiProtocol.RESULT_SUCCESS }?.let { return "$name refused ($it)" }
+                    cfg.UPLOAD_HASH -> session.send(cfg.SVC_FILE_UPLOAD, cfg.UPLOAD_HASH, cfg.uploadHash(fileId, sha256(bytes)))
+                    cfg.UPLOAD_PARAMS -> {
+                        t(5)?.let { chunk = HuaweiProtocol.bytesToInt(it).coerceIn(64, 4096) }
+                        session.send(cfg.SVC_FILE_UPLOAD, cfg.UPLOAD_PARAMS, cfg.uploadAck(fileId))
+                    }
+                    cfg.UPLOAD_BLOCK -> {
+                        val offset = t(2)?.let { HuaweiProtocol.bytesToInt(it) } ?: continue
+                        val length = t(3)?.let { HuaweiProtocol.bytesToInt(it) } ?: continue
+                        sent = maxOf(sent, sendBlock(fileId, bytes, offset, length, chunk))
+                    }
+                    cfg.UPLOAD_DONE -> {
+                        session.send(cfg.SVC_FILE_UPLOAD, cfg.UPLOAD_DONE, cfg.uploadAck(fileId))
+                        return "$name taken ($sent B)"
+                    }
+                }
+            }
+            if (!session.isOpen) return "$name: the link closed"
+        }
+        return if (sent == 0) "$name: the watch never asked for it" else "$name: $sent B sent, never confirmed"
+    }
 
     /** Answer one `[offset, length]` request, in as many frames as the chunk size requires. */
     private suspend fun sendBlock(

@@ -29,6 +29,7 @@ import androidx.core.content.edit
 object HuaweiSettings {
     private const val PREFS = "huawei_band_settings"
     private const val KEY_ADDRESS = "address"
+    private const val KEY_ACCOUNT_ID = "account_id"
     private const val KEY_DEVICE_NAME = "device_name"
     private const val KEY_AUTH_ID = "auth_id_self"
     private const val KEY_AUTH_TOKEN = "auth_token"
@@ -37,6 +38,7 @@ object HuaweiSettings {
     private const val KEY_OVERLAP_MIN = "overlap_minutes"
     private const val KEY_CHIZU_TOKEN = "chizu_token"
     private const val KEY_LAST_FILE_PULL = "last_file_pull_ms"
+    private const val KEY_DICTIONARY_SINCE = "dictionary_since_ms"
     private const val KEY_BEAT_METRICS_VERSION = "beat_metrics_version"
     private const val KEY_LOOKBACK_HOURS = "lookback_hours"
     private const val KEY_TIMEOUT_SEC = "timeout_sec"
@@ -80,6 +82,18 @@ object HuaweiSettings {
     /** The ACTIVE device: the one every task without an explicit `address` talks to. */
     fun address(context: Context): String =
         prefs(context).getString(KEY_ADDRESS, null)?.trim()?.ifEmpty { null } ?: DEFAULT_ADDRESS
+
+    /**
+     * 白い熊's Huawei account ID, the one Health sends in `0x1A/0x05` and `0x1A/0x01`. Private: it
+     * lives only here and in 「健康の設定」 (`%Huawei_AccountId`), which hands it over through the
+     * `account` argument of the pair and sync actions — never in the code, the repo or a bundle.
+     * Null until one has been handed over; the account steps are then skipped.
+     */
+    fun accountId(context: Context): String? =
+        prefs(context).getString(KEY_ACCOUNT_ID, null)?.trim()?.ifEmpty { null }
+
+    fun setAccountId(context: Context, value: String) =
+        prefs(context).edit { putString(KEY_ACCOUNT_ID, value.trim()) }
 
     /** Make [value] the active device. The previous device's bind and settings are kept. */
     fun setAddress(context: Context, value: String) =
@@ -253,6 +267,18 @@ object HuaweiSettings {
 
     fun markFilePull(context: Context, atMs: Long = System.currentTimeMillis(), device: String = address(context)) =
         devicePrefs(context, device).edit { putLong(KEY_LAST_FILE_PULL, atMs) }
+
+    /**
+     * Where the next data-dictionary fetch starts (ms), per device — the newest record already held,
+     * or 0 when nothing has been fetched yet. Its own mark rather than the sample window, because a
+     * routine sync's window is minutes long and a blood-pressure reading from this morning would
+     * otherwise never be asked for.
+     */
+    fun dictionarySince(context: Context, device: String = address(context)): Long =
+        devicePrefs(context, device).getLong(KEY_DICTIONARY_SINCE, 0L)
+
+    fun markDictionary(context: Context, sinceMs: Long, device: String = address(context)) =
+        devicePrefs(context, device).edit { putLong(KEY_DICTIONARY_SINCE, sinceMs) }
 
     fun chizuToken(context: Context): String? =
         prefs(context).getString(KEY_CHIZU_TOKEN, null)?.ifEmpty { null }
