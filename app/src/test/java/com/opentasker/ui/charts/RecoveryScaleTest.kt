@@ -103,15 +103,16 @@ class RecoveryScaleTest {
     }
 
     /**
-     * A cool night is unremarkable, not good. Temperature is banded one-sided because only elevation
-     * is meaningful at the wrist, so the scale must not assert a benefit the measurement cannot show.
+     * Temperature takes the whole 1–5 scale (白い熊, 2026-10-18): cooler than usual is 2 and 1, warmer
+     * 4 and 5. Only warmth is adverse — a cool night is coloured, never counted.
      */
     @Test
-    fun `a cool night is never graded as good`() {
+    fun `temperature is graded on the whole scale, but only warmth is adverse`() {
         val cool = MarkerReading(
-            RecoveryMarker.TEMPERATURE, 35.4, 36.4, 36.1, 36.7, null, RecoveryBand.LOW, false,
+            RecoveryMarker.TEMPERATURE, 35.4, 36.4, 36.1, 36.7, null, RecoveryBand.USUAL, false,
         )
-        assertEquals(3, cool.scaleStep)
+        assertEquals(1, cool.scaleStep)
+        assertTrue(!cool.adverse)
         val warm = MarkerReading(
             RecoveryMarker.TEMPERATURE, 37.4, 36.4, 36.1, 36.7, null, RecoveryBand.HIGH, false,
         )

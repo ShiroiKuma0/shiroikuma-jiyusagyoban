@@ -232,7 +232,14 @@ fun HuaweiDashboardScreen(
             }
         }
 
-        state.index?.let { idx -> item("index") { HealthIndexCard(idx) { onOpenMetric("index") } } }
+        state.index?.let { idx ->
+            item("index") {
+                HealthIndexCard(
+                    idx,
+                    temperature = state.recovery?.markers?.firstOrNull { it.marker == com.opentasker.ui.charts.RecoveryMarker.TEMPERATURE },
+                ) { onOpenMetric("index") }
+            }
+        }
 
         state.message?.let { msg -> item("message") { SectionCard { BodyText(msg[lang]) } } }
 
