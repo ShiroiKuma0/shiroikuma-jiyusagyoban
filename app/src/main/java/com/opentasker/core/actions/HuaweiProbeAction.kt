@@ -676,7 +676,12 @@ class HuaweiProbeAction : Action {
                             "0102" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES, HuaweiCommands.supportedServices())
                             "0103" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_COMMANDS, HuaweiCommands.supportedCommands())
                             "0137" -> session.request(HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_EXPAND_CAPABILITY, HuaweiCommands.expandCapability())
-                            "1a05" -> session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount())
+                            "1a05" -> session.request(
+                                HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT,
+                                HuaweiCommands.extendedAccount(
+                                    HuaweiSettings.accountId(ctx.app) ?: throw IllegalStateException("no account ID — run 健康の設定 and a sync first"),
+                                ),
+                            )
                             else -> throw IllegalArgumentException("unknown warm-up step '$which'")
                         }
                         session.decrypt(f).joinToString(",") { "%d:%s".format(it.tag, HuaweiCrypto.upperHex(it.value).take(32)) }

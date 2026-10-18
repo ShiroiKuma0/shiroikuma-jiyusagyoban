@@ -57,6 +57,8 @@ class HuaweiSyncAction : Action {
             )
         }
 
+        // 白い熊's account ID, handed over from 健康の設定; kept in the app's private settings only.
+        args["account"]?.trim()?.takeIf { it.isNotEmpty() && !it.startsWith("%") }?.let { HuaweiSettings.setAccountId(ctx.app, it) }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val timeoutSec = args["timeout_sec"]?.trim()?.toIntOrNull() ?: HuaweiSettings.timeoutSec(ctx.app)
         val maxRecords = args["max_records"]?.trim()?.toIntOrNull() ?: 4096

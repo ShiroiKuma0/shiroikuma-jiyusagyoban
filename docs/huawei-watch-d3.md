@@ -153,7 +153,9 @@ What to record here, step by step:
 ### 3.7 Findings from the live session (2026-10-17)
 
 **The device.** Model `RIV-B10` (“Riva”), HarmonyOS; Health updated it from `7.0.0.103(SP25C00M00)`
-to **`7.0.0.109(SP25C00M01)`** (0x01/0x07 tag 7). Bluetooth address `F0:91:B7:D7:37:44` (tag 34). The
+to **`7.0.0.109(SP25C00M01)`** (0x01/0x07 tag 7). **Two Bluetooth addresses:** Classic (BR/EDR) **`70:90:B7:D7:37:44`** (0x01/0x07 tag 5) — the one
+Health pairs on (SSP “just works”, IO capability NoInputNoOutput) and the one `huawei.pair` must use — and
+BLE `F0:91:B7:D7:37:44` (tag 34). A Classic `createBond` to the BLE address is refused by the watch. The
 pairing decrypts with the existing tools: 4 keys from the first pairing, 2 more from the re-auth after
 the update's restart, 0 undecryptable frames throughout.
 
@@ -327,6 +329,87 @@ and 172 × 290). The resource headers do not read as the Band's `family / format
 **Language:** at pairing Health sent `0x0C/0x01` `1:en-US 2:00`, the Band's command and layout.
 **Weather:** pushed unasked during the ECG step on the Band's service (`0x0F/0x01`–`0x0B`, location
 name in `0x0F/0x01` tag 8) together with the phone's position (`0x18/0x07`).
+
+### 3.9 Takeover, 2026-10-17 21:51
+
+Unpairing in Health left the watch on its normal face; a **factory reset** on the watch brought the
+pairing screen. `huawei.pair` (task `時計接続（D3） -- [727]`) on the **Classic** address then paired,
+bound and provisioned it with the Band's first-run set — “paired and provisioned — answered 6
+requests” — and the watch went to its face. The Band stayed the active device and kept syncing.
+
+`huawei.probe full=true` (task `時計棚卸し（D3） -- [727]`): auth version 1, device support type 4;
+SDP lists a second Huawei UUID beside `82ff3820-…`: **`65847aa1-102a-05e1-43b6-e2a3965be547`**.
+Services answered 128, supported 30, three not in the Band's list (0x01, 0x21, 0x28).
+
+**The census lies, as the Band's did.** It answers NO for 0x1C / 0x1F (satellite — Health used both
+tonight), omits 0x2C / 0x37 (files, app messages — both used), and lists no 0x07/0x2A (skin
+temperature — accepted). Never gate a step on it.
+
+**Variables collide:** the pair task and the Band's automatic sync both write `HUAWEI_*`; the Band
+sync started seconds after the pairing and overwrote its result. D3 tasks need their own prefix.
+
+### 3.10 Faces: the D3 ENFORCES the signed store record (2026-10-17)
+
+The opposite of the Band (`docs/huawei-watch-face-format.md` §1). Installed from our app over the
+Classic address, all sent in full, then `wf/3 r=100014` (not the Band's 100007 “no room”):
+
+| Face | Store record | Result |
+|---|---|---|
+| Wild Race 2186431433, untouched | its own (D3 `deviceId`) | **installed** |
+| MZ DIGICOLOR 7184120553, untouched | genuine, but the Band's (`deviceId` differs) | refused 100014 |
+| Wild Race renamed (new id, new hash) | Wild Race's, now mismatched | refused 100014 |
+| 相撲字時計 D3 7953832255 (layout C) | MZ DIGICOLOR's | refused 100014 |
+
+`watchContentHash` = SHA-256 of the `.bin` (checked on both faces); the record (`hitopId`,
+`watchContentHash`, `deviceId`, …) is signed by Huawei (`contentSign`). So our transfer works and the
+watch verifies the record.
+
+**Health sends tag 3 = `05` to the D3** (`01` to the Band). +048 exposes both knobs on
+`huawei.watchface` (`record` = store / none / empty / unsigned, `mode` = the tag-3 byte). Every
+combination tried on 相撲字時計 D3 was sent in full and refused with the same 100014 at the end:
+store+5, none+1, none+5, unsigned+1, unsigned+5, empty+5. There is no unsigned path through the
+ordinary install.
+
+**What is known outside (research, 2026-10-17):** Huawei documents ONE way to test an unpublished
+face on a watch — Huawei Health signed in with an ID holding the “HUAWEI Themes certified designer
+(watch face)” permission, Themes → Watch Face → Mine → Add watch faces, a `.hwt` from Theme Studio
+(developer.huawei.com, “watch-face-test”). Presumably Huawei's server then signs it for that one
+watch. Gadgetbridge (#6005) reaches the same wall on HarmonyOS 6.1+ watches and names the same record
+fields; a Coolapk report claims an unstable bypass (sleep mode on, a third-party face current, a
+hooked Health on a rooted phone; faces vanish on restart). No public source names 100014.
+
+The D3 build itself is done and kept: `scripts/sumoji-build-d3.py` (layout C, gaps 4, mark
+re-derived and measured), packed to `.scratch/d3/sumoji/pack/7953832255_2.1.1.bin`.
+
+### 3.11 The dictionary answers only after Health's reconnect (2026-10-18)
+
+Our first syncs (+049 – +053) sent the dictionary queries byte for byte as Health does; the watch
+acknowledged every one (`03 … cf`) and answered none, where it answers Health within 5 ms. Ruled out
+one at a time, none of them enough on its own: the message counter, the "since" value, the
+privacy switch / sync-device / blood-pressure-status messages Health sends at pairing (+052), and
+Health's full account step (+053).
+
+**What fixed it (+054): Health's whole reconnect**, replayed before anything is asked —
+`HuaweiD3Reconnect`, about thirty commands in Health's order and with Health's payloads, from its
+reconnect of 2026-10-17 19:48:25. The first sync with it brought 1 771 values from 1 621 records,
+30/30 classes answered: blood pressure 129/88/81 (20:17:21), arterial stiffness 6.53 m/s grade 1,
+skin temperature every minute from 21:18, the per-minute class 200003, the daily summaries from
+2026-10-15, and the night classes 500007 / 500010.
+
+The likeliest single cause is the **country feature file**, `feature_CZ_device.txt` (2 913 B, file id
+`0x0F` on the upload service `0x28`, SHA-256 `d02ff995…`), which Health uploads on every reconnect:
+it declares which health features the phone side supports — blood pressure (ABPM thresholds
+135/85, 120/70, 130/80), ECG (CE), arterial stiffness, the health check, emotion, plateau care,
+arrhythmia, sleep apnea. It is Huawei's file and holds nothing personal; the app carries it as
+`assets/huawei/feature_CZ_device.txt`. Not isolated — the whole replay ships, because it is what
+Health does and it costs about two seconds.
+
+Left out of the replay: the language (`0x0C/0x01` — connecting never changes it), the user profile
+(`0x07/0x02`, personal values), and what the sync asks for itself. The account ID (`0x1A/0x05`,
+`0x1A/0x01`) is 白い熊's own and private: it is `%Huawei_AccountId` in 「健康の設定」, handed over
+as the `account` argument of the pair and sync actions and stored only in the app's private
+settings. It was in the code from the fork's start and was purged from the GitHub history on
+2026-10-18.
 
 ### 3.8 Health's graph pages to rebuild in 健康 (白い熊, 2026-10-17)
 

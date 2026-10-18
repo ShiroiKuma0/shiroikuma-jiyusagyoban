@@ -692,6 +692,28 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * `huawei_ecg` — the Watch D3's ECG recordings, one row per recording, the trace as a blob.
+     * Additive only: a new table, nothing touched. No column declares a default, so none is stated.
+     */
+    val MIGRATION_36_37 = object : Migration(36, 37) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `huawei_ecg` (" +
+                    "`startSeconds` INTEGER NOT NULL, " +
+                    "`endSeconds` INTEGER NOT NULL, " +
+                    "`verdict` INTEGER NOT NULL, " +
+                    "`meanHr` INTEGER NOT NULL, " +
+                    "`analysisVersion` TEXT NOT NULL, " +
+                    "`sampleRate` INTEGER NOT NULL, " +
+                    "`sampleCount` INTEGER NOT NULL, " +
+                    "`samples` BLOB NOT NULL, " +
+                    "`syncId` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`startSeconds`))",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -729,6 +751,7 @@ object DatabaseMigrations {
             MIGRATION_33_34,
             MIGRATION_34_35,
             MIGRATION_35_36,
+            MIGRATION_36_37,
         )
     }
 }

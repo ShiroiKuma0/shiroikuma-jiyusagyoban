@@ -89,8 +89,14 @@ class HuaweiWatchFaceAction : Action {
             id to version
         }
 
-        ctx.logger("Huawei watch face: sending ${file.name} (${file.length()} bytes)")
-        val result = HuaweiSyncRunner.uploadWatchFace(ctx.app, address, file, evict) { sent ->
+        val record = args["record"]?.trim()?.lowercase()?.ifEmpty { null } ?: "store"
+        val mode = args["mode"]?.trim()?.ifEmpty { null }?.let { m ->
+            m.removePrefix("0x").toIntOrNull(if (m.startsWith("0x")) 16 else 10)
+                ?: return fail(ctx, prefix, store, "mode must be a number, e.g. 1 or 5 — not '$m'")
+        } ?: com.opentasker.core.huawei.HuaweiCommands.WF_MODE_INSTALL
+        if (mode == 2) return fail(ctx, prefix, store, "mode 2 is the DELETE command — use remove= to delete a face")
+        ctx.logger("Huawei watch face: sending ${file.name} (${file.length()} bytes, record=$record, mode=$mode)")
+        val result = HuaweiSyncRunner.uploadWatchFace(ctx.app, address, file, evict, record, mode) { sent ->
             ctx.variables.set("${prefix}FaceSent", sent.toString())
         }
         return result.fold(

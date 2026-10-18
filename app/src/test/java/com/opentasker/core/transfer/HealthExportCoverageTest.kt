@@ -82,7 +82,7 @@ class HealthExportCoverageTest {
                 .map { it.groupValues[1] }
                 .toList()
         }.toSet()
-        assertEquals("expected eleven band tables in the schema", 11, declared.size)
+        assertEquals("expected twelve band tables in the schema (huawei_ecg joined on 2026-10-17)", 12, declared.size)
 
         val listed = Regex("HEALTH_TABLES = listOf\\(([^)]*)\\)", RegexOption.DOT_MATCHES_ALL)
             .find(backup)!!

@@ -11,8 +11,9 @@ import com.opentasker.core.huawei.HuaweiProtocol.tlv
  * Bluetooth capture — see the `huawei-band-firstrun-recipe` memory. They are settings values, not
  * code, and nothing here derives from AGPL Gadgetbridge.
  *
- * **No Huawei account is used.** [ACCOUNT_ID] is an opaque identifier the band wants present;
- * presenting it involves no network call of any kind.
+ * **No Huawei account is used.** The account ID the device wants present is 白い熊's own and
+ * private, so it is not here: it comes from [HuaweiSettings.accountId]. Presenting it involves no
+ * network call of any kind.
  */
 object HuaweiCommands {
 
@@ -221,9 +222,6 @@ object HuaweiCommands {
         SVC_DEVICE_CONFIG to CMD_SETUP_DEVICE_STATUS,
     )
 
-    /** Opaque identifier the band expects. Not a credential; nothing contacts Huawei. */
-    const val ACCOUNT_ID = "ACCOUNT_ID_REMOVED"
-
     /** Sent as tag 6 of SecurityNegotiation. Health sends this literal string. */
     const val PHONE_IDENTIFY = "phoneIdentify"
 
@@ -318,14 +316,24 @@ object HuaweiCommands {
 
     fun accountStep04(): ByteArray = tlv(1, byteArrayOf(1))
 
-    fun extendedAccount(accountId: String = ACCOUNT_ID): ByteArray =
+    fun extendedAccount(accountId: String): ByteArray =
         tlv(1, accountId) + tlv(3, byteArrayOf(1))
+
+    /**
+     * The account step in Health's full form, as the Watch D3 receives it on EVERY connection
+     * (captured 2026-10-17 19:27:31 and again 19:48:25 after a restart; the watch answers `2:00`):
+     * `1:<account> 3:01 4:00 5:<country> 6:<country> 7:<empty> 8:<locale> 9:00`. The Band's first
+     * run took the short form ([extendedAccount]) and is left as it was.
+     */
+    fun extendedAccountFull(country: String, locale: String, accountId: String): ByteArray =
+        tlv(1, accountId) + tlv(3, byteArrayOf(1)) + tlv(4, byteArrayOf(0)) + tlv(5, country) +
+            tlv(6, country) + tlv(7) + tlv(8, locale) + tlv(9, byteArrayOf(0))
 
     /** Fire-and-forget. */
     fun countryCode(country: String, siteId: Int): ByteArray =
         tlv(1, country) + tlv(2, byteArrayOf(siteId.toByte()))
 
-    fun sendAccount(accountId: String = ACCOUNT_ID): ByteArray = tlv(1, accountId)
+    fun sendAccount(accountId: String): ByteArray = tlv(1, accountId)
 
     fun battery(): ByteArray = tlv(1)
 
@@ -793,6 +801,87 @@ object HuaweiCommands {
         )
 
     /**
+     * The Watch D3's form of [moduleConfig]: the SAME inner `0x84` body, addressed from a phone module
+     * to a watch app (tag 1 sender, tag 2 receiver, the body inside tag `0x83`). Captured from Health
+     * on 2026-10-17 for every switch it flipped; the Band takes the bare body, the D3 needs the
+     * addressing. The watch does not answer a set.
+     *
+     * [items] is the value block (tag 7): `01 01 <0|1>` for a switch. [stampMs] adds tag 8, the
+     * millisecond timestamp Health puts on an activation.
+     */
+    fun appMessage(
+        from: String,
+        to: String,
+        attribute: Int,
+        items: ByteArray?,
+        query: Boolean = false,
+        stampMs: Long? = null,
+        op: Int = if (query) 2 else 1,
+    ): ByteArray =
+        tlv(1, from) + tlv(2, to) + tlv(
+            0x83,
+            tlv(
+                0x84,
+                tlv(5, HuaweiProtocol.intBytes(attribute, 4)) +
+                    tlv(6, byteArrayOf(op.toByte())) +
+                    // A bare query carries no item list at all (Health's own, `84 09 05 04 … 06 01 02`).
+                    (items?.let { tlv(7, it) } ?: ByteArray(0)) +
+                    (stampMs?.let { tlv(8, longBytes(it)) } ?: ByteArray(0)),
+            ),
+        )
+
+    /** One switch for [appMessage]: `01 01 <on>`. */
+    fun appSwitch(on: Boolean): ByteArray = byteArrayOf(1, 1, if (on) 1 else 0)
+
+    /** Big-endian u64, as the D3's millisecond timestamps travel. */
+    fun longBytes(v: Long): ByteArray = ByteArray(8) { i -> (v ushr (8 * (7 - i))).toByte() }
+
+    /**
+     * The D3's app endpoints, phone side → watch side, and the attributes each takes. All captured
+     * on 2026-10-17 (docs/huawei-watch-d3.md §3.7).
+     */
+    object D3 {
+        const val ECG_PHONE = "hw.health.ecganalysis"
+        const val ECG_WATCH = "hw.watch.health.ecganalysis"
+        const val ECG_ACTIVATE = 0x35A97CE5
+        const val ARRHYTHMIA_PHONE = "hw.health.ppgjsmodule"
+        const val ARRHYTHMIA_WATCH = "hw.watch.health.arrhythmia"
+        const val ARRHYTHMIA_DETECT = 0x35A97CE2
+        const val ARRHYTHMIA_ALERT = 0x35A97CE9
+        const val PWV_PHONE = "hw.health.pwv"
+        const val PWV_WATCH = "com.huawei.health.pwv"
+        const val PWV_STATUS = 0x35A97CEA
+        const val APNEA_PHONE = "hw.health.apneajsmodule"
+        const val APNEA_WATCH = "hw.watch.health.osa"
+        /** The switch; 0x35A97CE7 is the status the watch reports, not something to set. */
+        const val APNEA_SWITCH = 0x35A97CE8
+        const val EMOTION_PHONE = "hw.health.emotion"
+        const val EMOTION_WATCH = "hw.watch.health.emotion"
+
+        /** ECG activation: `01 01 01` plus the phone app's own name in item 2, as Health sends it. */
+        fun ecgActivateItems(): ByteArray = byteArrayOf(1, 1, 1) + tlv(2, ECG_PHONE)
+
+        /**
+         * What Health tells the watch unprompted at every pairing, and we did not: the privacy
+         * switch (`35A66FA5` set to `00`), the sync-device question (`35A66FA3`, op 3, `08 01 01`;
+         * the watch answers op 5) and the blood-pressure status query (`35A97D1C`, stamped).
+         * Captured 2026-10-17 19:27:51–53. Sent before the dictionary because the watch acknowledges
+         * our dictionary queries and then answers none of them, and these are the difference
+         * (docs/huawei-watch-d3.md §3.7). None of them changes a measurement setting.
+         */
+        fun companionHello(nowMs: Long): List<ByteArray> = listOf(
+            appMessage("hw.otadevice.privacyswitch", "privacySwitch", 0x35A66FA5, byteArrayOf(0)),
+            appMessage("hw.unitedevice.syncdevice", "syncdevice", 0x35A66FA3, byteArrayOf(8, 1, 1), op = 3),
+            appMessage("hw.unitedevice.bloodpressure", "hw.watch.health.bp", 0x35A97D1C, null, op = 2, stampMs = nowMs),
+        )
+    }
+
+    /** Continuous skin temperature (fitness 0x2A): tag 1 `01`, tag 2 the switch, tag 3 `FFFF`. */
+    const val FIT_SKIN_TEMP = 0x2A
+    fun skinTemperature(on: Boolean): ByteArray =
+        tlv(1, byteArrayOf(1)) + tlv(2, byteArrayOf(if (on) 1 else 0)) + tlv(3, byteArrayOf(-1, -1))
+
+    /**
      * An alert switch with its threshold.
      *
      * Turning one OFF drops the threshold byte entirely rather than sending zero — that is what
@@ -823,18 +912,33 @@ object HuaweiCommands {
         version: String,
         width: Int,
         height: Int,
-        metaJson: String,
+        metaJson: String?,
+        mode: Int = WF_MODE_INSTALL,
     ): ByteArray =
-        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(1)) +
+        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(mode.toByte())) +
             tlv(5, HuaweiProtocol.intBytes(width, 2)) +
             tlv(6, HuaweiProtocol.intBytes(height, 2)) +
-            tlv(8, metaJson)
+            (metaJson?.let { tlv(8, it) } ?: ByteArray(0))
 
     /** Install a face already transferred. [width]/[height] come from [watchFaceCapability]. */
-    fun watchFaceInstall(assetId: String, version: String, width: Int, height: Int): ByteArray =
-        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(1)) +
+    fun watchFaceInstall(
+        assetId: String,
+        version: String,
+        width: Int,
+        height: Int,
+        mode: Int = WF_MODE_INSTALL,
+    ): ByteArray =
+        tlv(1, assetId) + tlv(2, version) + tlv(3, byteArrayOf(mode.toByte())) +
             tlv(5, HuaweiProtocol.intBytes(width, 2)) +
             tlv(6, HuaweiProtocol.intBytes(height, 2))
+
+    /**
+     * Tag 3 of the announce and install commands. Health sends 01 to the Band 11 Pro and **05 to the
+     * Watch D3** (captured 2026-10-17); 02 is delete ([watchFaceDelete]). 01 still installs a store
+     * face on the D3. The meaning of 05 is not known — it is exposed as `mode` on huawei.watchface
+     * so the D3's refusal of unsigned faces (100014) can be probed.
+     */
+    const val WF_MODE_INSTALL = 1
 
     /**
      * REMOVE a face from the band.

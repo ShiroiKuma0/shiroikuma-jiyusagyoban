@@ -29,6 +29,8 @@ class HuaweiPairAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val prefix = args["prefix"]?.trim()?.ifEmpty { null } ?: "HUAWEI_"
         val store = args["store"]?.trim()?.ifEmpty { null }
+        // 白い熊's account ID, handed over from 健康の設定; kept in the app's private settings only.
+        args["account"]?.trim()?.takeIf { it.isNotEmpty() && !it.startsWith("%") }?.let { HuaweiSettings.setAccountId(ctx.app, it) }
         val address = args["address"]?.trim()?.ifEmpty { null } ?: HuaweiSettings.address(ctx.app)
         val deviceName = args["device_name"]?.trim()?.ifEmpty { null }
         val timeoutSec = args["timeout_sec"]?.trim()?.toIntOrNull() ?: 180
