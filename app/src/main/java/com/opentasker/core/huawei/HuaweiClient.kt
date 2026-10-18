@@ -316,6 +316,12 @@ class HuaweiClient(
         var received = 0
         var served = 0
         for (frame in session.poll(timeoutMs)) {
+            // The satellite ask and its transfer are answered by the sync (HuaweiSyncRunner.answerGnss),
+            // so they go back in the queue for it — uncounted, or a kept frame would read as chatter.
+            if (frame.serviceId == HuaweiCommands.SVC_GNSS_ASK || frame.serviceId == HuaweiCommands.SVC_GNSS_FILES) {
+                session.keep(frame)
+                continue
+            }
             received++
             if (frame.isAck) continue
             val tlvs = session.decrypt(frame)
