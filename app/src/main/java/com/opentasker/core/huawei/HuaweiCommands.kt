@@ -685,10 +685,10 @@ object HuaweiCommands {
         daily: List<DailyPoint>,
     ): ByteArray {
         require(hourly.size == FORECAST_HOURS) {
-            "the band refuses a forecast that is not exactly $FORECAST_HOURS hours (got ${hourly.size})"
+            "a forecast that is not exactly $FORECAST_HOURS hours is refused (Band 11 Pro; got ${hourly.size})"
         }
         require(daily.size >= FORECAST_DAYS_MIN) {
-            "the band refuses a forecast with fewer than $FORECAST_DAYS_MIN days (got ${daily.size})"
+            "a forecast with fewer than $FORECAST_DAYS_MIN days is refused (Band 11 Pro; got ${daily.size})"
         }
         val hours = hourly.fold(ByteArray(0)) { acc, h ->
             acc + tlv(

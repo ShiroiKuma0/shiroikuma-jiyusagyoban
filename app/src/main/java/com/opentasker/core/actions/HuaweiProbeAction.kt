@@ -133,7 +133,7 @@ class HuaweiProbeAction : Action {
         val band = cfg.SUPPORTED_SERVICES.map { it.toInt() and 0xFF }.toSet()
         line("services answered ${services.size}, supported ${supported.size}")
         line("supported: " + supported.joinToString(" ") { "0x%02X".format(it) })
-        line("supported and NOT in the Band's list: " +
+        line("supported and NOT in the Band 11 Pro's list: " +
             supported.filter { it !in band }.joinToString(" ") { "0x%02X".format(it) }.ifEmpty { "none" })
         line("")
 
@@ -314,7 +314,7 @@ class HuaweiProbeAction : Action {
 
             // The census is a byte per service, in the order we asked. Decoded here rather than
             // dumped, because a 46-byte hex string is not an answer to "where does heart rate live".
-            line("=== service census — what the band says it supports ===")
+            line("=== service census — what the watch says it supports ===")
             runCatching {
                 val f = session.request(
                     HuaweiCommands.SVC_DEVICE_CONFIG, HuaweiCommands.CMD_SUPPORTED_SERVICES,
@@ -710,7 +710,7 @@ class HuaweiProbeAction : Action {
                         "=== live listen, ${listenSec}s from " +
                             java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
                                 .format(java.util.Date()) + " ===\n" +
-                            "Press Update on the band's satellite screen whenever you like; every frame\n" +
+                            "Press Update on the watch's satellite screen whenever you like; every frame\n" +
                             "is appended here the moment it arrives, so nothing is lost if this is cut short.\n",
                     )
                 }
@@ -769,7 +769,7 @@ class HuaweiProbeAction : Action {
                     }
                 }
                 heardLine(if (heard == 0) "  (nothing heard; $failed poll failure(s))" else "  $heard frame(s), $failed poll failure(s)")
-                if (heard == 0) line("  (silence — the band asked for nothing in $listenSec s)")
+                if (heard == 0) line("  (silence — the watch asked for nothing in $listenSec s)")
                 else line("  $heard frame(s)")
             }
             report.toString()

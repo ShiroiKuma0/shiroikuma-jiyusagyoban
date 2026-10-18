@@ -164,12 +164,12 @@ val BOARD_TILES = listOf(
     BoardTile("lift", "重量挙げ（Huawei） -- [727]", Loc("Lifting", "重量挙げ")),
     BoardTile("rehab", "機能訓練（Huawei） -- [727]", Loc("Rehab", "機能訓練")),
     BoardTile("walks", "運動（Huawei） -- [727]", Loc("Walks", "運動")),
-    BoardTile("faces", "バンド文字盤（Huawei） -- [727]", Loc("Watch faces", "文字盤")),
+    BoardTile("faces", "時計文字盤（Huawei） -- [727]", Loc("Watch faces", "文字盤")),
     // Beside the faces, because it is what a face is looked at WITH: a face can only be judged at
     // the hour it draws, and some hours come round slowly. The card opens the same window as the
     // task — calendar, dial, 丁度 and 半, and a switch that hands the band the phone's time back.
     // Nothing here is destructive: every connection announces the phone's time anyway.
-    BoardTile("clock", "時 合わせる -- [727]", Loc("Band clock", "時 合わせる")),
+    BoardTile("clock", "時 合わせる -- [727]", Loc("Watch time", "時 合わせる")),
     BoardTile("sat", "衛星予測（Huawei） -- [727]", Loc("Satellites", "衛星"),
         reopenTask = "衛星予測 開"),
     // Beside the predicted set, because they are the two halves of the same job and 白い熊 reaches
@@ -179,23 +179,23 @@ val BOARD_TILES = listOf(
     BoardTile("weather", "天気送信（Huawei） -- [727]", Loc("Weather", "天気")),
     BoardTile("place", "天気地点（Huawei） -- [727]", Loc("Location", "地点")),
     BoardTile("source", "天気提供元（Huawei） -- [727]", Loc("Weather source", "提供元")),
-    BoardTile("sensors", "バンド計測設定（Huawei） -- [727]", Loc("Sensors", "計測設定")),
-    BoardTile("lang", "バンド言語（Huawei） -- [727]", Loc("Language", "言語")),
+    BoardTile("sensors", "時計計測設定（Huawei） -- [727]", Loc("Sensors", "計測設定")),
+    BoardTile("lang", "時計 日本語 -- [727]", Loc("Language", "言語")),
     BoardTile("settings", "健康の設定 -- [727][01]", Loc("Settings", "設定")),
-    BoardTile("pair", "バンド接続（Huawei） -- [727]", Loc("Pair", "接続")),
-    BoardTile("unpair", "バンド解除（Huawei） -- [727]", Loc("Unpair", "解除")),
-    BoardTile("probe", "バンド診断（Huawei） -- [727]", Loc("Probe", "診断")),
-    BoardTile("census", "バンド棚卸し（Huawei） -- [727]", Loc("Census", "棚卸し")),
-    BoardTile("files", "バンド書類（Huawei） -- [727]", Loc("Raw files", "書類")),
+    BoardTile("pair", "時計接続（D3） -- [727]", Loc("Pair", "接続")),
+    BoardTile("unpair", "時計解除（Huawei） -- [727]", Loc("Unpair", "解除")),
+    BoardTile("probe", "時計診断（Huawei） -- [727]", Loc("Probe", "診断")),
+    BoardTile("census", "時計棚卸し（Huawei） -- [727]", Loc("Census", "棚卸し")),
+    BoardTile("files", "時計書類（Huawei） -- [727]", Loc("Raw files", "書類")),
 )
 
 private val BOARD_REOPEN = Loc("Show", "画面")
-private val BOARD_TITLE = Loc("Health — HUAWEI Band 11 Pro", "健康 — HUAWEI Band 11 Pro")
+private val BOARD_TITLE = Loc("Health — HUAWEI WATCH D3", "健康 — HUAWEI WATCH D3")
 private val SYNC_TITLE = Loc("Syncing", "同期しています")
 private val SYNC_OK = Loc("OK", "OK")
 private val SYNC_FULL = Loc("Full sync", "全部同期")
 private val SYNC_STATE = Loc("Sync state", "同期状態")
-private val LANG_TITLE = Loc("Band language", "バンドの言語")
+private val LANG_TITLE = Loc("Watch language", "時計の言語")
 
 /** Said plainly, because it is a weaker claim than the band's own answer and must read as one. */
 /**
@@ -212,16 +212,16 @@ private val LANG_FROM_US = Loc(
 )
 /** Stated once, plainly, so the line above is never mistaken for the band's own answer. */
 private val LANG_NO_READ = Loc(
-    "The band has no way to report its language — it has no language menu, and the phone owns the setting.",
-    "バンドには言語を答える手段がありません — バンド側に言語の設定項目は無く、設定は端末が持ちます。",
+    "The watch has no way to report its language over this link, so this phone's record is all there is.",
+    "時計にはこの接続で言語を答える手段がありません — 分かるのはこの端末の記録だけです。",
 )
 private val LANG_TOLD = Loc(
-    "Sent. Look at the band to see it.",
-    "送信しました。バンドを見て確認してください。",
+    "Sent. Look at the watch to see it.",
+    "送信しました。時計を見て確認してください。",
 )
 private val LANG_UNKNOWN = Loc(
-    "This phone has never set the band's language.",
-    "この端末はまだ一度もバンドの言語を設定していません。",
+    "This phone has never set the watch's language.",
+    "この端末はまだ一度も時計の言語を設定していません。",
 )
 private val LANG_SWITCH = Loc("Switch to", "切り替え：")
 /**
@@ -233,7 +233,7 @@ private val LANG_SWITCH = Loc("Switch to", "切り替え：")
  * Offering both removes the dependency altogether: whatever the band is actually showing, the button
  * for the language 白い熊 wants is on screen and does the right thing.
  */
-private val LANG_PICK = Loc("Set the band to:", "バンドの言語を：")
+private val LANG_PICK = Loc("Set the watch to:", "時計の言語を：")
 private val LANG_SWITCHING = Loc("Switching…", "切り替えています…")
 
 val SYNC_FULL_TASK = "同期（Huawei） ⇨ 全部 -- [727]"

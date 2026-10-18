@@ -205,8 +205,8 @@ class HuaweiBoardActivity : ComponentActivity() {
                 } else {
                     val why = pushed.exceptionOrNull()?.message
                     Loc(
-                        "The band did not take that language${why?.let { " — $it" }.orEmpty()}",
-                        "バンドはその言語を受け付けませんでした${why?.let { "— $it" }.orEmpty()}",
+                        "The watch did not take that language${why?.let { " — $it" }.orEmpty()}",
+                        "時計はその言語を受け付けませんでした${why?.let { "— $it" }.orEmpty()}",
                     )
                 },
             )

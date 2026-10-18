@@ -21,7 +21,7 @@ class BandCompareAction : Action {
         val span = args["span_minutes"]?.trim()?.toIntOrNull()?.takeIf { it > 0 }
         BandCompareActivity.open(ctx.app, span)
         args["store"]?.trim()?.ifEmpty { null }?.let {
-            ctx.variables.set(it, "opened the band comparison")
+            ctx.variables.set(it, "opened the device comparison")
         }
         return ActionResult.Success
     }

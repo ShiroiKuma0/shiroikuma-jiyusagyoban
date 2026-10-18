@@ -161,7 +161,7 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
             }
             delay(250)
         }
-        "no answer — accept the request on the band, then on the phone"
+        "no answer — accept the request on the watch, then on the phone"
     }
 
     /**
@@ -177,7 +177,7 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
         val device: BluetoothDevice = runCatching { a.getRemoteDevice(address) }.getOrNull()
             ?: return@withContext "bad address $address"
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
-            return@withContext "band is not paired — pair it first, accepting the request on the band"
+            return@withContext "watch is not paired — pair it first, accepting the request on the watch"
         }
         // Drop anything this client is still holding before asking for a second link. The band
         // serves ONE connection, so a socket stranded by an earlier run does not merely leak — it
@@ -279,13 +279,13 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
             return "$detail\n\nBluetooth is off on this phone — switch it on and try again."
         }
         if (device.bondState != BluetoothDevice.BOND_BONDED) {
-            return "$detail\n\nThe band is not paired with this phone. Run バンド接続（Huawei）first."
+            return "$detail\n\nThe watch is not paired with this phone. Run 時計接続（D3）first."
         }
-        return detail + "\n\nBluetooth is on and the band is still paired, so the connection was " +
-            "refused rather than misaddressed. The usual cause is a stale session on the BAND — it " +
-            "serves one host at a time and goes on holding the slot after that host has gone. " +
-            "**Restart the band** and try again; unpairing is not needed and tells you less. " +
-            "If a restart does not help, the band may simply be out of range or asleep."
+        return detail + "\n\nBluetooth is on and the watch is still paired, so the connection was " +
+            "refused rather than misaddressed. On the Band 11 Pro the usual cause was a stale session " +
+            "on the device itself — it served one host at a time and went on holding the slot after " +
+            "that host had gone. **Restart the watch** and try again; unpairing is not needed and " +
+            "tells you less. If a restart does not help, the watch may simply be out of range or asleep."
     }
 
     /** False once the link is gone, so a pump loop can tell a quiet band from a dead one. */

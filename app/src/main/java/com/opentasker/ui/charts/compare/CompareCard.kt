@@ -177,7 +177,7 @@ fun CompareCard(
 
         Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
             Text(
-                "● Band 11    ○ Hume",
+                "● Huawei    ○ Hume",
                 style = MaterialTheme.typography.bodySmall,
                 color = style.axisText,
             )
