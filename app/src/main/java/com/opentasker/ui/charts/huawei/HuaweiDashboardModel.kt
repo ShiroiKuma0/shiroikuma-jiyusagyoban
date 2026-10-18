@@ -118,7 +118,14 @@ data class HuaweiDashboardState(
     val bpReadings: List<HuaweiBpReading> = emptyList(),
     /** The Watch D3's ECG recordings, newest first. */
     val ecg: List<HuaweiEcgRecording> = emptyList(),
+    /** The Watch D3's pulse-wave arrhythmia checks, newest first. */
+    val arrhythmia: List<HuaweiPwaCheck> = emptyList(),
 )
+
+/** One pulse-wave arrhythmia check: its time and the watch's result (0 = no abnormality). */
+data class HuaweiPwaCheck(val tMs: Long, val result: Int) {
+    val normal: Boolean get() = result == 0
+}
 
 /** One cuff reading: systolic / diastolic (mmHg) and the pulse the cuff counted. */
 data class HuaweiBpReading(val tMs: Long, val systolic: Double, val diastolic: Double, val pulse: Double?)
@@ -231,6 +238,7 @@ class HuaweiDashboardModel(
 
         val bp = loadBloodPressure()
         val ecg = loadEcg()
+        val arrhythmia = loadArrhythmia()
         val charts = HuaweiMetricSpecs.ALL.map { spec ->
             buildChart(spec, oldest, newest, recorded, cutoverMs, historyFromMs)
         }
@@ -298,6 +306,7 @@ class HuaweiDashboardModel(
             bloodPressure = bp.first,
             bpReadings = bp.second,
             ecg = ecg,
+            arrhythmia = arrhythmia,
             coverage = coverage,
             diagnostics = diagnostics,
             unknownFields = unknown,
@@ -610,6 +619,15 @@ class HuaweiDashboardModel(
         )
         return chart to readings.reversed()
     }
+
+    /**
+     * The arrhythmia checks: class 500007's result field, one row per check, kept under its raw
+     * dictionary name (docs/huawei-watch-d3.md §3.11a).
+     */
+    private suspend fun loadArrhythmia(): List<HuaweiPwaCheck> =
+        db.huaweiSampleDao().range(HuaweiKeys.storageKey(HuaweiKeys.PWA_RESULT), 0L, Long.MAX_VALUE / 2000)
+            .map { HuaweiPwaCheck(it.epochSeconds * 1000L, it.value.toInt()) }
+            .sortedByDescending { it.tMs }
 
     private suspend fun loadEcg(): List<HuaweiEcgRecording> =
         runCatching { db.huaweiEcgDao().all() }.getOrDefault(emptyList()).map { e ->

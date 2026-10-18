@@ -84,6 +84,9 @@ class HuaweiChartsActivity : ComponentActivity() {
                         val state by model.state.collectAsState()
                         val progress by model.progress.collectAsState()
                         var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
+                        // The report's scroll position, kept out here so a page opened over the report
+                        // and closed again returns to the same card, not to the top.
+                        val reportScroll = androidx.compose.foundation.lazy.rememberLazyListState()
                         // The morning card's note editor. Held here rather than inside the card so
                         // it survives the card scrolling out of the LazyColumn while it is open.
                         var notingMorning by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -128,7 +131,14 @@ class HuaweiChartsActivity : ComponentActivity() {
                         val sleepOpen = selected == SLEEP_KEY
                         val bpOpen = selected == BP_KEY && state.bloodPressure != null
                         val ecgOpen = selected == ECG_KEY && state.ecg.isNotEmpty()
-                        if (bpOpen) {
+                        val pwaOpen = selected == PWA_KEY && state.arrhythmia.isNotEmpty()
+                        if (pwaOpen) {
+                            HuaweiArrhythmiaDetailScreen(
+                                checks = state.arrhythmia,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                            )
+                        } else if (bpOpen) {
                             HuaweiBloodPressureDetailScreen(
                                 chart = state.bloodPressure!!,
                                 readings = state.bpReadings,
@@ -225,6 +235,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                             }
                         } else if (chart == null) {
                             HuaweiDashboardScreen(
+                                listState = reportScroll,
                                 state = state,
                                 progress = progress,
                                 contentPadding = insets,

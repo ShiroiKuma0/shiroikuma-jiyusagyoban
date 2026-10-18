@@ -36,6 +36,8 @@ object HuaweiKeys {
     const val BP_DIASTOLIC = "hw:bp_diastolic"
     const val BP_PULSE = "hw:bp_pulse"
     const val PWV_GRADE = "hw:pwv_grade"
+    /** Pulse-wave arrhythmia: class 500007's result field, still under its raw dictionary name. */
+    const val PWA_RESULT = "hw:dict_500007_500007088"
 
     /** A storage metric name as the charts key it. */
     fun qualify(storageKey: String): String =

@@ -79,6 +79,7 @@ const val SLEEP_KEY = "hw:sleep"
 /** The Watch D3's blood-pressure and ECG pages: their own screens, not a metric detail. */
 const val BP_KEY = "hw:bp"
 const val ECG_KEY = "hw:ecg"
+const val PWA_KEY = "hw:pwa"
 
 /**
  * The 機能訓練 page's own key in the same `selected` slot the metric detail screens use.
@@ -114,6 +115,13 @@ fun HuaweiDashboardScreen(
     onTapRehabDay: (Long) -> Unit = {},
     /** Open one of the three workout windows — 運動, 重量挙げ, 機能訓練. */
     onOpenWorkouts: (HuaweiWorkoutStore.Kind) -> Unit = {},
+    /**
+     * Where the report is scrolled to. Owned by the caller, because this screen leaves composition
+     * whenever a page opens over it — a state remembered in here came back at the top every time
+     * (白い熊, 2026-10-18).
+     */
+    listState: androidx.compose.foundation.lazy.LazyListState =
+        androidx.compose.foundation.lazy.rememberLazyListState(),
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -128,6 +136,7 @@ fun HuaweiDashboardScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(style.cardGap),
     ) {
@@ -260,6 +269,9 @@ fun HuaweiDashboardScreen(
             MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
         }
         if (state.ecg.isNotEmpty()) item(ECG_KEY) { HuaweiEcgCard(state.ecg) { onOpenMetric(ECG_KEY) } }
+        if (state.arrhythmia.isNotEmpty()) {
+            item(PWA_KEY) { HuaweiArrhythmiaCard(state.arrhythmia) { onOpenMetric(PWA_KEY) } }
+        }
 
         // The day table, back across the whole history — the Huawei era and the Hume one before it.
         // Below the charts because it answers a different question: a chart is for seeing a shape, a
