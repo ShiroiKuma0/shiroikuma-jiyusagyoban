@@ -8,6 +8,17 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+066 — 2026-10-18
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+065`.
+
+### 健康
+
+- **Skin temperature opens its history page** from "Against your own normal", like every other row:
+  it had no per-night series, so its row opened nothing. The page is drawn in the temperature colour;
+  while the first five nights are collected it says "no baseline yet — night N of 5" and prints no
+  usual value or differences, and it has no "best nights" list — the coolest night is not the best.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+065 — 2026-10-18
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+063`.
