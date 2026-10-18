@@ -20,7 +20,11 @@ package com.opentasker.core.huawei
  * And the band waits only SECONDS after the pairing before abandoning its own flow, so provisioning
  * must follow immediately with no human-speed gap.
  */
-class HuaweiClient(private val session: HuaweiSession) {
+class HuaweiClient(
+    private val session: HuaweiSession,
+    /** [HuaweiSettings.accountId]; null skips the account steps. */
+    private val accountId: String? = null,
+) {
 
     /** What LinkParams told us. */
     data class Link(
@@ -63,7 +67,9 @@ class HuaweiClient(private val session: HuaweiSession) {
             )
         }
         val caps = readCapabilities()
-        runCatching { session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount()) }
+        accountId?.let { id ->
+            runCatching { session.request(HuaweiCommands.SVC_ACCOUNT, HuaweiCommands.ACC_EXTENDED_ACCOUNT, HuaweiCommands.extendedAccount(id)) }
+        }
         return caps
     }
 
@@ -276,9 +282,9 @@ class HuaweiClient(private val session: HuaweiSession) {
         if (locale != null) attempt(cfg.SVC_LOCALE, cfg.CMD_SET_LOCALE, cfg.setLocale(locale, false))
 
         attempt(cfg.SVC_ACCOUNT, cfg.ACC_UNKNOWN_04, cfg.accountStep04())
-        attempt(cfg.SVC_ACCOUNT, cfg.ACC_EXTENDED_ACCOUNT, cfg.extendedAccount())
+        accountId?.let { attempt(cfg.SVC_ACCOUNT, cfg.ACC_EXTENDED_ACCOUNT, cfg.extendedAccount(it)) }
         session.send(cfg.SVC_ACCOUNT, cfg.ACC_COUNTRY_CODE, cfg.countryCode("CZ", 0x07))
-        attempt(cfg.SVC_ACCOUNT, cfg.ACC_SEND_ACCOUNT, cfg.sendAccount())
+        accountId?.let { attempt(cfg.SVC_ACCOUNT, cfg.ACC_SEND_ACCOUNT, cfg.sendAccount(it)) }
         attempt(cfg.SVC_ACCOUNT, cfg.ACC_UNKNOWN_04, cfg.accountStep04())
         return caps
     }

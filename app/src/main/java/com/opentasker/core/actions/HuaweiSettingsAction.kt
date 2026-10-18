@@ -87,6 +87,21 @@ class HuaweiSettingsAction : Action {
                 unacknowledged = true,
             )
 
+        // The Watch D3 takes the same module bodies, but addressed from a phone module to a watch app
+        // — and a few switches of its own (docs/huawei-watch-d3.md §3.7).
+        val watch = HuaweiSettings.deviceName(ctx.app, address)?.contains("WATCH", ignoreCase = true) == true
+        val d3 = HuaweiCommands.D3
+
+        /** A D3 app message: sent, never answered (Health gets no reply to a set either). */
+        fun app(name: String, from: String, to: String, attribute: Int, items: ByteArray, stamp: Boolean = false) =
+            HuaweiSyncRunner.SettingWrite(
+                name, HuaweiCommands.SVC_DATA_SYNC, HuaweiCommands.DATA_SYNC_CONFIG,
+                HuaweiCommands.appMessage(from, to, attribute, items,
+                    stampMs = if (stamp) System.currentTimeMillis() else null),
+                timeoutMs = MODULE_TIMEOUT_MS,
+                unacknowledged = true,
+            )
+
         val toggles = buildList {
             flag("trusleep")?.let {
                 add(fit("truSleep", HuaweiCommands.FIT_TRUSLEEP, HuaweiCommands.fitnessToggle(it)))
@@ -100,11 +115,47 @@ class HuaweiSettingsAction : Action {
             // Both ids, together — see [HuaweiCommands.MODULE_APNEA]. Numbered in the name so a
             // half-failure reads as "the second one was refused" rather than as one ambiguous row.
             flag("apnea")?.let { on ->
-                HuaweiCommands.MODULE_APNEA.forEachIndexed { i, id ->
-                    add(module("sleep breathing awareness ${i + 1}/2", id, on))
+                if (watch) {
+                    add(app("sleep breathing awareness", d3.APNEA_PHONE, d3.APNEA_WATCH, d3.APNEA_SWITCH,
+                        HuaweiCommands.appSwitch(on)))
+                } else {
+                    HuaweiCommands.MODULE_APNEA.forEachIndexed { i, id ->
+                        add(module("sleep breathing awareness ${i + 1}/2", id, on))
+                    }
                 }
             }
-            flag("stress")?.let { add(module("emotions / stress", HuaweiCommands.MODULE_EMOTION, it)) }
+            flag("stress")?.let {
+                if (watch) {
+                    add(app("emotions / stress", d3.EMOTION_PHONE, d3.EMOTION_WATCH, HuaweiCommands.MODULE_EMOTION,
+                        HuaweiCommands.appSwitch(it)))
+                } else {
+                    add(module("emotions / stress", HuaweiCommands.MODULE_EMOTION, it))
+                }
+            }
+            // The Watch D3's own switches. Sent to a Band they would be answered and ignored, so
+            // they are only sent to a watch.
+            if (watch) {
+                flag("skin_temp")?.let {
+                    add(fit("continuous skin temperature", HuaweiCommands.FIT_SKIN_TEMP, HuaweiCommands.skinTemperature(it)))
+                }
+                flag("arrhythmia")?.let {
+                    add(app("arrhythmia detection", d3.ARRHYTHMIA_PHONE, d3.ARRHYTHMIA_WATCH, d3.ARRHYTHMIA_DETECT,
+                        HuaweiCommands.appSwitch(it)))
+                }
+                flag("arrhythmia_alert")?.let {
+                    add(app("arrhythmia alerts", d3.ARRHYTHMIA_PHONE, d3.ARRHYTHMIA_WATCH, d3.ARRHYTHMIA_ALERT,
+                        HuaweiCommands.appSwitch(it)))
+                }
+                // Activations: on is the only value that does anything — Health never deactivates.
+                if (flag("ecg") == true) {
+                    add(app("ECG activation", d3.ECG_PHONE, d3.ECG_WATCH, d3.ECG_ACTIVATE,
+                        d3.ecgActivateItems(), stamp = true))
+                }
+                if (flag("arterial_stiffness") == true) {
+                    add(app("arterial stiffness activation", d3.PWV_PHONE, d3.PWV_WATCH, d3.PWV_STATUS,
+                        HuaweiCommands.appSwitch(true), stamp = true))
+                }
+            }
             alert("high_hr")?.let { (on, t) ->
                 add(fit("high heart-rate alert", HuaweiCommands.FIT_HIGH_HR_ALERT, HuaweiCommands.fitnessAlert(on, t)))
             }

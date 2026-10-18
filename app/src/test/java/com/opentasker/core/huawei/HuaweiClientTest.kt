@@ -93,7 +93,7 @@ class HuaweiClientTest {
         // that deviated failed while every individual command still returned success, which is what
         // makes a prose comment worthless here and a test worth having.
         val fake = FakeTransport()
-        HuaweiClient(sessionWith(fake)).configure("HUAWEI Band 11 Pro-90F", 1_787_346_631L, 2, 0)
+        HuaweiClient(sessionWith(fake), accountId = "12345678901234567").configure("HUAWEI Band 11 Pro-90F", 1_787_346_631L, 2, 0)
         val C = HuaweiCommands
         assertEquals(
             listOf(

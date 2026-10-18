@@ -3,6 +3,7 @@ package com.opentasker.core.huawei
 import android.content.Context
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.HuaweiBeatEntity
+import com.opentasker.core.storage.HuaweiEcgEntity
 import com.opentasker.core.storage.HuaweiSampleEntity
 import com.opentasker.core.storage.HuaweiSleepEntity
 import com.opentasker.core.storage.HuaweiSyncEntity
@@ -107,7 +108,7 @@ object HuaweiSyncRunner {
             // before any watchdog covering the session had been armed.
             client.open(address)?.let { throw IllegalStateException(it) }
             val session = HuaweiSession(client)
-            val api = HuaweiClient(session)
+            val api = HuaweiClient(session, HuaweiSettings.accountId(context))
             val link = api.linkParams()
             api.deviceStatus()
             val authId = HuaweiSettings.authIdSelf(context, address)
@@ -413,6 +414,97 @@ object HuaweiSyncRunner {
     }
 
     /**
+     * The Watch D3's data dictionary: blood pressure, skin temperature, arterial stiffness, the
+     * per-minute class 200003 and the daily summary, into `huawei_samples` as ordinary metrics.
+     * Named fields get their names ([HuaweiDictionary.NAMED]); the rest are kept raw, never dropped.
+     *
+     * @return how many samples were written.
+     */
+    private suspend fun storeDictionary(
+        context: Context,
+        db: AppDatabase,
+        session: HuaweiSession,
+        syncId: Long,
+        address: String,
+        nowSeconds: Long,
+    ): String {
+        // From where the last fetch got to; the first time, as far back as sleep looks.
+        val since = HuaweiSettings.dictionarySince(context, address)
+            .takeIf { it > 0 } ?: ((nowSeconds - SLEEP_LOOKBACK_SEC) * 1000)
+        // Health's account steps, which it repeats on every connection and our sync never sent
+        // (0x1A/0x05 full form → 0x1A/0x0A country → 0x1A/0x01 account, in Health's order).
+        val cfg = HuaweiCommands
+        HuaweiSettings.accountId(context)?.let { id ->
+            runCatching { session.request(cfg.SVC_ACCOUNT, cfg.ACC_EXTENDED_ACCOUNT, cfg.extendedAccountFull("CZ", "en-US", id), timeoutMs = 3_000) }
+            runCatching { session.send(cfg.SVC_ACCOUNT, cfg.ACC_COUNTRY_CODE, cfg.countryCode("CZ", 0x07)) }
+            runCatching { session.request(cfg.SVC_ACCOUNT, cfg.ACC_SEND_ACCOUNT, cfg.sendAccount(id), timeoutMs = 3_000) }
+        }
+        // Health's unprompted setup next; the watch answered none of our queries without it.
+        HuaweiCommands.D3.companionHello(System.currentTimeMillis()).forEach { msg ->
+            runCatching { session.send(HuaweiCommands.SVC_DATA_SYNC, HuaweiCommands.DATA_SYNC_CONFIG, msg) }
+        }
+        kotlinx.coroutines.delay(1_500)
+        val fetch = HuaweiDictionary.fetch(session, HuaweiDictionary.CLASSES, since)
+        val records = fetch.records
+        val rows = records.flatMap { r ->
+            r.fields.map { (field, value) ->
+                HuaweiSampleEntity(HuaweiDictionary.metricFor(r.cls, field), r.epochMs / 1000, value, syncId)
+            }
+        }
+        rows.chunked(500).forEach { db.huaweiSampleDao().upsert(it) }
+        // Only moved forward by what actually arrived, so a sync that got nothing asks again.
+        records.maxOfOrNull { it.epochMs }?.let { HuaweiSettings.markDictionary(context, it + 1000, address) }
+        // The trace is for the day it fails again; a dictionary that answers needs no transcript.
+        val heard = when {
+            fetch.answered > 0 -> ""
+            fetch.heard.isEmpty() -> "; the watch sent nothing on 0x34"
+            else -> "; heard " + fetch.heard.joinToString(" ")
+        }
+        return "${rows.size} dictionary values (${records.size} records; ${fetch.answered}/${fetch.asked} classes answered$heard)"
+    }
+
+    /**
+     * The Watch D3's ECG recordings. The file holds EVERY recording on the watch, so it is read whole
+     * each time and only recordings not yet stored are written.
+     *
+     * @return how many NEW recordings were written.
+     */
+    private suspend fun storeEcg(db: AppDatabase, session: HuaweiSession, syncId: Long, toSeconds: Long): Int {
+        val file = HuaweiFileClient(session).fetch(HuaweiEcg.FILE, HuaweiEcg.TYPE, 0L, toSeconds)
+        if (file !is HuaweiFileClient.Result.Data) return 0
+        val recordings = HuaweiEcg.parse(file.bytes)
+        if (recordings.isEmpty()) return 0
+        val known = runCatching { db.huaweiEcgDao().starts().toSet() }.getOrDefault(emptySet())
+        val fresh = recordings.filterNot { it.startSeconds in known }
+        if (fresh.isNotEmpty()) {
+            db.huaweiEcgDao().upsert(
+                fresh.map {
+                    HuaweiEcgEntity(
+                        startSeconds = it.startSeconds, endSeconds = it.endSeconds,
+                        verdict = it.verdict, meanHr = it.meanHr, analysisVersion = it.analysisVersion,
+                        sampleRate = HuaweiEcg.SAMPLE_RATE, sampleCount = it.sampleCount,
+                        samples = it.samples, syncId = syncId,
+                    )
+                },
+            )
+            // The verdict and mean heart rate also go in as metrics, so the charts reach them.
+            db.huaweiSampleDao().upsert(
+                fresh.flatMap {
+                    listOf(
+                        HuaweiSampleEntity("ecg_verdict", it.startSeconds, it.verdict.toDouble(), syncId),
+                        HuaweiSampleEntity("ecg_hr", it.startSeconds, it.meanHr.toDouble(), syncId),
+                    )
+                },
+            )
+        }
+        return fresh.size
+    }
+
+    /** Whether [address] is a watch (the D3) rather than the Band — the dictionary and ECG exist only there. */
+    private fun isWatch(context: Context, address: String): Boolean =
+        HuaweiSettings.deviceName(context, address)?.contains("WATCH", ignoreCase = true) == true
+
+    /**
      * Install a watch face.
      *
      * The name is what the band files it under and Health always uses `<assetId>_<version>`, so the
@@ -664,6 +756,17 @@ object HuaweiSyncRunner {
         address: String,
         file: java.io.File,
         evict: Pair<String, String>? = null,
+        /**
+         * What travels as the face's store record (tag 8 of the announcement):
+         *  * `store` — the signed sidecar `<name>.json`, as Health sends it. The only form the Band
+         *    has ever been given, and the only one the Watch D3 is known to accept: the D3 checks
+         *    the record's hash and device id and refuses anything else with 100014.
+         *  * `none` — no tag 8 at all; `empty` — tag 8 present and empty;
+         *  * `unsigned` — a record naming this file's own SHA-256, with no signature.
+         * The last three exist to probe whether the D3 has a local path for unsigned faces.
+         */
+        record: String = "store",
+        mode: Int = HuaweiCommands.WF_MODE_INSTALL,
         onProgress: (Int) -> Unit = {},
     ): Result<HuaweiUploadClient.Outcome> {
         val name = file.name.removeSuffix(".bin")
@@ -672,13 +775,26 @@ object HuaweiSyncRunner {
         if (version.isEmpty()) {
             return Result.failure(IllegalArgumentException("$name is not <assetId>_<version>"))
         }
-        // The metadata sidecar is not optional: the band needs the face's signed store record
-        // before it will take, or keep, the bytes.
+        // The metadata sidecar is not optional for a store install: the band needs the face's
+        // signed store record before it will take, or keep, the bytes.
         val meta = java.io.File(file.parentFile, "$name.json")
-        if (!meta.isFile) {
+        if (record == "store" && !meta.isFile) {
             return Result.failure(
                 IllegalArgumentException("missing ${meta.name} beside the face — capture it with the file"),
             )
+        }
+        val bytes = file.readBytes()
+        val metaJson: String? = when (record) {
+            "store" -> meta.readText()
+            "none" -> null
+            "empty" -> ""
+            "unsigned" -> {
+                val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                """{"resultinfo":"success","result":{"content":{"hitopId":"$assetId","version":"$version",""" +
+                    """"watchContentHash":"$hash","status":"0"}},"resultcode":"0"}"""
+            }
+            else -> return Result.failure(IllegalArgumentException("record must be store, none, empty or unsigned — not '$record'"))
         }
 
         if (evict != null) {
@@ -702,8 +818,9 @@ object HuaweiSyncRunner {
             HuaweiUploadClient(session).installWatchFace(
                 assetId = assetId,
                 version = version,
-                bytes = file.readBytes(),
-                metaJson = meta.readText(),
+                bytes = bytes,
+                metaJson = metaJson,
+                mode = mode,
                 onProgress = onProgress,
             )
         }
@@ -1607,7 +1724,7 @@ object HuaweiSyncRunner {
                 client.open(request.address)?.let { return@withTimeoutOrNull close(false, it) }
 
                 val session = HuaweiSession(client)
-                val api = HuaweiClient(session)
+                val api = HuaweiClient(session, HuaweiSettings.accountId(context))
 
                 phase("handshake")
                 val link = api.linkParams()
@@ -1658,6 +1775,19 @@ object HuaweiSyncRunner {
                 phase("device")
                 firmware = runCatching { api.identity().firmware }.getOrNull()
                 battery = api.battery()
+
+                // The Watch D3 is given Health's whole reconnect before anything is asked of it: its
+                // dictionary acknowledged our queries and answered none while that was missing.
+                var reconnectNote = ""
+                if (!configure && isWatch(context, request.address)) {
+                    phase("device", "Health's reconnect")
+                    reconnectNote = runCatching {
+                        val r = HuaweiD3Reconnect.run(
+                            context, session, api, HuaweiSettings.deviceName(context, request.address) ?: "HUAWEI WATCH D3",
+                        )
+                        " · reconnect ${r.answered}/${r.sent} answered, ${r.feature}"
+                    }.getOrElse { " · reconnect: ${it.message ?: it::class.java.simpleName}" }
+                }
 
                 if (configure) {
                     phase("configuring")
@@ -1778,6 +1908,24 @@ object HuaweiSyncRunner {
                     storeSleep(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
                 }.getOrElse { sleepNote = it.message ?: it::class.java.simpleName; 0 }
 
+                // The Watch D3's own data: the dictionary (blood pressure, skin temperature, arterial
+                // stiffness, the daily summary) and the ECG file. Tolerant like sleep — none of it may
+                // cost what is already written — and only asked of a watch.
+                var dictNote = ""
+                var ecgNote = ""
+                if (isWatch(context, request.address)) {
+                    phase("dictionary")
+                    dictNote = " · " + runCatching {
+                        storeDictionary(db = db, context = context, session = session, syncId = syncId,
+                            address = request.address, nowSeconds = request.windows.first().last)
+                    }.getOrElse { "dictionary: ${it.message ?: it::class.java.simpleName}" }
+                    phase("ecg")
+                    val ecg = runCatching {
+                        storeEcg(db, session, syncId, request.windows.first().last)
+                    }.getOrElse { ecgNote = " · ecg: ${it.message ?: it::class.java.simpleName}"; 0 }
+                    if (ecg > 0) ecgNote = " · $ecg ECG recordings"
+                }
+
                 close(
                     true,
                     "$written samples from $recordsFetched/$recordCount records" +
@@ -1791,6 +1939,7 @@ object HuaweiSyncRunner {
                             ) +
                         (if (beats > 0) " · $beats RR windows" else "") +
                         (if (beatRecords > 0) " · $beatRecords beat records" else "") +
+                        reconnectNote + dictNote + ecgNote +
                         if (probe.isEmpty()) "" else " | $probe",
                 )
             }
