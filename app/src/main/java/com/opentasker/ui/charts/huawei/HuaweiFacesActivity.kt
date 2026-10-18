@@ -224,7 +224,7 @@ class HuaweiFacesActivity : ComponentActivity() {
                                             band = fresh ?: state.band,
                                             message = when {
                                                 r.getOrNull() == true -> "$label — removed"
-                                                else -> "$label — ${r.exceptionOrNull()?.message ?: "still on the band"}"
+                                                else -> "$label — ${r.exceptionOrNull()?.message ?: "still on the watch"}"
                                             },
                                         )
                                     }
@@ -259,7 +259,7 @@ class HuaweiFacesActivity : ComponentActivity() {
                                             band = fresh ?: state.band,
                                             message = when {
                                                 r.getOrNull() == true -> "${face.name} — removed"
-                                                else -> "${face.name} — ${r.exceptionOrNull()?.message ?: "still on the band"}"
+                                                else -> "${face.name} — ${r.exceptionOrNull()?.message ?: "still on the watch"}"
                                             },
                                         )
                                     }
@@ -292,7 +292,7 @@ class HuaweiFacesActivity : ComponentActivity() {
                                                 // Said plainly rather than dressed up: the protocol
                                                 // has no select command and this is the install
                                                 // command standing in for one, so it can decline.
-                                                r.isSuccess -> "${face.name} — the band kept the face it had; install it again to change the screen"
+                                                r.isSuccess -> "${face.name} — the watch kept the face it had; install it again to change the screen"
                                                 else -> "${face.name} — ${r.exceptionOrNull()?.message ?: "failed"}"
                                             },
                                         )
@@ -324,7 +324,7 @@ class HuaweiFacesActivity : ComponentActivity() {
 
         /** Where the library lives unless a task says otherwise. */
         const val DEFAULT_DIR =
-            "/sdcard/〇/[979] バックアップ/[979][60792][921] 白い熊 自由作業盤 Huawei Band 11 Pro"
+            "/sdcard/〇/[979] バックアップ/[979][60792][921] 白い熊 自由作業盤 Huawei Watch D3"
 
         fun open(context: Context, dir: String?) {
             context.startActivity(

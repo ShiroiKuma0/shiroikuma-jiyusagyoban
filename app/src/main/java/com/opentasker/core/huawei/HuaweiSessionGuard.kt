@@ -54,7 +54,7 @@ object HuaweiSessionGuard {
 
     /** The block outlasted its own ceiling even after the link was closed under it. */
     class Stalled(val timeoutMs: Long) : IllegalStateException(
-        "the band stopped answering — gave up after ${timeoutMs / 1000}s and hung up",
+        "the watch stopped answering — gave up after ${timeoutMs / 1000}s and hung up",
     )
 
     /** So a block whose result is legitimately null is not mistaken for a timeout. */

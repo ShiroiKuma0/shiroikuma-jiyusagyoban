@@ -77,7 +77,7 @@ object CompareJoin {
             return Result.Refused(
                 Refusal(
                     huawei.key, Refusal.Reason.ZERO_CONVENTION,
-                    "one band records a zero and the other omits it, so a missing minute means " +
+                    "one device records a zero and the other omits it, so a missing minute means " +
                         "different things on each — compare at ten minutes instead, where each " +
                         "device's own total is used",
                 ),
@@ -88,7 +88,7 @@ object CompareJoin {
         val (hu, huBad) = usable(hume.readings, windowStartMs, windowEndMs)
         if (hw.isEmpty() && hu.isEmpty()) {
             return Result.Refused(
-                Refusal(huawei.key, Refusal.Reason.NO_DATA, "neither band recorded anything here"),
+                Refusal(huawei.key, Refusal.Reason.NO_DATA, "neither device recorded anything here"),
             )
         }
 

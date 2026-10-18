@@ -107,7 +107,7 @@ object GnssForecastReminder {
         received = receivedAtMs
         notify(
             app,
-            title = "衛星：バンドの予測暦 ${leftLabel(untilMs)}",
+            title = "衛星：時計の予測暦 ${leftLabel(untilMs)}",
             text = statusText(untilMs),
             ongoing = false,
             dialogFor = untilMs,
@@ -150,12 +150,12 @@ object GnssForecastReminder {
                 append("予測暦は ${utc(untilMs)} UTC（${local(untilMs)}）で切れました。")
                 append("歩く前に「衛星 生成」を。\n")
             } else {
-                append("バンドの予測暦は ${utc(untilMs)} UTC（${local(untilMs)}）まで。")
+                append("時計の予測暦は ${utc(untilMs)} UTC（${local(untilMs)}）まで。")
                 append("${leftLabel(untilMs, now)}。切れる前に「衛星 生成」を。\n")
             }
             if (bandClaims != null) {
-                append("バンド自身の画面は ${leftLabel(bandClaims, now)} と言います — ")
-                append("受け取った時刻から $BAND_WINDOW_HOURS 時間を数えているためで、")
+                append("時計自身の画面はおそらく ${leftLabel(bandClaims, now)} と言います — ")
+                append("Band 11 Pro は受け取った時刻から $BAND_WINDOW_HOURS 時間を数えていたためで、")
                 append("資料そのものの窓ではありません。\n\n")
             } else {
                 append("\n")
@@ -164,11 +164,11 @@ object GnssForecastReminder {
                 append("The forecast ENDED ${utc(untilMs)} UTC (${local(untilMs)}). ")
                 append("Run 衛星 生成 before you walk.\n")
             } else {
-                append("The band's forecast runs to ${utc(untilMs)} UTC (${local(untilMs)}) — ")
+                append("The watch's forecast runs to ${utc(untilMs)} UTC (${local(untilMs)}) — ")
                 append("${leftLabel(untilMs, now)}. Rebuild with 衛星 生成 before then.\n")
             }
             if (bandClaims != null) {
-                append("The band's own screen says ${leftLabel(bandClaims, now)} — it counts ")
+                append("The watch's own screen likely says ${leftLabel(bandClaims, now)} — the Band 11 Pro counted ")
                 append("$BAND_WINDOW_HOURS h from the moment it TOOK the set, not the window the data has.")
             }
         }
@@ -185,7 +185,7 @@ object GnssForecastReminder {
         val bandClaims = bandClaimsUntil(now)
         val dead = untilMs <= now
         return buildString {
-            append(if (dead) "# 予測暦は切れています\n" else "# バンドの予測暦\n")
+            append(if (dead) "# 予測暦は切れています\n" else "# 時計の予測暦\n")
             append("\n")
             append("## **${leftLabel(untilMs, now)}**\n")
             append("\n")
@@ -195,13 +195,13 @@ object GnssForecastReminder {
             if (bandClaims != null) {
                 append("---\n")
                 append("\n")
-                append("## バンドの画面は **${leftLabel(bandClaims, now)}**\n")
+                append("## 時計の画面はおそらく **${leftLabel(bandClaims, now)}**\n")
                 append("\n")
-                append("バンドは **受け取った時刻から $BAND_WINDOW_HOURS 時間** を数えます — ")
+                append("Band 11 Pro は **受け取った時刻から $BAND_WINDOW_HOURS 時間** を数えていました — ")
                 append("${utc(received)} UTC から。資料そのものの窓ではないので、")
-                append("作ってから渡すまでの間だけ長く出ます。\n")
-                append("The band counts **$BAND_WINDOW_HOURS h from when it TOOK the set** ")
-                append("(${utc(received)} UTC), not the window the data has — so it over-claims by ")
+                append("作ってから渡すまでの間だけ長く出ていました。\n")
+                append("The Band 11 Pro counted **$BAND_WINDOW_HOURS h from when it TOOK the set** ")
+                append("(${utc(received)} UTC), not the window the data has — so it over-claimed by ")
                 append("exactly the delay between building a set and handing it over.\n")
                 append("\n")
             }
@@ -231,11 +231,11 @@ object GnssForecastReminder {
             title = "衛星：一式を作り直せませんでした",
             text = buildString {
                 append(why).append("\n\n")
-                append("バンドは前の一式を着けたままです。期限が切れていても、バンドの画面は")
-                append("「受け取ってから $BAND_WINDOW_HOURS 時間」を数え続けるので、まだ有効に見えます。\n\n")
-                append("The set was NOT rebuilt — the band still wears the previous one, and its own ")
-                append("screen goes on counting $BAND_WINDOW_HOURS h from when it TOOK that one, ")
-                append("so it will still look healthy.")
+                append("時計は前の一式を着けたままです。期限が切れていても、時計の画面はまだ有効に")
+                append("見えるかもしれません（Band 11 Pro は「受け取ってから $BAND_WINDOW_HOURS 時間」を数え続けた）。\n\n")
+                append("The set was NOT rebuilt — the watch still wears the previous one, and its own ")
+                append("screen may still look healthy (the Band 11 Pro went on counting $BAND_WINDOW_HOURS h ")
+                append("from when it TOOK that one).")
             },
             ongoing = true,
         )
@@ -250,12 +250,12 @@ object GnssForecastReminder {
     fun refusedStaleSet(context: Context, why: String) {
         notify(
             context.applicationContext,
-            title = "衛星：バンドには渡していません",
+            title = "衛星：時計には渡していません",
             text = buildString {
                 append(why).append("\n\n")
-                append("古い一式を新しいふりをして渡すことはしません。バンドは前のものを着けたままです。\n")
+                append("古い一式を新しいふりをして渡すことはしません。時計は前のものを着けたままです。\n")
                 append("「衛星 生成」をやり直してください。\n\n")
-                append("Nothing was handed to the band — an old set is not passed off as a new one. ")
+                append("Nothing was handed to the watch — an old set is not passed off as a new one. ")
                 append("It still wears the previous forecast. Run 衛星 生成 again.")
             },
             ongoing = true,
@@ -305,9 +305,9 @@ object GnssForecastReminder {
             context.applicationContext,
             title = "衛星：新しい概略暦が出ました（$newer）",
             text = buildString {
-                append("$have → $newer。いま作り直せば、バンドは正しい空を探します。\n")
+                append("$have → $newer。いま作り直せば、時計は正しい空を探します。\n")
                 append("この通知を押すと「$runTask」が走ります。\n\n")
-                append("A newer almanac is published: $have → $newer. Rebuild now and the band will ")
+                append("A newer almanac is published: $have → $newer. Rebuild now and the watch will ")
                 append("search the right sky. Tapping this runs 「$runTask」.")
             },
             ongoing = true,

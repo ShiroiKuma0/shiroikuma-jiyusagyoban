@@ -81,11 +81,11 @@ class CompareStatsTest {
             j, CompareStats.delta(j, 5.0), unit = "bpm", scale = "40–180 bpm", offsetSeconds = null,
         )
         assertEquals("four lines, never merged", 4, lines.size)
-        assertTrue(lines[0].startsWith("Band 11"))
+        assertTrue(lines[0].startsWith("Huawei"))
         assertTrue(lines[1].startsWith("Hume"))
         // Line three counts PAIRS and must reconcile with the two above it.
         assertTrue(lines[2].contains("2 both"))
-        assertTrue(lines[2].contains("7 Band 11 only"))
+        assertTrue(lines[2].contains("7 Huawei only"))
         assertTrue(lines[2].contains("4 Hume only"))
         assertEquals(j.humeSamples, j.both + j.humeOnly)
         assertEquals(j.huaweiSamples, j.both + j.huaweiOnly)

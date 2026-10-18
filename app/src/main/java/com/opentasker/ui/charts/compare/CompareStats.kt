@@ -99,7 +99,7 @@ object CompareStats {
         offsetSeconds: Long?,
     ): List<String> {
         val third = buildString {
-            append("対 Pairs·${join.both} both ·${join.huaweiOnly} Band 11 only ·${join.humeOnly} Hume only")
+            append("対 Pairs·${join.both} both ·${join.huaweiOnly} Huawei only ·${join.humeOnly} Hume only")
             if (join.grain == Grain.MINUTE) append(" ·±${CompareJoin.PAIR_TOLERANCE_MS / 1000} s")
             if (join.notCounted > 0) append(" ·${join.notCounted} not counted")
             if (delta.pairs > 0) {
@@ -109,7 +109,7 @@ object CompareStats {
             }
         }
         return listOf(
-            "Band 11 ·${join.huaweiSamples} samples" +
+            "Huawei ·${join.huaweiSamples} samples" +
                 if (join.impossible > 0) " ·${join.impossible} impossible timestamps" else "",
             "Hume ·${join.humeSamples} samples",
             third,

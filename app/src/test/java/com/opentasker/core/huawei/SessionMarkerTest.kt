@@ -66,7 +66,7 @@ class SessionMarkerTest {
     fun `the finding reaches the panel`() {
         assertTrue(action.contains("withUncleanNote"))
         assertTrue(action.contains("never closed"))
-        assertTrue("with the remedy beside it", action.contains("restart the band"))
+        assertTrue("with the remedy beside it", action.contains("restart the watch"))
         assertTrue("and as its own variable, for anything else that wants it",
             action.contains("""${'$'}{prefix}LastSessionUnclean"""))
     }

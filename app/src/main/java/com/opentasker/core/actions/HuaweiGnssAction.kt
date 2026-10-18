@@ -192,8 +192,8 @@ class HuaweiGnssAction : Action {
             val until = expired.joinToString(", ")
             ctx.variables.set(
                 "${prefix}PgnssAlert",
-                "THE BAND WAS NOT GIVEN THE FORECAST — every file in the set is out of date " +
-                    "($until). Nothing was handed over: a dead set stops the band asking for the " +
+                "THE WATCH WAS NOT GIVEN THE FORECAST — every file in the set is out of date " +
+                    "($until). Nothing was handed over: a dead set stops the watch asking for the " +
                     "broadcast ephemeris it can still use, which is worse than giving it nothing. " +
                     "Run 衛星更新 again to build a current one.",
             )
@@ -224,7 +224,7 @@ class HuaweiGnssAction : Action {
             GnssForecastReminder.refusedStaleSet(ctx.app, standingAlert)
             return fail(
                 ctx, prefix, store,
-                "NOT HANDED OVER — the build did not produce a set ($standingAlert) and the band " +
+                "NOT HANDED OVER — the build did not produce a set ($standingAlert) and the watch " +
                     "must not be given the old one as though it were new. Fix the build and run " +
                     "衛星 生成 again, or use 衛星 再送 to hand over the old set deliberately.",
             )
@@ -269,10 +269,10 @@ class HuaweiGnssAction : Action {
                 // allowed to proceed, because the set it is serving is still the one nobody rebuilt.
                 buildFailureStanding -> standingAlert
                 bandLeftHours == null -> ""
-                bandLeftHours < 0 -> "THE BAND'S FORECAST RAN OUT ${-bandLeftHours} h AGO — it has " +
-                    "been fixing the slow way since. Press 更新 on the band while this is open."
-                bandLeftHours < BAND_WARN_HOURS -> "The band's forecast has $bandLeftHours h left. " +
-                    "Press 更新 on the band while this is open."
+                bandLeftHours < 0 -> "THE WATCH'S FORECAST RAN OUT ${-bandLeftHours} h AGO — it has " +
+                    "been fixing the slow way since. Press 更新 on the watch while this is open."
+                bandLeftHours < BAND_WARN_HOURS -> "The watch's forecast has $bandLeftHours h left. " +
+                    "Press 更新 on the watch while this is open."
                 else -> ""
             },
         )
@@ -349,7 +349,7 @@ class HuaweiGnssAction : Action {
         // the band takes that seventh on its own errand and may simply not want it.
         val target = if (predictedOffered) predicted else files.keys.toList()
         panelSet("PgnssSteps", "done,done,run,wait")
-        panelSet("PgnssPhase", "Waiting for the band")
+        panelSet("PgnssPhase", "Waiting for the watch")
         panelSet("PgnssDetail", "${files.size} file(s) ready · ${files.values.sumOf { it.size } / 1024} KB")
         panelSet("PgnssCount", "0/${files.size}")
         panelSet("PgnssPct", "90")
@@ -370,9 +370,9 @@ class HuaweiGnssAction : Action {
                 val predictedServed = served.any { it.startsWith(HuaweiSyncRunner.PGNSS_PREFIX) }
                 if (!predictedOffered || predictedServed) {
                     panelSet("PgnssSteps", "done,done,done,run")
-                    panelSet("PgnssPhase", "The band is taking the files")
+                    panelSet("PgnssPhase", "The watch is taking the files")
                 } else {
-                    panelSet("PgnssPhase", "Waiting for the band")
+                    panelSet("PgnssPhase", "Waiting for the watch")
                 }
                 panelSet("PgnssDetail", served.joinToString(", "))
                 panelSet("PgnssCount", "${served.count { it in target }}/${target.size}")
@@ -393,12 +393,12 @@ class HuaweiGnssAction : Action {
         ).fold(
             onSuccess = { r ->
                 val text = buildString {
-                    append(if (r.asked) "band asked" else "band did not ask")
+                    append(if (r.asked) "watch asked" else "watch did not ask")
                     r.source?.let { append(" for $it") }
                     append(" · offered ${files.size} file(s), ${files.values.sumOf { it.size }} B")
                     if (fresh > 0) append(" ($fresh from the app's own store)")
                     if (r.served.isEmpty()) {
-                        append(" · the band took NOTHING")
+                        append(" · the watch took NOTHING")
                     } else {
                         append(" · it took ${r.served.joinToString(", ")} (${r.bytes} B)")
                     }
@@ -415,10 +415,10 @@ class HuaweiGnssAction : Action {
                     panelSet(
                         "PgnssFailed",
                         if (onlyBroadcast) {
-                            "On the band: it took only the broadcast file and never asked for the " +
-                                "forecast — press Update on the band while this is open"
+                            "On the watch: it took only the broadcast file and never asked for the " +
+                                "forecast — press Update on the watch while this is open"
                         } else {
-                            "On the band: the band took nothing"
+                            "On the watch: the watch took nothing"
                         },
                     )
                 } else {
@@ -459,9 +459,9 @@ class HuaweiGnssAction : Action {
                         if (onlyBroadcast) append(" — BROADCAST ONLY, no forecast")
                         append(" · offered ${files.size}")
                         if (tookPredicted && windowEnd != 0L) {
-                            append(" · the band now holds a forecast to ${stamp(unixOf(windowEnd))} UTC")
+                            append(" · the watch now holds a forecast to ${stamp(unixOf(windowEnd))} UTC")
                         }
-                        if (!r.asked) append(" · the band never asked")
+                        if (!r.asked) append(" · the watch never asked")
                     },
                     ctx.logger,
                 )
@@ -513,7 +513,7 @@ class HuaweiGnssAction : Action {
             onFailure = {
                 val why = it.message ?: it::class.java.simpleName
                 panelSet("PgnssSteps", "done,done,fail,wait")
-                panelSet("PgnssFailed", "On the band: $why")
+                panelSet("PgnssFailed", "On the watch: $why")
                 panelBeat()
                 recordServed(mirror, "FAILED · $why", ctx.logger)
                 fail(ctx, prefix, store, why)

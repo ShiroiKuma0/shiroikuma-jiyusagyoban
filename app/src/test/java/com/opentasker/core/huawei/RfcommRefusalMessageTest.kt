@@ -38,7 +38,7 @@ class RfcommRefusalMessageTest {
     /** And when both are fine, the likeliest cause and the remedy that worked. */
     @Test
     fun `the remedy is named`() {
-        assertTrue("Restart the band" in body)
+        assertTrue("Restart the watch" in body)
         assertTrue("the reason must be given, not just the cure", "stale session" in body)
         assertTrue("and the alternative kept honest", "out of range or asleep" in body)
     }

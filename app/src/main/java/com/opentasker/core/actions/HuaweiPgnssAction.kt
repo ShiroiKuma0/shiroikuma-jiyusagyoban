@@ -206,7 +206,7 @@ class HuaweiPgnssAction : Action {
                         (if (loud) "THE ALMANAC IS WRONG" else "THE ALMANAC IS OFF") +
                             " — $complaint. It says which satellites to look for and roughly " +
                             "where, so the fix will be slow even though the file is current. " +
-                            "Rebuilding may pick up a corrected one; the band's own search is " +
+                            "Rebuilding may pick up a corrected one; the watch's own search is " +
                             "what this costs.",
                     )
                     if (loud) GnssForecastReminder.staleAlmanac(ctx.app, complaint)
@@ -220,7 +220,7 @@ class HuaweiPgnssAction : Action {
             recordHistory(outDir, "NOT REBUILT · cancelled at step ${panel.step}", ctx.logger)
             ctx.variables.set(
                 "${prefix}PgnssAlert",
-                "${HuaweiGnssAction.NOT_REBUILT} — cancelled at step ${panel.step}. The band still holds " +
+                "${HuaweiGnssAction.NOT_REBUILT} — cancelled at step ${panel.step}. The watch still holds " +
                     "whatever it had before, which may be out of date.",
             )
             return panel.fail(store, panel.step, "cancelled")
@@ -242,7 +242,7 @@ class HuaweiPgnssAction : Action {
             // runs whose panel read "Build done" (白い熊, 2026-09-06). Silence here is the bug.
             ctx.variables.set(
                 "${prefix}PgnssAlert",
-                "${HuaweiGnssAction.NOT_REBUILT} — $why. The band still holds the previous set, which may " +
+                "${HuaweiGnssAction.NOT_REBUILT} — $why. The watch still holds the previous set, which may " +
                     "be out of date. Nothing new has been handed over.",
             )
             // …and loud where it will actually be SEEN. The banner above is inside a panel; the
@@ -555,7 +555,7 @@ class HuaweiPgnssAction : Action {
         const val BUILD_CEILING = 0.9
 
         /** The contract's four steps, for a failure message that names the one that broke. */
-        val STEP_NAMES = listOf("Download", "Build", "On the band", "Transferred")
+        val STEP_NAMES = listOf("Download", "Build", "On the watch", "Transferred")
 
         /**
          * The action's own ceiling, below `TaskRunner`'s budget so this one is what fires.

@@ -304,7 +304,7 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:taskAffinity=".bandcompare"
-            android:label="バンド比較"
+            android:label="機器比較"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 

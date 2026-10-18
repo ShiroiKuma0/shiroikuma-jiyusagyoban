@@ -302,5 +302,5 @@ class HuaweiFileIncompleteException(
 ) :
     Exception(
         "$name: $missing of $size bytes never arrived after $rounds round(s)" +
-            (negotiated?.let { " (band offered chunk ${it.chunkSize}, max ${it.maxSize}, mode ${it.mode})" } ?: ""),
+            (negotiated?.let { " (watch offered chunk ${it.chunkSize}, max ${it.maxSize}, mode ${it.mode})" } ?: ""),
     )
