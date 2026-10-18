@@ -274,7 +274,7 @@ class HuaweiWatchFaceStallTest {
         )
         assertTrue(
             "the report must name the closed link: ${outcome.message}",
-            outcome.message.contains("link to the band closed"),
+            outcome.message.contains("link to the watch closed"),
         )
     }
 }

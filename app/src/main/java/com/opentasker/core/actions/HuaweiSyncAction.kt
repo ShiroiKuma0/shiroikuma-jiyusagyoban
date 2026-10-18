@@ -52,8 +52,8 @@ class HuaweiSyncAction : Action {
         if (unclean != null) {
             AppLogger.warn(
                 "HuaweiSync",
-                "the band session opened at $unclean never closed — the process was killed holding " +
-                    "the link. If the band is now refusing connections, that is why; restart the band.",
+                "the watch session opened at $unclean never closed — the process was killed holding " +
+                    "the link. If the watch is now refusing connections, that is why; restart the watch.",
             )
         }
 
@@ -157,8 +157,8 @@ class HuaweiSyncAction : Action {
         if (unclean == null) {
             text
         } else {
-            "$text\n\nThe previous band session (opened $unclean) never closed — this app was " +
-                "killed while holding the link, which is what leaves the band refusing every later " +
-                "connection. If it refuses now, restart the band."
+            "$text\n\nThe previous watch session (opened $unclean) never closed — this app was " +
+                "killed while holding the link, which is what leaves the watch refusing every later " +
+                "connection. If it refuses now, restart the watch."
         }
 }

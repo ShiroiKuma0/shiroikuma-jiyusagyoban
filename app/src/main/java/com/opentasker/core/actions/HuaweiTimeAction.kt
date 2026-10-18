@@ -38,8 +38,8 @@ class HuaweiTimeAction : DeclaredAction(ActionCatalog.require("huawei.time")) {
         val pick = args["pick"]?.trim()?.lowercase().orEmpty()
         if (pick in TRUE_WORDS) {
             com.opentasker.ui.charts.huawei.HuaweiBandClockActivity.open(ctx.app)
-            ctx.variables.set("${prefix}Summary", "opened the band clock")
-            store?.let { ctx.variables.set(it, "opened the band clock") }
+            ctx.variables.set("${prefix}Summary", "opened the watch clock")
+            store?.let { ctx.variables.set(it, "opened the watch clock") }
             return ActionResult.Success
         }
 
@@ -54,10 +54,10 @@ class HuaweiTimeAction : DeclaredAction(ActionCatalog.require("huawei.time")) {
         val result = HuaweiSyncRunner.setBandTime(ctx.app, address, epoch)
         return result.fold(
             onSuccess = { when_ ->
-                val text = "band clock set to $when_"
+                val text = "watch clock set to $when_"
                 ctx.variables.set("${prefix}Summary", text)
                 store?.let { ctx.variables.set(it, text) }
-                ctx.logger("Huawei band time: $text")
+                ctx.logger("Huawei watch time: $text")
                 ActionResult.Success
             },
             onFailure = { fail(ctx, prefix, store, it.message ?: it::class.java.simpleName) },

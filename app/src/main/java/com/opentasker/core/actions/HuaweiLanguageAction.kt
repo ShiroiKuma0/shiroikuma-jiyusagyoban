@@ -59,12 +59,12 @@ class HuaweiLanguageAction : Action {
                     ctx.variables.set("${prefix}BandLocale", locale)
                     ctx.variables.set("${prefix}Summary", text)
                     store?.let { ctx.variables.set(it, text) }
-                    ctx.logger("Huawei band language set: $text")
+                    ctx.logger("Huawei watch language set: $text")
                     ActionResult.Success
                 } else {
                     // The band answered, and said no. Distinct from a connection failure, and the
                     // distinction matters: this one will not be fixed by trying again.
-                    fail(ctx, prefix, store, "the band refused $locale — it may have no pack for it")
+                    fail(ctx, prefix, store, "the watch refused $locale — it may have no pack for it")
                 }
             },
             onFailure = { fail(ctx, prefix, store, it.message ?: it::class.java.simpleName) },

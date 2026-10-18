@@ -253,7 +253,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
         if (before != null) {
             val already = before.faces.firstOrNull { it.assetId == assetId }
             if (already != null) {
-                val shown = if (already.showing) "already on the wrist" else "already on the band"
+                val shown = if (already.showing) "already on the wrist" else "already on the watch"
                 return if (already.showing) {
                     Outcome(true, 0, 0, "$name $shown", store = before)
                 } else {
@@ -280,7 +280,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             if (before.freeUnits == 0) {
                 return Outcome(
                     false, 0, 0,
-                    "the band has no room for $name — ${before.faces.size} faces and no free slot",
+                    "the watch has no room for $name — ${before.faces.size} faces and no free slot",
                     needsRoom = true,
                     store = before,
                 )
@@ -357,7 +357,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
                             state == 1 -> asked = true
                             result != null && result != 0 ->
                                 return noTransfer(
-                                    "the band refused $name (error $result)", before, sent, blocks, heard,
+                                    "the watch refused $name (error $result)", before, sent, blocks, heard,
                                 )
                             else -> installed = true
                         }
@@ -392,7 +392,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             // instantly — for the rest of its budget, burning a core to report a timeout that was
             // really a hang-up.
             if (!session.isOpen) {
-                return Outcome(false, maxOf(sent, 0), blocks, "the link to the band closed$shelf · $heard")
+                return Outcome(false, maxOf(sent, 0), blocks, "the link to the watch closed$shelf · $heard")
             }
 
             // Only offer the file once the band has asked for it.
@@ -416,14 +416,14 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             // the question it needed to ask was already answerable, eight seconds in.
             if (sent == -1 && offeredAt > 0 && System.currentTimeMillis() - offeredAt > roomMs) {
                 return noTransfer(
-                    "the band asked for $name and then took nothing", before, 0, 0, heard,
+                    "the watch asked for $name and then took nothing", before, 0, 0, heard,
                     askAgain = true,
                 )
             }
 
             if (sent == 0 && !asked && System.currentTimeMillis() > engageBy) {
                 return noTransfer(
-                    "the band never asked for $name", before, 0, 0, heard,
+                    "the watch never asked for $name", before, 0, 0, heard,
                 )
             }
 
@@ -440,7 +440,7 @@ class HuaweiUploadClient(private val session: HuaweiSession) {
             val silent = System.currentTimeMillis() - lastHeard
             if (silent > silenceMs) {
                 return noTransfer(
-                    "the band stopped answering ${silent / 1000}s ago, part way through $name",
+                    "the watch stopped answering ${silent / 1000}s ago, part way through $name",
                     before, maxOf(sent, 0), blocks, heard,
                 )
             }

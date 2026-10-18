@@ -53,10 +53,10 @@ object HuaweiMetricSpecs {
 
     private val NOT_TUNED = Loc(
         "No gate on this row has been tuned yet: outlier rejection and the slew limit are both off, "
-            + "and what the band returned is what is drawn.",
+            + "and what Huawei returned is what is drawn.",
 
         "測定値による調整はまだ行っていません。異常値の除外も傾きの制限も無効で、"
-            + "バンドが返した値をそのまま描いています。",
+            + "Huawei が返した値をそのまま描いています。",
 )
 
     // --- steps ---------------------------------------------------------------------------------
@@ -93,9 +93,9 @@ object HuaweiMetricSpecs {
                 "その一分間に数えた歩数。",
 ),
             howMeasured = Loc(
-                "The band writes into a per-minute grid. A minute it did not measure has no row at all.",
+                "The device writes into a per-minute grid. A minute it did not measure has no row at all.",
 
-                "バンドが一分ごとの升目に書き込む。測っていない分は行そのものが無い。",
+                "機器が一分ごとの升目に書き込む。測っていない分は行そのものが無い。",
 ),
             howToRead = Loc(
                 "A minute with no bar means NOT MEASURED, not that you did not walk. "
@@ -105,10 +105,10 @@ object HuaweiMetricSpecs {
 ),
             caveat = Loc(
                 "**Absent rows mean the OPPOSITE of the Hume band's.** Hume drops zeros at parse "
-                    + "time, so a minute with no bar means you did not walk. This band keeps a "
+                    + "time, so a minute with no bar means you did not walk. Huawei keeps a "
                     + "recorded zero, so an absent minute means it did not measure. A daily total "
                     + "comes out the same either way; a count of active minutes does not. The two "
-                    + "bands are compared at ten-minute buckets only, never per minute.",
+                    + "devices are compared at ten-minute buckets only, never per minute.",
 
                 "**Hume の歩数とは、行が無いことの意味が正反対。** Hume は解析時に 0 を捨てるので、"
                     + "棒の無い分は「歩いていない」。こちらは記録された 0 を残すので、行が無い分は"
@@ -144,8 +144,8 @@ object HuaweiMetricSpecs {
         headlineIsRange = true,
         provisional = true,
         info = MetricInfo(
-            whatItIs = Loc( "Heart rate as this band measured it.",
-"バンドが測った心拍数。",
+            whatItIs = Loc( "Heart rate as Huawei measured it.",
+"Huawei が測った心拍数。",
 ),
             howMeasured = Loc(
                 "Written into the per-minute grid, in whatever minutes it managed a reading.",
@@ -160,7 +160,7 @@ object HuaweiMetricSpecs {
             caveat = Loc(
                 "**Same unit as the Hume band's heart rate; not the same thing.** Hume's series "
                     + "carries two populations, one of which loses the pulse under wrist motion. "
-                    + "Whether this band's is one population or two has not been established. "
+                    + "Whether Huawei's is one population or two has not been established. "
                     + "The two devices' readings are never averaged together.\n\n",
 
                 "**Hume の心拍と同じ単位だが、同じものではない。** Hume の系列は二種類が混ざっており、"
@@ -200,7 +200,7 @@ object HuaweiMetricSpecs {
 "血中酸素飽和度。",
 ),
             howMeasured = Loc(
-                "Whether this band measures it only at night or opportunistically is not yet known.",
+                "Whether Huawei measures it only at night or opportunistically is not yet known.",
 
                 "夜間だけなのか、随時なのかは未確認。",
 ),
@@ -239,21 +239,21 @@ object HuaweiMetricSpecs {
         provisional = true,
         info = MetricInfo(
             whatItIs = Loc(
-                "Resting heart rate as the band reports it — a metric the Hume band never had.",
+                "Resting heart rate as the device reports it — a metric the Hume band never had.",
 
-                "バンドが出す安静時心拍。Hume には無かった指標。",
+                "機器が出す安静時心拍。Hume には無かった指標。",
 ),
             howMeasured = Loc(
-                "Computed inside the band by a method it does not disclose.",
+                "Computed inside the device by a method it does not disclose.",
 
-                "バンド内部での算出。方法は公開されていない。",
+                "機器内部での算出。方法は公開されていない。",
 ),
             howToRead = Loc(
-                "Expected to move very little within a day. A sudden step is more likely the band "
+                "Expected to move very little within a day. A sudden step is more likely the device "
                     + "recomputing than the body changing.",
 
                 "一日の中でほとんど動かないはずの値。急に変わったら、体調よりも先に"
-                    + "「バンドが計算し直しただけ」を疑うこと。",
+                    + "「機器が計算し直しただけ」を疑うこと。",
 ),
             caveat = Loc(
                 "**It is not yet established whether this is a step function or an instantaneous "
@@ -292,9 +292,9 @@ object HuaweiMetricSpecs {
         provisional = true,
         info = MetricInfo(
             whatItIs = Loc(
-                "A raw number the band returns. Its unit is unknown.",
+                "A raw number the device returns. Its unit is unknown.",
 
-                "バンドが返す生の数値。単位は不明。",
+                "機器が返す生の数値。単位は不明。",
 ),
             howMeasured = Loc( "Uncalibrated.",
 "未較正。",
