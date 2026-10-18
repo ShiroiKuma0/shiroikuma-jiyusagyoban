@@ -279,8 +279,12 @@ off; tag 1 and tag 3 (`FFFF`, likely “no interval”) unchanged. Off from the 
 was empty until it was switched on (left on, 2026-10-17 20:57).
 
 **Blood-pressure page.** Opening it starts Health's full sync. The scheduled-measurement page holds
-only reminders (sends nothing; not wanted). The ABPM page is an introduction only — ABPM is started on
-the watch and runs 24 h; not run in the session, to be read from our own sync (probably the same class
+only reminders, and never inflates the cuff. Opening it WRITES three default plans to the watch, all
+`"enabled":0` — 08:00 daily, 20:00 daily, 09:00–12:00 every 30 min (P2P `hw.unitedevice.bloodpressure` ↔
+`hw.watch.health.bp`, cmd `35A97D1C`; the reconnect queries them, answer `{"reminderPlans":[]}`). Not wanted. The ABPM page is an introduction only — ABPM is started on
+the watch (ABPM → Start plan) and runs 24 h, measuring automatically every 30 min at night; it is the
+ONLY automatic cuff measurement the D3 has. Health's state query (`hw.health.dynamicBp` →
+`hw.watch.health.dynamicbp`, `35A97D07`) answered an empty plan on 2026-10-17. Not run in the session, to be read from our own sync (probably the same class
 10002 with one of the flag fields marking it).
 
 **`0x07/0x02` = the user profile**, re-sent whenever the Heart or Temperature page opens
@@ -410,6 +414,53 @@ Left out of the replay: the language (`0x0C/0x01` — connecting never changes i
 as the `account` argument of the pair and sync actions and stored only in the app's private
 settings. It was in the code from the fork's start and was purged from the GitHub history on
 2026-10-18.
+
+### 3.11a Pulse-wave arrhythmia is class 500007 (2026-10-18)
+
+The watch's own screen on 2026-10-18 17:13: "7-day stats, total 37 times — no abnormalities 37,
+suspected A-fib 0", 3 on the 17th and 34 on the 18th. Class **500007** matches it record for record:
+3 on 2026-10-17 (22:36, 22:50, 23:40) and the rest on the 18th, every ~10 min through the night.
+Fields: `2200` = 1 on every record, `500007088` = 0 (the result — 0 = no abnormality, to confirm once
+an abnormal one exists), `500007278` = the measurement time again, in Unix seconds. Kept as raw
+`dict_500007_*` until named; not shown on any page yet. (Class 400017 is arterial stiffness, not
+arrhythmia.)
+
+### 3.12 The sync answers the watch's satellite asks (2026-10-18)
+
+The walk of 2026-10-18 had a fix in its first second. The orbits were not the reason: our own
+predicted set agrees with Huawei's to 2–7 m (GPS), 4–7 m (Galileo) and 5–17 m (GLONASS) over the
+60 hours both cover, and the broadcast file comes from the same Huawei endpoint. The reason was
+**timing**: Health answers the watch's ask on every connection, and had served a fresh broadcast
+file at 10:16, while our sync never answered at all.
+
+**The asks**, decoded from Health's captures (pairing 2026-10-17 19:29, reconnect 2026-10-18 10:39).
+The watch raises `0x1F/0x01` by itself, seconds after a companion connects and only for what has gone
+stale, and names what it wants in its answer to `0x1F/0x02` (tag 129 → tag 6):
+
+| source | Health's answer |
+| --- | --- |
+| `higeo/v1/gnssinfo?type=0x0004/HW_AGNSS` | ready `03`, lists `HW_AGNSS_RTCM_33` alone |
+| `com.huawei.higeo_dataModule_PGNSSConfig?type=HW_EEV2/HW_PGNSS_PRED;` | ready `03`, lists the six `HW_PGNSS_*` |
+| `higeo/v1/gnssIonInfo/<lat>,<lon>/HW_PRECSION_ION` | ready **`04`** — declined, nothing listed |
+
+**The block token** ahead of the file name in every `0x1C/0x04` answer is the **SHA-256 of the
+device's Bluetooth address**, upper-case hex, colons removed — the Band's constant and the D3's
+each hash to their own address. Until +061 the Band's was sent to every device.
+
+**What the sync does (+061)** — `HuaweiGnssServer`, `HuaweiGnssSupply`:
+- right after Health's reconnect it waits up to 3 s for an ask, and answers every round the watch
+  raises; at the end it answers any ask raised meanwhile. Nothing is announced unasked;
+- the broadcast file is **downloaded at the moment of the ask** (a few KB, a second); if the
+  download fails, the stored copy is used while under four hours old, otherwise the ask is declined;
+- the forecast is the set in the store (built by 衛星 生成), handed over only while it has at least
+  6 h left — a dead set is never given;
+- the ionosphere ask is declined, as Health declines it;
+- each round is a `SYNC ·` line in `served-log.txt`; a taken forecast writes `band-holds.txt` and arms
+  the expiry reminder, as the 衛星 tasks do;
+- `HuaweiClient.pump` puts satellite frames back in the queue instead of dropping them.
+
+No standing connection: the watch is answered whenever the sync connects (every four hours, and on
+each manual sync). Health holds the link open and so answers the moment the watch asks.
 
 ### 3.8 Health's graph pages to rebuild in 健康 (白い熊, 2026-10-17)
 

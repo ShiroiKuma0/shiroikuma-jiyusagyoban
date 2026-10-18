@@ -500,6 +500,46 @@ object HuaweiSyncRunner {
         return fresh.size
     }
 
+    /**
+     * Answer the watch's satellite asks on this connection, as Health does on every one.
+     *
+     * The watch asks by itself right after a companion connects, whenever its data is stale — the
+     * broadcast file is good for hours, the forecast for days. The broadcast file is downloaded at
+     * the moment of the ask, the forecast is the set 衛星 生成 last built, and the ionosphere ask is
+     * declined as Health declines it. Nothing is announced: an ask nobody raised is left alone.
+     *
+     * @return a line for the sync summary, empty when the watch asked for nothing.
+     */
+    private suspend fun answerGnss(context: Context, session: HuaweiSession, address: String, waitMs: Long): String {
+        var predictedUntil = 0L
+        val notes = ArrayList<String>()
+        val rounds = runCatching {
+            HuaweiGnssServer.answer(session, address, waitMs, maxMs = GNSS_MAX_MS, supply = { want ->
+                withContext(Dispatchers.IO) {
+                    when (want) {
+                        HuaweiGnssServer.Want.BROADCAST -> HuaweiGnssSupply.broadcast(context)
+                        HuaweiGnssServer.Want.PREDICTED -> HuaweiGnssSupply.predicted(context)?.also { predictedUntil = it.untilMs }
+                        HuaweiGnssServer.Want.OTHER -> null
+                    }
+                }?.also { notes += it.note }?.files
+            })
+        }.getOrElse { return " · satellite: ${it.message ?: it::class.java.simpleName}" }
+        if (rounds.isEmpty()) return ""
+        HuaweiGnssSupply.record(context, rounds, predictedUntil) {}
+        return " · satellite " + rounds.joinToString(", ") { r ->
+            val kind = when (r.want) {
+                HuaweiGnssServer.Want.BROADCAST -> "broadcast"
+                HuaweiGnssServer.Want.PREDICTED -> "forecast"
+                HuaweiGnssServer.Want.OTHER -> r.source?.substringAfterLast('/')?.ifEmpty { null } ?: "other"
+            }
+            when {
+                r.offered.isEmpty() -> "$kind declined"
+                r.served.isEmpty() -> "$kind not taken" + (if (r.note.isEmpty()) "" else " (${r.note})")
+                else -> "$kind taken (${r.bytes / 1024} KB)"
+            }
+        } + (if (notes.isEmpty()) "" else " — " + notes.joinToString(", "))
+    }
+
     /** Whether [address] is a watch (the D3) rather than the Band — the dictionary and ECG exist only there. */
     private fun isWatch(context: Context, address: String): Boolean =
         HuaweiSettings.deviceName(context, address)?.contains("WATCH", ignoreCase = true) == true
@@ -1181,10 +1221,8 @@ object HuaweiSyncRunner {
             log.append("ready sent; ")
         }
 
-        val served = LinkedHashSet<String>()
-        var bytes = 0
-        var unit = 862      // the band restates both in 0x1C/0x02; these are the captured defaults
-        var current: String? = null
+        val transfer = HuaweiGnssServer.Transfer(files, HuaweiGnssServer.token(address))
+        val served = transfer.served
         // Whether the PREDICTED set is on the table at all, and when the band last said anything.
         // Both feed the decision below about when a quiet line means "over" rather than "waiting".
         val predicted = files.keys.filter { it.startsWith(PGNSS_PREFIX) }
@@ -1274,103 +1312,37 @@ object HuaweiSyncRunner {
                 continue@loop
             }
             lastHeard = System.currentTimeMillis()
-            val tlvs = runCatching { session.decrypt(f) }.getOrElse { emptyList() }
-            fun str(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.value?.toString(Charsets.UTF_8)
-            fun num(tag: Int) = tlvs.firstOrNull { it.tag == tag }?.let { HuaweiProtocol.bytesToInt(it.value) }
-
-            when (f.commandId) {
-                HuaweiCommands.GNSS_LIST -> {
-                    onProgress("Transferring", "Offering: " + files.keys.joinToString(", "))
-                    // NOTE: no result tag on this one — the capture's answer is tag 1 alone.
-                    session.send(
-                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_LIST,
-                        HuaweiProtocol.tlv(1, files.keys.joinToString(";")),
-                    )
+            when (transfer.handle(session, f, onProgress)) {
+                HuaweiGnssServer.Transfer.Step.UNKNOWN_FILE -> {
+                    log.append("watch picked unknown '${transfer.current}'; ")
+                    break@loop
                 }
-                HuaweiCommands.GNSS_PARAMS -> {
-                    num(3)?.let { if (it in 1..4096) unit = it }
-                    session.send(
-                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_PARAMS,
-                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
+                HuaweiGnssServer.Transfer.Step.FILE_DONE -> {
+                    onProgress(
+                        if (done()) "Done" else "Waiting for the watch to ask again",
+                        "${transfer.served.last()} complete",
                     )
-                }
-                HuaweiCommands.GNSS_PICK -> {
-                    current = str(1)
-                    onProgress("Transferring", "It chose ${current ?: "?"}")
-                    val data = files[current]
-                    if (data == null) {
-                        onProgress("Refused", "It asked for $current, which we do not have")
-                        log.append("watch picked unknown '$current'; ")
-                        break@loop
-                    }
-                    // Size and CRC, and again no result tag.
-                    session.send(
-                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_PICK,
-                        HuaweiProtocol.tlv(2, HuaweiProtocol.intBytes(data.size, 4)) +
-                            HuaweiProtocol.tlv(3, HuaweiProtocol.intBytes(HuaweiProtocol.crc16(data), 2)),
-                    )
-                }
-                HuaweiCommands.GNSS_BLOCK -> {
-                    val name = str(1) ?: current
-                    val data = files[name] ?: break@loop
-                    val offset = num(2) ?: 0
-                    val length = (num(3) ?: 0).coerceAtMost(data.size - offset)
-                    session.send(
-                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_BLOCK,
-                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4) +
-                            HuaweiProtocol.tlv(2, GNSS_TOKEN + (name ?: "")) +
-                            HuaweiProtocol.tlv(3, HuaweiProtocol.intBytes(offset, 4)),
-                    )
-                    // 0x1C/0x05 is NOT TLV: one sequence byte, then raw file bytes. The sequence
-                    // restarts at 0 for every block, which is why it never exceeds 7 in the capture.
-                    var sent = 0
-                    var seq = 0
-                    while (sent < length) {
-                        val n = minOf(unit, length - sent)
-                        session.send(
-                            HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_DATA,
-                            byteArrayOf(seq.toByte()) + data.copyOfRange(offset + sent, offset + sent + n),
-                        )
-                        sent += n; seq++
-                    }
-                    bytes += sent
-                    onProgress("Transferring", "  sent $sent B of ${current ?: name}  ($bytes B total)")
-                }
-                HuaweiCommands.GNSS_DONE -> {
-                    session.send(
-                        HuaweiCommands.SVC_GNSS_FILES, HuaweiCommands.GNSS_DONE,
-                        HuaweiProtocol.tlv(HuaweiProtocol.TAG_RESULT, HuaweiProtocol.RESULT_SUCCESS, 4),
-                    )
-                    current?.let {
-                        served.add(it)
-                        onProgress(
-                            if (done()) "Done" else "Waiting for the watch to ask again",
-                            "$it complete",
-                        )
-                        onServed(served.toList(), bytes)
-                    }
-                    current = null
+                    onServed(served.toList(), transfer.bytes)
                     if (done()) break@loop
                 }
-                else -> log.append("unhandled 0x1C/0x%02X; ".format(f.commandId))
+                HuaweiGnssServer.Transfer.Step.UNHANDLED -> log.append("unhandled 0x1C/0x%02X; ".format(f.commandId))
+                HuaweiGnssServer.Transfer.Step.CONTINUE -> Unit
             }
         }
 
         GnssOutcome(
-            asked = ask != null, source = source, served = served.toList(), bytes = bytes,
+            asked = ask != null, source = source, served = served.toList(), bytes = transfer.bytes,
             detail = log.toString().trim().trimEnd(';'),
             caughtAtMs = caughtAt, waitedMs = if (caughtAt == 0L) 0L else caughtAt - watchStart,
         )
     }
 
-    /**
-     * The 64 hex characters Health puts in every `0x1C/0x04` answer, ahead of the file name.
-     *
-     * Identical in all 121 responses across all seven files in the capture, appears nowhere else,
-     * and is not the SHA-256 or MD5 of any file — checked. The band never echoes it back. What it
-     * identifies cannot be told from one capture, so it is replayed verbatim rather than explained:
-     * if the band validates it we need it, and if it ignores it nothing is lost.
-     */
+    /** How long a sync waits for the watch's first satellite ask; Health's came within a second of connecting. */
+    private const val GNSS_FIRST_WAIT_MS = 3_000L
+
+    /** The most one sync spends on satellite rounds — Health moved the 800 KB forecast in 17 s. */
+    private const val GNSS_MAX_MS = 120_000L
+
     /** The predicted set's file names all start with this; the broadcast one does not. */
     const val PGNSS_PREFIX = "HW_PGNSS_"
 
@@ -1381,8 +1353,6 @@ object HuaweiSyncRunner {
      * has not been told to update yet, and the caller's own deadline is what governs.
      */
     private const val SETTLE_MS = 30_000L
-
-    private const val GNSS_TOKEN = "42E41FAF3CAABEF0E56DFD793DF99E6DF15EA2FC9B18A5D73ABF0DC1D0F06CCA"
 
     /**
      * One setting the band was asked to change, and what it said.
@@ -1701,8 +1671,11 @@ object HuaweiSyncRunner {
             HuaweiSyncState.begin(request.windows.size)
             // A pairing run waits on two human confirmations, so it gets its own, longer ceiling
             // than the sync timeout the settings task configures.
+            // A sync also carries the watch's satellite rounds, which it does not schedule: a forecast
+            // is 800 KB at the watch's own pace, so it gets [GNSS_MAX_MS] on top.
             val ceilingSec =
-                if (bond || configure) request.timeoutSec + 120 + serveSec else request.timeoutSec
+                if (bond || configure) request.timeoutSec + 120 + serveSec
+                else request.timeoutSec + (GNSS_MAX_MS / 1000).toInt()
             val outcome = withTimeoutOrNull(ceilingSec.coerceIn(10, 1800) * 1000L) {
                 if (bond) {
                     // An unbonded band cannot honour a token we stored earlier: the pairing it was
@@ -1787,6 +1760,14 @@ object HuaweiSyncRunner {
                         )
                         " · reconnect ${r.answered}/${r.sent} answered, ${r.feature}"
                     }.getOrElse { " · reconnect: ${it.message ?: it::class.java.simpleName}" }
+                }
+
+                // The watch asks for satellite data within seconds of a companion connecting; Health
+                // answers at once, and so does this. Asked again at the end for one raised meanwhile.
+                var gnssNote = ""
+                if (!configure) {
+                    phase("satellite")
+                    gnssNote = answerGnss(context, session, request.address, GNSS_FIRST_WAIT_MS)
                 }
 
                 if (configure) {
@@ -1926,6 +1907,8 @@ object HuaweiSyncRunner {
                     if (ecg > 0) ecgNote = " · $ecg ECG recordings"
                 }
 
+                gnssNote += answerGnss(context, session, request.address, 0)
+
                 close(
                     true,
                     "$written samples from $recordsFetched/$recordCount records" +
@@ -1939,7 +1922,7 @@ object HuaweiSyncRunner {
                             ) +
                         (if (beats > 0) " · $beats RR windows" else "") +
                         (if (beatRecords > 0) " · $beatRecords beat records" else "") +
-                        reconnectNote + dictNote + ecgNote +
+                        reconnectNote + dictNote + ecgNote + gnssNote +
                         if (probe.isEmpty()) "" else " | $probe",
                 )
             }
