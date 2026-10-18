@@ -237,6 +237,14 @@ class HuaweiSession(private val transport: HuaweiTransport) {
         return out
     }
 
+    /**
+     * Put a frame back for a later reader. [HuaweiClient.pump] hands back the watch's satellite asks
+     * this way: it does not answer them itself, and dropping one cost the watch its fresh ephemeris.
+     */
+    fun keep(frame: HuaweiProtocol.Frame) {
+        queue.addLast(frame)
+    }
+
     /** See [HuaweiTransport.isOpen] — a pump that keeps polling a dead link reports the wrong fault. */
     val isOpen: Boolean get() = transport.isOpen
 
