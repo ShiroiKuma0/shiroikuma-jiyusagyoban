@@ -335,6 +335,8 @@ object RecoveryBuild {
                 latest = markers[marker],
             )
         return listOf(
+            // First, as on the strip (白い熊, 2026-10-18): its row opened nothing without a series.
+            series(RecoveryMarker.TEMPERATURE) { it.skinTemp },
             series(RecoveryMarker.SLEEP) { it.sleepMinutes },
             series(RecoveryMarker.BEDTIME_HR) { it.bedtimeHr },
             series(RecoveryMarker.NOCTURNAL_HR) { it.nocturnalHr },
