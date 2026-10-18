@@ -53,6 +53,9 @@ fun MarkerHistoryScreen(
     val marker = series.marker
     val nights = series.nights
     val accent = markerColour(marker)
+    // A skin temperature still collecting its first nights has no normal to print or to measure from.
+    val collecting = series.latest?.temperatureCollecting == true
+    val baseline = series.latest?.baseline?.takeIf { !collecting }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -69,8 +72,12 @@ fun MarkerHistoryScreen(
                     fontWeight = FontWeight.Bold,
                     color = sectionInk,
                 )
-                latest?.baseline?.let {
-                    NoteText(BandText.deviationBaseline[lang].format(markerValue(marker, it, lang)))
+                if (collecting) {
+                    NoteText(BandText.tempCollecting[lang].format(latest!!.nights + 1, Recovery.MIN_NIGHTS_FOR_ANY))
+                } else {
+                    baseline?.let {
+                        NoteText(BandText.deviationBaseline[lang].format(markerValue(marker, it, lang)))
+                    }
                 }
                 NoteText(BandText.markerNights[lang].format(nights.size))
             }
@@ -106,7 +113,7 @@ fun MarkerHistoryScreen(
                             if (a != null && b != null && b > a) a..b else null
                         },
                         marked = setOf(values.lastIndex),
-                        baseline = series.latest?.baseline,
+                        baseline = baseline,
                         height = 180.dp,
                     )
                     NoteText(BandText.markerChartNote[lang])
@@ -116,12 +123,13 @@ fun MarkerHistoryScreen(
 
         extra?.let { item("extra") { it() } }
 
-        if (nights.size >= 3) {
+        // No "best nights" for skin temperature: the coolest night is not the best one.
+        if (nights.size >= 3 && marker != RecoveryMarker.TEMPERATURE) {
             item("best") {
                 SectionCard(accent = accent) {
                     SubHeading(BandText.markerBest[lang])
                     for (n in series.best(3)) {
-                        NightRow(marker, n, series.latest?.baseline, zone, bold = false)
+                        NightRow(marker, n, baseline, zone, bold = false)
                     }
                 }
             }
@@ -137,7 +145,7 @@ fun MarkerHistoryScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (n in nights.reversed()) {
                         NightRow(
-                            marker, n, series.latest?.baseline, zone,
+                            marker, n, baseline, zone,
                             bold = n.endMs == nights.last().endMs,
                         )
                     }
@@ -218,5 +226,6 @@ private fun markerColour(marker: RecoveryMarker): androidx.compose.ui.graphics.C
     RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.BEDTIME_HR, RecoveryMarker.HR_SWING ->
         ChartPalette.HEART_RATE
     RecoveryMarker.FELT -> ChartPalette.BAND_WARN
+    RecoveryMarker.TEMPERATURE -> ChartPalette.TEMPERATURE
     else -> ChartPalette.STEPS
 }
