@@ -185,3 +185,61 @@ Switching a sentence's language DISCARDS its decode: a transcription belongs to 
 in, and a Czech sentence read as English is not a sentence to correct but one to decode again. The page
 asks before dropping one. Corrections already saved stay — they went into the voice corpus the moment they
 were saved — and the recording is untouched, which is all a re-decode needs.
+
+## 8. Amendment — the way back from the review (kxkb side, 2026-10-18)
+
+白い熊 opens the review from the 言語島 board's 「録音確認」 tile, and expects Back to show the board
+again. It did not, and no flag on either side could make it: **the board finishes itself the moment a
+tile hands its task over** (`GengoshimaBoardActivity`, "two stacked windows is one too many" — right for
+a tile that opens a window of 自由作業盤's own). By the time the review appears there is no board
+anywhere — not behind us, not in another task, not in recents. An activity that no longer exists cannot
+be revealed; it has to be **opened again**, and it is `exported="false"`, so kxkb cannot open it.
+
+So the caller names a task to run on the way out, as a **third extra on the §1-style launch intent**
+that opens the review:
+
+| key | type | meaning |
+| --- | --- | --- |
+| `return_task` | String, optional | the name of a 自由作業盤 task, run when the review is left by Back, the toolbar arrow or Close |
+
+kxkb runs it through 自由作業盤's **own exported** run-a-task trampoline —
+`com.opentasker.widget.TaskRunActivity`, extras `com.opentasker.widget.TASK_NAME` and
+`…SOURCE` (sent as `白い熊 kxkb`, so the run log says where it came from) — with the component pinned to
+`shiroikuma.jiyusagyoban`, never an implicit intent. **This grants nothing:** that trampoline is exported
+for launcher shortcuts, so every app on the phone may already run any task by name. The door still reads
+nothing else, still opens exactly one page, and still hands over no data.
+
+Nothing passed → the review closes exactly as it did before: no guessing at a screen to show instead.
+Nothing passed is also what the space-slide menu's own entry to the page means.
+
+**No code is needed in 自由作業盤.** The 「言語島 録音確認」 task's send-intent action already carries six
+string extras: `extra1_key = return_task`, `extra1_value = <the name of the task whose action is
+「言語島の盤」 / `gengoshima.board`>`. A task name rather than a component because the board is not
+exported, and a name rather than an id because a name survives a re-import — 自由作業盤's own reason, in
+`TaskRunActivity`.
+
+Rejected on the way here, for the record: bringing 自由作業盤's launcher task forward (it shows
+`MainActivity`, a different task from the board's `.gengoshimaboard` one — 白い熊 landed on the
+Variables page); a `PendingIntent` from the caller (a send-intent action cannot build one); and keeping
+the board alive behind the review (it is 自由作業盤's call, and the stack between two apps' tasks is not
+a thing either side can rely on).
+
+### 8a. The board's door (自由作業盤 side, 2026-10-18)
+
+So that the return needs no configuration at all, 自由作業盤 also has a **door to the board**, the mirror of
+kxkb's `WalkCaptureEntryActivity`:
+
+| | |
+| --- | --- |
+| action | `shiroikuma.jiyusagyoban.action.OPEN_GENGOSHIMA_BOARD`, category `DEFAULT` |
+| component | `com.opentasker.ui.gengoshima.GengoshimaBoardDoorActivity` in `shiroikuma.jiyusagyoban` |
+| manifest | `exported="true"`, `Theme.NoDisplay`, `noHistory`, `excludeFromRecents`, `taskAffinity=""` |
+| reads | **nothing** — its whole body is `GengoshimaBoardActivity.open(this)` then `finish()` |
+
+A trampoline rather than an exported board or alias: a door that takes no extras can open exactly one
+screen, so exporting it cannot be talked into opening another part of the app. No data crosses it in
+either direction.
+
+kxkb fires it, package-pinned and resolve-checked, as its **default** return whenever the review was
+opened through its door; `return_task` still wins when a caller names one; and with the door missing
+(an older 自由作業盤) the review falls back to a plain close. So the two halves land in either order.

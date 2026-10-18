@@ -344,6 +344,21 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- The board's door for 白い熊 kxkb (contract §8): the way back from its walk-capture review.
+             Exported, but it reads nothing from the intent and opens only the board. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaBoardDoorActivity"
+            android:exported="true"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.OPEN_GENGOSHIMA_BOARD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <!-- 言語島's player, in a process of its own so a player fault cannot take the automation
              engine with it. Exported with the MediaSessionService filter because that is how a
              headset, the steering wheel and the lock screen reach it. -->
