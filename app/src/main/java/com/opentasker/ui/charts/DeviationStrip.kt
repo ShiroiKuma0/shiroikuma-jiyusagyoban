@@ -174,6 +174,9 @@ fun DeviationStrip(
  * markers follow. Breathing is last because it is the newest and the least tested on this wrist.
  */
 val DEFAULT_ROWS = listOf(
+    // First since 2026-10-18 (白い熊): the Watch D3's skin temperature, the best-evidenced early sign
+    // of illness a wrist has — as a deviation from 白い熊's own nights, never as a body temperature.
+    RecoveryMarker.TEMPERATURE,
     RecoveryMarker.SLEEP,
     RecoveryMarker.BEDTIME_HR,
     RecoveryMarker.NOCTURNAL_HR,
@@ -216,7 +219,7 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
     val lang = LocalBandLanguage.current
     // Distance from usual, not better-or-worse — see [unusualness]. Null when there is no baseline
     // yet, and then the row is drawn in plain ink rather than given a colour it has not earned.
-    val step = unusualness(r)
+    val step = unusualness(r) ?: if (r.temperatureCollecting) COLLECTING_STEP else null
     val tint = step?.let { ChartPalette.scale(it) } ?: sectionNote
 
     Row(
@@ -240,8 +243,13 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
                 color = sectionInk,
             )
-            r.baseline?.let {
-                NoteText(BandText.deviationBaseline[lang].format(markerValue(r.marker, it, lang)))
+            if (r.temperatureCollecting) {
+                // Not "usual 33.8": a median of two nights is not anybody's normal.
+                NoteText(BandText.tempCollecting[lang].format(r.nights + 1, Recovery.MIN_NIGHTS_FOR_ANY))
+            } else {
+                r.baseline?.let {
+                    NoteText(BandText.deviationBaseline[lang].format(markerValue(r.marker, it, lang)))
+                }
             }
         }
 
@@ -254,7 +262,7 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
             )
             // The signed difference, always with its sign. This is the channel that survives
             // greyscale, a colour-blind reader and a photograph of the screen.
-            r.delta?.let { d ->
+            r.delta?.takeIf { !r.temperatureCollecting }?.let { d ->
                 Text(
                     markerDelta(r.marker, d, lang),
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.5.sp),

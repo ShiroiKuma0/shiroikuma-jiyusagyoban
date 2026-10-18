@@ -214,9 +214,11 @@ object RecoveryBuild {
             RecoveryMarker.FELT, feltFor(latest), prior.mapNotNull(feltFor),
             Recovery.FELT_MEANINGFUL_STEPS, confidence, counted = true,
         )
+        val tempHistory = prior.mapNotNull { it.skinTemp }
         val temp = Recovery.band(
-            RecoveryMarker.TEMPERATURE, latest.skinTemp, prior.mapNotNull { it.skinTemp },
-            Recovery.TEMP_MEANINGFUL_C, confidence, counted = false, oneSidedHigh = true,
+            RecoveryMarker.TEMPERATURE, latest.skinTemp, tempHistory,
+            Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(tempHistory),
+            counted = false, oneSidedHigh = true,
         )
         // Display-only, both of them, and banded on the heart-rate machinery where that applies: a
         // bedtime level is a heart rate and carries the same measured 3.5 % sensor dispersion the
@@ -262,7 +264,8 @@ object RecoveryBuild {
             val beforeThat = prior.dropLast(1).mapNotNull { it.skinTemp }
             Recovery.band(
                 RecoveryMarker.TEMPERATURE, previous, beforeThat,
-                Recovery.TEMP_MEANINGFUL_C, confidence, counted = false, oneSidedHigh = true,
+                Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(beforeThat),
+                counted = false, oneSidedHigh = true,
             ).band == RecoveryBand.HIGH
         } ?: false
 

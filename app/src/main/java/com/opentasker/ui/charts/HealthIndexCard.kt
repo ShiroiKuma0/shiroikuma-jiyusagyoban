@@ -42,7 +42,15 @@ import androidx.compose.ui.unit.dp
  * contribution, says exactly as much as is actually known. Tapping opens the full arithmetic.
  */
 @Composable
-fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
+fun HealthIndexCard(
+    index: HealthIndexResult,
+    /**
+     * Last night's skin temperature, drawn as the card's first line (白い熊, 2026-10-18). Beside the
+     * index, not in it: no weight, no score, so the number above is unchanged by it.
+     */
+    temperature: MarkerReading? = null,
+    onClick: () -> Unit,
+) {
     val lang = LocalBandLanguage.current
     SectionCard(onClick = onClick) {
         SectionTitle(BandText.indexTitle[lang]) {
@@ -93,6 +101,7 @@ fun HealthIndexCard(index: HealthIndexResult, onClick: () -> Unit) {
             // Measured over EVERY band word, not only the ones on screen today: the column must not
             // change width when a component moves from "Good" to "Very low" overnight.
         val bandWidth = labelColumnWidth((0..100 step 10).map { HealthIndex.bandOf(it)[lang] })
+        temperature?.takeIf { it.value != null }?.let { TemperatureRow(it, labelWidth) }
         index.components.forEach { ComponentRow(it, labelWidth, valueWidth, bandWidth) }
 
         if (index.partial) {
@@ -130,6 +139,59 @@ private fun labelColumnWidth(labels: List<String>): Dp {
     return remember(labels, style, density, measurer) {
         val widest = labels.maxOfOrNull { measurer.measure(it, style, softWrap = false).size.width } ?: 0
         with(density) { widest.toDp() }
+    }
+}
+
+/**
+ * Skin temperature as the index card's first line: the night's value in its box, then where it sits.
+ *
+ * Not a component: it has no 0–100 and no weight, so it gets a box instead of a bar — the same box
+ * the night table draws — yellow while the baseline is being collected, the 1–5 steps after.
+ */
+@Composable
+private fun TemperatureRow(r: MarkerReading, labelWidth: Dp) {
+    val lang = LocalBandLanguage.current
+    val step = r.displayStep
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            markerLabel(r.marker)[lang],
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(labelWidth),
+        )
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(5.dp))
+                .background(step?.let { ChartPalette.scale(it) } ?: Color.Transparent)
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+        ) {
+            Text(
+                markerValue(r.marker, r.value ?: return@Box, lang),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = step?.let { ChartPalette.scaleInk(it) } ?: sectionInk,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            when {
+                r.temperatureCollecting ->
+                    BandText.tempCollecting[lang].format(r.nights + 1, Recovery.MIN_NIGHTS_FOR_ANY)
+                r.delta != null && r.baseline != null ->
+                    markerDelta(r.marker, r.delta!!, lang) + " · " +
+                        BandText.deviationBaseline[lang].format(markerValue(r.marker, r.baseline, lang))
+                else -> ""
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = sectionNote,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

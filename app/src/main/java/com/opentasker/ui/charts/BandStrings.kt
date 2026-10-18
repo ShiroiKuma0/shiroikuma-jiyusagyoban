@@ -351,8 +351,8 @@ object BandText {
     // --- the two that are not graded against anybody else.
     val bandsTempNoBand = Loc("no reference band, deliberately", "基準帯は意図的に置かない")
     val bandsTempWhy = Loc(
-        "The wrist sensor correlates with the room at r = 0.961 (Sato 2024) and the ambient term is several times the physiological one, so an absolute threshold would be grading your bedroom. This column stays a comparison against your own nights — 3 is inside your usual range, 4 and 5 above it, and it is never graded downward because a cool night is unremarkable rather than good.",
-        "手首のセンサーは室温と r = 0.961 で相関し（Sato 2024）、環境の項が生理的な項の数倍ある。絶対値で切れば寝室を採点することになる。この列だけは自分自身の夜との比較のまま。3 は平常の範囲内、4 と 5 はその上。下側は採点しない — 涼しい夜は「良い」ではなく「特筆なし」だから。",
+        "The wrist sensor correlates with the room at r = 0.961 (Sato 2024) and the ambient term is several times the physiological one, so an absolute threshold would be grading your bedroom. This column stays a comparison against your own nights — 3 is inside your usual range, 4 and 5 above it, 2 and 1 below it. Only a warmer night is ever treated as a sign: a cool night is coloured, never counted.",
+        "手首のセンサーは室温と r = 0.961 で相関し（Sato 2024）、環境の項が生理的な項の数倍ある。絶対値で切れば寝室を採点することになる。この列だけは自分自身の夜との比較のまま。3 は平常の範囲内、4 と 5 はその上、2 と 1 はその下。兆しとして扱うのは暖かい夜だけで、涼しい夜は色を付けるが数えない。",
     )
     val bandsFeltWhy = Loc(
         "The number you tapped. Nothing to convert, and nothing to compare it against — it is already the scale.",
@@ -429,9 +429,10 @@ object BandText {
     val regColFelt = Loc("Woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
     val regColSleep = Loc("Asleep", "実睡眠")
-    // Dropped from the night table on 2026-09-03 — this band measures no temperature, so the column
-    // was a dash on every line. The string stays for the Hume report, which does measure it.
-    val regColTemp = Loc("Temp °C", "体温 ℃")
+    // Dropped from the night table on 2026-09-03, when the Band 11 Pro measured no temperature, and
+    // back as the FIRST column on 2026-10-18 with the Watch D3's skin sensor (白い熊). A skin
+    // temperature, so it says so: 体温 would read as a body temperature, which a wrist cannot give.
+    val regColTemp = Loc("Skin °C", "皮膚温 ℃")
     val regColDeep = Loc("Deep", "深い")
     val regColDeepRem = Loc("Deep+REM", "深＋レム")
     val regColLowHr = Loc("Low HR", "最低心拍")
@@ -465,7 +466,7 @@ object BandText {
      * the column cannot spell it.
      */
     val registerColumns = listOf(
-        regColDate, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
+        regColDate, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
         regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
@@ -480,6 +481,8 @@ object BandText {
         "昨夜と、その前 %d 夜の中央値との比較。",
     )
     val deviationBaseline = Loc("usual %s", "平常 %s")
+    /** Skin temperature's first nights, when there is a value and no baseline yet. */
+    val tempCollecting = Loc("no baseline yet — night %d of %d", "平常はまだ — %d / %d 夜目")
     val deviationNoBaseline = Loc(
         "Not enough nights yet to say what your normal is.",
         "平常を言うにはまだ夜が足りない。",

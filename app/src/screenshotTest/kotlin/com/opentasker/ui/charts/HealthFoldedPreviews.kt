@@ -264,6 +264,11 @@ private fun IndexFixture(lang: BandLanguage) = Frame(lang) {
                     steps = 11_400.0,
                 ),
             ),
+            // The Watch D3's real 2026-10-18 night, its second with a skin temperature: collecting.
+            temperature = Recovery.band(
+                RecoveryMarker.TEMPERATURE, 33.8, listOf(33.7), Recovery.TEMP_MEANINGFUL_C,
+                Recovery.temperatureConfidence(listOf(33.7)), counted = false, oneSidedHigh = true,
+            ),
         ) {}
     }
 }

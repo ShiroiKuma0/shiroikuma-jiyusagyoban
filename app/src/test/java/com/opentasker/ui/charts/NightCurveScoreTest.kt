@@ -93,7 +93,7 @@ class NightCurveScoreTest {
         for (kept in listOf("Date", "Woke", "Night HR", "Asleep", "Deep", "Deep+REM", "Low HR", "HRV", "SpO₂")) {
             assertTrue("$kept went missing: $en", kept in en)
         }
-        assertEquals(13, BandText.registerColumns.size)
+        assertEquals(14, BandText.registerColumns.size)
         // Every heading is translated: a column that falls back to English is a column nobody
         // reviewed, and this table is read in both languages.
         for (c in BandText.registerColumns) {
@@ -136,15 +136,13 @@ class NightCurveScoreTest {
     }
 
     /**
-     * Temperature stays OUT, and this test is why it will not quietly come back.
-     *
-     * "All the metrics" means every one this band measures. The Huawei has no skin-temperature
-     * sensor, so the column was a dash on every line and was dropped on 2026-09-03; the string is
-     * kept for the Hume report, which does measure it.
+     * Temperature was OUT from 2026-09-03 — the Band 11 Pro had no skin sensor, so the column was a
+     * dash on every line — and is back, first, with the Watch D3's sensor.
      */
     @Test
-    fun `temperature is not a column on a band with no thermometer`() {
-        assertTrue(BandText.regColTemp[BandLanguage.EN].isNotBlank())
-        assertTrue(BandText.regColTemp !in BandText.registerColumns)
+    fun `skin temperature is the first column after the date, since the Watch D3`() {
+        // 白い熊, 2026-10-18: the D3 has the sensor the Band 11 Pro lacked, and it leads the table.
+        assertEquals(BandText.regColTemp, BandText.registerColumns[1])
+        assertEquals("皮膚温 ℃", BandText.regColTemp[BandLanguage.JA])
     }
 }
