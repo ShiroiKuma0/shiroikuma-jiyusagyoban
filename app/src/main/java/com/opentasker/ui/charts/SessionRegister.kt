@@ -256,9 +256,11 @@ object SessionRegister {
             RecoveryMarker.FELT, feltFor(night), prior.mapNotNull(feltFor),
             Recovery.FELT_MEANINGFUL_STEPS, confidence, counted = true,
         )
+        val tempHistory = prior.mapNotNull { it.skinTemp }
         val temperature = Recovery.band(
-            RecoveryMarker.TEMPERATURE, night.skinTemp, prior.mapNotNull { it.skinTemp },
-            Recovery.TEMP_MEANINGFUL_C, confidence, counted = false, oneSidedHigh = true,
+            RecoveryMarker.TEMPERATURE, night.skinTemp, tempHistory,
+            Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(tempHistory),
+            counted = false, oneSidedHigh = true,
         )
         NightReading(
             startMs = night.startMs,
