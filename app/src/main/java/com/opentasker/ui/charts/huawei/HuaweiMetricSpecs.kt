@@ -40,7 +40,12 @@ object HuaweiMetricSpecs {
     private fun Loc.then(other: Loc) = Loc(en + other.en, ja + other.ja)
 
     /** Rendered on the dashboard, in the order the cards are drawn — the order is a colour decision. */
-    val ALL: List<MetricSpec> by lazy { listOf(STEPS, HEART_RATE, SPO2, RESTING_HEART_RATE) }
+    val ALL: List<MetricSpec> by lazy {
+        listOf(STEPS, HEART_RATE, SPO2, RESTING_HEART_RATE, SKIN_TEMPERATURE, ARTERIAL_STIFFNESS)
+    }
+
+    /** Drawn after the blood-pressure card rather than before it: the order is a colour decision. */
+    val AFTER_BLOOD_PRESSURE: Set<String> = setOf(HuaweiKeys.SKIN_TEMP, HuaweiKeys.PWV)
 
     /** Carried, charted only inside the 診断 card, and never presented as a measurement. */
     val DIAGNOSTIC: List<MetricSpec> by lazy { listOf(CALORIES, DISTANCE) }
@@ -263,6 +268,119 @@ object HuaweiMetricSpecs {
                 "**これが階段状の値なのか、その都度の測定値なのかを、まだ確認していない。**"
                     + "階段状だった場合、点と点の間の曲線は描かれてはいるが測られてはいない。\n\n",
 ).then(NOT_TUNED),
+        ),
+    )
+
+    // --- skin temperature (Watch D3) -------------------------------------------------------------
+
+    val SKIN_TEMPERATURE = MetricSpec(
+        key = HuaweiKeys.SKIN_TEMP,
+        label = Loc("Skin Temperature", "皮膚温"),
+        unit = "°C",
+        color = ChartPalette.TEMPERATURE,
+        render = RenderKind.LINE,
+        // Measured: one reading a minute while continuous skin temperature is on (733 values in the
+        // first twelve hours, 2026-10-17 21:18 → 10-18 09:30).
+        cadenceSec = 60,
+        // Facts about the quantity, not the watch: wrist skin is never below a cold room's air nor
+        // above a high fever's core temperature.
+        validMin = 20.0,
+        validMax = 42.0,
+        zeroIsNoReading = true,
+        slewPerStep = null,
+        hampelHalfWindow = 0,
+        hampelSigmas = 0.0,
+        hampelMinScale = 0.0,
+        yMin = 28.0,
+        yMax = 37.0,
+        decimals = 1,
+        bands = emptyList(),
+        mixedCadence = true,
+        headlineIsRange = true,
+        provisional = true,
+        info = MetricInfo(
+            whatItIs = Loc(
+                "The temperature of the skin under the watch — not body (core) temperature.",
+                "時計の下の皮膚の温度。体温（深部体温）ではない。",
+            ),
+            howMeasured = Loc(
+                "By the HUAWEI WATCH D3, once a minute while continuous skin temperature is switched on in "
+                    + "the sensor-settings task. A manual measurement in the watch's own app adds a reading. The "
+                    + "Band 11 Pro had no such sensor, so the series starts on 2026-10-17.",
+                "HUAWEI WATCH D3 が、連続皮膚温を入れている間（時計計測設定）一分ごとに測る。時計の"
+                    + "アプリで手動で測っても一件加わる。Band 11 Pro にはこのセンサーが無かったので、"
+                    + "記録は 2026-10-17 から。",
+            ),
+            howToRead = Loc(
+                "Skin temperature follows the room, clothing and activity as much as the body, so a "
+                    + "single value means little. What carries information is the NIGHT: the same hours "
+                    + "compared night by night. A night running clearly warmer than usual is the "
+                    + "best-evidenced early sign of illness among the watch's signals.",
+                "皮膚温は体だけでなく部屋・衣服・動きにも左右されるので、一点の値にはあまり意味が無い。"
+                    + "意味があるのは夜 — 同じ時間帯を夜ごとに比べること。いつもより明らかに温かい夜は、"
+                    + "時計の信号の中で体調の崩れを最も早く示す兆しとされる。",
+            ),
+            caveat = Loc(
+                "**Which minutes are worn and which are not is not yet known**: the watch does not mark "
+                    + "an off-wrist minute, so a reading taken on the charger is drawn like any other. "
+                    + "A per-night baseline needs a couple of weeks of nights before it means anything.\n\n",
+                "**着けていない分を見分ける手段はまだ無い。** 時計は外した分に印を付けないので、"
+                    + "充電中の値もほかと同じに描かれる。夜ごとの基準線には、二週間ほどの夜が要る。\n\n",
+            ).then(NOT_TUNED),
+        ),
+    )
+
+    // --- arterial stiffness (Watch D3) -----------------------------------------------------------
+
+    val ARTERIAL_STIFFNESS = MetricSpec(
+        key = HuaweiKeys.PWV,
+        label = Loc("Arterial Stiffness", "動脈硬化度"),
+        unit = "m/s",
+        color = ChartPalette.HRV,
+        // One reading per measurement, taken by hand: a capsule per hour shows each as a mark
+        // without inventing a curve between days.
+        render = RenderKind.CAPSULE,
+        cadenceSec = 86_400,
+        validMin = 3.0,
+        validMax = 25.0,
+        zeroIsNoReading = true,
+        slewPerStep = null,
+        hampelHalfWindow = 0,
+        hampelSigmas = 0.0,
+        hampelMinScale = 0.0,
+        yMin = 4.0,
+        yMax = 12.0,
+        decimals = 1,
+        bands = emptyList(),
+        mixedCadence = true,
+        provisional = true,
+        info = MetricInfo(
+            whatItIs = Loc(
+                "Pulse wave velocity (PWV): how fast the pulse travels along the arteries. Stiffer "
+                    + "arteries carry it faster, so a higher number means stiffer vessels.",
+                "脈波伝播速度（PWV）。脈が動脈を伝わる速さ。血管が硬いほど速く伝わるので、値が高いほど"
+                    + "硬い。",
+            ),
+            howMeasured = Loc(
+                "On the HUAWEI WATCH D3, in its arterial-stiffness app, sitting still with a finger on "
+                    + "the watch. Each measurement is one point. The watch also grades it — Huawei's own "
+                    + "bands are below 8 m/s (normal), 8–10, and 10 or more.",
+                "HUAWEI WATCH D3 の動脈硬化度のアプリで、座って時計に指を当てて測る。一回の測定が一点。"
+                    + "時計は等級も付ける — Huawei 自身の区分は 8 m/s 未満（正常）、8〜10、10 以上。",
+            ),
+            howToRead = Loc(
+                "PWV rises slowly with age and with blood pressure; what matters is the trend over "
+                    + "months, measured the same way at the same time of day. One reading is a data "
+                    + "point, not a verdict.",
+                "PWV は年齢とともに、また血圧とともにゆっくり上がる。大事なのは何か月かの傾向で、"
+                    + "同じ時間帯に同じやり方で測ること。一回の値は判定ではなく一つの点。",
+            ),
+            caveat = Loc(
+                "Huawei's grading bands are shown as text, not drawn on the chart: they are Huawei's "
+                    + "and have not been checked against anything here.\n\n",
+                "Huawei の区分は文字で示すだけで、図には引いていない。Huawei のものであって、"
+                    + "こちらで確かめてはいない。\n\n",
+            ).then(NOT_TUNED),
         ),
     )
 

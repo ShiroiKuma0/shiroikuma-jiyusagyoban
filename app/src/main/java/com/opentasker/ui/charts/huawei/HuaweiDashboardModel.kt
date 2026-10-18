@@ -109,7 +109,33 @@ data class HuaweiDashboardState(
      */
     val rehabDays: Set<Long> = emptySet(),
     val rehabNotes: Map<Long, String> = emptyMap(),
+    /**
+     * The Watch D3's cuff readings: the dumbbell chart, and every reading as the watch gave it.
+     * Null until the first reading — the Band and the Hume band never measured blood pressure
+     * (Hume's figures were a clamped estimate, and are deliberately not chained in here).
+     */
+    val bloodPressure: com.opentasker.ui.charts.BloodPressureChart? = null,
+    val bpReadings: List<HuaweiBpReading> = emptyList(),
+    /** The Watch D3's ECG recordings, newest first. */
+    val ecg: List<HuaweiEcgRecording> = emptyList(),
 )
+
+/** One cuff reading: systolic / diastolic (mmHg) and the pulse the cuff counted. */
+data class HuaweiBpReading(val tMs: Long, val systolic: Double, val diastolic: Double, val pulse: Double?)
+
+/** One ECG recording as the watch stored it: its verdict, mean heart rate and the single-lead trace (500 Hz). */
+data class HuaweiEcgRecording(
+    val startMs: Long,
+    val endMs: Long,
+    val verdict: Int,
+    val meanHr: Int,
+    val analysisVersion: String,
+    val sampleRate: Int,
+    val samples: FloatArray,
+) {
+    override fun equals(other: Any?) = other is HuaweiEcgRecording && other.startMs == startMs
+    override fun hashCode() = startMs.hashCode()
+}
 
 /**
  * The Huawei report's state.
@@ -203,6 +229,8 @@ class HuaweiDashboardModel(
         val humeOldest = db.bandSampleDao().oldestEpochMs()
         val historyFromMs = listOfNotNull(humeOldest, cutoverMs).minOrNull() ?: (oldest * 1000L)
 
+        val bp = loadBloodPressure()
+        val ecg = loadEcg()
         val charts = HuaweiMetricSpecs.ALL.map { spec ->
             buildChart(spec, oldest, newest, recorded, cutoverMs, historyFromMs)
         }
@@ -267,6 +295,9 @@ class HuaweiDashboardModel(
             status = status,
             bound = bound,
             metrics = charts,
+            bloodPressure = bp.first,
+            bpReadings = bp.second,
+            ecg = ecg,
             coverage = coverage,
             diagnostics = diagnostics,
             unknownFields = unknown,
@@ -551,6 +582,48 @@ class HuaweiDashboardModel(
         java.time.LocalDateTime.now(java.time.ZoneId.systemDefault()),
     )
 
+    /**
+     * The cuff readings. Systolic, diastolic and pulse are stored as three samples at the reading's
+     * one instant, so they are joined on that instant — a reading missing either pressure is not a
+     * reading and is left out rather than half-drawn.
+     */
+    private suspend fun loadBloodPressure(): Pair<com.opentasker.ui.charts.BloodPressureChart?, List<HuaweiBpReading>> {
+        val dao = db.huaweiSampleDao()
+        val all = 0L to Long.MAX_VALUE / 2000
+        fun key(k: String) = HuaweiKeys.storageKey(k)
+        val sys = dao.range(key(HuaweiKeys.BP_SYSTOLIC), all.first, all.second).associate { it.epochSeconds to it.value }
+        val dia = dao.range(key(HuaweiKeys.BP_DIASTOLIC), all.first, all.second).associate { it.epochSeconds to it.value }
+        val pulse = dao.range(key(HuaweiKeys.BP_PULSE), all.first, all.second).associate { it.epochSeconds to it.value }
+        val readings = sys.keys.intersect(dia.keys).sorted().map { t ->
+            HuaweiBpReading(t * 1000L, sys.getValue(t), dia.getValue(t), pulse[t])
+        }
+        if (readings.isEmpty()) return null to emptyList()
+        val sysPts = readings.map { ChartPoint(it.tMs, it.systolic) }
+        val diaPts = readings.map { ChartPoint(it.tMs, it.diastolic) }
+        fun range(v: List<ChartPoint>) = "${v.minOf { it.value }.toInt()}–${v.maxOf { it.value }.toInt()}"
+        val last = readings.last()
+        val chart = com.opentasker.ui.charts.BloodPressureChart(
+            dumbbells = com.opentasker.ui.charts.HourlyEnvelope.dumbbells(sysPts, diaPts),
+            headline = "${last.systolic.toInt()}/${last.diastolic.toInt()}",
+            systolicRange = range(sysPts),
+            diastolicRange = range(diaPts),
+        )
+        return chart to readings.reversed()
+    }
+
+    private suspend fun loadEcg(): List<HuaweiEcgRecording> =
+        runCatching { db.huaweiEcgDao().all() }.getOrDefault(emptyList()).map { e ->
+            HuaweiEcgRecording(
+                startMs = e.startSeconds * 1000L,
+                endMs = e.endSeconds * 1000L,
+                verdict = e.verdict,
+                meanHr = e.meanHr,
+                analysisVersion = e.analysisVersion,
+                sampleRate = e.sampleRate,
+                samples = com.opentasker.core.huawei.HuaweiEcg.decode(e.samples),
+            )
+        }
+
     private suspend fun buildChart(
         spec: MetricSpec,
         from: Long,
@@ -612,7 +685,10 @@ class HuaweiDashboardModel(
         return MetricChart(
             spec = spec,
             chunk = chunk,
-            buckets = emptyList(),
+            // A capsule metric is drawn from its hourly envelope, so it needs one. Every other row
+            // draws from the chunk and leaves this empty, as before.
+            buckets = if (spec.render == RenderKind.CAPSULE) com.opentasker.ui.charts.HourlyEnvelope.bucket(retained)
+            else emptyList(),
             // The bar renderer reads raw retained points and must never see a filtered series —
             // though with every filter off on this table, retained is currently everything.
             bars = if (spec.render == RenderKind.BARS) retained else emptyList(),
