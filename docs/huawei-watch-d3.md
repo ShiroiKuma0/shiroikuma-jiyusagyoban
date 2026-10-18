@@ -321,7 +321,7 @@ first value came from a manual measurement. Its continuous cadence is still to b
 **Watch face: the Band's container, a bigger screen.** A free store face (“Wild Race”, hitop id
 2186431433, v2.1.1, 1 904 559 B) went over Bluetooth through the file-upload service (`0x28`, 2 037
 `0x28/0x06` chunks; `0x27` around it), not Wi-Fi Direct; `scripts/huawei-extract-watchface.py`
-recovers it unchanged (`.scratch/d3/face/`). The `.bin` is the container of
+recovers it unchanged (the copy was deleted 2026-10-18: Wild Race is a TRIAL face that switches itself off on the watch after three minutes, so it is no use to keep). The `.bin` is the container of
 `docs/huawei-watch-face-format.md` §2 (version 2, `16 + L1 + L2 + L3 == filesize`, 181 resources).
 The largest image is **408 × 480** — the D3's screen — and the thumbnail **240 × 282** (Band: 286 × 482
 and 172 × 290). The resource headers do not read as the Band's `family / format` pairs; to check.
