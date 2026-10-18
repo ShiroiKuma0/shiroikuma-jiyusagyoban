@@ -88,8 +88,10 @@ Traps that cost real time:
 A stored `authToken` survives the band reverting to its wizard — a band showing the pair screen will
 still authenticate an existing bind. It does **not** survive the bond being removed.
 
-`ACCOUNT_ID = "ACCOUNT_ID_REMOVED"` is an opaque identifier the band wants present. It is not a Huawei
-account, nothing is registered, and no network call is involved in sending it.
+The account ID the device wants present (`0x1A/0x05`, `0x1A/0x01`) is 白い熊's own Huawei account
+ID, so it is private and kept out of the code: it is `%Huawei_AccountId` in 「健康の設定」, handed to
+the pair and sync actions as `account` and stored only in the app's private settings
+(`HuaweiSettings.accountId`). Nothing is registered and no network call is involved in sending it.
 
 ---
 

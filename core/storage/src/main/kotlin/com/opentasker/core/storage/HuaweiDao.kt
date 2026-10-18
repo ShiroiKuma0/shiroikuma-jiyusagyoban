@@ -173,6 +173,61 @@ data class HuaweiBeatEntity(
 }
 
 /**
+ * One ECG recording from the Watch D3 — `ecg_analysis_data.bin`, decoded by `HuaweiEcg`.
+ *
+ * A trace is 30 s of 500 Hz float32, 60 KB, and is only ever read whole, so it is the row's blob —
+ * the same call `huawei_beats` makes. The verdict and mean heart rate are the watch's own (its
+ * certified analysis runs on the watch); they are columns so a list needs no blob read.
+ */
+@Entity(tableName = "huawei_ecg", primaryKeys = ["startSeconds"])
+data class HuaweiEcgEntity(
+    /** UTC seconds the recording began. Unique, so the cumulative file re-read each sync overwrites. */
+    val startSeconds: Long,
+    val endSeconds: Long,
+    /** The watch's verdict code: 1 sinus rhythm, 0x40 inconclusive; others kept as they come. */
+    val verdict: Int,
+    /** Mean heart rate over the recording, bpm, as the watch computed it. */
+    val meanHr: Int,
+    /** The watch's analysis software version, e.g. `V1.0.0.27`. */
+    val analysisVersion: String,
+    val sampleRate: Int,
+    val sampleCount: Int,
+    /** float32 big-endian, exactly as the watch sent them. */
+    val samples: ByteArray,
+    val syncId: Long,
+) {
+    override fun equals(other: Any?): Boolean =
+        other is HuaweiEcgEntity && startSeconds == other.startSeconds && endSeconds == other.endSeconds &&
+            verdict == other.verdict && meanHr == other.meanHr && analysisVersion == other.analysisVersion &&
+            sampleRate == other.sampleRate && sampleCount == other.sampleCount && syncId == other.syncId &&
+            samples.contentEquals(other.samples)
+
+    override fun hashCode(): Int {
+        var h = startSeconds.hashCode()
+        h = 31 * h + verdict
+        h = 31 * h + meanHr
+        h = 31 * h + syncId.hashCode()
+        return 31 * h + samples.contentHashCode()
+    }
+}
+
+@Dao
+interface HuaweiEcgDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rows: List<HuaweiEcgEntity>)
+
+    @Query("SELECT COUNT(*) FROM huawei_ecg")
+    suspend fun count(): Int
+
+    /** Which recordings are already stored, so a re-served file is not re-written. */
+    @Query("SELECT startSeconds FROM huawei_ecg")
+    suspend fun starts(): List<Long>
+
+    @Query("SELECT * FROM huawei_ecg ORDER BY startSeconds DESC")
+    suspend fun all(): List<HuaweiEcgEntity>
+}
+
+/**
  * What one metric did over a window. Not an entity — a projection Room fills from an aggregate.
  *
  * [n] is carried so the caller can tell "averaged over 300 samples" from "averaged over 2", which

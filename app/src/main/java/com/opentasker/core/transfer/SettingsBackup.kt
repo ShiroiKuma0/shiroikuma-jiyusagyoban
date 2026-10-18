@@ -273,6 +273,9 @@ object SettingsBackup {
         // and each block of the heart-rate stream. Small: 288 KB for ten workouts, which is why
         // they ride in the NDJSON as base64 rather than earning their own file-per-blob path.
         "huawei_workouts", "huawei_workout_blobs",
+        // The Watch D3's ECG recordings: 60 KB a trace, base64 in the NDJSON like the workout blobs.
+        // A recording is a medical-grade measurement that cannot be re-taken after the fact.
+        "huawei_ecg",
     )
 
     /**
