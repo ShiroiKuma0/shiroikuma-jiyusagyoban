@@ -623,10 +623,10 @@ class HuaweiDashboardModel(
             // guess which band a stretch of chart belongs to.
             subtitle = when {
                 prefix.humeCount > 0 -> Loc(
-                    "${prefix.humeCount} earlier readings are the Hume band's — this band did not " +
-                        "exist yet. Nothing is mixed: they stop where this one starts." +
+                    "${prefix.humeCount} earlier readings are the Hume band's — Huawei had not " +
+                        "started yet. Nothing is mixed: they stop where Huawei starts." +
                         (if (spec.provisional) " · " + HuaweiText.provisional.en else ""),
-                    "古い ${prefix.humeCount} 件は Hume のもの — このバンドはまだ無かった。" +
+                    "古い ${prefix.humeCount} 件は Hume のもの — Huawei はまだ無かった。" +
                         "混ぜてはいない。こちらが始まるところで終わる。" +
                         (if (spec.provisional) " ／ " + HuaweiText.provisional.ja else ""),
                 )

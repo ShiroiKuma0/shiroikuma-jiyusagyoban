@@ -56,7 +56,7 @@ class HuaweiWatchFaceAction : Action {
             val gone = HuaweiSyncRunner.deleteWatchFace(ctx.app, address, id, version)
             val text = when {
                 gone.getOrNull() == true -> "$face removed"
-                gone.isSuccess -> "$face is still on the band"
+                gone.isSuccess -> "$face is still on the watch"
                 else -> gone.exceptionOrNull()?.message ?: "failed"
             }
             ctx.variables.set("${prefix}Summary", text)
@@ -107,7 +107,7 @@ class HuaweiWatchFaceAction : Action {
                 // thing 白い熊 already knew.
                 val shelf = if (!r.needsRoom) "" else r.store?.faces.orEmpty()
                     .joinToString(", ") { it.assetId + if (it.showing) " (showing)" else "" }
-                    .let { if (it.isEmpty()) "" else " · on the band: $it" }
+                    .let { if (it.isEmpty()) "" else " · on the watch: $it" }
                 val text = "${r.message} · ${r.bytesSent} B in ${r.blocks} blocks$shelf"
                 ctx.variables.set("${prefix}Summary", text)
                 store?.let { ctx.variables.set(it, text) }

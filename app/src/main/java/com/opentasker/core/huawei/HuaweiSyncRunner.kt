@@ -112,10 +112,10 @@ object HuaweiSyncRunner {
             val link = api.linkParams()
             api.deviceStatus()
             val authId = HuaweiSettings.authIdSelf(context, address)
-                ?: throw IllegalStateException("not bound — pair the band first")
+                ?: throw IllegalStateException("not bound — pair the watch first")
             api.securityNegotiation(link.deviceSupportType, authId, android.os.Build.MODEL)
             val token = HuaweiSettings.authToken(context, address)
-                ?: throw IllegalStateException("no stored token — pair the band first")
+                ?: throw IllegalStateException("no stored token — pair the watch first")
             api.authenticate(authId, token, Random.nextLong(1L, Long.MAX_VALUE))
             // The six Huawei Health sends on EVERY reconnect, without which the band never speaks.
             //
@@ -596,7 +596,7 @@ object HuaweiSyncRunner {
             val track = trackRaw?.let { HuaweiGpsTrack.decode(it) }
             val why = when {
                 !entry.hasTrack -> null                      // not a failure: this kind has no route
-                trackRaw == null -> "the band would not send the track"
+                trackRaw == null -> "the watch would not send the track"
                 track == null -> "${trackRaw.size} B of track that did not decode"
                 else -> null
             }
@@ -807,7 +807,7 @@ object HuaweiSyncRunner {
                 return Result.success(
                     HuaweiUploadClient.Outcome(
                         ok = false, bytesSent = 0, blocks = 0,
-                        message = "${evict.first} is still on the band — nothing was installed",
+                        message = "${evict.first} is still on the watch — nothing was installed",
                         store = null,
                     ),
                 )
@@ -930,7 +930,7 @@ object HuaweiSyncRunner {
             )
         }.getOrElse {
             throw IllegalStateException(
-                "$sent — but the band never answered the push (${it.message ?: it::class.java.simpleName}). " +
+                "$sent — but the watch never answered the push (${it.message ?: it::class.java.simpleName}). " +
                     "Nothing here can say it landed, so this is not reported as sent.",
             )
         }
@@ -995,8 +995,8 @@ object HuaweiSyncRunner {
             }
             if (days.isEmpty()) {
                 throw IllegalStateException(
-                    "$sent — no high/low, so there is no day to put in the forecast, and the band " +
-                        "refuses a forecast with no days (115001). Nothing was pushed.",
+                    "$sent — no high/low, so there is no day to put in the forecast, and a forecast " +
+                        "with no days is refused (115001, measured on the Band 11 Pro). Nothing was pushed.",
                 )
             }
             realDays = realDaily ?: days.size
@@ -1029,13 +1029,13 @@ object HuaweiSyncRunner {
             .firstOrNull { it.tag == HuaweiProtocol.TAG_RESULT }
             ?.let { HuaweiProtocol.bytesToInt(it.value) }
         when (code) {
-            null -> "$sent · the band answered without a result code"
+            null -> "$sent · the watch answered without a result code"
             // NOT "accepted": 白い熊 confirmed 2026-08-25 that this same success code came back
             // while the band's weather screen stayed blank and dated 2026-08-23. The band
             // acknowledges the FRAME; whether it stored or rendered the reading is not
             // observable from here, and saying otherwise is the same lie in a smaller font.
             HuaweiProtocol.RESULT_SUCCESS ->
-                "$sent · frame acknowledged (the band does not confirm display)" +
+                "$sent · frame acknowledged (display is not confirmed)" +
                     " · forecast=" + when (forecastCode) {
                         null -> "no answer"
                         HuaweiProtocol.RESULT_SUCCESS ->
@@ -1045,13 +1045,13 @@ object HuaweiSyncRunner {
                             else "accepted (${HuaweiCommands.FORECAST_HOURS}h/$realHours real, " +
                                 "${maxOf(HuaweiCommands.FORECAST_DAYS_MIN, realDays)}d/$realDays real)"
                         else -> throw IllegalStateException(
-                            "$place ${temperatureC}°C — the band REFUSED the forecast with $forecastCode, " +
-                                "so it discarded the reading with it and the screen did not change.",
+                            "$place ${temperatureC}°C — the watch REFUSED the forecast with $forecastCode; " +
+                                "on the Band 11 Pro that discarded the reading with it and left the screen unchanged.",
                         )
                     } +
                     (if (pre.isEmpty()) "" else " · pre$pre") +
                     (if (reads.isEmpty()) "" else " · reads$reads")
-            else -> throw IllegalStateException("$sent — the band REFUSED the push with result $code")
+            else -> throw IllegalStateException("$sent — the watch REFUSED the push with result $code")
         }
     }
 
@@ -1134,20 +1134,20 @@ object HuaweiSyncRunner {
         while (ask == null && System.currentTimeMillis() < deadline) {
             if (shouldCancel()) {
                 cancelled = true
-                onProgress("Cancelled", "Called off before the band asked")
+                onProgress("Cancelled", "Called off before the watch asked")
                 break
             }
             // Elapsed, not remaining. A countdown implies a deadline matters; what 白い熊 needs to
             // see is how long this has been sitting there, and since when.
             onTick(System.currentTimeMillis() - watchStart)
-            onProgress("Waiting for the band", null)
+            onProgress("Waiting for the watch", null)
             ask = session.awaitFrame(HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 1_000)
         }
         if (cancelled) log.append("cancelled; ")
         val caughtAt = if (ask != null) System.currentTimeMillis() else 0L
         if (ask != null) {
-            onProgress("The band asked", "The band asked for data")
-            log.append("band asked; ")
+            onProgress("The watch asked", "The watch asked for data")
+            log.append("watch asked; ")
             runCatching {
                 session.send(
                     HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY,
@@ -1164,11 +1164,11 @@ object HuaweiSyncRunner {
                     HuaweiProtocol.parseTlvs(outer.value).firstOrNull { it.tag == 6 }
                         ?.value?.toString(Charsets.UTF_8)
                 }
-                source?.let { onProgress("The band asked", "It wants: $it") }
+                source?.let { onProgress("The watch asked", "It wants: $it") }
             }
         } else if (!cancelled) {
-            onProgress("The band never asked", "The band never asked — its data is still fresh")
-            log.append("band did not ask; ")
+            onProgress("The watch never asked", "The watch never asked — its data is still fresh")
+            log.append("watch did not ask; ")
         }
 
         if (!cancelled && (ask != null || announce)) {
@@ -1217,8 +1217,8 @@ object HuaweiSyncRunner {
                 val again = session.awaitFrame(
                     HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY, 3_000,
                 ) ?: return@run null
-                onProgress("The band asked again", "Another round — answering")
-                log.append("band asked again; ")
+                onProgress("The watch asked again", "Another round — answering")
+                log.append("watch asked again; ")
                 runCatching {
                     session.send(
                         HuaweiCommands.SVC_GNSS_ASK, HuaweiCommands.GNSS_NOTIFY,
@@ -1235,7 +1235,7 @@ object HuaweiSyncRunner {
                             ?.value?.toString(Charsets.UTF_8)
                     }?.let {
                         source = it
-                        onProgress("The band asked again", "It wants: $it")
+                        onProgress("The watch asked again", "It wants: $it")
                     }
                 }
                 runCatching {
@@ -1300,7 +1300,7 @@ object HuaweiSyncRunner {
                     val data = files[current]
                     if (data == null) {
                         onProgress("Refused", "It asked for $current, which we do not have")
-                        log.append("band picked unknown '$current'; ")
+                        log.append("watch picked unknown '$current'; ")
                         break@loop
                     }
                     // Size and CRC, and again no result tag.
@@ -1344,7 +1344,7 @@ object HuaweiSyncRunner {
                     current?.let {
                         served.add(it)
                         onProgress(
-                            if (done()) "Done" else "Waiting for the band to ask again",
+                            if (done()) "Done" else "Waiting for the watch to ask again",
                             "$it complete",
                         )
                         onServed(served.toList(), bytes)
@@ -1689,7 +1689,7 @@ object HuaweiSyncRunner {
             return if (ok) {
                 Outcome.Ok(
                     syncId, message,
-                    if (missing > 0) "the band refused $missing record(s)" else null,
+                    if (missing > 0) "the watch refused $missing record(s)" else null,
                 )
             } else {
                 Outcome.Failed(message)
@@ -1711,7 +1711,7 @@ object HuaweiSyncRunner {
                     if (!client.isBonded(request.address) && HuaweiSettings.isBound(context, request.address)) {
                         HuaweiSettings.clearBind(context, request.address)
                     }
-                    phase("pairing", "accept on the band, then on the phone")
+                    phase("pairing", "accept on the watch, then on the phone")
                     client.ensureBonded(request.address, request.timeoutSec * 1000L) { state ->
                         HuaweiSyncState.phase("pairing", state)
                     }?.let { return@withTimeoutOrNull close(false, it) }
@@ -1752,11 +1752,11 @@ object HuaweiSyncRunner {
                         if (!bond) {
                             return@withTimeoutOrNull close(
                                 false,
-                                "the band no longer recognises this pairing — it was reset or " +
-                                    "connected to something else. Run バンド接続（Huawei） to re-bind.",
+                                "the watch no longer recognises this pairing — it was reset or " +
+                                    "connected to something else. Run 時計接続（D3） to re-bind.",
                             )
                         }
-                        phase("handshake", "re-binding — the band forgot this phone")
+                        phase("handshake", "re-binding — the watch forgot this phone")
                         HuaweiSettings.clearBind(context, request.address)
                         val fresh = api.bind(authId, api.fetchPin(link.authVersion), requestId)
                         HuaweiSettings.saveBind(
@@ -1831,7 +1831,7 @@ object HuaweiSyncRunner {
                     // but that is ordinary companion traffic, not setup, so waiting it out would
                     // hold the radio for no reason: the band is single-connection, and a standing
                     // Bluetooth session on this phone once cost 1322 mAh in a day.
-                    phase("serving", "the band is still talking — staying on the line")
+                    phase("serving", "the watch is still talking — staying on the line")
                     var served = 0
                     val startedServing = System.currentTimeMillis()
                     val floor = startedServing + SERVE_MIN_MS
