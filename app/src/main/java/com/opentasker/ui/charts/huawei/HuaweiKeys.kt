@@ -28,6 +28,15 @@ object HuaweiKeys {
     const val CALORIES = "hw:calories"
     const val DISTANCE = "hw:distance"
 
+    // The Watch D3's own measurements (dictionary classes, 2026-10-18). Storage names are the
+    // dictionary's named fields — HuaweiDictionary.NAMED.
+    const val SKIN_TEMP = "hw:skin_temp"
+    const val PWV = "hw:pwv"
+    const val BP_SYSTOLIC = "hw:bp_systolic"
+    const val BP_DIASTOLIC = "hw:bp_diastolic"
+    const val BP_PULSE = "hw:bp_pulse"
+    const val PWV_GRADE = "hw:pwv_grade"
+
     /** A storage metric name as the charts key it. */
     fun qualify(storageKey: String): String =
         if (storageKey.startsWith(PREFIX)) storageKey else PREFIX + storageKey

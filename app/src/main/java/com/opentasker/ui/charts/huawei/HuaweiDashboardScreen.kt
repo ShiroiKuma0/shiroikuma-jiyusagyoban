@@ -76,6 +76,9 @@ import java.time.format.DateTimeFormatter
  */
 /** The key the sleep card opens under — it has no MetricSpec of its own. */
 const val SLEEP_KEY = "hw:sleep"
+/** The Watch D3's blood-pressure and ECG pages: their own screens, not a metric detail. */
+const val BP_KEY = "hw:bp"
+const val ECG_KEY = "hw:ecg"
 
 /**
  * The 機能訓練 page's own key in the same `selected` slot the metric detail screens use.
@@ -237,11 +240,26 @@ fun HuaweiDashboardScreen(
             HuaweiSleepCard(state.sleep, viewport, crosshair) { onOpenMetric(SLEEP_KEY) }
         }
         items(
-            state.metrics.filter { it.spec.key != HuaweiKeys.STEPS },
+            state.metrics.filter {
+                it.spec.key != HuaweiKeys.STEPS && it.spec.key !in HuaweiMetricSpecs.AFTER_BLOOD_PRESSURE
+            },
             key = { it.spec.key },
         ) { chart ->
             MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
         }
+        // The Watch D3's own measurements. Blood pressure sits between the lime resting heart rate
+        // and the ochre skin temperature so neither pair of neighbours is hue-adjacent; cards with
+        // no data yet are simply not drawn.
+        state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
+            item(BP_KEY) { HuaweiBloodPressureCard(bp, viewport, crosshair) { onOpenMetric(BP_KEY) } }
+        }
+        items(
+            state.metrics.filter { it.spec.key in HuaweiMetricSpecs.AFTER_BLOOD_PRESSURE && !it.isEmpty },
+            key = { it.spec.key },
+        ) { chart ->
+            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
+        }
+        if (state.ecg.isNotEmpty()) item(ECG_KEY) { HuaweiEcgCard(state.ecg) { onOpenMetric(ECG_KEY) } }
 
         // The day table, back across the whole history — the Huawei era and the Hume one before it.
         // Below the charts because it answers a different question: a chart is for seeing a shape, a
