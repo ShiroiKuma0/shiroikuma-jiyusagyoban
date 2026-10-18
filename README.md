@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+063`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+065`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -137,11 +137,13 @@ of its rule. There is deliberately **no red**; a missed day is a gap, not an err
 
 ### 🌙 The night table, and what a colour is allowed to mean
 
-Thirteen columns now, in the order the night happened — date, how you woke, night HR,
+Fourteen columns now — date, **skin temperature**, how you woke, night HR,
 **going-to-bed HR**, **the night's HR swing**, **the night's curve**, asleep, **deep**,
 **deep+REM**, **lowest HR**, **HRV (RMSSD)**, **breathing** and **SpO₂** — in one horizontal scroll,
-every cell one line, sized against the device's real font scale rather than the default. Temperature
-is gone: this band has none, so the column was a dash on every line.
+every cell one line, sized against the device's real font scale rather than the default. Skin
+temperature left the table while the Band 11 Pro, which had no sensor, was the band, and came back
+**first** with the Watch D3: graded 1–5 against your own nights only, yellow for the first five
+nights while there is no baseline yet, and only ever a sign when it is warmer.
 
 **One of those columns draws instead of printing.** A swing in bpm is not
 heart-rate-through-the-night: 14 bpm that fell early and 14 bpm that rose at four in the morning are
