@@ -61,11 +61,16 @@ fun InfoHeading(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Body prose inside an info panel. */
+/**
+ * Body prose inside an info panel.
+ *
+ * `**…**` marks bold, as the specs' caveats are written. It used to be printed literally — every
+ * caveat on every metric page showed its asterisks.
+ */
 @Composable
 fun InfoBody(text: String, modifier: Modifier = Modifier, bold: Boolean = false) {
     Text(
-        text,
+        boldMarked(text),
         modifier = modifier,
         style = MaterialTheme.typography.bodyLarge,
         fontSize = InfoType.BODY_SP,
@@ -97,4 +102,23 @@ object BandDates {
 
     /** `22:41 → 08:33` — a night's extent, which is a different thing from its duration. */
     fun span(startMs: Long, endMs: Long): String = "${time(startMs)} → ${time(endMs)}"
+}
+
+/** `**bold**` → a bold span; an unpaired `**` is left as written. */
+internal fun boldMarked(text: String): androidx.compose.ui.text.AnnotatedString {
+    val parts = text.split("**")
+    if (parts.size < 3) return androidx.compose.ui.text.AnnotatedString(text)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        parts.forEachIndexed { i, part ->
+            val inside = i % 2 == 1
+            // An odd count means the last marker is unpaired: print it back rather than bolding
+            // the rest of the text.
+            if (inside && i == parts.lastIndex) { append("**"); append(part); return@forEachIndexed }
+            if (inside) {
+                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold))
+                append(part)
+                pop()
+            } else append(part)
+        }
+    }
 }
