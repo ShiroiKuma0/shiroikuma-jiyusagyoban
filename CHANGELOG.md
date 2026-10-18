@@ -8,6 +8,98 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+063 — 2026-10-18
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+045`.
+
+### 健康: the HUAWEI WATCH D3 replaces the Band 11 Pro
+
+- **Per-device Huawei settings.** `HuaweiSettings` is keyed by Bluetooth address — bind, name, locale,
+  faces, file-pull timing and capabilities per device; the Band keeps its original prefs file.
+  `huawei.pair make_active` chooses the device that tasks without an address talk to, and each device
+  has its own sync window. The device picker lists bonded `HUAWEI WATCH` devices.
+- **Capabilities kept, not thrown away.** `HuaweiCapabilities` decodes SupportedServices,
+  SupportedCommands and ExpandCapability and stores them per device; `huawei.probe full=true` asks
+  every service, every command and the expand bitmap.
+- **The Hume history is never pruned again** (`BandPruneWorker` is cancelled at startup).
+- **Health's reconnect, replayed.** The D3's data dictionary (`0x34/0x01`) acknowledged every query and
+  answered none until the sync replayed Huawei Health's whole reconnect: `HuaweiD3Reconnect` sends its
+  ~30 commands in Health's order, including the CZ country feature file (`assets/huawei`, upload slot
+  `0x0F`). The first run brought 1 771 values, all 30 classes answering.
+- **The data dictionary.** `HuaweiDictionary` asks every class Health asks about, pages each one and
+  acknowledges as Health does. Named fields become `bp_systolic` / `bp_diastolic` / `bp_pulse` /
+  `skin_temp` / `pwv` / `pwv_grade` / `pwv_hr`; everything else is kept as `dict_<class>_<field>`.
+- **ECG.** `HuaweiEcg` parses `ecg_analysis_data.bin` (500 Hz float32 per recording) into the new
+  `huawei_ecg` table (**Room schema 37**, migration replayed `--all`), with `ecg_verdict` / `ecg_hr`
+  samples; the table travels in the health backup.
+- **Settings for the D3:** skin temperature (`0x07/0x2A`), arrhythmia detection and alerts, ECG and
+  arterial-stiffness activation, and the D3 forms of apnea and stress.
+- **The Huawei account ID is private.** It left the code for `HuaweiSettings.accountId`, handed over
+  from 健康の設定 as the new `account` argument of `huawei.pair` and `huawei.sync`; without one the
+  account steps are skipped. It was purged from the repository's history.
+- **Faces:** the D3 enforces the signed store record (an edited face is refused with 100014); test
+  switches (`record`, `mode`) for that check, and `scripts/sumoji-build-d3.py` for the 408 × 480 layout.
+- **The app speaks of the watch.** About 280 strings across the Huawei screens, the comparison screen,
+  the `huawei.*` editor texts and the sync messages now name the Watch D3 (facts measured only on the
+  Band stay marked as the Band 11 Pro's). The board's tiles open the renamed tasks, its title is
+  HUAWEI WATCH D3, the comparison window is 機器比較 and the faces window opens the D3 library.
+- **Live-session tooling:** `scripts/huawei-capture-session.py` and `scripts/huawei-capture-analyze.py`
+  capture and decrypt Huawei Health talking to the watch step by step. `docs/huawei-watch-d3.md`
+  records the session and every finding.
+
+### 健康: the Watch D3's pages
+
+- **Blood pressure** — systolic/diastolic dumbbells over three days ending **now**, every reading
+  listed, with the ESH office categories as text. ABPM, the watch's 24-hour plan, is documented as its
+  only automatic cuff measurement.
+- **ECG** — the middle five seconds on the card; the page draws each recording whole in 5-second rows
+  on a 0.2-second grid, scaled without the first second's electrode-settling spike, min/max per pixel
+  so no QRS peak is lost.
+- **Skin temperature** (a line) and **arterial stiffness** (a capsule, which needed hourly buckets to
+  draw at all).
+- **Pulse-wave arrhythmia** — class 500007 is the watch's automatic arrhythmia check, matched record for
+  record against its own "7-day stats" screen. The card counts the last seven days as the watch does;
+  the page lists every check by time, grouped by day. A not-normal check is an outline and a word,
+  never colour alone; any result other than 0 is shown as "not normal" with its number until its
+  meaning is known.
+- Adjacent cards are measured for red–green colour-blind separation (`HuaweiD3PaletteTest`).
+- **The report keeps its place:** closing a page opened from the report returns to the same card
+  instead of the top.
+- Info texts render `**bold**`.
+
+### 健康: walks on the Watch D3
+
+- Altitude in every 5-second sample (bitmap `0x0027`, int32 dm), and in the summary: descent, max/min
+  altitude, recovery time, training load, aerobic/anaerobic load, active calories and the watch's five
+  zone times.
+- The walk page shows the watch's after-walk screens as cards — pace, heart-rate zones, altitude,
+  cadence and steps, energy and training — each with a chart from the samples. `HuaweiD3WalkTest`
+  asserts the real 2026-10-18 walk against the watch's own screens.
+
+### 健康: satellite data, whenever the watch asks
+
+- **The sync answers the watch's satellite asks, as Health does** (`HuaweiGnssServer`,
+  `HuaweiGnssSupply`). The watch asks seconds after a companion connects, only for what is stale:
+  broadcast ephemeris (downloaded at the moment of the ask; a stored copy under four hours old as the
+  fallback), the 3-day forecast (the store's set while it has at least 6 h left; a dead set is never
+  given), or the ionosphere (declined, as Health declines it). Each round is logged in
+  `served-log.txt`; a taken forecast records `band-holds.txt` and arms the expiry reminder.
+- **The transfer token is the SHA-256 of the device's Bluetooth address**; the Band's had been sent to
+  every device.
+- `HuaweiClient.pump` keeps satellite frames for the sync instead of dropping them.
+- Our predicted set was compared with Huawei's: they agree to 2–7 m (GPS), 4–7 m (Galileo) and 5–17 m
+  (GLONASS) over the 60 hours both cover.
+
+### 言語島
+
+- **A door back to the board** for 白い熊 kxkb: `shiroikuma.jiyusagyoban.action.OPEN_GENGOSHIMA_BOARD`
+  (exported, no-display trampoline that reads nothing from the intent).
+
+### 画面操作
+
+- **The bottom-middle up-swipe no longer misfires as Multi window**: a flick needs a real diagonal,
+  `%Diagflick_Deg` off vertical (default 35°, clamped 20–55°).
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+045 — 2026-10-13
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+034`.
