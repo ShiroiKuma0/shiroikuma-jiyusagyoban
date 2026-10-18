@@ -76,7 +76,31 @@ object HuaweiWorkout {
          * not.
          */
         val recovery: List<Int> = emptyList(),
+        /** Total descent, decimetres (tag `0x1B`) — the Watch D3's "Total descent". */
+        val descentDm: Int? = null,
+        /** Highest and lowest altitude, decimetres (tags `0x1C`, `0x1D`). */
+        val maxAltitudeDm: Int? = null,
+        val minAltitudeDm: Int? = null,
+        /** The watch's "Recovery time", in minutes (tag `0x11`: 120 = its "2 h"). */
+        val recoveryMinutes: Int? = null,
+        /** The watch's "Training load" (tag `0x0D`). */
+        val trainingLoad: Int? = null,
+        /**
+         * The keyed text fields in `0xE7` containers — `{0x68: id, 0x69: ASCII value}`. Read by id
+         * through [Extra], never by position: the order is the watch's, not a contract.
+         */
+        val extras: Map<Long, String> = emptyMap(),
     ) {
+        /** Active energy, kcal: id 300010159 carries it in calories ("113000" = 113 kcal). */
+        val activeKcal: Int? get() = extras[Extra.ACTIVE_CAL]?.toLongOrNull()?.let { (it / 1000).toInt() }
+        val aerobicLoad: Int? get() = extras[Extra.AEROBIC_LOAD]?.toIntOrNull()
+        val anaerobicLoad: Int? get() = extras[Extra.ANAEROBIC_LOAD]?.toIntOrNull()
+        /**
+         * Seconds in each heart-rate zone, the watch's own: warm-up, fat-burning, aerobic,
+         * anaerobic, extreme. Null when the watch sent none (the Band never did).
+         */
+        val zoneSeconds: List<Int>? get() = Extra.ZONES.map { extras[it]?.toIntOrNull() ?: return null }
+
         /** How far the heart fell once the work stopped, in bpm. Null when nothing was recorded. */
         val recoveryDrop: Int?
             get() = recovery.filter { it > 0 }.takeIf { it.size >= 2 }?.let { it.first() - it.last() }
@@ -161,6 +185,17 @@ object HuaweiWorkout {
         }
     }
 
+    /**
+     * Ids of the keyed text fields, matched on 2026-10-18 against the Watch D3's own screens for a
+     * 2.00 km walk: zones 1770 / 435 / 0 / 0 / 0 s = 29 + 7 min, active "113000" = 113 kcal, load 9 / 0.
+     */
+    object Extra {
+        const val ACTIVE_CAL = 300010159L
+        const val AEROBIC_LOAD = 300010222L
+        const val ANAEROBIC_LOAD = 300010223L
+        val ZONES = listOf(300010345L, 300010346L, 300010347L, 300010348L, 300010349L)
+    }
+
     /** Parse the reply to a summary request. Returns null when the container is not there at all. */
     fun parseSummary(reply: List<HuaweiProtocol.Tlv>): Summary? {
         val body = reply.firstOrNull { it.tag == 0x81 }?.value ?: return null
@@ -184,6 +219,17 @@ object HuaweiWorkout {
             type = u(0x14),
             meanSpeedDmS = u(0x0A),
             recovery = f[0x66]?.map { it.toInt() and 0xFF } ?: emptyList(),
+            descentDm = u(0x1B),
+            maxAltitudeDm = u(0x1C),
+            minAltitudeDm = u(0x1D),
+            recoveryMinutes = u(0x11),
+            trainingLoad = u(0x0D),
+            extras = containers(body, 0xE7).mapNotNull { row ->
+                val kv = fields(row)
+                val id = kv[0x68]?.let { be(it) }?.toLong()?.and(0xFFFFFFFFL) ?: return@mapNotNull null
+                val text = kv[0x69]?.toString(Charsets.US_ASCII) ?: return@mapNotNull null
+                id to text
+            }.toMap(),
         )
     }
 
@@ -205,6 +251,11 @@ object HuaweiWorkout {
         val speedDmS: List<Int>,
         /** Steps taken during that interval. Empty unless the stream carries it. */
         val steps: List<Int>,
+        /**
+         * Altitude in decimetres per sample — the Watch D3's field `0x20`, a signed 32-bit value
+         * in bytes 4–7 of its 8-byte record. Empty for the Band, which never sent it.
+         */
+        val altitudeDm: List<Int> = emptyList(),
     )
 
     /**
@@ -235,14 +286,21 @@ object HuaweiWorkout {
 
         val hasSpeed = bitmap and 0x02 != 0 && stride >= 3
         val hasSteps = bitmap and 0x04 != 0 && stride >= 4
+        // Only where its offset is certain: fields 0x08 and 0x10 (never seen) would sit before it.
+        val hasAltitude = bitmap and 0x20 != 0 && bitmap and 0x18 == 0 && stride >= 8
         val heart = ArrayList<Int>(count)
         val speed = ArrayList<Int>(if (hasSpeed) count else 0)
         val steps = ArrayList<Int>(if (hasSteps) count else 0)
+        val altitude = ArrayList<Int>(if (hasAltitude) count else 0)
         for (i in 0 until count) {
             val at = i * stride
             heart += data[at].toInt() and 0xFF
             if (hasSpeed) speed += ((data[at + 1].toInt() and 0xFF) shl 8) or (data[at + 2].toInt() and 0xFF)
             if (hasSteps) steps += data[at + 3].toInt() and 0xFF
+            if (hasAltitude) {
+                altitude += ((data[at + 4].toInt() and 0xFF) shl 24) or ((data[at + 5].toInt() and 0xFF) shl 16) or
+                    ((data[at + 6].toInt() and 0xFF) shl 8) or (data[at + 7].toInt() and 0xFF)
+            }
         }
         return SampleBlock(
             number = word(0),
@@ -252,6 +310,7 @@ object HuaweiWorkout {
             heart = heart,
             speedDmS = speed,
             steps = steps,
+            altitudeDm = altitude,
         )
     }
 

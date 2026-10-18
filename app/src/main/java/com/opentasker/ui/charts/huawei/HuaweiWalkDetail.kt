@@ -291,6 +291,9 @@ fun HuaweiWalkDetailScreen(
         // Directly under the summary because for a lift it IS the summary: a strength session has
         // no distance and no steps, so the card above it is a clock and a calorie count.
         if (effort != null) item { EffortCard(walk, effort) }
+        // Then the watch's own after-walk pages, in its order — pace, zones, altitude, cadence,
+        // energy and training — each only when this walk carries what it shows.
+        if (effort != null) item { androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { WalkMetricsCards(walk, effort) } }
 
         // What 白い熊 made of the walk, as opposed to what the band measured of it. Its own card,
         // directly under the figures, because it is the only thing on this screen that is an answer

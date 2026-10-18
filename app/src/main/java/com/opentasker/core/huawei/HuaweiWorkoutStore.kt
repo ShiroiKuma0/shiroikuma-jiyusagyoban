@@ -130,6 +130,10 @@ object HuaweiWorkoutStore {
         val stepsPerInterval: List<Int> = emptyList(),
         val recovery: List<Int> = emptyList(),
         val splits: List<HuaweiWorkout.Split> = emptyList(),
+        /** Altitude per sample, decimetres — the Watch D3 only. */
+        val altitudeDm: List<Int> = emptyList(),
+        /** The watch's own summary, re-read from the stored bytes: zones, loads, altitude extremes. */
+        val summary: HuaweiWorkout.Summary? = null,
     ) {
         private val live: List<Int> get() = heart.filter { it > 0 }
         val samples: Int get() = live.size
@@ -240,6 +244,8 @@ object HuaweiWorkoutStore {
                 }
             }
         if (blocks.isEmpty()) return legacyEffort(dao, workout)
+        val summary = dao.blob(workout.startSeconds, BLOB_SUMMARY)
+            ?.let { HuaweiWorkout.parseSummary(listOf(HuaweiProtocol.Tlv(0x81, it))) }
         val effort = Effort(
             intervalSeconds = blocks.first().intervalSeconds,
             heart = blocks.flatMap { it.heart },
@@ -247,6 +253,8 @@ object HuaweiWorkoutStore {
             stepsPerInterval = blocks.flatMap { it.steps },
             recovery = workout.recovery,
             splits = workout.splits,
+            altitudeDm = blocks.flatMap { it.altitudeDm },
+            summary = summary,
         )
         return effort.takeIf { !it.isEmpty }
     }

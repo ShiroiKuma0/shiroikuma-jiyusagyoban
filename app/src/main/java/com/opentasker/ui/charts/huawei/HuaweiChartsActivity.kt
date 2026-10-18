@@ -126,7 +126,23 @@ class HuaweiChartsActivity : ComponentActivity() {
                         val registerOpen = selected == com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
                         val rehabOpen = selected == REHAB_KEY
                         val sleepOpen = selected == SLEEP_KEY
-                        if (sleepOpen) {
+                        val bpOpen = selected == BP_KEY && state.bloodPressure != null
+                        val ecgOpen = selected == ECG_KEY && state.ecg.isNotEmpty()
+                        if (bpOpen) {
+                            HuaweiBloodPressureDetailScreen(
+                                chart = state.bloodPressure!!,
+                                readings = state.bpReadings,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                                bounds = state.bounds,
+                            )
+                        } else if (ecgOpen) {
+                            HuaweiEcgDetailScreen(
+                                recordings = state.ecg,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                            )
+                        } else if (sleepOpen) {
                             HuaweiSleepDetailScreen(
                                 night = state.sleep,
                                 nights = state.nights,
