@@ -8,6 +8,31 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+065 — 2026-10-18
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+063`.
+
+### 健康: the Watch D3's skin temperature as a nightly cue
+
+- **The D3's skin temperature reaches the recovery cue** the Hume band's fed: the report now hands it
+  to the shared recovery code as `TEMPERATURE`, where before only steps, heart rate and blood oxygen
+  went. Each night's value is the median skin temperature while asleep, compared only with your own
+  nights — never as a body temperature, which a wrist cannot give.
+- **Temperature counts its own nights.** Its baseline confidence comes from the nights that have a
+  skin temperature, not from every night on record — otherwise the Band's and the Hume band's nights,
+  which have none, would make one D3 night look like an established normal.
+- **The first five nights are yellow:** a value, no grade yet ("no baseline yet — night N of 5").
+- **Graded 1–5** from the sixth night: 3 inside your usual range, 4 and 5 warmer, 2 and 1 cooler.
+  Only warmth is adverse and only two warm nights in a row raise the sustained note; a cool night is
+  coloured, never counted.
+- **Off-wrist readings below 31 °C are left out** of the night (the watch off the wrist read 29.9 and
+  30.6 °C; worn, its lowest was 31.3, outdoors).
+- **Shown in three places, first in each:** the "Skin °C" / 「皮膚温 ℃」 column of the night table,
+  the first row of "Against your own normal", and the first line of the Health Index card — beside
+  the index, with no weight in it. The strip grades distance from normal, as all its rows do.
+- **Fixed:** an unjudged temperature was turned into "usual" whenever the night before was not
+  warm, so a first night would have read "usual 33.7 °C".
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+063 — 2026-10-18
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+045`.
