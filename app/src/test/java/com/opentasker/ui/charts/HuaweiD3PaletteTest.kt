@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * The Watch D3's cards join the Huawei report between resting heart rate and the day table, in the
- * order resting HR → blood pressure → skin temperature → arterial stiffness → ECG. Each neighbour pair
+ * order resting HR → blood pressure → skin temperature → arterial stiffness → ECG → arrhythmia. Each neighbour pair
  * must stay apart for a red–green-deficient reader (白い熊): the CVD floor of the palette check.
  */
 class HuaweiD3PaletteTest {
@@ -16,6 +16,7 @@ class HuaweiD3PaletteTest {
         "skin temperature" to ChartPalette.TEMPERATURE,
         "arterial stiffness" to ChartPalette.HRV,
         "ECG" to ChartPalette.STEPS,
+        "arrhythmia" to com.opentasker.ui.charts.huawei.PWA_COLOR,
     )
 
     @Test

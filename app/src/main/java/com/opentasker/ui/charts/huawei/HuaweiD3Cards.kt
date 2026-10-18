@@ -169,16 +169,17 @@ fun HuaweiBloodPressureDetailScreen(
     contentPadding: PaddingValues,
     onBack: () -> Unit,
     bounds: LongRange = 0L..0L,
+    nowMs: Long = System.currentTimeMillis(),
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
     val zone = remember { ZoneId.systemDefault() }
     val viewport = remember(style.defaultSpanMs) {
-        val end = readings.firstOrNull()?.tMs ?: System.currentTimeMillis()
         // A cuff reading is a few a day at most: open on three days, not on the dashboard's one —
-        // and not on a week, where each hour's dumbbell narrows to three pixels.
-        ChartViewport(initialEndMs = end + 3_600_000L, initialSpanMs = 3 * 86_400_000L)
+        // and not on a week, where each hour's dumbbell narrows to three pixels. Ending at NOW, not
+        // at the last reading: a page that stops at yesterday's reading hides that today has none.
+        ChartViewport(initialEndMs = nowMs, initialSpanMs = 3 * 86_400_000L)
     }
     val crosshair = rememberCrosshairState()
     val span = if (bounds.last > bounds.first) bounds else viewport.startMs..viewport.endMs
