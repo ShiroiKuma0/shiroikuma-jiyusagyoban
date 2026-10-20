@@ -185,7 +185,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
         AppMultiSelectDialog(
             title = "Add share targets",
             preselected = relays.map { it.targetPackage }.toSet(),
-            onConfirm = { picked ->
+            onConfirm = { picked, _ ->
                 showPicker = false
                 scope.launch {
                     withContext(Dispatchers.IO) {
