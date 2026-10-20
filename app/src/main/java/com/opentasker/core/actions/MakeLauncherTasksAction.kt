@@ -49,6 +49,20 @@ import kotlinx.serialization.json.Json
  * which app already has a task"*). The tick is a READING, not a switch: leaving it on creates nothing
  * twice, and taking it off deletes nothing. Generating tasks and destroying them are not the same
  * gesture, and this action only ever adds.
+ *
+ * ## One pass for a new app: the task AND its bubble (2026-10-20)
+ *
+ * Name the bubble roster in `bubbles` (凍結融解: `Toketsu_Bubbles`) and the grid gains two checkboxes,
+ * both ticked: 「起動作業を作る」 and 「凍結泡を出す」. 白い熊 used to run this generator and then 泡を選ぶ
+ * for every new app; now one run does both. **The boxes apply only to the apps ticked in THIS run** —
+ * the pre-ticks are a reading (above), and a bubble switched on for every app that already has a task
+ * would be the generator re-deciding 泡を選ぶ's whole roster. Adding to the roster only ever appends;
+ * taking a bubble away stays 泡を選ぶ's job. A bubble is only queued by a launch task running, so a
+ * new app with the task box off gets no bubble either (logged), unless it already had a task.
+ *
+ * The roster is published as the variable; writing it back into the 01 settings task — so the next
+ * run of the 01 does not republish the old value — is the calling task's `task.editaction`, exactly as
+ * in 泡を選ぶ.
  */
 class MakeLauncherTasksAction : Action {
     override val id = "tasks.launchers"
@@ -60,6 +74,7 @@ class MakeLauncherTasksAction : Action {
         val groupName = args["group"]?.trim().orEmpty()
         if (groupName.isEmpty()) return ActionResult.Failure("group name is required")
         val suffix = args["suffix"].orEmpty()
+        val bubbleVar = ctx.variables.expand(args["bubbles"].orEmpty()).trim().removePrefix("%")
 
         val db = OpenTaskerApp_NoHilt.db
 
@@ -121,6 +136,9 @@ class MakeLauncherTasksAction : Action {
             putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_APP_MULTISELECT)
             putExtra(DialogActivity.EXTRA_TITLE, "Select apps")
             putExtra(DialogActivity.EXTRA_PRESELECTED, ticked.joinToString("\n"))
+            if (bubbleVar.isNotEmpty()) {
+                putExtra(DialogActivity.EXTRA_TOGGLES, arrayOf("起動作業を作る", "凍結泡を出す"))
+            }
         }
         val picked: List<Pair<String, String>> = when (outcome) {
             is DialogOutcome.Confirmed -> outcome.value
@@ -134,7 +152,14 @@ class MakeLauncherTasksAction : Action {
                 }
             DialogOutcome.Cancelled -> return ActionResult.Success
         }
+        val toggles = (outcome as DialogOutcome.Confirmed).toggles
+        val makeTasks = bubbleVar.isEmpty() || toggles.getOrElse(0) { true }
+        val addBubbles = bubbleVar.isNotEmpty() && toggles.getOrElse(1) { true }
+        // The apps ticked in THIS run; the pre-ticks come back too and are only a reading.
+        val newlyPicked = picked.filter { (pkg, _) -> pkg !in ticked }
 
+        var bubbleCandidates: List<String> = emptyList()
+        var noTask: List<String> = emptyList()
         val (created, skipped) = withContext(Dispatchers.IO) {
             // Every name already spoken for in this PROJECT. The uniqueness Room enforces is
             // (projectId, name), so a clash two groups away is still a clash, and an insert that hits
@@ -148,6 +173,7 @@ class MakeLauncherTasksAction : Action {
             var count = 0
             var already = 0
             for ((pkg, label) in picked) {
+                if (!makeTasks) break
                 // BY PACKAGE. The pre-ticked apps come back in `picked` — that is what a tick means —
                 // so this is also the line that makes confirming the grid unchanged a no-op.
                 if (pkg in covered) { already++; continue }
@@ -183,7 +209,18 @@ class MakeLauncherTasksAction : Action {
             // 4. Keep the group at the BOTTOM and its tasks in alphabetical order, re-sorted on EVERY run
             // (shared with the `tasks.sort` action).
             sortGroupTasksAlphabetically(pid, groupId)
+            if (addBubbles) bubbleCandidates = newlyPicked.map { it.first }.filter { it in covered }
+            if (addBubbles) noTask = newlyPicked.map { it.first }.filterNot { it in covered }
             count to already
+        }
+
+        if (addBubbles) {
+            val roster = ctx.variables.get(bubbleVar).orEmpty().split(Regex("\\s+"))
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            val added = bubbleCandidates.filterNot { it in roster }
+            ctx.variables.set(bubbleVar, (roster + added).joinToString(" "))
+            ctx.logger("Freeze bubbles: +${added.size} (%$bubbleVar = ${roster.size + added.size} apps)" +
+                if (noTask.isNotEmpty()) "; no bubble without a launch task: ${noTask.joinToString(" ")}" else "")
         }
 
         // Both numbers, always. "Created 0" on its own is what a run looks like when every pick was

@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -150,9 +151,13 @@ internal fun AppMultiSelectDialog(
     showMissingRestricted: Boolean = false,
     singleSelect: Boolean = false,
     includeSelf: Boolean = false,
-    onConfirm: (List<Pair<String, String>>) -> Unit,
+    toggles: List<String> = emptyList(),
+    onConfirm: (List<Pair<String, String>>, List<Boolean>) -> Unit,
     onCancel: () -> Unit,
 ) {
+    // Option checkboxes under the grid, every one ticked to start with (tasks.launchers: make the
+    // launch task / show the freeze bubble). Their state comes back beside the picks.
+    val toggleOn = remember { mutableStateListOf<Boolean>().apply { repeat(toggles.size) { add(true) } } }
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     var apps by remember { mutableStateOf<List<PickableApp>?>(null) }
@@ -407,7 +412,7 @@ internal fun AppMultiSelectDialog(
                                     selected = selected.containsKey(app.pkg),
                                     onToggle = {
                                         if (singleSelect) {
-                                            onConfirm(listOf(app.pkg to app.label))
+                                            onConfirm(listOf(app.pkg to app.label), toggleOn.toList())
                                         } else if (selected.containsKey(app.pkg)) {
                                             selected.remove(app.pkg)
                                         } else {
@@ -420,12 +425,21 @@ internal fun AppMultiSelectDialog(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
+                toggles.forEachIndexed { i, label ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { toggleOn[i] = !toggleOn[i] }.padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = toggleOn[i], onCheckedChange = { toggleOn[i] = it })
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onCancel) { Text("Cancel") }
                     if (!singleSelect) {
                         Spacer(Modifier.width(8.dp))
                         TextButton(onClick = {
-                            onConfirm(selected.map { (pkg, label) -> pkg to label })
+                            onConfirm(selected.map { (pkg, label) -> pkg to label }, toggleOn.toList())
                         }) { Text("OK (${selected.size})") }
                     }
                 }

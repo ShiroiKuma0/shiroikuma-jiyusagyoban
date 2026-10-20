@@ -6,8 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** The result of a task-driven dialog. */
 sealed class DialogOutcome {
-    /** The user confirmed. [value] is the input/selected text; [index] is the picked list index or -1. */
-    data class Confirmed(val value: String, val index: Int = -1) : DialogOutcome()
+    /**
+     * The user confirmed. [value] is the input/selected text; [index] is the picked list index or -1;
+     * [toggles] the state of an app grid's option checkboxes ([DialogActivity.EXTRA_TOGGLES]), in order.
+     */
+    data class Confirmed(val value: String, val index: Int = -1, val toggles: List<Boolean> = emptyList()) : DialogOutcome()
 
     /** The user dismissed, the dialog timed out, or it couldn't be shown. */
     data object Cancelled : DialogOutcome()
