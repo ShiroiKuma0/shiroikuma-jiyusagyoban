@@ -219,7 +219,10 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
     val lang = LocalBandLanguage.current
     // Distance from usual, not better-or-worse — see [unusualness]. Null when there is no baseline
     // yet, and then the row is drawn in plain ink rather than given a colour it has not earned.
-    val step = unusualness(r) ?: if (r.temperatureCollecting) COLLECTING_STEP else null
+    // Skin temperature is the exception: it is graded 1–5 here as in the night table, cooler than
+    // usual towards 1 and warmer towards 5, and yellow while its baseline is collecting (白い熊,
+    // 2026-10-19). Only warmth is a cue, so its grade and its distance never argue.
+    val step = if (r.marker == RecoveryMarker.TEMPERATURE) r.displayStep else unusualness(r)
     val tint = step?.let { ChartPalette.scale(it) } ?: sectionNote
 
     Row(
