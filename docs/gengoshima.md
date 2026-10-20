@@ -116,8 +116,11 @@ Sentences come from walking and saying whatever comes to mind, screen off. Contr
    clip of the triple press. With the screen on and the camera in front (`%Pkey_CamPkg`), `言語島 文`
    hands the press to `下・単押し` — the shutter — instead; screen off, or out of the camera, it marks
    sentences again. Vibration only: armed 2 long · start 1 · saved 2 short · mode ended 3 · error long 1. `core/gengoshima/SentenceCapture.kt` — 16 kHz mono PCM16 WAV per
-   sentence, UNPROCESSED or VOICE_RECOGNITION (no AGC), 28 s auto-split, < 0.2 s dropped, streamed to
-   `filesDir/gengoshima_capture/` with a JSON sidecar.
+   sentence, UNPROCESSED or VOICE_RECOGNITION (no AGC), < 0.2 s dropped, streamed to
+   `filesDir/gengoshima_capture/` with a JSON sidecar. **No length limit since 2026-10-19:** past 28 s a
+   clip is a long recording (`kind:long`, one 60 ms tick at 28 s), capped at 4 h / 200 MB free; kxkb's
+   review keeps it as OGG or splits it at its pauses (contract §9). The header is rewritten every 5 s and
+   a `.part` left by a kill is salvaged, not discarded.
 2. **To kxkb** — `ClipOffer` on mode end and every engine start: `voice_capture_offer`, ≤ 10 descriptors
    per call; deleted only when kxkb's `OK:` names the uuid; kxkb-`rejected` clips go to `rejected/`.
 3. **Review in kxkb** (its side): decode, correct, ✓ — learning as in dictation.
