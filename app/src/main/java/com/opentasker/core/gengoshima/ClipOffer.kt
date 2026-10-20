@@ -19,6 +19,10 @@ import org.json.JSONObject
  * exactly one place at every instant. Ten per call, each as a read-only descriptor; a uuid kxkb
  * `rejected` is moved aside (never deleted, never retried automatically); anything else is re-offered
  * on the next mode end or engine start.
+ *
+ * A long recording (past 28 s, contract §9) travels alone in its call, so one large copy never holds
+ * up the short sentences. A kxkb from before §9 answers it `length`; that keeps it HERE, pending, rather
+ * than setting it aside — it is not a bad clip, only one kxkb cannot take yet.
  */
 object ClipOffer {
     private const val TAG = "OpenTasker"
@@ -31,6 +35,7 @@ object ClipOffer {
     /** Offer everything pending, off the caller's thread. Overlapping calls coalesce. */
     fun offerAsync(ctx: Context) {
         val app = ctx.applicationContext
+        SentenceCapture.salvageStale(app)
         if (SentenceCapture.pending(app).isEmpty()) return
         if (!running.compareAndSet(false, true)) return
         Thread({
@@ -46,7 +51,7 @@ object ClipOffer {
         var rejected = 0
         val skipped = HashSet<String>()
         while (true) {
-            val batch = SentenceCapture.pending(app).filter { it.nameWithoutExtension !in skipped }.take(BATCH)
+            val batch = nextBatch(SentenceCapture.pending(app).filter { it.nameWithoutExtension !in skipped })
             if (batch.isEmpty()) break
             val reply = call(app, batch) ?: break
             val result = reply.getString("result").orEmpty()
@@ -57,6 +62,10 @@ object ClipOffer {
                 val id = wav.nameWithoutExtension
                 when {
                     id in okIds -> { wav.delete(); sidecar(wav).delete(); delivered++ }
+                    id in rejectedIds && rejectedIds[id] == "length" && SentenceCapture.isLong(wav) -> {
+                        AppLogger.warn(TAG, "言語島 clip $id: kxkb does not take long recordings yet — kept")
+                        skipped += id
+                    }
                     id in rejectedIds -> { setAside(wav, rejectedIds.getValue(id)); rejected++ }
                     else -> skipped += id
                 }
@@ -69,6 +78,13 @@ object ClipOffer {
         val line = "言語島 clips: $delivered delivered to kxkb, $rejected rejected, ${SentenceCapture.pending(app).size} still pending"
         AppLogger.info(TAG, line)
         return line
+    }
+
+    /** Short sentences ten at a time, oldest first; a long recording, when it is the oldest, alone. */
+    private fun nextBatch(pending: List<File>): List<File> {
+        val first = pending.firstOrNull() ?: return emptyList()
+        if (SentenceCapture.isLong(first)) return listOf(first)
+        return pending.filterNot { SentenceCapture.isLong(it) }.take(BATCH)
     }
 
     private fun call(app: Context, batch: List<File>): Bundle? {
@@ -93,7 +109,10 @@ object ClipOffer {
                         .put("channels", SentenceCapture.CHANNELS)
                         .put("bitsPerSample", SentenceCapture.BITS)
                         .put("byteLength", wav.length())
-                        .put("sha256", sha256(wav)),
+                        .put("sha256", sha256(wav))
+                        // §9: only on a long recording / one saved after a kill.
+                        .apply { if (SentenceCapture.isLong(wav)) put("kind", "long") }
+                        .apply { if (meta.optBoolean("salvaged")) put("salvaged", true) },
                 )
             }
             extras.putString("items", items.toString())

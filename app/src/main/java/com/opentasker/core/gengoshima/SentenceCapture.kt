@@ -35,6 +35,7 @@ import org.json.JSONObject
  * | --- | --- |
  * | capture mode entered — armed, nothing recording yet | two 200 ms |
  * | sentence started | one 200 ms buzz |
+ * | sentence passed 28 s — it is a long recording now | one short 60 ms tick |
  * | sentence saved | two short |
  * | capture mode ended | three short |
  * | error — mic lost or refused, nothing saved | one long 800 ms |
@@ -45,11 +46,17 @@ import org.json.JSONObject
  *   clip moves into its corpus without re-encoding.
  * - **No processing.** `UNPROCESSED` where the device has it, else `VOICE_RECOGNITION` (no AGC by
  *   definition). kxkb peak-normalises at decode time and its confidence threshold is calibrated on that.
- * - **28 s per sentence.** Whisper hears 30 s; a longer clip would silently lose its tail. At the cap
- *   the sentence is saved and the next one starts at once — a forgotten press costs no speech.
+ * - **No length limit (2026-10-19).** Until then a sentence was cut at 28 s, because Whisper hears
+ *   30 s; the seam lost speech and fell mid-word. Now one press-to-press is one file however long, so
+ *   the same press also records anything to keep (白い熊: no second key for plain recordings). A clip
+ *   past 28 s is a **long recording** (`"kind":"long"` in its sidecar), and kxkb's Walk review decides
+ *   what it is: kept as an OGG, or split at its pauses into sentences (contract §9). The only caps are
+ *   [CAP_MS] and [MIN_FREE_BYTES], where the recording is saved and the mode stays armed.
  * - **Under 0.2 s is a stray press** and is dropped (with the error buzz, so the finger learns).
- * - **Streamed to disk** as it records (`<uuid>.wav.part`, renamed on save), so an EMUI kill loses at
- *   most the sentence in progress; a leftover `.part` is discarded on the next start.
+ * - **Streamed to disk** as it records (`<uuid>.wav.part`, renamed on save), its header rewritten and
+ *   the file synced every [HEADER_EVERY_MS], so an EMUI kill loses at most those last seconds: a
+ *   leftover `.part` is salvaged into a WAV on the next start ([salvageStale]) — losing an hour-long
+ *   recording to a kill is not the same as losing one sentence.
  *
  * **The CPU is held awake for the whole mode** (a partial wakelock, capped at [MODE_WAKE_CAP_MS]). With
  * the screen off and no recording running, the phone deep-sleeps between sentences, and the key
@@ -73,13 +80,22 @@ object SentenceCapture {
     const val BITS = 16
     const val HEADER_BYTES = 44
     private const val BYTES_PER_SEC = SAMPLE_RATE * CHANNELS * BITS / 8
-    const val MAX_MS = 28_000L
+    /** Past this a clip is a long recording: Whisper hears 30 s, so it is never decoded as one piece. */
+    const val LONG_MS = 28_000L
     const val MIN_MS = 200L
-    private const val MAX_DATA_BYTES = (MAX_MS * BYTES_PER_SEC / 1000).toInt()
+    /** The longest single recording; at it the clip is saved and the mode stays armed. */
+    const val CAP_MS = 4 * 60 * 60 * 1000L
+    /** Stop and save when the phone's free storage falls under this. */
+    const val MIN_FREE_BYTES = 200L * 1024 * 1024
+    private const val HEADER_EVERY_MS = 5_000L
+    private const val LONG_DATA_BYTES = (LONG_MS * BYTES_PER_SEC / 1000).toInt()
     private const val MIN_DATA_BYTES = (MIN_MS * BYTES_PER_SEC / 1000).toInt()
+    private const val CAP_DATA_BYTES = (CAP_MS * BYTES_PER_SEC / 1000).toInt()
+    private const val HEADER_EVERY_BYTES = (HEADER_EVERY_MS * BYTES_PER_SEC / 1000).toInt()
 
     private val BUZZ_MODE_START = longArrayOf(0, 200, 150, 200)
     private val BUZZ_START = longArrayOf(0, 200)
+    private val BUZZ_LONG = longArrayOf(0, 60)
     private val BUZZ_SAVED = longArrayOf(0, 80, 120, 80)
     private val BUZZ_MODE_END = longArrayOf(0, 80, 120, 80, 120, 80)
     private val BUZZ_ERROR = longArrayOf(0, 800)
@@ -87,8 +103,8 @@ object SentenceCapture {
     @Volatile var modeOn = false
         private set
 
-    /** Longest a forgotten capture mode may keep the CPU awake. */
-    private const val MODE_WAKE_CAP_MS = 3 * 60 * 60 * 1000L
+    /** Longest a forgotten capture mode may keep the CPU awake: one full-length recording and an hour. */
+    private const val MODE_WAKE_CAP_MS = CAP_MS + 60 * 60 * 1000L
     private var wake: PowerManager.WakeLock? = null
 
     private var recording: Recording? = null
@@ -103,6 +119,7 @@ object SentenceCapture {
         @Volatile var stop = false
         @Volatile var failed = false
         @Volatile var dataBytes = 0
+        @Volatile var longCued = false
     }
 
     fun dir(ctx: Context) = File(ctx.filesDir, DIR).apply { mkdirs() }
@@ -118,7 +135,7 @@ object SentenceCapture {
             ClipOffer.offerAsync(app)
             "capture mode off" + (saved?.let { ", saved $it" } ?: "")
         } else {
-            discardStale(app)
+            salvageStale(app)
             // Armed only: the first sentence starts with a single press like every other one, so a
             // walk no longer opens with a clip of the triple press and the pause after it (白い熊,
             // 2026-10-12). The mic is checked now, so a refusal is felt before the first sentence.
@@ -200,23 +217,42 @@ object SentenceCapture {
         return true
     }
 
-    /** The recording thread: stream PCM into the `.part` file until stopped, failed or at the cap. */
+    /** The recording thread: stream PCM into the `.part` file until stopped, failed or at a cap. */
     private fun pump(app: Context, rec: Recording, bufBytes: Int) {
         val buf = ByteArray(bufBytes)
         try {
             RandomAccessFile(rec.part, "rw").use { out ->
                 out.setLength(0)
                 out.write(ByteArray(HEADER_BYTES)) // patched on save
+                var sinceHeader = 0
                 while (!rec.stop) {
                     val n = rec.record.read(buf, 0, buf.size)
                     if (n < 0) { rec.failed = true; break }
                     if (n == 0) continue
-                    val take = minOf(n, MAX_DATA_BYTES - rec.dataBytes)
+                    val take = minOf(n, CAP_DATA_BYTES - rec.dataBytes)
                     out.write(buf, 0, take)
                     rec.dataBytes += take
-                    if (rec.dataBytes >= MAX_DATA_BYTES) {
-                        // The 28 s cap: save this one and open the next, off this thread.
-                        Thread({ splitAtCap(app, rec) }, "gengoshima-capture-split").start()
+                    sinceHeader += take
+                    if (!rec.longCued && rec.dataBytes >= LONG_DATA_BYTES) {
+                        rec.longCued = true
+                        buzz(app, BUZZ_LONG)
+                    }
+                    if (sinceHeader >= HEADER_EVERY_BYTES) {
+                        // Keep the file a valid WAV of what is on disk, so a kill can be salvaged.
+                        sinceHeader = 0
+                        val end = out.filePointer
+                        writeHeader(out, rec.dataBytes)
+                        out.seek(end)
+                        out.fd.sync()
+                        if (rec.part.parentFile?.usableSpace?.let { it < MIN_FREE_BYTES } == true) {
+                            AppLogger.warn(TAG, "言語島 capture: storage under ${MIN_FREE_BYTES / 1048576} MB, saving ${rec.uuid}")
+                            Thread({ capReached(app, rec) }, "gengoshima-capture-cap").start()
+                            break
+                        }
+                    }
+                    if (rec.dataBytes >= CAP_DATA_BYTES) {
+                        AppLogger.info(TAG, "言語島 capture: ${rec.uuid} reached ${CAP_MS / 3_600_000} h, saving")
+                        Thread({ capReached(app, rec) }, "gengoshima-capture-cap").start()
                         break
                     }
                 }
@@ -230,11 +266,11 @@ object SentenceCapture {
         if (rec.failed) Thread({ failed(app, rec) }, "gengoshima-capture-fail").start()
     }
 
+    /** A cap was reached: save the recording; the mode stays armed for the next press. */
     @Synchronized
-    private fun splitAtCap(app: Context, rec: Recording) {
+    private fun capReached(app: Context, rec: Recording) {
         if (recording !== rec) return
         finish(app, keep = true)
-        if (modeOn) begin(app)
     }
 
     @Synchronized
@@ -267,23 +303,67 @@ object SentenceCapture {
         }
         val wav = File(rec.part.parentFile, "${rec.uuid}.wav")
         if (!rec.part.renameTo(wav)) { rec.part.delete(); buzz(app, BUZZ_ERROR); return null }
-        File(rec.part.parentFile, "${rec.uuid}.json").writeText(
-            JSONObject()
-                .put("uuid", rec.uuid)
-                .put("capturedAt", rec.capturedAt)
-                .put("durationMs", rec.dataBytes * 1000L / BYTES_PER_SEC)
-                .put("language", "en")
-                .toString(),
-        )
+        writeSidecar(wav, rec.uuid, rec.capturedAt, rec.dataBytes, salvaged = false)
         buzz(app, BUZZ_SAVED)
         AppLogger.info(TAG, "言語島 capture: sentence ${rec.uuid} saved (${rec.dataBytes * 1000L / BYTES_PER_SEC} ms)")
         return rec.uuid
     }
 
-    /** A `.part` left by a killed process is half a sentence with no header — never offered. */
-    private fun discardStale(app: Context) {
-        dir(app).listFiles { f -> f.name.endsWith(".wav.part") }?.forEach { it.delete() }
+    private fun writeSidecar(wav: File, uuid: String, capturedAt: Long, dataBytes: Int, salvaged: Boolean) {
+        val durationMs = dataBytes * 1000L / BYTES_PER_SEC
+        File(wav.parentFile, "$uuid.json").writeText(
+            JSONObject()
+                .put("uuid", uuid)
+                .put("capturedAt", capturedAt)
+                .put("durationMs", durationMs)
+                .put("language", "en")
+                .apply { if (durationMs > LONG_MS) put("kind", "long") }
+                .apply { if (salvaged) put("salvaged", true) }
+                .toString(),
+        )
     }
+
+    /**
+     * A `.part` left by a killed process holds everything up to its last header rewrite (and possibly
+     * a few seconds past it): turn it into a WAV of what is on disk and offer it like any other clip.
+     * Never touches the recording in progress. Also run before every offer, so an engine start after a
+     * kill salvages without waiting for the next walk.
+     */
+    @Synchronized
+    fun salvageStale(ctx: Context) {
+        val live = recording?.part
+        dir(ctx).listFiles { f -> f.name.endsWith(".wav.part") }?.forEach { part ->
+            if (part == live) return@forEach
+            val uuid = part.name.removeSuffix(".wav.part")
+            val dataBytes = salvage(part)
+            if (dataBytes == null) {
+                part.delete()
+                return@forEach
+            }
+            val wav = File(part.parentFile, "$uuid.wav")
+            if (!part.renameTo(wav)) return@forEach
+            writeSidecar(wav, uuid, wav.lastModified() - dataBytes * 1000L / BYTES_PER_SEC, dataBytes, salvaged = true)
+            AppLogger.warn(TAG, "言語島 capture: salvaged $uuid after a kill (${dataBytes * 1000L / BYTES_PER_SEC} ms)")
+        }
+    }
+
+    /**
+     * Rewrite [part]'s header to cover every whole sample on disk; returns the data size, or null when
+     * there is less than [MIN_MS] of it (a stray press, deleted by the caller).
+     */
+    internal fun salvage(part: File): Int? {
+        val data = ((part.length() - HEADER_BYTES).coerceIn(0L, CAP_DATA_BYTES.toLong()).toInt()) and 1.inv()
+        if (data < MIN_DATA_BYTES) return null
+        RandomAccessFile(part, "rw").use { out ->
+            out.setLength(HEADER_BYTES.toLong() + data)
+            writeHeader(out, data)
+            out.fd.sync()
+        }
+        return data
+    }
+
+    /** Past [LONG_MS]: a long recording, offered to kxkb on its own (contract §9). */
+    fun isLong(wav: File): Boolean = wav.length() - HEADER_BYTES > LONG_DATA_BYTES
 
     /** Clips saved and not yet taken by kxkb, oldest first. */
     fun pending(ctx: Context): List<File> =

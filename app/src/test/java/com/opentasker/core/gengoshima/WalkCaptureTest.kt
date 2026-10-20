@@ -33,6 +33,37 @@ class WalkCaptureTest {
     }
 
     @Test
+    fun `a part left by a kill is salvaged into a valid WAV of what is on disk`() {
+        val part = java.io.File.createTempFile("salvage", ".wav.part")
+        try {
+            // 44 header bytes never patched (zeros), 3 s of audio, and half a sample torn off by the kill.
+            part.writeBytes(ByteArray(44) + ByteArray(3 * 32_000) { 7 } + ByteArray(1))
+            assertEquals(3 * 32_000, SentenceCapture.salvage(part))
+            val bytes = part.readBytes()
+            assertEquals(44 + 3 * 32_000, bytes.size)
+            val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+            assertEquals("RIFF", String(bytes, 0, 4))
+            assertEquals(36 + 3 * 32_000, b.getInt(4))
+            assertEquals(3 * 32_000, b.getInt(40))
+            assertEquals(7, bytes[44].toInt())
+            assertTrue(SentenceCapture.isLong(part).not())
+        } finally { part.delete() }
+    }
+
+    @Test
+    fun `a stray press is not salvaged and past 28 s is a long recording`() {
+        val part = java.io.File.createTempFile("salvage", ".wav.part")
+        try {
+            part.writeBytes(ByteArray(44 + 3_000))
+            assertNull(SentenceCapture.salvage(part))
+            part.writeBytes(ByteArray(44 + 28 * 32_000))
+            assertTrue(SentenceCapture.isLong(part).not())
+            part.writeBytes(ByteArray(44 + 28 * 32_000 + 2))
+            assertTrue(SentenceCapture.isLong(part))
+        } finally { part.delete() }
+    }
+
+    @Test
     fun `rejected list parses uuid and reason`() {
         val m = ClipOffer.parseRejected("a-1:sha256, b-2:format")
         assertEquals(mapOf("a-1" to "sha256", "b-2" to "format"), m)
