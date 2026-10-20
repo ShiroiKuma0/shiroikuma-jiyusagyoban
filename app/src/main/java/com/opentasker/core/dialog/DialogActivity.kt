@@ -117,10 +117,11 @@ class DialogActivity : ComponentActivity() {
                             .takeIf { it.isNotEmpty() },
                         showMissingRestricted = intent.getBooleanExtra(EXTRA_SHOW_MISSING, false),
                         includeSelf = intent.getBooleanExtra(EXTRA_INCLUDE_SELF, false),
-                        onConfirm = { picked ->
+                        toggles = intent.getStringArrayExtra(EXTRA_TOGGLES)?.toList() ?: emptyList(),
+                        onConfirm = { picked, toggles ->
                             // One app per line, "<package>\t<label>".
                             val value = picked.joinToString("\n") { (pkg, label) -> "$pkg\t$label" }
-                            settle(DialogOutcome.Confirmed(value))
+                            settle(DialogOutcome.Confirmed(value, toggles = toggles))
                         },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_APP_SINGLESELECT -> AppMultiSelectDialog(
@@ -132,7 +133,7 @@ class DialogActivity : ComponentActivity() {
                             .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
                             .takeIf { it.isNotEmpty() },
                         singleSelect = true,
-                        onConfirm = { picked ->
+                        onConfirm = { picked, _ ->
                             settle(DialogOutcome.Confirmed(picked.firstOrNull()?.first.orEmpty()))
                         },
                         onCancel = { settle(DialogOutcome.Cancelled) })
@@ -239,6 +240,7 @@ class DialogActivity : ComponentActivity() {
         const val EXTRA_INCLUDE_SELF = "include_self" // keep this app in an unrestricted app grid
         const val EXTRA_SHOW_MISSING = "show_missing" // restricted grid: tile a package the platform cannot resolve
         const val EXTRA_PRESELECTED = "preselected"
+        const val EXTRA_TOGGLES = "toggles" // app grid: labels of option checkboxes (all ticked), read back in Confirmed.toggles
         const val EXTRA_INPUT_TYPE = "input_type"
         const val EXTRA_OK = "ok"
         const val EXTRA_CANCEL = "cancel"

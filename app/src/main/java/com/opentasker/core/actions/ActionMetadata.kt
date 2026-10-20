@@ -2611,6 +2611,7 @@ fun registerActionMetadata() {
                 ActionField("project", "Project", required = true),
                 ActionField("group", "Group", required = true),
                 ActionField("suffix", "Task name suffix"),
+                ActionField("bubbles", "Freeze-bubble roster", hint = "e.g. Toketsu_Bubbles — adds two ticked boxes (make the launch task / show the freeze bubble) for the apps ticked in this run; the bubble box appends them to this space-separated variable"),
                 ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
             )
         )
