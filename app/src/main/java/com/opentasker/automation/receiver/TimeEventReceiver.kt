@@ -7,6 +7,7 @@ import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.engine.AutomationService
 import com.opentasker.core.engine.EngineHeartbeat
 import com.opentasker.core.engine.EngineShutdown
+import com.opentasker.core.huawei.HuaweiBondWatch
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import com.opentasker.core.scheduling.ExpectedTriggerLedger
@@ -48,6 +49,23 @@ class TimeEventReceiver : BroadcastReceiver() {
                 } finally {
                     TimeEventScheduler(context).scheduleNextMinute()
                 }
+                // The watch's bond, read once a minute; a loss is confirmed and its evidence saved
+                // off this thread, inside goAsync's window, before Bluetooth or logcat can lose it.
+                runCatching { HuaweiBondWatch.check(context) }
+                    .onFailure { AppLogger.error(TAG, "Bond check failed", it) }
+                    .getOrNull()
+                    ?.let { change ->
+                        val pending = goAsync()
+                        Thread {
+                            try {
+                                HuaweiBondWatch.record(context, change)
+                            } catch (e: Exception) {
+                                AppLogger.error(TAG, "Bond change not recorded", e)
+                            } finally {
+                                pending.finish()
+                            }
+                        }.apply { name = "bond-watch" }.start()
+                    }
             }
             ExactAlarmSupport.PERMISSION_STATE_CHANGED_ACTION -> {
                 try {
