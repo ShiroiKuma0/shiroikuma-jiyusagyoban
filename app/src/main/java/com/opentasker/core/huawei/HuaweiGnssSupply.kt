@@ -116,6 +116,7 @@ object HuaweiGnssSupply {
             if (r.want == HuaweiGnssServer.Want.PREDICTED && r.served.isNotEmpty() && predictedUntilMs > 0) {
                 HuaweiGnssAction.writeBandHolds(dir, predictedUntilMs, log)
                 GnssForecastReminder.arm(context, predictedUntilMs, System.currentTimeMillis())
+                GnssRebuildSchedule.forecastTaken(context)
             }
         }
     }
