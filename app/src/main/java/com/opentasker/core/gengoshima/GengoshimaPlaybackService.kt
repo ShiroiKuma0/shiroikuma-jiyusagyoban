@@ -13,6 +13,10 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.opentasker.ui.gengoshima.GengoshimaPlayerActivity
 
 /**
@@ -32,12 +36,18 @@ import com.opentasker.ui.gengoshima.GengoshimaPlayerActivity
  * BEFORE hearing it. Each queued item carries its own `pauseAfterMs`; the player pauses at the end of
  * every item and this service resumes it when that pause is over. While it waits, the session's
  * extras say so ([EXTRA_GAP_UNTIL]), so the window can show "your turn".
+ *
+ * **Stop after each sentence** ([COMMAND_STOP_AFTER_SENTENCE], off unless the window turns it on):
+ * at the end of a sentence's last item the player simply stays paused there, on that sentence, with
+ * no gap — and play then carries on into the NEXT one, because ExoPlayer resumes past an item it
+ * paused at the end of.
  */
 class GengoshimaPlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
     private val handler = Handler(Looper.getMainLooper())
     private var resume: Runnable? = null
+    private var stopAfterSentence = false
 
     override fun onCreate() {
         super.onCreate()
@@ -57,7 +67,7 @@ class GengoshimaPlaybackService : MediaSessionService() {
             object : Player.Listener {
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                     if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
-                        gapThenContinue(exo)
+                        if (stopAfterSentence && endsSentence(exo)) endGap() else gapThenContinue(exo)
                     } else {
                         // Any other change — the user paused, played, or skipped — ends a gap.
                         endGap()
@@ -78,7 +88,40 @@ class GengoshimaPlaybackService : MediaSessionService() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
             )
+            .setCallback(
+                object : MediaSession.Callback {
+                    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
+                        MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                            .setAvailableSessionCommands(
+                                MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                                    .add(SessionCommand(COMMAND_STOP_AFTER_SENTENCE, Bundle.EMPTY))
+                                    .build(),
+                            )
+                            .build()
+
+                    override fun onCustomCommand(
+                        session: MediaSession,
+                        controller: MediaSession.ControllerInfo,
+                        customCommand: SessionCommand,
+                        args: Bundle,
+                    ): ListenableFuture<SessionResult> {
+                        if (customCommand.customAction != COMMAND_STOP_AFTER_SENTENCE) {
+                            return super.onCustomCommand(session, controller, customCommand, args)
+                        }
+                        stopAfterSentence = args.getBoolean(EXTRA_ON)
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
+                },
+            )
             .build()
+    }
+
+    /** Whether the item that just ended is its sentence's last (its repeats and English included). */
+    private fun endsSentence(exo: ExoPlayer): Boolean {
+        val i = exo.currentMediaItemIndex
+        if (i >= exo.mediaItemCount - 1) return true
+        fun id(k: Int) = exo.getMediaItemAt(k).mediaMetadata.extras?.getLong(EXTRA_SENTENCE_ID)
+        return id(i) != id(i + 1)
     }
 
     /** The item that just ended asked for a pause after it: wait, then go on to the next one. */
@@ -193,5 +236,9 @@ class GengoshimaPlaybackService : MediaSessionService() {
 
         /** Session extra: wall-clock millis until which the player is deliberately silent. */
         const val EXTRA_GAP_UNTIL = "gapUntil"
+
+        /** Custom command: stop at the end of every sentence; its [EXTRA_ON] argument turns it on. */
+        const val COMMAND_STOP_AFTER_SENTENCE = "gengoshima.stopAfterSentence"
+        const val EXTRA_ON = "on"
     }
 }
