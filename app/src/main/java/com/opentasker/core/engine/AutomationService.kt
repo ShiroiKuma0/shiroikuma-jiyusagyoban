@@ -183,6 +183,9 @@ class AutomationService : Service() {
         // Shake / orientation / app-foreground monitors are NOT started here — reloadProfiles() gates
         // them on whether an enabled profile actually uses them (applyContextSourceGating).
         hardwareKeyListener.start(this, scope)
+        // The forecast build is planned by alarm, which an update or a reboot drops — re-arm it.
+        runCatching { com.opentasker.core.huawei.GnssRebuildSchedule.restore(this) }
+            .onFailure { AppLogger.warn(TAG, "Forecast build plan not restored: ${it.message}") }
         // 言語島 walk capture: clips kxkb has not yet taken (offline, locked, not installed) go again.
         com.opentasker.core.gengoshima.ClipOffer.offerAsync(this)
         ContextCompat.registerReceiver(
