@@ -55,6 +55,10 @@ class ShizukuKeyEventListener {
     @Volatile private var service: IKeyGrabberService? = null
     @Volatile private var bound = false
     @Volatile private var bindInFlight = false
+    /** When the pending [bindInFlight] request was made, so a bind Shizuku never answers can be abandoned. */
+    @Volatile private var bindStartedMs = 0L
+    /** Consecutive loop passes that saw the grabber disabled or Shizuku away; see [runLoop]. */
+    @Volatile private var offReads = 0
     @Volatile private var grabUnavailable = false
 
     /**
@@ -172,10 +176,10 @@ class ShizukuKeyEventListener {
             if (devs <= 0) {
                 grabFailures++
                 if (grabFailures >= MAX_GRAB_FAILURES) {
-                    AppLogger.warn(TAG, "grab unavailable (start=$devs) after $grabFailures tries — detect-only")
+                    trace("grab unavailable (start=$devs) after $grabFailures tries — detect-only")
                     grabUnavailable = true
                 } else {
-                    AppLogger.warn(TAG, "grab start=$devs (try $grabFailures) — retrying shortly")
+                    trace("grab start=$devs (try $grabFailures) — retrying shortly")
                 }
                 teardownBind()
             } else {
@@ -185,11 +189,12 @@ class ShizukuKeyEventListener {
                 ringing = readRinging()
                 runCatching { svc.setRinging(ringing) }
                 runCatching { svc.setConsumeShort(consumeShort) }  // seeded on every (re)bind
-                AppLogger.info(TAG, "grab mode active on $devs device(s)")
+                trace("grab active on $devs device(s)")
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
+            trace("grabber process went away — rebinding")
             service = null
             bound = false
             bindInFlight = false
@@ -258,9 +263,14 @@ class ShizukuKeyEventListener {
         job = scope.launch(Dispatchers.IO) { runLoop(scope) }
         killSwitchJob = scope.launch(Dispatchers.IO) {
             // If %PKEY_ON is turned off, release everything promptly (don't wait on the stream).
+            // Two reads in a row, not one: a single false reading tore the grab down on 2026-10-20 and
+            // the rebind after it never completed (see [runLoop]).
+            var offs = 0
             while (scope.isActive) {
                 delay(2_000)
-                if (!enabled()) {
+                offs = if (enabled()) 0 else offs + 1
+                if (offs == 2) {
+                    trace("Pkey_On is off — releasing the grab")
                     teardownBind()
                     runCatching { currentProcess?.destroy() }
                 }
@@ -281,11 +291,42 @@ class ShizukuKeyEventListener {
         AppLogger.info(TAG, "Hardware-key listener stopped")
     }
 
+    /**
+     * The supervision loop.
+     *
+     * ## 2026-10-20: the keys were EMUI's for hours, and nothing noticed
+     *
+     * The grabber process was alive, but its grab thread had ended and it held no input device, so
+     * every volume press went to the system — a screen-off double press opened the camera and the
+     * 言語島 triple press never arrived. The listener still believed it was bound. When the process
+     * was killed to force a restart, no rebind followed either: a bind request had been made and
+     * never answered, and [bindInFlight] stayed true for good, so the loop never asked again. Turning
+     * Pkey_On off and on was the only way out.
+     *
+     * So three guards, each covering a way the grab can be lost without a callback:
+     * - a bind that Shizuku has not answered within [BIND_TIMEOUT_MS] is abandoned, any leftover
+     *   grabber process is killed, and the loop binds again;
+     * - while bound, the grabber is asked [IKeyGrabberService.isGrabbing] on every pass, and a "no"
+     *   or a dead binder is treated as a lost grab;
+     * - "disabled" and "Shizuku away" must be seen on two passes in a row before the grab is torn
+     *   down, so one bad reading cannot start the chain.
+     * Every one of these writes a line to [GRAB_LOG] — EMUI drops info and warning lines from logcat,
+     * which is why the first loss left no trace at all.
+     */
     private suspend fun runLoop(scope: CoroutineScope) {
         while (scope.isActive) {
+            val off = !enabled() || !shizukuReady()
+            offReads = if (off) offReads + 1 else 0
             when {
-                !enabled() -> { teardownBind(); delay(POLL_DISABLED_MS) }
-                !shizukuReady() -> { teardownBind(); delay(POLL_NO_SHIZUKU_MS) }
+                off && offReads < 2 -> delay(GRAB_RETRY_MS)
+                !enabled() -> {
+                    if (offReads == 2 && (bound || bindInFlight)) trace("Pkey_On is off — releasing the grab")
+                    teardownBind(); delay(POLL_DISABLED_MS)
+                }
+                !shizukuReady() -> {
+                    if (offReads == 2 && (bound || bindInFlight)) trace("Shizuku is not reachable — releasing the grab")
+                    teardownBind(); delay(POLL_NO_SHIZUKU_MS)
+                }
                 grabUnavailable -> {
                     // Detect-only fallback: blocks while the stream is alive; respawns after it ends.
                     runCatching { streamGetevent(scope) }
@@ -293,6 +334,15 @@ class ShizukuKeyEventListener {
                     if (scope.isActive) delay(RESPAWN_DELAY_MS)
                 }
                 else -> {
+                    if (bindInFlight && System.currentTimeMillis() - bindStartedMs > BIND_TIMEOUT_MS) {
+                        trace("bind unanswered after ${BIND_TIMEOUT_MS / 1000} s — killing any grabber and binding again")
+                        killGrabberProcesses()
+                        teardownBind()
+                    } else if (bound && runCatching { service?.isGrabbing() }.getOrNull() != true) {
+                        trace("the grab loop has ended (process still bound) — restarting the grabber")
+                        killGrabberProcesses()
+                        teardownBind()
+                    }
                     if (!bound && !bindInFlight) bindGrabber()
                     // A short wait while retrying a lost grab, so the rebind lands once the dying
                     // process has actually released the device rather than a poll interval later.
@@ -356,10 +406,36 @@ class ShizukuKeyEventListener {
         val ctx = appContext ?: return
         reapStaleGrabbers(ctx)
         bindInFlight = true
+        bindStartedMs = System.currentTimeMillis()
         val ok = runCatching { Shizuku.bindUserService(userServiceArgs(ctx), connection); true }
             .onFailure { AppLogger.warn(TAG, "bindUserService failed: ${it.message}"); grabUnavailable = true }
             .getOrDefault(false)
         if (!ok) bindInFlight = false
+    }
+
+    /**
+     * Kill every grabber process, as `物理鍵 ⇨ 無効` does. Used only when one has stopped answering or
+     * stopped grabbing: unbinding it does not reliably end it, and a live one can block the next bind.
+     */
+    private fun killGrabberProcesses() {
+        runCatching {
+            ShizukuShell.exec("for p in \$(pidof ${appContext?.packageName ?: return}:keygrab); do kill -9 \$p; done")
+        }.onFailure { trace("could not kill the grabber: ${it.message}") }
+    }
+
+    /**
+     * A grab-state line in [GRAB_LOG] as well as the app log. The file sits in the app's external files
+     * directory, so `adb shell` (and rish) can read it while EMUI keeps the logcat lines to itself.
+     */
+    private fun trace(message: String) {
+        AppLogger.warn(TAG, "key grab: $message")
+        val dir = appContext?.getExternalFilesDir(null) ?: return
+        runCatching {
+            val f = java.io.File(dir, GRAB_LOG)
+            val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date())
+            val lines = (if (f.isFile) f.readLines() else emptyList()) + "$stamp  $message"
+            f.writeText(lines.takeLast(GRAB_LOG_LINES).joinToString("\n", postfix = "\n"))
+        }
     }
 
     private fun teardownBind() {
@@ -508,6 +584,13 @@ class ShizukuKeyEventListener {
 
         /** Gap between those attempts. */
         private const val GRAB_RETRY_MS = 400L
+
+        /** How long a bind may go unanswered before it is abandoned and made again. */
+        private const val BIND_TIMEOUT_MS = 10_000L
+
+        /** The grab-state log, in the app's external files dir (readable over adb), and its length. */
+        const val GRAB_LOG = "keygrab-log.txt"
+        private const val GRAB_LOG_LINES = 300
 
         private val WATCHED_CODES = intArrayOf(114, 115)
 
