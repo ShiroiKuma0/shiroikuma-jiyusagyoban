@@ -462,6 +462,21 @@ each hash to their own address. Until +061 the Band's was sent to every device.
 No standing connection: the watch is answered whenever the sync connects (every four hours, and on
 each manual sync). Health holds the link open and so answers the moment the watch asks.
 
+**When the watch asks for a forecast (measured 2026-10-18 – 20, local times).** At the first sync
+more than **24 hours after it received** the set it holds — the age of the data does not enter. Health
+handed over a set on 10-17 at 19:28 (its blocks starting 20:00); the watch asked at the 20:00 sync on
+10-18 (24.5 h) and took ours. The 20:00 sync on 10-19, exactly 24.0 h after that, got no ask although
+the data was then 28 h old; the 00:00 sync on 10-20 (28 h) did. Since a receipt is itself at a
+sync slot, the ask lands on the slot 28 hours later and moves four hours later each day. The old
+nightly 00:00 build ran two minutes after the 00:00 sync and so handed over a day-old set, which the
+watch — counting 72 h from receipt — over-claimed by that day.
+
+**When the phone builds (+070, `GnssRebuildSchedule`).** 30 minutes before the first local sync
+slot after 24 h from the later of the last take and the last successful build; the profile
+`衛星 毎晩生成` is gone and the alarm runs `衛星 予定生成 -- [727]`. Firing plans a retry 30 minutes
+on, which a successful build replaces with the next plan. The plan is re-armed on engine start and
+written to `rebuild-plan.txt` beside `built-log.txt`.
+
 ### 3.8 Health's graph pages to rebuild in 健康 (白い熊, 2026-10-17)
 
 Every Health page that has a graph gets its counterpart in our data-graph pages. Screenshots of each
