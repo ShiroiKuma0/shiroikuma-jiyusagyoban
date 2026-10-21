@@ -69,6 +69,29 @@ class HuaweiRfcommClient(private val context: Context) : HuaweiTransport {
 
         /** A second "Private COM" record exists on channel 17; we do not use it. */
         val ALT_SERVICE_UUID: UUID = UUID.fromString("65847aa1-102a-05e1-43b6-e2a3965be547")
+
+        const val BOND_NONE = BluetoothDevice.BOND_NONE
+        const val BOND_BONDING = BluetoothDevice.BOND_BONDING
+        const val BOND_BONDED = BluetoothDevice.BOND_BONDED
+
+        /**
+         * The phone's bond state for [address], or null when it cannot be read — above all while the
+         * adapter is off, when Android answers BOND_NONE for every device. For [HuaweiBondWatch].
+         */
+        @SuppressLint("MissingPermission")
+        fun bondStateOf(context: Context, address: String): Int? = runCatching {
+            val a = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+                ?: return null
+            if (!a.isEnabled) return null
+            a.getRemoteDevice(address).bondState
+        }.getOrNull()
+
+        /** Every device the phone holds a bond with, as `name address`, for the bond-loss evidence. */
+        @SuppressLint("MissingPermission")
+        fun bondedDevices(context: Context): String = runCatching {
+            (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+                ?.bondedDevices?.joinToString { "${it.name ?: "?"} ${it.address}" } ?: "?"
+        }.getOrDefault("unreadable")
     }
 
     private var socket: BluetoothSocket? = null
