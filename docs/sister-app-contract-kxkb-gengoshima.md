@@ -244,7 +244,7 @@ kxkb fires it, package-pinned and resolve-checked, as its **default** return whe
 opened through its door; `return_task` still wins when a caller names one; and with the door missing
 (an older 自由作業盤) the review falls back to a plain close. So the two halves land in either order.
 
-## 9. Amendment — long recordings (自由作業盤 side 2026-10-19; kxkb side by hand-off)
+## 9. Amendment — long recordings (自由作業盤 side 2026-10-19; kxkb side 2026-10-20, 0.23.1+361)
 
 白い熊 wants the walk capture's press to double as a plain audio recorder — "record this, keep it for
 later", not transcribed — with no second key. So the recorder no longer cuts at 28 s: one press-to-press
@@ -268,7 +268,9 @@ Changes to §1, everything else unchanged:
 kxkb's side (in its review):
 
 - Store a long recording, show it as one row (duration, time, play / seek), and never auto-decode it.
-- **Save as OGG** — Opus to a fixed folder, named by its `capturedAt` (`yyyy-MM-dd_HH-mm-ss.ogg`).
+- **Save as OGG** — Opus to a directory 白い熊 picks once on the review page, named by its `capturedAt`
+  (`yyyy-MM-dd_HH-mm-ss.ogg`), never written over. Offered on **every** row that still has its recording,
+  not only a long one — what makes audio worth keeping is what was said into it.
 - **Split into sentences** — cut at the pauses (the VAD kxkb already carries), each piece ≤ 28 s, a hard
   cut only where 28 s holds no pause. Each piece is an ordinary sentence with a **new uuid**, `parent` =
   the long clip's uuid and `capturedAt` = parent + its offset, so §2 to 言語島 is unchanged.
