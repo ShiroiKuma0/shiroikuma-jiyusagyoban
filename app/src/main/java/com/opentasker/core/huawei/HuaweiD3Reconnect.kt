@@ -44,7 +44,7 @@ object HuaweiD3Reconnect {
         Step(0x02, 0x04, "8106020100030100"),  // notification capability
         Step(0x01, 0x21, "0100"),  // asks
         Step(0x08, 0x08, "020207ea03033032360413332c34342c35382c3132382c3236322c3238320571302c312c322c34352c34362c34372c34382c34392c35302c35312c35322c35332c39332c39342c39352c3132302c3132312c3132322c3132332c3132342c3136392c3137302c3137312c3236372c3236382c3236392c3237332c3237342c3237352c3237362c3237372c3237382c323739"),  // 2026 holiday calendar for CZ (day numbers)
-        Step(0x01, 0x04, "8106020101030101"),  // command support
+        Step(0x01, 0x04, "8106020101030101"),  // date and time format (tag 2 date, tag 3 time) — not "command support", which is 0x01/0x03
         Step(0x20, 0x09, "010101"),  // 01
         Step(0x01, 0x1D, "0100"),  // asks
         FEATURE,
