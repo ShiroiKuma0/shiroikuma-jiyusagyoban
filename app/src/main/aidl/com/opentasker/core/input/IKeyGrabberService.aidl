@@ -41,4 +41,12 @@ interface IKeyGrabberService {
      * instead of changing the volume). Ringing still forces re-injection. Off → the screen rule decides.
      */
     void setConsumeShort(boolean consume) = 5;
+
+    /**
+     * Whether the native grab loop is still running. The loop can end without anyone being told — it
+     * releases its grabs on the way out and the process lives on — so the app asks every few seconds and
+     * rebinds when the answer is no (2026-10-20: the keys were EMUI's for hours while the app thought
+     * they were ours).
+     */
+    boolean isGrabbing() = 6;
 }
