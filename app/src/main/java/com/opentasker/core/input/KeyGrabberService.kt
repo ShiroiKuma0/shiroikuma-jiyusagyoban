@@ -76,6 +76,8 @@ class KeyGrabberService : IKeyGrabberService.Stub {
         runCatching { if (libLoaded) nativeSetConsumeShort(consume) }
     }
 
+    override fun isGrabbing(): Boolean = worker?.isAlive == true
+
     override fun destroy() {
         stopInternal()
         // daemon(false) → Shizuku kills this process after unbind; nothing else to clean up.
