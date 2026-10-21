@@ -503,6 +503,7 @@ class HuaweiGnssAction : Action {
                     // every record needed to know better was already on the phone. See
                     // [GnssForecastReminder] for what the band's countdown actually means.
                     GnssForecastReminder.arm(ctx.app, unixOf(windowEnd), receivedAt)
+                    com.opentasker.core.huawei.GnssRebuildSchedule.forecastTaken(ctx.app, receivedAt)
                 }
                 // Offering data the band declines is not success. Saying so here is the whole
                 // lesson of the weather bug: a transfer that reports "sent" while the band kept
