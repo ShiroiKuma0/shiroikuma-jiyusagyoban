@@ -560,10 +560,19 @@ object HuaweiText {
     val phaseServing = Loc("answering the watch", "時計に応答中")
     val phaseDone = Loc("done", "完了")
 
-    /** Worded as a FLOOR. It is the deepest the band has answered from, never a promise. */
+    /**
+     * Worded as a FLOOR and as ONE sync's reach. It is the deepest the watch has answered from in a
+     * single sync, never a promise of its buffer — and never the history we hold, which is
+     * [historyHeld]. "At least 24.2 h of history observed" read as the latter beside 104 nights.
+     */
     val observedDepth = Loc(
-        "At least %s h of history observed",
-        "これまでに確認できた履歴は最低 %s 時間",
+        "Watch answered from up to %s h back in one sync",
+        "1 回の同期で時計が遡って答えたのは最大 %s 時間前まで",
+    )
+    /** What is stored here, oldest sample to newest: grows with every sync, past the watch's own buffer. */
+    val historyHeld = Loc(
+        "History held: %s days, since %s",
+        "保存している履歴: %s 日分（%s から）",
     )
     val observedDepthUnmeasured = Loc(
         "History depth not measured yet",
