@@ -8,6 +8,41 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+075 — 2026-10-21
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+066`.
+
+### 言語島
+
+- **Pause after each sentence** while listening: a chip under the header, 文ごとに止める, off at every
+  new session. The player holds at the end of each sentence, still showing it, and play goes on to
+  the next one. A bar at the foot fills over the whole sentence — its repeats, its English and the
+  pauses between — and stands full while it holds, so it is plain that play will not repeat it.
+- **Long recordings.** One press of the walk-capture key now records as long as it needs to: the 28 s
+  auto-split is gone, a 60 ms tick marks the clip becoming a long recording, and it stops at 4 h or
+  200 MB free. The header is synced every 5 s and a recording cut off by a kill is salvaged on the
+  next start. kxkb takes long clips alone and offers them as a recording to keep or to split.
+
+### 健康 and the watch
+
+- **The pairing watch.** The watch's bond is read every minute; an unpairing is confirmed after 5 s and
+  its evidence saved at once (bonded devices, the Bluetooth and companion-device state, logcat from
+  before the loss) to `bond-lost_<stamp>.txt`, with an ongoing notification whose tap reconnects.
+- **The satellite forecast is built 30 minutes before the watch asks for it** — at the first sync more
+  than 24 h after it took the last set — so the set it takes is about 30 minutes old. A failed build
+  retries every 30 minutes; the nightly build is gone; the plan survives updates and reboots.
+- **The dashboard** says how far back one sync reached ("Watch answered from up to N h back in one
+  sync") and, on a line of its own, how much history is held and since when.
+- **Skin temperature is graded 1–5** in 平常との差, as in the night table: cooler towards 1, warmer
+  towards 5.
+
+### Automation
+
+- **The key-grab watchdog.** A vol-down grab that died is noticed and rebound; binds time out instead
+  of hanging, and every bind, loss and rebind is logged to `keygrab-log.txt`.
+- **凍結融解: one pass for a new app** — the app picker offers 起動作業を作る and 凍結泡を出す, both
+  ticked, so a newly chosen app gets its launch task and its freeze bubble together.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+066 — 2026-10-18
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+065`.
