@@ -330,6 +330,16 @@ private fun SyncHeader(
                         style = MaterialTheme.typography.bodySmall,
                         color = axisInk,
                     )
+                    s?.heldSpanSeconds?.let { span ->
+                        Text(
+                            HuaweiText.historyHeld[lang].format(
+                                "%.1f".format(span / 86_400.0),
+                                DAY.format(Instant.ofEpochSecond(s.oldestSampleSeconds!!)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = axisInk,
+                        )
+                    }
                     s?.firmware?.let {
                         Text(
                             "${HuaweiText.firmware[lang]} $it",
@@ -575,5 +585,8 @@ private fun secs(v: Int): String = when {
 
 private val STAMP: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
+
+private val DAY: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
 
 private fun stamp(millis: Long): String = STAMP.format(Instant.ofEpochMilli(millis))
