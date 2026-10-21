@@ -9,6 +9,7 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +74,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
 import com.opentasker.app.OpenTaskerApp_NoHilt
@@ -168,6 +172,8 @@ private object ListenLog {
     /** The item being heard now: its sentence and its length. */
     var currentSentence: Long? = null
     var currentDurationMs: Long = 0
+    /** 「文ごとに止める」: hold on each sentence once it has been said. Off at every new session. */
+    var stopAfterSentence = false
 
     /**
      * Close the item that was playing: credit the time actually spent on it, and count it as HEARD
@@ -213,6 +219,7 @@ private object ListenLog {
         currentDurationMs = 0
         heardMs = 0
         playingSince = null
+        stopAfterSentence = false
     }
 }
 
@@ -500,6 +507,17 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
     var gapUntil by remember { mutableLongStateOf(c.sessionExtras.getLong(EXTRA_GAP_UNTIL, 0L)) }
     var showEn by remember { mutableStateOf(ListenLog.mode != ListenMode.RECALL) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var position by remember { mutableLongStateOf(c.currentPosition) }
+    var stopAfter by remember { mutableStateOf(ListenLog.stopAfterSentence) }
+    // The player runs in its own process and keeps its own copy: tell it whenever this one is set,
+    // and once on opening, so a window re-created over a running session cannot disagree with it.
+    LaunchedEffect(stopAfter) {
+        ListenLog.stopAfterSentence = stopAfter
+        c.sendCustomCommand(
+            SessionCommand(GengoshimaPlaybackService.COMMAND_STOP_AFTER_SENTENCE, Bundle.EMPTY),
+            Bundle().apply { putBoolean(GengoshimaPlaybackService.EXTRA_ON, stopAfter) },
+        )
+    }
 
     DisposableEffect(c) {
         val listener = object : Player.Listener {
@@ -534,7 +552,8 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
         while (true) {
             now = System.currentTimeMillis()
             gapUntil = c.sessionExtras.getLong(EXTRA_GAP_UNTIL, 0L)
-            delay(250)
+            position = c.currentPosition
+            delay(100)
         }
     }
 
@@ -576,6 +595,11 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
             // the old 止める did the same and is gone (白い熊, 2026-10-12).
             HeaderPill("閉じる") { onClose() }
         }
+        FilterChip(
+            selected = stopAfter,
+            onClick = { stopAfter = !stopAfter },
+            label = { Text("文ごとに止める / pause after each sentence", fontSize = 16.sp) },
+        )
 
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -635,6 +659,43 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
                 c.play()
             }
         }
+        SentenceBar(sentenceProgress(c, index, sentenceIds, position, gapUntil, now))
+    }
+}
+
+/**
+ * How far through the CURRENT sentence playback is, 0–1: its repeats, its English and the pauses
+ * between them, in the order queued. The pause after its last item is not counted — the sentence has
+ * been said by then — so the bar stands full while 「文ごとに止める」 holds on it, which is what
+ * says that play goes on to the next one rather than this one again.
+ */
+private fun sentenceProgress(c: MediaController, index: Int, sentenceIds: List<Long>, position: Long, gapUntil: Long, now: Long): Float {
+    val count = c.mediaItemCount
+    if (count == 0 || index !in 0 until count) return 0f
+    val sid = sentenceIds[index]
+    var first = index
+    while (first > 0 && sentenceIds[first - 1] == sid) first--
+    var last = index
+    while (last < count - 1 && sentenceIds[last + 1] == sid) last++
+    // The playing item by the player's own measure, so a held sentence reads exactly full.
+    fun length(k: Int) = (if (k == index) c.duration.takeIf { it > 0 } else null)
+        ?: c.getMediaItemAt(k).mediaMetadata.extras?.getLong(GengoshimaPlaybackService.EXTRA_DURATION_MS)?.takeIf { it > 0 } ?: 1_000L
+    fun pause(k: Int) = if (k == last) 0L else c.getMediaItemAt(k).mediaMetadata.extras?.getLong(EXTRA_PAUSE_AFTER_MS) ?: 0L
+    val total = (first..last).sumOf { length(it) + pause(it) }
+    val before = (first until index).sumOf { length(it) + pause(it) }
+    val here = if (gapUntil > now) length(index) + (pause(index) - (gapUntil - now)).coerceIn(0L, pause(index))
+        else position.coerceIn(0L, length(index))
+    return ((before + here).toFloat() / total).coerceIn(0f, 1f)
+}
+
+/** The sentence's progress as a fill along the foot of the screen: outline = the whole sentence. */
+@Composable
+private fun SentenceBar(fraction: Float) {
+    val ink = MaterialTheme.colorScheme.primary
+    Box(
+        Modifier.fillMaxWidth().height(14.dp).border(2.dp, ink, RoundedCornerShape(7.dp)).padding(3.dp),
+    ) {
+        Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(ink, RoundedCornerShape(4.dp)))
     }
 }
 
