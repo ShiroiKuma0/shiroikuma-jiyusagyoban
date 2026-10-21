@@ -658,6 +658,14 @@
         </receiver>
 
         <receiver
+            android:name="com.opentasker.core.huawei.GnssRebuildReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.opentasker.huawei.GNSS_REBUILD" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name="com.opentasker.core.huawei.GnssForecastReminderReceiver"
             android:exported="false">
             <intent-filter>

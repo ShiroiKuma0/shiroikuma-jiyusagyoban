@@ -214,6 +214,8 @@ class HuaweiPgnssAction : Action {
             }
             ctx.logger("Huawei predicted ephemeris: ${result.summary}")
             for (note in result.notes) ctx.logger("  $note")
+            // The next build is planned from this one (and from the watch's next take).
+            com.opentasker.core.huawei.GnssRebuildSchedule.built(ctx.app)
             return ActionResult.Success
         } catch (cancelled: PgnssCancelledException) {
             ctx.variables.set("${prefix}PgnssResult", "NOT REBUILT — cancelled at step ${panel.step}")
