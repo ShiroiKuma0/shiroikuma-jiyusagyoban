@@ -8,6 +8,22 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+077 — 2026-10-22
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+075`.
+
+### Automation
+
+- **Bluetooth Audio Device** (`bluetooth.audio`), a new action for one paired headset, chosen by
+  address. Four modes: **check** stores 1 or 0; **connect**, **disconnect** and **toggle** do
+  nothing when the device is already in the wanted state, and otherwise ask both its A2DP and
+  Headset profiles and wait up to `wait` seconds (default 10, at most 60) for the change.
+- Every mode flashes its result with the device's name — "… CONNECTED", "… NOT CONNECTED",
+  "… disconnected", "… already CONNECTED" — unless `flash` is `false`.
+- It never fails the task: the outcome goes into `var` as `connected`, `disconnected`, `asked`
+  (asked, but no change within the wait) or `failed: <why>`.
+- Needs only the Bluetooth (nearby devices) permission. The action count is now 216.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+075 — 2026-10-21
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+066`.
