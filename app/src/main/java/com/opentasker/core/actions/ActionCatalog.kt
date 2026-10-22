@@ -67,6 +67,7 @@ object ActionCatalog {
         // variables, and the platform decides whether a fresh scan happens either way.
         define("wifi.scan", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::WifiScanAction),
         define("bluetooth.toggle", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::BluetoothToggleAction),
+        define("bluetooth.audio", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::BluetoothAudioAction),
         define("brightness.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::BrightnessAction),
         define("volume.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::VolumeAction),
         define("airplane.toggle", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::AirplaneModeAction),

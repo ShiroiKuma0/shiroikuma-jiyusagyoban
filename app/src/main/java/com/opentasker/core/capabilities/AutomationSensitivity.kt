@@ -287,6 +287,7 @@ object AutomationSensitivityRegistry {
         "script.shizuku.run",
         "wifi.toggle",
         "bluetooth.toggle",
+        "bluetooth.audio",
         "brightness.set",
         "volume.set",
         "airplane.toggle",
