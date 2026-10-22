@@ -54,6 +54,9 @@ object ActionCapabilityRegistry {
         "plugin.locale.query" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires an installed Locale-compatible condition plugin; queries are explicit ordered broadcasts with timeout handling."),
         "wifi.toggle" to shizukuCapability("WiFi toggle on Android 10+"),
         "bluetooth.toggle" to bluetoothCapability(),
+        // Checks and connects a paired audio device through the A2DP / headset proxies; on Android 13
+        // the service asks BLUETOOTH_CONNECT and nothing more, so unlike the toggle it is not blocked.
+        "bluetooth.audio" to ActionCapability(CapabilityLevel.RequiresSetup, "Checks or connects paired earphones / a headset — needs the Nearby devices (Bluetooth) permission.", CapabilityRequirement.Bluetooth, blocking = true),
         "brightness.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Write Settings special access.", CapabilityRequirement.WriteSettings, blocking = true),
         // Upstream's new "write an Android setting by name" action. RequiresSetup, not Unsupported:
         // unlike the elevated actions this one has a route a user can actually take without root or

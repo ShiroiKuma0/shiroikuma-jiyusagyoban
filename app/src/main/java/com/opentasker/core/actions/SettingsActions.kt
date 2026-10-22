@@ -2,7 +2,10 @@ package com.opentasker.core.actions
 
 import android.Manifest
 import android.app.NotificationManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
@@ -96,6 +99,119 @@ class BluetoothToggleAction : DeclaredAction(ActionCatalog.require("bluetooth.to
         ctx.logger("Bluetooth: $state")
         return ActionResult.Success
     }
+}
+
+/**
+ * A Bluetooth audio device — earphones, a headset, a car: is it connected; connect, disconnect, toggle.
+ *
+ * Args:
+ *   - "address": the device's address, e.g. "C1:EB:C2:F1:FC:17". It must be paired with the phone.
+ *   - "mode": "check" (default), "connect", "disconnect" or "toggle".
+ *   - "var": the variable that gets the answer.
+ *     - check: "1" when the media (A2DP) or call (headset) profile has the device connected, else "0".
+ *     - connect / disconnect / toggle: "connected" or "disconnected" (also when it already was);
+ *       "asked" when the device did not move within "wait" seconds; or "failed: <why>". These never
+ *       fail the task — a device that is not there is an answer, not an error.
+ *   - "wait": seconds to wait for the device to come or go (default 10, max 60).
+ *   - "flash": "false" to stay quiet. Otherwise every mode flashes its result — "B8 CONNECTED".
+ *
+ * Connecting has no public API. `connect` and `disconnect` on the A2DP and headset proxies are
+ * hidden but marked `@UnsupportedAppUsage` with no target limit, so reflection reaches them, and the
+ * Android 13 services behind them ask only BLUETOOTH_CONNECT (checked against android13-release,
+ * 2026-10-22).
+ */
+private val MODES = setOf("check", "connect", "disconnect", "toggle")
+
+class BluetoothAudioAction : DeclaredAction(ActionCatalog.require("bluetooth.audio")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val address = args["address"]?.trim()?.uppercase().orEmpty()
+        if (!BluetoothAdapter.checkBluetoothAddress(address)) return ActionResult.Failure("invalid address: $address")
+        val mode = args["mode"]?.trim()?.lowercase().orEmpty().ifEmpty { "check" }
+        if (mode !in MODES) return ActionResult.Failure("invalid mode: $mode")
+        val variable = args["var"]?.trim()?.removePrefix("%").orEmpty()
+        val quiet = args["flash"]?.trim()?.lowercase() in setOf("false", "0", "no", "off")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(ctx.app, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return ActionResult.Failure("Bluetooth permission is not granted")
+        }
+        val adapter = ctx.app.getSystemService(BluetoothManager::class.java)?.adapter
+            ?: return ActionResult.Failure("Bluetooth not available")
+        var label = address
+        suspend fun answer(value: String, shown: String): ActionResult {
+            if (variable.isNotEmpty()) ctx.variables.set(variable, value)
+            ctx.logger("Bluetooth audio $address $mode: $value")
+            if (!quiet) FlashAction().run(ctx, mapOf("text" to "$label $shown"))
+            return ActionResult.Success
+        }
+        if (!adapter.isEnabled) {
+            return if (mode == "check") answer("0", "NOT CONNECTED — Bluetooth is off")
+            else answer("failed: Bluetooth is off", "$mode FAILED — Bluetooth is off")
+        }
+        val device = adapter.getRemoteDevice(address)
+        label = runCatching { device.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: address
+        val a2dp = proxy(ctx.app, adapter, BluetoothProfile.A2DP)
+        val headset = proxy(ctx.app, adapter, BluetoothProfile.HEADSET)
+        val profiles = listOfNotNull(a2dp, headset)
+        try {
+            fun connected() = profiles.any { it.getConnectionState(device) == BluetoothProfile.STATE_CONNECTED }
+            val now = connected()
+            val wantConnected = when (mode) {
+                "check" -> return answer(if (now) "1" else "0", if (now) "CONNECTED" else "NOT CONNECTED")
+                "connect" -> true
+                "disconnect" -> false
+                else -> !now
+            }
+            if (now == wantConnected) {
+                return if (now) answer("connected", "already CONNECTED") else answer("disconnected", "not connected — nothing to do")
+            }
+            val verb = if (wantConnected) "connect" else "disconnect"
+            if (wantConnected && device.bondState != BluetoothDevice.BOND_BONDED) {
+                return answer("failed: not paired with this phone", "connect FAILED — not paired with this phone")
+            }
+            val asked = profiles.map { p ->
+                runCatching { p.javaClass.getMethod(verb, BluetoothDevice::class.java).invoke(p, device) as? Boolean ?: false }
+            }
+            if (asked.none { it.getOrNull() == true }) {
+                val why = asked.firstNotNullOfOrNull { it.exceptionOrNull() }
+                    ?.let { (it.cause ?: it).let { e -> e.javaClass.simpleName + (e.message?.let { m -> ": $m" } ?: "") } }
+                    ?: "the system refused"
+                return answer("failed: $why", "$verb FAILED — $why")
+            }
+            val waitS = (args["wait"]?.toLongOrNull() ?: 10L).coerceIn(1L, 60L)
+            val moved = withTimeoutOrNull(waitS * 1000L) {
+                while (connected() != wantConnected) kotlinx.coroutines.delay(250)
+                true
+            } ?: false
+            return when {
+                !moved -> answer("asked", "$verb asked — no change after $waitS s")
+                wantConnected -> answer("connected", "CONNECTED")
+                else -> answer("disconnected", "DISCONNECTED")
+            }
+        } finally {
+            a2dp?.let { adapter.closeProfileProxy(BluetoothProfile.A2DP, it) }
+            headset?.let { adapter.closeProfileProxy(BluetoothProfile.HEADSET, it) }
+        }
+    }
+
+    /** A profile proxy, or null when the profile does not come up within three seconds. */
+    private suspend fun proxy(context: Context, adapter: BluetoothAdapter, profile: Int): BluetoothProfile? =
+        withTimeoutOrNull(3_000L) {
+            suspendCancellableCoroutine { cont ->
+                val asked = adapter.getProfileProxy(
+                    context,
+                    object : BluetoothProfile.ServiceListener {
+                        override fun onServiceConnected(p: Int, proxy: BluetoothProfile) {
+                            if (cont.isActive) cont.resume(proxy) else adapter.closeProfileProxy(p, proxy)
+                        }
+                        override fun onServiceDisconnected(p: Int) = Unit
+                    },
+                    profile,
+                )
+                if (!asked && cont.isActive) cont.resume(null)
+            }
+        }
 }
 
 /**

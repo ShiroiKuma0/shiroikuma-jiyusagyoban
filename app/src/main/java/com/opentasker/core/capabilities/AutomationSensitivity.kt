@@ -284,6 +284,7 @@ object AutomationSensitivityRegistry {
         "script.termux.run",
         "wifi.toggle",
         "bluetooth.toggle",
+        "bluetooth.audio",
         "brightness.set",
         "volume.set",
         "airplane.toggle",

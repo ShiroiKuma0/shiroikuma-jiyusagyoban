@@ -2154,6 +2154,22 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "bluetooth.audio",
+            name = "Bluetooth Audio Device",
+            description = "Check, connect, disconnect or toggle paired earphones / a headset — flashes the result",
+            category = "Settings",
+            fields = listOf(
+                ActionField("address", "Device address", FieldType.TEXT, required = true, hint = "e.g. C1:EB:C2:F1:FC:17 or %var"),
+                ActionField("mode", "Mode", FieldType.DROPDOWN, required = true, hint = "check / connect / disconnect / toggle", options = listOf("check", "connect", "disconnect", "toggle")),
+                ActionField("var", "Result variable", FieldType.TEXT, required = false, hint = "check: 1/0 · others: connected / disconnected / asked / failed: …"),
+                ActionField("wait", "Wait (s)", FieldType.NUMBER, required = false, hint = "default 10"),
+                ActionField("flash", "Flash the result", FieldType.DROPDOWN, required = false, hint = "true (default) / false", options = listOf("true", "false")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "brightness.set",
             name = "Set Brightness",
             description = "Set screen brightness level",
