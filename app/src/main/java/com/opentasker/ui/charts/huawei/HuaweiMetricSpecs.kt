@@ -44,8 +44,8 @@ object HuaweiMetricSpecs {
         listOf(STEPS, HEART_RATE, SPO2, RESTING_HEART_RATE, SKIN_TEMPERATURE, ARTERIAL_STIFFNESS)
     }
 
-    /** Drawn after the blood-pressure card rather than before it: the order is a colour decision. */
-    val AFTER_BLOOD_PRESSURE: Set<String> = setOf(HuaweiKeys.SKIN_TEMP, HuaweiKeys.PWV)
+    /** The Watch D3's per-minute rows, drawn only once they hold data. */
+    val DRAWN_ONLY_WITH_DATA: Set<String> = setOf(HuaweiKeys.SKIN_TEMP, HuaweiKeys.PWV)
 
     /** Carried, charted only inside the 診断 card, and never presented as a measurement. */
     val DIAGNOSTIC: List<MetricSpec> by lazy { listOf(CALORIES, DISTANCE) }
@@ -376,10 +376,11 @@ object HuaweiMetricSpecs {
                     + "同じ時間帯に同じやり方で測ること。一回の値は判定ではなく一つの点。",
             ),
             caveat = Loc(
-                "Huawei's grading bands are shown as text, not drawn on the chart: they are Huawei's "
-                    + "and have not been checked against anything here.\n\n",
-                "Huawei の区分は文字で示すだけで、図には引いていない。Huawei のものであって、"
-                    + "こちらで確かめてはいない。\n\n",
+                "Huawei's grading bands — 8 and 10 m/s — are the dashed lines, and the bars are coloured "
+                    + "on the Health index's ramp between them. They are Huawei's and have not been "
+                    + "checked against anything here.\n\n",
+                "Huawei の区分（8 m/s と 10 m/s）を破線で示し、棒はその間の健康指数の採点で塗っている。"
+                    + "Huawei のものであって、こちらで確かめてはいない。\n\n",
             ).then(NOT_TUNED),
         ),
     )

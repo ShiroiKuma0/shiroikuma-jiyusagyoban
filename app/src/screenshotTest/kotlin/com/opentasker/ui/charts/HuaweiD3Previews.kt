@@ -57,12 +57,23 @@ private val SETTLING = HuaweiEcgRecording(
 )
 
 private const val END = 1_792_310_400_000L          // 2026-10-18 morning
+/** INVENTED readings, newest first, chosen to reach every grade and to put two on one day. */
 private val READINGS = listOf(
-    HuaweiBpReading(END - 1 * 3_600_000L, 124.0, 83.0, 76.0),
-    HuaweiBpReading(END - 14 * 3_600_000L, 129.0, 88.0, 81.0),
-    HuaweiBpReading(END - 40 * 3_600_000L, 132.0, 86.0, 79.0),
-    HuaweiBpReading(END - 64 * 3_600_000L, 121.0, 80.0, 72.0),
+    HuaweiBpReading(END - 1 * 3_600_000L, 145.0, 97.0, 73.0),
+    HuaweiBpReading(END - 25 * 3_600_000L, 135.0, 98.0, 75.0),
+    HuaweiBpReading(END - 25 * 3_600_000L - 60_000L, 162.0, 101.0, 70.0),
+    HuaweiBpReading(END - 49 * 3_600_000L, 137.0, 86.0, 70.0),
+    HuaweiBpReading(END - 73 * 3_600_000L, 124.0, 82.0, 78.0),
+    HuaweiBpReading(END - 97 * 3_600_000L, 116.0, 76.0, 81.0),
+    HuaweiBpReading(END - 121 * 3_600_000L, 129.0, 88.0, 81.0),
 )
+
+/** INVENTED: six weeks of one reading a morning, across a month's end — the strip has to scroll. */
+private val SIX_WEEKS = (0 until 42).map { d ->
+    val sys = 118.0 + (d * 37 % 31)
+    HuaweiBpReading(END - d * 86_400_000L, sys, sys * 0.66 + (d % 5), 72.0)
+}
+
 private val BP = BloodPressureChart(
     dumbbells = HourlyEnvelope.dumbbells(
         READINGS.reversed().map { ChartPoint(it.tMs, it.systolic) },
@@ -96,16 +107,61 @@ private fun Frame(lang: BandLanguage, content: @Composable () -> Unit) {
 @Composable
 fun D3CardsEnglish() = Frame(BandLanguage.EN) {
     androidx.compose.foundation.layout.Column {
-        HuaweiBloodPressureCard(BP, ChartViewport(initialEndMs = END, initialSpanMs = 4 * 86_400_000L), rememberCrosshairState()) {}
+        HuaweiBloodPressureCard(BP, READINGS) {}
         HuaweiEcgCard(listOf(SINUS, SETTLING)) {}
     }
 }
 
 @PreviewTest
-@Preview(name = "D3 blood pressure page — 日本語", widthDp = 413, heightDp = 1100, showBackground = true)
+@Preview(name = "D3 blood pressure page — 日本語", widthDp = 413, heightDp = 1300, showBackground = true)
 @Composable
 fun D3BloodPressureJapanese() = Frame(BandLanguage.JA) {
-    HuaweiBloodPressureDetailScreen(BP, READINGS, PaddingValues(10.dp), onBack = {}, nowMs = END)
+    HuaweiBloodPressureDetailScreen(BP, READINGS, PaddingValues(10.dp), onBack = {})
+}
+
+@PreviewTest
+@Preview(name = "D3 blood pressure card — six weeks, English", widthDp = 413, heightDp = 420, showBackground = true)
+@Composable
+fun D3BloodPressureSixWeeks() = Frame(BandLanguage.EN) {
+    HuaweiBloodPressureCard(BP, SIX_WEEKS) {}
+}
+
+@PreviewTest
+@Preview(name = "D3 blood pressure page — unfolded, English", widthDp = 900, heightDp = 1400, showBackground = true)
+@Composable
+fun D3BloodPressurePageUnfolded() = Frame(BandLanguage.EN) {
+    HuaweiBloodPressureDetailScreen(BP, SIX_WEEKS.take(12), PaddingValues(10.dp), onBack = {})
+}
+
+@PreviewTest
+@Preview(name = "D3 blood pressure card — unfolded, English", widthDp = 900, heightDp = 420, showBackground = true)
+@Composable
+fun D3BloodPressureUnfolded() = Frame(BandLanguage.EN) {
+    HuaweiBloodPressureCard(BP, SIX_WEEKS) {}
+}
+
+/** INVENTED: three weeks of the watch's resting heart rate, and four stiffness readings. */
+private val RHR_DAYS = (0 until 21).map { d ->
+    com.opentasker.ui.charts.huawei.HuaweiDayValue(END - (20 - d) * 86_400_000L, 72.0 - d * 0.4 + (d % 3))
+}
+private val PWV_READINGS = listOf(6.5, 7.1, 8.4, 9.6).mapIndexed { i, v ->
+    com.opentasker.ui.charts.huawei.HuaweiDayValue(END - (3 - i) * 5 * 86_400_000L, v)
+}
+
+@PreviewTest
+@Preview(name = "D3 resting HR and stiffness cards — English", widthDp = 413, heightDp = 900, showBackground = true)
+@Composable
+fun D3ValueCardsEnglish() = Frame(BandLanguage.EN) {
+    androidx.compose.foundation.layout.Column {
+        com.opentasker.ui.charts.huawei.HuaweiValueCard(
+            com.opentasker.ui.charts.huawei.HuaweiMetricSpecs.RESTING_HEART_RATE, RHR_DAYS,
+            com.opentasker.ui.charts.huawei.ValueBarsScale.RESTING_HR,
+        ) {}
+        com.opentasker.ui.charts.huawei.HuaweiValueCard(
+            com.opentasker.ui.charts.huawei.HuaweiMetricSpecs.ARTERIAL_STIFFNESS, PWV_READINGS,
+            com.opentasker.ui.charts.huawei.ValueBarsScale.PWV,
+        ) {}
+    }
 }
 
 @PreviewTest
