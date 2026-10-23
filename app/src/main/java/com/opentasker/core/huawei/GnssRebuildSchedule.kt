@@ -19,7 +19,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /**
- * When the phone rebuilds the predicted set: half an hour before the watch will next ask for one.
+ * When the phone rebuilds the predicted set: ten minutes before the watch will next ask for one.
  *
  * ## What the watch does (measured 2026-10-18 – 20)
  *
@@ -33,11 +33,17 @@ import java.time.format.DateTimeFormatter
  * after it. The old nightly build at 00:00 ran two minutes AFTER the 00:00 sync and so handed over a
  * set already a day old, and the watch — which counts 72 h from receipt — over-claimed by that day.
  *
- * ## The rule (白い熊, 2026-10-20)
+ * ## The rule (白い熊, 2026-10-20; the lead and the hold 2026-10-23)
  *
  * Build **[LEAD_MIN] minutes before the first sync slot after 24 hours have passed** since the later
- * of the last forecast the watch took and the last successful build. The build takes about ten
- * minutes, so the watch is handed a set that is about half an hour old.
+ * of the last forecast the watch took and the last successful build, so the watch is handed a set
+ * about ten minutes old. Two holds make that true whatever else connects:
+ * - **A sync waits while a build is running** ([awaitBuild]) — a build that runs past its slot
+ *   delays the sync rather than letting it hand over the old set.
+ * - **The forecast is never handed over twice** ([hasUnservedSet]): until a build newer than the
+ *   watch's last take exists, its ask is declined. Opening 健康 syncs at once, and on 2026-10-23 it
+ *   connected at 11:51 and 07:41 between the slots; after the 24 hours, such a connection would
+ *   otherwise have handed over yesterday's set and restarted the watch's count from it.
  * - Counting from the last build too covers a watch that does not ask (off the wrist, out of
  *   range): the set is rebuilt a day later instead of ageing until the sync refuses it.
  * - When the alarm fires, a retry is planned [RETRY_MIN] minutes on at once. A build that
@@ -60,7 +66,7 @@ object GnssRebuildSchedule {
     /** The watch asks once this long has passed since it received its set. */
     const val ASK_AFTER_HOURS = 24L
 
-    const val LEAD_MIN = 30L
+    const val LEAD_MIN = 10L
     const val RETRY_MIN = 30L
 
     /** One line saying when the next build is planned, beside `built-log.txt`. */
@@ -71,6 +77,10 @@ object GnssRebuildSchedule {
     private const val KEY_TAKEN = "taken_ms"
     private const val KEY_BUILT = "built_ms"
     private const val KEY_NEXT = "next_ms"
+    private const val KEY_FIRED = "fired_ms"
+
+    /** The longest a sync waits for a running build. A build that takes longer has hung. */
+    const val HOLD_MAX_MIN = 20L
     private const val REQUEST = 13121
     internal const val ACTION_BUILD = "com.opentasker.huawei.GNSS_REBUILD"
 
@@ -88,6 +98,30 @@ object GnssRebuildSchedule {
         replan(context, "a build finished")
     }
 
+    /** A build the alarm started is still running: started, not finished, not yet given up on. */
+    fun buildRunning(context: Context, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val p = prefs(context)
+        val fired = p.getLong(KEY_FIRED, 0L)
+        return fired > p.getLong(KEY_BUILT, 0L) && nowMs - fired < HOLD_MAX_MIN * 60_000L
+    }
+
+    /** Hold the caller while [buildRunning], checking every five seconds, for at most [HOLD_MAX_MIN]. */
+    suspend fun awaitBuild(context: Context, onWait: () -> Unit = {}) {
+        if (!buildRunning(context)) return
+        onWait()
+        AppLogger.info(TAG, "A sync waits for the forecast build to finish")
+        while (buildRunning(context)) kotlinx.coroutines.delay(5_000)
+    }
+
+    /**
+     * A set has been built since the watch last took one — the only kind worth handing over. Until
+     * then the store holds the set the watch already has (or an older one), and the ask is declined.
+     */
+    fun hasUnservedSet(context: Context): Boolean {
+        val p = prefs(context)
+        return p.getLong(KEY_BUILT, 0L) > p.getLong(KEY_TAKEN, 0L)
+    }
+
     /** Re-arm on engine start. The first run seeds the receipt time from `band-holds.txt`. */
     fun restore(context: Context) {
         val p = prefs(context)
@@ -97,10 +131,14 @@ object GnssRebuildSchedule {
         }
         val next = p.getLong(KEY_NEXT, 0L)
         val now = System.currentTimeMillis()
+        // A pending retry is kept as it stands; anything else is planned afresh from the rule, so
+        // an update that changes the rule (the lead went from 30 to 10 minutes) takes effect at once.
+        val retrying = p.getLong(KEY_FIRED, 0L) > p.getLong(KEY_BUILT, 0L)
         when {
             next == 0L -> replan(context, "first plan")
             next <= now -> arm(context, now + 60_000L, "the planned build was missed while the engine was down")
-            else -> arm(context, next, "re-armed on engine start")
+            retrying -> arm(context, next, "re-armed on engine start")
+            else -> replan(context, "planned afresh on engine start")
         }
     }
 
@@ -156,6 +194,7 @@ object GnssRebuildSchedule {
     internal fun fire(context: Context) {
         val app = context.applicationContext
         if (EngineShutdown.refuse(app, "planned forecast build")) return
+        prefs(app).edit().putLong(KEY_FIRED, System.currentTimeMillis()).apply()
         arm(app, System.currentTimeMillis() + RETRY_MIN * 60_000L, "retry, in case this build does not finish")
         val intent = Intent(app, AutomationService::class.java).apply {
             action = AutomationService.ACTION_RUN_NOTIFICATION_TASK
