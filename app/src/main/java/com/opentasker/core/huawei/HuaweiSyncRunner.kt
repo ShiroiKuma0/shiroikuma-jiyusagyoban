@@ -518,7 +518,13 @@ object HuaweiSyncRunner {
                 withContext(Dispatchers.IO) {
                     when (want) {
                         HuaweiGnssServer.Want.BROADCAST -> HuaweiGnssSupply.broadcast(context)
-                        HuaweiGnssServer.Want.PREDICTED -> HuaweiGnssSupply.predicted(context)?.also { predictedUntil = it.untilMs }
+                        // Only a set built since the watch's last take: handing the same one over
+                        // again would restart its 24-hour count from now.
+                        HuaweiGnssServer.Want.PREDICTED ->
+                            if (!GnssRebuildSchedule.hasUnservedSet(context)) {
+                                notes += "forecast held for the next build"
+                                null
+                            } else HuaweiGnssSupply.predicted(context)?.also { predictedUntil = it.untilMs }
                         HuaweiGnssServer.Want.OTHER -> null
                     }
                 }?.also { notes += it.note }?.files
@@ -1618,6 +1624,10 @@ object HuaweiSyncRunner {
         // the most often anything happens in this feature, and it costs nothing once the recorded
         // version matches.
         runCatching { recomputeBeatStats(context, db) }
+        // A forecast build is running: wait for it, so this connection hands over the new set
+        // rather than the one the watch already holds. See GnssRebuildSchedule.
+        // Before the lock, so it touches no progress state that may belong to a running sync.
+        GnssRebuildSchedule.awaitBuild(context)
 
         if (!running.tryLock()) {
             // Deliberately NOT touching HuaweiSyncState: the progress on screen belongs to the sync
