@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.roundToInt
 
 /**
  * 健康指数 exists to be checkable, so it is checked.
@@ -22,7 +23,11 @@ class HealthIndexTest {
         sleepMinutes: Int? = 480,
         deepRem: Double? = 0.35,
         steps: Double? = 6_000.0,
-    ) = HealthIndexInputs(restingHr, iqr, spo2, sleepMinutes, deepRem, steps)
+        bpSystolic: Double? = 118.0,
+        bpDiastolic: Double? = 76.0,
+        hrvMs: Double? = 40.0,
+        pwv: Double? = 6.5,
+    ) = HealthIndexInputs(restingHr, iqr, spo2, sleepMinutes, deepRem, steps, bpSystolic, bpDiastolic, hrvMs, pwv)
 
     @Test
     fun `a ramp hits 100 at its best, 0 at its worst, and interpolates between`() {
@@ -53,7 +58,7 @@ class HealthIndexTest {
         val r = HealthIndex.compute(
             inputs(
                 restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.45,
-                steps = 7_500.0,
+                steps = 7_500.0, bpSystolic = 120.0, bpDiastolic = 80.0, hrvMs = 45.0, pwv = 7.9,
             ),
         )
         assertEquals(100, r.value)
@@ -68,26 +73,28 @@ class HealthIndexTest {
         val r = HealthIndex.compute(
             inputs(
                 restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.35,
-                steps = 7_500.0,
+                steps = 7_500.0, bpSystolic = 120.0, bpDiastolic = 80.0, hrvMs = 45.0, pwv = 7.9,
             ),
         )
         // share = (0.35-0.10)/(0.45-0.10) = 71 ; sleep = 100×0.7 + 71×0.3 = 91
         assertEquals(91, r.components.single { it.key == "sleep" }.score)
-        // index = 100×(0.26+0.11+0.17+0.20) + 91×0.26 = 74 + 23.66 = 97.66 → 98
+        // index = 100×0.80 + 91×0.20 = 80 + 18.2 = 98.2 → 98
         assertEquals(98, r.value)
     }
 
     @Test
     fun `the weights sum to one, so a perfect score is reachable`() {
         val total = HealthIndex.W_RESTING_HR + HealthIndex.W_STABILITY +
-            HealthIndex.W_SPO2 + HealthIndex.W_SLEEP + HealthIndex.W_STEPS
+            HealthIndex.W_SPO2 + HealthIndex.W_SLEEP + HealthIndex.W_STEPS +
+            HealthIndex.W_BLOOD_PRESSURE + HealthIndex.W_HRV + HealthIndex.W_PWV
         assertEquals(1.0, total, 1e-9)
         // The printed percentages must sum to 100 too — a panel that publishes its arithmetic and
         // then shows weights adding to 99 undermines the one thing it is for.
         val printed = listOf(
             HealthIndex.W_RESTING_HR, HealthIndex.W_STABILITY, HealthIndex.W_SPO2,
             HealthIndex.W_SLEEP, HealthIndex.W_STEPS,
-        ).sumOf { (it * 100).toInt() }
+            HealthIndex.W_BLOOD_PRESSURE, HealthIndex.W_HRV, HealthIndex.W_PWV,
+        ).sumOf { (it * 100).roundToInt() }
         assertEquals(100, printed)
     }
 
@@ -119,7 +126,7 @@ class HealthIndexTest {
         val r = HealthIndex.compute(HealthIndexInputs(null, null, null, null, null, null))
         assertNull(r.value)
         assertTrue(r.partial)
-        assertEquals(5, r.missing.size)
+        assertEquals(8, r.missing.size)
         assertEquals("—", r.band.en)
     }
 
@@ -136,7 +143,7 @@ class HealthIndexTest {
     @Test
     fun `every component carries its scale text, so the info panel can print the arithmetic`() {
         val r = HealthIndex.compute(inputs())
-        assertEquals(5, r.components.size)
+        assertEquals(8, r.components.size)
         r.components.forEach {
             assertTrue("${it.key} must publish its breakpoints", it.scale.en.isNotBlank())
             assertTrue("${it.key} must publish its weight", it.weight > 0.0)
@@ -220,31 +227,42 @@ class HealthIndexTest {
         val walked = HealthIndex.compute(inputs(steps = 7_500.0))
         assertTrue(
             "steps must be able to move the index (still=${still.value}, walked=${walked.value})",
-            walked.value!! > still.value!! + 15,
+            // Steps carry 13 % since the 2026-10-23 re-weighing: a full ramp moves the index 13.
+            walked.value!! >= still.value!! + 12,
         )
     }
 
     /**
-     * The `hrv` byte is not HRV, so it scores nothing.
-     *
-     * Established against 2 131 records: it correlates POSITIVELY with heart rate where every real
-     * variability metric is negative, carries no sleep-stage information, and has 74 % of its
-     * variance fixed by two firmware flags. Nothing was substituted for it — there is no other field
-     * in this protocol that measures autonomic tone, and a stand-in would be the exact failure this
-     * index exists to avoid.
+     * HRV is back as RMSSD from real beat-to-beat intervals — the `hrv` byte it replaced was a
+     * device state index, and nothing reads that byte now. The order of the components is the order
+     * the info panel prints them in.
      */
     @Test
-    fun `there is no HRV component, and nothing was invented to replace it`() {
+    fun `the components are the eight measured ones, HRV now a real RMSSD`() {
         val r = HealthIndex.compute(inputs())
-        assertEquals(5, r.components.size)
-        assertTrue(
-            "no component may claim to measure variability",
-            r.components.none { it.key == "hrv" || it.label.en.contains("HRV") },
-        )
         assertEquals(
-            listOf("resting_hr", "stability", "spo2", "sleep", "steps"),
+            listOf("resting_hr", "stability", "spo2", "sleep", "steps", "blood_pressure", "hrv", "pwv"),
             r.components.map { it.key },
         )
+        assertEquals("ms", r.components.single { it.key == "hrv" }.unit)
+    }
+
+    /** Blood pressure scores the WORSE of its two pressures, on the BP card's own ESH edges. */
+    @Test
+    fun `blood pressure scores the worse of the two pressures`() {
+        fun bp(s: Double, d: Double) = HealthIndex.compute(inputs(bpSystolic = s, bpDiastolic = d))
+            .components.single { it.key == "blood_pressure" }
+        assertEquals(100, bp(118.0, 76.0).score)
+        assertEquals(0, bp(165.0, 76.0).score)
+        assertEquals(0, bp(118.0, 102.0).score)
+        // 140/90: systolic halfway (50), diastolic halfway (50).
+        assertEquals(50, bp(140.0, 90.0).score)
+        // 130/95: systolic 75, diastolic 25 — the diastolic decides.
+        assertEquals(25, bp(130.0, 95.0).score)
+        assertEquals("130/95 mmHg", bp(130.0, 95.0).measuredText)
+        val noCuff = HealthIndex.compute(inputs(bpSystolic = null, bpDiastolic = null))
+        assertTrue(noCuff.partial)
+        assertEquals(listOf("Blood pressure"), noCuff.missing.map { it.en })
     }
 
     /** The dashboard must not offer the derived copy of a number it already draws. */
@@ -267,7 +285,10 @@ class HealthIndexTest {
     @Test
     fun `a poor night reads as poor`() {
         val r = HealthIndex.compute(
-            inputs(restingHr = 82.0, iqr = 22.0, spo2 = 91.0, sleepMinutes = 300, deepRem = 0.12),
+            inputs(
+                restingHr = 82.0, iqr = 22.0, spo2 = 91.0, sleepMinutes = 300, deepRem = 0.12,
+                bpSystolic = 155.0, bpDiastolic = 98.0, hrvMs = 17.0, pwv = 9.8,
+            ),
         )
         assertTrue("expected a low index, got ${r.value}", r.value!! < 30)
         assertEquals("Very low", r.band.en)

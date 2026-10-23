@@ -134,6 +134,8 @@ object RecoveryBuild {
         respirationPoints: List<ChartPoint> = emptyList(),
         /** Per-window HF power (`rri_f8`), for the consecutive-night run. Empty for the Hume band. */
         hfPoints: List<ChartPoint> = emptyList(),
+        /** The Watch D3's blood pressure, resting heart rate and stiffness. Empty elsewhere. */
+        watch: RecoverySource.WatchSeries = RecoverySource.WatchSeries(),
         sessions_: List<TrainingSessions.Session>,
         sessionOpen: Boolean,
         localDateOf: (Long) -> Long,
@@ -167,6 +169,7 @@ object RecoveryBuild {
         val history = nights.map {
             RecoverySource.metricsFor(
                 it, hrPoints, tempPoints, spo2Points, hrvPoints, respirationPoints, hfPoints,
+                watch, stepPoints,
             )
         }
         // By the night's END: the morning it is filed under. See [ratableMorning].
@@ -254,6 +257,23 @@ object RecoveryBuild {
             RecoveryMarker.HR_SWING, latest.hrSwing, prior.mapNotNull { it.hrSwing },
             Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
         )
+        // The rest of what is measured, display-only: the night's restorative share and oxygen, the
+        // day's steps, and the Watch D3's morning readings. Each is judged on ITS OWN count of
+        // earlier values, as skin temperature is — the cuff began on 2026-10-17 and a confidence
+        // taken from the night count would band five readings as though they were fifty.
+        fun shown(marker: RecoveryMarker, pick: (RecoverySource.NightMetrics) -> Double?, meaningful: Double): MarkerReading {
+            val past = prior.mapNotNull(pick)
+            return Recovery.band(marker, pick(latest), past, meaningful, Recovery.confidenceFor(past.size), counted = false)
+        }
+        val extra = listOf(
+            shown(RecoveryMarker.DEEP_REM, { it.deepRemShare }, Recovery.DEEP_REM_MEANINGFUL_SHARE),
+            shown(RecoveryMarker.RESTING_HR, { it.restingHrWatch }, Recovery.RESTING_HR_MEANINGFUL_BPM),
+            shown(RecoveryMarker.BP_SYSTOLIC, { it.bpSystolic }, Recovery.BP_MEANINGFUL_MMHG),
+            shown(RecoveryMarker.BP_DIASTOLIC, { it.bpDiastolic }, Recovery.BP_MEANINGFUL_MMHG),
+            shown(RecoveryMarker.SPO2, { it.spo2 }, Recovery.SPO2_MEANINGFUL_PCT),
+            shown(RecoveryMarker.PWV, { it.pwv }, Recovery.PWV_MEANINGFUL_MS),
+            shown(RecoveryMarker.STEPS, { it.steps }, Recovery.STEPS_MEANINGFUL),
+        )
         // Over the whole history, not just the baseline window: a run is a property of the sequence
         // and truncating the sequence truncates the run.
         val hrvRun = Recovery.runAbove(history.map { it.hfPower })
@@ -285,6 +305,7 @@ object RecoveryBuild {
                 hrv = hrv,
                 hrSwing = swing,
                 hrvRunNights = hrvRun,
+                extra = extra,
         )
         return Assembled(
             recovery = assembledRecovery,
@@ -344,6 +365,13 @@ object RecoveryBuild {
             series(RecoveryMarker.HRV) { it.hrvMs },
             series(RecoveryMarker.HR_SWING) { it.hrSwing },
             series(RecoveryMarker.RESPIRATION) { it.respirationBpm },
+            series(RecoveryMarker.DEEP_REM) { it.deepRemShare },
+            series(RecoveryMarker.RESTING_HR) { it.restingHrWatch },
+            series(RecoveryMarker.BP_SYSTOLIC) { it.bpSystolic },
+            series(RecoveryMarker.BP_DIASTOLIC) { it.bpDiastolic },
+            series(RecoveryMarker.SPO2) { it.spo2 },
+            series(RecoveryMarker.PWV) { it.pwv },
+            series(RecoveryMarker.STEPS) { it.steps },
         ).toMap()
     }
 

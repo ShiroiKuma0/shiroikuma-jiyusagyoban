@@ -180,10 +180,19 @@ val DEFAULT_ROWS = listOf(
     RecoveryMarker.SLEEP,
     RecoveryMarker.BEDTIME_HR,
     RecoveryMarker.NOCTURNAL_HR,
+    RecoveryMarker.RESTING_HR,
+    // The morning cuff reading, as two rows: the two pressures move apart often enough that one
+    // row for both would have to pick which one to colour.
+    RecoveryMarker.BP_SYSTOLIC,
+    RecoveryMarker.BP_DIASTOLIC,
     RecoveryMarker.DEEP,
+    RecoveryMarker.DEEP_REM,
     RecoveryMarker.HRV,
     RecoveryMarker.HR_SWING,
     RecoveryMarker.RESPIRATION,
+    RecoveryMarker.SPO2,
+    RecoveryMarker.PWV,
+    RecoveryMarker.STEPS,
     RecoveryMarker.FELT,
 )
 
@@ -197,7 +206,10 @@ val DEFAULT_ROWS = listOf(
  * came out in good-step green above the same sentence. A card whose colours argue with its own text
  * teaches a reader to ignore the colours.
  *
- * So this card grades by DISTANCE: inside the usual band is the middle step, outside it is step 4,
+ * **The rows no longer use it** (2026-10-23): they take [MarkerReading.displayStep], the recovery
+ * card's grading. It still colours the sickness-behaviour box, where the distance is the point.
+ *
+ * So this card graded by DISTANCE: inside the usual band is the middle step, outside it is step 4,
  * and twice the band's half-width is step 5. The direction is not lost — the signed delta carries it
  * on every row, and carries it in greyscale, which the colour never could.
  */
@@ -217,20 +229,25 @@ private fun unusualness(r: MarkerReading): Int? {
 @Composable
 private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) {
     val lang = LocalBandLanguage.current
-    // Distance from usual, not better-or-worse — see [unusualness]. Null when there is no baseline
-    // yet, and then the row is drawn in plain ink rather than given a colour it has not earned.
-    // Skin temperature is the exception: it is graded 1–5 here as in the night table, cooler than
-    // usual towards 1 and warmer towards 5, and yellow while its baseline is collecting (白い熊,
-    // 2026-10-19). Only warmth is a cue, so its grade and its distance never argue.
-    val step = if (r.marker == RecoveryMarker.TEMPERATURE) r.displayStep else unusualness(r)
+    // The recovery card's grading since 2026-10-23 (白い熊: "the strip should use the recovery-card
+    // color grading"): blue 3 inside the usual range, yellow 1 and green 2 better than usual, 4 and
+    // 5 worse — one colour vocabulary on the whole page. It graded by DISTANCE until then (see
+    // [unusualness]), which painted a high HRV dark red; the long-night caveat that argued for
+    // distance is now carried by the text box under the chart, which still grades that way.
+    // Null when there is no baseline yet, and then the row is drawn in plain ink.
+    val step = r.displayStep
     val tint = step?.let { ChartPalette.scale(it) } ?: sectionNote
 
     Row(
         Modifier
             .fillMaxWidth()
+            // The whole line in its step's colour, faintly, as well as the bar: the bar alone was too
+            // small to scan down the strip by (白い熊, 2026-10-23).
+            .clip(RoundedCornerShape(6.dp))
+            .background(step?.let { ChartPalette.scale(it).copy(alpha = ROW_TINT_ALPHA) } ?: Color.Transparent)
             // Padding BEFORE clickable, so the whole row is the target rather than the text inside
             // it — the same trap the morning card's number buttons carry a note about.
-            .padding(vertical = 2.dp)
+            .padding(vertical = 4.dp, horizontal = 4.dp)
             .then(if (onOpen != null) Modifier.clickable { onOpen(r.marker) } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -296,7 +313,7 @@ private fun DeviationRow(r: MarkerReading, onOpen: ((RecoveryMarker) -> Unit)?) 
 private fun ScoreBar(tint: Color, height: Dp = 10.dp) {
     Box(
         Modifier
-            .width(6.dp)
+            .width(10.dp)
             .clip(RoundedCornerShape(2.dp))
             .background(tint)
             .padding(vertical = height),

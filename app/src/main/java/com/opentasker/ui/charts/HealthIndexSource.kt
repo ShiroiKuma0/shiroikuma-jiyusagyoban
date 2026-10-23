@@ -35,10 +35,19 @@ object HealthIndexSource {
         return q3 - q1
     }
 
+    /** The inputs only the Watch D3 era has. All null for the Hume band, which measured none. */
+    data class Extras(
+        val bpSystolic: Double? = null,
+        val bpDiastolic: Double? = null,
+        val hrvMs: Double? = null,
+        val pwv: Double? = null,
+    )
+
     fun compute(
         metrics: List<MetricChart>,
         latestSleep: SleepSession?,
         spo2Times: Set<Long>,
+        extras: Extras = Extras(),
     ): HealthIndexResult {
         val hrPoints = pointsOf(metrics, BandMetric.HEART_RATE)
         val spo2Points = pointsOf(metrics, BandMetric.SPO2)
@@ -67,6 +76,10 @@ object HealthIndexSource {
                 sleepMinutes = latestSleep?.totalMinutes,
                 deepRemShare = latestSleep?.deepRemShare,
                 steps = stepsLastDay(metrics),
+                bpSystolic = extras.bpSystolic,
+                bpDiastolic = extras.bpDiastolic,
+                hrvMs = extras.hrvMs,
+                pwv = extras.pwv,
             ),
         )
     }

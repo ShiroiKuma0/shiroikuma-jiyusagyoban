@@ -52,6 +52,8 @@ data class IndexComponent(
     val scale: Loc,
     /** Why it is missing, when it is. */
     val missingReason: Loc? = null,
+    /** The measurement as printed, when one number cannot carry it — a cuff reading is two. */
+    val measuredText: String? = null,
 ) {
     val contribution: Double get() = (score ?: 0) * weight
 }
@@ -103,6 +105,13 @@ data class HealthIndexInputs(
      * confused with missing.
      */
     val steps: Double? = null,
+    /** The latest cuff reading within a week, mmHg. Both or neither. */
+    val bpSystolic: Double? = null,
+    val bpDiastolic: Double? = null,
+    /** Last night's median RMSSD, ms. */
+    val hrvMs: Double? = null,
+    /** The latest pulse-wave velocity within a month, m/s. */
+    val pwv: Double? = null,
 )
 
 object HealthIndex {
@@ -138,15 +147,27 @@ object HealthIndex {
     }
 
     /**
+     * The word for one COMPONENT's 0–100. The same as [bandOf] except for blood pressure, whose bad
+     * end reads "Bad" and "Very bad" (白い熊, 2026-10-23): "low" blood pressure is a condition of its
+     * own, so "Very low" beside a reading of 145/97 says the opposite of what is meant.
+     */
+    fun bandOf(score: Int?, componentKey: String): Loc =
+        if (componentKey == "blood_pressure") when (score?.let(::step)) {
+            4 -> Loc("Bad", "悪い")
+            5 -> Loc("Very bad", "とても悪い")
+            else -> bandOf(score)
+        } else bandOf(score)
+
+    /**
      * Breakpoints, and where they come from.
      *
      * **These are the same numbers as the metric cards' band ladders**, and `HealthIndexTest` asserts
      * it. That is what stops the two disagreeing: a card cannot read "Standard" while the index
      * scores the same metric 15 out of 100, because both are reading one set of edges.
      *
-     * ## There is no HRV component, and there was one
+     * ## The HRV component, removed and restored
      *
-     * It was removed on 2026-08-06 after the field it read turned out not to be HRV. Forensic
+     * The first one was removed on 2026-08-06 after the field it read turned out not to be HRV. Forensic
      * analysis of 2 131 records established that the `hrv` byte has **positive** correlation with
      * heart rate (+0.383 pooled, +0.179 asleep) where every real variability metric is negative; that
      * it carries **no sleep-stage information at all** (deep 21.0, light 21.0, REM 20.5 — effect size
@@ -155,9 +176,9 @@ object HealthIndex {
      * flags** — sleep mode, and whether the PPG read succeeded. It is a device state index wearing
      * an HRV label.
      *
-     * Its 25 % was redistributed across the four surviving components in proportion. Nothing was
-     * substituted for it: there is no other field in this protocol that measures autonomic tone, and
-     * inventing a stand-in would be exactly the failure this index exists to avoid.
+     * Its 25 % was redistributed across the four surviving components in proportion, and nothing
+     * stood in for it until a real measurement existed: since 2026-10-23 it is RMSSD computed from
+     * the Watch D3's beat-to-beat intervals — see [HRV_BEST].
      */
     const val HR_WORST = 85.0
     const val HR_BEST = 50.0
@@ -187,15 +208,45 @@ object HealthIndex {
     const val STEPS_WORST = 3_000.0
     const val STEPS_BEST = 7_500.0
 
+    /**
+     * Blood pressure, HRV and arterial stiffness. Added 2026-10-23 at 白い熊's instruction, when the
+     * Watch D3 began measuring all three.
+     *
+     * **Blood pressure** takes the blood-pressure card's own grade edges — the ESH office categories
+     * — as every component here takes its card's: 120/80 or below scores 100, 160/100 scores 0, and
+     * each pressure is scored on its own with the WORSE of the two counting, which is the guideline's
+     * own rule for classifying a reading. Raised blood pressure is the largest single modifiable risk
+     * in the cardiovascular literature, so it takes the weight a resting heart rate does, nearly.
+     *
+     * **HRV** returns as a real measurement this time: RMSSD, computed here from the watch's own
+     * beat-to-beat intervals (the field removed in August was a device-state byte, not HRV). Its
+     * edges, 15 ms and 45 ms, are a wide adult range rather than an age norm — RMSSD falls with age
+     * and an age-matched norm would need an age this app does not hold — so its weight is modest.
+     *
+     * **Arterial stiffness** takes Huawei's own bands: below 8 m/s is normal and scores 100, 10 m/s
+     * or more is their worst band and scores 0. One measurement now and then, so the smallest weight.
+     */
+    const val BP_SYS_BEST = 120.0
+    const val BP_SYS_WORST = 160.0
+    const val BP_DIA_BEST = 80.0
+    const val BP_DIA_WORST = 100.0
+    const val HRV_BEST = 45.0
+    const val HRV_WORST = 15.0
+    const val PWV_BEST = 8.0
+    const val PWV_WORST = 10.0
+
     // --- weights, summing to 1.0 -------------------------------------------------------------
-    // Steps took 20 % on 2026-08-07, out of the other four in proportion (each × 0.8: 26.4, 11.2,
-    // 16.0, 26.4). Rounded to whole percent so the printed weights sum to exactly 100 rather than
-    // 99 — the single point went to blood oxygen, the component furthest from a round number.
-    const val W_RESTING_HR = 0.26
-    const val W_STABILITY = 0.11
-    const val W_SPO2 = 0.17
-    const val W_SLEEP = 0.26
-    const val W_STEPS = 0.20
+    // Re-weighed 2026-10-23 for the three new components. Physiological state keeps most of it:
+    // resting heart rate and sleep a fifth or near it each, blood pressure 15 %, blood oxygen 12 %,
+    // HRV 10 %, heart-rate stability 7 %, arterial stiffness 5 %; steps, the one behaviour, 13 %.
+    const val W_RESTING_HR = 0.18
+    const val W_STABILITY = 0.07
+    const val W_SPO2 = 0.12
+    const val W_SLEEP = 0.20
+    const val W_STEPS = 0.13
+    const val W_BLOOD_PRESSURE = 0.15
+    const val W_HRV = 0.10
+    const val W_PWV = 0.05
 
     /**
      * A piecewise-linear map from a measurement to 0–100.
@@ -248,6 +299,17 @@ object HealthIndex {
                 ),
                 Loc("no step records", "歩数の記録がありません"),
             ) { ramp(it, best = STEPS_BEST, worst = STEPS_WORST) },
+            bloodPressureComponent(inputs),
+            component(
+                "hrv", Loc("HRV (RMSSD)", "心拍変動（RMSSD）"), inputs.hrvMs, "ms", W_HRV,
+                Loc("45 ms or above = 100 · 15 ms = 0", "45 ms 以上 = 100 ／ 15 ms = 0"),
+                Loc("no beat-to-beat intervals last night", "昨夜の拍間隔がありません"),
+            ) { ramp(it, best = HRV_BEST, worst = HRV_WORST) },
+            component(
+                "pwv", Loc("Arterial stiffness", "動脈硬化度"), inputs.pwv, "m/s", W_PWV,
+                Loc("below 8 m/s = 100 · 10 m/s = 0 (Huawei's bands)", "8 m/s 未満 = 100 ／ 10 m/s = 0（Huawei の区分）"),
+                Loc("no measurement in the last 30 days", "過去 30 日に測定がありません"),
+            ) { ramp(it, best = PWV_BEST, worst = PWV_WORST) },
         )
 
         val available = components.filter { it.score != null }
@@ -289,6 +351,28 @@ object HealthIndex {
         return IndexComponent(
             "sleep", Loc("Sleep", "睡眠"), minutes.toDouble(), "min", score, W_SLEEP,
             SLEEP_SCALE,
+        )
+    }
+
+    /** The worse of the two pressures, each on its own ESH ramp — see [BP_SYS_BEST]. */
+    private fun bloodPressureComponent(inputs: HealthIndexInputs): IndexComponent {
+        val sys = inputs.bpSystolic
+        val dia = inputs.bpDiastolic
+        val label = Loc("Blood pressure", "血圧")
+        val scale = Loc(
+            "120/80 or below = 100 · 160/100 = 0, the worse of the two counting",
+            "120/80 以下 = 100 ／ 160/100 = 0。上と下の悪い方で採点",
+        )
+        if (sys == null || dia == null) {
+            return IndexComponent(
+                "blood_pressure", label, null, "mmHg", null, W_BLOOD_PRESSURE, scale,
+                Loc("no cuff reading in the last 7 days", "過去 7 日に血圧の測定がありません"),
+            )
+        }
+        val score = minOf(ramp(sys, BP_SYS_BEST, BP_SYS_WORST), ramp(dia, BP_DIA_BEST, BP_DIA_WORST))
+        return IndexComponent(
+            "blood_pressure", label, sys, "mmHg", score, W_BLOOD_PRESSURE, scale,
+            measuredText = "${sys.roundToInt()}/${dia.roundToInt()} mmHg",
         )
     }
 

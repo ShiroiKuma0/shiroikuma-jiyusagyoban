@@ -227,5 +227,7 @@ private fun markerColour(marker: RecoveryMarker): androidx.compose.ui.graphics.C
         ChartPalette.HEART_RATE
     RecoveryMarker.FELT -> ChartPalette.BAND_WARN
     RecoveryMarker.TEMPERATURE -> ChartPalette.TEMPERATURE
+    RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC -> ChartPalette.BLOOD_PRESSURE
+    RecoveryMarker.RESTING_HR -> ChartPalette.RESTING_HEART_RATE
     else -> ChartPalette.STEPS
 }
