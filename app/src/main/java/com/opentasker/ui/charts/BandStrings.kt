@@ -126,6 +126,12 @@ object BandText {
     val markerBedtimeHr = Loc("Going-to-bed heart rate", "就寝時心拍")
     val markerRespiration = Loc("Breathing rate", "呼吸数")
     val markerHrSwing = Loc("Night's HR swing", "夜間心拍の振れ")
+    val markerBpSystolic = Loc("Blood pressure, systolic", "血圧（収縮期）")
+    val markerBpDiastolic = Loc("Blood pressure, diastolic", "血圧（拡張期）")
+    val markerRestingHr = Loc("Resting heart rate (watch)", "安静時心拍（時計）")
+    val markerSpo2 = Loc("Blood oxygen, night", "夜間の血中酸素")
+    val markerPwv = Loc("Arterial stiffness", "動脈硬化度")
+    val markerSteps = Loc("Steps, the day before", "前日の歩数")
     /** Under the chart: what it is, in as few words as it takes. One series needs no legend. */
     val curveCaption = Loc("Heart rate through the night", "一晩の心拍の推移")
 
@@ -615,6 +621,10 @@ object BandText {
     val indexContribution = Loc(
         "measured %.1f %s → %d points → contributes %.1f",
         "実測 %.1f %s → %d 点 → 寄与 %.1f",
+    )
+    val indexContributionText = Loc(
+        "measured %s → %d points → contributes %.1f",
+        "実測 %s → %d 点 → 寄与 %.1f",
     )
     val indexTargets = Loc("What to aim for", "何を目指すか")
     val indexHowRead = Loc("How to read it", "この数字の読み方")

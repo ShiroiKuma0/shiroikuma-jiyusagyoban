@@ -100,7 +100,9 @@ fun HealthIndexCard(
         val valueWidth = labelColumnWidth(index.components.map { it.score?.toString() ?: "—" } + "100")
             // Measured over EVERY band word, not only the ones on screen today: the column must not
             // change width when a component moves from "Good" to "Very low" overnight.
-        val bandWidth = labelColumnWidth((0..100 step 10).map { HealthIndex.bandOf(it)[lang] })
+        val bandWidth = labelColumnWidth(
+            (0..100 step 10).flatMap { listOf(HealthIndex.bandOf(it)[lang], HealthIndex.bandOf(it, "blood_pressure")[lang]) },
+        )
         temperature?.takeIf { it.value != null }?.let { TemperatureRow(it, labelWidth) }
         index.components.forEach { ComponentRow(it, labelWidth, valueWidth, bandWidth) }
 
@@ -213,17 +215,25 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp, band
             ScoreBar(c.score)
         }
         Spacer(Modifier.width(10.dp))
-        // The band word, in the bar's own colour. The colour is an extension of a rule written for
-        // the total (see HealthIndex.step), so the word carries the claim and the colour agrees with
-        // it — rather than a hue asserting a grade on its own.
-        Text(
-            HealthIndex.bandOf(c.score)[lang],
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.width(bandWidth),
-            color = c.score?.let { ChartPalette.scale(HealthIndex.step(it)) } ?: sectionNote,
-        )
+        // The band word, in a pill of the bar's own colour with that step's own ink. It was the word
+        // in the colour itself, and the 5's dark red on this ground could not be read (白い熊,
+        // 2026-10-23). The colour is an extension of a rule written for the total (see
+        // HealthIndex.step), so the word carries the claim and the colour agrees with it.
+        val step = c.score?.let { HealthIndex.step(it) }
+        Box(Modifier.width(bandWidth + 12.dp)) {
+            Text(
+                HealthIndex.bandOf(c.score, c.key)[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+                color = step?.let { ChartPalette.scaleInk(it) } ?: sectionNote,
+                modifier = if (step == null) Modifier else Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(ChartPalette.scale(step))
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+            )
+        }
         Spacer(Modifier.width(8.dp))
         Text(
             if (c.score == null) "—" else "${c.score}",
@@ -253,7 +263,8 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp, band
 @Composable
 private fun ScoreBar(score: Int?) {
     val tint = score?.let { ChartPalette.scale(HealthIndex.step(it)) }
-    Canvas(Modifier.fillMaxWidth().height(6.dp)) {
+    // 14 dp since 2026-10-23 (白い熊: "make all the horizontal bars thicker — there's space").
+    Canvas(Modifier.fillMaxWidth().height(14.dp)) {
         val r = size.height / 2f
         drawRoundRect(
             color = Color.White.copy(alpha = 0.08f),
@@ -391,8 +402,9 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     if (c.score == null) {
                         BandText.indexMissing[lang].format(c.missingReason?.get(lang).orEmpty())
                     } else {
-                        BandText.indexContribution[lang]
-                            .format(c.measured ?: 0.0, c.unit, c.score, c.contribution)
+                        c.measuredText?.let { BandText.indexContributionText[lang].format(it, c.score, c.contribution) }
+                            ?: BandText.indexContribution[lang]
+                                .format(c.measured ?: 0.0, c.unit, c.score, c.contribution)
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     fontSize = InfoType.BODY_SP,

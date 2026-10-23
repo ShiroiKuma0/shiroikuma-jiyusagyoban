@@ -116,6 +116,9 @@ data class HuaweiDashboardState(
      */
     val bloodPressure: com.opentasker.ui.charts.BloodPressureChart? = null,
     val bpReadings: List<HuaweiBpReading> = emptyList(),
+    /** The watch's resting heart rate, one per day (that day's last figure), and every stiffness reading. */
+    val restingHrDays: List<HuaweiDayValue> = emptyList(),
+    val pwvReadings: List<HuaweiDayValue> = emptyList(),
     /** The Watch D3's ECG recordings, newest first. */
     val ecg: List<HuaweiEcgRecording> = emptyList(),
     /** The Watch D3's pulse-wave arrhythmia checks, newest first. */
@@ -305,6 +308,8 @@ class HuaweiDashboardModel(
             metrics = charts,
             bloodPressure = bp.first,
             bpReadings = bp.second,
+            restingHrDays = loadDayValues(HuaweiKeys.RESTING_HR, lastPerDay = true),
+            pwvReadings = loadDayValues(HuaweiKeys.PWV, lastPerDay = false),
             ecg = ecg,
             arrhythmia = arrhythmia,
             coverage = coverage,
@@ -381,11 +386,15 @@ class HuaweiDashboardModel(
         val minuteOfDayOf: (Long) -> Double =
             { ms -> com.opentasker.ui.charts.SleepShape.minuteOfDay(ms, zone).toDouble() }
 
+        // Read once and handed to all three users: the strip, the index and the day table.
+        val watch = watchSeries()
+        val rmssd = nightlyRmssd()
         val assembled = com.opentasker.ui.charts.RecoveryBuild.build(
             metrics = rekeyed,
-            hrvPoints = publishableRmssd(),
+            hrvPoints = rmssd,
             respirationPoints = respirationPoints(),
             hfPoints = publishableField(8),
+            watch = watch,
             sessions = nights,
             ratings = com.opentasker.core.band.RecoveryLog.all(appContext),
             notes = com.opentasker.core.band.DayNotes.RECOVERY.all(appContext),
@@ -422,10 +431,14 @@ class HuaweiDashboardModel(
             sleepSessions = nights,
             spo2Times = emptySet(),
             zone = zone,
+            watch = watch,
+            hrv = rmssd,
         )
 
         return Derived(
-            index = com.opentasker.ui.charts.HealthIndexSource.compute(rekeyed, latest, emptySet()),
+            index = com.opentasker.ui.charts.HealthIndexSource.compute(
+                rekeyed, latest, emptySet(), indexExtras(assembled.recovery, watch),
+            ),
             days = days,
             recovery = assembled.recovery,
             lastNightHrCurve = assembled.lastNightHrCurve,
@@ -497,6 +510,61 @@ class HuaweiDashboardModel(
         return runCatching { dao.range(HuaweiRriKeys.metricFor(field), from, to) }.getOrNull().orEmpty()
             .filter { it.epochSeconds in publishable }
             .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+    }
+
+    /**
+     * RMSSD for the nightly figure: our own, from the beat-to-beat intervals, wherever it exists.
+     *
+     * The Band's panel (`rri_f5`) stopped on 2026-10-17 — the Watch D3 does not send it — while the
+     * intervals kept arriving, and `beat_rmssd` is computed from them every night. One estimator has
+     * to carry the whole baseline, or the change of device reads as a change in 白い熊: on the
+     * nights both exist ours runs 10–30 % below the panel's, because it corrects artefacts the
+     * band's figure keeps. So ours is used for every night it covers (from 2026-09-09) and the
+     * panel only before ours began.
+     */
+    private suspend fun nightlyRmssd(): List<ChartPoint> {
+        val ours = runCatching {
+            db.huaweiSampleDao().range(HuaweiRriKeys.BEAT_RMSSD, 0L, Long.MAX_VALUE / 2)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
+        val from = ours.minOfOrNull { it.tMs } ?: return publishableRmssd()
+        return publishableRmssd().filter { it.tMs < from } + ours
+    }
+
+    /** The Watch D3's morning readings, as points, for the strip. */
+    private suspend fun watchSeries(): com.opentasker.ui.charts.RecoverySource.WatchSeries {
+        val dao = db.huaweiSampleDao()
+        suspend fun points(key: String) = runCatching {
+            dao.range(HuaweiKeys.storageKey(key), 0L, Long.MAX_VALUE / 2000)
+                .map { ChartPoint(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList())
+        return com.opentasker.ui.charts.RecoverySource.WatchSeries(
+            bpSystolic = points(HuaweiKeys.BP_SYSTOLIC),
+            bpDiastolic = points(HuaweiKeys.BP_DIASTOLIC),
+            restingHr = points(HuaweiKeys.RESTING_HR),
+            pwv = points(HuaweiKeys.PWV),
+        )
+    }
+
+    /**
+     * The index's newer inputs: the latest cuff reading within a week, last night's RMSSD, and the
+     * latest stiffness measurement within a month. Older than that and the component is MISSING,
+     * not scored on a stale number — the index says what it did not have.
+     */
+    private fun indexExtras(
+        recovery: com.opentasker.ui.charts.RecoveryResult?,
+        w: com.opentasker.ui.charts.RecoverySource.WatchSeries,
+    ): com.opentasker.ui.charts.HealthIndexSource.Extras {
+        val now = System.currentTimeMillis()
+        fun latestWithin(points: List<ChartPoint>, ms: Long) = points.filter { it.tMs >= now - ms }.maxByOrNull { it.tMs }
+        val sys = latestWithin(w.bpSystolic, 7 * 86_400_000L)
+        val dia = sys?.let { s -> w.bpDiastolic.firstOrNull { it.tMs == s.tMs } }
+        return com.opentasker.ui.charts.HealthIndexSource.Extras(
+            bpSystolic = dia?.let { sys.value },
+            bpDiastolic = dia?.value,
+            hrvMs = recovery?.markers?.firstOrNull { it.marker == com.opentasker.ui.charts.RecoveryMarker.HRV }?.value,
+            pwv = latestWithin(w.pwv, 30 * 86_400_000L)?.value,
+        )
     }
 
     /**
@@ -598,6 +666,23 @@ class HuaweiDashboardModel(
      * one instant, so they are joined on that instant — a reading missing either pressure is not a
      * reading and is left out rather than half-drawn.
      */
+    /**
+     * A single-number series for the bar charts. With [lastPerDay], one per local day — the watch
+     * recomputes its resting heart rate several times a day, and the day's last figure is the one it
+     * settled on; without, every reading, which is what a measurement taken by hand is.
+     */
+    private suspend fun loadDayValues(key: String, lastPerDay: Boolean): List<HuaweiDayValue> {
+        val zone = java.time.ZoneId.systemDefault()
+        val all = runCatching {
+            db.huaweiSampleDao().range(HuaweiKeys.storageKey(key), 0L, Long.MAX_VALUE / 2000)
+                .filter { it.value > 0 }
+                .map { HuaweiDayValue(it.epochSeconds * 1000L, it.value) }
+        }.getOrDefault(emptyList()).sortedBy { it.tMs }
+        if (!lastPerDay) return all
+        return all.groupBy { java.time.Instant.ofEpochMilli(it.tMs).atZone(zone).toLocalDate() }
+            .values.map { it.last() }.sortedBy { it.tMs }
+    }
+
     private suspend fun loadBloodPressure(): Pair<com.opentasker.ui.charts.BloodPressureChart?, List<HuaweiBpReading>> {
         val dao = db.huaweiSampleDao()
         val all = 0L to Long.MAX_VALUE / 2000
@@ -687,19 +772,20 @@ class HuaweiDashboardModel(
         val retained = chunk.segments.flatMap { it.points }
         val lastDay = HealthIndexSource.lastDay(retained)
 
+        // The number alone, as on the Hume side: the card prints [MetricSpec.unit] beside it in its
+        // own smaller text, and a unit written in here too read "66 bpm bpm" (fixed 2026-10-23).
         val headline = when {
             retained.isEmpty() -> "—"
             // A bar metric headlines its 24 h TOTAL, matching the Hume screen so the two figures
             // answer the same question.
-            spec.render == RenderKind.BARS -> spec.format(lastDay.sumOf { it.value }) + " " + spec.unit
+            spec.render == RenderKind.BARS -> spec.format(lastDay.sumOf { it.value })
             spec.headlineIsRange -> {
                 val lo = lastDay.minOfOrNull { it.value }
                 val hi = lastDay.maxOfOrNull { it.value }
                 if (lo == null || hi == null) "—"
-                else "${spec.format(lo)}–${spec.format(hi)} ${spec.unit}"
+                else "${spec.format(lo)}–${spec.format(hi)}"
             }
-            else -> HealthIndexSource.median(lastDay.map { it.value })
-                ?.let { "${spec.format(it)} ${spec.unit}" } ?: "—"
+            else -> HealthIndexSource.median(lastDay.map { it.value })?.let { spec.format(it) } ?: "—"
         }
 
         return MetricChart(
