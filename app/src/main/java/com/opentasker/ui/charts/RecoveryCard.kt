@@ -206,7 +206,16 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
     } else {
         null
     }
-    Column {
+    // The whole line in the reading's own 1–5 colour, faintly, so a row can be found by its grade
+    // from across the card — the chip carries the same colour at full strength (白い熊, 2026-10-23).
+    val step = m.displayStep
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(step?.let { ChartPalette.scale(it).copy(alpha = ROW_TINT_ALPHA) } ?: Color.Transparent)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 markerLabel(m.marker)[lang],
@@ -227,7 +236,8 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
                 color = sectionInk,
                 maxLines = 1,
                 softWrap = false,
-                modifier = if (narrow) Modifier else Modifier.width(86.dp),
+                // 112 dp: "130 mmHg" did not fit the old 86 and ran under the chip.
+                modifier = if (narrow) Modifier else Modifier.width(112.dp),
             )
             Spacer(Modifier.width(if (narrow) 8.dp else 0.dp))
             BandChip(m)
@@ -261,16 +271,34 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
 @Composable
 private fun BandChip(m: MarkerReading) {
     val lang = LocalBandLanguage.current
-    val (label, tint) = when (m.band) {
-        RecoveryBand.USUAL -> BandText.bandUsual[lang] to ChartPalette.BAND_GOOD
-        RecoveryBand.HIGH -> BandText.bandHigh[lang] to
-            (if (m.adverse) ChartPalette.BAND_SERIOUS else ChartPalette.BAND_GOOD)
-        RecoveryBand.LOW -> BandText.bandLow[lang] to
-            (if (m.adverse) ChartPalette.BAND_SERIOUS else ChartPalette.BAND_GOOD)
-        RecoveryBand.UNKNOWN -> BandText.bandUnknown[lang] to LocalChartStyle.current.axisText
+    val label = when (m.band) {
+        RecoveryBand.USUAL -> BandText.bandUsual[lang]
+        RecoveryBand.HIGH -> BandText.bandHigh[lang]
+        RecoveryBand.LOW -> BandText.bandLow[lang]
+        RecoveryBand.UNKNOWN -> BandText.bandUnknown[lang]
     }
-    ValueChip(label, tint)
+    // Filled in the reading's 1–5 step, with that step's own ink: usual is the blue 3, better than
+    // usual 2 and 1, worse 4 and 5 — the night table's grading, so a colour means one thing in both.
+    // It was a green outline whatever the band, which said nothing a reader could see.
+    val step = m.displayStep
+    if (step == null) {
+        ValueChip(label, LocalChartStyle.current.axisText)
+        return
+    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
+        fontWeight = FontWeight.Bold,
+        color = ChartPalette.scaleInk(step),
+        modifier = Modifier
+            .clip(RoundedCornerShape(100.dp))
+            .background(ChartPalette.scale(step))
+            .padding(horizontal = 10.dp, vertical = 2.dp),
+    )
 }
+
+/** How strongly a whole row takes its grade's colour — enough to scan by, faint enough to read on. */
+internal const val ROW_TINT_ALPHA = 0.22f
 
 /**
  * Sleep regularity — the single best-evidenced number on this card.
@@ -521,6 +549,12 @@ fun markerLabel(m: RecoveryMarker): Loc = when (m) {
     RecoveryMarker.BEDTIME_HR -> BandText.markerBedtimeHr
     RecoveryMarker.RESPIRATION -> BandText.markerRespiration
     RecoveryMarker.HR_SWING -> BandText.markerHrSwing
+    RecoveryMarker.BP_SYSTOLIC -> BandText.markerBpSystolic
+    RecoveryMarker.BP_DIASTOLIC -> BandText.markerBpDiastolic
+    RecoveryMarker.RESTING_HR -> BandText.markerRestingHr
+    RecoveryMarker.SPO2 -> BandText.markerSpo2
+    RecoveryMarker.PWV -> BandText.markerPwv
+    RecoveryMarker.STEPS -> BandText.markerSteps
 }
 
 /**
@@ -728,6 +762,12 @@ fun markerValue(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: Boo
         // A span of heart rate, so bpm — but never rounded away to nothing: the whole quantity on a
         // flat night is six of them.
         RecoveryMarker.HR_SWING -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
+        RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC ->
+            if (unit) "${v.roundToInt()} mmHg" else "${v.roundToInt()}"
+        RecoveryMarker.RESTING_HR -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
+        RecoveryMarker.SPO2 -> if (unit) "${v.roundToInt()} %" else "${v.roundToInt()}"
+        RecoveryMarker.PWV -> if (unit) String.format("%.1f m/s", v) else String.format("%.1f", v)
+        RecoveryMarker.STEPS -> String.format(java.util.Locale.US, "%,d", v.roundToInt())
     }
 
 /** Same measured-not-guessed column trick as the health index — see `labelColumnWidth` there. */

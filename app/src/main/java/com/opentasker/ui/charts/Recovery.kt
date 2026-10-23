@@ -100,6 +100,30 @@ enum class RecoveryMarker {
      * there is no night here against which its behaviour has been seen.
      */
     RESPIRATION,
+
+    /**
+     * The Watch D3's own readings, added to the strip 2026-10-23 (白い熊: "all other stats that we
+     * have should also be there"). All display-only, for the reason the four above are: the counting
+     * rule is a rule of three with published operating points, and none of these is one of the three.
+     *
+     * Each is filed under the night it FOLLOWS — see [RecoverySource.metricsFor]: the cuff reading,
+     * the watch's resting heart rate and a stiffness measurement are morning readings, and the
+     * morning is what a night of the strip is named by.
+     */
+    BP_SYSTOLIC,
+    BP_DIASTOLIC,
+
+    /** The watch's own resting heart rate — Huawei's figure, a different derivation from [NOCTURNAL_HR]. */
+    RESTING_HR,
+
+    /** The night's median blood oxygen. */
+    SPO2,
+
+    /** Pulse-wave velocity, from the watch's arterial-stiffness measurement. */
+    PWV,
+
+    /** Steps walked in the day leading into the night. */
+    STEPS,
 }
 
 /** The step whose colour (yellow) a collecting skin temperature is drawn in — see [MarkerReading.temperatureCollecting]. */
@@ -161,7 +185,9 @@ data class MarkerReading(
             // harmless rather than the one that quietly adds a fourth marker to a rule built on
             // three (≥2 of 3 → 92 % PPV; a rule of five is a different rule with no evidence).
             RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM, RecoveryMarker.HRV,
-            RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION, RecoveryMarker.HR_SWING -> false
+            RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION, RecoveryMarker.HR_SWING,
+            RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC, RecoveryMarker.RESTING_HR,
+            RecoveryMarker.SPO2, RecoveryMarker.PWV, RecoveryMarker.STEPS -> false
         }
 
     /**
@@ -195,14 +221,19 @@ data class MarkerReading(
                 // adverse when it is HIGH, in the ordinary reading. The episode that prompted this
                 // marker ran the other way — see [RecoveryResult.sicknessBehaviour], which is where
                 // a suppressed evening is read, because it is only meaningful in conjunction.
-                RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION ->
+                RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION,
+                // Higher pressure, a higher resting rate and stiffer arteries are all the worse way.
+                RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC, RecoveryMarker.RESTING_HR,
+                RecoveryMarker.PWV ->
                     deviations > 0
                 // More is better for all four: time asleep, time in deep, the restorative share, and
                 // the beat-to-beat variability. A night BELOW the baseline is the worse night.
                 // More is better for all five: time asleep, time in deep, the restorative share,
                 // the beat-to-beat variability, and a night whose heart rate actually moves.
                 RecoveryMarker.SLEEP, RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM,
-                RecoveryMarker.HRV, RecoveryMarker.HR_SWING -> deviations < 0
+                RecoveryMarker.HRV, RecoveryMarker.HR_SWING,
+                // More oxygen and more walking are better too.
+                RecoveryMarker.SPO2, RecoveryMarker.STEPS -> deviations < 0
             }
             val far = kotlin.math.abs(deviations) >= 2.0
             return when {
@@ -384,6 +415,20 @@ object Recovery {
     const val DEEP_MEANINGFUL_MIN = 15.0
     const val DEEP_REM_MEANINGFUL_SHARE = 0.05
     const val HRV_MEANINGFUL_MS = 5.0
+
+    /**
+     * Display-only floors for the Watch D3's readings — like [DEEP_MEANINGFUL_MIN], these stop a
+     * short history manufacturing colour and are not published smallest-worthwhile-changes.
+     *
+     * 5 mmHg is about one reading's own scatter on a home cuff; 2 bpm is the watch's resting figure,
+     * which moves a beat or two a week; 1 % of SpO₂ is one step of the sensor's resolution;
+     * 0.5 m/s is a third of the 8–10 m/s band Huawei grades on; 1 500 steps is a short walk.
+     */
+    const val BP_MEANINGFUL_MMHG = 5.0
+    const val RESTING_HR_MEANINGFUL_BPM = 2.0
+    const val SPO2_MEANINGFUL_PCT = 1.0
+    const val PWV_MEANINGFUL_MS = 0.5
+    const val STEPS_MEANINGFUL = 1_500.0
 
     const val MIN_NIGHTS_FOR_ANY = 5
 
@@ -580,6 +625,8 @@ object Recovery {
         hrSwing: MarkerReading? = null,
         /** Consecutive elevated-HF nights ending last night. See [runAbove]. */
         hrvRunNights: Int = 0,
+        /** Every other display-only reading — the Watch D3's and the night's restorative share. */
+        extra: List<MarkerReading> = emptyList(),
     ): RecoveryResult {
         val confidence = confidenceFor(nightsOfHistory)
         // Only a WARM night waits for the night before it; a reading not yet judged stays unjudged, so
@@ -589,7 +636,7 @@ object Recovery {
             else temperature.copy(band = RecoveryBand.USUAL)
         val markers = listOfNotNull(
             nocturnalHr, sleep, felt, tempShown, bedtimeHr, respiration, deep, hrv, hrSwing,
-        )
+        ) + extra
         val fired = markers.filter { it.counted && it.adverse }.map { it.marker }
         // Radin's conjunction, at ITS thresholds (0.5 SD), not the 1.5 SD display band: it is a
         // separate published rule with its own operating point, and re-using our band edges would
