@@ -23,27 +23,36 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.opentasker.core.huawei.HuaweiEcg
 import com.opentasker.ui.charts.BandText
 import com.opentasker.ui.charts.BloodPressureChart
-import com.opentasker.ui.charts.BloodPressurePlot
 import com.opentasker.ui.charts.ChartCard
 import com.opentasker.ui.charts.ChartPalette
-import com.opentasker.ui.charts.ChartViewport
-import com.opentasker.ui.charts.CrosshairState
 import com.opentasker.ui.charts.InfoBody
 import com.opentasker.ui.charts.InfoHeading
-import com.opentasker.ui.charts.LegendEntry
 import com.opentasker.ui.charts.Loc
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.LocalChartStyle
 import com.opentasker.ui.charts.NoteText
 import com.opentasker.ui.charts.SectionCard
 import com.opentasker.ui.charts.SectionTitle
-import com.opentasker.ui.charts.crosshairInput
-import com.opentasker.ui.charts.rememberChartGestureModifier
-import com.opentasker.ui.charts.rememberCrosshairState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import com.opentasker.ui.charts.ActionPill
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -60,6 +69,16 @@ import java.time.format.DateTimeFormatter
 object HuaweiD3Text {
     val bloodPressure = Loc("Blood Pressure", "血圧")
     val bpReadings = Loc("Readings", "測定一覧")
+    val bpExport = Loc("Export", "書き出し")
+    val bpExportGo = Loc("Write the file", "ファイルに書き出す")
+    val bpExportFailed = Loc("Could not write the file.", "ファイルを書けなかった。")
+    val bpNewestFirst = Loc("Newest first", "新しい順")
+    val bpOldestFirst = Loc("Oldest first", "古い順")
+    fun bpFormat(f: HuaweiBpExport.Format): Loc = when (f) {
+        HuaweiBpExport.Format.PLAIN -> Loc("Plain", "簡潔")
+        HuaweiBpExport.Format.CLINICAL -> Loc("Clinical", "医療向け")
+        HuaweiBpExport.Format.CSV -> Loc("CSV", "CSV")
+    }
     val pulse = Loc("pulse", "脈拍")
     val ecg = Loc("ECG", "心電図")
     val ecgRecordings = Loc("%d recordings", "%d 件")
@@ -75,11 +94,17 @@ object HuaweiD3Text {
             + "そしてカフが数えた脈拍。",
     )
     val bpHow = Loc(
-        "Each dumbbell is one hour: its top is that hour's systolic, its bottom the diastolic. One "
-            + "reading makes a bar from its systolic to its diastolic; several in one hour stretch it "
-            + "to their extremes. Nothing is averaged — the list below gives every reading.",
-        "一本が一時間。上端がその時間の収縮期、下端が拡張期。一回の測定なら収縮期から拡張期までの"
-            + "一本、同じ時間に何回かあれば、その最も外側まで伸びる。平均はしない — 下の一覧に全件。",
+        "Each bar is one reading: its top is the systolic, its foot the diastolic, both written "
+            + "inside its own half, and each half is filled in that number's own grade — 1 to 5 by the "
+            + "European (ESH) categories — so a reading whose two pressures differ shows both. Bars of one day stand together; "
+            + "the axis names the day, and the month under its first reading. The scale is fixed at "
+            + "60–170 mmHg so a bar means the same from week to week; the dashed lines are 140 and 90, "
+            + "where high begins. Nothing is averaged — the list below gives every reading.",
+        "一本が一回の測定。上端が収縮期、下端が拡張期で、それぞれ棒の自分の半分に書き、"
+            + "半分ずつをその値の等級で塗る — 欧州（ESH）の区分による 1〜5。上と下で区分が違えば、両方が見える。同じ日の棒は並べて"
+            + "置き、軸には日を、月はその月の最初の測定の下に書く。縦軸は 60〜170 mmHg に固定し、"
+            + "週が変わっても棒の意味が同じになるようにしている。破線は高血圧の始まる 140 と 90。"
+            + "平均はしない — 下の一覧に全件。",
     )
     val bpRead = Loc(
         "For reference, the European (ESH) office categories: optimal below 120/80, normal "
@@ -132,12 +157,12 @@ private fun stamp(ms: Long, zone: ZoneId): String = WHEN.format(Instant.ofEpochM
 @Composable
 fun HuaweiBloodPressureCard(
     chart: BloodPressureChart,
-    viewport: ChartViewport,
-    crosshair: CrosshairState,
+    readings: List<HuaweiBpReading>,
     onClick: () -> Unit,
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
+    val oldestFirst = remember(readings) { readings.sortedBy { it.tMs } }
     ChartCard(
         title = HuaweiD3Text.bloodPressure[lang],
         headline = chart.headline,
@@ -148,16 +173,9 @@ fun HuaweiBloodPressureCard(
         accent = ChartPalette.BLOOD_PRESSURE,
         onClick = onClick,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            BloodPressurePlot(
-                chart, viewport,
-                Modifier.height(style.previewHeight).crosshairInput(crosshair, viewport),
-                showAxes = false, crosshair = crosshair,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                LegendEntry(style.systolic, BandText.systolic[lang])
-                LegendEntry(style.diastolic, BandText.diastolic[lang])
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BpReadingBars(oldestFirst, height = style.previewHeight + 40.dp, modifier = Modifier.fillMaxWidth())
+            BpScaleLegend()
         }
     }
 }
@@ -168,25 +186,12 @@ fun HuaweiBloodPressureDetailScreen(
     readings: List<HuaweiBpReading>,
     contentPadding: PaddingValues,
     onBack: () -> Unit,
-    bounds: LongRange = 0L..0L,
-    nowMs: Long = System.currentTimeMillis(),
 ) {
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
     val zone = remember { ZoneId.systemDefault() }
-    val viewport = remember(style.defaultSpanMs) {
-        // A cuff reading is a few a day at most: open on three days, not on the dashboard's one —
-        // and not on a week, where each hour's dumbbell narrows to three pixels. Ending at NOW, not
-        // at the last reading: a page that stops at yesterday's reading hides that today has none.
-        ChartViewport(initialEndMs = nowMs, initialSpanMs = 3 * 86_400_000L)
-    }
-    val crosshair = rememberCrosshairState()
-    val span = if (bounds.last > bounds.first) bounds else viewport.startMs..viewport.endMs
-    val gestures = rememberChartGestureModifier(
-        onZoom = { viewport.zoomAround(viewport.plotWidthPx / 2f, it, span) },
-        onPan = { viewport.panBy(it.x, span) },
-    )
+    val oldestFirst = remember(readings) { readings.sortedBy { it.tMs } }
     val accent = ChartPalette.BLOOD_PRESSURE
 
     LazyColumn(
@@ -199,15 +204,8 @@ fun HuaweiBloodPressureDetailScreen(
             SectionCard(accent = accent) {
                 SectionTitle(HuaweiD3Text.bloodPressure[lang], accent)
                 Text("${chart.headline} mmHg", style = MaterialTheme.typography.headlineSmall, color = accent)
-                BloodPressurePlot(
-                    chart, viewport,
-                    Modifier.fillMaxWidth().height(style.detailHeight).then(gestures),
-                    crosshair = crosshair,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    LegendEntry(style.systolic, BandText.systolic[lang])
-                    LegendEntry(style.diastolic, BandText.diastolic[lang])
-                }
+                BpReadingBars(oldestFirst, height = style.detailHeight * 1.26f, modifier = Modifier.fillMaxWidth(), detailed = true)
+                BpScaleLegend()
             }
         }
         item("readings") {
@@ -217,8 +215,12 @@ fun HuaweiBloodPressureDetailScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stamp(r.tMs, zone), fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.bodyMedium)
-                        Text("${r.systolic.toInt()}/${r.diastolic.toInt()}",
-                            style = MaterialTheme.typography.bodyMedium, color = accent)
+                        // Each pressure in its own grade, as in the bars above.
+                        Row {
+                            BpPill(r.systolic, BpGrade.ofSystolic(r.systolic))
+                            Text("/", style = MaterialTheme.typography.bodyMedium)
+                            BpPill(r.diastolic, BpGrade.ofDiastolic(r.diastolic))
+                        }
                         r.pulse?.let {
                             Text("${HuaweiD3Text.pulse[lang]} ${it.toInt()}",
                                 style = MaterialTheme.typography.bodyMedium)
@@ -227,6 +229,7 @@ fun HuaweiBloodPressureDetailScreen(
                 }
             }
         }
+        item("export") { BpExportCard(readings, accent) }
         item("info") {
             SectionCard(accent = accent) {
                 SectionTitle(HuaweiD3Text.bloodPressure[lang], accent)
@@ -243,6 +246,69 @@ fun HuaweiBloodPressureDetailScreen(
         }
     }
 }
+
+@Composable
+private fun BpPill(value: Double, grade: Int) {
+    Text(
+        " ${value.toInt()} ",
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.Bold,
+        color = ChartPalette.scaleInk(grade),
+        modifier = Modifier.background(ChartPalette.scale(grade), RoundedCornerShape(4.dp)),
+    )
+}
+
+/**
+ * Every reading written to a text file in “/sdcard/tmp”, under a stamped name: newest first in
+ * 白い熊's own one-line layout unless another is chosen. The choices are not remembered — the
+ * defaults are what is wanted nearly every time, and a remembered CSV would surprise the next export.
+ */
+@Composable
+private fun BpExportCard(readings: List<HuaweiBpReading>, accent: Color) {
+    val lang = LocalBandLanguage.current
+    val scope = rememberCoroutineScope()
+    var format by remember { mutableStateOf(HuaweiBpExport.Format.PLAIN) }
+    var newestFirst by remember { mutableStateOf(true) }
+    var result by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    SectionCard(accent = accent) {
+        SectionTitle(HuaweiD3Text.bpExport[lang], accent)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HuaweiBpExport.Format.entries.forEach { f ->
+                FilterChip(
+                    selected = format == f,
+                    onClick = { format = f },
+                    label = { Text(HuaweiD3Text.bpFormat(f)[lang]) },
+                )
+            }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = newestFirst, onClick = { newestFirst = true },
+                label = { Text(HuaweiD3Text.bpNewestFirst[lang]) })
+            FilterChip(selected = !newestFirst, onClick = { newestFirst = false },
+                label = { Text(HuaweiD3Text.bpOldestFirst[lang]) })
+        }
+        NoteText(HuaweiBpExport.render(readings.take(1), format, newestFirst).trimEnd())
+        ActionPill(
+            label = HuaweiD3Text.bpExportGo[lang],
+            icon = Icons.Filled.Download,
+            enabled = !busy && readings.isNotEmpty(),
+            onClick = {
+                busy = true
+                scope.launch {
+                    val file = withContext(Dispatchers.IO) {
+                        HuaweiBpExport.write(readings, format, newestFirst, File(BP_EXPORT_DIR))
+                    }
+                    result = file?.absolutePath ?: HuaweiD3Text.bpExportFailed[lang]
+                    busy = false
+                }
+            },
+        )
+        result?.let { NoteText(it) }
+    }
+}
+
+private const val BP_EXPORT_DIR = "/sdcard/tmp"
 
 // --- ECG ---------------------------------------------------------------------------------------
 

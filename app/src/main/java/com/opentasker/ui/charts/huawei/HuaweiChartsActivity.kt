@@ -132,7 +132,22 @@ class HuaweiChartsActivity : ComponentActivity() {
                         val bpOpen = selected == BP_KEY && state.bloodPressure != null
                         val ecgOpen = selected == ECG_KEY && state.ecg.isNotEmpty()
                         val pwaOpen = selected == PWA_KEY && state.arrhythmia.isNotEmpty()
-                        if (pwaOpen) {
+                        val valueOpen = when (selected) {
+                            HuaweiKeys.RESTING_HR -> state.restingHrDays.takeIf { it.isNotEmpty() }
+                                ?.let { Triple(HuaweiMetricSpecs.RESTING_HEART_RATE, it, ValueBarsScale.RESTING_HR) }
+                            HuaweiKeys.PWV -> state.pwvReadings.takeIf { it.isNotEmpty() }
+                                ?.let { Triple(HuaweiMetricSpecs.ARTERIAL_STIFFNESS, it, ValueBarsScale.PWV) }
+                            else -> null
+                        }
+                        if (valueOpen != null) {
+                            HuaweiValueDetailScreen(
+                                spec = valueOpen.first,
+                                values = valueOpen.second,
+                                scale = valueOpen.third,
+                                contentPadding = insets,
+                                onBack = { selected = null },
+                            )
+                        } else if (pwaOpen) {
                             HuaweiArrhythmiaDetailScreen(
                                 checks = state.arrhythmia,
                                 contentPadding = insets,
@@ -144,7 +159,6 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 readings = state.bpReadings,
                                 contentPadding = insets,
                                 onBack = { selected = null },
-                                bounds = state.bounds,
                             )
                         } else if (ecgOpen) {
                             HuaweiEcgDetailScreen(

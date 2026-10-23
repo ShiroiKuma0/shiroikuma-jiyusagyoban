@@ -105,14 +105,15 @@ class DailySummaryTest {
     fun `a day scored from too little of the index shows no number at all`() {
         val start = at(2026, 8, 4, 23)
         val asleep = (0 until 400).map { ChartPoint(start + it * 60_000L, 54.0 + it % 4) }
-        // Sleep + resting HR + stability = 0.63 of the weight: enough.
+        // Sleep + resting HR + stability + blood oxygen = 0.57 of the weight: enough.
+        val oxygen = (0 until 40).map { ChartPoint(start + it * 600_000L, 96.0) }
         val rich = DailySummary.build(
-            hr = asleep, spo2 = emptyList(), steps = emptyList(),
+            hr = asleep, spo2 = oxygen, steps = emptyList(),
             sleepSessions = listOf(night(2026, 8, 4, 23, 7)), spo2Times = emptySet(), zone = zone,
         ).first { it.date == LocalDate.of(2026, 8, 4) }
         assertTrue("expected a score, got ${rich.index}", rich.index?.value != null)
 
-        // Steps alone = 0.20: not enough.
+        // Steps alone = 0.13: not enough.
         val thin = DailySummary.build(
             hr = emptyList(), spo2 = emptyList(),
             steps = listOf(ChartPoint(at(2026, 8, 9, 12), 9_000.0)),

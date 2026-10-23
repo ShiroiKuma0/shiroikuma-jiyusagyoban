@@ -113,7 +113,33 @@ object RecoverySource {
          * them was unique in the record. See [Recovery.runAbove].
          */
         val hfPower: Double? = null,
+        /**
+         * The Watch D3's morning readings, filed under the night they follow: the first of each
+         * within [MORNING_WINDOW_MS] of waking. A cuff reading at 08:17 belongs to the night that
+         * ended at 07:30; one taken the next evening belongs to no night at all.
+         */
+        val bpSystolic: Double? = null,
+        val bpDiastolic: Double? = null,
+        val restingHrWatch: Double? = null,
+        val pwv: Double? = null,
+        /** Steps over the 24 hours before the night began — the day leading into it. */
+        val steps: Double? = null,
     )
+
+    /** The Watch D3's own point series, by what they are. Empty for every other device. */
+    data class WatchSeries(
+        val bpSystolic: List<ChartPoint> = emptyList(),
+        val bpDiastolic: List<ChartPoint> = emptyList(),
+        val restingHr: List<ChartPoint> = emptyList(),
+        val pwv: List<ChartPoint> = emptyList(),
+    )
+
+    /** How long after waking a reading still counts as that morning's. */
+    const val MORNING_WINDOW_MS = 14 * 3_600_000L
+
+    private fun morning(session: SleepSession, points: List<ChartPoint>): Double? =
+        points.filter { it.tMs > session.endMs && it.tMs <= session.endMs + MORNING_WINDOW_MS }
+            .minByOrNull { it.tMs }?.value
 
     /**
      * Real nights only, oldest first.
@@ -218,6 +244,9 @@ object RecoverySource {
         respirationPoints: List<ChartPoint> = emptyList(),
         /** Per-window HF power. Empty for the Hume band, which never measured one. */
         hfPoints: List<ChartPoint> = emptyList(),
+        watch: WatchSeries = WatchSeries(),
+        /** Per-minute steps; empty leaves [NightMetrics.steps] null. */
+        stepPoints: List<ChartPoint> = emptyList(),
     ): NightMetrics = NightMetrics(
         startMs = session.startMs,
         endMs = session.endMs,
@@ -236,7 +265,17 @@ object RecoverySource {
         hrCurve = hrCurve(session, hrPoints),
         hrSwing = hrCurve(session, hrPoints).takeIf { it.isNotEmpty() }?.let { it.max() - it.min() },
         hfPower = nightMedian(session, hfPoints),
+        bpSystolic = morning(session, watch.bpSystolic),
+        bpDiastolic = morning(session, watch.bpDiastolic),
+        restingHrWatch = morning(session, watch.restingHr),
+        pwv = morning(session, watch.pwv),
+        // Zero is a real total (a day indoors); no step data at all before the night is null.
+        steps = stepPoints.takeIf { pts -> pts.isNotEmpty() && pts.minOf { it.tMs } <= session.startMs - DAY_BEFORE_MS }
+            ?.filter { it.tMs in (session.startMs - DAY_BEFORE_MS) until session.startMs }
+            ?.sumOf { it.value },
     )
+
+    private const val DAY_BEFORE_MS = 24 * 3_600_000L
 
     /** How many slices the night is cut into for [NightMetrics.hrCurve]. */
     const val CURVE_BINS = 12

@@ -255,25 +255,39 @@ fun HuaweiDashboardScreen(
         item("sleep") {
             HuaweiSleepCard(state.sleep, viewport, crosshair) { onOpenMetric(SLEEP_KEY) }
         }
+        // Heart rate, then the cuff reading under it (白い熊, 2026-10-23: blood pressure belongs
+        // with the heart), then blood oxygen and the rest. The Watch D3's cards with no data yet
+        // are simply not drawn.
+        items(
+            state.metrics.filter { it.spec.key == HuaweiKeys.HEART_RATE },
+            key = { it.spec.key },
+        ) { chart ->
+            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
+        }
+        state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
+            item(BP_KEY) { HuaweiBloodPressureCard(bp, state.bpReadings) { onOpenMetric(BP_KEY) } }
+        }
         items(
             state.metrics.filter {
-                it.spec.key != HuaweiKeys.STEPS && it.spec.key !in HuaweiMetricSpecs.AFTER_BLOOD_PRESSURE
+                it.spec.key != HuaweiKeys.STEPS && it.spec.key != HuaweiKeys.HEART_RATE &&
+                    (it.spec.key !in HuaweiMetricSpecs.DRAWN_ONLY_WITH_DATA || !it.isEmpty ||
+                        (it.spec.key == HuaweiKeys.PWV && state.pwvReadings.isNotEmpty()))
             },
             key = { it.spec.key },
         ) { chart ->
-            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
-        }
-        // The Watch D3's own measurements. Blood pressure sits between the lime resting heart rate
-        // and the ochre skin temperature so neither pair of neighbours is hue-adjacent; cards with
-        // no data yet are simply not drawn.
-        state.bloodPressure?.takeIf { !it.isEmpty }?.let { bp ->
-            item(BP_KEY) { HuaweiBloodPressureCard(bp, viewport, crosshair) { onOpenMetric(BP_KEY) } }
-        }
-        items(
-            state.metrics.filter { it.spec.key in HuaweiMetricSpecs.AFTER_BLOOD_PRESSURE && !it.isEmpty },
-            key = { it.spec.key },
-        ) { chart ->
-            MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
+            // Resting heart rate and arterial stiffness are one bar per reading, like blood
+            // pressure (白い熊, 2026-10-23): on a time axis one was a flat line, the other empty.
+            when {
+                chart.spec.key == HuaweiKeys.RESTING_HR && state.restingHrDays.isNotEmpty() ->
+                    HuaweiValueCard(chart.spec, state.restingHrDays, ValueBarsScale.RESTING_HR) {
+                        onOpenMetric(chart.spec.key)
+                    }
+                chart.spec.key == HuaweiKeys.PWV && state.pwvReadings.isNotEmpty() ->
+                    HuaweiValueCard(chart.spec, state.pwvReadings, ValueBarsScale.PWV) {
+                        onOpenMetric(chart.spec.key)
+                    }
+                else -> MetricPreviewCard(chart, viewport, crosshair) { onOpenMetric(chart.spec.key) }
+            }
         }
         if (state.ecg.isNotEmpty()) item(ECG_KEY) { HuaweiEcgCard(state.ecg) { onOpenMetric(ECG_KEY) } }
         if (state.arrhythmia.isNotEmpty()) {
@@ -545,7 +559,7 @@ private fun DiagnosticsCard(state: HuaweiDashboardState) {
             NoteText(HuaweiText.rawUnitsWarning[lang], warn = true)
             state.diagnostics.forEach { chart ->
                 SubHeading(chart.spec.label[lang])
-                NoteText(chart.headline)
+                NoteText(listOf(chart.headline, chart.spec.unit).filter { it.isNotBlank() }.joinToString(" "))
             }
             SubHeading(HuaweiText.unknownFields[lang])
             if (state.unknownFields.isEmpty()) {

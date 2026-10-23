@@ -65,6 +65,10 @@ object DailySummary {
         spo2Times: Set<Long>,
         zone: ZoneId,
         limit: Int = 60,
+        /** The Watch D3's cuff and stiffness readings. Empty for every other device. */
+        watch: RecoverySource.WatchSeries = RecoverySource.WatchSeries(),
+        /** RMSSD windows, for the night's median. Empty where there were no beat intervals. */
+        hrv: List<ChartPoint> = emptyList(),
     ): List<DaySummary> {
         fun dayOf(tMs: Long): LocalDate =
             java.time.Instant.ofEpochMilli(tMs).atZone(zone).toLocalDate()
@@ -89,6 +93,7 @@ object DailySummary {
             val dayStepPoints = stepsByDay[day].orEmpty()
 
             val restingHr = HealthIndexSource.percentile(hrAsleep.map { it.value }, 0.05)
+            val firstBp = watch.bpSystolic.filter { dayOf(it.tMs) == day }.minByOrNull { it.tMs }
             val spo2Low = HealthIndexSource.percentile(spo2Day.map { it.value }, 0.05)
 
             DaySummary(
@@ -109,6 +114,13 @@ object DailySummary {
                         // That day's OWN total, not the rolling window the dashboard index uses —
                         // a per-day row must be scoreable from that day alone.
                         steps = dayStepPoints.takeIf { it.isNotEmpty() }?.sumOf { p -> p.value },
+                        // That day's first cuff reading, that night's RMSSD, and the latest
+                        // stiffness measurement in the 30 days up to that day's end.
+                        bpSystolic = firstBp?.value,
+                        bpDiastolic = firstBp?.let { s -> watch.bpDiastolic.firstOrNull { it.tMs == s.tMs }?.value },
+                        hrvMs = window?.let { w -> HealthIndexSource.median(hrv.filter { it.tMs in w }.map { it.value }) },
+                        pwv = watch.pwv.filter { dayOf(it.tMs) <= day && !dayOf(it.tMs).isBefore(day.minusDays(30)) }
+                            .maxByOrNull { it.tMs }?.value,
                     ),
                 ).takeIf { it.value != null && it.availableWeight >= MIN_WEIGHT_FOR_A_ROW },
             )

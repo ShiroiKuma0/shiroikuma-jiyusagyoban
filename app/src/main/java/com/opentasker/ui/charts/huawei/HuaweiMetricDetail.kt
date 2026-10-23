@@ -79,7 +79,8 @@ fun HuaweiMetricDetailScreen(
             SectionCard(accent = spec.color) {
                 SectionTitle(spec.label[lang], spec.color)
                 Text(
-                    "${chart.headline}",
+                    if (chart.headline == "—" || spec.unit.isBlank()) chart.headline
+                    else "${chart.headline} ${spec.unit}",
                     style = MaterialTheme.typography.headlineSmall,
                     color = spec.color,
                 )
