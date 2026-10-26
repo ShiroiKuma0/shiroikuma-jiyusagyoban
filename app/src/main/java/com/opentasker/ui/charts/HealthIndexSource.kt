@@ -1,6 +1,7 @@
 package com.opentasker.ui.charts
 
 import com.opentasker.core.band.BandMetric
+import kotlin.math.roundToInt
 
 /**
  * Turning loaded charts into [HealthIndexInputs].
@@ -73,7 +74,10 @@ object HealthIndexSource {
                 restingHr = percentile(hrAsleep.map { it.value }, 0.05),
                 hrIqr = iqr(periodicAsleep.map { it.value }),
                 spo2Low = percentile(spo2Points.takeLast(SPO2_WINDOW).map { it.value }, 0.05),
-                sleepMinutes = latestSleep?.totalMinutes,
+                // Time ASLEEP, the session less its awake runs — the figure the night table and the
+                // 回復 card grade. The whole session (662 min on 2026-10-25 against 614 asleep) put
+                // the index a rung below the table for the same night.
+                sleepMinutes = latestSleep?.let { RecoverySource.sleepMinutes(it).roundToInt() },
                 deepRemShare = latestSleep?.deepRemShare,
                 steps = stepsLastDay(metrics),
                 bpSystolic = extras.bpSystolic,

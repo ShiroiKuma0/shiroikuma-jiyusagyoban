@@ -161,14 +161,33 @@ data class MarkerReading(
     val temperatureCollecting: Boolean
         get() = marker == RecoveryMarker.TEMPERATURE && value != null && band == RecoveryBand.UNKNOWN
 
-    /** The tint step a display uses: [scaleStep], or the collecting yellow (step 1's colour). */
+    /**
+     * THE grade of this reading — what every screen colours it with and words it by.
+     *
+     * [Grade.ladder] when the marker has an absolute ladder (sleep, the heart rates, blood oxygen,
+     * blood pressure, HRV, steps, stiffness, 体感), otherwise the within-person [scaleStep], or the
+     * collecting yellow (step 1's colour) for a skin temperature without a baseline yet. One
+     * definition since 2026-10-25, when the table, the strip and this card graded one night three
+     * ways — see [Grade].
+     */
     val displayStep: Int?
-        get() = scaleStep ?: if (temperatureCollecting) COLLECTING_STEP else null
+        get() = value?.let { Grade.ladder(marker, it) }
+            ?: scaleStep ?: if (temperatureCollecting) COLLECTING_STEP else null
 
     val delta: Double? get() = if (value != null && baseline != null) value - baseline else null
 
-    /** Fired in the direction that means "worse", which is the only direction the count cares about. */
+    /**
+     * Graded bad — a 4 or a 5 of [displayStep] — and so counted by the headline, whatever the marker.
+     *
+     * It was the within-person band of the three counted markers alone (Nuuttila's ≥2-of-3), so the
+     * headline could read "Nothing unusual" above a row coloured as bad. Since 2026-10-25 the count
+     * is a count of what the card's own colours say. [withinPersonAdverse] keeps the old reading.
+     */
     val adverse: Boolean
+        get() = (displayStep ?: 0) >= Grade.BAD_FROM && !temperatureCollecting
+
+    /** Fired in the direction that means "worse" against 白い熊's own band — the pre-2026-10-25 rule. */
+    val withinPersonAdverse: Boolean
         get() = when (marker) {
             // A LOW resting HR is a good night, not an event. Only elevation counts.
             RecoveryMarker.NOCTURNAL_HR -> band == RecoveryBand.HIGH
@@ -271,7 +290,7 @@ data class RecoveryResult(
     val markers: List<MarkerReading>,
     val confidence: RecoveryConfidence,
     val nightsOfHistory: Int,
-    /** How many of the three counted markers fired adversely: 0, 1, 2 or 3. */
+    /** How many readings are graded bad (4 or 5) — see [MarkerReading.adverse]. */
     val adverseCount: Int,
     /** The counted markers that fired, for naming them in the headline. */
     val adverseMarkers: List<RecoveryMarker>,
@@ -637,7 +656,8 @@ object Recovery {
         val markers = listOfNotNull(
             nocturnalHr, sleep, felt, tempShown, bedtimeHr, respiration, deep, hrv, hrSwing,
         ) + extra
-        val fired = markers.filter { it.counted && it.adverse }.map { it.marker }
+        // Every reading graded 4 or 5, in the order the card lists them — see [MarkerReading.adverse].
+        val fired = markers.filter { it.adverse }.map { it.marker }
         // Radin's conjunction, at ITS thresholds (0.5 SD), not the 1.5 SD display band: it is a
         // separate published rule with its own operating point, and re-using our band edges would
         // silently change what it detects.

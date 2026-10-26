@@ -255,7 +255,16 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onSync = model::sync,
                                 onOpenMetric = { selected = it },
-                                onOpenMarker = { selected = MARKER_PREFIX + it.name },
+                                // Both pressure rows open the ONE blood-pressure page, the main
+                                // card's, rather than a systolic page and a diastolic page: a reading
+                                // is the pair (白い熊, 2026-10-26).
+                                onOpenMarker = {
+                                    selected = if (
+                                        (it == com.opentasker.ui.charts.RecoveryMarker.BP_SYSTOLIC ||
+                                            it == com.opentasker.ui.charts.RecoveryMarker.BP_DIASTOLIC) &&
+                                        state.bloodPressure != null
+                                    ) BP_KEY else MARKER_PREFIX + it.name
+                                },
                                 onFelt = model::setFelt,
                                 onNote = { notingMorning = state.feltMorning ?: model.morningKeyNow() },
                                 onTapRehabDay = { rehabDay = com.opentasker.core.band.RehabLog

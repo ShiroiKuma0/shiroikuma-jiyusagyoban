@@ -308,7 +308,7 @@ class SessionRegisterTest {
      * and the card can never disagree about how many markers were off on one night.
      */
     @Test
-    fun `a warm night is reported without being counted`() {
+    fun `a warm night is graded and counted in its row`() {
         val history = (0 until 20).map {
             RecoverySource.NightMetrics(
                 startMs = base + it * day,
@@ -321,7 +321,7 @@ class SessionRegisterTest {
         val last = SessionRegister.readNights(history) { 3.0 }.last()
         assertEquals("the warm night is banded", RecoveryBand.HIGH, last.temperature.band)
         assertEquals(37.6, last.temperature.value!!, 0.001)
-        assertEquals("but it is not one of the three counted", 0, last.adverseCount)
+        assertEquals("and, graded bad, it is the row's one count", 1, last.adverseCount)
     }
 
     /**

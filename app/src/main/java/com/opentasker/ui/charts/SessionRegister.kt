@@ -1,6 +1,7 @@
 package com.opentasker.ui.charts
 
 import com.opentasker.core.band.TrainingSessions
+import com.opentasker.ui.charts.huawei.BpGrade
 
 /**
  * 運動と回復 — every marked session, paired with the night that followed it.
@@ -159,6 +160,17 @@ object SessionRegister {
         val bedtimeHrStep: Int? = null,
         val hrSwingStep: Int? = null,
         val respirationStep: Int? = null,
+        /** The two published-ladder cells that have no [RecoveryMarker] reading of their own. */
+        val lowestHrStep: Int? = null,
+        val spo2Step: Int? = null,
+        /**
+         * That morning's cuff reading — the first within [RecoverySource.MORNING_WINDOW_MS] of
+         * waking — and its ESH grade, the worse of the two pressures ([BpGrade.of]), exactly as
+         * the blood-pressure bars colour it. Null on a morning with no reading.
+         */
+        val bpSystolic: Double? = null,
+        val bpDiastolic: Double? = null,
+        val bpStep: Int? = null,
     )
 
     /** One square of the grid. */
@@ -245,75 +257,50 @@ object SessionRegister {
         feltFor: (RecoverySource.NightMetrics) -> Double?,
     ): List<NightReading> = history.indices.map { i ->
         val prior = history.subList(maxOf(0, i - Recovery.BASELINE_NIGHTS), i)
-        val confidence = Recovery.confidenceFor(prior.size)
         val night = history[i]
-        val hr = Recovery.bandNocturnalHr(night.nocturnalHr, prior.mapNotNull { it.nocturnalHr }, confidence)
-        val sleep = Recovery.band(
-            RecoveryMarker.SLEEP, night.sleepMinutes, prior.mapNotNull { it.sleepMinutes },
-            Recovery.SLEEP_MEANINGFUL_MIN, confidence, counted = true,
-        )
-        val felt = Recovery.band(
-            RecoveryMarker.FELT, feltFor(night), prior.mapNotNull(feltFor),
-            Recovery.FELT_MEANINGFUL_STEPS, confidence, counted = true,
-        )
-        val tempHistory = prior.mapNotNull { it.skinTemp }
-        val temperature = Recovery.band(
-            RecoveryMarker.TEMPERATURE, night.skinTemp, tempHistory,
-            Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(tempHistory),
-            counted = false, oneSidedHigh = true,
-        )
+        // The SAME construction the strip and the 回復 card use for last night, so a night carries
+        // one grade per number whichever screen it is read on (2026-10-25).
+        val r = RecoveryBuild.readingsFor(night, prior, feltFor)
+        val curveStep = curveStep(night, prior)
+        val lowestStep = night.lowestHr?.let { RecoveryReference.lowestHrStep(it) }
+        val spo2Step = night.spo2?.let { Grade.ladder(RecoveryMarker.SPO2, it) }
+        val bpStep = night.bpSystolic?.let { sys -> night.bpDiastolic?.let { BpGrade.of(sys, it) } }
         NightReading(
             startMs = night.startMs,
             endMs = night.endMs,
-            nocturnalHr = hr,
-            sleep = sleep,
-            felt = felt,
-            temperature = temperature,
-            // Three, not four: temperature is reported and never counted, so the register's count and
-            // the card's headline can never disagree about the same night.
-            adverseCount = listOf(hr, sleep, felt).count { it.adverse },
+            nocturnalHr = r.hr,
+            sleep = r.sleep,
+            felt = r.felt,
+            temperature = r.temp,
+            // Every cell of the row graded 4 or 5 — what the row's own colours say, and what the
+            // 回復 headline counts for last night.
+            adverseCount = (
+                listOf(r.temp, r.felt, r.hr, r.bedtime, r.swing, r.sleep, r.deep, r.hrv, r.respiration)
+                    .count { it.adverse } +
+                    listOfNotNull(r.of(RecoveryMarker.DEEP_REM)).count { it.adverse } +
+                    listOfNotNull(bpStep, curveStep, lowestStep, spo2Step).count { it >= Grade.BAD_FROM }
+                ),
             deepMinutes = night.deepMinutes,
             deepRemShare = night.deepRemShare,
             lowestHr = night.lowestHr,
             spo2 = night.spo2,
             hrvMs = night.hrvMs,
-            // Banded against this night's own past, exactly as the counted markers are — the same
-            // function, the same confidence ladder — but taken only as far as `scaleStep`, which is
-            // a colour. Nothing here reaches `adverseCount`.
-            deepStep = Recovery.band(
-                RecoveryMarker.DEEP, night.deepMinutes, prior.mapNotNull { it.deepMinutes },
-                Recovery.DEEP_MEANINGFUL_MIN, confidence, counted = false,
-            ).scaleStep,
-            deepRemStep = Recovery.band(
-                RecoveryMarker.DEEP_REM, night.deepRemShare, prior.mapNotNull { it.deepRemShare },
-                Recovery.DEEP_REM_MEANINGFUL_SHARE, confidence, counted = false,
-            ).scaleStep,
-            hrvStep = Recovery.band(
-                RecoveryMarker.HRV, night.hrvMs, prior.mapNotNull { it.hrvMs },
-                Recovery.HRV_MEANINGFUL_MS, confidence, counted = false,
-            ).scaleStep,
+            deepStep = r.deep.displayStep,
+            deepRemStep = r.of(RecoveryMarker.DEEP_REM)?.displayStep,
+            hrvStep = r.hrv.displayStep,
             bedtimeHr = night.bedtimeHr,
             hrSwing = night.hrSwing,
             respirationBpm = night.respirationBpm,
             hrCurve = night.hrCurve,
-            hrCurveStep = curveStep(night, prior),
-            // The going-to-bed rate and the swing are both heart rates in bpm, so they take the
-            // heart rate's own published smallest-worthwhile-change rather than a figure invented
-            // for them — the same call RecoveryBuild makes for the strip's swing row, so a colour
-            // means the same thing on both screens.
-            bedtimeHrStep = Recovery.band(
-                RecoveryMarker.BEDTIME_HR, night.bedtimeHr, prior.mapNotNull { it.bedtimeHr },
-                Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
-            ).scaleStep,
-            hrSwingStep = Recovery.band(
-                RecoveryMarker.HR_SWING, night.hrSwing, prior.mapNotNull { it.hrSwing },
-                Recovery.HR_MEANINGFUL_BPM, confidence, counted = false,
-            ).scaleStep,
-            respirationStep = Recovery.band(
-                RecoveryMarker.RESPIRATION, night.respirationBpm,
-                prior.mapNotNull { it.respirationBpm },
-                Recovery.RESPIRATION_MEANINGFUL_BPM, confidence, counted = false,
-            ).scaleStep,
+            hrCurveStep = curveStep,
+            bedtimeHrStep = r.bedtime.displayStep,
+            hrSwingStep = r.swing.displayStep,
+            respirationStep = r.respiration.displayStep,
+            lowestHrStep = lowestStep,
+            spo2Step = spo2Step,
+            bpSystolic = night.bpSystolic,
+            bpDiastolic = night.bpDiastolic,
+            bpStep = bpStep,
         )
     }
 

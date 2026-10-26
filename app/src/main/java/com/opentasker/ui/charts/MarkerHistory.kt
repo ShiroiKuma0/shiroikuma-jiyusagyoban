@@ -22,8 +22,14 @@ import kotlin.math.abs
  */
 object MarkerHistory {
 
-    /** One night's value for one marker. [endMs] is the morning it is filed under. */
-    data class Night(val endMs: Long, val value: Double)
+    /**
+     * One night's value for one marker. [endMs] is the morning it is filed under.
+     *
+     * [step] is that night's grade as it was AT THE TIME — banded against the nights before it, by
+     * the same construction the night table uses — so a bar or a row on the page behind a strip row
+     * carries the colour the table gave the same night. Null when the night could not be graded.
+     */
+    data class Night(val endMs: Long, val value: Double, val step: Int? = null)
 
     /** Everything the page behind a row needs. */
     data class Series(

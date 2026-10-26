@@ -204,8 +204,95 @@ object RecoveryBuild {
         // The current night is judged against the ones BEFORE it, never including itself: a value
         // cannot be part of the baseline it is measured against.
         val prior = history.dropLast(1).takeLast(Recovery.BASELINE_NIGHTS)
-        val confidence = Recovery.confidenceFor(prior.size)
 
+        val r = readingsFor(latest, prior, feltFor)
+        // Over the whole history, not just the baseline window: a run is a property of the sequence
+        // and truncating the sequence truncates the run.
+        val hrvRun = Recovery.runAbove(history.map { it.hfPower })
+
+        // "Sustained" means the night before was warm too. One warm night at the wrist is the
+        // bedroom, not 白い熊 — ambient correlates with the sensor at r = 0.961.
+        val previousWarm = prior.lastOrNull()?.skinTemp?.let { previous ->
+            val beforeThat = prior.dropLast(1).mapNotNull { it.skinTemp }
+            Recovery.band(
+                RecoveryMarker.TEMPERATURE, previous, beforeThat,
+                Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(beforeThat),
+                counted = false, oneSidedHigh = true,
+            ).band == RecoveryBand.HIGH
+        } ?: false
+
+        val assembledRecovery = Recovery.assemble(
+                nightStartMs = latest.startMs,
+                nightEndMs = latest.endMs,
+                nocturnalHr = r.hr,
+                sleep = r.sleep,
+                felt = r.felt,
+                temperature = r.temp,
+                temperatureSustained = r.temp.band == RecoveryBand.HIGH && previousWarm,
+                lateEffortMinutesBeforeSleep = RecoverySource.lateEffortMinutes(latest.startMs, stepPoints),
+                nightsOfHistory = prior.size,
+                bedtimeHr = r.bedtime,
+                respiration = r.respiration,
+                deep = r.deep,
+                hrv = r.hrv,
+                hrSwing = r.swing,
+                hrvRunNights = hrvRun,
+                extra = r.extra,
+        )
+        return Assembled(
+            recovery = assembledRecovery,
+            load = load,
+            sri = sri,
+            sleepScore = sleepScore,
+            peak30Cadence = peak30,
+            peakCadenceDay = peakDay?.first,
+            regime = regime,
+            register = register,
+            lastNightHrCurve = latest.hrCurve,
+            markerHistory = markerHistory(history, assembledRecovery.markers.associateBy { it.marker }),
+            // Against the nights BEFORE it, as the night table scores the same curve — so the strip's
+            // bar and the table's cell are one grade (2026-10-25). It was every night, this one too.
+            descent = descentOf(prior, latest),
+            bestDescent = bestDescentOf(history),
+            recentCurves = history.filter { it.hrCurve.isNotEmpty() }
+                .takeLast(CURVE_HISTORY).map { it.endMs to it.hrCurve },
+        )
+    }
+
+    /** Every reading of one night, each banded against the nights before it. See [readingsFor]. */
+    data class NightReadings(
+        val hr: MarkerReading,
+        val sleep: MarkerReading,
+        val felt: MarkerReading,
+        val temp: MarkerReading,
+        val bedtime: MarkerReading,
+        val respiration: MarkerReading,
+        val deep: MarkerReading,
+        val hrv: MarkerReading,
+        val swing: MarkerReading,
+        /** The restorative share, the oxygen, the day's steps and the Watch D3's morning readings. */
+        val extra: List<MarkerReading>,
+    ) {
+        fun of(marker: RecoveryMarker): MarkerReading? =
+            (listOf(hr, sleep, felt, temp, bedtime, respiration, deep, hrv, swing) + extra)
+                .firstOrNull { it.marker == marker }
+    }
+
+    /**
+     * Band one night against [prior] — THE construction, used for last night by the strip and the
+     * 回復 card and for every night by the night table (2026-10-25).
+     *
+     * There were two, one here and one in [SessionRegister.readNights], and they had drifted: the
+     * table banded the going-to-bed heart rate without the heart rate's sensor floor and the
+     * restorative share on the night count rather than its own, so the same night could carry two
+     * colours for one number. [prior] is the nights before [latest], at most [Recovery.BASELINE_NIGHTS].
+     */
+    fun readingsFor(
+        latest: RecoverySource.NightMetrics,
+        prior: List<RecoverySource.NightMetrics>,
+        feltFor: (RecoverySource.NightMetrics) -> Double?,
+    ): NightReadings {
+        val confidence = Recovery.confidenceFor(prior.size)
         val hr = Recovery.bandNocturnalHr(
             latest.nocturnalHr, prior.mapNotNull { it.nocturnalHr }, confidence,
         )
@@ -274,55 +361,7 @@ object RecoveryBuild {
             shown(RecoveryMarker.PWV, { it.pwv }, Recovery.PWV_MEANINGFUL_MS),
             shown(RecoveryMarker.STEPS, { it.steps }, Recovery.STEPS_MEANINGFUL),
         )
-        // Over the whole history, not just the baseline window: a run is a property of the sequence
-        // and truncating the sequence truncates the run.
-        val hrvRun = Recovery.runAbove(history.map { it.hfPower })
-
-        // "Sustained" means the night before was warm too. One warm night at the wrist is the
-        // bedroom, not 白い熊 — ambient correlates with the sensor at r = 0.961.
-        val previousWarm = prior.lastOrNull()?.skinTemp?.let { previous ->
-            val beforeThat = prior.dropLast(1).mapNotNull { it.skinTemp }
-            Recovery.band(
-                RecoveryMarker.TEMPERATURE, previous, beforeThat,
-                Recovery.TEMP_MEANINGFUL_C, Recovery.temperatureConfidence(beforeThat),
-                counted = false, oneSidedHigh = true,
-            ).band == RecoveryBand.HIGH
-        } ?: false
-
-        val assembledRecovery = Recovery.assemble(
-                nightStartMs = latest.startMs,
-                nightEndMs = latest.endMs,
-                nocturnalHr = hr,
-                sleep = sleep,
-                felt = felt,
-                temperature = temp,
-                temperatureSustained = temp.band == RecoveryBand.HIGH && previousWarm,
-                lateEffortMinutesBeforeSleep = RecoverySource.lateEffortMinutes(latest.startMs, stepPoints),
-                nightsOfHistory = prior.size,
-                bedtimeHr = bedtime,
-                respiration = respiration,
-                deep = deep,
-                hrv = hrv,
-                hrSwing = swing,
-                hrvRunNights = hrvRun,
-                extra = extra,
-        )
-        return Assembled(
-            recovery = assembledRecovery,
-            load = load,
-            sri = sri,
-            sleepScore = sleepScore,
-            peak30Cadence = peak30,
-            peakCadenceDay = peakDay?.first,
-            regime = regime,
-            register = register,
-            lastNightHrCurve = latest.hrCurve,
-            markerHistory = markerHistory(history, assembledRecovery.markers.associateBy { it.marker }),
-            descent = descentOf(history, latest),
-            bestDescent = bestDescentOf(history),
-            recentCurves = history.filter { it.hrCurve.isNotEmpty() }
-                .takeLast(CURVE_HISTORY).map { it.endMs to it.hrCurve },
-        )
+        return NightReadings(hr, sleep, felt, temp, bedtime, respiration, deep, hrv, swing, extra)
     }
 
     /** How many nights' curves the OVERLAY stacks. Enough to see a habit, few enough to read. */
@@ -349,10 +388,17 @@ object RecoveryBuild {
         history: List<RecoverySource.NightMetrics>,
         markers: Map<RecoveryMarker, MarkerReading>,
     ): Map<RecoveryMarker, MarkerHistory.Series> {
+        // Every night graded against the nights before it — the night table's construction, so the
+        // page behind a row colours each night exactly as the table does.
+        val graded = history.indices.map { i ->
+            readingsFor(history[i], history.subList(maxOf(0, i - Recovery.BASELINE_NIGHTS), i)) { null }
+        }
         fun series(marker: RecoveryMarker, pick: (RecoverySource.NightMetrics) -> Double?) =
             marker to MarkerHistory.Series(
                 marker = marker,
-                nights = history.mapNotNull { n -> pick(n)?.let { MarkerHistory.Night(n.endMs, it) } },
+                nights = history.mapIndexedNotNull { i, n ->
+                    pick(n)?.let { MarkerHistory.Night(n.endMs, it, graded[i].of(marker)?.displayStep) }
+                },
                 latest = markers[marker],
             )
         return listOf(

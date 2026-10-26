@@ -135,7 +135,7 @@ class NightReadingsTest {
      * and a rule over five is a different rule with no evidence behind it. This is the guard.
      */
     @Test
-    fun `the coloured readings are never counted as adverse`() {
+    fun `every coloured reading graded bad is counted in the row`() {
         // Twenty nights of steady deep sleep, then one with almost none — as adverse as this metric
         // can look, so if it were ever going to reach the count it would reach it here.
         val steady = (0 until 20).map {
@@ -162,8 +162,9 @@ class NightReadingsTest {
         assertEquals("the worst step, so the colour did fire", 5, reading.deepStep)
         assertEquals(5, reading.deepRemStep)
         assertEquals(5, reading.hrvStep)
-        // And the count is untouched: three markers, none of them these.
-        assertEquals("still counted on the three markers alone", 0, reading.adverseCount)
+        // Since 2026-10-25 the row counts what its own colours say: these three 5s, and nothing else
+        // (60 bpm is a 3 on Jensen's decades, 8 h asleep a 1, 体感 3 a 3).
+        assertEquals(3, reading.adverseCount)
     }
 
     /**

@@ -33,10 +33,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.opentasker.ui.charts.ChartPalette
+import com.opentasker.ui.charts.Grade
 import com.opentasker.ui.charts.HealthIndex
 import com.opentasker.ui.charts.Loc
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.LocalChartStyle
+import com.opentasker.ui.charts.RecoveryMarker
 import java.time.Instant
 import java.time.ZoneId
 
@@ -64,13 +66,31 @@ data class ValueBarsScale(
     fun format(v: Double): String = if (decimals == 0) "${Math.round(v)}" else String.format("%.${decimals}f", v)
 
     companion object {
-        /** The watch's resting heart rate, on the index's 50–85 bpm ramp. */
+        /**
+         * The watch's resting heart rate, on Jensen's decades — [Grade], the ladder every other screen
+         * grades it on. It was the index's old 50–85 bpm ramp until 2026-10-26, which called 72 bpm a 5
+         * here while the strip and the index called it a 4.
+         */
         val RESTING_HR = ValueBarsScale(
             lo = 40.0, hi = 90.0, guides = emptyList(), gridStep = 5.0, decimals = 0,
-            grade = { HealthIndex.step(HealthIndex.ramp(it, HealthIndex.HR_BEST, HealthIndex.HR_WORST)) },
+            grade = { Grade.ladder(RecoveryMarker.RESTING_HR, it) ?: 3 },
             legend = listOf(
-                Loc("55 bpm or below", "55 bpm 以下"), Loc("56–60", "56–60"), Loc("61–65", "61–65"),
-                Loc("66–71", "66–71"), Loc("72 or more", "72 以上"),
+                Loc("below 50 bpm", "50 bpm 未満"), Loc("50–59", "50–59"), Loc("60–69", "60–69"),
+                Loc("70–79", "70–79"), Loc("80 or more", "80 以上"),
+            ),
+        )
+
+        /**
+         * Nightly skin temperature. There is no absolute ladder for a wrist reading, so the bars are
+         * coloured by each night's own within-person grade, passed in as `steps`; [grade] is never
+         * consulted for it. The floor sits near the readings so a few tenths are visible.
+         */
+        val SKIN_TEMPERATURE = ValueBarsScale(
+            lo = 32.0, hi = 34.0, guides = emptyList(), gridStep = 0.5, decimals = 1,
+            grade = { 3 },
+            legend = listOf(
+                Loc("well below usual", "平常よりかなり低い"), Loc("below usual", "平常より低い"),
+                Loc("usual", "平常"), Loc("above usual", "平常より高い"), Loc("well above usual", "平常よりかなり高い"),
             ),
         )
 
@@ -117,6 +137,8 @@ fun ValueScaleLegend(scale: ValueBarsScale, modifier: Modifier = Modifier) {
  * fixed while the strip scrolls and opens on the newest.
  *
  * @param values oldest first.
+ * @param steps each bar's grade, in [values]' order, when it is not a function of the value alone (a
+ *   within-person grade); a null there draws the bar ungraded. Omitted, [ValueBarsScale.grade] decides.
  */
 @Composable
 fun ValueBars(
@@ -125,6 +147,7 @@ fun ValueBars(
     height: Dp,
     modifier: Modifier = Modifier,
     detailed: Boolean = false,
+    steps: List<Int?>? = null,
 ) {
     if (values.isEmpty()) return
     val measurer = rememberTextMeasurer()
@@ -138,6 +161,8 @@ fun ValueBars(
     val hi = maxOf(scale.hi, values.maxOf { it.value } + scale.gridStep)
     val guide = style.axisText.copy(alpha = 0.55f)
     val grid = style.axisText.copy(alpha = 0.14f)
+    // A night with no grade yet (a baseline still collecting): drawn, never in a grade's colour.
+    val ungraded = style.axisText.copy(alpha = 0.3f)
     val gridValues = if (!detailed) emptyList() else
         generateSequence(Math.ceil(lo / scale.gridStep) * scale.gridStep) { it + scale.gridStep }
             .takeWhile { it <= hi + 1e-9 }.filter { v -> scale.guides.none { kotlin.math.abs(it - v) < 1e-9 } }.toList()
@@ -189,20 +214,20 @@ fun ValueBars(
                     if (i > 0 && days[i] != days[i - 1]) x += dayGap * slot
                     val cx = x + slot / 2
                     if (i == 0 || days[i] != days[i - 1]) dayStartIndex = i
-                    val step = scale.grade(r.value)
+                    val step = if (steps != null) steps.getOrNull(i) else scale.grade(r.value)
                     val top = frame.y(r.value)
                     val left = cx - barW / 2
                     val radius = CornerRadius(minOf(barW / 3, 10.dp.toPx()))
                     // Rounded at the top only: the bar stands on the floor of the chart.
                     drawPath(Path().apply {
                         addRoundRect(RoundRect(Rect(left, top, left + barW, floor), topLeft = radius, topRight = radius))
-                    }, ChartPalette.scale(step))
+                    }, step?.let(ChartPalette::scale) ?: ungraded)
                     val num = measurer.measure(scale.format(r.value), TextStyle(fontSize = numSize, fontWeight = FontWeight.Bold))
                     val pad = 3.dp.toPx()
                     if (floor - top >= num.size.height + 2 * pad) {
-                        drawText(num, ChartPalette.scaleInk(step), Offset(cx - num.size.width / 2f, top + pad))
+                        drawText(num, step?.let(ChartPalette::scaleInk) ?: style.axisText, Offset(cx - num.size.width / 2f, top + pad))
                     } else {
-                        drawText(num, ChartPalette.scale(step), Offset(cx - num.size.width / 2f, top - num.size.height - 1))
+                        drawText(num, step?.let(ChartPalette::scale) ?: style.axisText, Offset(cx - num.size.width / 2f, top - num.size.height - 1))
                     }
 
                     if (i == 0 || days[i] != days[i - 1]) dayStart = cx
@@ -213,7 +238,10 @@ fun ValueBars(
                         val t = measurer.measure(text, TextStyle(fontSize = 12.sp,
                             fontWeight = if (firstOfMonth) FontWeight.Bold else FontWeight.Normal))
                         val mid = (dayStart + cx) / 2
-                        drawText(t, style.axisText, Offset(mid - t.size.width / 2f, size.height - dayRow + 4.dp.toPx()))
+                        // Kept inside the strip: centred under the first day, its month ran off the left edge
+                        // and read ")ct 18" (2026-10-26).
+                        val lx = (mid - t.size.width / 2f).coerceIn(0f, maxOf(0f, size.width - t.size.width))
+                        drawText(t, style.axisText, Offset(lx, size.height - dayRow + 4.dp.toPx()))
                     }
                     x += slot
                 }

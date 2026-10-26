@@ -100,8 +100,11 @@ fun HealthIndexCard(
         val valueWidth = labelColumnWidth(index.components.map { it.score?.toString() ?: "—" } + "100")
             // Measured over EVERY band word, not only the ones on screen today: the column must not
             // change width when a component moves from "Good" to "Very low" overnight.
+        // BOLD, as the pill draws it: measured at the regular weight, "Standard" came out a few
+        // pixels short and printed "Standarc" (白い熊's phone, 2026-10-26).
         val bandWidth = labelColumnWidth(
-            (0..100 step 10).flatMap { listOf(HealthIndex.bandOf(it)[lang], HealthIndex.bandOf(it, "blood_pressure")[lang]) },
+            (0..100 step 10).map { HealthIndex.bandOf(it)[lang] } + Grade.WORDS.map { it[lang] },
+            bold = true,
         )
         temperature?.takeIf { it.value != null }?.let { TemperatureRow(it, labelWidth) }
         index.components.forEach { ComponentRow(it, labelWidth, valueWidth, bandWidth) }
@@ -134,9 +137,9 @@ fun HealthIndexCard(
  * instead, which is visible and harmless where a broken row is neither.
  */
 @Composable
-private fun labelColumnWidth(labels: List<String>): Dp {
+private fun labelColumnWidth(labels: List<String>, bold: Boolean = false): Dp {
     val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.bodyMedium
+    val style = MaterialTheme.typography.bodyMedium.let { if (bold) it.copy(fontWeight = FontWeight.Bold) else it }
     val density = LocalDensity.current
     return remember(labels, style, density, measurer) {
         val widest = labels.maxOfOrNull { measurer.measure(it, style, softWrap = false).size.width } ?: 0
@@ -212,17 +215,18 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp, band
         )
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
-            ScoreBar(c.score)
+            ScoreBar(c.score, c.step)
         }
         Spacer(Modifier.width(10.dp))
         // The band word, in a pill of the bar's own colour with that step's own ink. It was the word
         // in the colour itself, and the 5's dark red on this ground could not be read (白い熊,
         // 2026-10-23). The colour is an extension of a rule written for the total (see
-        // HealthIndex.step), so the word carries the claim and the colour agrees with it.
-        val step = c.score?.let { HealthIndex.step(it) }
+        // HealthIndex.step), so the word carries the claim and the colour agrees with it. Since
+        // 2026-10-25 the step is the component's own [Grade] — the one every other card draws.
+        val step = c.step
         Box(Modifier.width(bandWidth + 12.dp)) {
             Text(
-                HealthIndex.bandOf(c.score, c.key)[lang],
+                HealthIndex.bandOf(c)[lang],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -261,8 +265,8 @@ private fun ComponentRow(c: IndexComponent, labelWidth: Dp, valueWidth: Dp, band
  * the same.
  */
 @Composable
-private fun ScoreBar(score: Int?) {
-    val tint = score?.let { ChartPalette.scale(HealthIndex.step(it)) }
+private fun ScoreBar(score: Int?, step: Int?) {
+    val tint = step?.let { ChartPalette.scale(it) }
     // 14 dp since 2026-10-23 (白い熊: "make all the horizontal bars thicker — there's space").
     Canvas(Modifier.fillMaxWidth().height(14.dp)) {
         val r = size.height / 2f
@@ -387,7 +391,7 @@ fun HealthIndexDetail(index: HealthIndexResult) {
                     // The same banded colour the card's bar carries, so the detail page and the card
                     // are one reading of the same component rather than two.
                     Box(Modifier.size(10.dp).clip(CircleShape).background(
-                        if (c.score == null) ChartPalette.UNKNOWN else ChartPalette.scale(HealthIndex.step(c.score)),
+                        c.step?.let { ChartPalette.scale(it) } ?: ChartPalette.UNKNOWN,
                     ).align(Alignment.CenterVertically))
                     Spacer(Modifier.width(8.dp))
                     InfoBody(c.label[lang], Modifier.weight(1f), bold = true)

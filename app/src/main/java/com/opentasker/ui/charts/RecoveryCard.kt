@@ -271,16 +271,12 @@ private fun MarkerRow(m: MarkerReading, labelWidth: Dp) {
 @Composable
 private fun BandChip(m: MarkerReading) {
     val lang = LocalBandLanguage.current
-    val label = when (m.band) {
-        RecoveryBand.USUAL -> BandText.bandUsual[lang]
-        RecoveryBand.HIGH -> BandText.bandHigh[lang]
-        RecoveryBand.LOW -> BandText.bandLow[lang]
-        RecoveryBand.UNKNOWN -> BandText.bandUnknown[lang]
-    }
-    // Filled in the reading's 1–5 step, with that step's own ink: usual is the blue 3, better than
-    // usual 2 and 1, worse 4 and 5 — the night table's grading, so a colour means one thing in both.
-    // It was a green outline whatever the band, which said nothing a reader could see.
+    // The GRADE's word, not the within-person band's (2026-10-25): it said "usual" beside 10 h 14 min
+    // asleep, which the night table grades a 4. The usual range stays printed beside it as a fact.
     val step = m.displayStep
+    val label = if (m.temperatureCollecting) BandText.bandUnknown[lang] else Grade.word(step)[lang]
+    // Filled in the reading's 1–5 step, with that step's own ink — the night table's grading, so a
+    // colour means one thing in both. It was a green outline whatever the band.
     if (step == null) {
         ValueChip(label, LocalChartStyle.current.axisText)
         return
