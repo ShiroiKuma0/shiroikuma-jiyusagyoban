@@ -265,7 +265,10 @@ fun BpReadingBars(
                         val t = measurer.measure(text, TextStyle(fontSize = 12.sp,
                             fontWeight = if (firstOfMonth) FontWeight.Bold else FontWeight.Normal))
                         val mid = (dayStart + cx) / 2
-                        drawText(t, style.axisText, Offset(mid - t.size.width / 2f, size.height - dayRow + 4.dp.toPx()))
+                        // Kept inside the strip: centred under the first day, its month ran off the left edge
+                        // and read ")ct 18" (2026-10-26).
+                        val lx = (mid - t.size.width / 2f).coerceIn(0f, maxOf(0f, size.width - t.size.width))
+                        drawText(t, style.axisText, Offset(lx, size.height - dayRow + 4.dp.toPx()))
                     }
                     x += slot
                 }

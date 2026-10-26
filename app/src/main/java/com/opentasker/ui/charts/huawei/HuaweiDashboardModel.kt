@@ -413,7 +413,12 @@ class HuaweiDashboardModel(
 
         // The band's own last night, if it has one — otherwise the newest on record, which will be
         // the Hume band's. Either way it is A night that happened, never a blend of two.
-        val latest = nights.lastOrNull()
+        //
+        // A NIGHT, by the night table's own test ([RecoverySource.nights]): the session list holds
+        // the watch's naps too, and taking its last entry handed the health index a morning nap,
+        // which scored sleep 0 "Very bad" beside a table grading the same morning's 10 h 14 a 4
+        // (2026-10-25). The resting-HR window below it was reading the nap as well.
+        val latest = com.opentasker.ui.charts.RecoverySource.nights(nights, minuteOfDayOf).lastOrNull()
         // One row per day, back across everything on record — the Huawei era and, before it, the
         // Hume one. The rows are built from the SAME series the charts draw, so a day's figures and
         // its curve can never disagree: they are the same points counted twice, not two sources.

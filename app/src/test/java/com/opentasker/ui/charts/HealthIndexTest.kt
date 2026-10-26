@@ -57,8 +57,8 @@ class HealthIndexTest {
     fun `every component at its best scores exactly 100`() {
         val r = HealthIndex.compute(
             inputs(
-                restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.45,
-                steps = 7_500.0, bpSystolic = 120.0, bpDiastolic = 80.0, hrvMs = 45.0, pwv = 7.9,
+                restingHr = 45.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.45,
+                steps = 7_500.0, bpSystolic = 115.0, bpDiastolic = 75.0, hrvMs = 45.0, pwv = 7.9,
             ),
         )
         assertEquals(100, r.value)
@@ -68,18 +68,46 @@ class HealthIndexTest {
     }
 
     @Test
-    fun `sleep architecture pulls a perfect night down, and the arithmetic is checkable`() {
-        // Everything at its best EXCEPT a 35 % deep+REM share against the 45 % target.
+    fun `sleep scores its duration on the NSF ladder, and the arithmetic is checkable`() {
+        // Everything at its best except 10 h 14 min asleep — the night of 2026-10-25, a 4 on the
+        // ladder: 600 → 54 and 660 → 40, so 614 → 54 − 14 × 14/60 = 50.7 → 51.
         val r = HealthIndex.compute(
             inputs(
-                restingHr = 50.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 480, deepRem = 0.35,
-                steps = 7_500.0, bpSystolic = 120.0, bpDiastolic = 80.0, hrvMs = 45.0, pwv = 7.9,
+                restingHr = 45.0, iqr = 4.0, spo2 = 97.0, sleepMinutes = 614, deepRem = 0.35,
+                steps = 7_500.0, bpSystolic = 115.0, bpDiastolic = 75.0, hrvMs = 45.0, pwv = 7.9,
             ),
         )
-        // share = (0.35-0.10)/(0.45-0.10) = 71 ; sleep = 100×0.7 + 71×0.3 = 91
-        assertEquals(91, r.components.single { it.key == "sleep" }.score)
-        // index = 100×0.80 + 91×0.20 = 80 + 18.2 = 98.2 → 98
-        assertEquals(98, r.value)
+        val sleep = r.components.single { it.key == "sleep" }
+        assertEquals(51, sleep.score)
+        assertEquals(4, sleep.step)
+        assertEquals("Bad", HealthIndex.bandOf(sleep).en)
+        // index = 100 × 0.80 + 51 × 0.20 = 90.2 → 90
+        assertEquals(90, r.value)
+    }
+
+    /** A component's step is the same quantity's step on every other card — [Grade]. */
+    @Test
+    fun `a component is graded exactly as the same number is graded elsewhere`() {
+        for (m in 300..720 step 7) {
+            val c = HealthIndex.compute(inputs(sleepMinutes = m)).components.single { it.key == "sleep" }
+            assertEquals("sleep $m", Grade.ladder(RecoveryMarker.SLEEP, m.toDouble()), c.step)
+            assertEquals("sleep $m score agrees", c.step, HealthIndex.step(c.score!!))
+        }
+        for (bpm in 40..95) {
+            val c = HealthIndex.compute(inputs(restingHr = bpm.toDouble())).components.single { it.key == "resting_hr" }
+            assertEquals("hr $bpm", RecoveryReference.lowestHrStep(bpm.toDouble()), c.step)
+            assertEquals("hr $bpm score agrees", c.step, HealthIndex.step(c.score!!))
+        }
+        for (sys in 100..185 step 3) for (dia in 60..112 step 3) {
+            val c = HealthIndex.compute(inputs(bpSystolic = sys.toDouble(), bpDiastolic = dia.toDouble()))
+                .components.single { it.key == "blood_pressure" }
+            assertEquals("bp $sys/$dia", com.opentasker.ui.charts.huawei.BpGrade.of(sys.toDouble(), dia.toDouble()), c.step)
+            assertEquals("bp $sys/$dia score agrees", c.step, HealthIndex.step(c.score!!))
+        }
+        for (ms in 10..60) {
+            val c = HealthIndex.compute(inputs(hrvMs = ms.toDouble())).components.single { it.key == "hrv" }
+            assertEquals("hrv $ms", Grade.ladder(RecoveryMarker.HRV, ms.toDouble()), c.step)
+        }
     }
 
     @Test
@@ -252,13 +280,16 @@ class HealthIndexTest {
     fun `blood pressure scores the worse of the two pressures`() {
         fun bp(s: Double, d: Double) = HealthIndex.compute(inputs(bpSystolic = s, bpDiastolic = d))
             .components.single { it.key == "blood_pressure" }
-        assertEquals(100, bp(118.0, 76.0).score)
-        assertEquals(0, bp(165.0, 76.0).score)
-        assertEquals(0, bp(118.0, 102.0).score)
-        // 140/90: systolic halfway (50), diastolic halfway (50).
-        assertEquals(50, bp(140.0, 90.0).score)
-        // 130/95: systolic 75, diastolic 25 — the diastolic decides.
-        assertEquals(25, bp(130.0, 95.0).score)
+        assertEquals(100, bp(112.0, 72.0).score)
+        // Through the ESH edges: 140/90 is grade 1 on both, the top of the 4 band.
+        assertEquals(54, bp(140.0, 90.0).score)
+        assertEquals(4, bp(140.0, 90.0).step)
+        // 130/95: systolic high-normal (69), diastolic grade 1 (54 − 15 × 5/10 = 46.5 → 47) — the
+        // diastolic decides, as ESH's own rule does.
+        assertEquals(47, bp(130.0, 95.0).score)
+        assertEquals(4, bp(130.0, 95.0).step)
+        assertEquals(5, bp(165.0, 76.0).step)
+        assertEquals(5, bp(118.0, 102.0).step)
         assertEquals("130/95 mmHg", bp(130.0, 95.0).measuredText)
         val noCuff = HealthIndex.compute(inputs(bpSystolic = null, bpDiastolic = null))
         assertTrue(noCuff.partial)
@@ -290,7 +321,7 @@ class HealthIndexTest {
                 bpSystolic = 155.0, bpDiastolic = 98.0, hrvMs = 17.0, pwv = 9.8,
             ),
         )
-        assertTrue("expected a low index, got ${r.value}", r.value!! < 30)
+        assertTrue("expected a low index, got ${r.value}", r.value!! < 40)
         assertEquals("Very low", r.band.en)
     }
 

@@ -115,8 +115,9 @@ object RecoverySource {
         val hfPower: Double? = null,
         /**
          * The Watch D3's morning readings, filed under the night they follow: the first of each
-         * within [MORNING_WINDOW_MS] of waking. A cuff reading at 08:17 belongs to the night that
-         * ended at 07:30; one taken the next evening belongs to no night at all.
+         * within [MORNING_WINDOW_MS] of waking, or up to [MORNING_LEAD_MS] before the session ends
+         * (taken in bed). A cuff reading at 08:17 belongs to the night that ended at 07:30; one taken
+         * the next evening belongs to no night at all.
          */
         val bpSystolic: Double? = null,
         val bpDiastolic: Double? = null,
@@ -137,9 +138,22 @@ object RecoverySource {
     /** How long after waking a reading still counts as that morning's. */
     const val MORNING_WINDOW_MS = 14 * 3_600_000L
 
-    private fun morning(session: SleepSession, points: List<ChartPoint>): Double? =
-        points.filter { it.tMs > session.endMs && it.tMs <= session.endMs + MORNING_WINDOW_MS }
+    /**
+     * How long BEFORE the session's end a reading still counts as that morning's.
+     *
+     * The watch's session ends when it decides 白い熊 is up, which is not when the cuff goes on: on
+     * 2026-10-25 the blood pressure was taken at 07:00 and the stiffness at 07:01, lying in bed, while
+     * the session ran to 07:39 — and both were dropped as "before the morning". Three hours keeps a
+     * reading taken in bed with the night it follows, and is far too short to reach back to the
+     * evening before.
+     */
+    const val MORNING_LEAD_MS = 3 * 3_600_000L
+
+    private fun morning(session: SleepSession, points: List<ChartPoint>): Double? {
+        val from = maxOf(session.startMs, session.endMs - MORNING_LEAD_MS)
+        return points.filter { it.tMs > from && it.tMs <= session.endMs + MORNING_WINDOW_MS }
             .minByOrNull { it.tMs }?.value
+    }
 
     /**
      * Real nights only, oldest first.

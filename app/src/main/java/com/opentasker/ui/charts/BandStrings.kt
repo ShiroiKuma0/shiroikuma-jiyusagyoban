@@ -108,9 +108,11 @@ object BandText {
     // footer
     // ---- 回復 --------------------------------------------------------------------------------
     val recoveryTitle = Loc("Recovery", "回復")
-    val recoveryAllUsual = Loc("Nothing unusual", "すべて平常")
-    val recoveryOneOff = Loc("One marker is outside your usual range", "1つが平常の範囲外")
-    val recoveryTwoOff = Loc("%d markers are outside your usual range", "%d つが平常の範囲外")
+    // Counts of what the rows' own grades say — a 4 or a 5 — since 2026-10-25, not of the within-person
+    // band, which read "Nothing unusual" above a 10-hour night graded a 4 in the same card.
+    val recoveryAllUsual = Loc("Nothing graded bad", "悪い評価はなし")
+    val recoveryOneOff = Loc("One reading is graded bad", "1つが悪い評価")
+    val recoveryTwoOff = Loc("%d readings are graded bad", "%d つが悪い評価")
     val recoveryCollecting = Loc(
         "Collecting — %d of 5 nights needed before there is anything to compare against",
         "収集中 — 比較できるようになるまで、あと %d／5 夜",
@@ -215,9 +217,6 @@ object BandText {
         "記録中で一度きりの並び — しかも体感より先ではなく、後から追いついた。" +
             "見ておく価値はあるが、これで動くほどではない。",
     )
-    val bandUsual = Loc("usual", "平常")
-    val bandHigh = Loc("high", "高い")
-    val bandLow = Loc("low", "低い")
     val bandUnknown = Loc("—", "—")
     val usualRange = Loc("usual %s–%s", "平常 %s〜%s")
     val recoveryLateEffort = Loc(
@@ -295,8 +294,8 @@ object BandText {
     // The grid can only show a count, and a count is not a reading. These print what is stored.
     val registerNightsTitle = Loc("Every night and every rating — %d lines, %d rated", "夜と評価のすべて — %d 行、うち %d 件は評価あり")
     val registerNightsNote = Loc(
-        "Newest first. 体感 is the number you tapped. Night HR and 実睡眠 are graded against published reference ranges — tap the i above for the cut points and their sources. 皮膚温 keeps the within-person reading, because a wrist sensor tracks the room almost as closely as the wearer and has no absolute band worth having. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it.",
-        "新しい順。体感は押した数字そのもの。夜間心拍と実睡眠は公表された基準範囲で採点する — 区切りと出典は上の i を押せば出る。皮膚温だけは自分自身との比較のまま。手首のセンサーは装着者とほぼ同じくらい部屋の温度を測っており、絶対的な基準を置く意味がないため。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。",
+        "Newest first. 体感 is the number you tapped. Night HR, the low, 実睡眠, HRV and blood oxygen are graded against published ranges — tap the i above for the cut points and their sources. 皮膚温, deep, deep+REM, bed HR, the swing and breathing are graded against your own recent nights, because no absolute band fits them. These are the same grades as everywhere else in 健康. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it.",
+        "新しい順。体感は押した数字そのもの。夜間心拍・最低心拍・実睡眠・心拍変動・血中酸素は公表された範囲で採点する — 区切りと出典は上の i を押せば出る。皮膚温・深い睡眠・深＋レム・就床心拍・振れ・呼吸数は自分自身の直近の夜と比べる。当てはまる絶対的な基準がないため。健康のほかの画面と同じ採点である。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。",
     )
     // ---- the reference bands, behind the i ------------------------------------------------------
     //
@@ -365,8 +364,11 @@ object BandText {
         "押した数字そのもの。変換するものも、比べる相手もない。これ自体が尺度だから。",
     )
     val bandsRingNote = Loc(
-        "Separately: a thicker ring on a calendar tile still means \"outside YOUR usual range that night\". That is a different question from these bands, and neither is derived from the other.",
-        "なお、暦のタイルの太い縁は今も「その夜が自分の平常の範囲外だったか」を意味する。ここの基準帯とは別の問いで、どちらも他方から導いてはいない。",
+        "These are the grades everywhere in 健康: the deviation strip, the 回復 card and the health index "
+            + "colour and word the same number the same way. Where \"usual …\" is printed beside a "
+            + "reading, that is your own recent range — a fact about your nights, not the grade.",
+        "これが健康のどこでも同じ採点である。平常との差、回復のカード、健康指数は、同じ数字を同じ色と言葉で"
+            + "示す。読み値の横の「平常 …」は自分の直近の範囲で、夜についての事実であって採点ではない。",
     )
     // Column headings, printed once. The values under them keep their own colour. Prefixed because
     // the day-table further down already owns the bare col* names for a different set of columns.
@@ -405,33 +407,53 @@ object BandText {
             + "どれだけ確信してよいかではない。",
     )
     val bandsWithinTitle = Loc(
-        "Deep · Deep+REM · HRV · Bed HR · HR swing · Breaths",
-        "深い・深＋レム・心拍変動・就床心拍・心拍の振れ・呼吸数",
+        "Deep · Deep+REM · Bed HR · HR swing · Breaths",
+        "深い・深＋レム・就床心拍・心拍の振れ・呼吸数",
     )
     val bandsWithinWhy = Loc(
-        "These three are banded against YOUR OWN preceding nights, not against a population range, "
+        "These are banded against YOUR OWN preceding nights, not against a population range, "
             + "because no published ladder fits them. This band's \"deep\" is not polysomnography's "
             + "N3 — these nights run 30–40 % of sleep where the literature is 13–23 % — so an absolute "
-            + "ladder would score every night ever recorded as extreme. RMSSD norms are so "
-            + "age-dependent that a population mean would paint the whole column one colour. The "
-            + "going-to-bed rate, the night's swing and the breathing rate joined them in 2026-09: "
-            + "no published ladder exists for a wrist band's bedtime rate, for the spread of a "
-            + "binned night curve, or for an estimated respiratory rate either.",
-        "この三つは公表された範囲ではなく、自分自身の直前の夜に対して段を付けてある。当てはまる公表尺度が無いから"
+            + "ladder would score every night ever recorded as extreme. No published ladder exists for "
+            + "a wrist band's bedtime rate, for the spread of a binned night curve, or for an estimated "
+            + "respiratory rate either. 3 is inside your usual range, 4 and 5 outside it on the worse "
+            + "side, 2 and 1 on the better side.",
+        "これらは公表された範囲ではなく、自分自身の直前の夜に対して段を付けてある。当てはまる公表尺度が無いから"
             + "である。このバンドの「深い」は睡眠ポリグラフの N3 ではない — ここでの夜は睡眠の 30〜40 % を占め、"
-            + "文献は 13〜23 % である — ので、絶対尺度に掛ければ記録した全ての夜が極端と出る。RMSSD の基準値は"
-            + "年齢依存が強く、母集団平均では欄全体が一色になる。就床心拍・心拍の振れ・呼吸数も 2026 年 9 月に"
-            + "加わった。手首のバンドの就床時心拍にも、区分けした夜の曲線の振れ幅にも、推定呼吸数にも、"
-            + "当てはまる公表尺度は無いからである。",
+            + "文献は 13〜23 % である — ので、絶対尺度に掛ければ記録した全ての夜が極端と出る。手首のバンドの"
+            + "就床時心拍にも、区分けした夜の曲線の振れ幅にも、推定呼吸数にも、当てはまる公表尺度は無い。"
+            + "3 は平常の範囲内、4 と 5 は悪い側の外、2 と 1 は良い側の外。",
+    )
+    val bandsBpTitle = Loc("Blood pressure (morning)", "血圧（朝）")
+    val bandsBpWhy = Loc(
+        "The first cuff reading of the morning after the night, graded on the ESH 2018 office "
+            + "categories. The worse of the two pressures decides: 118/86 is a 3.",
+        "夜明けの最初の測定値を ESH 2018 の診察室血圧の区分で評価する。二つの値のうち悪い方で決まる — "
+            + "118/86 は 3。",
+    )
+    val bandsHrvTitle = Loc("HRV (RMSSD)", "心拍変動（RMSSD）")
+    val bandsHrvWhy = Loc(
+        "On the health index's own edges since 2026-10-25: 45 ms or more is the best end and 15 ms the "
+            + "worst, so about 41 ms and above is a 1, 36–40 a 2, 32–35 a 3, 27–31 a 4 and below that a 5. "
+            + "It was graded against your own nights, and those run from 20 to 60 ms, so anything from "
+            + "20 to 40 read as usual. It is a wide adult range, not an age norm — RMSSD falls with age — "
+            + "so read a run of nights rather than one.",
+        "2026-10-25 から健康指数と同じ境界で採点する：45 ms 以上が最良、15 ms が最悪で、およそ 41 ms 以上が 1、"
+            + "36〜40 が 2、32〜35 が 3、27〜31 が 4、それ未満が 5。以前は自分の夜と比べていたが、その夜が 20〜60 ms "
+            + "に散らばるため、20〜40 は何でも平常と出ていた。年齢基準ではなく成人の広い範囲であり（RMSSD は"
+            + "年齢と共に下がる）、一晩ではなく数晩の並びで読むこと。",
     )
     val bandsNotCounted = Loc(
-        "NONE of these is COUNTED. The headline still counts three markers; a colour here says "
-            + "where a value sits, never that the night was adverse.",
-        "ここに並ぶものはいずれも数えていない。見出しが数えるのは今も三つの指標である。ここの色は値の位置を"
-            + "言うのみで、その夜が悪かったとは言わない。",
+        "Every column counts. A 4 or a 5 anywhere in a row is a reading graded bad, and the row's "
+            + "count — like the 回復 headline for last night — is how many there are.",
+        "どの列も数える。行のどこかの 4 か 5 は悪い評価の読み値であり、行の数 — 昨夜の回復の見出しも同じ — は"
+            + "その個数である。",
     )
 
     val regColDate = Loc("Date", "日付")
+    // The FIRST reading column since 2026-10-25, when 白い熊 began taking it every morning: the
+    // first cuff reading within the morning window after the night, as "128/82".
+    val regColBp = Loc("BP", "血圧")
     val regColFelt = Loc("Woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
     val regColSleep = Loc("Asleep", "実睡眠")
@@ -472,7 +494,7 @@ object BandText {
      * the column cannot spell it.
      */
     val registerColumns = listOf(
-        regColDate, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
+        regColDate, regColBp, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
         regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
@@ -487,6 +509,12 @@ object BandText {
         "昨夜と、その前 %d 夜の中央値との比較。",
     )
     val deviationBaseline = Loc("usual %s", "平常 %s")
+    /** Under the skin-temperature bars: the yellow of the first nights is not the legend's 1. */
+    val markerTempCollectingNote = Loc(
+        "Yellow bars with no grade behind them are the first nights, before there was a baseline to "
+            + "compare against — as in the night table. They are not “well below usual”.",
+        "最初の夜の黄色い棒は、比べる平常がまだ無かった夜で、夜の表と同じ。「平常よりかなり低い」ではない。",
+    )
     /** Skin temperature's first nights, when there is a value and no baseline yet. */
     val tempCollecting = Loc("no baseline yet — night %d of %d", "平常はまだ — %d / %d 夜目")
     val deviationNoBaseline = Loc(
@@ -519,8 +547,8 @@ object BandText {
     )
     /** The same note before there is a baseline to quote a threshold from. */
     val registerNightsNotePlain = Loc(
-        "Newest first. 体感 is the number you tapped. The measured columns are graded against your own recent median, not against anyone else: 3 is inside your usual range, 2 and 4 are outside it — 2 on the better side, 4 on the worse — and 1 and 5 twice as far out again. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it. Grey means there is no baseline yet to judge against.",
-        "新しい順。体感はあなたが押した数字そのもの。測定値は他人ではなく自分自身の直近の中央値と比べる：3 は平常の範囲内、2 と 4 はその外（2 が良い側、4 が悪い側）、1 と 5 はさらに倍だけ外。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。灰色はまだ比べる基準がない値。",
+        "Newest first. 体感 is the number you tapped. Heart rate, the low, sleep, HRV and blood oxygen are graded on published ranges; the other measured columns against your own recent nights — 3 inside your usual range, 4 and 5 outside it on the worse side, 2 and 1 on the better. These are the same grades as everywhere else in 健康. A dash is a value the band never recorded; a row of dashes is a rating with no night beside it. Grey means there is no baseline yet to judge against.",
+        "新しい順。体感はあなたが押した数字そのもの。心拍・最低心拍・睡眠・心拍変動・血中酸素は公表された範囲で採点し、ほかの測定値は自分自身の直近の夜と比べる：3 は平常の範囲内、4 と 5 は悪い側の外、2 と 1 は良い側の外。健康のほかの画面と同じ採点である。ダッシュはバンドが記録しなかった値、全部ダッシュの行は夜のない評価。灰色はまだ比べる基準がない値。",
     )
     val registerNightUnrated = Loc("not rated", "未評価")
     val registerSession = Loc("%s · %d min · %d MET-min", "%s ・ %d 分 ・ %d MET分")

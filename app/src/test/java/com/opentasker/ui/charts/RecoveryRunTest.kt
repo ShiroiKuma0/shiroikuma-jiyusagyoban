@@ -151,12 +151,13 @@ class RecoveryRunTest {
 
     /** The swing never reaches the counting rule — it is display-only, like the rest of the strip. */
     @Test
-    fun `the swing is never counted`() {
+    fun `a flat night is counted once its grade says bad`() {
+        // Since 2026-10-25 the count is what the colours say, for every marker the card lists.
         val r = Recovery.band(
             RecoveryMarker.HR_SWING, 6.0, swing.take(7), Recovery.HR_MEANINGFUL_BPM,
             RecoveryConfidence.ESTABLISHED, counted = false,
         )
-        assertTrue(!r.counted)
-        assertTrue("and never adverse, whatever it does", !r.adverse)
+        assertTrue(r.displayStep!! >= Grade.BAD_FROM)
+        assertTrue(r.adverse)
     }
 }
