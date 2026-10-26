@@ -1,6 +1,8 @@
 package com.opentasker.ui.gengoshima
 
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import com.android.tools.screenshot.PreviewTest
 import com.opentasker.core.gengoshima.GenerationRunner.Progress
@@ -96,3 +98,19 @@ private val SIX_STEPS = DONE.copy(
 @Preview(name = "言語島 progress — six steps, long log", widthDp = 413, heightDp = 860, fontScale = 1.3f, showBackground = true)
 @Composable
 fun GengoshimaProgressSixStepsPreview() = Frame(SIX_STEPS)
+
+/** 「文ごとに止める」 off and on, one above the other, so the two states can be told apart. */
+@PreviewTest
+@Preview(name = "言語島 toggle pill — off and on", widthDp = 400, backgroundColor = 0xFF000000, showBackground = true)
+@Composable
+fun GengoshimaTogglePillPreview() {
+    OpenTaskerTheme {
+        androidx.compose.foundation.layout.Column(
+            androidx.compose.ui.Modifier.padding(16.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        ) {
+            TogglePill("文ごとに止める / pause after each sentence", checked = false) {}
+            TogglePill("文ごとに止める / pause after each sentence", checked = true) {}
+        }
+    }
+}

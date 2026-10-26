@@ -86,6 +86,12 @@ object OnseRender {
         val error: String?,
         val index: Int,
         val total: Int,
+        /**
+         * The reading VOICEVOX actually used, AquesTalk-style kana (`ホ'カノ/イヌヲ…`), for a
+         * Japanese item; null from a 音声 that does not send it yet. [com.opentasker.core.gengoshima.ReadingCheck]
+         * holds it against the furigana.
+         */
+        val kana: String? = null,
     )
 
     /**
@@ -210,6 +216,7 @@ object OnseRender {
                             error = reply.getStringExtra("error"),
                             index = reply.getStringExtra("index")?.toIntOrNull() ?: (replies.size + 1),
                             total = reply.getStringExtra("total")?.toIntOrNull() ?: items.size,
+                            kana = reply.getStringExtra("kana")?.takeIf { it.isNotBlank() },
                         )
                         replies += r
                         onItem(r)
