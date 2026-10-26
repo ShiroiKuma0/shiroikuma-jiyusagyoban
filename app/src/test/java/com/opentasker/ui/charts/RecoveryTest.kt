@@ -228,15 +228,17 @@ class RecoveryTest {
 
     /** The published operating point: two of three is where a composite starts beating its parts. */
     @Test
-    fun `two markers off is the threshold the counting rule exists for`() {
+    fun `the headline counts what is graded bad, not what left the usual band`() {
+        // 2026-10-25: 70 bpm is a 4 on Jensen's decades and counts; 6 h 20 min asleep is below the
+        // usual band but a 3 on the NSF ladder, and does not.
         val r = assemble(hr = 70.0, sleep = 380.0, felt = 3.0)
-        assertEquals(2, r.adverseCount)
-        assertTrue(RecoveryMarker.NOCTURNAL_HR in r.adverseMarkers)
-        assertTrue(RecoveryMarker.SLEEP in r.adverseMarkers)
+        assertEquals(RecoveryBand.LOW, r.markers.first { it.marker == RecoveryMarker.SLEEP }.band)
+        assertEquals(1, r.adverseCount)
+        assertEquals(listOf(RecoveryMarker.NOCTURNAL_HR), r.adverseMarkers)
     }
 
     @Test
-    fun `temperature is shown but never counted`() {
+    fun `a warm night is graded, and counted like any other reading graded bad`() {
         val r = Recovery.assemble(
             nightStartMs = 0L,
             nocturnalHr = hrBand(62.0, realNights),
@@ -251,14 +253,18 @@ class RecoveryTest {
             RecoveryBand.HIGH,
             r.markers.first { it.marker == RecoveryMarker.TEMPERATURE }.band,
         )
-        assertEquals("it is an illness flag, not a recovery component", 0, r.adverseCount)
+        assertEquals(listOf(RecoveryMarker.TEMPERATURE), r.adverseMarkers)
     }
 
     @Test
-    fun `sleeping much longer than usual is not adverse`() {
+    fun `sleeping far longer than recommended is graded bad everywhere, and counted`() {
+        // 白い熊, 2026-10-25: 10+ hours is red in the night table "which it clearly is — bad — it must
+        // be graded so everywhere". 11 h 40 min is a 5 on the NSF ladder.
         val r = assemble(hr = 62.0, sleep = 700.0, felt = 3.0)
-        assertEquals(RecoveryBand.HIGH, r.markers.first { it.marker == RecoveryMarker.SLEEP }.band)
-        assertEquals(0, r.adverseCount)
+        val sleep = r.markers.first { it.marker == RecoveryMarker.SLEEP }
+        assertEquals(RecoveryBand.HIGH, sleep.band)
+        assertEquals(5, sleep.displayStep)
+        assertEquals(listOf(RecoveryMarker.SLEEP), r.adverseMarkers)
     }
 
     // --- the Radin illness conjunction ------------------------------------------------------------

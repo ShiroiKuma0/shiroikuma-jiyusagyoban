@@ -56,6 +56,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.opentasker.ui.charts.huawei.BpGrade
 import com.opentasker.ui.theme.isNarrowScreen
 import java.time.Instant
 import java.time.LocalDate
@@ -465,6 +466,12 @@ private fun ReferenceBandsPanel() {
     ) {
         InfoHeading(BandText.bandsTitle[lang])
 
+        // 血圧 — the first column, so the first section (2026-10-25).
+        BandSection(BandText.bandsBpTitle[lang]) {
+            BpGrade.LABELS.forEachIndexed { i, label -> BandRung(i + 1, label[lang]) }
+            InfoBody(BandText.bandsBpWhy[lang])
+        }
+
         // 実睡眠 — five rungs, each with the exact times that land a night on it and why they are
         // there. Prose could say all of this and did; a reader looking up "what counts as 7h40"
         // then had to find it inside a paragraph. (白い熊, 2026-08-12.)
@@ -500,6 +507,10 @@ private fun ReferenceBandsPanel() {
         BandSection(BandText.bandsSpo2Title[lang]) {
             InfoBody(BandText.bandsSpo2Why[lang])
             InfoBody(BandText.bandsSpo2Caveat[lang])
+        }
+
+        BandSection(BandText.bandsHrvTitle[lang]) {
+            InfoBody(BandText.bandsHrvWhy[lang])
         }
 
         BandSection(BandText.bandsWithinTitle[lang]) {
@@ -677,7 +688,16 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             maxLines = 1,
             softWrap = false,
         )
-        // Skin temperature first (白い熊, 2026-10-18), with one decimal: the whole signal is a few
+        // Blood pressure first (白い熊, 2026-10-25 — measured every morning now), on the ESH ladder
+        // the blood-pressure bars use, the worse of the two pressures deciding the colour.
+        // A size down: "140/100" is seven characters and does not fit the one column width at the
+        // phone's font scale 1.3 in the table's own size — it printed "140/1…" (2026-10-26).
+        ValueCell(
+            n?.bpSystolic?.let { s -> n.bpDiastolic?.let { d -> "${s.roundToInt()}/${d.roundToInt()}" } },
+            n?.bpStep,
+            compact = true,
+        )
+        // Skin temperature next (白い熊, 2026-10-18), with one decimal: the whole signal is a few
         // tenths of a degree. Yellow while its baseline is still being collected, then the 1–5 steps.
         ValueCell(
             n?.temperature?.value?.let { String.format("%.1f", it) },
@@ -692,20 +712,20 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         )
         // ## Every column carries a colour, and not every colour means the same thing
         //
-        // Heart rate, the low, sleep and blood oxygen are graded against PUBLISHED ranges — see
-        // [RecoveryReference], which also carries the two caveats worth knowing (a sleeping floor
-        // sits under a daytime resting rate; a wrist oximeter's error is about twice the swing it
-        // measures). The other six — deep, deep+REM, RMSSD, the going-to-bed rate, the night's
-        // swing and breathing — are graded WITHIN-PERSON, against the nights before
-        // them, because no published ladder fits a consumer band's staging or an age-dependent
-        // RMSSD — [SessionRegister.NightReading] sets out why at length, and the ⓘ panel says which
-        // is which on screen. None of them is counted; a colour is not a verdict on the night.
+        // Every cell takes [Grade] — the one grading the strip, the 回復 card and the index draw
+        // too (2026-10-25). Heart rate, the low, sleep, RMSSD and blood oxygen sit on ABSOLUTE
+        // ladders — see [RecoveryReference] for the two caveats worth knowing (a sleeping floor sits
+        // under a daytime resting rate; a wrist oximeter's error is about twice the swing it
+        // measures). Skin temperature, deep, deep+REM, the going-to-bed rate, the night's swing and
+        // breathing are graded WITHIN-PERSON, against the nights before them, because no absolute
+        // ladder fits a consumer band's staging or a sensor that measures the bedroom. The ⓘ panel
+        // says which is which on screen.
         ValueCell(
             n?.nocturnalHr?.value?.let {
                 "${it.roundToInt()}" +
                     (n.nocturnalHr.delta?.let { d -> " %+d".format(d.roundToInt()) } ?: "")
             },
-            n?.nocturnalHr?.value?.let { RecoveryReference.nocturnalHrStep(it) },
+            n?.nocturnalHr?.displayStep,
         )
         // Going to bed and the night's own spread, beside the nocturnal rate they belong with —
         // the night in the order it happened (白い熊, 2026-09-26).
@@ -717,13 +737,13 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         CurveCell(n?.hrCurve.orEmpty(), n?.hrCurveStep)
         ValueCell(
             n?.sleep?.value?.let { hoursAndMinutes(it) },
-            n?.sleep?.value?.let { RecoveryReference.sleepStep(it) },
+            n?.sleep?.displayStep,
         )
         ValueCell(n?.deepMinutes?.let { hoursAndMinutes(it) }, n?.deepStep)
         ValueCell(n?.deepRemShare?.let { "${(it * 100).roundToInt()}%" }, n?.deepRemStep)
         ValueCell(
             n?.lowestHr?.let { "${it.roundToInt()}" },
-            n?.lowestHr?.let { RecoveryReference.lowestHrStep(it) },
+            n?.lowestHrStep,
         )
         // RMSSD, in the milliseconds it is measured in — the unit is part of the reading, and a bare
         // "38" in a table of heart rates would be read as a heart rate.
@@ -733,7 +753,7 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         ValueCell(n?.respirationBpm?.let { String.format("%.1f", it) }, n?.respirationStep)
         ValueCell(
             n?.spo2?.let { "${it.roundToInt()}%" },
-            n?.spo2?.let { RecoveryReference.spo2Step(it) },
+            n?.spo2Step,
         )
     }
     row.note?.takeIf { it.isNotBlank() }?.let { note ->
@@ -843,7 +863,7 @@ private fun CurveCell(curve: List<Double>, step: Int?) {
 private val CURVE_CELL_HEIGHT = 30.dp
 
 @Composable
-private fun ValueCell(text: String?, step: Int?) {
+private fun ValueCell(text: String?, step: Int?, compact: Boolean = false) {
     val skin = scaleSkin(step, Color.Transparent, sectionNote)
     Box(
         Modifier
@@ -855,7 +875,7 @@ private fun ValueCell(text: String?, step: Int?) {
     ) {
         Text(
             text ?: "—",
-            style = MaterialTheme.typography.bodyLarge,
+            style = if (compact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             fontWeight = if (step != null) FontWeight.Bold else FontWeight.Normal,
             color = skin.ink,
             // One line, never wrapped and never shrunk to fit: a value that does not fit its column

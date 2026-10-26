@@ -128,9 +128,10 @@ class RecoverySicknessTest {
      * flag rather than a wider first one.
      */
     @Test
-    fun `that same night trips no counted marker and no published conjunction`() {
+    fun `that same night is graded bad on its length, and trips no published conjunction`() {
         val r = assemble(sleepMinutes = 636.0, bedtimeHr = 74.0)
-        assertEquals("no counted marker fired", 0, r.adverseCount)
+        // 10 h 36 min is a 4 on the NSF ladder — the reading every screen now gives it.
+        assertTrue(RecoveryMarker.SLEEP in r.adverseMarkers)
         assertFalse("Radin's rule cannot fire on sleep ABOVE baseline", r.illnessSigns)
     }
 
@@ -213,9 +214,8 @@ class RecoverySicknessTest {
      * 2024 — into a ≥2-of-4 rule with no evidence behind it at all.
      */
     @Test
-    fun `the bedtime marker never reaches the count`() {
+    fun `a racing bedtime heart rate is counted once it is graded bad`() {
         val r = assemble(sleepMinutes = 636.0, bedtimeHr = 95.0)
-        assertFalse(r.adverseMarkers.contains(RecoveryMarker.BEDTIME_HR))
-        assertTrue(r.markers.any { it.marker == RecoveryMarker.BEDTIME_HR && !it.counted })
+        assertTrue(r.adverseMarkers.contains(RecoveryMarker.BEDTIME_HR))
     }
 }
