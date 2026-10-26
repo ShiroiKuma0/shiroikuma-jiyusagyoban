@@ -44,7 +44,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -174,6 +173,13 @@ private object ListenLog {
     var currentDurationMs: Long = 0
     /** 「文ごとに止める」: hold on each sentence once it has been said. Off at every new session. */
     var stopAfterSentence = false
+    /** The picker's 「原文も」, kept so a resumed session rebuilds the same queue. */
+    var englishAfter = false
+    /** 「次回は続きから」: 閉じる keeps the place (see [ListenPlace]). On at every new session. */
+    var keepPlace = true
+    /** Sentences heard and islands already reviewed in earlier sessions of a resumed chain. */
+    val carriedHeard = HashSet<Long>()
+    val reviewed = HashSet<Long>()
 
     /**
      * Close the item that was playing: credit the time actually spent on it, and count it as HEARD
@@ -220,6 +226,10 @@ private object ListenLog {
         heardMs = 0
         playingSince = null
         stopAfterSentence = false
+        englishAfter = false
+        keepPlace = true
+        carriedHeard.clear()
+        reviewed.clear()
     }
 }
 
@@ -240,17 +250,51 @@ private fun PlayerRoot(onClose: () -> Unit) {
     }
     // Reopened from the notification while something is queued: straight back to it.
     var playing by remember { mutableStateOf(c.mediaItemCount > 0) }
+    // Nothing queued, but a place was kept: rebuild that queue and open on it, paused, instead of
+    // the picker. A board tile asking for another mode gets the picker; the place stays for later.
+    val place = remember {
+        if (c.mediaItemCount > 0) null
+        else ListenPlace.load(context)?.takeIf { p ->
+            val asked = GengoshimaPlayerActivity.requestedMode
+            asked == null || asked.name.equals(p.mode, true)
+        }
+    }
+    var resuming by remember { mutableStateOf(place != null) }
+    if (resuming && place != null) {
+        LaunchedEffect(place) {
+            val queued = resumeQueue(context, place)
+            if (queued == null) {
+                ListenPlace.clear(context)
+            } else {
+                val (items, start, mode) = queued
+                startSession(mode, place.islandIds, place.englishAfter)
+                ListenLog.stopAfterSentence = place.stopAfterSentence
+                ListenLog.carriedHeard += place.heard
+                ListenLog.reviewed += place.reviewed
+                c.setMediaItems(items, start, 0L)
+                c.prepare()
+                playing = true
+            }
+            resuming = false
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("続きを開いています… / opening where you left off…") }
+        return
+    }
     if (playing) {
         val back = {
-            finishSession(c)
+            // Kept: the place is saved and the window closes, so the next 聴く opens right here.
+            // Not kept (or nothing left to play): forgotten, and back to the picker to choose afresh.
+            val keep = ListenLog.keepPlace && c.playbackState != Player.STATE_ENDED
+            finishSession(context, c, keep)
             c.stop()
             c.clearMediaItems()
-            playing = false
+            if (keep) onClose() else playing = false
         }
         PlayingScreen(c, onClose = back)
     } else {
-        PickerScreen(onStart = { items, mode, islands ->
-            startSession(mode, islands)
+        PickerScreen(onStart = { items, mode, islands, englishAfter ->
+            ListenPlace.clear(context)
+            startSession(mode, islands, englishAfter)
             c.setMediaItems(items)
             c.prepare()
             c.play()
@@ -259,9 +303,66 @@ private fun PlayerRoot(onClose: () -> Unit) {
     }
 }
 
-private fun startSession(mode: ListenMode, islands: List<Long>) {
+/**
+ * The queue a kept place stands for, rebuilt from its islands in their order, and the index of the
+ * first item of the sentence it was left on (the start, if that sentence is gone). Null when none of
+ * its islands has anything left to play.
+ */
+private suspend fun resumeQueue(context: Context, place: ListenPlace): Triple<List<MediaItem>, Int, ListenMode>? {
+    val db = OpenTaskerApp_NoHilt.readyDb ?: return null
+    val dao = db.gengoshimaDao()
+    val mode = ListenMode.entries.firstOrNull { it.name.equals(place.mode, true) } ?: return null
+    val sentences = place.islandIds.mapNotNull { dao.island(it) }.flatMap { i ->
+        dao.sentences(i.id).filter { it.state == GengoshimaSentenceEntity.STATE_READY && File(it.audioPath).exists() }.map { i to it }
+    }
+    if (sentences.isEmpty()) return null
+    val items = queue(sentences, mode, GengoshimaSettings.last(context), place.englishAfter)
+    val start = items.indexOfFirst { it.mediaMetadata.extras?.getLong(EXTRA_SENTENCE_ID) == place.sentenceId }
+    return Triple(items, start.coerceAtLeast(0), mode)
+}
+
+/**
+ * The sentence to resume on: the one being heard, or — once it has been said in full (paused at
+ * its end by 「文ごとに止める」, or waiting in its gap) — the next one. Null past the queue's end.
+ */
+private fun placeSentence(c: MediaController): Long? {
+    val n = c.mediaItemCount
+    if (n == 0 || c.playbackState == Player.STATE_ENDED) return null
+    val i = c.currentMediaItemIndex.coerceIn(0, n - 1)
+    fun sid(k: Int) = c.getMediaItemAt(k).mediaMetadata.extras?.getLong(EXTRA_SENTENCE_ID)
+    val duration = c.duration
+    val itemSaid = c.sessionExtras.getLong(EXTRA_GAP_UNTIL, 0L) > System.currentTimeMillis() ||
+        (!c.isPlaying && duration > 0 && c.currentPosition >= duration - 300)
+    if (!itemSaid) return sid(i)
+    val endsSentence = i >= n - 1 || sid(i) != sid(i + 1)
+    return if (!endsSentence) sid(i) else if (i + 1 < n) sid(i + 1) else null
+}
+
+/** Write the place [c] stands at now, or forget it when nothing is left to play. */
+private fun keepPlace(context: Context, c: MediaController, sentenceId: Long? = placeSentence(c)) {
+    if (sentenceId == null) {
+        ListenPlace.clear(context)
+        return
+    }
+    ListenPlace.save(
+        context,
+        ListenPlace(
+            mode = ListenLog.mode.name,
+            islandIds = ListenLog.islandIds.split(",").mapNotNull { it.toLongOrNull() },
+            englishAfter = ListenLog.englishAfter,
+            sentenceId = sentenceId,
+            stopAfterSentence = ListenLog.stopAfterSentence,
+            heard = (ListenLog.carriedHeard + ListenLog.plays.keys).toList(),
+            reviewed = ListenLog.reviewed.toList(),
+            savedAt = System.currentTimeMillis(),
+        ),
+    )
+}
+
+private fun startSession(mode: ListenMode, islands: List<Long>, englishAfter: Boolean) {
     ListenLog.reset()
     ListenLog.mode = mode
+    ListenLog.englishAfter = englishAfter
     ListenLog.startedAt = System.currentTimeMillis()
     ListenLog.islandIds = islands.joinToString(",")
     ListenLog.lastItemStart = ListenLog.startedAt
@@ -278,9 +379,17 @@ private fun startSession(mode: ListenMode, islands: List<Long>) {
     }
 }
 
-/** Write the session's end, its played counts and minutes. Called on stop and on window close. */
-private fun finishSession(c: MediaController? = null) {
-    val id = ListenLog.sessionId ?: return
+/**
+ * Write the session's end, its played counts and minutes. Called on 閉じる. With [keep] the place is
+ * saved for the next session (after the reviews, so it carries them); without, it is forgotten.
+ */
+private fun finishSession(context: Context, c: MediaController, keep: Boolean) {
+    val place = if (keep) placeSentence(c) else null
+    val id = ListenLog.sessionId
+    if (id == null) {
+        if (keep) keepPlace(context, c, place) else ListenPlace.clear(context)
+        return
+    }
     ListenLog.closeItem(System.currentTimeMillis())
     val db = OpenTaskerApp_NoHilt.readyDb ?: return
     kotlinx.coroutines.runBlocking {
@@ -297,25 +406,29 @@ private fun finishSession(c: MediaController? = null) {
             ),
         )
         dao.upsertPlays(ListenLog.plays.map { (sid, n) -> GengoshimaPlayEntity(id, sid, n) })
-        // An island every sentence of which was heard in this session counts as one review of it
-        // (spaced rotation — see Rotation). Half an island reviews nothing: it is one monologue.
+        // An island every sentence of which was heard counts as one review of it (spaced rotation —
+        // see Rotation). Half an island reviews nothing: it is one monologue. A resumed session
+        // counts what the sessions before it heard too, and never reviews the same island twice.
         val zone = java.time.ZoneId.systemDefault()
         val today = java.time.LocalDate.now(zone)
         ListenLog.islandIds.split(",").mapNotNull { it.toLongOrNull() }.forEach { islandId ->
+            if (islandId in ListenLog.reviewed) return@forEach
             val island = dao.island(islandId) ?: return@forEach
             val ready = dao.sentences(islandId).filter { it.state == GengoshimaSentenceEntity.STATE_READY }.map { it.id }
-            if (ready.isNotEmpty() && ready.all { it in ListenLog.plays }) {
+            if (ready.isNotEmpty() && ready.all { it in ListenLog.plays || it in ListenLog.carriedHeard }) {
                 dao.updateIsland(com.opentasker.core.gengoshima.Rotation.review(island, ListenLog.mode.name.lowercase(), today, zone))
+                ListenLog.reviewed += islandId
             }
         }
     }
+    if (keep) keepPlace(context, c, place) else ListenPlace.clear(context)
     ListenLog.reset()
 }
 
 // ── the picker ──────────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> Unit, onClose: () -> Unit) {
+private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>, Boolean) -> Unit, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val dao = remember { OpenTaskerApp_NoHilt.db.gengoshimaDao() }
     val scope = rememberCoroutineScope()
@@ -407,7 +520,7 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>) -> U
                     val order = if (shuffle) picked.shuffled() else picked
                     val sentences = order.flatMap { i -> dao.sentences(i.id).filter { it.state == GengoshimaSentenceEntity.STATE_READY && File(it.audioPath).exists() }.map { i to it } }
                     if (sentences.isEmpty()) return@launch
-                    onStart(queue(sentences, mode, settings, englishAfter), mode, order.map { it.id })
+                    onStart(queue(sentences, mode, settings, englishAfter), mode, order.map { it.id }, englishAfter)
                 }
             },
             enabled = picked.isNotEmpty(),
@@ -509,6 +622,11 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var position by remember { mutableLongStateOf(c.currentPosition) }
     var stopAfter by remember { mutableStateOf(ListenLog.stopAfterSentence) }
+    var keep by remember { mutableStateOf(ListenLog.keepPlace) }
+    LaunchedEffect(keep) {
+        ListenLog.keepPlace = keep
+        if (keep) keepPlace(context, c) else ListenPlace.clear(context)
+    }
     // The player runs in its own process and keeps its own copy: tell it whenever this one is set,
     // and once on opening, so a window re-created over a running session cannot disagree with it.
     LaunchedEffect(stopAfter) {
@@ -527,6 +645,8 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
                 val ex = mediaItem?.mediaMetadata?.extras
                 ListenLog.openItem(ex?.takeIf { it.getString(EXTRA_LANG) != "en" }?.getLong(EXTRA_SENTENCE_ID), ex?.getLong(com.opentasker.core.gengoshima.GengoshimaPlaybackService.EXTRA_DURATION_MS) ?: 0L, t, c.isPlaying)
                 index = c.currentMediaItemIndex
+                // Kept on every move, so a session EMUI kills still resumes about where it was.
+                if (ListenLog.keepPlace) keepPlace(context, c)
             }
 
             override fun onIsPlayingChanged(playing: Boolean) {
@@ -536,7 +656,11 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
 
             override fun onPlaybackStateChanged(state: Int) {
                 ended = state == Player.STATE_ENDED
-                if (ended) ListenLog.closeItem(System.currentTimeMillis())
+                if (ended) {
+                    ListenLog.closeItem(System.currentTimeMillis())
+                    // Played to the end: there is no place left to come back to.
+                    ListenPlace.clear(context)
+                }
             }
         }
         c.addListener(listener)
@@ -591,15 +715,12 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
                     fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            // 閉じる stops and leaves the playing screen for the picker it came from, not the window;
-            // the old 止める did the same and is gone (白い熊, 2026-10-12).
+            // 閉じる stops. With 「次回は続きから」 on it keeps the place and closes the window; off,
+            // it forgets the place and goes back to the picker (白い熊, 2026-10-12 and 2026-10-24).
             HeaderPill("閉じる") { onClose() }
         }
-        FilterChip(
-            selected = stopAfter,
-            onClick = { stopAfter = !stopAfter },
-            label = { Text("文ごとに止める / pause after each sentence", fontSize = 16.sp) },
-        )
+        TogglePill("文ごとに止める / pause after each sentence", stopAfter) { stopAfter = !stopAfter }
+        TogglePill("次回は続きから / resume here next time", keep) { keep = !keep }
 
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -742,13 +863,27 @@ internal fun hiragana(katakana: String): String = buildString {
     for (ch in katakana) append(if (ch in 'ァ'..'ヶ') (ch - 0x60) else ch)
 }
 
-/** Hand one word to 白い熊の辞書 — the same "look up" any app's text selection offers. */
+/**
+ * Hand one word to 白い熊の辞書, always as a Japanese lookup. Both intents name jisho's MainActivity
+ * outright: since jisho 1.6.0+003 a second activity (the 日本語辞書 trampoline) also takes
+ * PROCESS_TEXT, so a package-only intent matched two and Android put up a chooser. Builds older than
+ * that have no OPEN_DICTIONARY action and get the PROCESS_TEXT one instead.
+ */
 private fun lookUp(context: Context, word: String) {
-    val intent = Intent(Intent.ACTION_PROCESS_TEXT)
+    val dictionary = Intent("shiroikuma.jisho.action.OPEN_DICTIONARY")
+        .setClassName(JISHO, "$JISHO.MainActivity")
+        .putExtra("language", "ja")
+        .putExtra("query", word)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val processText = Intent(Intent.ACTION_PROCESS_TEXT)
         .setType("text/plain")
         .putExtra(Intent.EXTRA_PROCESS_TEXT, word)
         .putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
-        .setPackage("shiroikuma.jisho")
+        .setClassName(JISHO, "$JISHO.MainActivity")
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { context.startActivity(intent) }
+    val opened = dictionary.resolveActivity(context.packageManager) != null &&
+        runCatching { context.startActivity(dictionary) }.isSuccess
+    if (!opened) runCatching { context.startActivity(processText) }
 }
+
+private const val JISHO = "shiroikuma.jisho"

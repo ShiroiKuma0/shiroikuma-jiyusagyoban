@@ -52,6 +52,12 @@ import java.util.Locale
  *   project name to disambiguate). Runs through [executeAndLogTask] like a manual run and answers
  *   with success + duration. Exists so the dev loop can trigger a project's 起動/71 reload task
  *   right after a settings-bundle import (白い熊 2026-07-20: never leave that reload to the user).
+ * - [ACTION_GENGOSHIMA_TOKENS]: replace the word split (furigana, reading overrides) of named 言語島
+ *   sentences — [EXTRA_PATH] names a [GengoshimaTokensManifest]. A sentence is changed only when its
+ *   Japanese still matches the manifest's, so a correction worked out from an old export never lands
+ *   on a sentence edited since; a `newJa` replaces the Japanese too. With `generate` the 言語島 run starts after, and re-voices every
+ *   sentence whose spoken text the new overrides changed. Exists for the 2026-10-24 sweep that made
+ *   the audio agree with the furigana, and for any later one.
  *
  * No permission (adb shell can't hold one): the broadcast must be explicit AND carry the shared
  * protocol extra, same gate as the other bridges. [Activity.RESULT_OK] = done;
@@ -66,6 +72,27 @@ data class DeleteItemsManifest(
     val scenes: List<String> = emptyList(),
     val variables: List<String> = emptyList(),
 )
+
+/** Manifest for [WorkspaceTransferReceiver.ACTION_GENGOSHIMA_TOKENS]. */
+@kotlinx.serialization.Serializable
+data class GengoshimaTokensManifest(
+    val sentences: List<Sentence>,
+    val generate: Boolean = false,
+) {
+    @kotlinx.serialization.Serializable
+    data class Sentence(
+        val id: Long,
+        /** The Japanese the sentence must still have — the guard against a later edit. */
+        val ja: String,
+        val tokensJson: String,
+        /**
+         * A corrected Japanese text, replacing [ja] together with the words — for a name written
+         * wrong (2026-10-26: 青錦 and 蒼錦 → 安青錦). Its new spoken text re-voices it on the run,
+         * and the changed text and audio take it to 暗記 on the run's sync.
+         */
+        val newJa: String? = null,
+    )
+}
 
 class WorkspaceTransferReceiver : BroadcastReceiver() {
 
@@ -180,6 +207,48 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                             pending.setResultExtras(Bundle().apply {
                                 putStringArray(EXTRA_WARNINGS, result.warnings.toTypedArray())
                             })
+                        }
+                    }
+                    ACTION_GENGOSHIMA_TOKENS -> {
+                        require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
+                        val file = resolveInTmp(path)
+                        require(file.isFile) { "no such file: ${file.absolutePath}" }
+                        val manifest = json.decodeFromString<GengoshimaTokensManifest>(file.readText(Charsets.UTF_8))
+                        val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
+                        val warnings = mutableListOf<String>()
+                        var changed = 0
+                        for (row in manifest.sentences) {
+                            val sentence = dao.sentence(row.id)
+                            when {
+                                sentence == null -> warnings += "no sentence ${row.id}"
+                                sentence.ja != row.ja -> warnings += "sentence ${row.id} was edited since — left alone"
+                                com.opentasker.core.gengoshima.Translator.tokens(row.tokensJson).isEmpty() ->
+                                    warnings += "sentence ${row.id}: the words do not parse — left alone"
+                                row.newJa != null && row.newJa.isBlank() ->
+                                    warnings += "sentence ${row.id}: empty new Japanese — left alone"
+                                sentence.tokensJson != row.tokensJson || (row.newJa != null && row.newJa != sentence.ja) -> {
+                                    dao.updateSentence(
+                                        sentence.copy(
+                                            ja = row.newJa ?: sentence.ja,
+                                            tokensJson = row.tokensJson,
+                                            updatedAt = System.currentTimeMillis(),
+                                        ),
+                                    )
+                                    changed++
+                                }
+                            }
+                        }
+                        val started = manifest.generate && com.opentasker.core.gengoshima.GenerationRunner.start(
+                            app, com.opentasker.core.gengoshima.GengoshimaSettings.last(app),
+                        )
+                        pending.setResultCode(Activity.RESULT_OK)
+                        pending.setResultData(
+                            "changed $changed of ${manifest.sentences.size} sentences" +
+                                (if (manifest.generate) if (started) " · 言語島 run started" else " · 言語島 run NOT started (already running?)" else "") +
+                                (if (warnings.isEmpty()) "" else " · ${warnings.size} warning(s)"),
+                        )
+                        if (warnings.isNotEmpty()) {
+                            pending.setResultExtras(Bundle().apply { putStringArray(EXTRA_WARNINGS, warnings.toTypedArray()) })
                         }
                     }
                     ACTION_RUN_TASK -> {
@@ -371,6 +440,7 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         private const val BROADCAST_BUDGET_MS = 45_000L
 
         const val ACTION_RUN_TASK = "shiroikuma.jiyusagyoban.action.RUN_TASK"
+        const val ACTION_GENGOSHIMA_TOKENS = "shiroikuma.jiyusagyoban.action.GENGOSHIMA_TOKENS"
         const val ACTION_SET_STARTUP_TASKS = "shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS"
 
         /** Comma-separated task NAMES for the run-on-start list; omit to leave it alone, "" to clear. */

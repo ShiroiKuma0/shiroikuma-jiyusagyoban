@@ -929,6 +929,7 @@
                 <action android:name="shiroikuma.jiyusagyoban.action.DELETE_ITEMS" />
                 <action android:name="shiroikuma.jiyusagyoban.action.RUN_TASK" />
                 <action android:name="shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS" />
+                <action android:name="shiroikuma.jiyusagyoban.action.GENGOSHIMA_TOKENS" />
             </intent-filter>
         </receiver>
 
