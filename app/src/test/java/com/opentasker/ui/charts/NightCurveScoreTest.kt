@@ -93,7 +93,7 @@ class NightCurveScoreTest {
         for (kept in listOf("Date", "Woke", "Night HR", "Asleep", "Deep", "Deep+REM", "Low HR", "HRV", "SpO₂")) {
             assertTrue("$kept went missing: $en", kept in en)
         }
-        assertEquals(14, BandText.registerColumns.size)
+        assertEquals(15, BandText.registerColumns.size)
         // Every heading is translated: a column that falls back to English is a column nobody
         // reviewed, and this table is read in both languages.
         for (c in BandText.registerColumns) {
@@ -140,9 +140,11 @@ class NightCurveScoreTest {
      * dash on every line — and is back, first, with the Watch D3's sensor.
      */
     @Test
-    fun `skin temperature is the first column after the date, since the Watch D3`() {
-        // 白い熊, 2026-10-18: the D3 has the sensor the Band 11 Pro lacked, and it leads the table.
-        assertEquals(BandText.regColTemp, BandText.registerColumns[1])
+    fun `blood pressure leads the table, then skin temperature`() {
+        // 白い熊, 2026-10-25: measured every morning now, and the first reading of the row. Skin
+        // temperature (2026-10-18, the D3's sensor) follows it.
+        assertEquals(BandText.regColBp, BandText.registerColumns[1])
+        assertEquals(BandText.regColTemp, BandText.registerColumns[2])
         assertEquals("皮膚温 ℃", BandText.regColTemp[BandLanguage.JA])
     }
 }

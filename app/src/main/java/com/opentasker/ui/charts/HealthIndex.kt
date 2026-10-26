@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts
 
+import com.opentasker.ui.charts.huawei.BpGrade
 import kotlin.math.roundToInt
 
 /**
@@ -54,6 +55,11 @@ data class IndexComponent(
     val missingReason: Loc? = null,
     /** The measurement as printed, when one number cannot carry it — a cuff reading is two. */
     val measuredText: String? = null,
+    /**
+     * The component's 1–5 grade — its measurement on [Grade]'s ladder, the same step the night
+     * table, the strip and the 回復 card give the same quantity. Null when nothing was measured.
+     */
+    val step: Int? = score?.let(HealthIndex::step),
 ) {
     val contribution: Double get() = (score ?: 0) * weight
 }
@@ -147,16 +153,12 @@ object HealthIndex {
     }
 
     /**
-     * The word for one COMPONENT's 0–100. The same as [bandOf] except for blood pressure, whose bad
-     * end reads "Bad" and "Very bad" (白い熊, 2026-10-23): "low" blood pressure is a condition of its
-     * own, so "Very low" beside a reading of 145/97 says the opposite of what is meant.
+     * The word for one COMPONENT: [Grade.word] of its step, so a component reads exactly what the
+     * same quantity reads on every other card. Its bad end is "Bad" and "Very bad" for all of them
+     * since 2026-10-25 — blood pressure's since 2026-10-23 (白い熊: "low" blood pressure is a
+     * condition of its own), and a 10-hour night is no more "low" than 145/97 is.
      */
-    fun bandOf(score: Int?, componentKey: String): Loc =
-        if (componentKey == "blood_pressure") when (score?.let(::step)) {
-            4 -> Loc("Bad", "悪い")
-            5 -> Loc("Very bad", "とても悪い")
-            else -> bandOf(score)
-        } else bandOf(score)
+    fun bandOf(c: IndexComponent): Loc = Grade.word(c.step)
 
     /**
      * Breakpoints, and where they come from.
@@ -248,6 +250,62 @@ object HealthIndex {
     const val W_HRV = 0.10
     const val W_PWV = 0.05
 
+    fun hrvScore(ms: Double): Int = ramp(ms, best = HRV_BEST, worst = HRV_WORST)
+    fun stepsScore(steps: Double): Int = ramp(steps, best = STEPS_BEST, worst = STEPS_WORST)
+    fun pwvScore(ms: Double): Int = ramp(ms, best = PWV_BEST, worst = PWV_WORST)
+
+    /**
+     * ## The components that have a published ladder are scored THROUGH it (2026-10-25)
+     *
+     * Their 0–100 used to be a straight ramp between two ends, and its step (85/70/55/40) fell
+     * wherever the ramp put it: a 10-hour night scored 59 on the sleep plateau and read "Standard"
+     * here while the night table graded the same night a 4 on the NSF ladder. Each of these is now a
+     * piecewise-linear line through its ladder's own edges, placed so every rung of the ladder lands
+     * on the score band of the same step — so the bar, the word and the number all agree with
+     * [Grade], and the score is still continuous inside a rung. Points are (value, score), ascending.
+     */
+    fun through(value: Double, points: List<Pair<Double, Double>>): Int {
+        if (value <= points.first().first) return points.first().second.roundToInt()
+        for (i in 1 until points.size) {
+            val (x1, y1) = points[i]
+            if (value <= x1) {
+                val (x0, y0) = points[i - 1]
+                if (x1 == x0) return y1.roundToInt()
+                return (y0 + (y1 - y0) * (value - x0) / (x1 - x0)).roundToInt()
+            }
+        }
+        return points.last().second.roundToInt()
+    }
+
+    /**
+     * Jensen's decades: below 50 is a 1, each decade one step, 90 and above scores 0. A rung's lower
+     * edge belongs to the WORSE step (50 bpm is a 2), so each edge sits one point under its band —
+     * 84, 69, 54, 39 — and the score agrees with the ladder at the edge as well as between.
+     */
+    val HR_POINTS = listOf(45.0 to 100.0, 50.0 to 84.0, 60.0 to 69.0, 70.0 to 54.0, 80.0 to 39.0, 90.0 to 0.0)
+    fun restingHrScore(bpm: Double): Int = through(bpm, HR_POINTS)
+
+    /** The clinical oximetry ranges: 96 % and above a 1, 95 a 2, 93–94 a 3, 90–92 a 4, below 90 a 5. */
+    val SPO2_POINTS = listOf(85.0 to 0.0, 90.0 to 40.0, 93.0 to 55.0, 95.0 to 70.0, 96.0 to 85.0, 97.0 to 100.0)
+    fun spo2Score(percent: Double): Int = through(percent, SPO2_POINTS)
+
+    /**
+     * NSF / AASM: 7–9 h a 1, 9–10 h a 2, 6–7 h a 3, 5–6 h and 10–11 h a 4, beyond those a 5 — so
+     * the line jumps where the ladder skips a rung (a 10-hour night is a 2, a minute more is a 4).
+     */
+    val SLEEP_POINTS = listOf(
+        240.0 to 0.0, 300.0 to 40.0, 359.0 to 54.0, 360.0 to 55.0, 419.0 to 69.0, 420.0 to 85.0,
+        450.0 to 100.0, 510.0 to 100.0, 540.0 to 85.0, 600.0 to 70.0, 600.0 to 54.0, 660.0 to 40.0,
+        720.0 to 0.0,
+    )
+    fun sleepScore(minutes: Double): Int = through(minutes, SLEEP_POINTS)
+
+    /** ESH 2018, each pressure on its own: optimal a 1, normal a 2, high-normal a 3, grade 1 a 4, grade 2+ a 5. */
+    val SYS_POINTS = listOf(115.0 to 100.0, 120.0 to 84.0, 130.0 to 69.0, 140.0 to 54.0, 160.0 to 39.0, 180.0 to 0.0)
+    val DIA_POINTS = listOf(75.0 to 100.0, 80.0 to 84.0, 85.0 to 69.0, 90.0 to 54.0, 100.0 to 39.0, 110.0 to 0.0)
+    fun bpScore(systolic: Double, diastolic: Double): Int =
+        minOf(through(systolic, SYS_POINTS), through(diastolic, DIA_POINTS))
+
     /**
      * A piecewise-linear map from a measurement to 0–100.
      *
@@ -273,9 +331,13 @@ object HealthIndex {
             component(
                 "resting_hr", Loc("Resting heart rate", "安静時心拍"), inputs.restingHr, "bpm",
                 W_RESTING_HR,
-                Loc("50 bpm or below = 100 · 85 bpm = 0", "50 bpm 以下 = 100 ／ 85 bpm = 0"),
+                Loc(
+                    "Jensen's decades: below 50 bpm = 85–100 · 50s 70–85 · 60s 55–70 · 70s 40–55 · 80s 0–40",
+                    "Jensen の10拍区分：50 bpm 未満 = 85〜100 ／ 50台 70〜85 ／ 60台 55〜70 ／ 70台 40〜55 ／ 80台 0〜40",
+                ),
                 Loc("no heart rate during sleep", "睡眠中の心拍がありません"),
-            ) { ramp(it, best = HR_BEST, worst = HR_WORST) },
+                grade = RecoveryReference::lowestHrStep,
+            ) { restingHrScore(it) },
             component(
                 "stability", Loc("Heart-rate stability", "心拍安定性"), inputs.hrIqr, "bpm",
                 W_STABILITY,
@@ -287,9 +349,13 @@ object HealthIndex {
             ) { ramp(it, best = IQR_BEST, worst = IQR_WORST) },
             component(
                 "spo2", Loc("Blood oxygen", "血中酸素"), inputs.spo2Low, "%", W_SPO2,
-                Loc("97 % or above = 100 · 90 % = 0", "97 % 以上 = 100 ／ 90 % = 0"),
+                Loc(
+                    "96 % or above = 85–100 · 95 % 70–85 · 93–94 % 55–70 · 90–92 % 40–55 · below 90 % 0–40",
+                    "96 % 以上 = 85〜100 ／ 95 % 70〜85 ／ 93〜94 % 55〜70 ／ 90〜92 % 40〜55 ／ 90 % 未満 0〜40",
+                ),
                 Loc("no blood-oxygen readings", "血中酸素の測定がありません"),
-            ) { ramp(it, best = SPO2_BEST, worst = SPO2_WORST) },
+                grade = RecoveryReference::spo2Step,
+            ) { spo2Score(it) },
             sleepComponent(inputs),
             component(
                 "steps", Loc("Steps", "歩数"), inputs.steps, "歩", W_STEPS,
@@ -298,18 +364,18 @@ object HealthIndex {
                     "7,500 歩以上 = 100 ／ 3,000 歩 = 0（7,500 歩を超えても加点なし）",
                 ),
                 Loc("no step records", "歩数の記録がありません"),
-            ) { ramp(it, best = STEPS_BEST, worst = STEPS_WORST) },
+            ) { stepsScore(it) },
             bloodPressureComponent(inputs),
             component(
                 "hrv", Loc("HRV (RMSSD)", "心拍変動（RMSSD）"), inputs.hrvMs, "ms", W_HRV,
                 Loc("45 ms or above = 100 · 15 ms = 0", "45 ms 以上 = 100 ／ 15 ms = 0"),
                 Loc("no beat-to-beat intervals last night", "昨夜の拍間隔がありません"),
-            ) { ramp(it, best = HRV_BEST, worst = HRV_WORST) },
+            ) { hrvScore(it) },
             component(
                 "pwv", Loc("Arterial stiffness", "動脈硬化度"), inputs.pwv, "m/s", W_PWV,
                 Loc("below 8 m/s = 100 · 10 m/s = 0 (Huawei's bands)", "8 m/s 未満 = 100 ／ 10 m/s = 0（Huawei の区分）"),
                 Loc("no measurement in the last 30 days", "過去 30 日に測定がありません"),
-            ) { ramp(it, best = PWV_BEST, worst = PWV_WORST) },
+            ) { pwvScore(it) },
         )
 
         val available = components.filter { it.score != null }
@@ -330,27 +396,24 @@ object HealthIndex {
     }
 
     /**
-     * Sleep scores duration and architecture together, because either alone misleads: ten hours of
-     * pure light sleep is not a good night, and neither is five hours with excellent deep share.
+     * Sleep scores its DURATION, on the NSF / AASM ladder. It blended in the deep+REM share at 30 %
+     * until 2026-10-25, which made it the one sleep grade on the page that disagreed with the others
+     * (see [SLEEP_POINTS]); [HealthIndexInputs.deepRemShare] is still carried, and no longer scored.
      */
     private fun sleepComponent(inputs: HealthIndexInputs): IndexComponent {
         val minutes = inputs.sleepMinutes
-        val share = inputs.deepRemShare
         if (minutes == null) {
             return IndexComponent(
                 "sleep", Loc("Sleep", "睡眠"), null, "min", null, W_SLEEP,
                 SLEEP_SCALE, Loc("no recent sleep record", "直近の睡眠記録がありません"),
             )
         }
-        // 7-9 h is the plateau; 4 h and 12 h score zero.
-        val duration = plateau(minutes.toDouble(), zeroFrom = 240.0, goodFrom = 420.0, goodTo = 540.0, zeroTo = 720.0)
-        // Architecture is only blended in when it was actually measured.
-        val score = if (share == null) duration else {
-            (duration * 0.7 + ramp(share, best = 0.45, worst = 0.10) * 0.3).roundToInt()
-        }
+        // Duration alone since 2026-10-25, through the NSF ladder: the deep+REM blend made this
+        // component disagree with the night table's sleep column for the same night, and the
+        // restorative share is graded on its own, against 白い熊's own nights, where it is shown.
         return IndexComponent(
-            "sleep", Loc("Sleep", "睡眠"), minutes.toDouble(), "min", score, W_SLEEP,
-            SLEEP_SCALE,
+            "sleep", Loc("Sleep", "睡眠"), minutes.toDouble(), "min", sleepScore(minutes.toDouble()), W_SLEEP,
+            SLEEP_SCALE, step = RecoveryReference.sleepStep(minutes.toDouble()),
         )
     }
 
@@ -360,8 +423,8 @@ object HealthIndex {
         val dia = inputs.bpDiastolic
         val label = Loc("Blood pressure", "血圧")
         val scale = Loc(
-            "120/80 or below = 100 · 160/100 = 0, the worse of the two counting",
-            "120/80 以下 = 100 ／ 160/100 = 0。上と下の悪い方で採点",
+            "ESH: below 120/80 = 85–100 · 120–129/80–84 70–85 · 130–139/85–89 55–70 · 140–159/90–99 40–55 · 160/100 or more 0–40, the worse of the two counting",
+            "ESH：120/80 未満 = 85〜100 ／ 120〜129/80〜84 70〜85 ／ 130〜139/85〜89 55〜70 ／ 140〜159/90〜99 40〜55 ／ 160/100 以上 0〜40。上と下の悪い方で採点",
         )
         if (sys == null || dia == null) {
             return IndexComponent(
@@ -369,10 +432,10 @@ object HealthIndex {
                 Loc("no cuff reading in the last 7 days", "過去 7 日に血圧の測定がありません"),
             )
         }
-        val score = minOf(ramp(sys, BP_SYS_BEST, BP_SYS_WORST), ramp(dia, BP_DIA_BEST, BP_DIA_WORST))
         return IndexComponent(
-            "blood_pressure", label, sys, "mmHg", score, W_BLOOD_PRESSURE, scale,
+            "blood_pressure", label, sys, "mmHg", bpScore(sys, dia), W_BLOOD_PRESSURE, scale,
             measuredText = "${sys.roundToInt()}/${dia.roundToInt()} mmHg",
+            step = BpGrade.of(sys, dia),
         )
     }
 
@@ -384,6 +447,8 @@ object HealthIndex {
         weight: Double,
         scale: Loc,
         missingReason: Loc,
+        /** The component's ladder, when it has one of its own; otherwise its step is its score's. */
+        grade: ((Double) -> Int)? = null,
         score: (Double) -> Int,
     ): IndexComponent = IndexComponent(
         key = key,
@@ -394,10 +459,11 @@ object HealthIndex {
         weight = weight,
         scale = scale,
         missingReason = if (measured == null) missingReason else null,
+        step = measured?.let { grade?.invoke(it) ?: HealthIndex.step(score(it)) },
     )
 
     private val SLEEP_SCALE = Loc(
-        "7–9 h = 100 · 4 h and 12 h = 0, blended 70/30 with deep+REM share (45 % or above = 100)",
-        "7〜9 時間 = 100 ／ 4 時間・12 時間 = 0。深い睡眠と REM の割合 45 % 以上 = 100 を 3 割の重みで混ぜる",
+        "NSF / AASM: 7–9 h = 85–100 · 9–10 h 70–85 · 6–7 h 55–70 · 5–6 h and 10–11 h 40–55 · beyond 0–40",
+        "NSF・AASM：7〜9 時間 = 85〜100 ／ 9〜10 時間 70〜85 ／ 6〜7 時間 55〜70 ／ 5〜6 時間と 10〜11 時間 40〜55 ／ それ以外 0〜40",
     )
 }
