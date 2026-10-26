@@ -8,6 +8,62 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+100 — 2026-10-26
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+077`.
+
+### 健康 — one grade per number
+
+- **Every screen grades a reading the same way.** The night table, 平常との差, the 回復 card, the
+  health index and the history pages all draw one 1–5 grade per number. Published ladders where they
+  exist — time asleep (NSF/AASM), nocturnal, resting and lowest heart rate (Jensen's decades), blood
+  oxygen, blood pressure (ESH 2018), HRV, steps, arterial stiffness, and 体感 as tapped — and the
+  person's own preceding nights for the rest (skin temperature, deep, deep+REM, going-to-bed rate,
+  the night's swing, breathing). A 10-hour night is “Bad” on every screen, not red in one and
+  “usual” in another.
+- **The headline counts readings graded bad**, and names them; each night-table row counts the same.
+- **HRV is graded on fixed edges** (45 ms best, 15 ms worst) everywhere, instead of against the
+  person's own nights in the table.
+- **Health index:** each part is scored through its grade's own ladder; sleep is time asleep from the
+  last real night — a morning nap had scored it 0 — and no longer blends in deep+REM; the band word
+  fits (“Standard” printed as “Standarc”).
+- **Morning readings taken in bed count.** A cuff or stiffness reading up to 3 h before the watch
+  ends the night belongs to that morning; a 07:00 reading against a 07:39 wake-up was dropped.
+
+### 健康 — screens
+
+- **Blood pressure bars:** one wide bar per reading, systolic and diastolic halves graded separately
+  with the numbers inside, a splitter where both grades match; export to TXT (plain or clinical) or
+  CSV, newest or oldest first.
+- **Blood pressure in the night table** as its first column, ESH-graded, with its own ⓘ section.
+- **Both pressure rows of 平常との差 open the one blood-pressure page.**
+- **Skin temperature page:** one bar per night with its value and its grade's colour; every history
+  page colours each night as the night table does.
+- **Resting heart rate and arterial stiffness** get bar charts and detail pages; the resting-rate bars
+  use the same ladder as everything else.
+- **平常との差 and the strip** gain blood pressure, the watch's resting rate, SpO₂, stiffness and steps.
+- **HRV page: “The science of HRV”** — what RMSSD measures, how this app computes it (Malik's 20 %
+  rule, the nightly median), what moves it, what it means, how to read a run of nights, how it is
+  graded, its limits, and twelve sources; every section folds, closed by default.
+- HRV comes from the beat-to-beat RMSSD (the Watch D3 sends no RR panel).
+
+### 衛星
+
+- **The forecast is built 10 minutes before the sync that asks for it** — the first sync more than
+  24 h after the watch last took one — and a sync waits (up to 20 min) for a build in progress, so
+  the watch always takes a set about 10 minutes old and never yesterday's.
+
+### 言語島
+
+- **Furigana and voice agree.** Each sentence's furigana is checked against what VOICEVOX actually
+  read; a word read otherwise is given its furigana as the spoken reading and re-voiced, a number
+  takes the spoken form. 34 words in 29 sentences were corrected this way.
+- **Listening:** “pause after each sentence” is a pill (thin yellow off, a check-mark on); a resume
+  toggle keeps the session and reopens the chosen islands where they were left.
+- **Word lookup opens 白い熊の辞書 directly.**
+- **A correction bridge** (`GENGOSHIMA_TOKENS`) changes named sentences' words — and, newly, their
+  Japanese — re-voices what changed and syncs it to 暗記.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+077 — 2026-10-22
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+075`.
