@@ -471,8 +471,13 @@ object GenerationRunner {
     /**
      * Every translated sentence whose file is missing, or says something else than it should (the
      * text, a reading or the voice changed), goes to 音声 in ONE batch, in island order.
+     *
+     * Each file that comes back is held against its furigana ([ReadingCheck]) by the reading 音声
+     * says it used. A word VOICEVOX read otherwise is given its furigana as an override, and every
+     * sentence so corrected is voiced once more in a second [pass]; what still disagrees after that
+     * is only logged, never looped on.
      */
-    private suspend fun voiceAll(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes): Voiced {
+    private suspend fun voiceAll(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, pass: Int = 1): Voiced {
         val islands = dao.islands().associateBy { it.id }
         data class Job(val sentence: GengoshimaSentenceEntity, val text: String, val hash: String, val file: File)
         val jobs = dao.allSentences().mapNotNull { sentence ->
@@ -504,6 +509,7 @@ object GenerationRunner {
         val byId = jobs.associateBy { it.sentence.id.toString() }
         var ok = 0
         var failed = 0
+        var revoice = 0
         // What the window says between replies. 音声 answers once per FINISHED file, so without a
         // ticker the line would sit still for the whole of each synthesis — and the first one also
         // loads the voice (白い熊, 2026-09-30: step 2 needs to show how far along it is too).
@@ -562,6 +568,12 @@ object GenerationRunner {
                     val took = (now - lastAt) / 100 / 10.0
                     if (reply.ok) {
                         ok++
+                        // Does the audio say what the furigana says? A corrected sentence keeps this
+                        // file for now; its new override makes it stale, so the second pass re-voices it.
+                        val check = reply.kana?.let { ReadingCheck.fix(Translator.tokens(job.sentence.tokensJson), it) }
+                        check?.fixed?.forEach { log("  読 ${it.surface}: 振り仮名 ${it.furigana} · 声 ${it.voice}") }
+                        check?.stuck?.forEach { log("  ✕ 読 ${it.surface}: 振り仮名 ${it.furigana} · 声 ${it.voice} — 直せません / cannot fix") }
+                        if (check?.revoice == true) revoice++
                         // A re-voice replaces the old file atomically at the NEW path; if the
                         // sentence's name changed, the old file is now a stray that 整理 removes.
                         dao.updateSentence(
@@ -572,6 +584,7 @@ object GenerationRunner {
                                 durationMs = reply.durationMs,
                                 error = "",
                                 updatedAt = now,
+                                tokensJson = if (check != null && check.fixed.isNotEmpty()) Translator.tokensJson(check.tokens) else job.sentence.tokensJson,
                             ),
                         )
                         log("  ♪ ${reply.index}/${reply.total}  ${reply.durationMs / 100 / 10.0}秒の音声 · 作成 ${took}秒  ${job.sentence.ja}")
@@ -605,7 +618,13 @@ object GenerationRunner {
         )
         log(if (result.ok) "✓ 音声 $ok / ${jobs.size}" else "✕ 音声: ${result.result.removePrefix("ERROR:")}")
         // Anything not answered OK failed — including items a cancelled or refused batch never reached.
-        return Voiced(ok, jobs.size - ok, if (result.ok) null else result.result.removePrefix("ERROR:"))
+        val error = if (result.ok) null else result.result.removePrefix("ERROR:")
+        if (revoice > 0 && pass == 1) {
+            log("→ 読みを直した $revoice 文をもう一度 / voicing $revoice corrected sentences again")
+            val again = voiceAll(app, dao, s, notes, pass = 2)
+            return Voiced(ok, (jobs.size - ok) + again.failed, error ?: again.error)
+        }
+        return Voiced(ok, jobs.size - ok, error)
     }
 
     /**

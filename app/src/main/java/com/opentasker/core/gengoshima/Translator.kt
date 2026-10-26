@@ -242,11 +242,15 @@ object Translator {
      * What VOICEVOX is given to read: the Japanese with every reading-overridden word replaced by its
      * katakana, which VOICEVOX reads verbatim. Without overrides — or if the words no longer spell
      * the sentence, after a hand edit — it is the Japanese as it stands.
+     *
+     * Spaces do not count when checking that the words spell the sentence: a few translations came
+     * back as 「20 年代」, with the space a token of its own or in no token at all, and an override
+     * in such a sentence was silently never sent. A space says nothing to VOICEVOX either way.
      */
     fun speechText(ja: String, tokensJson: String): String {
-        val tokens = tokens(tokensJson)
+        val tokens = tokens(tokensJson).filter { it.surface.isNotBlank() }
         if (tokens.none { !it.reading_override.isNullOrBlank() }) return ja
-        if (tokens.joinToString("") { it.surface } != ja) return ja
+        if (tokens.joinToString("") { it.surface } != ja.filterNot { it.isWhitespace() }) return ja
         return tokens.joinToString("") { t -> t.reading_override?.takeIf { it.isNotBlank() } ?: t.surface }
     }
 }
