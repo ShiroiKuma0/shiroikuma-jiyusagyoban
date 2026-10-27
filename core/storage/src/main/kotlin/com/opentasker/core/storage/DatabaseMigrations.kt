@@ -714,6 +714,16 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * `gengoshima_sentences.wordsEdited` — the word split was edited by hand in the island editor, so
+     * no run splits the sentence again. Additive; the entity declares the default, so it is spelt out.
+     */
+    val MIGRATION_37_38 = object : Migration(37, 38) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `wordsEdited` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -752,6 +762,7 @@ object DatabaseMigrations {
             MIGRATION_34_35,
             MIGRATION_35_36,
             MIGRATION_36_37,
+            MIGRATION_37_38,
         )
     }
 }
