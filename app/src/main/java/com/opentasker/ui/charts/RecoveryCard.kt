@@ -749,7 +749,9 @@ fun markerValue(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: Boo
             if (lang == BandLanguage.EN) "${h}h ${m.toString().padStart(2, '0')}m" else "${h}時間${m}分"
         }
         RecoveryMarker.DEEP_REM -> "${(v * 100).roundToInt()}%"
-        RecoveryMarker.HRV -> if (unit) "${v.roundToInt()} ms" else "${v.roundToInt()}"
+        // One decimal (白い熊, 2026-10-26): the grade edges fall on whole milliseconds, so a rounded
+        // "27" could be either side of the 27 ms line and the same number wore two colours.
+        RecoveryMarker.HRV -> String.format("%.1f", v) + if (unit) " ms" else ""
         RecoveryMarker.BEDTIME_HR -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
         // A tenth, because that is what the estimator returns — and no more, because a 60-second
         // record resolves one breath per minute and a second decimal would be inventing precision.

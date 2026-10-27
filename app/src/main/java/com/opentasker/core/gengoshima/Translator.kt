@@ -227,6 +227,27 @@ object Translator {
         }
     }
 
+    /**
+     * The Japanese without the spaces a translation now and then puts beside a number — 「1968 年」,
+     * 「20 年代」. Japanese has none, and the space did harm twice over (2026-10-26): the words no
+     * longer spelled the sentence, so the furigana was not drawn and the voice check skipped it, and
+     * VOICEVOX paused at the space and read the 年 after it as トシ. A space between two latin words
+     * stays; one with Japanese on either side goes, from the sentence and from the words alike.
+     */
+    fun closeSpaces(ja: String, tokens: List<Token>): Pair<String, List<Token>> {
+        val fixed = ja.replace(BESIDE_JAPANESE, "")
+        if (fixed == ja) return ja to tokens
+        val words = tokens.mapNotNull { t ->
+            if (t.surface.isBlank()) null else t.copy(surface = t.surface.trim(), base = t.base.trim())
+        }
+        // A space kept between latin words may have been a word of its own; then keep them as they came.
+        return fixed to if (words.joinToString("") { it.surface } == fixed) words else tokens
+    }
+
+    private val BESIDE_JAPANESE = Regex(
+        "(?<=[\\u3000-\\u30FF\\u3400-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF])\\s+|\\s+(?=[\\u3000-\\u30FF\\u3400-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF])",
+    )
+
     fun tokensJson(tokens: List<Token>): String = json.encodeToString(
         kotlinx.serialization.builtins.ListSerializer(Token.serializer()),
         tokens,
