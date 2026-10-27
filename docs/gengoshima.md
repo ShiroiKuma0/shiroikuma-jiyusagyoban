@@ -154,7 +154,7 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
 - Changing a filed sentence's language re-translates it and deletes its old source file.
 - The 未分類 title counts Czech rows: `未分類 (12 · CS 3)`.
 
-## Data — Room v33 → v36
+## Data — Room v33 → v38
 
 `core/storage/.../GengoshimaDao.kt`. **The database is authoritative; the audio tree is a view.**
 
@@ -168,7 +168,9 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
   (`new → translated → ready`, `annotate` = Japanese edited by hand, `error`), `jaEdited`,
   `audioPath`/`audioHash`/`durationMs`; v34 adds `uuid` (the 暗記 note's tag), `enAudioPath`/
   `enAudioHash`/`enDurationMs`, `ankiHash` (what 暗記 last took) and `ankiNid` (the note it was
-  adopted from). v36 adds `language` (`en` | `cs`, default `en`) — the language `en` is in.
+  adopted from). v36 adds `language` (`en` | `cs`, default `en`) — the language `en` is in. v38 adds
+  `wordsEdited` (default 0): 白い熊 cut, joined or re-read words in the editor's word dialog, so no run,
+  register change or voice check splits the sentence again (cleared only by 訳し直す / 分け直す, which ask).
 - `gengoshima_sessions`, `gengoshima_plays` — listening history (a sentence counts as heard at
   ≥ 60 % played).
 - `gengoshima_tombstones` (v34) — uuids of deleted sentences/islands not yet told to 暗記.
@@ -176,7 +178,7 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
   `en`, `recognized`, the target (`islandId` or `newIslandName`/`newIslandRegister`), `proposed`,
   `state` (`pending` → `filed`, kept so a re-send is still answered OK), `sentenceId`.
 
-Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`, `MIGRATION_35_36`);
+Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`, `MIGRATION_35_36`, `MIGRATION_37_38`);
 `python3 scripts/check-room-migration.py --all` passes. The backup category `gengoshima` carries all
 six tables.
 
@@ -246,6 +248,16 @@ result and 閉じる are always on screen.
 granted first (`cmd deviceidle tempwhitelist` through Shizuku). A reading override is sent as the
 word's katakana, which VOICEVOX reads verbatim. When 音声 cannot be started, a notification says why
 and opens 音声 to set the exemption (`OnseWarning`).
+
+**English respellings (`core/gengoshima/EnglishSpeech.kt`).** The English counterpart of the katakana
+overrides: words Kokoro says wrong are respelled in the text sent to 音声 only — the sentence, the
+screens and 暗記 keep their own spelling. **Sumo / Sumō → “Smaw”, Sumodo / Sumōdō → “Smaw-daw”**
+(白い熊's choice by ear, 2026-10-27, from four spellings rendered with am_michael 1.0; “Smo”/“Smodo”
+of the day before sounded English). Whole words, any case, the macron forms and the dictation
+spellings Smaw/Smawdaw included; Czech is read as written. The English audio hash is taken over the
+respelled text, so changing a respelling re-voices exactly the sentences it touches on the next run.
+Try a new one by rendering candidates straight through `RENDER` into `~/tmp` for 白い熊 to judge
+first, never by re-voicing the cards.
 
 ## 暗記 (islands sync)
 
