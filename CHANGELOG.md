@@ -8,6 +8,43 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+106 — 2026-10-27
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+100`.
+
+### 言語島 — the sentence editor
+
+- **Every card plays both recordings**: EN (or CS) and 日本語 pills; tap again to stop, starting one
+  stops the other, and the pill returns to ▶ when the sentence ends.
+- **The source and the Japanese each have their own edit pill**, replacing the one dialog for both.
+  An edited source waits to be translated; edited Japanese is kept exactly as written and waits to
+  be re-split, the readings staying on the same words.
+- **The state is a coloured border and a word**: orange “to translate”, blue “to re-split”, yellow
+  “to voice”, red “failed”, plus marks for “to 暗記”, “hand-written” and “split by hand”.
+- **The word editor**: tap a word to set its furigana (the voice says what the furigana says), cut it
+  in two (the readings shared out when one half is kana), or join it with the next.
+- **A sentence split by hand stays split** — no run, register change or voice check re-splits it
+  (Room schema 38, `wordsEdited`); translate again and re-split ask before discarding the work.
+- **One finish pill per sentence** — 仕上げる / 声にする / 暗記へ — runs that sentence alone with the
+  page open; the ⋯ menu offers split only, translate again, re-split, re-voice both, update in 暗記.
+- **Island pills** finish every sentence of the island that needs it, or re-send the whole island
+  to 暗記; a line shows the running step and opens the progress window.
+
+### 言語島 — the voice
+
+- **Sumo is voiced “Smaw” and Sumodo “Smaw-daw”** in English (Sumō, Sumōdō and the dictation
+  spellings Smaw/Smawdaw too), the spelling 白い熊 chose by ear from four rendered with the cards'
+  own voice. Only the voice reads the respelling; the sentence, the screens and 暗記 keep their own.
+  19 recordings re-voiced and sent to 暗記.
+- **A space beside Japanese is closed after translation**: 「1968 年」 paused at the space and read 年
+  as とし; both affected sentences fixed and re-voiced, which also gives them furigana again.
+- **Duplicates removed** from 相撲 (35 copies), the island renumbered and 暗記 told.
+- The tokens bridge (`GENGOSHIMA_TOKENS`) can delete sentences and correct the English (`newEn`).
+
+### 健康
+
+- **HRV shows one decimal** on the recovery card and in the session register.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+100 — 2026-10-26
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+077`.
