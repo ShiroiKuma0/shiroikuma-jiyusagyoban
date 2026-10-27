@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+100`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+106`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -55,6 +55,8 @@ Mikel Hyperpolyglot's method, built in: your own English sentences grouped into 
 **New sentences come from walking and talking.** With the screen off, a vol-down **triple** press arms capture mode (two long buzzes) and each single press then marks where a sentence starts and ends — the volume never moves, and every step is a vibration (one to start, two to save, three to finish), so nothing ever needs a look. With the screen on and the camera open, the same press stays the shutter. Each sentence is a raw 16 kHz recording handed to **白い熊 kxkb**, which transcribes it at home with offline Whisper; correcting a misheard word there teaches the keyboard exactly as dictation does. The reviewed sentences come back into a **未分類** inbox, where Claude proposes an island for each — tap one to change it, select many to move them together, file them all with one press.
 
 **English or Czech.** Each sentence carries its language from the review — a Czech one is translated cs→ja and voiced with a Czech 音声 voice, and 暗記 tags it. An island whose topic is written in Japanese keeps that as its Japanese name; only an English topic is named by Claude.
+
+**An editor where every sentence can be heard and fixed on its own.** Each card plays both recordings, edits the English or the Japanese separately, and shows its state as a coloured border and a word. Tap a Japanese word to set its furigana — the voice follows — or to cut it in two or join it with the next; a sentence split by hand is never re-split by a later run. One pill finishes a sentence (translate, split, voice, 暗記), and the ⋯ menu can stop after the split so the words can be checked before voicing.
 
 **One board for all of it**: every 言語島 task as a drawn picture tile, in the order of the work — review the walk, file it, write by hand, translate, the big play tile, then practice and upkeep — and every tile can be dragged where it suits.
 
