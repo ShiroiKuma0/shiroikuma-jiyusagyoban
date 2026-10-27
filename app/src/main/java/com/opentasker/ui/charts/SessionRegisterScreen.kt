@@ -747,7 +747,8 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
         )
         // RMSSD, in the milliseconds it is measured in — the unit is part of the reading, and a bare
         // "38" in a table of heart rates would be read as a heart rate.
-        ValueCell(n?.hrvMs?.let { "${it.roundToInt()} ms" }, n?.hrvStep)
+        // One decimal, as everywhere (2026-10-26) — and a size down, so "29.9 ms" fits the column.
+        ValueCell(n?.hrvMs?.let { String.format("%.1f ms", it) }, n?.hrvStep, compact = true)
         // One decimal, because the whole useful range of this quantity is about three breaths wide
         // and rounding it to an integer would paint most nights the same number.
         ValueCell(n?.respirationBpm?.let { String.format("%.1f", it) }, n?.respirationStep)

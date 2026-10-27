@@ -105,6 +105,12 @@ data class GengoshimaSentenceEntity(
      * old name: it is the SOURCE sentence, English or Czech, translated into [ja] (v36).
      */
     @ColumnInfo(defaultValue = "'en'") val language: String = "en",
+    /**
+     * True once 白い熊 has split or joined the words, or set a reading, by hand in the island editor
+     * (v38). Nothing automatic splits such a sentence again — not a run, not a register change; only
+     * an edit of the Japanese itself (the words no longer spell it) or 白い熊's own 「分け直す」.
+     */
+    @ColumnInfo(defaultValue = "0") val wordsEdited: Boolean = false,
 ) {
     companion object {
         const val STATE_NEW = "new"

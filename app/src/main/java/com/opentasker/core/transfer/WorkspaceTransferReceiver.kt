@@ -55,7 +55,8 @@ import java.util.Locale
  * - [ACTION_GENGOSHIMA_TOKENS]: replace the word split (furigana, reading overrides) of named 言語島
  *   sentences — [EXTRA_PATH] names a [GengoshimaTokensManifest]. A sentence is changed only when its
  *   Japanese still matches the manifest's, so a correction worked out from an old export never lands
- *   on a sentence edited since; a `newJa` replaces the Japanese too. With `generate` the 言語島 run starts after, and re-voices every
+ *   on a sentence edited since; a `newJa` replaces the Japanese too, and `delete` removes sentences
+ *   as the island editor does. With `generate` the 言語島 run starts after, and re-voices every
  *   sentence whose spoken text the new overrides changed. Exists for the 2026-10-24 sweep that made
  *   the audio agree with the furigana, and for any later one.
  *
@@ -76,7 +77,13 @@ data class DeleteItemsManifest(
 /** Manifest for [WorkspaceTransferReceiver.ACTION_GENGOSHIMA_TOKENS]. */
 @kotlinx.serialization.Serializable
 data class GengoshimaTokensManifest(
-    val sentences: List<Sentence>,
+    val sentences: List<Sentence> = emptyList(),
+    /**
+     * Sentences to delete, exactly as the island editor does: the row, its two recordings, a
+     * tombstone so the run's sync removes the 暗記 note, and the island renumbered (2026-10-26: the
+     * duplicated 151–155 of 相撲).
+     */
+    val delete: List<Deletion> = emptyList(),
     val generate: Boolean = false,
 ) {
     @kotlinx.serialization.Serializable
@@ -91,7 +98,17 @@ data class GengoshimaTokensManifest(
          * and the changed text and audio take it to 暗記 on the run's sync.
          */
         val newJa: String? = null,
+        /**
+         * A corrected source sentence — for a word 白い熊 had misspelt on purpose to steer the English
+         * voice (2026-10-26: "Smaw" and "Smawdaw", now Sumo and Sumodo, which [EnglishSpeech]
+         * respells for the voice instead). Re-voices the English on the run.
+         */
+        val newEn: String? = null,
     )
+
+    /** A sentence to delete, named by id and guarded by its Japanese like a correction. */
+    @kotlinx.serialization.Serializable
+    data class Deletion(val id: Long, val ja: String)
 }
 
 class WorkspaceTransferReceiver : BroadcastReceiver() {
@@ -226,10 +243,14 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                                     warnings += "sentence ${row.id}: the words do not parse — left alone"
                                 row.newJa != null && row.newJa.isBlank() ->
                                     warnings += "sentence ${row.id}: empty new Japanese — left alone"
-                                sentence.tokensJson != row.tokensJson || (row.newJa != null && row.newJa != sentence.ja) -> {
+                                row.newEn != null && row.newEn.isBlank() ->
+                                    warnings += "sentence ${row.id}: empty new English — left alone"
+                                sentence.tokensJson != row.tokensJson || (row.newJa != null && row.newJa != sentence.ja) ||
+                                    (row.newEn != null && row.newEn != sentence.en) -> {
                                     dao.updateSentence(
                                         sentence.copy(
                                             ja = row.newJa ?: sentence.ja,
+                                            en = row.newEn ?: sentence.en,
                                             tokensJson = row.tokensJson,
                                             updatedAt = System.currentTimeMillis(),
                                         ),
@@ -238,12 +259,37 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                                 }
                             }
                         }
+                        var deleted = 0
+                        val touchedIslands = mutableSetOf<Long>()
+                        for (row in manifest.delete) {
+                            val sentence = dao.sentence(row.id)
+                            when {
+                                sentence == null -> warnings += "no sentence ${row.id} to delete"
+                                sentence.ja != row.ja -> warnings += "sentence ${row.id} was edited since — not deleted"
+                                else -> {
+                                    dao.deleteSentence(sentence.id)
+                                    dao.insertTombstone(
+                                        com.opentasker.core.storage.GengoshimaTombstoneEntity(sentence.uuid, "sentence", System.currentTimeMillis()),
+                                    )
+                                    if (sentence.audioPath.isNotEmpty()) java.io.File(sentence.audioPath).delete()
+                                    if (sentence.enAudioPath.isNotEmpty()) java.io.File(sentence.enAudioPath).delete()
+                                    touchedIslands += sentence.islandId
+                                    deleted++
+                                }
+                            }
+                        }
+                        for (islandId in touchedIslands) {
+                            dao.sentences(islandId).forEachIndexed { k, s ->
+                                if (s.position != k + 1) dao.updateSentence(s.copy(position = k + 1))
+                            }
+                        }
                         val started = manifest.generate && com.opentasker.core.gengoshima.GenerationRunner.start(
                             app, com.opentasker.core.gengoshima.GengoshimaSettings.last(app),
                         )
                         pending.setResultCode(Activity.RESULT_OK)
                         pending.setResultData(
                             "changed $changed of ${manifest.sentences.size} sentences" +
+                                (if (manifest.delete.isEmpty()) "" else " · deleted $deleted of ${manifest.delete.size}") +
                                 (if (manifest.generate) if (started) " · 言語島 run started" else " · 言語島 run NOT started (already running?)" else "") +
                                 (if (warnings.isEmpty()) "" else " · ${warnings.size} warning(s)"),
                         )

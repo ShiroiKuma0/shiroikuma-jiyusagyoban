@@ -98,17 +98,24 @@ object GenerationRunner {
     private val _progress = MutableStateFlow<Progress?>(null)
     val progress: StateFlow<Progress?> = _progress
 
-    private fun newProgress(mode: Mode = Mode.GENERATE, anki: Boolean = true) = Progress(
+    private fun newProgress(mode: Mode = Mode.GENERATE, anki: Boolean = true, splitOnly: Boolean = false) = Progress(
         steps = listOfNotNull(
             Step("暗記から取り込む / Take the notes from 暗記", key = K.ADOPT).takeIf { mode == Mode.ADOPT },
             Step("訳す / Translate", key = K.TRANSLATE).takeIf { mode != Mode.EDITOR },
-            Step("音声 / Voice", key = K.VOICE).takeIf { mode != Mode.EDITOR },
-            Step("原文の音声 / source voice", key = K.ENGLISH).takeIf { mode != Mode.EDITOR },
-            Step("整理 / Tidy the directories", key = K.TIDY),
-            Step("辞書用の一本 / Whole-island files for 辞書", key = K.EXPORT),
-            Step("暗記と同期 / Sync with 暗記", key = K.ANKI).takeIf { anki || mode != Mode.GENERATE },
+            Step("音声 / Voice", key = K.VOICE).takeIf { mode != Mode.EDITOR && !splitOnly },
+            Step("原文の音声 / source voice", key = K.ENGLISH).takeIf { mode != Mode.EDITOR && !splitOnly },
+            Step("整理 / Tidy the directories", key = K.TIDY).takeIf { !splitOnly },
+            Step("辞書用の一本 / Whole-island files for 辞書", key = K.EXPORT).takeIf { !splitOnly },
+            Step("暗記と同期 / Sync with 暗記", key = K.ANKI).takeIf { !splitOnly && (anki || mode != Mode.GENERATE) },
         ),
     )
+
+    /**
+     * The sentences the current run is limited to, for the island editor to mark them as being
+     * worked on; empty when idle or when the run covers everything.
+     */
+    private val _working = MutableStateFlow<Set<Long>>(emptySet())
+    val working: StateFlow<Set<Long>> = _working
 
     private fun step(key: K, state: StepState, detail: String? = null, percent: Int? = null) {
         _progress.value = _progress.value?.let { p ->
@@ -176,12 +183,26 @@ object GenerationRunner {
             (error?.let { " — $it" } ?: "")
     }
 
-    /** Start in the background unless a run is already going. False = one is already running. */
-    fun start(context: Context, settings: GengoshimaSettings, mode: Mode = Mode.GENERATE): Boolean {
+    /**
+     * Start in the background unless a run is already going. False = one is already running.
+     *
+     * [only] limits the run to those sentences — the island editor's 「仕上げる」 for one sentence or
+     * one island (2026-10-26); the 暗記 sync is still the usual delta, so a deletion made in the editor
+     * goes with it. [splitOnly] stops after translating and splitting, before anything is voiced, so
+     * 白い熊 can check and correct the words first.
+     */
+    fun start(
+        context: Context,
+        settings: GengoshimaSettings,
+        mode: Mode = Mode.GENERATE,
+        only: Set<Long>? = null,
+        splitOnly: Boolean = false,
+    ): Boolean {
         if (mutex.isLocked) return false
         // Shown at once, so the window that opens with it is never blank while the run spins up.
-        _progress.value = newProgress(mode, settings.ankiSync)
-        scope.launch { run(context.applicationContext, settings, mode) }
+        _progress.value = newProgress(mode, settings.ankiSync, splitOnly)
+        _working.value = only.orEmpty()
+        scope.launch { run(context.applicationContext, settings, mode, only, splitOnly) }
         return true
     }
 
@@ -222,22 +243,35 @@ object GenerationRunner {
         }
     }
 
-    suspend fun run(context: Context, settings: GengoshimaSettings, mode: Mode = Mode.GENERATE): Summary {
+    suspend fun run(
+        context: Context,
+        settings: GengoshimaSettings,
+        mode: Mode = Mode.GENERATE,
+        only: Set<Long>? = null,
+        splitOnly: Boolean = false,
+    ): Summary {
         if (!mutex.tryLock()) return Summary(0, 0, 0, null, "already running")
         val app = context.applicationContext
         val wake = (app.getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "opentasker:gengoshima")
             .apply { acquire(WAKE_MS) }
-        _progress.value = newProgress(mode, settings.ankiSync)
+        _progress.value = newProgress(mode, settings.ankiSync, splitOnly)
+        _working.value = only.orEmpty()
         val notes = Notes(app, if (mode == Mode.EDITOR) "言語島：暗記と同期中 / syncing with 暗記" else "言語島：作成中 / generating")
         try {
             val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
             val adoptError = if (mode == Mode.ADOPT) adoptFromAnki(app, dao, settings, notes) else null
             repairImportedText(dao)
             val editor = mode == Mode.EDITOR
-            val translated = if (editor) Translated(0, 0, null) else translateAll(dao, settings, notes)
-            val (voiced, failed, renderError) = if (editor) Voiced(0, 0, null) else voiceAll(app, dao, settings, notes)
-            val english = if (editor) Voiced(0, 0, null) else voiceEnglish(app, dao, settings, notes)
+            val translated = if (editor) Translated(0, 0, null) else translateAll(dao, settings, notes, only)
+            if (splitOnly) {
+                val summary = Summary(translated.count, 0, translated.failed, null, translated.error)
+                finish(app, summary)
+                notes.done(summary)
+                return summary
+            }
+            val (voiced, failed, renderError) = if (editor) Voiced(0, 0, null) else voiceAll(app, dao, settings, notes, only = only)
+            val english = if (editor) Voiced(0, 0, null) else voiceEnglish(app, dao, settings, notes, only)
             notes.progress("整理 / tidying the directories", -1)
             step(K.TIDY, StepState.RUN, "ディレクトリを付け合わせています / matching the directories to the list", -1)
             val tidy = runCatching {
@@ -282,6 +316,7 @@ object GenerationRunner {
             return summary
         } finally {
             _status.value = null
+            _working.value = emptySet()
             runCatching { if (wake.isHeld) wake.release() }
             mutex.unlock()
         }
@@ -322,14 +357,15 @@ object GenerationRunner {
      * are"): while Claude is still deciding, the window shows its thinking summary and the seconds
      * spent; once it writes, the count moves sentence by sentence with the line just written.
      */
-    private suspend fun translateAll(dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes): Translated {
+    private suspend fun translateAll(dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, only: Set<Long>? = null): Translated {
         var count = 0
         var failed = 0
         var error: String? = null
+        val inScope = { row: GengoshimaSentenceEntity -> only == null || row.id in only }
         val islands = dao.islands()
-        val waiting = islands.associate { i -> i.id to dao.sentences(i.id).count { it.state == GengoshimaSentenceEntity.STATE_NEW && !it.jaEdited } }
+        val waiting = islands.associate { i -> i.id to dao.sentences(i.id).count { it.state == GengoshimaSentenceEntity.STATE_NEW && !it.jaEdited && inScope(it) } }
         val total = waiting.values.sum()
-        val anyEdited = dao.allSentences().any { it.state == GengoshimaSentenceEntity.STATE_ANNOTATE }
+        val anyEdited = dao.allSentences().any { it.state == GengoshimaSentenceEntity.STATE_ANNOTATE && inScope(it) }
         if (total == 0 && !anyEdited) {
             step(K.TRANSLATE, StepState.SKIP, "訳すものはありません / nothing to translate")
             return Translated(0, 0, null)
@@ -352,7 +388,7 @@ object GenerationRunner {
                 }
             }
             val chunks = dao.sentences(island.id)
-                .filter { it.state == GengoshimaSentenceEntity.STATE_NEW && !it.jaEdited }
+                .filter { it.state == GengoshimaSentenceEntity.STATE_NEW && !it.jaEdited && inScope(it) }
                 .chunked(CHUNK)
             for ((k, pending) in chunks.withIndex()) {
                 val all = dao.sentences(island.id) // fresh: the previous chunk's Japanese is context now
@@ -403,10 +439,12 @@ object GenerationRunner {
                         dao.updateSentence(sentence.copy(error = "訳: missing from Claude's answer", updatedAt = now))
                         continue
                     }
+                    val (ja, tokens) = Translator.closeSpaces(line.ja.trim(), line.tokens)
                     dao.updateSentence(
                         sentence.copy(
-                            ja = line.ja.trim(),
-                            tokensJson = Translator.tokensJson(line.tokens),
+                            ja = ja,
+                            tokensJson = Translator.tokensJson(tokens),
+                            wordsEdited = false,
                             state = GengoshimaSentenceEntity.STATE_TRANSLATED,
                             error = "",
                             updatedAt = now,
@@ -419,7 +457,7 @@ object GenerationRunner {
             }
         }
         // Hand-edited Japanese: split into words again (the text itself is kept exactly).
-        val edited = dao.allSentences().filter { it.state == GengoshimaSentenceEntity.STATE_ANNOTATE }
+        val edited = dao.allSentences().filter { it.state == GengoshimaSentenceEntity.STATE_ANNOTATE && inScope(it) }
         if (edited.isNotEmpty()) {
             log("→ Claude: 手直しした日本語 ${edited.size} 文を単語に分ける / re-splitting ${edited.size} edited")
             var before = 0
@@ -438,6 +476,7 @@ object GenerationRunner {
                         dao.updateSentence(
                             sentence.copy(
                                 tokensJson = Translator.tokensJson(tokens),
+                                wordsEdited = false,
                                 state = GengoshimaSentenceEntity.STATE_TRANSLATED,
                                 error = "",
                                 updatedAt = now,
@@ -477,10 +516,12 @@ object GenerationRunner {
      * sentence so corrected is voiced once more in a second [pass]; what still disagrees after that
      * is only logged, never looped on.
      */
-    private suspend fun voiceAll(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, pass: Int = 1): Voiced {
+    private suspend fun voiceAll(
+        app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, pass: Int = 1, only: Set<Long>? = null,
+    ): Voiced {
         val islands = dao.islands().associateBy { it.id }
         data class Job(val sentence: GengoshimaSentenceEntity, val text: String, val hash: String, val file: File)
-        val jobs = dao.allSentences().mapNotNull { sentence ->
+        val jobs = dao.allSentences().filter { only == null || it.id in only }.mapNotNull { sentence ->
             if (sentence.ja.isBlank()) return@mapNotNull null
             if (sentence.state != GengoshimaSentenceEntity.STATE_TRANSLATED &&
                 sentence.state != GengoshimaSentenceEntity.STATE_READY &&
@@ -621,7 +662,7 @@ object GenerationRunner {
         val error = if (result.ok) null else result.result.removePrefix("ERROR:")
         if (revoice > 0 && pass == 1) {
             log("→ 読みを直した $revoice 文をもう一度 / voicing $revoice corrected sentences again")
-            val again = voiceAll(app, dao, s, notes, pass = 2)
+            val again = voiceAll(app, dao, s, notes, pass = 2, only = only)
             return Voiced(ok, (jobs.size - ok) + again.failed, error ?: again.error)
         }
         return Voiced(ok, jobs.size - ok, error)
@@ -639,14 +680,14 @@ object GenerationRunner {
      * twice as slow as real time on the phone (measured: first file ~10 s with the model load, then
      * 5–8 s each), so this step is the long one; the window shows each file as it lands.
      */
-    private suspend fun voiceEnglish(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes): Voiced {
+    private suspend fun voiceEnglish(app: Context, dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, only: Set<Long>? = null): Voiced {
         val islands = dao.islands().associateBy { it.id }
         data class Job(val sentence: GengoshimaSentenceEntity, val lang: String, val hash: String, val file: File)
-        val jobs = dao.allSentences().mapNotNull { sentence ->
+        val jobs = dao.allSentences().filter { only == null || it.id in only }.mapNotNull { sentence ->
             if (sentence.en.isBlank() || sentence.state != GengoshimaSentenceEntity.STATE_READY) return@mapNotNull null
             val island = islands[sentence.islandId] ?: return@mapNotNull null
             val lang = GengoshimaLanguage.normalize(sentence.language)
-            val hash = enAudioHash(sentence.en, s, lang)
+            val hash = enAudioHash(EnglishSpeech.text(sentence.en, lang), s, lang)
             if (sentence.enAudioHash == hash && sentence.enAudioPath.isNotEmpty() && File(sentence.enAudioPath).exists()) return@mapNotNull null
             Job(sentence, lang, hash, AudioTree.sentenceEnFile(island, sentence, s))
         }
@@ -693,7 +734,7 @@ object GenerationRunner {
             val before = done
             val result = OnseRender.render(
                 context = app,
-                items = list.map { OnseRender.Item(it.sentence.id.toString(), it.sentence.en, it.file.absolutePath) },
+                items = list.map { OnseRender.Item(it.sentence.id.toString(), EnglishSpeech.text(it.sentence.en, lang), it.file.absolutePath) },
                 batchDir = File(s.dir),
                 voice = if (cs) {
                     OnseRender.Voice(lang = GengoshimaLanguage.CS, csVoice = s.csVoice.ifBlank { null }, speed = s.csSpeed, bitrateKbps = s.bitrateKbps)
@@ -838,6 +879,7 @@ object GenerationRunner {
                 row.copy(
                     en = en, ja = ja, updatedAt = now,
                     state = if (reVoice) GengoshimaSentenceEntity.STATE_ANNOTATE else row.state,
+                    wordsEdited = row.wordsEdited && !reVoice,
                 ),
             )
             log("  ✎ $en")
