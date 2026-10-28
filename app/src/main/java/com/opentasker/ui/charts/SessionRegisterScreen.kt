@@ -689,14 +689,8 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             softWrap = false,
         )
         // Blood pressure first (白い熊, 2026-10-25 — measured every morning now), on the ESH ladder
-        // the blood-pressure bars use, the worse of the two pressures deciding the colour.
-        // A size down: "140/100" is seven characters and does not fit the one column width at the
-        // phone's font scale 1.3 in the table's own size — it printed "140/1…" (2026-10-26).
-        ValueCell(
-            n?.bpSystolic?.let { s -> n.bpDiastolic?.let { d -> "${s.roundToInt()}/${d.roundToInt()}" } },
-            n?.bpStep,
-            compact = true,
-        )
+        // the blood-pressure bars use, each half in its own pressure's grade (2026-10-28).
+        BpCell(n?.bpSystolic, n?.bpDiastolic)
         // Skin temperature next (白い熊, 2026-10-18), with one decimal: the whole signal is a few
         // tenths of a degree. Yellow while its baseline is still being collected, then the 1–5 steps.
         ValueCell(
@@ -887,6 +881,68 @@ private fun ValueCell(text: String?, step: Int?, compact: Boolean = false) {
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * A morning's blood pressure, split down the middle: systolic left, diastolic right, each half
+ * filled with ITS OWN grade on the ESH ladder.
+ *
+ * One colour for the pair hid which pressure was the problem — 129/95 painted "high" for the
+ * diastolic alone, with a systolic that is merely normal (白い熊, 2026-10-28). The halves meet
+ * square, exactly as the blood-pressure bars' do; where both land in one grade a thin splitter in
+ * the grade's own ink keeps the two numbers apart, so the split never depends on a hue change
+ * (白い熊 is red-green colour-blind). The gap stands in for the slash, and the numbers are a size
+ * down: "140" and "100" each get half of [NightColumns.CELL].
+ */
+@Composable
+private fun BpCell(systolic: Double?, diastolic: Double?) {
+    if (systolic == null || diastolic == null) {
+        ValueCell(null, null)
+        return
+    }
+    val sysGrade = BpGrade.ofSystolic(systolic)
+    val diaGrade = BpGrade.ofDiastolic(diastolic)
+    Row(
+        Modifier
+            .width(NightColumns.CELL)
+            .padding(end = 4.dp)
+            .height(IntrinsicSize.Min)
+            .clip(RoundedCornerShape(5.dp)),
+    ) {
+        BpHalf(systolic.roundToInt().toString(), sysGrade)
+        if (sysGrade == diaGrade) {
+            Box(
+                Modifier
+                    .width(1.5.dp)
+                    .fillMaxHeight()
+                    .background(ChartPalette.scale(sysGrade))
+                    .padding(vertical = 6.dp)
+                    .background(ChartPalette.scaleInk(sysGrade).copy(alpha = 0.6f)),
+            )
+        }
+        BpHalf(diastolic.roundToInt().toString(), diaGrade)
+    }
+}
+
+@Composable
+private fun RowScope.BpHalf(text: String, grade: Int) {
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxHeight()
+            .background(ChartPalette.scale(grade))
+            .padding(vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = ChartPalette.scaleInk(grade),
+            maxLines = 1,
+            softWrap = false,
         )
     }
 }
