@@ -8,6 +8,19 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+107 — 2026-10-28
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+106`.
+
+### 健康 — the night table
+
+- **Blood pressure is split in two, each half on its own grade**: systolic on the left, graded on
+  the systolic ladder (< 120 / 130 / 140 / 160), diastolic on the right on the diastolic ladder
+  (< 80 / 85 / 90 / 100). One colour for the pair hid which pressure was the problem — 129/95 read
+  “high” for the diastolic alone. The halves meet square, as the blood-pressure bars’ do, and where
+  both fall in one grade a thin splitter in the grade’s own ink keeps them apart, so the split never
+  depends on hue.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+106 — 2026-10-27
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+100`.
