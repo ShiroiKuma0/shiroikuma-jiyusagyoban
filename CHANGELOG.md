@@ -8,6 +8,29 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+110 — 2026-10-30
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+107`.
+
+### 健康 — body weight
+
+- **A weight pill under the morning note**: tap it, type the weight in kg (comma or dot), and it is
+  recorded with the time. Blank deletes today’s weighing. Stored in its own table (Room schema 39)
+  and carried in the health backup.
+- **The night table** shows the day’s latest weighing as its last column.
+- **The 運動と回復 calendar is one box per day**: the rating fills it, the date sits in a black box
+  at the top-left, the weight in a yellow-ringed chip at the bottom. Today has a yellow date box and
+  a thick yellow frame. The training-load bar under each tile is no longer drawn; the sessions are
+  still listed below the calendar.
+
+### Actions
+
+- **Open App Notification** (`notify.open`): opens another app’s newest notification exactly as a
+  tap would — optionally only one whose title or body contains a text — and can turn the screen on
+  first. Needs notification access.
+- **Play Sound** loops (`loop`), stops itself after a time (`seconds`) and can be named (`name`);
+  **Stop Sound** with a name stops that player.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+107 — 2026-10-28
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+106`.
