@@ -156,6 +156,7 @@ fun SessionRegisterScreen(
                                         ?: if (cell.adverseCount != null) "·" else "",
                                     hasNote = cell.hasNote,
                                     bar = cell.sessionLoad?.let { (it / maxLoad).toFloat() },
+                                    weight = cell.weightKg?.let { String.format("%.1f", it) },
                                 )
                             },
                             zone = zone,
@@ -750,6 +751,9 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             n?.spo2?.let { "${it.roundToInt()}%" },
             n?.spo2Step,
         )
+        // Body weight last (白い熊, 2026-10-30) — typed in, not measured, so it wears the authored
+        // livery rather than a grade: the calendar's black chip with the yellow ring.
+        WeightCell(row.weightKg)
     }
     row.note?.takeIf { it.isNotBlank() }?.let { note ->
         Row(
@@ -848,6 +852,46 @@ private fun CurveCell(curve: List<Double>, step: Int?) {
                     path,
                     skin.ink,
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The day's body weight, as the calendar draws it: yellow figure on a black chip, ringed in yellow.
+ *
+ * Ungraded on purpose. There is no 1–5 for a weight — no published ladder fits one person's
+ * trajectory, and a within-person band would paint a slow, wanted loss as a run of "worse than
+ * usual". The chip is the annotation pill's livery, which is what everything 白い熊 typed wears.
+ */
+@Composable
+private fun WeightCell(kg: Double?) {
+    Box(Modifier.width(NightColumns.CELL).padding(end = 4.dp)) {
+        if (kg == null) {
+            Text(
+                "—",
+                Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
+                style = MaterialTheme.typography.bodyLarge,
+                color = sectionNote,
+                maxLines = 1,
+            )
+        } else {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(ANNOTATION_FILL)
+                    .border(1.5.dp, ANNOTATION_INK, RoundedCornerShape(5.dp))
+                    // 1.5 dp less than a value cell's 5 dp, so the ring keeps the row's height.
+                    .padding(horizontal = 6.dp, vertical = 3.5.dp),
+            ) {
+                Text(
+                    String.format("%.1f", kg),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = ANNOTATION_INK,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
         }

@@ -110,6 +110,8 @@ fun HuaweiDashboardScreen(
     onFelt: (Int) -> Unit = {},
     /** Open the note editor for the morning the card is asking about. */
     onNote: () -> Unit = {},
+    /** Open the weight dialog for today. */
+    onWeight: () -> Unit = {},
     onOpenRegister: () -> Unit = {},
     /** 機能訓練: tick a day of the cut-out, or open the full calendar. */
     onTapRehabDay: (Long) -> Unit = {},
@@ -175,6 +177,8 @@ fun HuaweiDashboardScreen(
                     onFelt = onFelt,
                     note = state.feltNote,
                     onNote = onNote,
+                    weight = state.weightToday,
+                    onWeight = onWeight,
                     // Both counts from the SAME list, so the share can never exceed the whole.
                     nights = state.nights.size,
                     rated = state.register?.rows?.count { it.felt != null } ?: 0,

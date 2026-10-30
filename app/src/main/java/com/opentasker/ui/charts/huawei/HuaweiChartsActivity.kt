@@ -90,6 +90,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                         // The morning card's note editor. Held here rather than inside the card so
                         // it survives the card scrolling out of the LazyColumn while it is open.
                         var notingMorning by rememberSaveable { mutableStateOf<Long?>(null) }
+                        var weighing by rememberSaveable { mutableStateOf(false) }
                         // 機能訓練: the day whose tick is open, and the day whose note is. Two states
                         // rather than one, for the register's reason — the note editor stacks OVER
                         // the day dialog and returns to it, so the day must stay chosen underneath.
@@ -267,6 +268,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 },
                                 onFelt = model::setFelt,
                                 onNote = { notingMorning = state.feltMorning ?: model.morningKeyNow() },
+                                onWeight = { weighing = true },
                                 onTapRehabDay = { rehabDay = com.opentasker.core.band.RehabLog
                                     .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
                                 // Each pill opens the workout window it names. A separate
@@ -316,6 +318,22 @@ class HuaweiChartsActivity : ComponentActivity() {
                                     notingRehab = null
                                 },
                                 onDismiss = { notingRehab = null },
+                            )
+                        }
+
+                        if (weighing) {
+                            com.opentasker.ui.charts.WeightDialog(
+                                title = com.opentasker.ui.charts.AnnotationText.weightTitle[lang].format(
+                                    com.opentasker.ui.charts.nightDateFull(
+                                        com.opentasker.core.band.RehabLog.today(), lang,
+                                    ),
+                                ),
+                                current = state.weightToday,
+                                onSave = { kg ->
+                                    model.setWeight(kg)
+                                    weighing = false
+                                },
+                                onDismiss = { weighing = false },
                             )
                         }
 

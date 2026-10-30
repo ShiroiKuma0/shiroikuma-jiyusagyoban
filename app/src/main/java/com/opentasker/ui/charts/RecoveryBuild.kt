@@ -115,6 +115,8 @@ object RecoveryBuild {
         ratings: Map<Long, Int>,
         /** The written notes, keyed exactly as [ratings] are. Carried straight to the register. */
         notes: Map<Long, String>,
+        /** Body weight, `yyyyMMdd` → that day's latest kg. Carried straight to the register. */
+        weights: Map<Long, Double> = emptyMap(),
         /**
          * RMSSD windows, already filtered to the ones the band itself would publish.
          *
@@ -184,6 +186,7 @@ object RecoveryBuild {
             toEpochDay = todayEpochDay,
             ratings = ratings,
             notes = notes,
+            weights = weights,
             dateOfNight = localDateOf,
         )
 

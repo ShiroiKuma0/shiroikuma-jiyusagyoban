@@ -268,8 +268,8 @@ object BandText {
         "まだ運動が記録されていない。運動記録で記録すれば、その次の夜がここに並んで出る。",
     )
     val registerLegend = Loc(
-        "Each tile is a morning: how you woke that day, after the day before it — filled in that score's own colour from the scale below, 1 the best and 5 the worst. A yellow border marks today, and marks nothing else. The bar underneath is that day's own training, and its effect shows in the NEXT morning's score.",
-        "各タイルは朝 — その日どう目覚めたか、前の日を経て。下の尺度と同じ色で塗る（1 が最良、5 が最悪）。黄色の枠は今日、それ以外の意味はない。下の棒はその日自身の運動量で、効いてくるのは翌朝の点数。",
+        "Each tile is a morning: how you woke that day, after the day before it — filled in that score's own colour from the scale below, 1 the best and 5 the worst. The date sits in the box top-left, the body weight on the chip along the foot. A yellow date and a thick yellow frame mark today, and mark nothing else.",
+        "各タイルは朝 — その日どう目覚めたか、前の日を経て。下の尺度と同じ色で塗る（1 が最良、5 が最悪）。日付は左上の箱に、体重は下の札に。黄色の日付と太い黄色の枠は今日、それ以外の意味はない。",
     )
     // ---- 過去の夜を評価する ----------------------------------------------------------------------
     //
@@ -466,6 +466,7 @@ object BandText {
     val regColLowHr = Loc("Low HR", "最低心拍")
     val regColHrv = Loc("HRV", "心拍変動")
     val regColSpo2 = Loc("SpO₂", "血中酸素")
+    val regColWeight = Loc("Weight", "体重")
 
     // Added 2026-09-26: 白い熊, on the table — "it lacks the going-to-bed-hr, hr-through-the-night:
     // it must have all the metrics, so it's more descriptive." Every quantity the strip and the
@@ -495,7 +496,7 @@ object BandText {
      */
     val registerColumns = listOf(
         regColDate, regColBp, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
-        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2,
+        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2, regColWeight,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
     //

@@ -21,7 +21,7 @@ import com.opentasker.ui.theme.OpenTaskerTheme
  * an instruction about prominence cannot be checked by reading the code.
  */
 @Composable
-private fun Frame(felt: Int?, note: String? = null) {
+private fun Frame(felt: Int?, note: String? = null, weight: Double? = null) {
     OpenTaskerTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.padding(12.dp)) {
@@ -31,6 +31,8 @@ private fun Frame(felt: Int?, note: String? = null) {
                     onFelt = {},
                     note = note,
                     onNote = {},
+                    weight = weight,
+                    onWeight = {},
                     nights = 48,
                     rated = 15,
                     humeNights = 26,
@@ -77,4 +79,12 @@ fun HuaweiMorningNotedPreview() {
 @Composable
 fun HuaweiMorningNoteEmptyPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Frame(1, null) }
+}
+
+
+@PreviewTest
+@Preview(name = "Morning — weight recorded 日本語", widthDp = 840, heightDp = 520, fontScale = 1.3f, showBackground = true)
+@Composable
+fun HuaweiMorningWeightPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Frame(felt = 2, note = "よく眠れた", weight = 134.2) }
 }

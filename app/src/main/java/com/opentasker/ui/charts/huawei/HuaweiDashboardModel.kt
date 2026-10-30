@@ -100,6 +100,8 @@ data class HuaweiDashboardState(
      * a perfectly ordinary thing to have written.
      */
     val feltNote: String? = null,
+    /** Today's body weight in kg — its latest weighing — or null when nothing has been weighed today. */
+    val weightToday: Double? = null,
     /**
      * 機能訓練 — the days the rehab was done, and what was written about them.
      *
@@ -290,6 +292,7 @@ class HuaweiDashboardModel(
             felt = com.opentasker.core.band.RecoveryLog.rating(appContext, morningKey),
             feltMorning = morningKey,
             feltNote = com.opentasker.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
+            weightToday = weightsByDay(zone)[com.opentasker.core.band.RehabLog.today(zone)],
             // The band's own rehab sessions AND anything 白い熊 ticked by hand.
                 //
                 // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
@@ -398,6 +401,7 @@ class HuaweiDashboardModel(
             sessions = nights,
             ratings = com.opentasker.core.band.RecoveryLog.all(appContext),
             notes = com.opentasker.core.band.DayNotes.RECOVERY.all(appContext),
+            weights = weightsByDay(zone),
             sessions_ = com.opentasker.core.band.TrainingSessions.all(appContext),
             sessionOpen = com.opentasker.core.band.TrainingSessions.openStart(appContext) != null,
             // yyyyMMdd of an instant, the key every rating and every register row is filed under.
@@ -660,6 +664,39 @@ class HuaweiDashboardModel(
         com.opentasker.core.band.DayNotes.REHAB.setNote(appContext, dateKey, text)
         refresh()
     }
+
+    /**
+     * Record a weighing now, or — on null, the dialog's emptied field — withdraw today's.
+     *
+     * Every save is a new row with its own instant, so the history keeps each reading; the screens
+     * show a day's LATEST. Withdrawing takes the whole calendar day, which is what "today's weight"
+     * meant on the card that was tapped.
+     */
+    fun setWeight(kg: Double?) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val dao = db.bodyWeightDao()
+                if (kg != null) {
+                    dao.put(com.opentasker.core.storage.BodyWeightEntity(System.currentTimeMillis(), kg))
+                } else {
+                    val zone = java.time.ZoneId.systemDefault()
+                    val start = java.time.LocalDate.now(zone).atStartOfDay(zone)
+                    dao.deleteBetween(start.toInstant().toEpochMilli(), start.plusDays(1).toInstant().toEpochMilli())
+                }
+            }
+            refresh()
+        }
+    }
+
+    /** Every weighing, one figure per local day — the day's latest — keyed `yyyyMMdd`. */
+    private suspend fun weightsByDay(zone: java.time.ZoneId): Map<Long, Double> =
+        runCatching { db.bodyWeightDao().all() }.getOrDefault(emptyList())
+            // Ascending by instant, so a later weighing on the same day overwrites an earlier one.
+            .associate { w ->
+                com.opentasker.core.band.RehabLog.dateKeyOf(
+                    java.time.Instant.ofEpochMilli(w.epochMs).atZone(zone).toLocalDate(),
+                ) to w.kg
+            }
 
     /** The morning the card's own note belongs to — the same one [setFelt] rates. */
     fun morningKeyNow(): Long = com.opentasker.ui.charts.RecoveryBuild.ratableMorning(
