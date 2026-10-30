@@ -144,6 +144,7 @@ object AutomationSensitivityRegistry {
         "nav.recents",
         "nav.screenshot",
         "notify.dismiss",
+        "notify.open",
         "panel.notifications",
         "panel.quicksettings",
         "power.off",
