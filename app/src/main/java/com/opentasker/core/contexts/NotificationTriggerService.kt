@@ -1,8 +1,10 @@
 package com.opentasker.core.contexts
 
+import android.app.ActivityOptions
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.opentasker.core.engine.EngineShutdown
@@ -39,6 +41,37 @@ class NotificationTriggerService : NotificationListenerService() {
             }
         }
         return n
+    }
+
+    /**
+     * Do what a tap on [pkg]'s newest notification does: send its content intent, then clear it if it
+     * auto-cancels. [text] narrows the pick to one whose title or body contains it (ignoring case).
+     * Returns the key of the notification opened, or null when none matched or it has no tap action.
+     */
+    fun openNewest(pkg: String, text: String): String? {
+        val active = runCatching { activeNotifications }.getOrNull() ?: return null
+        val sbn = active.filter { it.packageName == pkg && it.notification.contentIntent != null }
+            .filter { text.isEmpty() || it.mentions(text) }
+            .maxByOrNull { it.postTime } ?: return null
+        val n = sbn.notification
+        // Hik-Connect and its like start an Activity from here while we sit in the background. Our
+        // overlay grant lets us do that; from Android 14 the grant has to be passed on explicitly.
+        val options = if (Build.VERSION.SDK_INT >= 34) {
+            ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED,
+            ).toBundle()
+        } else {
+            null
+        }
+        n.contentIntent.send(this, 0, null, null, null, null, options)
+        if (n.flags and Notification.FLAG_AUTO_CANCEL != 0) runCatching { cancelNotification(sbn.key) }
+        return sbn.key
+    }
+
+    private fun StatusBarNotification.mentions(text: String): Boolean {
+        val extras = notification.extras
+        return listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT, Notification.EXTRA_BIG_TEXT)
+            .any { extras.getCharSequence(it)?.contains(text, ignoreCase = true) == true }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
