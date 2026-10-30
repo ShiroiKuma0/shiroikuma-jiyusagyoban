@@ -268,6 +268,40 @@ class NotifyDismissAction : Action {
     }
 }
 
+/**
+ * Open another app's notification as a tap would: send its content intent, and clear it when it is
+ * set to clear on tap. Needs notification access.
+ *
+ * Args:
+ *   - "package": the app whose notification to open (usually %NOTIF_PACKAGE)
+ *   - "text": optional; only a notification whose title or body contains this (ignoring case)
+ *   - "wake": "true" turns the screen on first (through Shizuku), for a phone lying asleep
+ *
+ * The newest matching notification wins. With the screen off the opened app decides whether it
+ * shows over the lock screen; one that does not waits behind it until the phone is unlocked.
+ */
+class NotifyOpenAction : Action {
+    override val id = "notify.open"
+    override val category = ActionCategory.NOTIFICATION
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val pkg = args["package"]?.trim().orEmpty()
+        if (pkg.isEmpty()) return ActionResult.Failure("Specify 'package' whose notification to open")
+        val listener = NotificationTriggerService.instance
+            ?: return ActionResult.Failure("Notification access not granted (listener not connected)")
+        if (args["wake"]?.trim().equals("true", ignoreCase = true)) {
+            // A failed wake is not fatal: an app that turns the screen on itself still comes up.
+            WakeAction().run(ctx, emptyMap())
+        }
+        val text = args["text"]?.trim().orEmpty()
+        val key = runCatching { listener.openNewest(pkg, text) }
+            .getOrElse { return ActionResult.Failure("Opening the notification failed: ${it.message}") }
+            ?: return ActionResult.Failure("No notification from $pkg" + if (text.isEmpty()) "" else " containing \"$text\"")
+        ctx.logger("Opened notification $key")
+        return ActionResult.Success
+    }
+}
+
 internal object NotificationChannels {
     data class ChannelDef(
         val id: String,

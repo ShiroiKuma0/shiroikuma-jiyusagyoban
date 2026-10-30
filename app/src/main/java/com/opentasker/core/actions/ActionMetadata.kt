@@ -122,6 +122,20 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "notify.open",
+            name = "Open App Notification",
+            description = "Open another app's newest notification as a tap would (needs notification access)",
+            category = "Notification",
+            fields = listOf(
+                ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app whose notification to open, or type a package / %var"),
+                ActionField("text", "Containing", hint = "only a notification whose title or body contains this; blank = the newest"),
+                ActionField("wake", "Wake screen", FieldType.DROPDOWN, hint = "true turns the screen on first (needs Shizuku)", options = listOf("false", "true")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "var.set",
             name = "Set Variable",
             description = "Set a variable to a new value",
@@ -2960,6 +2974,9 @@ fun registerActionMetadata() {
                 ActionField("volume", "Volume (0-100)", FieldType.NUMBER, hint = "Optional; uses current volume when empty"),
                 ActionField("stream", "Stream", FieldType.DROPDOWN, hint = "media (default); notification/ring/system follow the ringer mode — vibrate/silent mutes them", options = listOf("media", "notification", "ring", "alarm", "system")),
                 ActionField("wait", "Wait for playback to finish", FieldType.DROPDOWN, hint = "true (default) blocks the task until the sound ends; false plays it in the background so vibration/overlays run at the same time", options = listOf("true", "false")),
+                ActionField("loop", "Loop", FieldType.DROPDOWN, hint = "true repeats the sound until it is stopped or the time limit runs out", options = listOf("false", "true")),
+                ActionField("seconds", "Stop after (seconds)", FieldType.NUMBER, hint = "optional time limit — the ceiling on a looped sound"),
+                ActionField("name", "Name", hint = "optional; Stop Sound with the same name silences it from any task. Playing a name already sounding restarts it"),
             )
         )
     )
@@ -2968,9 +2985,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "sound.stop",
             name = "Stop Sound",
-            description = "Stop playback",
+            description = "Stop a named sound this app is playing, or send a media STOP key",
             category = "Media",
-            fields = emptyList()
+            fields = listOf(
+                ActionField("name", "Name", hint = "the Name given to Play Sound (* = all of ours); empty sends a media STOP key to the music app"),
+            )
         )
     )
 

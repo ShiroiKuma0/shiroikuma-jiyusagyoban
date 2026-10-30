@@ -133,6 +133,7 @@ object ActionCatalog {
         // action converges on the same state (a read, or a write that sets rather than accumulates);
         // anything that sends, appends, opens a window, or asks the user is NEVER.
         define("notify.dismiss", ActionCategory.NOTIFICATION, ActionRetrySafety.IDEMPOTENT, ::NotifyDismissAction),
+        define("notify.open", ActionCategory.NOTIFICATION, ActionRetrySafety.NEVER, ::NotifyOpenAction),
         define("intent.send", ActionCategory.APP, ActionRetrySafety.NEVER, ::SendIntentAction),
         define("volume.get", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::VolumeGetAction),
         define("state.get", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::StateGetAction),
