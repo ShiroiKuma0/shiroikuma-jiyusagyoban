@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +43,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,6 +87,14 @@ object AnnotationText {
     val noteBlankDeletes = Loc("Saving it empty deletes the note.", "空のまま保存すると消えます。")
     val save = Loc("Save", "保存")
     val cancel = Loc("Cancel", "取消")
+    val weightAdd = Loc("Record weight", "体重を記録")
+    val weightTitle = Loc("Body weight — %s", "体重 — %s")
+    val weightField = Loc("Weight in kg", "体重（kg）")
+    val weightHint = Loc(
+        "Saved with today's date and time. Saving it empty withdraws today's weighing.",
+        "今日の日付と時刻で記録。空のまま保存すると今日の記録を取り消す。",
+    )
+    val weightInvalid = Loc("A weight in kg, e.g. 134.2", "kg の数値で、例 134.2")
     /** The card that holds a walk's own answers, as opposed to the band's measurements of it. */
     val own = Loc("Your own record", "自分の記録")
     val stops = Loc("Stops", "休憩")
@@ -522,4 +532,120 @@ fun CountPickerDialog(
             }
         }
     }
+}
+
+
+/**
+ * Today's body weight, or the invitation to record it — under the note pill on the 今朝 card.
+ *
+ * The note pill's own shape and livery, so the card's two authored things read as one family: faded
+ * while nothing is recorded, full strength once a figure is. The figure is the label, as a written
+ * note's first line is: "134.2 kg" says what the pill holds better than any word for it.
+ */
+@Composable
+fun WeightPill(kg: Double?, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val lang = LocalBandLanguage.current
+    val has = kg != null
+    val ink = if (has) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
+    Row(
+        modifier
+            .clip(RoundedCornerShape(100.dp))
+            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            // Padding BEFORE clickable, or the touch target shrinks to the glyph — see [NotePill].
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            Icons.Filled.MonitorWeight,
+            contentDescription = AnnotationText.weightAdd[lang],
+            tint = ink,
+            modifier = Modifier.size(if (has) 22.dp else 20.dp),
+        )
+        Text(
+            kg?.let { String.format("%.1f kg", it) } ?: AnnotationText.weightAdd[lang],
+            style = if (has) MaterialTheme.typography.bodyLarge
+            else MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+            fontWeight = if (has) FontWeight.Bold else FontWeight.Normal,
+            color = ink,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Parse what was typed into the weight field: a dot or a comma, a plausible adult weight, or null. */
+fun parseWeightKg(typed: String): Double? =
+    typed.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it in 20.0..400.0 }
+
+/**
+ * Ask for today's weight in kg — [NoteDialog]'s shape, with a number pad.
+ *
+ * Opens holding today's figure when there is one, so a second weighing is an edit of a number in
+ * place. Save hands back the parsed kg, or null for an emptied field (withdraw today's); anything
+ * that is not a weight keeps the dialog open with the hint in the explanation ink turned to yellow.
+ */
+@Composable
+fun WeightDialog(
+    title: String,
+    current: Double?,
+    onSave: (Double?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val lang = LocalBandLanguage.current
+    var typed by rememberSaveable { mutableStateOf(current?.let { String.format(java.util.Locale.ROOT, "%.1f", it) }.orEmpty()) }
+    var invalid by rememberSaveable { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    fun save() {
+        if (typed.isBlank()) return onSave(null)
+        val kg = parseWeightKg(typed)
+        if (kg == null) invalid = true else onSave(kg)
+    }
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.5.dp, sectionInk, RoundedCornerShape(18.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it; invalid = false },
+                label = { Text(AnnotationText.weightField[lang]) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                textStyle = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+            if (invalid) {
+                Text(
+                    AnnotationText.weightInvalid[lang],
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ANNOTATION_INK,
+                )
+            }
+            NoteText(AnnotationText.weightHint[lang])
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DialogAction(AnnotationText.cancel[lang], sectionNote, onDismiss)
+                Spacer(Modifier.width(6.dp))
+                DialogAction(AnnotationText.save[lang], sectionInk) { save() }
+            }
+        }
+    }
+    // The number pad up at once: this dialog exists to take one figure.
+    androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 }
