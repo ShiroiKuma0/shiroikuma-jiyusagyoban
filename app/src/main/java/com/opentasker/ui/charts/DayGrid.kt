@@ -79,6 +79,8 @@ data class DayGridCell(
     val badge: String? = null,
     /** The bar under the tile, as a fraction of the cell's width. Null draws none. */
     val bar: Float? = null,
+    /** The day's body weight, already formatted ("134.2"), or null. Drawn by [DayGridStyle.RATINGS]. */
+    val weight: String? = null,
 )
 
 /**
@@ -269,8 +271,6 @@ fun DayGrid(
     // date label, which grows with the font-scale preference, and a viewport pinned at a literal 370
     // would clip the last row the moment 白い熊 moved that slider.
     val density = LocalDensity.current
-    val lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
-    val dateLine = if (lineHeight.isSp) with(density) { lineHeight.toDp() } else 21.dp
     // date + gap + (tile 34 + its 2.5 ring inset either side) + gap + load-bar strip
     //
     // The day calendar has no strip at all any more: the note moved into the tile (白い熊,
@@ -278,8 +278,9 @@ fun DayGrid(
     // nothing per row — five rows of it in a full calendar, and a fifth of the 機能訓練 card.
     // The ratings strip is 8 dp rather than 18 for the same reason: the bar it holds is 4 dp tall
     // and the other fourteen were the gap 白い熊 asked to close (2026-09-20).
+    val ratingCell = ratingCellHeight()
     val weekRow =
-        if (dateInTile) 3.dp + 49.dp else dateLine + 2.dp + 39.dp + 2.dp + 8.dp
+        if (dateInTile) 3.dp + 49.dp else ratingCell + RATING_ROW_GAP * 2
     val headLine = MaterialTheme.typography.titleMedium.lineHeight
     val monthRule = (if (headLine.isSp) with(density) { headLine.toDp() } else 22.dp) + 12.dp
     val viewport = weekRow * visibleWeeks + monthRule
@@ -347,6 +348,24 @@ fun DayGrid(
             ) {
                 for (i in 0 until 7) {
                     val cell = week.getOrNull(i)
+                    if (!dateInTile) {
+                        // 運動と回復: one cell per day holding all three of its lines — see
+                        // [RatingDayCell]. Rows sit RATING_ROW_GAP apart rather than abutting, so the
+                        // cells read as separate days; the weekend rule spans the gap regardless.
+                        Box(Modifier.weight(1f).padding(vertical = RATING_ROW_GAP)) {
+                            if (cell == null) {
+                                Spacer(Modifier.height(ratingCell))
+                            } else {
+                                RatingDayCell(
+                                    cell = cell,
+                                    day = labels.format(Instant.ofEpochMilli(cell.epochDay * 86_400_000L)),
+                                    today = cell.epochDay == todayEpochDay,
+                                    height = ratingCell,
+                                    onTap = { onTap(cell.epochDay) },
+                                )
+                            }
+                        }
+                    } else
                     Column(
                         Modifier.weight(1f).padding(vertical = rowPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -488,6 +507,147 @@ fun DayGrid(
                 }
             }
         }
+        }
+    }
+}
+
+/** Space above and below every ratings cell, so two weeks never touch. */
+private val RATING_ROW_GAP = 2.dp
+
+/** The ratings cell's three type sizes — V4 of the 2026-10-30 mock-ups, chosen by 白い熊. */
+private val RATING_DATE_SIZE = 12.5.sp
+private val RATING_DIGIT_SIZE = 18.sp
+private val RATING_WEIGHT_SIZE = 13.sp
+
+/** Inside every cell's edge, and the extra step today's contents take inside its thick frame. */
+private val RATING_INSET = 3.dp
+private val TODAY_FRAME = 4.8.dp
+private val TODAY_EXTRA = TODAY_FRAME - 1.5.dp
+
+/**
+ * How tall a ratings cell is: the digit's line and the weight chip's, stacked, plus the insets —
+ * measured from the type, so it grows with the font-scale preference instead of clipping at 1.3.
+ *
+ * Every cell is today-sized. Today's contents step inside its frame, and if that made today's cell
+ * taller its whole week would be taller than the rest.
+ */
+@Composable
+private fun ratingCellHeight(): androidx.compose.ui.unit.Dp {
+    val density = LocalDensity.current
+    return with(density) {
+        val digit = (RATING_DIGIT_SIZE * 1.15f).toDp()
+        val chip = (RATING_WEIGHT_SIZE * 1.25f).toDp() + 2.dp * 1.5f + 1.1.dp * 2
+        (RATING_INSET + TODAY_EXTRA) * 2 + digit + 2.dp + chip
+    }
+}
+
+/**
+ * One day of the 運動と回復 calendar: date, rating and weight in ONE cell (白い熊, 2026-10-30).
+ *
+ * The rating is the cell — its colour fills the whole of it, so a run of good mornings and a run of
+ * bad ones are still different shapes on the page. On that colour sit two black objects: the date in
+ * a light-blue-ringed box top-left, and the weight on a yellow-ringed chip along the foot — the
+ * explanation ink and the data ink, each on the black ground that keeps it legible on every fill.
+ * The digit stands at the cell's true centre, at the same height whether or not the day was weighed,
+ * so a week of ratings reads as one line.
+ *
+ * Today is marked twice over, because it is the cell most likely to be tapped and the hardest to find
+ * in five weeks of squares: its date box turns yellow, and a frame three times the old ring's weight
+ * runs round the cell. The contents step inside the frame so it covers nothing.
+ *
+ * The session-load bar that hung under the old tile is not drawn here: the cell has no strip for it,
+ * and 白い熊 chose this layout without one. The load is still in the entries below the calendar.
+ */
+@Composable
+private fun RatingDayCell(
+    cell: DayGridCell,
+    day: String,
+    today: Boolean,
+    height: androidx.compose.ui.unit.Dp,
+    onTap: () -> Unit,
+) {
+    val style = LocalChartStyle.current
+    val fill = cell.fill ?: style.grid
+    val ink = cell.ink ?: sectionNote
+    val shape = RoundedCornerShape(6.dp)
+    val inset = RATING_INSET + if (today) TODAY_EXTRA else 0.dp
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(shape)
+            .background(fill)
+            .then(if (today) Modifier.border(TODAY_FRAME, sectionInk, shape) else Modifier)
+            // The whole cell is the target — see the note on the old tile.
+            .clickable(onClick = onTap),
+    ) {
+        Column(Modifier.fillMaxSize().padding(inset)) {
+            Box(Modifier.fillMaxWidth().weight(1f)) {
+                // The date, boxed.
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .clip(RoundedCornerShape(4.5.dp))
+                        .background(if (today) sectionInk else ANNOTATION_FILL)
+                        .then(
+                            if (today) Modifier
+                            else Modifier.border(1.1.dp, sectionNote, RoundedCornerShape(4.5.dp)),
+                        )
+                        .padding(horizontal = 3.5.dp, vertical = 0.5.dp),
+                ) {
+                    Text(
+                        day,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontSize = RATING_DATE_SIZE,
+                            lineHeight = RATING_DATE_SIZE * 1.2f,
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = if (today) Color.Black else sectionNote,
+                        maxLines = 1,
+                    )
+                }
+                if (cell.label.isNotEmpty()) {
+                    Text(
+                        cell.label,
+                        Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = RATING_DIGIT_SIZE,
+                            lineHeight = RATING_DIGIT_SIZE * 1.15f,
+                        ),
+                        fontWeight = if (cell.bold) FontWeight.Bold else FontWeight.Normal,
+                        color = ink,
+                        maxLines = 1,
+                    )
+                }
+                Box(Modifier.align(Alignment.TopEnd)) { TileNote(cell.hasNote) }
+            }
+            Spacer(Modifier.height(2.dp))
+            // The weight — or the chip's height left empty, so the digit above keeps its place.
+            val chipText = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = RATING_WEIGHT_SIZE,
+                lineHeight = RATING_WEIGHT_SIZE * 1.25f,
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (cell.weight != null) Modifier
+                            .clip(RoundedCornerShape(4.5.dp))
+                            .background(ANNOTATION_FILL)
+                            .border(1.1.dp, ANNOTATION_INK, RoundedCornerShape(4.5.dp))
+                        else Modifier,
+                    )
+                    .padding(vertical = 1.5.dp + 1.1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    cell.weight ?: " ",
+                    style = chipText,
+                    color = ANNOTATION_INK,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
     }
 }

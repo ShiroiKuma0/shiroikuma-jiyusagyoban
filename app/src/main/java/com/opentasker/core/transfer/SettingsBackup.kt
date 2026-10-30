@@ -276,6 +276,8 @@ object SettingsBackup {
         // The Watch D3's ECG recordings: 60 KB a trace, base64 in the NDJSON like the workout blobs.
         // A recording is a medical-grade measurement that cannot be re-taken after the fact.
         "huawei_ecg",
+        // 白い熊's typed-in weighings. Authored, not measured — nothing can ever re-supply them.
+        "body_weight",
     )
 
     /**

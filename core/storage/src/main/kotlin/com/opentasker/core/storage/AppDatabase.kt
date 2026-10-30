@@ -14,10 +14,11 @@ import java.util.concurrent.CountDownLatch
 // touched, because both devices run in parallel until their data has been compared.
 // v33 adds 言語島's four tables (gengoshima_*), additive only.
 // v34 adds 言語島's uuids, English audio and Anki sync state, and gengoshima_tombstones.
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 38
+// v39 adds body_weight (健康's typed-in weighings), additive only.
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 39
 
 @Database(
-    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiEcgEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class, GengoshimaInboxEntity::class],
+    entities = [ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class, ProjectEntity::class, ItemMetaEntity::class, ItemGroupEntity::class, BandSampleEntity::class, BandDailyEntity::class, BandSleepEntity::class, BandSyncEntity::class, HuaweiSampleEntity::class, HuaweiSyncEntity::class, HuaweiSleepEntity::class, HuaweiBeatEntity::class, HuaweiEcgEntity::class, HuaweiWorkoutEntity::class, HuaweiWorkoutBlobEntity::class, HuaweiMapCutoutEntity::class, GengoshimaIslandEntity::class, GengoshimaSentenceEntity::class, GengoshimaSessionEntity::class, GengoshimaPlayEntity::class, GengoshimaTombstoneEntity::class, GengoshimaInboxEntity::class, BodyWeightEntity::class],
     version = OPEN_TASKER_DATABASE_SCHEMA_VERSION,
     exportSchema = true,
 )
@@ -43,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun huaweiEcgDao(): HuaweiEcgDao
     abstract fun huaweiWorkoutDao(): HuaweiWorkoutDao
     abstract fun gengoshimaDao(): GengoshimaDao
+    abstract fun bodyWeightDao(): BodyWeightDao
 }
 
 /** Process-local handoff from the application bootstrap to workers in the storage module. */

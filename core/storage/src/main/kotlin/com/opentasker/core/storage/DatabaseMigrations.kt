@@ -724,6 +724,18 @@ object DatabaseMigrations {
         }
     }
 
+    /** `body_weight` — 健康's typed-in weighings, one row per reading. A new table, nothing else touched. */
+    val MIGRATION_38_39 = object : Migration(38, 39) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `body_weight` (" +
+                    "`epochMs` INTEGER NOT NULL, " +
+                    "`kg` REAL NOT NULL, " +
+                    "PRIMARY KEY(`epochMs`))",
+            )
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -763,6 +775,7 @@ object DatabaseMigrations {
             MIGRATION_35_36,
             MIGRATION_36_37,
             MIGRATION_37_38,
+            MIGRATION_38_39,
         )
     }
 }

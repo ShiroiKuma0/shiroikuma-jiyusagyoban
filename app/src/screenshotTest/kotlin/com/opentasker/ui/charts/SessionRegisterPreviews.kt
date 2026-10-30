@@ -118,6 +118,9 @@ private val FELT = mapOf(
     15 to 4, 16 to 3, 17 to 2, 18 to 3, 19 to 3, 20 to 1, 21 to 2,
 )
 
+/** Body weight on most days, 133.0–136.0 kg — five characters, the widest a chip has to hold. */
+private val WEIGHT = (0..27).filter { it % 4 != 3 }.associateWith { i -> 133.0 + ((i * 37) % 31) / 10.0 }
+
 private val REGISTER = SessionRegister.Register(
     entries = emptyList(),
     days = (0..27).map { i ->
@@ -127,6 +130,7 @@ private val REGISTER = SessionRegister.Register(
             adverseCount = if (FELT[i] != null) 0 else null,
             felt = FELT[i],
             hasNote = NOTED.containsKey(i),
+            weightKg = WEIGHT[i],
         )
     },
     nights = emptyList(),
@@ -149,6 +153,7 @@ private val REGISTER = SessionRegister.Register(
             },
             felt = FELT[i],
             note = NOTED[i],
+            weightKg = WEIGHT[i],
         )
     },
     contrast = null,
@@ -245,5 +250,17 @@ fun SessionRegisterTableUnfoldedJaPreview() {
 @Preview(name = "Register — notes 日本語", widthDp = 413, heightDp = 1200, showBackground = true)
 @Composable
 fun SessionRegisterNotesJaPreview() {
+    CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Frame() }
+}
+
+
+/**
+ * The semi-folded panel at 白い熊's font scale — 840 dp and 1.3, where the weight calendar was
+ * designed (V4 of the 2026-10-30 mock-ups): date box, centred digit, weight chip in one cell.
+ */
+@PreviewTest
+@Preview(name = "Register — weight calendar semi-folded big type 日本語", widthDp = 840, heightDp = 1100, fontScale = 1.3f, showBackground = true)
+@Composable
+fun SessionRegisterWeightCalendarPreview() {
     CompositionLocalProvider(LocalBandLanguage provides BandLanguage.JA) { Frame() }
 }

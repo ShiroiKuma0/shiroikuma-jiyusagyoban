@@ -190,6 +190,8 @@ object SessionRegister {
          * about", so the tile is marked and the note itself is read in the editor behind it.
          */
         val hasNote: Boolean = false,
+        /** That day's body weight in kg — its latest weighing — or null when nothing was weighed. */
+        val weightKg: Double? = null,
     )
 
     /**
@@ -215,6 +217,11 @@ object SessionRegister {
          * invisible, which is the one state this row type exists to make impossible.
          */
         val note: String? = null,
+        /**
+         * That day's body weight in kg, its latest weighing. A weighing with neither a night nor a
+         * rating still gets a line, for the reason a lone note does.
+         */
+        val weightKg: Double? = null,
     )
 
     /** Nights after a session against nights after none. */
@@ -344,6 +351,8 @@ object SessionRegister {
          * unreachable.
          */
         notes: Map<Long, String> = emptyMap(),
+        /** Body weight, `yyyyMMdd` → that day's latest kg, keyed by the calendar day it was weighed on. */
+        weights: Map<Long, Double> = emptyMap(),
         /** An instant → its `yyyyMMdd` local date. Applied to a night's END, which names it. */
         dateOfNight: (Long) -> Long = { 0L },
     ): Register {
@@ -385,14 +394,18 @@ object SessionRegister {
         // Notes are keyed by the same morning as the ratings, so they cross into grid days by exactly
         // the same conversion — never by the night's start, which is a day earlier for most nights.
         val notedDays = notes.keys.mapNotNull(::epochDayOf).toSet()
+        val weightByDay = weights.mapNotNull { (date, kg) -> epochDayOf(date)?.let { it to kg } }.toMap()
         val days = (fromEpochDay..toEpochDay).map { d ->
-            DayCell(d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d], d in notedDays)
+            DayCell(
+                d, loadByDay[d], adverseByDay[d], feltByDay[d] ?: ratingByDay[d], d in notedDays,
+                weightByDay[d],
+            )
         }
 
         // The union, so a rating whose date the band never recorded is still a line. Newest first.
         val nightByDate = nights.associateBy { dateOfNight(it.endMs) }
-        val rows = (nightByDate.keys + ratings.keys + notes.keys).sortedDescending().map { date ->
-            NightRow(date, nightByDate[date], ratings[date], notes[date])
+        val rows = (nightByDate.keys + ratings.keys + notes.keys + weights.keys).sortedDescending().map { date ->
+            NightRow(date, nightByDate[date], ratings[date], notes[date], weights[date])
         }
 
         // Which nights followed a session, by the same pairing rule the entries use.

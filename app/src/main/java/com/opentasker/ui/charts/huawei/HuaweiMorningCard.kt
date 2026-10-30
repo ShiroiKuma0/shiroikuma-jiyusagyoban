@@ -27,6 +27,7 @@ import com.opentasker.ui.charts.PaletteCheck
 import com.opentasker.ui.charts.LocalBandLanguage
 import com.opentasker.ui.charts.NotePill
 import com.opentasker.ui.charts.NoteText
+import com.opentasker.ui.charts.WeightPill
 
 /** 1 is best, 5 is worst — settled 2026-08-12 and never re-ordered. */
 private val SCALE = 1..5
@@ -61,6 +62,9 @@ fun HuaweiMorningCard(
     /** This morning's written note, and the way to open its editor. See [NotePill]. */
     note: String? = null,
     onNote: (() -> Unit)? = null,
+    /** Today's body weight, and the way to record it. See [WeightPill]. */
+    weight: Double? = null,
+    onWeight: (() -> Unit)? = null,
     /** Nights on record and how many are rated — the register, folded into this same pill. */
     nights: Int = 0,
     rated: Int = 0,
@@ -144,6 +148,11 @@ fun HuaweiMorningCard(
         // morning; this is what may be.
         if (onNote != null) {
             NotePill(note = note, onClick = onNote)
+        }
+        // Body weight, under the note (白い熊, 2026-10-30): the other figure taken first thing in the
+        // morning, and authored the same way — typed, not measured by the band.
+        if (onWeight != null) {
+            WeightPill(kg = weight, onClick = onWeight)
         }
 
         // 「あらゆる夜と運動」 lives inside this pill (白い熊, 2026-08-23) — the register is the
