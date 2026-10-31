@@ -8,6 +8,24 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+112 — 2026-10-31
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+110`.
+
+### 凍結融解 — launcher tasks straight into 白い熊 雷起動盤
+
+- **Make Launcher Tasks copies what it made**: the names of the tasks a run created go on the
+  clipboard, and 白い熊 雷起動盤’s new 「貼り付け」 add item (14.3.7+014) turns them into launcher
+  shortcuts — the same icon, name and target app as a manual pick — without opening the shortcut
+  picker. Several new tasks are added one after another. Nothing is copied when nothing was created.
+- **Copy Launcher Shortcut** (`tasks.copyshortcut`), shipped as the task
+  「貼り付け用に写す -- [1707][7107][076]」: the apps that have a launcher task, in the generator’s icon
+  grid; one tap copies that app’s task for 「貼り付け」 and closes the dialog.
+- **The shortcut picker can be skipped**: a launcher that names a task in
+  `shiroikuma.jiyusagyoban.extra.TASK_NAME` gets its shortcut back at once; an unknown name cancels
+  silently, and the launcher reports it.
+- The one-tap app grid now shows a tile for an app whose task outlived its install.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+110 — 2026-10-30
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+107`.
