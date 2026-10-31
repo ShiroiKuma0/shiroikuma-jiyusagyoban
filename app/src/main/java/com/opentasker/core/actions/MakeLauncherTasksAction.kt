@@ -14,6 +14,7 @@ import com.opentasker.core.policy.AppFreeze
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.core.storage.ItemMetaEntity
 import com.opentasker.core.storage.TaskEntity
+import com.opentasker.widget.TaskShortcutClip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -63,6 +64,13 @@ import kotlinx.serialization.json.Json
  * The roster is published as the variable; writing it back into the 01 settings task — so the next
  * run of the 01 does not republish the old value — is the calling task's `task.editaction`, exactly as
  * in 泡を選ぶ.
+ *
+ * ## The new tasks go on the clipboard (2026-10-31)
+ *
+ * The next thing 白い熊 does with a new launcher task is add it to 白い熊 雷起動盤, and finding it again in
+ * the launcher's shortcut picker was the slow half. So the names of the tasks THIS run created are left
+ * on the clipboard as a [TaskShortcutClip], which the launcher's 「貼り付け」 add item turns straight
+ * into shortcuts. Nothing is copied when nothing was created — the clipboard is 白い熊's, not ours.
  */
 class MakeLauncherTasksAction : Action {
     override val id = "tasks.launchers"
@@ -160,6 +168,7 @@ class MakeLauncherTasksAction : Action {
 
         var bubbleCandidates: List<String> = emptyList()
         var noTask: List<String> = emptyList()
+        val createdNames = mutableListOf<String>()
         val (created, skipped) = withContext(Dispatchers.IO) {
             // Every name already spoken for in this PROJECT. The uniqueness Room enforces is
             // (projectId, name), so a clash two groups away is still a clash, and an insert that hits
@@ -202,6 +211,7 @@ class MakeLauncherTasksAction : Action {
                     ItemMetaEntity(tab = "tasks", itemKey = newId.toString(), groupId = groupId),
                 )
                 takenNames += taskName
+                createdNames += taskName
                 covered += pkg
                 count++
             }
@@ -227,6 +237,10 @@ class MakeLauncherTasksAction : Action {
         // already covered AND what it looked like when the label check was eating them, and those two
         // have to be tellable apart from the run log alone.
         ctx.logger("Created $created launcher tasks in $groupName ($skipped already had one)")
+        if (createdNames.isNotEmpty()) {
+            withContext(Dispatchers.Main) { TaskShortcutClip.copy(ctx.app, createdNames.sorted()) }
+            ctx.logger("Copied ${createdNames.size} task name(s) for 白い熊 雷起動盤's 「貼り付け」")
+        }
         return ActionResult.Success
     }
 }

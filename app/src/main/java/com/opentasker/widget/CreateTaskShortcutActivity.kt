@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.lifecycle.lifecycleScope
 import com.opentasker.app.OpenTaskerApp_NoHilt
 import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.icons.TaskIconStore
@@ -62,6 +63,7 @@ import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemePrefs
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -69,12 +71,33 @@ import kotlinx.coroutines.withContext
  * projects → groups → tasks picker; choosing a task returns a home-screen shortcut that runs that task,
  * using the task's saved icon (or 自由作業盤's launcher icon when none is set). Layout (font, spacing,
  * indent, group-box look) is tunable under UI customization → Shortcut picker.
+ *
+ * ## Named in advance: no picker at all
+ *
+ * A launcher that already knows which task it wants passes its name in [EXTRA_TASK_NAME] and gets the
+ * shortcut back at once, without the picker ever drawing. That is 白い熊 雷起動盤's 「貼り付け」 item: the
+ * launcher-task generator (`tasks.launchers`) leaves the names it just made on the clipboard under
+ * [TaskShortcutClip.HEADER], and the launcher hands them here one by one. The result is the very same
+ * `createShortcutResultIntent` a manual pick returns, so icon, label and target package cannot differ
+ * between the two ways in. A name that matches nothing cancels silently; the launcher reports it.
  */
 class CreateTaskShortcutActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setResult(RESULT_CANCELED)  // backing out without picking cancels cleanly
+        val named = intent.getStringExtra(EXTRA_TASK_NAME)?.trim().orEmpty()
+        if (named.isNotEmpty()) {
+            lifecycleScope.launch {
+                val task = withContext(Dispatchers.IO) {
+                    OpenTaskerApp_NoHilt.db.taskDao().getByName(named)?.toDomainDecodeResult()?.value
+                }
+                // Silent on a miss: the launcher may be asking for several names and reports the
+                // tally once, in its own Flash — N stacked toasts would only bury it.
+                if (task == null) finish() else finishWithShortcut(task)
+            }
+            return
+        }
         enableEdgeToEdge()
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
@@ -109,6 +132,11 @@ class CreateTaskShortcutActivity : ComponentActivity() {
         val shortcut = TaskShortcutHelper.buildShortcut(this, task)
         setResult(RESULT_OK, ShortcutManagerCompat.createShortcutResultIntent(this, shortcut))
         finish()
+    }
+
+    companion object {
+        /** The task to make a shortcut for, by its (unique) name; skips the picker. */
+        const val EXTRA_TASK_NAME = "shiroikuma.jiyusagyoban.extra.TASK_NAME"
     }
 }
 
