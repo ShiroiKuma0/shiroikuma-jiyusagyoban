@@ -90,10 +90,11 @@ class NightCurveScoreTest {
             assertTrue("the table is missing $needed: $en", needed in en)
         }
         // …and the ones it always had, so this test fails if a column is lost rather than added.
-        for (kept in listOf("Date", "Woke", "Night HR", "Asleep", "Deep", "Deep+REM", "Low HR", "HRV", "SpO₂")) {
+        for (kept in listOf("Date", "Woke", "Night HR", "Asleep", "Deep", "Deep+REM", "Low HR", "HRV", "SpO₂", "Weight")) {
             assertTrue("$kept went missing: $en", kept in en)
         }
-        assertEquals(15, BandText.registerColumns.size)
+        // 16 since 2026-10-30: the day's latest weighing is the last column.
+        assertEquals(16, BandText.registerColumns.size)
         // Every heading is translated: a column that falls back to English is a column nobody
         // reviewed, and this table is read in both languages.
         for (c in BandText.registerColumns) {
