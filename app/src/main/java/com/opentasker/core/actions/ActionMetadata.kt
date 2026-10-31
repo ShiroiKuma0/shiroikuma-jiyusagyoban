@@ -2687,6 +2687,21 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "tasks.copyshortcut",
+            name = "Copy Launcher Shortcut",
+            description = "Tap an app in the grid of launcher tasks: its task goes on the clipboard for 白い熊 雷起動盤's 「貼り付け」 add item, and the dialog closes",
+            category = "App",
+            fields = listOf(
+                ActionField("project", "Project", hint = "narrow the list to this project; empty = every project"),
+                ActionField("group", "Group", hint = "narrow it further to this Tasks-tab group; empty = the whole project"),
+                ActionField("title", "Title", hint = "dialog title (default: Copy for 貼り付け)"),
+                ActionField("timeout", "Close after (s)", FieldType.NUMBER, hint = "0 = wait indefinitely"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "app.pickmulti",
             name = "Pick Apps → Variable",
             description = "Multi-select apps (the variable's current packages pre-ticked and shown first); write the chosen packages back to the variable.",

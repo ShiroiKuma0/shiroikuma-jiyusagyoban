@@ -98,6 +98,7 @@ class RuntimeRegistriesTest {
         assertFieldKeys("app.pickmulti", "variable", "title", "separator", "include_self", "timeout")
         assertFieldKeys("tasks.launchers", "project", "group", "suffix", "bubbles", "timeout")
         assertFieldKeys("tasks.freezebubbles", "project", "group", "variable", "title", "timeout")
+        assertFieldKeys("tasks.copyshortcut", "project", "group", "title", "timeout")
         // The freeze-bubble actions mirror the flash ones, plus "freeze" — the companion packages a
         // bubble re-freezes alongside its own, which is the thing that made RaiPay work.
         assertFieldKeys("bubble.freeze_add", "package", "label", "freeze")

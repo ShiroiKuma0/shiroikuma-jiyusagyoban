@@ -154,6 +154,7 @@ object ActionCatalog {
         define("bubble.freeze_clear", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::FreezeBubbleClearAction),
         define("tasks.launchers", ActionCategory.APP, ActionRetrySafety.NEVER, ::MakeLauncherTasksAction),
         define("tasks.freezebubbles", ActionCategory.APP, ActionRetrySafety.NEVER, ::PickFreezeBubblesAction),
+        define("tasks.copyshortcut", ActionCategory.APP, ActionRetrySafety.NEVER, ::CopyLauncherShortcutAction),
         define("share.relays", ActionCategory.APP, ActionRetrySafety.NEVER, ::GenerateShareRelaysAction),
         define("task.editaction", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::EditActionAction),
         define("task.addaction", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::AddActionAction),
