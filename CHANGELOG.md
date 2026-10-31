@@ -8,6 +8,20 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+113 — 2026-10-31
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+112`.
+
+### 電池線 — the charging flame’s memory runaway
+
+- **The charging flame no longer grows the app past 2 GB.** Each comet body was blurred anew on
+  every frame; the GPU renderer gives such a blur its own offscreen buffer sized to the visible part
+  of the comet, and because the comets slide past the ends of the line that size changed every frame,
+  so a new buffer was made each time — over 10 000 of them (322 MB of GPU memory) while charging with
+  the screen on, with the render thread busy blurring. The body is now blurred once into a cached
+  image and stamped each frame; the flame looks the same. Measured afterwards: about 130–170 MB in
+  total, graphics flat at 22–29 MB, render-thread CPU down from about 50 % to 17 %.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+112 — 2026-10-31
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+110`.
