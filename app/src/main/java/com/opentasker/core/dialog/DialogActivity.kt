@@ -133,6 +133,7 @@ class DialogActivity : ComponentActivity() {
                             .split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
                             .takeIf { it.isNotEmpty() },
                         singleSelect = true,
+                        showMissingRestricted = intent.getBooleanExtra(EXTRA_SHOW_MISSING, false),
                         onConfirm = { picked, _ ->
                             settle(DialogOutcome.Confirmed(picked.firstOrNull()?.first.orEmpty()))
                         },
