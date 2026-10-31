@@ -76,13 +76,15 @@ class HealthExportCoverageTest {
      */
     @Test
     fun `the measurement dump names every band table and no others`() {
-        val declared = listOf("BandDao.kt", "HuaweiDao.kt", "HuaweiWorkoutDao.kt").flatMap { file ->
+        val declared = listOf("BandDao.kt", "HuaweiDao.kt", "HuaweiWorkoutDao.kt", "BodyWeightDao.kt").flatMap { file ->
             Regex("tableName\\s*=\\s*\"([a-z_]+)\"")
                 .findAll(ProductionSources.read("com/opentasker/core/storage/$file"))
                 .map { it.groupValues[1] }
                 .toList()
         }.toSet()
-        assertEquals("expected twelve band tables in the schema (huawei_ecg joined on 2026-10-17)", 12, declared.size)
+        // body_weight joined on 2026-10-30: typed in rather than measured, but kept by the same dump —
+        // nothing can re-supply a weighing either, so it belongs with the measurements.
+        assertEquals("expected thirteen health tables in the schema (huawei_ecg 2026-10-17, body_weight 2026-10-30)", 13, declared.size)
 
         val listed = Regex("HEALTH_TABLES = listOf\\(([^)]*)\\)", RegexOption.DOT_MATCHES_ALL)
             .find(backup)!!
