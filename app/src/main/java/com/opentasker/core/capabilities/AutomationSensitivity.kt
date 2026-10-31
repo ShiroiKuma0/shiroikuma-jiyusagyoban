@@ -161,6 +161,7 @@ object AutomationSensitivityRegistry {
         "tasks.sort",
         "tasks.launchers",
         "tasks.freezebubbles",
+        "tasks.copyshortcut",
         "backup.export",
         "var.add",
         "var.clear",
