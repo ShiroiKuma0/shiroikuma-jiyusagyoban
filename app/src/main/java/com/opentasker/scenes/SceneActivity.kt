@@ -1394,6 +1394,7 @@ private fun ChargingFlame(
     // [trailMs] before fading back. Driven by real frame time in a LaunchedEffect that lives ONLY while
     // composed (charging && screen-on), so it stops dead off-screen. 64 bins across the line width.
     val heat = remember { FloatArray(64) }
+    val bodySprite = remember { CometBodySprite() }
     if (trailMs > 0f) LaunchedEffect(trailMs) {
         var last = 0L
         while (true) {
@@ -1435,8 +1436,8 @@ private fun ChargingFlame(
                 nc.drawRect(i * binW, 0f, (i + 1) * binW + 1f, strip, tint)
             }
             // left comet: head glides 0 → centre; right comet: head glides w → centre (mirror).
-            drawDenchiComet(nc, s * center, 1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 0.0, emberCount, glintCount)
-            drawDenchiComet(nc, w - s * center, -1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 3.3, emberCount, glintCount)
+            drawDenchiComet(nc, bodySprite, s * center, 1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 0.0, emberCount, glintCount)
+            drawDenchiComet(nc, bodySprite, w - s * center, -1f, tail, lineCy, lineHalf, fallRange, flicker, ember, 3.3, emberCount, glintCount)
             // collision bloom where they meet in the middle (grows as s → 1) — deep-red/orange.
             val meet = s * s
             if (meet > 0.03f) {
@@ -1479,6 +1480,7 @@ private fun depositHeat(heat: FloatArray, frac: Float) {
  */
 private fun drawDenchiComet(
     nc: android.graphics.Canvas,
+    bodySprite: CometBodySprite,
     headX: Float,
     dir: Float,
     tail: Float,
@@ -1492,22 +1494,18 @@ private fun drawDenchiComet(
     glintCount: Int = 7,
 ) {
     val tailX = headX - dir * tail
-    val lft = minOf(headX, tailX)
-    val rgt = maxOf(headX, tailX)
     val bodyH = (lineHalf * 1.6f).coerceAtLeast(1.5f)
-    // 1) comet body — a deep, blood-red tail rising to a hot orange-red head (no white/amber), softly blurred.
-    val body = android.graphics.Paint().apply {
-        isAntiAlias = true
-        shader = android.graphics.LinearGradient(
-            tailX, 0f, headX, 0f,
-            intArrayOf(0x00A00010, 0x55C2181B.toInt(), 0xCCE02020.toInt(), 0xFFFF3A1A.toInt(), 0xFFFF7A3A.toInt()),
-            floatArrayOf(0f, 0.5f, 0.82f, 0.94f, 1f),
-            android.graphics.Shader.TileMode.CLAMP,
-        )
-        alpha = (255 * flicker).toInt().coerceIn(0, 255)
-        maskFilter = android.graphics.BlurMaskFilter(bodyH * 0.7f, android.graphics.BlurMaskFilter.Blur.NORMAL)
-    }
-    nc.drawRoundRect(lft, lineCy - bodyH, rgt, lineCy + bodyH, bodyH, bodyH, body)
+    // 1) comet body — a deep, blood-red tail rising to a hot orange-red head (no white/amber), softly
+    //    blurred. Blurred ONCE into a sprite and stamped here, mirrored for the right-hand comet; see
+    //    [CometBodySprite] for why it must never be blurred per frame.
+    val sprite = bodySprite.bitmapFor(tail, bodyH)
+    val pad = bodySprite.pad
+    nc.save()
+    nc.translate(tailX - dir * pad, lineCy - bodyH - pad)
+    nc.scale(dir, 1f)
+    bodySprite.paint.alpha = (255 * flicker).toInt().coerceIn(0, 255)
+    nc.drawBitmap(sprite, 0f, 0f, bodySprite.paint)
+    nc.restore()
     // 2) head glow — hot orange-red core into deep red, fading to transparent dark red.
     val glowR = bodyH * 3.2f
     val glow = android.graphics.Paint().apply {
@@ -1564,6 +1562,58 @@ private fun drawDenchiComet(
         spark.color = emberColor(la)
         spark.alpha = (255 * flicker * (1f - la) * (if (la < 0.1f) la / 0.1f else 1f)).toInt().coerceIn(0, 255)
         nc.drawCircle(sx, sy, sr, spark)
+    }
+}
+
+/**
+ * The comet's blurred body, rendered once in software and reused for every frame and both comets.
+ *
+ * It used to be drawn per frame with a `BlurMaskFilter` — and that was a 2 GB runaway (2026-10-31). On
+ * the GPU pipeline Skia blurs a mask-filtered shape into an offscreen **scratch render target** sized to
+ * the shape as CLIPPED to the canvas, and the comets slide in and out past the line's two ends, so that
+ * size changed on every frame. A scratch target is reused only at the same size, so each frame minted a
+ * new one: at ~80 fps while charging with the screen on, `dumpsys gfxinfo` counted 10 307 RenderTargets
+ * (322 MB of GPU memory) and the GL driver's native bookkeeping took the process past 2 GB before the
+ * cache was purged — then it climbed straight back, with the render thread pegged doing the blurs.
+ *
+ * The body never changes shape — only its position and flicker alpha — so it is blurred once into a
+ * bitmap here (comet-local: tail at the left, head at the right) and drawn as one textured quad, which
+ * the GPU keeps as a single cached texture. Re-rendered only when the line's size changes.
+ */
+private class CometBodySprite {
+    val paint = android.graphics.Paint().apply { isFilterBitmap = true }
+    var pad = 0f
+        private set
+    private var bitmap: android.graphics.Bitmap? = null
+    private var keyTail = -1f
+    private var keyBodyH = -1f
+
+    fun bitmapFor(tail: Float, bodyH: Float): android.graphics.Bitmap {
+        bitmap?.let { if (tail == keyTail && bodyH == keyBodyH) return it }
+        val radius = bodyH * 0.7f
+        // A NORMAL blur reaches about 1.7 × its radius past the shape; 2 × leaves the edge fully faded.
+        val p = kotlin.math.ceil(radius * 2f) + 2f
+        val bmp = android.graphics.Bitmap.createBitmap(
+            (tail + 2 * p).toInt().coerceAtLeast(1),
+            (2 * bodyH + 2 * p).toInt().coerceAtLeast(1),
+            android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        val body = android.graphics.Paint().apply {
+            isAntiAlias = true
+            shader = android.graphics.LinearGradient(
+                p, 0f, p + tail, 0f,
+                intArrayOf(0x00A00010, 0x55C2181B.toInt(), 0xCCE02020.toInt(), 0xFFFF3A1A.toInt(), 0xFFFF7A3A.toInt()),
+                floatArrayOf(0f, 0.5f, 0.82f, 0.94f, 1f),
+                android.graphics.Shader.TileMode.CLAMP,
+            )
+            maskFilter = android.graphics.BlurMaskFilter(radius, android.graphics.BlurMaskFilter.Blur.NORMAL)
+        }
+        android.graphics.Canvas(bmp).drawRoundRect(p, p, p + tail, p + 2 * bodyH, bodyH, bodyH, body)
+        bitmap = bmp
+        pad = p
+        keyTail = tail
+        keyBodyH = bodyH
+        return bmp
     }
 }
 
