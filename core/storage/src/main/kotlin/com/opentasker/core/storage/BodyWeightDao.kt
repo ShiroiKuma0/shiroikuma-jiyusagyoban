@@ -7,7 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 /**
- * One body-weight reading, typed in by 白い熊 from the 健康 report's 今朝 card.
+ * One body-weight reading, typed in by 白い熊 from the 健康 report's 今朝 card or the register.
  *
  * Every weighing is its own row, keyed by the instant it was saved: the history is the point, and a
  * second weighing on one day is a reading too, not a correction of the first. Screens that show one
@@ -28,6 +28,10 @@ interface BodyWeightDao {
 
     @Query("SELECT * FROM body_weight ORDER BY epochMs")
     suspend fun all(): List<BodyWeightEntity>
+
+    /** Withdraw one reading — the one the dialog was editing, which a save replaces. */
+    @Query("DELETE FROM body_weight WHERE epochMs = :epochMs")
+    suspend fun delete(epochMs: Long)
 
     /** Withdraw the readings of one span — the dialog's emptied field deletes the day's weighings. */
     @Query("DELETE FROM body_weight WHERE epochMs >= :fromMs AND epochMs < :toMs")

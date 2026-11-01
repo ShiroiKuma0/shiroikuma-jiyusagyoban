@@ -41,17 +41,30 @@ class TaskCollisionCoordinator(
     private val slots = ConcurrentHashMap<Long, Slot>()
 
     suspend fun <T> execute(task: Task, block: suspend () -> T): TaskCollisionOutcome<T> {
-        val caller = currentCoroutineContext()[Job] ?: return TaskCollisionOutcome.Executed(block())
+        val runNo = RunTrace.nextRun()
+        val who = "r$runNo '${task.name}' #${task.id} ${task.collisionMode}"
+        val caller = currentCoroutineContext()[Job] ?: run {
+            RunTrace.line("$who UNCOORDINATED (no Job)")
+            return TaskCollisionOutcome.Executed(block())
+        }
+        val job = caller
         // A task with no id shares no slot, but its run still gets a scope of its own: the stop
         // button holds whatever Job the block runs in.
-        if (task.id <= 0L) return runRegistered(Slot(), caller, block = block)
+        if (task.id <= 0L) {
+            RunTrace.line("$who UNCOORDINATED (id<=0)")
+            return runRegistered(Slot(), caller, block = block)
+        }
         val slot = slots.computeIfAbsent(task.id) { Slot() }
+        val active = synchronized(slot) { slot.activeJobs.count { it.isActive } }
+        RunTrace.line("$who enter active=$active job=${System.identityHashCode(job)}")
 
-        return when (task.collisionMode) {
+        val outcome = when (task.collisionMode) {
             CollisionMode.RUN_BOTH -> runRegistered(slot, caller, block = block)
             CollisionMode.WAIT -> {
                 val owner = Any()
+                val queuedAt = System.currentTimeMillis()
                 withTimeoutOrNull(waitAcquisitionTimeoutMs) { slot.waitMutex.lock(owner) }
+                RunTrace.line("$who WAIT lock=${slot.waitMutex.holdsLock(owner)} after ${System.currentTimeMillis() - queuedAt} ms")
                 // holdsLock is the authoritative post-condition: it stays correct even when the
                 // timeout fires in the window between acquiring the lock and returning.
                 if (!slot.waitMutex.holdsLock(owner)) {
@@ -101,6 +114,13 @@ class TaskCollisionCoordinator(
                 }
             }
         }
+        RunTrace.line(
+            "$who " + when (outcome) {
+                is TaskCollisionOutcome.Executed -> "done"
+                is TaskCollisionOutcome.Skipped -> "SKIPPED: ${outcome.reason}"
+            },
+        )
+        return outcome
     }
 
     /**

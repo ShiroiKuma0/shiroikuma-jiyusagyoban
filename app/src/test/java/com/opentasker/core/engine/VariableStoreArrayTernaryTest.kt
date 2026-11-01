@@ -26,6 +26,38 @@ class VariableStoreArrayTernaryTest {
     }
 
     @Test
+    fun anIndexHeldInAVariableReadsThatItem() {
+        val store = VariableStore()
+        store.setArray("titles", listOf("買い物", "秘密", "力"))
+        // The index means exactly what a literal one does (this store counts from 0).
+        store.set("n", "2")
+        assertEquals("力", store.expand("%titles(%n)"))
+        assertEquals(store.expand("%titles(2)"), store.expand("%titles(%n)"))
+        // A literal index and a join separator still behave as before.
+        assertEquals("秘密", store.expand("%titles(1)"))
+        assertEquals("買い物|秘密|力", store.expand("%titles(|)"))
+        // An index variable that is unset or not a number reads as empty, never as a join.
+        assertEquals("", store.expand("%titles(%missing)"))
+    }
+
+    @Test
+    fun anIndexReadsTheArrayEvenBesideAPlainValueOfTheSameName() {
+        val store = VariableStore()
+        // What text.match leaves behind: %h = the whole match, the array h = [whole, group 1, …].
+        store.set("h", "⇐ SIM2 · +420700000002")
+        store.setArray("h", listOf("⇐ SIM2 · +420700000002", "SIM2", "+420700000002"))
+        store.set("n", "1")
+        assertEquals("+420700000002", store.expand("%h(2)"))
+        assertEquals("SIM2", store.expand("%h(%n)"))
+        assertEquals("3", store.expand("%h(#)"))
+        assertEquals("⇐ SIM2 · +420700000002", store.expand("%h"))
+        // Arithmetic on a plain number is untouched by an array of the same name.
+        store.set("k", "5")
+        store.setArray("k", listOf("x"))
+        assertEquals("6", store.expand("%k(+1)"))
+    }
+
+    @Test
     fun ternaryHandlesPlainCondition() {
         val store = VariableStore().apply { set("A", "7") }
         assertEquals("big", store.expand("(%A > 5) ? big : small"))

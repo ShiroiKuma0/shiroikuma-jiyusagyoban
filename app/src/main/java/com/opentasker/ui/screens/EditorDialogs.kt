@@ -155,7 +155,7 @@ internal fun TemplatePickerDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -322,7 +322,7 @@ internal fun TaskEditorDialog(
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = cleanupAndDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = cleanupAndDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -820,7 +820,7 @@ internal fun ProfileEditorDialog(
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -1115,7 +1115,7 @@ internal fun DeleteConfirmationDialog(
                 Text(confirmLabel)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -1148,7 +1148,7 @@ internal fun TaskIconPickerDialog(
         title = { Text(title) },
         text = { TaskIconEditorRow(iconPath = staged, onStage = { stage(it) }, targetPackage = targetPackage) },
         confirmButton = { OutlinedButton(onClick = { onConfirm(staged) }) { Text("Done") } },
-        dismissButton = { TextButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = cancel) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 

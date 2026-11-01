@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,7 +40,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -307,9 +307,9 @@ private fun NameDialog(existing: List<String>, onConfirm: (String) -> Unit, onDi
             }
         },
         confirmButton = {
-            TextButton(enabled = trimmed.isNotEmpty() && !clash, onClick = { onConfirm(trimmed) }) { Text("Design") }
+            Button(enabled = trimmed.isNotEmpty() && !clash, onClick = { onConfirm(trimmed) }) { Text("Design") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

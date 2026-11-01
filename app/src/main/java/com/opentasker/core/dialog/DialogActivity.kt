@@ -1,5 +1,7 @@
 package com.opentasker.core.dialog
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,7 +29,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -108,6 +109,17 @@ class DialogActivity : ComponentActivity() {
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_LIST -> ListDialog(title, items, cancelLabel,
                         onPick = { index -> settle(DialogOutcome.Confirmed(items[index], index)) },
+                        onCancel = { settle(DialogOutcome.Cancelled) })
+                    TYPE_FORM -> FormDialog(
+                        title = title,
+                        intro = text,
+                        fields = FormField.listFromJson(intent.getStringExtra(EXTRA_FORM).orEmpty()),
+                        okLabel = okLabel,
+                        cancelLabel = cancelLabel,
+                        skipLabel = intent.getStringExtra(EXTRA_SKIP)?.takeIf { it.isNotBlank() },
+                        // The answers as one JSON object, var → value; index 0 = OK, 1 = skip.
+                        onConfirm = { settle(DialogOutcome.Confirmed(org.json.JSONObject(it).toString(), 0)) },
+                        onSkip = { settle(DialogOutcome.Confirmed("{}", 1)) },
                         onCancel = { settle(DialogOutcome.Cancelled) })
                     TYPE_APP_MULTISELECT -> AppMultiSelectDialog(title, preselected,
                         // Absent/blank = the full user-app grid; a list restricts it to exactly those
@@ -257,6 +269,9 @@ class DialogActivity : ComponentActivity() {
         const val TYPE_APP_MULTISELECT = "app_multiselect"
         const val TYPE_APP_SINGLESELECT = "app_singleselect"
         const val TYPE_LIST_MULTISELECT = "list_multiselect"
+        const val TYPE_FORM = "form"
+        const val EXTRA_FORM = "form"   // FORM: the resolved fields, a JSON array (see FormField)
+        const val EXTRA_SKIP = "skip"   // FORM: label of the optional middle "leave as it is" button
     }
 }
 
@@ -302,8 +317,8 @@ private fun InputDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text(okLabel) } },
-        dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+        confirmButton = { Button(onClick = { onConfirm(value) }) { Text(okLabel) } },
+        dismissButton = { OutlinedButton(onClick = onCancel) { Text(cancelLabel) } },
     )
 }
 
@@ -355,7 +370,7 @@ private fun ListDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+        dismissButton = { OutlinedButton(onClick = onCancel) { Text(cancelLabel) } },
     )
 }
 
@@ -428,9 +443,9 @@ private fun ListMultiSelectDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(items.filter { it in checked }) }) { Text(okLabel) }
+            Button(onClick = { onConfirm(items.filter { it in checked }) }) { Text(okLabel) }
         },
-        dismissButton = { TextButton(onClick = onCancel) { Text(cancelLabel) } },
+        dismissButton = { OutlinedButton(onClick = onCancel) { Text(cancelLabel) } },
     )
 }
 
@@ -475,10 +490,10 @@ private fun TextDialog(
                 settingsTargets.forEach { (reqName, label) -> SettingsPill(label) { onOpenSettings(reqName) } }
             }
         },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(okLabel) } },
+        confirmButton = { Button(onClick = onConfirm) { Text(okLabel) } },
         // An explicitly blank cancel label (dialog.text with cancel="") drops the dismiss button —
         // for acknowledgment-only dialogs where there is nothing to cancel.
-        dismissButton = cancelLabel?.let { { TextButton(onClick = onCancel) { Text(it) } } },
+        dismissButton = cancelLabel?.let { { OutlinedButton(onClick = onCancel) { Text(it) } } },
         // "large"/"full" have to opt out of the platform's fixed dialog width before any fillMaxWidth
         // on the surface can take effect.
         properties = DialogProperties(usePlatformDefaultWidth = size == DialogSize.NORMAL),

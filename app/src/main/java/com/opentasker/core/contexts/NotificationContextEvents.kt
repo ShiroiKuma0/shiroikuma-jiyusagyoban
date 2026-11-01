@@ -19,12 +19,13 @@ object NotificationContextEvents {
         ongoing: Boolean = false,
         isProtected: Boolean = false,
         channel: String = "",
+        key: String = "",
     ): Boolean {
         // The notification's fields are threaded PER-INVOCATION to the enter task via ContextEvent.vars
         // (see buildEvent) — NOT persisted as super-globals. The only reader is the notification enter task
         // (通知明滅点灯), which receives these locals; persisting them just cluttered the global namespace.
         val pkg = packageName.trim()
-        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing, isProtected, channel))
+        return notifications.tryEmit(buildEvent(pkg, title, body, ongoing, isProtected, channel, key))
     }
 
     fun buildEvent(
@@ -34,6 +35,7 @@ object NotificationContextEvents {
         ongoing: Boolean = false,
         isProtected: Boolean = false,
         channel: String = "",
+        key: String = "",
     ): ContextEvent = ContextEvent(
         type = "event",
         matched = true,
@@ -57,6 +59,10 @@ object NotificationContextEvents {
             // The posting app's notification-channel id — the locale-proof way to tell housekeeping
             // channels (e.g. Jami's shiroikuma_watchdog) from real message/call channels.
             "NOTIF_CHANNEL" to channel.trim(),
+            // The notification's own key, so a task can dismiss exactly this one (notify.dismiss key=)
+            // and leave the app's other notifications alone — 通知明滅 clears a 携帯 bridge chat's Jami
+            // notification this way while other Jami chats stay in the shade.
+            "NOTIF_KEY" to key,
         ),
     )
 

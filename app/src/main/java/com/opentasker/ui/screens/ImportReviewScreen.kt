@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,7 +37,6 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -404,7 +404,7 @@ internal fun ImportReviewScreen(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
+                    OutlinedButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         enabled = plan.canImport && !busy,

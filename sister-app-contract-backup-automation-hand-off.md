@@ -426,7 +426,7 @@ precisely this shape.)
   code is not where to look.
 
 **Emit the reserved key only when the button would actually help — TWO conditions, not one.**
-(`shiroikuma-handyrss`.) `ERROR:no-foreground-start` earns 白い熊 a 「電池最適化を除外」 button on the
+(`shiroikuma-kiji`, formerly `shiroikuma-handyrss`.) `ERROR:no-foreground-start` earns 白い熊 a 「電池最適化を除外」 button on the
 failed row, so send it only when **both** hold:
 
 1. the throwable is `ForegroundServiceStartNotAllowedException`, **and**
@@ -929,7 +929,7 @@ Four mechanical rules:
   caller's descriptor on **every** attempt, which is exactly the app least likely to notice.
 - **Spool a large import to disk rather than into memory.** Reading the whole archive into a byte
   array to sniff it is fine for a settings ZIP and fatal for an app whose archive carries a corpus —
-  `shiroikuma-handyrss` ships roughly 3,700 images. Stream the descriptor to a cache file, validate
+  `shiroikuma-kiji` ships roughly 3,700 images. Stream the descriptor to a cache file, validate
   there, then apply. The guarantee is unchanged (nothing is written until the whole archive has
   arrived and been checked); only the bound moves from RAM to disk.
   **Check how far the `byte[]` reaches before you size this work.** It is a local change to the
@@ -1147,7 +1147,7 @@ presence check and a contents check are both useless:
 | repo | what it had | why it looked fine |
 | --- | --- | --- |
 | `shiroikuma-gauguin`, `shiroikuma-sokki`, `shiroikuma-rindenwa` | no `<queries>` element at all | nothing to see |
-| `shiroikuma-handyrss`, `shiroikuma-jisho` | `<package>` for 応用管理 only | the element is there and looks deliberate |
+| `shiroikuma-kiji`, `shiroikuma-jisho` | `<package>` for 応用管理 only | the element is there and looks deliberate |
 | `shiroikuma-kxkb`, `shiroikuma-simplex` | an element holding only `<intent>` filters, no package | passes a presence check |
 | `shiroikuma-raikidoban`, `shiroikuma-fairemail` | an element naming neither caller | passes a presence check |
 
@@ -1376,7 +1376,7 @@ follow, and both bit real repos in the rollout:
 - **Below `compileSdk 34`, `aapt2` rejects the literal outright** and the build fails — the value
   does not exist in the platform you are compiling against. Declare **`dataSync`** instead, which is
   accurate for streaming an archive, needs no subtype property, and needs no extra permission at a
-  `targetSdk` below 34. (`shiroikuma-handyrss`, `compileSdk 31`.)
+  `targetSdk` below 34. (`shiroikuma-kiji`, `compileSdk 31`.)
 - **At `targetSdk 34+` the `FOREGROUND_SERVICE_SPECIAL_USE` permission is required as well** — the
   `foregroundServiceType` alone is not enough and the service throws at `startForeground`.
 

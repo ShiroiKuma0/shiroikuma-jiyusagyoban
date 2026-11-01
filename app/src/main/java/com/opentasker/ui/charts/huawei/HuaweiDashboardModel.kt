@@ -103,6 +103,11 @@ data class HuaweiDashboardState(
     /** Today's body weight in kg — its latest weighing — or null when nothing has been weighed today. */
     val weightToday: Double? = null,
     /**
+     * Each day's LATEST weighing, keyed `yyyyMMdd` — the reading the weight dialog opens on and
+     * replaces, for today on the 今朝 card and for any past morning in the register.
+     */
+    val weightReadings: Map<Long, com.opentasker.core.storage.BodyWeightEntity> = emptyMap(),
+    /**
      * 機能訓練 — the days the rehab was done, and what was written about them.
      *
      * Two plain collections rather than a built list of squares: the card shows two weeks and the
@@ -293,6 +298,7 @@ class HuaweiDashboardModel(
             feltMorning = morningKey,
             feltNote = com.opentasker.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
             weightToday = weightsByDay(zone)[com.opentasker.core.band.RehabLog.today(zone)],
+            weightReadings = latestWeighings(zone),
             // The band's own rehab sessions AND anything 白い熊 ticked by hand.
                 //
                 // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
@@ -666,27 +672,33 @@ class HuaweiDashboardModel(
     }
 
     /**
-     * Record a weighing now, or — on null, the dialog's emptied field — withdraw today's.
+     * Save one weighing at [atMs], replacing the reading the dialog was opened on ([replacingMs]).
      *
-     * Every save is a new row with its own instant, so the history keeps each reading; the screens
-     * show a day's LATEST. Withdrawing takes the whole calendar day, which is what "today's weight"
-     * meant on the card that was tapped.
+     * The dialog edits ONE reading — the day's latest, which is the figure every screen shows — so
+     * a save moves it to the date and time in the boxes, and a null [kg] (the emptied field) withdraws
+     * it. Earlier weighings of that day are left alone: every save is still its own row and the
+     * history keeps them; only the reading being edited is replaced, so an edit is never hidden
+     * behind the figure it was meant to correct.
      */
-    fun setWeight(kg: Double?) {
+    fun setWeight(atMs: Long, kg: Double?, replacingMs: Long?) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val dao = db.bodyWeightDao()
-                if (kg != null) {
-                    dao.put(com.opentasker.core.storage.BodyWeightEntity(System.currentTimeMillis(), kg))
-                } else {
-                    val zone = java.time.ZoneId.systemDefault()
-                    val start = java.time.LocalDate.now(zone).atStartOfDay(zone)
-                    dao.deleteBetween(start.toInstant().toEpochMilli(), start.plusDays(1).toInstant().toEpochMilli())
-                }
+                if (replacingMs != null) dao.delete(replacingMs)
+                if (kg != null) dao.put(com.opentasker.core.storage.BodyWeightEntity(atMs, kg))
             }
             refresh()
         }
     }
+
+    /** Each local day's latest weighing, keyed `yyyyMMdd` — what the dialog edits. */
+    private suspend fun latestWeighings(zone: java.time.ZoneId): Map<Long, com.opentasker.core.storage.BodyWeightEntity> =
+        runCatching { db.bodyWeightDao().all() }.getOrDefault(emptyList())
+            .associateBy { w ->
+                com.opentasker.core.band.RehabLog.dateKeyOf(
+                    java.time.Instant.ofEpochMilli(w.epochMs).atZone(zone).toLocalDate(),
+                )
+            }
 
     /** Every weighing, one figure per local day — the day's latest — keyed `yyyyMMdd`. */
     private suspend fun weightsByDay(zone: java.time.ZoneId): Map<Long, Double> =

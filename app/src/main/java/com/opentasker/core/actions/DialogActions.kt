@@ -270,3 +270,77 @@ class TextDialogAction : Action {
         return ActionResult.Success
     }
 }
+
+/**
+ * Many labelled settings in ONE dialog (白い熊, 2026-11-01) — the settings tasks' replacement for a
+ * chain of one-question dialogs.
+ *
+ * [fields] is a JSON array of field objects. Each settable field names the VARIABLE it edits
+ * (`"var"`): the form opens on that variable's current value (or `"default"` when it is empty) and
+ * writes it back only on OK, so a form is its own load and save and nothing has to be quoted into the
+ * JSON at run time. A choice reads its options either literally (`"options"`, `"values"`) or from
+ * array variables (`"options_array"`, `"values_array"` — e.g. a provider.call result), optionally
+ * headed by a `"none"` option whose value is empty. See [com.opentasker.core.dialog.FormField] for the
+ * field types. `%<prefix>_button` says how it closed: ok, skip or cancel.
+ */
+class FormDialogAction : Action {
+    override val id = "dialog.form"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val prefix = args["prefix"]?.trim()?.takeIf { it.isNotEmpty() } ?: "form"
+        val spec = runCatching { org.json.JSONArray(args["fields"].orEmpty()) }.getOrElse {
+            return ActionResult.Failure("fields is not a JSON array: ${it.message}")
+        }
+        val resolved = org.json.JSONArray()
+        for (i in 0 until spec.length()) {
+            val f = spec.optJSONObject(i) ?: continue
+            val o = org.json.JSONObject(f.toString())
+            val name = f.optString("var").removePrefix("%")
+            if (name.isNotEmpty()) {
+                o.put("var", name)
+                val current = ctx.variables.get(name).orEmpty()
+                o.put("value", current.ifEmpty { f.optString("default") })
+            }
+            if (f.optString("type") == "choice") {
+                val opts = f.optString("options_array").takeIf { it.isNotBlank() }
+                    ?.let { ctx.variables.getArrayItems(it.removePrefix("%")) }
+                    ?: f.optJSONArray("options")?.let { a -> (0 until a.length()).map { a.optString(it) } }
+                    ?: emptyList()
+                val vals = f.optString("values_array").takeIf { it.isNotBlank() }
+                    ?.let { ctx.variables.getArrayItems(it.removePrefix("%")) }
+                    ?: f.optJSONArray("values")?.let { a -> (0 until a.length()).map { a.optString(it) } }
+                    ?: opts
+                val none = f.optString("none").takeIf { it.isNotEmpty() }
+                // A blank label would draw as an empty row — an untitled Jami one-to-one conversation
+                // has no title at all — so it shows as untitled plus the start of its value instead.
+                val named = opts.mapIndexed { i, label ->
+                    label.ifBlank { "(無題 / untitled) · " + vals.getOrNull(i).orEmpty().take(8) }
+                }
+                o.put("options", org.json.JSONArray((listOfNotNull(none) + named)))
+                o.put("values", org.json.JSONArray((listOfNotNull(none?.let { "" }) + vals)))
+            }
+            resolved.put(o)
+        }
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_FORM)
+            putExtra(DialogActivity.EXTRA_TITLE, args["title"].orEmpty())
+            putExtra(DialogActivity.EXTRA_TEXT, args["text"].orEmpty())
+            putExtra(DialogActivity.EXTRA_FORM, resolved.toString())
+            args["ok"]?.takeIf { it.isNotBlank() }?.let { putExtra(DialogActivity.EXTRA_OK, it) }
+            args["cancel"]?.takeIf { it.isNotBlank() }?.let { putExtra(DialogActivity.EXTRA_CANCEL, it) }
+            args["skip"]?.takeIf { it.isNotBlank() }?.let { putExtra(DialogActivity.EXTRA_SKIP, it) }
+        }
+        val button = when {
+            outcome !is DialogOutcome.Confirmed -> "cancel"
+            outcome.index == 1 -> "skip"
+            else -> {
+                val answers = runCatching { org.json.JSONObject(outcome.value) }.getOrNull()
+                answers?.keys()?.forEach { k -> ctx.variables.set(k, answers.optString(k)) }
+                "ok"
+            }
+        }
+        ctx.variables.set("${prefix}_button", button)
+        ctx.logger("Form dialog → $button")
+        return ActionResult.Success
+    }
+}
