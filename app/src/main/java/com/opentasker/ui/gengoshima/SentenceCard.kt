@@ -1,5 +1,6 @@
 package com.opentasker.ui.gengoshima
 
+import androidx.compose.material3.OutlinedButton
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
@@ -31,7 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -300,7 +300,7 @@ internal fun SourceEditDialog(s: GengoshimaSentenceEntity, onDismiss: () -> Unit
             }
         },
         confirmButton = { Button(onClick = { onSave(en.trim(), language) }, enabled = en.isNotBlank()) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 
@@ -322,7 +322,7 @@ internal fun JapaneseEditDialog(s: GengoshimaSentenceEntity, onDismiss: () -> Un
             }
         },
         confirmButton = { Button(onClick = { onSave(ja.trim()) }, enabled = ja.isNotBlank()) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 
@@ -383,11 +383,11 @@ internal fun WordDialog(tokens: List<Translator.Token>, k: Int, onDismiss: () ->
         dismissButton = {
             Row {
                 if (cutAt != null) {
-                    TextButton(onClick = { cutAt = null }) { Text("戻る / back") }
+                    OutlinedButton(onClick = { cutAt = null }) { Text("戻る / back") }
                 } else if (k + 1 < tokens.size) {
-                    TextButton(onClick = { onSave(WordEdit.joinNext(tokens, k)) }) { Text("次とつなぐ / join next") }
+                    OutlinedButton(onClick = { onSave(WordEdit.joinNext(tokens, k)) }) { Text("次とつなぐ / join next") }
                 }
-                TextButton(onClick = onDismiss) { Text("やめる") }
+                OutlinedButton(onClick = onDismiss) { Text("やめる") }
             }
         },
     )

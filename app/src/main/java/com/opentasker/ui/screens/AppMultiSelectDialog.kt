@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -435,10 +437,10 @@ internal fun AppMultiSelectDialog(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onCancel) { Text("Cancel") }
+                    OutlinedButton(onClick = onCancel) { Text("Cancel") }
                     if (!singleSelect) {
                         Spacer(Modifier.width(8.dp))
-                        TextButton(onClick = {
+                        Button(onClick = {
                             onConfirm(selected.map { (pkg, label) -> pkg to label }, toggleOn.toList())
                         }) { Text("OK (${selected.size})") }
                     }

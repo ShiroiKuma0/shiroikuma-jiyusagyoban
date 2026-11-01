@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -91,10 +92,11 @@ object AnnotationText {
     val weightTitle = Loc("Body weight — %s", "体重 — %s")
     val weightField = Loc("Weight in kg", "体重（kg）")
     val weightHint = Loc(
-        "Saved with today's date and time. Saving it empty withdraws today's weighing.",
-        "今日の日付と時刻で記録。空のまま保存すると今日の記録を取り消す。",
+        "Saved at the date and time above — tap a digit to overwrite it. Saving it empty withdraws this weighing.",
+        "上の日付と時刻で記録。数字を押すと上書きできる。空のまま保存するとこの記録を取り消す。",
     )
     val weightInvalid = Loc("A weight in kg, e.g. 134.2", "kg の数値で、例 134.2")
+    val weightWhenInvalid = Loc("A real date and time, not in the future.", "正しい日付と時刻で、未来は不可。")
     /** The card that holds a walk's own answers, as opposed to the band's measurements of it. */
     val own = Loc("Your own record", "自分の記録")
     val stops = Loc("Stops", "休憩")
@@ -579,44 +581,108 @@ fun parseWeightKg(typed: String): Double? =
     typed.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it in 20.0..400.0 }
 
 /**
- * Ask for today's weight in kg — [NoteDialog]'s shape, with a number pad.
+ * Ask for a weight in kg, and when it was taken — [NoteDialog]'s shape, with a number pad.
  *
- * Opens holding today's figure when there is one, so a second weighing is an edit of a number in
- * place. Save hands back the parsed kg, or null for an emptied field (withdraw today's); anything
- * that is not a weight keeps the dialog open with the hint in the explanation ink turned to yellow.
+ * Opens on [dateKey]'s reading when there is one ([currentKg] at [currentAtMs]), so a second weighing
+ * is an edit of a number in place; a day with none opens at **07:00**, the time 白い熊 weighs (2026-11-01).
+ * The same dialog serves today's pill and any past morning in the register, so the date is editable
+ * here too, not only the time.
+ *
+ * Save hands back the instant in the boxes and the parsed kg, or null for an emptied field (withdraw
+ * the reading); a figure that is not a weight, or a date and time that is not real or lies in the
+ * future, keeps the dialog open with its hint in yellow.
  */
 @Composable
 fun WeightDialog(
-    title: String,
-    current: Double?,
-    onSave: (Double?) -> Unit,
+    dateKey: Long,
+    currentKg: Double?,
+    currentAtMs: Long?,
+    onSave: (atMs: Long, kg: Double?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val lang = LocalBandLanguage.current
-    var typed by rememberSaveable { mutableStateOf(current?.let { String.format(java.util.Locale.ROOT, "%.1f", it) }.orEmpty()) }
+    val zone = remember { java.time.ZoneId.systemDefault() }
+    var typed by rememberSaveable { mutableStateOf(currentKg?.let { String.format(java.util.Locale.ROOT, "%.1f", it) }.orEmpty()) }
     var invalid by rememberSaveable { mutableStateOf(false) }
-    val focus = remember { FocusRequester() }
-    fun save() {
-        if (typed.isBlank()) return onSave(null)
-        val kg = parseWeightKg(typed)
-        if (kg == null) invalid = true else onSave(kg)
+    var whenInvalid by rememberSaveable { mutableStateOf(false) }
+    // "yyyyMMddHHmm", one digit per box.
+    var digits by rememberSaveable {
+        val start = currentAtMs?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime() }
+            ?: java.time.LocalDate.of((dateKey / 10_000L).toInt(), ((dateKey / 100L) % 100L).toInt(), (dateKey % 100L).toInt())
+                .atTime(7, 0)
+        mutableStateOf(start.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmm")))
     }
-    Dialog(onDismissRequest = onDismiss) {
+    val chosen = weighingTimeOf(digits)
+    val focus = remember { FocusRequester() }
+    val boxes = remember { List(12) { FocusRequester() } }
+    fun save() {
+        val at = chosen?.takeIf { !it.toLocalDate().isAfter(java.time.LocalDate.now(zone)) }
+        if (at == null) { whenInvalid = true; return }
+        val atMs = at.atZone(zone).toInstant().toEpochMilli()
+        if (typed.isBlank()) return onSave(atMs, null)
+        val kg = parseWeightKg(typed)
+        if (kg == null) invalid = true else onSave(atMs, kg)
+    }
+    fun box(i: Int, width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp): @Composable () -> Unit = {
+        DigitBox(
+            digit = digits[i],
+            focus = boxes[i],
+            width = width,
+            height = height,
+            onDigit = { c ->
+                digits = digits.substring(0, i) + c + digits.substring(i + 1)
+                whenInvalid = false
+                // Straight on to the next digit — the last time digit hands over to the kg field.
+                runCatching { if (i < 11) boxes[i + 1].requestFocus() else focus.requestFocus() }
+            },
+        )
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        // Wider than the platform's 320 dp dialog: twelve digit boxes do not fit in that at a font
+        // scale of 1.3, and shrinking the boxes would shrink the very thing that is being tapped.
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Column(
             Modifier
+                .padding(horizontal = 16.dp)
                 .fillMaxWidth()
+                .widthIn(max = 520.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.5.dp, sectionInk, RoundedCornerShape(18.dp))
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // The title follows the boxes, so the day named is always the day that will be saved.
             Text(
-                title,
+                AnnotationText.weightTitle[lang].format(
+                    nightDateFull(chosen?.toLocalDate()?.let { com.opentasker.core.band.RehabLog.dateKeyOf(it) } ?: dateKey, lang),
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = sectionInk,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                for (i in 0..3) box(i, 32.dp, 40.dp)()
+                BoxSeparator("-")
+                for (i in 4..5) box(i, 32.dp, 40.dp)()
+                BoxSeparator("-")
+                for (i in 6..7) box(i, 32.dp, 40.dp)()
+            }
+            // The time as 白い熊 drew it: four square boxes, a colon in the middle.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                for (i in 8..9) box(i, 44.dp, 44.dp)()
+                BoxSeparator(":")
+                for (i in 10..11) box(i, 44.dp, 44.dp)()
+            }
+            if (whenInvalid) {
+                Text(
+                    AnnotationText.weightWhenInvalid[lang],
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ANNOTATION_INK,
+                )
+            }
             OutlinedTextField(
                 value = typed,
                 onValueChange = { typed = it; invalid = false },
@@ -648,4 +714,61 @@ fun WeightDialog(
     }
     // The number pad up at once: this dialog exists to take one figure.
     androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+}
+
+/** The boxes' "yyyyMMddHHmm" as a real local date-time, or null while it is out of range (a 13th month, 25:00). */
+internal fun weighingTimeOf(digits: String): java.time.LocalDateTime? = runCatching {
+    if (digits.length != 12 || !digits.all { it.isDigit() }) return null
+    java.time.LocalDateTime.of(
+        digits.substring(0, 4).toInt(), digits.substring(4, 6).toInt(), digits.substring(6, 8).toInt(),
+        digits.substring(8, 10).toInt(), digits.substring(10, 12).toInt(),
+    )
+}.getOrNull()
+
+@Composable
+private fun BoxSeparator(text: String) {
+    Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ANNOTATION_INK)
+}
+
+/**
+ * One digit of a date or a time: a yellow-ringed black square, inverted while it has the focus.
+ *
+ * A tap makes the digit ready to be OVERWRITTEN rather than dropping a caret beside it, and the
+ * caller moves the focus straight on to the next box, which arrives the same way (白い熊,
+ * 2026-11-01). The field underneath is kept permanently empty and the digit is drawn over it: then
+ * every key is new text, so typing the digit that is already there still counts and still moves on,
+ * which a field holding the digit selected cannot tell apart from a tap. There is no empty box — a
+ * digit is only ever replaced — so the date and time in the boxes are always whole.
+ */
+@Composable
+private fun DigitBox(
+    digit: Char,
+    focus: FocusRequester,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    onDigit: (Char) -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val ink = if (focused) ANNOTATION_FILL else ANNOTATION_INK
+    BasicTextField(
+        value = "",
+        onValueChange = { typed -> typed.lastOrNull { it.isDigit() }?.let(onDigit) },
+        modifier = Modifier
+            .size(width, height)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (focused) ANNOTATION_INK else ANNOTATION_FILL)
+            .border(1.5.dp, ANNOTATION_INK, RoundedCornerShape(6.dp))
+            .focusRequester(focus)
+            .onFocusChanged { focused = it.isFocused },
+        textStyle = MaterialTheme.typography.titleLarge.copy(color = ink),
+        cursorBrush = SolidColor(Color.Transparent),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+        decorationBox = { field ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(digit.toString(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ink)
+                field()
+            }
+        },
+    )
 }

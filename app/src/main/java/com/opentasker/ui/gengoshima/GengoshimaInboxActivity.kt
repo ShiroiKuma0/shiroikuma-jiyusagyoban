@@ -341,7 +341,7 @@ private fun IslandPicker(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { creating = true }) { Text("＋ 新しい島") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        confirmButton = { Button(onClick = { creating = true }) { Text("＋ 新しい島") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }

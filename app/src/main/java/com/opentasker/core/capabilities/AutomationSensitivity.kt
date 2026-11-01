@@ -94,6 +94,7 @@ object AutomationSensitivityRegistry {
         "backup.categories",
         "backup.edititems",
         "dialog.pickmulti",
+        "dialog.form",
         "flow.fail",
         "system.get_locale",
         "task.return",
@@ -228,6 +229,9 @@ object AutomationSensitivityRegistry {
         "screenshot.take",
         "file.read",
         "file.list",
+        "provider.call",
+        "file.from_uri",
+        "sim.status",
     )
 
     private val externalTransmissionActionIds = setOf(
@@ -260,6 +264,8 @@ object AutomationSensitivityRegistry {
         "gengoshima.generate",
         "gengoshima.anki_sync",
         "gengoshima.anki_adopt",
+        "provider.call",
+        "ussd.run",
     )
 
     private val deviceControlActionIds = setOf(
@@ -373,6 +379,7 @@ object AutomationSensitivityRegistry {
         // Turning another profile on or off changes what the phone does next, so an imported task
         // that does it is called out. It can't turn on an imported profile still waiting for review.
         "profile.set",
+        "ussd.run",
     )
 
     private val destructiveActionIds = setOf(

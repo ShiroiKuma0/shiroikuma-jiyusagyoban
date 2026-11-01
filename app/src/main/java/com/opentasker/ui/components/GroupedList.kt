@@ -1,5 +1,7 @@
 package com.opentasker.ui.components
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -513,9 +514,9 @@ fun GroupHeaderRow(
             title = { Text("Rename group") },
             text = { OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth()) },
             confirmButton = {
-                TextButton(onClick = { if (text.isNotBlank()) onRename(text.trim()); renaming = false }) { Text("Save") }
+                Button(onClick = { if (text.isNotBlank()) onRename(text.trim()); renaming = false }) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { renaming = false }) { Text("Cancel") } },
         )
     }
     if (addingSub) {
@@ -532,9 +533,9 @@ fun GroupHeaderRow(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { if (text.isNotBlank()) onAddSubgroup(text.trim()); addingSub = false }) { Text("Create") }
+                Button(onClick = { if (text.isNotBlank()) onAddSubgroup(text.trim()); addingSub = false }) { Text("Create") }
             },
-            dismissButton = { TextButton(onClick = { addingSub = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { addingSub = false }) { Text("Cancel") } },
         )
     }
 }
@@ -804,9 +805,9 @@ fun GroupPickerDialog(
         },
         confirmButton = {
             if (creating && onCreate != null) {
-                TextButton(onClick = { if (newName.isNotBlank()) onCreate(newName.trim()) }) { Text("Create") }
+                Button(onClick = { if (newName.isNotBlank()) onCreate(newName.trim()) }) { Text("Create") }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts.huawei
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -154,7 +154,7 @@ object WalkMapViewer {
                         .padding(12.dp),
                     horizontalAlignment = Alignment.End,
                 ) {
-                    TextButton(onClick = onClose) { Text(HuaweiText.walksZoomClose[lang]) }
+                    Button(onClick = onClose) { Text(HuaweiText.walksZoomClose[lang]) }
                     if (fetching) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }

@@ -90,6 +90,15 @@ fun SessionRegisterScreen(
     onRate: (Long, Int) -> Unit,
     /** `yyyyMMdd` of the morning, then its note. Empty text deletes it — see `DayNotes`. */
     onNote: (Long, String) -> Unit = { _, _ -> },
+    /**
+     * Each morning's latest weighing, `yyyyMMdd` → (epoch ms, kg) — what the weight dialog opens on.
+     */
+    weighings: Map<Long, Pair<Long, Double>> = emptyMap(),
+    /**
+     * Save a weighing at an instant, replacing the one the dialog opened on; a null kg withdraws it.
+     * Null hides the weight pill — the Hume report has no weight store.
+     */
+    onWeight: ((atMs: Long, kg: Double?, replacingMs: Long?) -> Unit)? = null,
     onBack: () -> Unit,
     onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
@@ -107,6 +116,9 @@ fun SessionRegisterScreen(
     // So the note pill inside it opens this instead, and dismissing this returns to the dialog
     // underneath with the night still chosen.
     var noting by rememberSaveable { mutableStateOf<Long?>(null) }
+    // The morning whose WEIGHT is open — stacked over the rating dialog exactly as the note is, so
+    // a past morning gets its weight from the same place it gets its rating and its note.
+    var weighing by rememberSaveable { mutableStateOf<Long?>(null) }
 
     Column(
         Modifier
@@ -173,11 +185,13 @@ fun SessionRegisterScreen(
 
                 NightsCard(r.rows, onRate = { rating = it })
 
-                rating?.takeIf { noting == null }?.let { key ->
+                rating?.takeIf { noting == null && weighing == null }?.let { key ->
                     RateNightDialog(
                         dateKey = key,
                         note = r.rows.firstOrNull { it.dateKey == key }?.note,
                         onEditNote = { noting = key },
+                        weightKg = weighings[key]?.second,
+                        onEditWeight = onWeight?.let { { weighing = key } },
                         // Straight from the store's own row, never from the night's banded marker: the
                         // dialog offers back the number 白い熊 typed, so tapping it again withdraws it
                         // rather than re-writing something adjacent to it. A day with neither a night
@@ -201,6 +215,20 @@ fun SessionRegisterScreen(
                             noting = null
                         },
                         onDismiss = { noting = null },
+                    )
+                }
+
+                weighing?.let { key ->
+                    val reading = weighings[key]
+                    WeightDialog(
+                        dateKey = key,
+                        currentKg = reading?.second,
+                        currentAtMs = reading?.first,
+                        onSave = { atMs, kg ->
+                            onWeight?.invoke(atMs, kg, reading?.first)
+                            weighing = null
+                        },
+                        onDismiss = { weighing = null },
                     )
                 }
 
@@ -1043,6 +1071,9 @@ private fun RateNightDialog(
     /** That morning's note, shown on a pill that opens its own editor. */
     note: String? = null,
     onEditNote: () -> Unit = {},
+    /** That morning's weight, on a pill that opens the weight dialog; no pill when [onEditWeight] is null. */
+    weightKg: Double? = null,
+    onEditWeight: (() -> Unit)? = null,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1114,6 +1145,9 @@ private fun RateNightDialog(
             // band recorded nothing on — which is exactly the morning most likely to need a sentence
             // rather than a number.
             NotePill(note = note, onClick = onEditNote)
+            // …and its weight, the 今朝 card's own pill: a morning missed on the scale can be filled
+            // in afterwards, like a rating or a note (白い熊, 2026-11-01).
+            onEditWeight?.let { WeightPill(kg = weightKg, onClick = it) }
             NoteText(BandText.rateClearHint[lang])
             NoteText(BandText.rateLateNote[lang])
             Text(

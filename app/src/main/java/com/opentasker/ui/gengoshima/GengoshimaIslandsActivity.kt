@@ -1,5 +1,6 @@
 package com.opentasker.ui.gengoshima
 
+import androidx.compose.material3.OutlinedButton
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -425,7 +426,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                 )
             },
             confirmButton = { Button(onClick = { discarding = null; act(s, a) }) { Text("進める / go ahead") } },
-            dismissButton = { TextButton(onClick = { discarding = null }) { Text("やめる") } },
+            dismissButton = { OutlinedButton(onClick = { discarding = null }) { Text("やめる") } },
         )
     }
     moving?.let { s ->
@@ -534,7 +535,7 @@ private fun IslandEditDialog(island: GengoshimaIslandEntity, onDismiss: () -> Un
             }
         },
         confirmButton = { Button(onClick = { onSave(en.trim(), ja.trim(), register.trim()) }, enabled = en.isNotBlank()) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 
@@ -563,7 +564,7 @@ private fun MoveDialog(targets: List<GengoshimaIslandEntity>, onDismiss: () -> U
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 
@@ -574,7 +575,7 @@ private fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, on
         title = { Text(title) },
         text = { Text(body) },
         confirmButton = { Button(onClick = onConfirm) { Text("消す / delete") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 
