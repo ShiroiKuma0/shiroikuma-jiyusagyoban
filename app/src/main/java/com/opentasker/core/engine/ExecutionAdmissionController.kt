@@ -47,6 +47,15 @@ data class ExecutionAdmissionProfileLimits(
         maxActive?.let { require(it in ProfileConcurrencyPolicy.MIN_MAX_ACTIVE..ProfileConcurrencyPolicy.MAX_MAX_ACTIVE) }
         burstLimit?.let { require(it in ProfileConcurrencyPolicy.MIN_BURST_LIMIT..ProfileConcurrencyPolicy.MAX_BURST_LIMIT) }
     }
+
+    /**
+     * Fork: a profile set to BOTH maxima is never throttled — no active cap, no burst cap, no circuit.
+     * The edge flash (通知明滅) must answer every notification; a burst of them (Jami results plus the
+     * Messēji message) tripped the burst limit, three strikes opened the circuit, and every
+     * notification for the next minute went dark (白い熊, 2026-11-01: "it must fire every time").
+     */
+    val unthrottled: Boolean
+        get() = maxActive == ProfileConcurrencyPolicy.MAX_MAX_ACTIVE && burstLimit == ProfileConcurrencyPolicy.MAX_BURST_LIMIT
 }
 
 fun Profile.toExecutionAdmissionProfileLimits(): ExecutionAdmissionProfileLimits? {
@@ -249,6 +258,14 @@ class ExecutionAdmissionController(
         val current = now()
         prune(current)
         val snapshot = snapshotLocked(current)
+        if (profileLimits?.unthrottled == true) {
+            // Still counted, so the active/burst numbers stay true for everyone else.
+            activeGlobal += 1
+            if (profileId != null) activeByProfile[profileId] = (activeByProfile[profileId] ?: 0) + 1
+            globalStarts.addLast(current)
+            profileId?.let { startsByProfile.getOrPut(it) { ArrayDeque() }.addLast(current) }
+            return@synchronized ExecutionAdmissionDecision(accepted = true, lease = ExecutionAdmissionLease(this, profileId))
+        }
         val (profileMaxActive, profileBurstLimit) = effectiveProfileLimits(profileLimits)
         var circuit = circuitState(profileId)
         if (circuit.openUntilMs > current) {

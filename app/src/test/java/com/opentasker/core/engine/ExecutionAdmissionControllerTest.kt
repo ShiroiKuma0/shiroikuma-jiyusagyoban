@@ -62,6 +62,21 @@ class ExecutionAdmissionControllerTest {
     )
 
     @Test
+    fun aProfileAtBothMaximaIsNeverThrottled() {
+        val controller = ExecutionAdmissionController(limits())
+        val unthrottled = ExecutionAdmissionProfileLimits(
+            maxActive = com.opentasker.core.model.ProfileConcurrencyPolicy.MAX_MAX_ACTIVE,
+            burstLimit = com.opentasker.core.model.ProfileConcurrencyPolicy.MAX_BURST_LIMIT,
+        )
+        // Far past every active, burst and circuit limit, and never refused.
+        repeat(100) { assertTrue(controller.tryAcquire(profileId = 9L, profileLimits = unthrottled).accepted) }
+        // One maximum alone is an ordinary override, still limited.
+        val oneMax = ExecutionAdmissionProfileLimits(maxActive = com.opentasker.core.model.ProfileConcurrencyPolicy.MAX_MAX_ACTIVE)
+        val limited = (1..100).count { controller.tryAcquire(profileId = 10L, profileLimits = oneMax).accepted }
+        assertTrue(limited < 100)
+    }
+
+    @Test
     fun globalAndPerProfileActiveCapsApplyToAllProfiles() {
         val controller = ExecutionAdmissionController(limits())
         val first = controller.tryAcquire(profileId = 7L)
