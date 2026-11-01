@@ -147,7 +147,7 @@ internal fun ContextTypePickerDialog(onDismiss: () -> Unit, onSelect: (ContextTy
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -282,7 +282,7 @@ internal fun ContextConfigDialog(
                 Text(stringResource(R.string.action_save))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 

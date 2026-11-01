@@ -818,7 +818,11 @@ class VariableExpander {
                 if (operator != null) {
                     val left = expr.substring(0, index).trim()
                     val right = expr.substring(index + operator.token.length).trim()
-                    if (left.isEmpty() || right.isEmpty()) return null
+                    // Fork: one empty side is an empty VALUE, not a non-comparison. A flow.if condition
+                    // reaches here already expanded, so `%list !~ *|3|*` with %list empty arrives as
+                    // ` !~ *|3|*`; refusing it made the whole condition plain false, and 携帯's relay
+                    // skipped every received SMS (2026-11-01). Both sides empty is still no comparison.
+                    if (left.isEmpty() && right.isEmpty()) return null
                     matches += ConditionComparison(left, operator, right)
                     // Tasker keeps a pattern in a field of its own, so once the first operator is a
                     // match, the rest is its pattern, a `<` or `==` in it included.
@@ -975,6 +979,10 @@ class VariableExpander {
     }
 
     companion object {
+        /** `%arr(%n)` — the op is exactly one variable reference, read as the index. */
+        private val INDEX_VARIABLE = Regex("%([A-Za-z0-9_]+)")
+        private val ARRAY_INDEX = Regex("\\d+")
+
         // (suffix, isSetWhenTrue) — order matters: "not_set"/"!is_set" style negatives must be
         // checked before a shorter positive suffix could partially match, though with these two
         // literal strings neither is a suffix of the other, so this is just future-proofing.

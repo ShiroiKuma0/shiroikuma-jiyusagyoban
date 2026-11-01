@@ -1,5 +1,7 @@
 package com.opentasker.ui.components
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -117,11 +118,11 @@ fun ItemNoteSection(tab: String, itemKey: String, modifier: Modifier = Modifier)
                 )
             },
             confirmButton = {
-                TextButton(onClick = { persist(newNote = text.trim(), newExpanded = true); editing = false }) {
+                Button(onClick = { persist(newNote = text.trim(), newExpanded = true); editing = false }) {
                     Text("Save")
                 }
             },
-            dismissButton = { TextButton(onClick = { editing = false }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { editing = false }) { Text("Cancel") } },
         )
     }
 }

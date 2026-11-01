@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
@@ -172,7 +172,7 @@ internal fun SyntheticTriggerSimulationDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+            Button(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
         },
     )
 }

@@ -1254,8 +1254,8 @@ private fun TaskCard(
                     onDismissRequest = { showRename = false },
                     title = { Text("Rename task") },
                     text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), singleLine = true) },
-                    confirmButton = { TextButton(onClick = { onRename(name); showRename = false }) { Text("Save") } },
-                    dismissButton = { TextButton(onClick = { showRename = false }) { Text("Cancel") } },
+                    confirmButton = { Button(onClick = { onRename(name); showRename = false }) { Text("Save") } },
+                    dismissButton = { OutlinedButton(onClick = { showRename = false }) { Text("Cancel") } },
                 )
             }
             if (expanded) {
@@ -1668,8 +1668,8 @@ private fun RowScope.ArgPill(
                 onDismissRequest = { showConfirm = false; onCancel() },
                 title = { Text("Save changes?") },
                 text = { Text("“$argKey” was edited but not saved.") },
-                confirmButton = { TextButton(onClick = { showConfirm = false; onCommit(text) }) { Text("Save") } },
-                dismissButton = { TextButton(onClick = { showConfirm = false; onCancel() }) { Text("Discard") } },
+                confirmButton = { Button(onClick = { showConfirm = false; onCommit(text) }) { Text("Save") } },
+                dismissButton = { OutlinedButton(onClick = { showConfirm = false; onCancel() }) { Text("Discard") } },
             )
         }
     } else {

@@ -462,7 +462,7 @@ object ProgressPanelManager {
      * The exemption is one of the allowances that sets `mAllowStartForeground`, so granting it is
      * the repair, and the panel stays up behind: grant → back → 保存し直す.
      *
-     * **The key is reserved for the exemption-fixable case only** (`shiroikuma-handyrss`). The same
+     * **The key is reserved for the exemption-fixable case only** (`shiroikuma-kiji`, formerly `shiroikuma-handyrss`). The same
      * call site can also fail with a missing `FOREGROUND_SERVICE` permission, or — on this phone —
      * with EMUI's アプリ起動管理 set to 自動管理, which **no app can change for itself**. Those must
      * keep a descriptive `ERROR:` line instead, because a button that does not fix the fault is
@@ -548,7 +548,7 @@ private fun isStorageAccessError(detail: String): Boolean {
  * **Matched on the reserved key alone, never on the exception text.** An app that catches
  * `Throwable` and emits the key unconditionally is the easy implementation and the one that produces
  * a useless button, so the contract reserves `no-foreground-start` for the exemption-fixable case and
- * requires every other start failure to carry a descriptive line. (`shiroikuma-handyrss`.)
+ * requires every other start failure to carry a descriptive line. (`shiroikuma-kiji`.)
  */
 private fun isForegroundStartError(detail: String): Boolean =
     "no-foreground-start" in detail.lowercase()

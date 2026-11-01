@@ -83,7 +83,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -821,13 +820,13 @@ fun ActiveAutomationUi(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                Button(onClick = {
                     exitReport = null
                     AppShutdown.finish(context, report)
                     hostActivity?.finishAndRemoveTask()
                 }) { Text("Stop everything & exit") }
             },
-            dismissButton = { TextButton(onClick = { exitReport = null }) { Text("Cancel") } },
+            dismissButton = { OutlinedButton(onClick = { exitReport = null }) { Text("Cancel") } },
         )
     }
 

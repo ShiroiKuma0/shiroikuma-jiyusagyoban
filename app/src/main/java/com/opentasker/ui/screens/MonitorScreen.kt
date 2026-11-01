@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -602,7 +603,7 @@ fun MonitorScreen(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { pickerFor = null }) { Text("Close") }
+                        OutlinedButton(onClick = { pickerFor = null }) { Text("Close") }
                     }
                 }
             }
