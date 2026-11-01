@@ -82,6 +82,7 @@ data class BundleFile(
                 cooldownSec = d.cooldownSec, automationMode = d.automationMode,
                 projectId = projId(d.projectName), position = d.position,
                 enterTaskName = d.enterTaskName, exitTaskName = d.exitTaskName,
+                maxActiveExecutions = d.maxActiveExecutions, burstLimit = d.burstLimit,
             )
         }
 
@@ -201,6 +202,7 @@ data class BundleFile(
                     exitTaskName = p.exitTaskName.ifBlank { p.exitTaskId?.let { taskNameById[it] } ?: "" },
                     cooldownSec = p.cooldownSec, automationMode = p.automationMode,
                     projectName = projName(p.projectId), position = p.position,
+                    maxActiveExecutions = p.maxActiveExecutions, burstLimit = p.burstLimit,
                 )
             }
             val variables = b.variables.map { VariableDto(it.name, it.value, projName(it.projectId)) }
@@ -294,6 +296,10 @@ data class ProfileDto(
     val automationMode: AutomationMode = AutomationMode.SINGLE,
     val projectName: String? = null,
     val position: Int = 0,
+    // Fork: the profile's admission overrides travel with it (null = the global limits). Both at their
+    // maxima make the profile unthrottled — how 通知明滅 answers every notification.
+    val maxActiveExecutions: Int? = null,
+    val burstLimit: Int? = null,
 )
 
 @Serializable

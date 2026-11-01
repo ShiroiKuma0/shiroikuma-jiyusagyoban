@@ -73,6 +73,7 @@ suspend fun executeAndLogTask(
     val admission = admissionController.tryAcquire(profileId, profileLimits)
     if (!admission.accepted) {
         val reason = admission.reason ?: "Execution admission rejected this run."
+        RunTrace.line("REFUSED '${task.name}' #${task.id} profile=${profileId ?: "-"}: $reason")
         // SILENT is for a profile that is *expected* to overflow — a fast pulse whose rejected runs
         // are noise rather than news. It suppresses the row, not the rejection itself.
         val inserted = if (overflowPolicy == ProfileOverflowPolicy.SILENT) {

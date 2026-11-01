@@ -57,7 +57,18 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         // accessibility grant — 白い熊 would have to re-enable the service by hand in system settings —
         // so the service stays bound and simply stops feeding the engine.
         if (EngineShutdown.isStopped(this)) return
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val kind = event?.eventType ?: return
+        if (kind != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && kind != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+        // Fork: the app in front is the one whose APPLICATION window holds the focus. Asked of the window
+        // list itself, so a widget, popup, toast or overlay (which fire events under their own package)
+        // cannot pass for it, and a return to the launcher counts even when it fires no Activity-named
+        // event — the miss that left %APP_PACKAGE on Messēji over the home screen, so 通知明滅 treated
+        // Messēji as "in front" and swallowed its edge flash (2026-11-01).
+        focusedAppPackage()?.let { front ->
+            recordForeground(front)
+            return
+        }
+        if (kind != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         // A window-state change is NOT proof that `pkg` came to the front. Anything that adds or replaces
         // a window inside somebody else's screen fires one tagged with its OWN package: an app widget on
@@ -73,6 +84,16 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
         val type = runCatching { windows.firstOrNull { it.id == event.windowId }?.type }.getOrNull()
         if (type != null && type != AccessibilityWindowInfo.TYPE_APPLICATION) return
         if (type == null && isIme(pkg)) return
+        recordForeground(pkg)
+    }
+
+    /** The package of the focused APPLICATION window, or null when none has the focus (shade, IME, …). */
+    private fun focusedAppPackage(): String? = runCatching {
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isFocused }
+            ?.root?.packageName?.toString()
+    }.getOrNull()?.takeIf { it.isNotBlank() && !isIme(it) }
+
+    private fun recordForeground(pkg: String) {
         val isApp = launchable.getOrPut(pkg) { packageManager.getLaunchIntentForPackage(pkg) != null }
         if (!isApp) return
         val changed: Boolean
