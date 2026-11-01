@@ -79,6 +79,7 @@ object AutomationSensitivityRegistry {
         "backup.categories",
         "backup.edititems",
         "dialog.pickmulti",
+        "dialog.form",
         "flow.fail",
         "system.get_locale",
         "task.return",
@@ -206,6 +207,9 @@ object AutomationSensitivityRegistry {
         "screenshot.take",
         "file.read",
         "file.list",
+        "provider.call",
+        "file.from_uri",
+        "sim.status",
     )
 
     private val externalTransmissionActionIds = setOf(
@@ -235,6 +239,8 @@ object AutomationSensitivityRegistry {
         "gengoshima.generate",
         "gengoshima.anki_sync",
         "gengoshima.anki_adopt",
+        "provider.call",
+        "ussd.run",
     )
 
     private val deviceControlActionIds = setOf(
@@ -335,6 +341,7 @@ object AutomationSensitivityRegistry {
         "lock",
         "screen.off",
         "wake",
+        "ussd.run",
     )
 
     private val destructiveActionIds = setOf(

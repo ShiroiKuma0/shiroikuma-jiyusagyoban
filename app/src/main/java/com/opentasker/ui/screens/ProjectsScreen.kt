@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -201,7 +202,9 @@ fun ProjectsManagementScreen(
             var rowH by remember { mutableFloatStateOf(0f) }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                // 88 dp at the bottom so the last row can scroll clear of the “+” button — it covered
+                // the bottom project's delete icon (白い熊, 2026-11-01). The scene library does the same.
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(order, key = { it.id }) { project ->
@@ -389,11 +392,11 @@ private fun ProjectEditDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank() && !nameClash) {
+            Button(onClick = { onConfirm(name.trim(), color) }, enabled = name.isNotBlank() && !nameClash) {
                 Text(if (initial == null) "Create" else "Save")
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
@@ -417,19 +420,34 @@ private fun DeleteProjectDialog(
                 },
             )
         },
+        // Pills, never bare text (白い熊, 2026-11-01). An EMPTY project has nothing to move, so its one
+        // action is plainly "Delete" — it used to show the with-items label "Move to Unfiled", which
+        // read as though deleting were not on offer at all. With items there are three answers, and
+        // Cancel is one of them: the dialog used to have no way back but a tap outside it.
         confirmButton = {
-            TextButton(onClick = onReassign) { Text("Move to Unfiled") }
-        },
-        dismissButton = {
-            if (members > 0) {
-                TextButton(
-                    onClick = onDeleteItems,
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
-                ) { Text("Delete items too") }
-            } else {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                androidx.compose.material3.OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+                if (members == 0) {
+                    androidx.compose.material3.Button(
+                        onClick = onReassign,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
+                    ) { Text("Delete") }
+                } else {
+                    androidx.compose.material3.Button(onClick = onReassign) { Text("Move items to Unfiled") }
+                    androidx.compose.material3.Button(
+                        onClick = onDeleteItems,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
+                    ) { Text("Delete items too") }
+                }
             }
         },
     )
@@ -455,7 +473,7 @@ fun ProjectPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

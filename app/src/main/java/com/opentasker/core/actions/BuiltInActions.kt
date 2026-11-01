@@ -252,16 +252,25 @@ class NotifyCancelAction : DeclaredAction(ActionCatalog.require("notify.cancel")
     }
 }
 
-/** Dismiss every clearable notification from another app, by package — needs notification access. */
+/**
+ * Dismiss every clearable notification from another app, by package — needs notification access.
+ * With "key" (a notification's %NOTIF_KEY) only that one notification goes, the app's others stay.
+ */
 class NotifyDismissAction : Action {
     override val id = "notify.dismiss"
     override val category = ActionCategory.NOTIFICATION
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val pkg = args["package"]?.trim().orEmpty()
-        if (pkg.isEmpty()) return ActionResult.Failure("Specify 'package' to dismiss notifications from")
+        val key = args["key"]?.trim().orEmpty()
+        if (pkg.isEmpty() && key.isEmpty()) return ActionResult.Failure("Specify 'package' (or 'key') to dismiss notifications from")
         val listener = NotificationTriggerService.instance
             ?: return ActionResult.Failure("Notification access not granted (listener not connected)")
+        if (key.isNotEmpty()) {
+            val one = listener.dismissKey(key)
+            ctx.logger("Dismissed $one notification with key $key")
+            return ActionResult.Success
+        }
         val n = listener.dismissPackage(pkg)
         ctx.logger("Dismissed $n notification(s) from $pkg")
         return ActionResult.Success

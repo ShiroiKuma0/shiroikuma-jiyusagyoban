@@ -15,7 +15,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -125,7 +124,7 @@ internal fun TaskerImportReviewDialog(
         // Stays enabled while busy. Disabling it left the only way out of a long import as force
         // stopping the app, because nothing held the job to cancel.
         dismissButton = {
-            TextButton(onClick = if (busy) onCancel else onDismiss) {
+            OutlinedButton(onClick = if (busy) onCancel else onDismiss) {
                 Text(stringResource(if (busy) R.string.action_stop else R.string.action_cancel))
             }
         },

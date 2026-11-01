@@ -53,6 +53,8 @@ suspend fun executeAndLogTask(
      */
     allowFallback: Boolean = true,
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
+    RunTrace.attach(appContext)
+    RunTrace.line("trigger '${task.name}' #${task.id} source=$source profile=${profileId ?: "-"}")
     // Switched off in the editor. Checked HERE, at the one place every run funnels through, so a
     // profile, a widget, `task.run`, a shortcut and the adb bridge all obey it — a gate that only
     // covered the profile path would be a switch that quietly does nothing when pressed elsewhere.

@@ -39,15 +39,27 @@ class TaskCollisionCoordinator(
     private val slots = ConcurrentHashMap<Long, Slot>()
 
     suspend fun <T> execute(task: Task, block: suspend () -> T): TaskCollisionOutcome<T> {
-        if (task.id <= 0L) return TaskCollisionOutcome.Executed(block())
-        val job = currentCoroutineContext()[Job] ?: return TaskCollisionOutcome.Executed(block())
+        val runNo = RunTrace.nextRun()
+        val who = "r$runNo '${task.name}' #${task.id} ${task.collisionMode}"
+        if (task.id <= 0L) {
+            RunTrace.line("$who UNCOORDINATED (id<=0)")
+            return TaskCollisionOutcome.Executed(block())
+        }
+        val job = currentCoroutineContext()[Job] ?: run {
+            RunTrace.line("$who UNCOORDINATED (no Job)")
+            return TaskCollisionOutcome.Executed(block())
+        }
         val slot = slots.computeIfAbsent(task.id) { Slot() }
+        val active = synchronized(slot) { slot.activeJobs.count { it.isActive } }
+        RunTrace.line("$who enter active=$active job=${System.identityHashCode(job)}")
 
-        return when (task.collisionMode) {
+        val outcome = when (task.collisionMode) {
             CollisionMode.RUN_BOTH -> runRegistered(slot, job, block = block)
             CollisionMode.WAIT -> {
                 val owner = Any()
+                val queuedAt = System.currentTimeMillis()
                 withTimeoutOrNull(waitAcquisitionTimeoutMs) { slot.waitMutex.lock(owner) }
+                RunTrace.line("$who WAIT lock=${slot.waitMutex.holdsLock(owner)} after ${System.currentTimeMillis() - queuedAt} ms")
                 // holdsLock is the authoritative post-condition: it stays correct even when the
                 // timeout fires in the window between acquiring the lock and returning.
                 if (!slot.waitMutex.holdsLock(owner)) {
@@ -92,6 +104,13 @@ class TaskCollisionCoordinator(
                 runRegistered(slot, job, alreadyRegistered = true, block = block)
             }
         }
+        RunTrace.line(
+            "$who " + when (outcome) {
+                is TaskCollisionOutcome.Executed -> "done"
+                is TaskCollisionOutcome.Skipped -> "SKIPPED: ${outcome.reason}"
+            },
+        )
+        return outcome
     }
 
     private suspend fun <T> runRegistered(

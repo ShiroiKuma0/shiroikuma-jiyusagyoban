@@ -112,10 +112,11 @@ fun registerActionMetadata() {
         ActionMetadata(
             id = "notify.dismiss",
             name = "Dismiss App Notifications",
-            description = "Cancel another app's notifications by package (needs notification access)",
+            description = "Cancel another app's notifications by package, or one notification by its key (needs notification access)",
             category = "Notification",
             fields = listOf(
                 ActionField("package", "App", FieldType.APP_PACKAGE, required = true, hint = "pick an app whose notifications to dismiss, or type a package / %var"),
+                ActionField("key", "Only this notification", hint = "%NOTIF_KEY of a notification trigger — dismiss just that one; empty = all of the app's"),
             )
         )
     )
@@ -1680,6 +1681,93 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "sim.status",
+            name = "SIM Status",
+            description = "Read one SIM slot's state: SIM present, operator, service state, signal and roaming",
+            category = "System",
+            fields = listOf(
+                ActionField("slot", "SIM slot", FieldType.NUMBER, required = true, hint = "0 = SIM1, 1 = SIM2"),
+                ActionField("prefix", "Variable prefix", hint = "default sim — writes %sim_present, %sim_state, %sim_operator, %sim_service (in_service / out_of_service / emergency_only / power_off), %sim_dbm, %sim_level (0–4), %sim_roaming, %sim_sub, %sim_number (empty when the card does not carry it), %sim_name (the SIM's name), %sim_enabled (false = switched off in the SIM settings)"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ussd.run",
+            name = "Run USSD",
+            description = "Send a USSD code from a SIM slot and store the network's answer — call forwarding (*#21#), credit, any operator code",
+            category = "System",
+            fields = listOf(
+                ActionField("slot", "SIM slot", FieldType.NUMBER, required = true, hint = "0 = SIM1, 1 = SIM2"),
+                ActionField("code", "USSD code", required = true, hint = "*#21#"),
+                ActionField("result_var", "Result variable", hint = "default ussd — the network's answer text"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "default 30, max 55"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "provider.call",
+            name = "Call Provider",
+            description = "Call another app's content provider method (e.g. 白い熊 GNU Jami's or 白い熊 メッセージ's bridge methods) and spread its answer into variables",
+            category = "App",
+            fields = listOf(
+                ActionField("authority", "Provider authority", required = true, hint = "shiroikuma.jami.automation"),
+                ActionField("method", "Method", required = true, hint = "bridge_send_text"),
+                ActionField("arg", "Argument", hint = "optional String argument"),
+                ActionField("extra1_key", "Extra 1 key", hint = "account"),
+                ActionField("extra1_value", "Extra 1 value", hint = "the account id"),
+                ActionField("extra1_type", "Extra 1 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra2_key", "Extra 2 key", hint = "conversation"),
+                ActionField("extra2_value", "Extra 2 value", hint = "the conversation id"),
+                ActionField("extra2_type", "Extra 2 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra3_key", "Extra 3 key", hint = "text"),
+                ActionField("extra3_value", "Extra 3 value", hint = "the message"),
+                ActionField("extra3_type", "Extra 3 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra4_key", "Extra 4 key"),
+                ActionField("extra4_value", "Extra 4 value"),
+                ActionField("extra4_type", "Extra 4 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra5_key", "Extra 5 key"),
+                ActionField("extra5_value", "Extra 5 value"),
+                ActionField("extra5_type", "Extra 5 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra6_key", "Extra 6 key"),
+                ActionField("extra6_value", "Extra 6 value"),
+                ActionField("extra6_type", "Extra 6 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra7_key", "Extra 7 key"),
+                ActionField("extra7_value", "Extra 7 value"),
+                ActionField("extra7_type", "Extra 7 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("extra8_key", "Extra 8 key"),
+                ActionField("extra8_value", "Extra 8 value"),
+                ActionField("extra8_type", "Extra 8 type", FieldType.DROPDOWN, hint = "blank = String; array = a String[] of |-separated items", options = listOf("", "int", "long", "float", "bool", "array")),
+                ActionField("grant_uri", "Lend files / URIs", hint = "content:// URIs or local file paths, |-separated; read access is granted to the provider's app for this call"),
+                ActionField("grant_key", "Extra carrying the lent URI(s)", hint = "default uri (Messēji: part_uris)"),
+                ActionField("grant_array", "Send them as a String[]", FieldType.CHECKBOX, hint = "on for Messēji's part_uris even with one picture; several URIs always go as a String[]"),
+                ActionField("prefix", "Variable prefix", hint = "default pc — values land as %pc_<key>; lists of records as arrays %pc_<key>_<field> plus %pc_<key>_count; files as their copied path"),
+                ActionField("file_dir", "Directory for returned files", hint = "default the app's user_files/provider"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "default 30, max 55"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "file.from_uri",
+            name = "Copy From URI",
+            description = "Copy a content URI another app lent us (a received picture) into a local file",
+            category = "File",
+            fields = listOf(
+                ActionField("uri", "URI", required = true, hint = "content://…"),
+                ActionField("dir", "Target directory", hint = "default the app's user_files/bridge"),
+                ActionField("name", "File name", hint = "default the provider's own name"),
+                ActionField("prefix", "Variable prefix", hint = "default uri — writes %uri_path, %uri_name, %uri_mime, %uri_size"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "location.mode",
             name = "Location Mode",
             description = "Turn location services on/off (via Shizuku)",
@@ -2730,6 +2818,25 @@ fun registerActionMetadata() {
                 ActionField("labels", "Labels", hint = "optional display labels, parallel to Items"),
                 ActionField("parents", "Parents", hint = "optional parent ids, parallel to Items (blank = top-level); children indent + follow their parent's toggle"),
                 ActionField("separator", "Separator", hint = "splits Items/Labels/Parents and joins the result (default: comma)"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "optional; cancel after this many seconds"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "dialog.form",
+            name = "Form Dialog",
+            description = "Many labelled settings in one dialog — text, choice (pills or drop-down), colour swatches, a live badge preview, sections and notes, each with an ⓘ explanation. Every field edits the variable it names: opens on its current value, writes back on OK only.",
+            category = "Alert",
+            fields = listOf(
+                ActionField("title", "Title", hint = "dialog title"),
+                ActionField("text", "Intro", FieldType.MULTILINE, hint = "optional line under the title"),
+                ActionField("fields", "Fields (JSON)", FieldType.MULTILINE, required = true, hint = "[{\"type\":\"text\",\"var\":\"MyName\",\"label\":\"Name\",\"info\":\"…\",\"default\":\"…\"}, {\"type\":\"choice\",\"var\":\"Mode\",\"options\":[\"a\",\"b\"]}, …] — types section, note, text, choice (options/values or options_array/values_array, none), color, badge (text/fill/ink/border = vars)"),
+                ActionField("ok", "OK label", hint = "default OK"),
+                ActionField("skip", "Skip label", hint = "optional middle button: close without saving, %<prefix>_button = skip"),
+                ActionField("cancel", "Cancel label", hint = "default Cancel"),
+                ActionField("prefix", "Result prefix", hint = "%<prefix>_button = ok / skip / cancel (default form)"),
                 ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "optional; cancel after this many seconds"),
             )
         )

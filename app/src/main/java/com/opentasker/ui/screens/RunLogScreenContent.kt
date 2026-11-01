@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -297,7 +298,7 @@ private fun RunLogRetentionCard(
             title = { Text(stringResource(R.string.run_log_clear_action)) },
             text = { Text(stringResource(R.string.run_log_clear_confirm_body)) },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         confirmClear = false
                         onClearRunLog()
@@ -307,7 +308,7 @@ private fun RunLogRetentionCard(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
+                OutlinedButton(onClick = { confirmClear = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },

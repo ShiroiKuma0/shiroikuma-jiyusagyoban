@@ -1,5 +1,6 @@
 package com.opentasker.widget
 
+import androidx.compose.material3.Button
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +43,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -205,12 +205,12 @@ private fun TaskerImportDialog(onImport: (WidgetNode) -> Unit, onDismiss: () -> 
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            Button(onClick = {
                 val node = TaskerWidgetImport.convert(pasted)
                 if (node != null) onImport(node) else error = "Couldn’t parse that as a Tasker layout."
             }) { Text("Convert") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

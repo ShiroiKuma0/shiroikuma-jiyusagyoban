@@ -151,6 +151,23 @@ class VariableStoreTest {
     }
 
     @Test
+    fun anEmptySideComparesAsAnEmptyValue() {
+        val store = VariableStore()
+        // A flow.if condition is expanded before it is parsed, so an empty variable leaves one side blank.
+        assertTrue(store.evaluateCondition(" !~ *|3|*"))
+        assertFalse(store.evaluateCondition(" ~ *|3|*"))
+        assertTrue(store.evaluateCondition(" != x"))
+        assertFalse(store.evaluateCondition(" == x"))
+        assertFalse(store.evaluateCondition("x == "))
+        assertTrue(store.evaluateCondition("x != "))
+        // Unexpanded, an empty variable still compares the same way.
+        store.set("list", "")
+        assertTrue(store.evaluateCondition("%list !~ *|3|*"))
+        store.set("list", "|3|\n")
+        assertFalse(store.evaluateCondition("%list !~ *|3|*"))
+    }
+
+    @Test
     fun conditionParserHandlesOrderedOperatorsAndLogic() {
         val store = VariableStore().apply {
             set("mode", "on")

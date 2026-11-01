@@ -33,7 +33,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -331,7 +330,7 @@ internal fun NewIslandDialog(onDismiss: () -> Unit, onCreate: (String, String) -
             }
         },
         confirmButton = { Button(onClick = { onCreate(en.trim(), register.trim()) }, enabled = en.isNotBlank()) { Text("作る") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("やめる") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("やめる") } },
     )
 }
 

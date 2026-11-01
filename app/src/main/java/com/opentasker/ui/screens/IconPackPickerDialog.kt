@@ -1,5 +1,7 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -23,7 +25,6 @@ import com.opentasker.ui.components.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -158,7 +159,7 @@ internal fun IconPackPickerDialog(onDismiss: () -> Unit, onPick: (String) -> Uni
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+            dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
         )
     } else {
         IconPackGrid(pack = current, onBack = { chosen = null }, onDismiss = onDismiss, onPick = onPick)
@@ -221,7 +222,7 @@ private fun IconPackGrid(pack: IconPack, onBack: () -> Unit, onDismiss: () -> Un
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onBack) { Text("Packs") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { Button(onClick = onBack) { Text("Packs") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }

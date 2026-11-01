@@ -709,9 +709,15 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 val withIcon = task.copy(iconPath = iconPath)
                 val reuseId = reusableTaskIds.remove(task.name.lowercase())
                 val resolvedId = if (reuseId != null) {
-                    val oldIcon = db.taskDao().getById(reuseId)?.iconPath
+                    val old = db.taskDao().getById(reuseId)
+                    val oldIcon = old?.iconPath
                     if (oldIcon != null && oldIcon != iconPath) TaskIconStore.delete(oldIcon)  // don't leak the replaced icon
-                    db.taskDao().update(withIcon.copy(id = reuseId, projectId = pid).toEntity())  // in-place: same id, new actions
+                    // Fork: an overwrite keeps the task's place on this phone. The bundle's position is the
+                    // generator's numbering; a drag renumbers a group 0, 1, 2 …, so a one-task re-import with
+                    // its absolute position collided with a sibling and the name tie-break moved it (白い熊,
+                    // 2026-11-01: 「携帯の設定 [01]」 fell below 「携帯 ⇨ 無効 [37]」 after every re-import).
+                    val keptPosition = old?.position ?: task.position
+                    db.taskDao().update(withIcon.copy(id = reuseId, projectId = pid, position = keptPosition).toEntity())  // in-place: same id, new actions
                     reuseId
                 } else {
                     val newName = uniqueName(task.name, takenTaskNames)
@@ -808,6 +814,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                     exitTaskId = remappedExitId,
                     exitTaskName = remappedExitId?.let { db.taskDao().getById(it)?.name } ?: "",
                     projectId = pid,
+                    // An overwrite keeps the profile's place on this phone (see the task loop above).
+                    position = reuseId?.let { db.profileDao().getById(it)?.position } ?: profile.position,
                 )
                 profileIdMap[profile.id] = if (reuseId != null) {
                     db.profileDao().update(remappedProfile.toEntity()); reuseId
@@ -847,7 +855,11 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 val reuseId = reusableSceneIds.remove(scene.name.lowercase())
                 val newName = if (reuseId != null) scene.name else uniqueName(scene.name, takenSceneNames)
                 val pid = remapProjectId(scene.projectId)
-                val remapped = scene.copy(id = reuseId ?: 0, name = newName, elements = remappedElements, projectId = pid)
+                val remapped = scene.copy(
+                    id = reuseId ?: 0, name = newName, elements = remappedElements, projectId = pid,
+                    // An overwrite keeps the scene's place on this phone (see the task loop above).
+                    position = reuseId?.let { db.sceneDao().getById(it)?.position } ?: scene.position,
+                )
                 sceneIdMap[scene.id] = if (reuseId != null) {
                     db.sceneDao().update(remapped.toEntity()); reuseId
                 } else {

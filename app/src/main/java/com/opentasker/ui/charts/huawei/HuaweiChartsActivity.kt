@@ -186,6 +186,8 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onRate = { night, step -> model.setFeltFor(night, step) },
                                 onNote = { morning, text -> model.setNoteFor(morning, text) },
+                                weighings = state.weightReadings.mapValues { (_, w) -> w.epochMs to w.kg },
+                                onWeight = { atMs, kg, replacingMs -> model.setWeight(atMs, kg, replacingMs) },
                                 onBack = { selected = null },
                             )
                         } else if (rehabOpen) {
@@ -322,15 +324,14 @@ class HuaweiChartsActivity : ComponentActivity() {
                         }
 
                         if (weighing) {
+                            val today = com.opentasker.core.band.RehabLog.today()
+                            val reading = state.weightReadings[today]
                             com.opentasker.ui.charts.WeightDialog(
-                                title = com.opentasker.ui.charts.AnnotationText.weightTitle[lang].format(
-                                    com.opentasker.ui.charts.nightDateFull(
-                                        com.opentasker.core.band.RehabLog.today(), lang,
-                                    ),
-                                ),
-                                current = state.weightToday,
-                                onSave = { kg ->
-                                    model.setWeight(kg)
+                                dateKey = today,
+                                currentKg = reading?.kg,
+                                currentAtMs = reading?.epochMs,
+                                onSave = { atMs, kg ->
+                                    model.setWeight(atMs, kg, reading?.epochMs)
                                     weighing = false
                                 },
                                 onDismiss = { weighing = false },

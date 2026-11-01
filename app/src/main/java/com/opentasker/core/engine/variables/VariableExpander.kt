@@ -179,9 +179,19 @@ class VariableExpander {
     private fun evaluateVarOp(name: String, op: String, store: VariableStore, arrays: ArrayStore): String {
         val baseValue = store.get(name)
 
-        if (arrays.contains(name) && baseValue == null) {
+        // text.match sets a plain %h (the whole match) beside the array h (its groups). An index or a
+        // count still means the array then — before, %h(2) fell through to the plain value and every
+        // capture group read as the whole match (白い熊's 携帯 sender came out as the full header line).
+        val arrayOp = op == "#" || ARRAY_INDEX.matches(op) || INDEX_VARIABLE.matches(op)
+        if (arrays.contains(name) && (baseValue == null || arrayOp)) {
+            // Tasker's `%arr(%n)`: an index held in a variable. Without this the op was taken as a
+            // join separator, so a loop could never read row n of a provider.call result list.
+            val indexVar = INDEX_VARIABLE.matchEntire(op)?.groupValues?.get(1)
+            val index = indexVar?.let { store.get(it)?.trim()?.toIntOrNull() }
             return when {
                 op == "#" -> arrays.length(name).toString()
+                index != null -> arrays.get(name, index)
+                indexVar != null -> ""
                 op.toIntOrNull() != null -> arrays.get(name, op.toInt())
                 op.isEmpty() -> arrays.join(name, "")
                 else -> arrays.join(name, op)
@@ -434,7 +444,11 @@ class VariableExpander {
                 if (operator != null) {
                     val left = expr.substring(0, index).trim()
                     val right = expr.substring(index + operator.token.length).trim()
-                    if (left.isEmpty() || right.isEmpty()) return null
+                    // Fork: one empty side is an empty VALUE, not a non-comparison. A flow.if condition
+                    // reaches here already expanded, so `%list !~ *|3|*` with %list empty arrives as
+                    // ` !~ *|3|*`; refusing it made the whole condition plain false, and 携帯's relay
+                    // skipped every received SMS (2026-11-01). Both sides empty is still no comparison.
+                    if (left.isEmpty() && right.isEmpty()) return null
                     matches += ConditionComparison(left, operator, right)
                     index += operator.token.length
                     continue
@@ -555,6 +569,10 @@ class VariableExpander {
     }
 
     companion object {
+        /** `%arr(%n)` — the op is exactly one variable reference, read as the index. */
+        private val INDEX_VARIABLE = Regex("%([A-Za-z0-9_]+)")
+        private val ARRAY_INDEX = Regex("\\d+")
+
         // (suffix, isSetWhenTrue) — order matters: "not_set"/"!is_set" style negatives must be
         // checked before a shorter positive suffix could partially match, though with these two
         // literal strings neither is a suffix of the other, so this is just future-proofing.

@@ -209,6 +209,7 @@ object ActionCatalog {
         define("dialog.input", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::InputDialogAction),
         define("dialog.list", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::ListDialogAction),
         define("dialog.pickmulti", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::PickListToVariableAction),
+        define("dialog.form", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::FormDialogAction),
         define("dialog.text", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TextDialogAction),
         define("scene.gestures", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SceneGesturesAction),
         define("key.bindings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::KeyBindingsAction),
@@ -217,6 +218,12 @@ object ActionCatalog {
         define("net.speedtest.cancel", ActionCategory.NET, ActionRetrySafety.IDEMPOTENT, ::CancelSpeedTestAction),
         define("sim.list", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::ReadSimsAction),
         define("sim.data.set", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SetDataSimAction),
+        define("sim.status", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SimStatusAction),
+        // NEVER: a USSD code can change network state (**21* sets call forwarding).
+        define("ussd.run", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UssdAction),
+        // NEVER: a provider method may send a message; only the target app knows.
+        define("provider.call", ActionCategory.APP, ActionRetrySafety.NEVER, ::ProviderCallAction),
+        define("file.from_uri", ActionCategory.FILE, ActionRetrySafety.IDEMPOTENT, ::CopyFromUriAction),
         define("location.get", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::GetLocationAction),
         define("location.mode", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::LocationModeAction),
         define("band.sync", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::BandSyncAction),

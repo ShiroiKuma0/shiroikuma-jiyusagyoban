@@ -343,7 +343,7 @@ private fun IdentifyDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDone) { Text(HuaweiText.facesIdentifyDone[lang]) }
+            Button(onClick = onDone) { Text(HuaweiText.facesIdentifyDone[lang]) }
         },
     )
 }
@@ -368,10 +368,10 @@ private fun ConfirmRemoveDialog(label: String, onKeep: () -> Unit, onRemove: () 
             }
         },
         confirmButton = {
-            TextButton(onClick = onRemove) { Text(HuaweiText.facesRemoveConfirmYes[lang]) }
+            Button(onClick = onRemove) { Text(HuaweiText.facesRemoveConfirmYes[lang]) }
         },
         dismissButton = {
-            TextButton(onClick = onKeep) { Text(HuaweiText.facesRemoveCancel[lang]) }
+            OutlinedButton(onClick = onKeep) { Text(HuaweiText.facesRemoveCancel[lang]) }
         },
     )
 }
