@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.Button
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -64,7 +65,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -1707,8 +1707,8 @@ private fun ColorPickerDialog(title: String, initial: Int, onDismiss: () -> Unit
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(argb) }) { Text("Apply") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = { onConfirm(argb) }) { Text("Apply") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
@@ -1788,7 +1788,7 @@ private fun FontPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        confirmButton = { Button(onClick = onDismiss) { Text("Close") } },
     )
 }
 

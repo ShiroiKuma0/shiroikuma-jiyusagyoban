@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -256,13 +255,13 @@ private fun BandClockScreen(address: String, context: Context) {
             // that opened it (白い熊, 2026-09-05).
             modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, DatePickerDefaults.shape),
             confirmButton = {
-                TextButton(onClick = {
+                Button(onClick = {
                     dateState.selectedDateMillis?.let { day = it }
                     showDate = false
                 }) { Text(HuaweiText.clockPick[lang]) }
             },
             dismissButton = {
-                TextButton(onClick = { showDate = false }) { Text(HuaweiText.clockCancel[lang]) }
+                OutlinedButton(onClick = { showDate = false }) { Text(HuaweiText.clockCancel[lang]) }
             },
         ) {
             DatePicker(state = dateState)

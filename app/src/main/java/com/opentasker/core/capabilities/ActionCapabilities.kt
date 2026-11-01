@@ -151,6 +151,10 @@ object ActionCapabilityRegistry {
         // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
         "sim.data.set" to ActionCapability(CapabilityLevel.RequiresSetup, "Switches the SIM that carries mobile data — requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
         "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
+        "sim.status" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (READ_PHONE_STATE) permission to read a SIM slot's service state and signal."),
+        "ussd.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to send a USSD code from a SIM slot."),
+        "provider.call" to ActionCapability(CapabilityLevel.Supported, "Calls another app's content provider; that app decides whether to answer us."),
+        "file.from_uri" to ActionCapability(CapabilityLevel.Supported, "Copies a content URI another app has lent us into a local file."),
         // Reads a fix through the framework LocationManager; the permission is the whole requirement.
         // Connects to the band over BLE. No pairing, no bonding and no scan — it is addressed by
         // MAC — so BLUETOOTH_CONNECT is the entire requirement.

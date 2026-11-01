@@ -49,6 +49,8 @@
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <!-- Reading the SIM slots (carrier name + subscription id) for the 接続 speed tests. -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- SIM Status reads the card's own number (携帯's settings show which SIM sits in which slot). -->
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
@@ -236,7 +238,7 @@
         <package android:name="shiroikuma.mahojutan" />
         <package android:name="shiroikuma.shutokukanri" />
         <package android:name="shiroikuma.fairemail" />
-        <package android:name="shiroikuma.handyrss" />
+        <package android:name="shiroikuma.kiji" />
         <package android:name="shiroikuma.gauguin" />
         <package android:name="shiroikuma.jinsoningen" />
         <package android:name="shiroikuma.jisho" />

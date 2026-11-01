@@ -1,5 +1,7 @@
 package com.opentasker.ui.components
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -67,11 +68,11 @@ fun RgbaColorPickerDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm("#%08X".format(argb)) }) { Text("Apply") } },
+        confirmButton = { Button(onClick = { onConfirm("#%08X".format(argb)) }) { Text("Apply") } },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onClear) { Text("Default") }
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                OutlinedButton(onClick = onClear) { Text("Default") }
+                OutlinedButton(onClick = onDismiss) { Text("Cancel") }
             }
         },
     )

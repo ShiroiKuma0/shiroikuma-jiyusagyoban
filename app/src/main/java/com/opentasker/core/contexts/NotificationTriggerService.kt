@@ -32,6 +32,14 @@ class NotificationTriggerService : NotificationListenerService() {
 
     /** Cancel every clearable active notification from [pkg]. Used by the notify.dismiss action so
      *  entering an app removes its notification (the 通知明滅 edge-light off-trigger). Returns the count. */
+    /** Cancel the one active notification whose key is [key] (from %NOTIF_KEY), if it is still there
+     *  and clearable. Returns 1 when it was cancelled, 0 otherwise. */
+    fun dismissKey(key: String): Int {
+        val active = runCatching { activeNotifications }.getOrNull() ?: return 0
+        val sbn = active.firstOrNull { it.key == key && it.isClearable } ?: return 0
+        return if (runCatching { cancelNotification(sbn.key) }.isSuccess) 1 else 0
+    }
+
     fun dismissPackage(pkg: String): Int {
         val active = runCatching { activeNotifications }.getOrNull() ?: return 0
         var n = 0
@@ -94,6 +102,7 @@ class NotificationTriggerService : NotificationListenerService() {
             ongoing = sbn.isOngoing,
             isProtected = isProtected,
             channel = sbn.notification.channelId.orEmpty(),
+            key = sbn.key.orEmpty(),
         )
         AppLogger.debug(
             TAG,

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -355,8 +356,8 @@ private fun DeadGlobalsSection(report: DeadGlobalsReport, projects: List<Project
             onDismissRequest = { confirm = false },
             title = { Text("Delete $dead dead global${if (dead == 1) "" else "s"}?") },
             text = { Text("${report.shadowCopies.size} shadow-copies + ${report.orphans.size} orphans + ${report.dangling.size} dangling (dead-project) globals. ${report.proper.size} proper globals stay; every live project copy is untouched.") },
-            confirmButton = { TextButton(onClick = { confirm = false; onCleanup() }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+            confirmButton = { Button(onClick = { confirm = false; onCleanup() }) { Text("Delete") } },
+            dismissButton = { OutlinedButton(onClick = { confirm = false }) { Text("Cancel") } },
         )
     }
 }
@@ -576,10 +577,10 @@ private fun EditVariableDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(value) }) { Text(stringResource(R.string.action_save)) }
+            Button(onClick = { onSave(value) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

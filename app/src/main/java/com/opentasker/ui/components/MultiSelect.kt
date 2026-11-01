@@ -1,5 +1,7 @@
 package com.opentasker.ui.components
 
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -95,8 +97,8 @@ fun ConfirmDeleteSelected(count: Int, noun: String, onConfirm: () -> Unit, onDis
         onDismissRequest = onDismiss,
         title = { Text("Delete $count $noun${if (count == 1) "" else "s"}?") },
         text = { Text("This permanently removes the selected ${noun}s.") },
-        confirmButton = { TextButton(onClick = onConfirm) { Text("Delete") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { Button(onClick = onConfirm) { Text("Delete") } },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 

@@ -565,6 +565,21 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
             action = PermissionAction.RuntimePermission(Manifest.permission.READ_CALENDAR),
             requiredFor = "Calendar triggers",
         ),
+        // Fork: the SIM actions (Read SIMs, SIM Status, Run USSD) and the call-state trigger read the
+        // phone state, and SIM Status also the card's own number — 携帯's settings show which SIM sits
+        // in which slot by it. Both were declared but nothing asked for them, so a new phone had them off.
+        PermissionSetupItem(
+            title = "Phone (SIMs and numbers)",
+            body = "Needed to read the SIM slots, their service state and their numbers, and the call state. 携帯 uses it to tell which SIM is in which slot.",
+            granted = hasPermission(context, Manifest.permission.READ_PHONE_STATE) &&
+                hasPermission(context, Manifest.permission.READ_PHONE_NUMBERS),
+            actionLabel = "Request",
+            action = PermissionAction.RuntimePermission(
+                Manifest.permission.READ_PHONE_STATE,
+                requestedWith = listOf(Manifest.permission.READ_PHONE_NUMBERS),
+            ),
+            requiredFor = "SIM actions, call-state trigger, 携帯",
+        ),
         PermissionSetupItem(
             title = "Overlay access",
             body = "Needed for scene overlays, freeze bubbles, and other controls displayed over other apps.",

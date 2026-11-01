@@ -23,7 +23,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -140,7 +139,7 @@ class StyledWidgetConfigActivity : ComponentActivity() {
                             OutlinedButton(onClick = { save(name, template, tapTask, layout) }, modifier = Modifier.fillMaxWidth(0.6f)) {
                                 Text("Add widget")
                             }
-                            TextButton(onClick = { finish() }) { Text("Cancel") }
+                            OutlinedButton(onClick = { finish() }) { Text("Cancel") }
                         }
                     }
                 }
