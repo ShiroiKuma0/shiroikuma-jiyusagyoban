@@ -8,6 +8,62 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+133 — 2026-11-02
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+113`.
+
+### 携帯 — SMS over Jami, the actions it needs
+
+- **Call Provider** (`provider.call`): `ContentResolver.call` on another app's provider, with up to
+  eight typed extras (an `array` extra is split on `|` into a String[], empty items kept), optional
+  read grants on content URIs, and the result flattened into variables — String[] results become
+  arrays `%<prefix>_<key>`, a list of Bundles becomes `%<prefix>_items_<field>`, and a returned file
+  descriptor is copied into a local file whose path is returned. It is how the 携帯 bundle talks to
+  白い熊 GNU Jami's and 白い熊 Messēji's caller-verified bridges.
+- **SIM Status** (`sim.status`): for a slot, the operator, service state, signal, roaming, the card's
+  number and name, and whether the card is switched off.
+- **Run USSD** (`ussd.run`): sends a USSD code on a chosen SIM and puts the reply text into a variable.
+- **Copy From URI** (`file.from_uri`): a granted content URI into a local file.
+- **Form Dialog** (`dialog.form`): one dialog with labelled text, colour, badge and choice fields, each
+  with an info note and a hint; every field is prefilled from its variable (or a default) and written
+  back only on OK; choice fields take their options from arrays and show them as pills, and a choice
+  with a blank label shows “(無題 / untitled) · <id>”.
+- **Notification trigger** passes `%NOTIF_KEY`, and **Dismiss Notification** takes a `key` to dismiss
+  that one notification.
+- **Setup** has a “Phone (SIMs and numbers)” permission row (READ_PHONE_STATE and READ_PHONE_NUMBERS).
+
+### Engine
+
+- **Run trace**: every task run and every collision decision is appended to
+  `Android/data/<package>/files/trace/run-trace.log`, capped and rotated — EMUI keeps no app log lines
+  in logcat, so this is the record of what ran and what was refused.
+- **A condition with one empty side compares as an empty value.** `%list !~ *|3|*` with `%list` empty
+  came out false, because the condition is expanded before it is parsed and the parser gave up on the
+  blank side; the relay therefore skipped every received SMS. Only a condition with both sides empty
+  still fails.
+- **`%arr(N)` reads the array** even when a plain variable of the same name exists (as `text.match`
+  leaves behind).
+- **A profile set to both maxima is never throttled** (8 active, 32 per burst): no active cap, no burst
+  cap, no circuit breaker. 通知明滅 had started only 33 of 64 notification runs when a burst of Jami
+  results and a Messēji message tripped the burst limit and the circuit shut the profile for a minute.
+  Every refusal is now written to the run trace.
+- **The foreground app follows the focused window.** The accessibility service also listens to window
+  changes and takes the package of the focused application window, so a return to the launcher no
+  longer leaves `%APP_PACKAGE` on the last app (it read Messēji over the home screen, and 通知明滅
+  swallowed Messēji's flash).
+
+### Bundles and import
+
+- **An overwritten task, profile or scene keeps its position** on the phone when a bundle is imported.
+- **Bundles carry a profile's run limits** (`maxActiveExecutions`, `burstLimit`), so the setting
+  survives export and import.
+
+### UI
+
+- **Pill buttons**: dialog text buttons across the app are filled or outlined pills.
+- **Form labels are visible** in every theme (they took the surrounding content colour).
+- **健康: weight can be entered and edited for past dates.**
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+113 — 2026-10-31
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+112`.
