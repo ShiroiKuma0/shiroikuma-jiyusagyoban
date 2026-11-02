@@ -7,7 +7,7 @@
 
 **A FOSS, Tasker-style Android automation app** — a fork of [OpenTasker](https://github.com/SysAdminDoc/OpenTasker) with major additions.
 
-**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+113`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
+**📥 Latest release: [`0.2.94+2026-09-30.11-19.ga3b4fda4+133`](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases)
 
 [![version](https://img.shields.io/badge/version-0.2.94-blue.svg)](https://github.com/ShiroiKuma0/shiroikuma-jiyusagyoban/releases/latest)
 [![license](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
@@ -31,6 +31,9 @@ It is a native **Kotlin + Jetpack Compose** automation engine — profiles bind 
 
 ### 🎯 Send Intent — fire any Android intent
 The reason this fork exists. A generic action that fires arbitrary **explicit or implicit intents** (action, data URI, MIME type, string/int/bool extras, target component, flags) — including the automation intents exposed by the sister apps (a token is optional there since v2, and one sent to an app that does not ask for it is ignored) (e.g. `白い熊 GNU Jami` / `shiroikuma.jami`: send-message, place-call, open-conversation; `白い熊 音楽` / `shiroikuma.ongaku`: favorite-track, delete-track, play-playlist). `<queries>` manifest entries make the explicit targets resolve on Android 11+.
+
+### 📨 「携帯」 — the SIMs stay home, the texts still arrive
+Carry a phone with no SIM and leave the SIM cards in phones at home: a task bundle turns those home phones into SMS relays over Jami, and the carried phone shows every text in 白い熊 Messēji as an ordinary SMS on a per-SIM pseudo-line — threads, contacts, notifications, search, replies and pictures included. The app's part is generic: **Call Provider** talks to Jami's and Messēji's caller-verified automation providers, **SIM Status** and **Run USSD** report on the cards, a **Form Dialog** holds the per-phone settings, and a **run trace** file records every task run and collision decision, because the phone keeps no app logs.
 
 ### 🖼️ Wallpapers, without the picker
 Switching to a **live wallpaper** is guarded by a `signature|privileged` permission, so the only route an app has is the system preview screen and a confirming tap — which is why the Tasker original drove that screen with AutoInput across six taps, complete with an `If`/`Else` on the system locale because the button's label follows the system language. Shell holds that permission, so with Shizuku the `wallpaper.live` action sets the component outright: under half a second, no picker, no locale branch. Without Shizuku it opens the preview and says so rather than claiming success. `wallpaper.set` covers the still side, including the **lock screen** — which the API leaves alone unless you ask for it by name.
@@ -407,18 +410,18 @@ A profile is active while **all** its contexts match. Seven families:
 
 ## Actions
 
-### Actions (217 registered + 10 engine-handled)
+### Actions (223 registered + 10 engine-handled)
 
-**217 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
+**223 built-in actions** in the registry, plus 10 the engine handles itself (the flow-control
 constructs — `flow.if`, `flow.foreach`, `flow.try` and friends — which the runner interprets rather
 than dispatching). Counted from `core/actions/ActionCatalog.kt`, not by hand: `verifyReleaseTruth`
 recomputes both figures from source and fails the build if this line drifts.
 
 > Bold = added or materially extended in this fork.
 
-**App (31)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Pick Freeze Bubbles** *(tick which launcher tasks pop a re-freeze bubble; the ones already on are pre-ticked and first)* · **Copy Launcher Shortcut** *(one tap on a launcher task's app copies it for 白い熊 雷起動盤's 「貼り付け」)* · **Backup Through The Door** *(§2a provider export onto a descriptor we open — no storage permission in the app)* · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable; `window=split_right` opens it in the right half of a split)* · **Window Mode** *(Huawei floating window / split-screen halves via Shizuku, task kept)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
+**App (32)** — **Send Intent** *(＋ `reply_via=receiver` binder-free reply channel, waits up to 600 s)* · **Call Provider** *(`ContentResolver.call` on a sister app’s automation provider — typed extras, `|`-split String[] arrays, URI grants, the result Bundle flattened into variables and arrays, a returned descriptor copied to a file)* · **Launch Intent** · Launch App · **Freeze App** · **Unfreeze App** · **Make Launcher Tasks** · **Pick Freeze Bubbles** *(tick which launcher tasks pop a re-freeze bubble; the ones already on are pre-ticked and first)* · **Copy Launcher Shortcut** *(one tap on a launcher task's app copies it for 白い熊 雷起動盤's 「貼り付け」)* · **Backup Through The Door** *(§2a provider export onto a descriptor we open — no storage permission in the app)* · **Generate Share Relays** · **Pick Apps → Variable** *(icon-tile grid, pre-ticked)* · **Pick One App → Variable** *(one-tap, restrictable; `window=split_right` opens it in the right half of a split)* · **Window Mode** *(Huawei floating window / split-screen halves via Shizuku, task kept)* · Kill App · Go Home · Next App · Previous App · Open URL · Send SMS · Call · Compose Email · List Apps · Take Screenshot · Archive App · Unarchive App · Publish Shortcut
 
-**System (35)** — **Tap by Label** *(press a control in another app by the words on it — several candidate labels, because the caption follows the phone's language)* · **Huawei watch GNSS** *(serve the watch its satellite assistance data, watch-driven)* · **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
+**System (37)** — **SIM Status** *(per slot: operator, service state, signal, roaming, the card’s number and name, switched off or not)* · **Run USSD** *(the reply text into a variable)* · **Tap by Label** *(press a control in another app by the words on it — several candidate labels, because the caption follows the phone's language)* · **Huawei watch GNSS** *(serve the watch its satellite assistance data, watch-driven)* · **Get Location** *(framework LocationManager, no Play Services; publishes the fix's age)* · **Set Data SIM** *(root-free, by slot, via Shizuku)* · **List SIMs** · **Turn Screen Off** · **Wake Device** · **Run Shell** (Shizuku) · **Show Scene** · **Hide Scene** · **Set Widget** · **Refresh Widgets** · **Flash Bubble Add / Remove / Clear** · **Flash Kill Icon Show / Hide** · Flash · Vibrate · Reboot Device · Lock Device · Set / Get Clipboard · Set Wallpaper · Set / Pick Keyboard · Profile Status · Log Message
 
 **Settings (26)** — Toggle WiFi · Toggle Bluetooth · Toggle Mobile Data · Toggle Airplane Mode · Toggle Torch · Set / Auto Brightness · Set Volume · Get Volume · Set Ringer Mode · Set Do Not Disturb · Set Screen Timeout · Location Mode · Set Tile State · **Get Locale** · **Set Locale** *(reorders the list — keeps other languages)* · **Get Device State** (battery / charging-plugged / WiFi / airplane → vars) · Get / Put Setting · WiFi Settings · Set Zen Rule · Clear Zen Rule · Temporary State *(applies a setting and restores it after a duration, surviving process death)* · Get Keyboard Info
 
@@ -430,7 +433,7 @@ recomputes both figures from source and fails the build if this line drifts.
 
 **Flow (14)** — If · Else · End If · For Each · End For · Run Task · Return Values · Stop · Fail · Wait · Comment · Try · Catch · End Try *(bounded exponential retry, `FLOW_ERROR_*` handler variables)*
 
-**File (9)** *(＋ `shared` — resolve in your own storage instead of the app sandbox)* — Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
+**File (10)** *(＋ `shared` — resolve in your own storage instead of the app sandbox)* — **Copy From URI** *(a granted content URI into a local file)* · Read · Write · Append · Move · Delete · List Files · Create Directory · Open File
 
 **Interface (8)** — Back · Recents · Lock Screen · Notifications Panel · Quick Settings · Power Dialog · Take Screenshot *(accessibility global actions)*
 
@@ -440,7 +443,7 @@ recomputes both figures from source and fails the build if this line drifts.
 
 **Notification (5)** — Show Notification *(tap-task + 3 action buttons)* · Cancel Notification · **Dismiss App Notifications** *(by package)* · Say (Text-to-Speech) · Progress Notification
 
-**Alert (6)** — Input Dialog · List Dialog · **Text Dialog** *(＋ near-fullscreen `size`, a `markup` body with headings/bold/underline and a heading-driven indent, and `text_scale`)* · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)* · **List Scene Gestures** *(which gesture on which scene runs which task)* · **List Key Bindings** *(which physical-key press runs which task, with its conditions)*
+**Alert (7)** — **Form Dialog** *(labelled text, colour, badge and choice fields in one dialog, each prefilled from its variable and written only on OK; choices from arrays in a pill picker)* · Input Dialog · List Dialog · **Text Dialog** *(＋ near-fullscreen `size`, a `markup` body with headings/bold/underline and a heading-driven indent, and `text_scale`)* · **Pick From List → Variable** *(checkbox multi-select with a 全選択 master toggle and indented sub-options)* · **List Scene Gestures** *(which gesture on which scene runs which task)* · **List Key Bindings** *(which physical-key press runs which task, with its conditions)*
 
 **Tasks (4)** — **Add Action to Task** *(idempotent, optionally re-sorting the matched block)* · **Task Exists** · **Sort Tasks** · **Edit Action**
 
