@@ -11,6 +11,11 @@ class NightScoreTest {
     private fun all(step: Int?) = NightScore.Part.entries.associateWith { step }
 
     @Test
+    fun `every cell of the score has a history page to link to`() {
+        for (part in NightScore.Part.entries) assertTrue("${part.name} has no page", part.marker != null)
+    }
+
+    @Test
     fun `the defaults sum to a hundred`() {
         assertEquals(100, NightScore.DEFAULTS.values.sum())
     }

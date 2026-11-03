@@ -257,7 +257,7 @@ private fun niceStep(range: Double): Double {
  * takes the card's own blue rather than borrowing one that means something else.
  */
 private fun markerColour(marker: RecoveryMarker): androidx.compose.ui.graphics.Color = when (marker) {
-    RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.BEDTIME_HR, RecoveryMarker.HR_SWING ->
+    RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.BEDTIME_HR, RecoveryMarker.HR_SWING, RecoveryMarker.LOWEST_HR ->
         ChartPalette.HEART_RATE
     RecoveryMarker.FELT -> ChartPalette.BAND_WARN
     RecoveryMarker.TEMPERATURE -> ChartPalette.TEMPERATURE
