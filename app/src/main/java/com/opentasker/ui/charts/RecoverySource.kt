@@ -178,6 +178,31 @@ object RecoverySource {
             .sortedBy { it.startMs }
 
     /**
+     * Every night by WHEN it happened, short ones included — the night table's rows.
+     *
+     * [nights] drops a session under [MIN_NIGHT_MINUTES] "entirely", and that is right for what it
+     * feeds: the nocturnal-HR estimator and the baselines. It was wrong for the table. On 2026-11-03
+     * 白い熊 slept 04:04–07:12 — three hours, synced, stored — and the morning's row came up empty
+     * beside the rating 白い熊 had just given it. A short night is still the night that morning
+     * followed ([SleepShape.isNightMidpoint] says so in as many words), so it gets its row; what it
+     * cannot honestly give — the four-hour window — is left out of that row, not the whole row.
+     *
+     * One per morning: the longest session ending on it, so a doze after a full night never
+     * displaces the night.
+     */
+    fun tableNights(
+        sessions: List<SleepSession>,
+        minuteOfDayOf: (Long) -> Double,
+        morningOf: (Long) -> Long,
+    ): List<SleepSession> =
+        sessions
+            .filter { it.totalMinutes > 0 }
+            .filter { SleepShape.isNightMidpoint(minuteOfDayOf(SleepShape.midpointMs(it)).toInt()) }
+            .groupBy { morningOf(it.endMs) }
+            .values.map { same -> same.maxBy { it.totalMinutes } }
+            .sortedBy { it.startMs }
+
+    /**
      * Nocturnal heart rate over the Sleep4h window — the single best-evidenced marker here.
      *
      * ## The window

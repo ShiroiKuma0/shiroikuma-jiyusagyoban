@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import com.android.tools.screenshot.PreviewTest
 import com.opentasker.ui.charts.huawei.BoardLanguage
 import com.opentasker.ui.charts.huawei.BoardSync
+import com.opentasker.ui.charts.huawei.SyncJob
+import com.opentasker.ui.charts.huawei.SyncLine
 import com.opentasker.ui.charts.huawei.HuaweiBoardScreen
 import com.opentasker.ui.charts.huawei.HuaweiBoardState
 import com.opentasker.ui.theme.OpenTaskerTheme
@@ -68,8 +70,16 @@ fun HuaweiBoardSyncingPreview() {
         Frame(
             HuaweiBoardState(
                 lang = BandLanguage.JA,
-                sync = BoardSync(phase = "履歴を読んでいます", pct = "62",
-                    records = "1137 / 1820", running = true),
+                sync = BoardSync(
+                    running = SyncJob.NORMAL, phase = "reading", percent = 62,
+                    count = "記録 31 / 49 · 標本 712",
+                    lines = listOf(
+                        SyncLine(0, "starting"), SyncLine(1, "connecting"), SyncLine(3, "handshake"),
+                        SyncLine(6, "device"), SyncLine(7, "device", "Health's reconnect"),
+                        SyncLine(19, "satellite"), SyncLine(24, "counting"), SyncLine(25, "reading"),
+                    ),
+                    startedAtMs = System.currentTimeMillis() - 31_000,
+                ),
             ),
         )
     }
@@ -86,7 +96,8 @@ fun HuaweiBoardSyncedPreview() {
                 lang = BandLanguage.EN,
                 sync = BoardSync(
                     summary = "1137 samples from 49/49 records · 104 sleep segments · 328 RR windows",
-                    running = false,
+                    last = SyncJob.NORMAL,
+                    info = SyncJob.FULL,
                 ),
             ),
         )

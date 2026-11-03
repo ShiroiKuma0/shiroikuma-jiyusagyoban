@@ -1,6 +1,6 @@
 package com.opentasker.ui.screens
 
-import androidx.compose.material3.Button
+import com.opentasker.ui.components.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,10 +44,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -429,9 +429,9 @@ private fun DeleteProjectDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                androidx.compose.material3.OutlinedButton(onClick = onDismiss) { Text("Cancel") }
+                com.opentasker.ui.components.OutlinedButton(onClick = onDismiss) { Text("Cancel") }
                 if (members == 0) {
-                    androidx.compose.material3.Button(
+                    com.opentasker.ui.components.Button(
                         onClick = onReassign,
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,
@@ -439,8 +439,8 @@ private fun DeleteProjectDialog(
                         ),
                     ) { Text("Delete") }
                 } else {
-                    androidx.compose.material3.Button(onClick = onReassign) { Text("Move items to Unfiled") }
-                    androidx.compose.material3.Button(
+                    com.opentasker.ui.components.Button(onClick = onReassign) { Text("Move items to Unfiled") }
+                    com.opentasker.ui.components.Button(
                         onClick = onDeleteItems,
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.error,

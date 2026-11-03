@@ -76,6 +76,8 @@ fun RecoveryCard(
     registerRated: Int,
     onOpenRegister: () -> Unit,
     onClick: () -> Unit,
+    /** The newest night's score and its morning key — the register's first column, at a glance. */
+    nightScore: Pair<Long, NightScore.Score>? = null,
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -89,6 +91,35 @@ fun RecoveryCard(
         // wants it should not have to travel the summary to find it. The card reads top-down as
         // "here is everything, and here is last night out of it".
         RegisterButton(registerNights, registerRated, onOpenRegister)
+
+        // The night score, the same number the register's first column prints (2026-11-03).
+        nightScore?.takeIf { it.second.value != null }?.let { (key, score) ->
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = onOpenRegister).padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    BandText.scoreOnCard[lang],
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = sectionInk,
+                )
+                Spacer(Modifier.width(8.dp))
+                ScoreChip(score)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    score.step?.let { Grade.word(it)[lang] } ?: "",
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sectionInk,
+                )
+                Text(
+                    nightDateParts(key, lang).first,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = sectionNote,
+                )
+            }
+        }
 
         if (recovery == null || !recovery.hasHeadline) {
                 NoteText(
