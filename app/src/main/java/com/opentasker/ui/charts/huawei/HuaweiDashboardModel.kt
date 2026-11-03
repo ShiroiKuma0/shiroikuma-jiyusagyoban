@@ -107,6 +107,11 @@ data class HuaweiDashboardState(
      * replaces, for today on the 今朝 card and for any past morning in the register.
      */
     val weightReadings: Map<Long, com.opentasker.core.storage.BodyWeightEntity> = emptyMap(),
+    /** 白い熊's own bedtimes, morning key → instant — see NightStarts. */
+    val nightStarts: Map<Long, Long> = emptyMap(),
+    /** 白い熊's weights for the night score — see NightScore and NightScoreWeights. */
+    val nightScoreWeights: Map<com.opentasker.ui.charts.NightScore.Part, Int> =
+        com.opentasker.ui.charts.NightScore.DEFAULTS,
     /**
      * 機能訓練 — the days the rehab was done, and what was written about them.
      *
@@ -299,6 +304,8 @@ class HuaweiDashboardModel(
             feltNote = com.opentasker.core.band.DayNotes.RECOVERY.note(appContext, morningKey),
             weightToday = weightsByDay(zone)[com.opentasker.core.band.RehabLog.today(zone)],
             weightReadings = latestWeighings(zone),
+            nightStarts = com.opentasker.core.band.NightStarts.all(appContext),
+            nightScoreWeights = com.opentasker.core.band.NightScoreWeights.all(appContext),
             // The band's own rehab sessions AND anything 白い熊 ticked by hand.
                 //
                 // A union, not a replacement (白い熊, 2026-09-04: *"the calendar will now get
@@ -387,7 +394,11 @@ class HuaweiDashboardModel(
         }
 
         val humeSessions = loadHumeSessions(zone)
-        val nights = HuaweiNights.all(db, cutoverMs, humeSessions)
+        // 白い熊's own bedtimes over the watch's, where one was authored — see NightStarts.
+        val nights = com.opentasker.ui.charts.SleepShape.withNightStarts(
+            HuaweiNights.all(db, cutoverMs, humeSessions),
+            com.opentasker.core.band.NightStarts.all(appContext),
+        ) { ms -> com.opentasker.core.band.RehabLog.dateKeyOf(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()) }
         val boundary = cutoverMs ?: Long.MAX_VALUE
         val humeNights = nights.count { it.endMs < boundary }
 
@@ -656,6 +667,21 @@ class HuaweiDashboardModel(
      */
     fun setNoteFor(morningKey: Long, text: String) {
         com.opentasker.core.band.DayNotes.RECOVERY.setNote(appContext, morningKey, text)
+        refresh()
+    }
+
+    /** Correct — or, with null, withdraw the correction of — when the night ending on [morningKey] began. */
+    /**
+     * Store the night score's weights. No rebuild: the score is computed from the register's steps
+     * at draw time, so a slider moves the column at once instead of after a reload.
+     */
+    fun setNightScoreWeights(weights: Map<com.opentasker.ui.charts.NightScore.Part, Int>) {
+        com.opentasker.core.band.NightScoreWeights.set(appContext, weights)
+        _state.value = _state.value.copy(nightScoreWeights = weights)
+    }
+
+    fun setNightStart(morningKey: Long, atMs: Long?) {
+        com.opentasker.core.band.NightStarts.set(appContext, morningKey, atMs)
         refresh()
     }
 

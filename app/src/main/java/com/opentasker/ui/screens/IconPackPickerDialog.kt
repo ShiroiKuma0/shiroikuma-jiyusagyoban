@@ -1,7 +1,7 @@
 package com.opentasker.ui.screens
 
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import com.opentasker.ui.components.Button
+import com.opentasker.ui.components.OutlinedButton
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager

@@ -96,6 +96,15 @@ class HuaweiChartsActivity : ComponentActivity() {
                         // the day dialog and returns to it, so the day must stay chosen underneath.
                         var rehabDay by rememberSaveable { mutableStateOf<Long?>(null) }
                         var notingRehab by rememberSaveable { mutableStateOf<Long?>(null) }
+                        // The night score's weights page, and where a history page opened FROM it
+                        // returns to — the register, with the page still open, not the report.
+                        var scoreWeightsOpen by rememberSaveable { mutableStateOf(false) }
+                        var markerBack by rememberSaveable { mutableStateOf<String?>(null) }
+                        // Up one level: back to whatever opened this page, else to the report.
+                        val up = {
+                            selected = markerBack
+                            markerBack = null
+                        }
 
                         // The system Back button, which until now was not wired to this screen's
                         // state at all. Every sub-screen offered a tappable header to return, and
@@ -115,7 +124,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                         // `onDismissRequest` — which is exactly what returns the note editor to the
                         // 機能訓練 day dialog underneath it rather than closing both at once.
                         androidx.activity.compose.BackHandler(enabled = selected != null) {
-                            selected = null
+                            up()
                         }
 
                         val chart = state.metrics.firstOrNull { it.spec.key == selected }
@@ -146,26 +155,26 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 values = valueOpen.second,
                                 scale = valueOpen.third,
                                 contentPadding = insets,
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (pwaOpen) {
                             HuaweiArrhythmiaDetailScreen(
                                 checks = state.arrhythmia,
                                 contentPadding = insets,
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (bpOpen) {
                             HuaweiBloodPressureDetailScreen(
                                 chart = state.bloodPressure!!,
                                 readings = state.bpReadings,
                                 contentPadding = insets,
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (ecgOpen) {
                             HuaweiEcgDetailScreen(
                                 recordings = state.ecg,
                                 contentPadding = insets,
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (sleepOpen) {
                             HuaweiSleepDetailScreen(
@@ -174,7 +183,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 cutoverMs = state.cutoverMs,
                                 contentPadding = insets,
                                 bounds = state.bounds,
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (registerOpen) {
                             // The Hume side's own register screen, unchanged. One record of 白い熊's
@@ -188,7 +197,24 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 onNote = { morning, text -> model.setNoteFor(morning, text) },
                                 weighings = state.weightReadings.mapValues { (_, w) -> w.epochMs to w.kg },
                                 onWeight = { atMs, kg, replacingMs -> model.setWeight(atMs, kg, replacingMs) },
-                                onBack = { selected = null },
+                                nightStarts = state.nightStarts,
+                                onNightStart = { morning, atMs -> model.setNightStart(morning, atMs) },
+                                scoreWeights = state.nightScoreWeights,
+                                onScoreWeights = model::setNightScoreWeights,
+                                scoreWeightsOpen = scoreWeightsOpen,
+                                onScoreWeightsOpen = { scoreWeightsOpen = it },
+                                onOpenMarker = { marker ->
+                                    markerBack = com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
+                                    selected = if (
+                                        (marker == com.opentasker.ui.charts.RecoveryMarker.BP_SYSTOLIC ||
+                                            marker == com.opentasker.ui.charts.RecoveryMarker.BP_DIASTOLIC) &&
+                                        state.bloodPressure != null
+                                    ) BP_KEY else MARKER_PREFIX + marker.name
+                                },
+                                onBack = {
+                                    scoreWeightsOpen = false
+                                    selected = null
+                                },
                             )
                         } else if (rehabOpen) {
                             val zone = java.time.ZoneId.systemDefault()
@@ -212,7 +238,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 contentPadding = insets,
                                 onTapDay = { rehabDay = com.opentasker.core.band.RehabLog
                                     .dateKeyOf(java.time.LocalDate.ofEpochDay(it)) },
-                                onBack = { selected = null },
+                                onBack = up,
                             )
                         } else if (openMarker != null) {
                             // One strip row's own history. Its own branch rather than a synthetic
@@ -221,13 +247,13 @@ class HuaweiChartsActivity : ComponentActivity() {
                             val markerZone = java.time.ZoneId.systemDefault()
                             val series = state.markerHistory[openMarker]
                             if (series == null || series.nights.isEmpty()) {
-                                selected = null
+                                up()
                             } else {
                                 com.opentasker.ui.charts.MarkerHistoryScreen(
                                     series = series,
                                     zone = markerZone,
                                     contentPadding = insets,
-                                    onBack = { selected = null },
+                                    onBack = up,
                                     // The swing's page carries the curves themselves: that is what
                                     // "the history of this shape" actually means. Twice over, and
                                     // the two answer different questions — the overlay asks whether
@@ -290,7 +316,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                             HuaweiMetricDetailScreen(
                                 chart = chart,
                                 contentPadding = insets,
-                                onBack = { selected = null },
+                                onBack = up,
                                 bounds = state.bounds,
                             )
                         }
