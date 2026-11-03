@@ -124,6 +124,12 @@ enum class RecoveryMarker {
 
     /** Steps walked in the day leading into the night. */
     STEPS,
+
+    /**
+     * The night's lowest heart rate — the table's `Low HR`, on Jensen's decades. Display-only. Added
+     * 2026-11-03 so the night score's weights page can link it to a history page of its own.
+     */
+    LOWEST_HR,
 }
 
 /** The step whose colour (yellow) a collecting skin temperature is drawn in — see [MarkerReading.temperatureCollecting]. */
@@ -206,7 +212,8 @@ data class MarkerReading(
             RecoveryMarker.DEEP, RecoveryMarker.DEEP_REM, RecoveryMarker.HRV,
             RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION, RecoveryMarker.HR_SWING,
             RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC, RecoveryMarker.RESTING_HR,
-            RecoveryMarker.SPO2, RecoveryMarker.PWV, RecoveryMarker.STEPS -> false
+            RecoveryMarker.SPO2, RecoveryMarker.PWV, RecoveryMarker.STEPS,
+            RecoveryMarker.LOWEST_HR -> false
         }
 
     /**
@@ -243,7 +250,7 @@ data class MarkerReading(
                 RecoveryMarker.BEDTIME_HR, RecoveryMarker.RESPIRATION,
                 // Higher pressure, a higher resting rate and stiffer arteries are all the worse way.
                 RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC, RecoveryMarker.RESTING_HR,
-                RecoveryMarker.PWV ->
+                RecoveryMarker.PWV, RecoveryMarker.LOWEST_HR ->
                     deviations > 0
                 // More is better for all four: time asleep, time in deep, the restorative share, and
                 // the beat-to-beat variability. A night BELOW the baseline is the worse night.
