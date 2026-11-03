@@ -232,6 +232,9 @@ fun HuaweiDashboardScreen(
                     registerRated = state.register?.rows?.count { it.felt != null } ?: 0,
                     onOpenRegister = onOpenRegister,
                     onClick = onOpenRegister,
+                    nightScore = state.register?.rows?.firstOrNull { it.night != null }?.let { row ->
+                        row.dateKey to com.opentasker.ui.charts.NightScore.score(row.night!!, state.nightScoreWeights)
+                    },
                 )
             }
         }
@@ -583,7 +586,8 @@ private fun DiagnosticsCard(state: HuaweiDashboardState) {
     }
 }
 
-private fun phaseLabel(phase: String) = when (phase) {
+/** A [com.opentasker.core.huawei.HuaweiSyncState] phase as words; also the board's sync dialog. */
+internal fun phaseLabel(phase: String) = when (phase) {
     "connecting" -> HuaweiText.phaseConnecting
     "handshake" -> HuaweiText.phaseHandshake
     "device" -> HuaweiText.phaseDevice
@@ -592,6 +596,14 @@ private fun phaseLabel(phase: String) = when (phase) {
     "writing" -> HuaweiText.phaseWriting
     "serving" -> HuaweiText.phaseServing
     "done" -> HuaweiText.phaseDone
+    "satellite" -> HuaweiText.phaseSatellite
+    "sleep" -> HuaweiText.phaseSleep
+    "dictionary" -> HuaweiText.phaseDictionary
+    "ecg" -> HuaweiText.phaseEcg
+    "pairing" -> HuaweiText.phasePairing
+    "configuring" -> HuaweiText.phaseConfiguring
+    "listing" -> HuaweiText.phaseListing
+    "workouts" -> HuaweiText.phaseWorkouts
     else -> HuaweiText.phaseStarting
 }
 

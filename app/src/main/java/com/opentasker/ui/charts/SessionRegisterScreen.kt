@@ -99,9 +99,37 @@ fun SessionRegisterScreen(
      * Null hides the weight pill — the Hume report has no weight store.
      */
     onWeight: ((atMs: Long, kg: Double?, replacingMs: Long?) -> Unit)? = null,
+    /** 白い熊's own bedtimes, morning key → instant; see `NightStarts`. */
+    nightStarts: Map<Long, Long> = emptyMap(),
+    /** Correct (or, with null, withdraw) a night's start; no pill in the dialog when null. */
+    onNightStart: ((morningKey: Long, atMs: Long?) -> Unit)? = null,
+    /** The night score's weights — see [NightScore]. */
+    scoreWeights: Map<NightScore.Part, Int> = NightScore.DEFAULTS,
+    /** Store new weights; null hides the weights pill and page (the Hume report keeps the defaults). */
+    onScoreWeights: ((Map<NightScore.Part, Int>) -> Unit)? = null,
+    /**
+     * Whether the weights page is open. Hoisted, so a history page opened from it can come back to
+     * it — this screen leaves composition while the history page is up.
+     */
+    scoreWeightsOpen: Boolean = false,
+    onScoreWeightsOpen: (Boolean) -> Unit = {},
+    /** A cell's history page, from the weights page. */
+    onOpenMarker: ((RecoveryMarker) -> Unit)? = null,
     onBack: () -> Unit,
     onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
+    if (scoreWeightsOpen && onScoreWeights != null && register != null) {
+        NightScoreWeightsPage(
+            rows = register.rows,
+            weights = scoreWeights,
+            contentPadding = contentPadding,
+            onChange = onScoreWeights,
+            onOpenMarker = onOpenMarker,
+            onBack = { onScoreWeightsOpen(false) },
+            onSwitchLanguage = onSwitchLanguage,
+        )
+        return
+    }
     BackHandler(onBack = onBack)
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -119,6 +147,15 @@ fun SessionRegisterScreen(
     // The morning whose WEIGHT is open — stacked over the rating dialog exactly as the note is, so
     // a past morning gets its weight from the same place it gets its rating and its note.
     var weighing by rememberSaveable { mutableStateOf<Long?>(null) }
+    var bedtiming by remember { mutableStateOf<Long?>(null) }
+    // The night whose score breakdown is open.
+    var scoring by remember { mutableStateOf<Long?>(null) }
+    // Every row's score, recomputed only when the rows or the weights change.
+    val scores = remember(register, scoreWeights) {
+        register?.rows.orEmpty().mapNotNull { row ->
+            row.night?.let { row.dateKey to NightScore.score(it, scoreWeights) }
+        }.toMap()
+    }
 
     Column(
         Modifier
@@ -183,15 +220,45 @@ fun SessionRegisterScreen(
                     }
                 }
 
-                NightsCard(r.rows, onRate = { rating = it })
+                // The score's month, oldest first, directly above the table it summarises.
+                NightScoreTrendCard(
+                    scores.entries.sortedBy { it.key }.map { it.key to it.value },
+                )
 
-                rating?.takeIf { noting == null && weighing == null }?.let { key ->
+                NightsCard(
+                    r.rows,
+                    scores = scores,
+                    onRate = { rating = it },
+                    onScore = { scoring = it },
+                    onOpenWeights = onScoreWeights?.let { { onScoreWeightsOpen(true) } },
+                )
+
+                scoring?.let { key ->
+                    scores[key]?.let { s ->
+                        NightScoreBreakdownDialog(
+                            dateKey = key,
+                            score = s,
+                            onOpenWeights = onScoreWeights?.let {
+                                {
+                                    scoring = null
+                                    onScoreWeightsOpen(true)
+                                }
+                            },
+                            onDismiss = { scoring = null },
+                        )
+                    }
+                }
+
+                rating?.takeIf { noting == null && weighing == null && bedtiming == null }?.let { key ->
                     RateNightDialog(
                         dateKey = key,
                         note = r.rows.firstOrNull { it.dateKey == key }?.note,
                         onEditNote = { noting = key },
                         weightKg = weighings[key]?.second,
                         onEditWeight = onWeight?.let { { weighing = key } },
+                        nightStartMs = r.rows.firstOrNull { it.dateKey == key }?.night?.startMs,
+                        nightStartAuthored = key in nightStarts,
+                        onEditNightStart = onNightStart?.let { { bedtiming = key } },
                         // Straight from the store's own row, never from the night's banded marker: the
                         // dialog offers back the number 白い熊 typed, so tapping it again withdraws it
                         // rather than re-writing something adjacent to it. A day with neither a night
@@ -229,6 +296,21 @@ fun SessionRegisterScreen(
                             weighing = null
                         },
                         onDismiss = { weighing = null },
+                    )
+                }
+
+                bedtiming?.let { key ->
+                    val night = r.rows.firstOrNull { it.dateKey == key }?.night
+                    NightStartDialog(
+                        dateKey = key,
+                        currentStartMs = night?.startMs,
+                        endMs = night?.endMs,
+                        authored = key in nightStarts,
+                        onSave = { atMs ->
+                            onNightStart?.invoke(key, atMs)
+                            bedtiming = null
+                        },
+                        onDismiss = { bedtiming = null },
                     )
                 }
 
@@ -281,7 +363,13 @@ fun SessionRegisterScreen(
  * reading is visible as an absence instead of being silently closed over.
  */
 @Composable
-private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> Unit) {
+private fun NightsCard(
+    rows: List<SessionRegister.NightRow>,
+    scores: Map<Long, NightScore.Score>,
+    onRate: (Long) -> Unit,
+    onScore: (Long) -> Unit,
+    onOpenWeights: (() -> Unit)?,
+) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -307,6 +395,12 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                 ScaleLegend(onInfo = { showBands = !showBands })
                 if (showBands) ReferenceBandsPanel()
                 RateHint()
+                // The way to the score's weights, at the table whose first column they decide.
+                onOpenWeights?.let {
+                    com.opentasker.ui.components.OutlinedButton(onClick = it) {
+                        Text("⚖  " + BandText.scoreWeightsOpen[lang])
+                    }
+                }
                 // The field names appear ONCE, as column headings. Repeating them on every line was
                 // four labels a night of pure noise, and it buried the numbers they were labelling.
                 //
@@ -351,7 +445,12 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                             topPadding = if (i == 0) 2.dp else 10.dp,
                         )
                     }
-                    NightTableRow(row, onRate = { onRate(row.dateKey) })
+                    NightTableRow(
+                        row,
+                        score = scores[row.dateKey],
+                        onRate = { onRate(row.dateKey) },
+                        onScore = { onScore(row.dateKey) },
+                    )
                     // Never under the last line of a month: the month rule below it says the same
                     // thing louder, and two rules three pixels apart read as a rendering fault.
                     val opensAMonth = i < rows.lastIndex &&
@@ -366,6 +465,13 @@ private fun NightsCard(rows: List<SessionRegister.NightRow>, onRate: (Long) -> U
                         }
                     }
                 }
+                }
+                if (scores.values.any { it.value != null && it.partial }) {
+                    Text(
+                        BandText.scorePartialMark[lang],
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = sectionNote,
+                    )
                 }
                 Text(
                     BandText.registerNightsNote[lang],
@@ -686,7 +792,12 @@ private object NightColumns {
 }
 
 @Composable
-private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
+private fun NightTableRow(
+    row: SessionRegister.NightRow,
+    score: NightScore.Score?,
+    onRate: () -> Unit,
+    onScore: () -> Unit,
+) {
     val lang = LocalBandLanguage.current
     val n = row.night
     // A Column so a written note can sit UNDER the columns rather than inside one of them.
@@ -717,6 +828,9 @@ private fun NightTableRow(row: SessionRegister.NightRow, onRate: () -> Unit) {
             maxLines = 1,
             softWrap = false,
         )
+        // The night score first (白い熊, 2026-11-03) — the row's own cells, weighted; see [NightScore].
+        // Its own tap: the breakdown, not the rating the rest of the row opens.
+        ScoreCell(score, onScore)
         // Blood pressure first (白い熊, 2026-10-25 — measured every morning now), on the ESH ladder
         // the blood-pressure bars use, each half in its own pressure's grade (2026-10-28).
         BpCell(n?.bpSystolic, n?.bpDiastolic)
@@ -929,6 +1043,20 @@ private fun WeightCell(kg: Double?) {
 /** Tall enough for a descent to have a shape, short enough not to change the row's height. */
 private val CURVE_CELL_HEIGHT = 30.dp
 
+/** The night score, `*` when partial; tapping it opens the breakdown. A dash when there is none. */
+@Composable
+private fun ScoreCell(score: NightScore.Score?, onClick: () -> Unit) {
+    val value = score?.value
+    Box(
+        if (score != null) Modifier.clickable(onClick = onClick) else Modifier,
+    ) {
+        ValueCell(
+            value?.let { "$it" + if (score.partial) "*" else "" },
+            score?.step,
+        )
+    }
+}
+
 @Composable
 private fun ValueCell(text: String?, step: Int?, compact: Boolean = false) {
     val skin = scaleSkin(step, Color.Transparent, sectionNote)
@@ -1074,6 +1202,10 @@ private fun RateNightDialog(
     /** That morning's weight, on a pill that opens the weight dialog; no pill when [onEditWeight] is null. */
     weightKg: Double? = null,
     onEditWeight: (() -> Unit)? = null,
+    /** The night's start in use, and whether it is 白い熊's correction; no pill when [onEditNightStart] is null. */
+    nightStartMs: Long? = null,
+    nightStartAuthored: Boolean = false,
+    onEditNightStart: (() -> Unit)? = null,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1148,19 +1280,15 @@ private fun RateNightDialog(
             // …and its weight, the 今朝 card's own pill: a morning missed on the scale can be filled
             // in afterwards, like a rating or a note (白い熊, 2026-11-01).
             onEditWeight?.let { WeightPill(kg = weightKg, onClick = it) }
+            // …and when the night really began, for a night the watch started late (白い熊, 2026-11-03).
+            onEditNightStart?.let { NightStartPill(startMs = nightStartMs, authored = nightStartAuthored, onClick = it) }
             NoteText(BandText.rateClearHint[lang])
             NoteText(BandText.rateLateNote[lang])
-            Text(
-                BandText.rateClose[lang],
-                Modifier
-                    .align(Alignment.End)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = sectionInk,
-            )
+            // A pill like every other action — a bare word reads as a note (白い熊, 2026-11-03).
+            com.opentasker.ui.components.OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.align(Alignment.End),
+            ) { Text(BandText.rateClose[lang]) }
         }
     }
 }

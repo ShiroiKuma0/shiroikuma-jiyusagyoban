@@ -19,10 +19,21 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.opentasker.ui.components.AlertDialog
-import androidx.compose.material3.Button
+import com.opentasker.ui.components.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.composed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -94,13 +105,39 @@ data class BoardTile(
     val reopenTask: String? = null,
 )
 
-/** What the sync dialog is showing, read live from the globals the sync action publishes. */
+/**
+ * The four things the sync dialog can start. Nothing starts on opening it (白い熊, 2026-11-03): the
+ * tile opens the dialog, and a button in it is what talks to the watch.
+ */
+enum class SyncJob { NORMAL, WORKOUTS, FULL, STATE }
+
+/** One step of a run as it happened: [atSec] after the press, a phase key and its detail. */
+data class SyncLine(val atSec: Int, val phase: String, val message: String = "")
+
+/**
+ * What the sync dialog is showing.
+ *
+ * Fed from the runner's own [com.opentasker.core.huawei.HuaweiSyncState] flow, not from the task's
+ * globals. The globals were the old source and could not work: the action writes `starting` / `0`
+ * once at the top and nothing more until the end, so the dialog sat on "starting · 0 %" for the
+ * whole fifty seconds and then jumped to the result (白い熊, 2026-11-03).
+ */
 data class BoardSync(
+    /** The job now running, or null when the dialog is idle. */
+    val running: SyncJob? = null,
+    /** The job whose result [summary] is. */
+    val last: SyncJob? = null,
     val phase: String = "",
-    val pct: String = "",
-    val records: String = "",
+    val message: String = "",
+    /** A real fraction of the work, 0–100, or null while the step has no count to measure. */
+    val percent: Int? = null,
+    /** "12 / 48 records · 300 samples" — the counter behind [percent]. */
+    val count: String = "",
+    val lines: List<SyncLine> = emptyList(),
+    val startedAtMs: Long = 0L,
     val summary: String = "",
-    val running: Boolean = false,
+    /** Which button's explanation is open under the buttons. */
+    val info: SyncJob? = null,
 )
 
 /**
@@ -145,7 +182,7 @@ data class HuaweiBoardState(
      * answers "a Huawei sync is already running" — but a button that can be pressed to be told no
      * is a button that should have been disabled.
      */
-    val anyBusy: Boolean get() = busy != null || sync?.running == true || language?.busy == true
+    val anyBusy: Boolean get() = busy != null || sync?.running != null || language?.busy == true
 }
 
 /**
@@ -191,10 +228,50 @@ val BOARD_TILES = listOf(
 
 private val BOARD_REOPEN = Loc("Show", "画面")
 private val BOARD_TITLE = Loc("Health — HUAWEI WATCH D3", "健康 — HUAWEI WATCH D3")
-private val SYNC_TITLE = Loc("Syncing", "同期しています")
+private val SYNC_TITLE = Loc("Sync", "同期")
 private val SYNC_OK = Loc("OK", "OK")
+private val SYNC_NORMAL = Loc("Sync", "同期")
+private val SYNC_WORKOUTS = Loc("Walks, lifting, rehab", "運動・重量挙げ・機能訓練")
 private val SYNC_FULL = Loc("Full sync", "全部同期")
 private val SYNC_STATE = Loc("Sync state", "同期状態")
+private val SYNC_IDLE = Loc(
+    "Nothing runs until you press a button.",
+    "ボタンを押すまで何も始まりません。",
+)
+private val SYNC_SECONDS = Loc("%d s", "%d 秒")
+
+/** What each button does — behind its ⓘ, because the names alone did not say (白い熊, 2026-11-03). */
+private val SYNC_INFO = mapOf(
+    SyncJob.NORMAL to Loc(
+        "The everyday sync: the watch's records since the last successful sync, plus the last few " +
+            "nights of sleep, the beat series, blood pressure, skin temperature, ECG and the " +
+            "satellite data the watch asks for. Tens of seconds.",
+        "ふだんの同期：前回成功してから今までの記録と、ここ数晩の睡眠・心拍の系列・血圧・皮膚温・" +
+            "心電図、それに時計が求める衛星データ。数十秒かかります。",
+    ),
+    SyncJob.WORKOUTS to Loc(
+        "The workouts the watch recorded in the last 30 days — walks with their GPS tracks, lifting " +
+            "and rehab sessions with their heart rate. A separate fetch: the everyday sync does not " +
+            "bring them. Already-stored workouts are refreshed, never doubled.",
+        "時計が記録したここ 30 日の運動 — 散歩は GPS の経路ごと、重量挙げと機能訓練は心拍ごと。" +
+            "ふだんの同期では取れない別の取り込みです。保存済みのものは上書きされ、二重にはなりません。",
+    ),
+    SyncJob.FULL to Loc(
+        "Everything the watch still holds, walked back in 24-hour windows — not only what is new " +
+            "since the last sync. Use it when the charts show gaps: records that closed after a " +
+            "sync are never asked for again by the everyday one. Safe to repeat. Takes minutes.",
+        "時計がまだ持っている履歴を全部、24 時間ずつ遡って取り込みます — 前回からの分だけではありません。" +
+            "グラフに空白があるときに。同期の後で閉じた記録はふだんの同期では二度と要求されないためです。" +
+            "何度走らせても安全。数分かかります。",
+    ),
+    SyncJob.STATE to Loc(
+        "Does not touch the watch. Checks whether syncing is keeping up: when the last success was, " +
+            "and whether the gap is longer than the warning threshold or than the history the watch " +
+            "can reach back to. Raises or clears the 「同期できていません」 notification.",
+        "時計には触れません。同期が追いついているかを確かめます — 最後の成功はいつか、その間隔が" +
+            "警告のしきい値や時計が遡れる深さを超えていないか。「同期できていません」の通知を出すか消します。",
+    ),
+)
 private val LANG_TITLE = Loc("Watch language", "時計の言語")
 
 /** Said plainly, because it is a weaker claim than the band's own answer and must read as one. */
@@ -244,7 +321,8 @@ fun HuaweiBoardScreen(
     state: HuaweiBoardState,
     contentPadding: PaddingValues,
     onRun: (BoardTile) -> Unit,
-    onSyncAction: (String) -> Unit = {},
+    onSyncAction: (SyncJob) -> Unit = {},
+    onSyncInfo: (SyncJob?) -> Unit = {},
     onCloseSync: () -> Unit = {},
     onSwitchLanguage: (BandLanguage) -> Unit = {},
     onCloseLanguage: () -> Unit = {},
@@ -376,7 +454,7 @@ fun HuaweiBoardScreen(
             )
         }
     }
-    state.sync?.let { SyncDialog(it, lang, onSyncAction, onCloseSync) }
+    state.sync?.let { SyncDialog(it, lang, onSyncAction, onSyncInfo, onCloseSync) }
     state.language?.let { LanguageDialog(it, lang, onSwitchLanguage, onCloseLanguage) }
 }
 
@@ -537,60 +615,194 @@ private fun BoardCard(
 }
 
 /**
+ * The steps a run goes through, in order — what the second, overall bar counts against.
+ *
+ * Only the record reading has an item count of its own (the watch says how many records a window
+ * holds before they are fetched); sleep, the dictionary and the ECG do not, so the overall bar moves
+ * a step at a time there and smoothly only through the records. A band that is not a watch skips
+ * the last two steps, and its bar jumps to the end — a jump forward, never a false promise.
+ */
+private val SYNC_STEPS = listOf(
+    "starting", "connecting", "handshake", "device", "satellite",
+    "counting", "reading", "writing", "sleep", "dictionary", "ecg",
+)
+private val WORKOUT_STEPS = listOf("starting", "connecting", "handshake", "device", "listing", "workouts")
+private val SYNC_STEP_OF = Loc("step %d / %d", "段階 %d / %d")
+
+/** The run's place in its whole sequence, 0–1, and the step it is on; null for a job with no steps. */
+private fun overall(sync: BoardSync): Pair<Float, Int>? {
+    val steps = when (sync.running) {
+        SyncJob.NORMAL, SyncJob.FULL -> SYNC_STEPS
+        SyncJob.WORKOUTS -> WORKOUT_STEPS
+        else -> return null
+    }
+    val at = steps.indexOf(sync.phase).takeIf { it >= 0 } ?: return null
+    val within = if (sync.phase == "reading" || sync.phase == "workouts") (sync.percent ?: 0) / 100f else 0f
+    return ((at + within) / steps.size).coerceIn(0f, 1f) to (at + 1)
+}
+
+/** A thin yellow frame around a block of the dialog. [thick] for the running portal. */
+private fun Modifier.framed(thick: Boolean = false) = composed {
+    border(
+        if (thick) 2.dp else 1.dp,
+        MaterialTheme.colorScheme.primary.copy(alpha = if (thick) 1f else 0.7f),
+        RoundedCornerShape(12.dp),
+    ).padding(horizontal = 12.dp, vertical = 10.dp)
+}
+
+/**
  * The sync, watched rather than guessed at.
  *
- * A sync takes tens of seconds over Bluetooth and the old board simply started one and closed, which
- * left 白い熊 with no way of telling a working sync from a band that never answered. The action
- * already publishes its phase, its percentage and its record count as it goes, so this reads them.
+ * A sync takes tens of seconds over Bluetooth, so every step the runner announces is kept as a line
+ * with the second it arrived at — which part is slow is then on screen rather than guessed. The
+ * lines run inside their own yellow frame, a window onto the run that scrolls itself to the newest
+ * line (白い熊, 2026-11-03). Under them two bars: the current step (filled while records are read,
+ * whose count is known up front; running while a step has nothing to count) and the whole run,
+ * counted in steps.
  *
- * 全部同期 and 同期状態 live here because they are the same job at a different depth — the full
- * backfill when the charts show gaps, and the state readout when the question is whether syncing is
- * keeping up at all. Putting them on the board would have been three cards for one idea.
+ * Every word is yellow — the dialog had blue notes and grey lines, and on this theme only yellow
+ * reads as text. An explanation behind an ⓘ sits in its own thin frame.
+ *
+ * Opening the dialog starts nothing (白い熊, 2026-11-03). The four buttons are the same job at
+ * different depths, and each carries an ⓘ that says what it does.
  */
 @Composable
 private fun SyncDialog(
     sync: BoardSync,
     lang: BandLanguage,
-    onAction: (String) -> Unit,
+    onAction: (SyncJob) -> Unit,
+    onInfo: (SyncJob?) -> Unit,
     onClose: () -> Unit,
 ) {
+    val ink = MaterialTheme.colorScheme.primary
+    // The seconds counter: ticks only while something runs.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(sync.running) {
+        while (sync.running != null) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+    val portal = rememberScrollState()
+    // Follow the newest line, the way a terminal does.
+    LaunchedEffect(sync.lines.size) { portal.animateScrollTo(portal.maxValue) }
     AlertDialog(
         // Same frame as every other dialog in the app; see the note on the faces one.
         onDismissRequest = onClose,
         title = { Text(SYNC_TITLE[lang]) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (sync.running) {
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Text(
-                            listOf(sync.phase, sync.pct.takeIf { it.isNotBlank() }?.let { "$it %" })
-                                .filterNot { it.isNullOrBlank() }.joinToString(" · "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (sync.lines.isEmpty() && sync.running == null && sync.summary.isBlank()) {
+                    Text(SYNC_IDLE[lang], style = MaterialTheme.typography.bodyMedium, color = ink)
+                }
+                if (sync.lines.isNotEmpty()) {
+                    Column(Modifier.fillMaxWidth().framed(thick = true), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 190.dp).verticalScroll(portal),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            for (line in sync.lines) {
+                                Text(
+                                    "+" + SYNC_SECONDS[lang].format(line.atSec) + "  " +
+                                        listOf(phaseLabel(line.phase)[lang], line.message)
+                                            .filter { it.isNotBlank() }.joinToString(" — "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ink,
+                                )
+                            }
+                        }
+                        if (sync.running != null) {
+                            val elapsed = ((now - sync.startedAtMs) / 1000).toInt().coerceAtLeast(0)
+                            val whole = overall(sync)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                Text(
+                                    listOf(
+                                        phaseLabel(sync.phase)[lang],
+                                        sync.percent?.let { "$it %" },
+                                        SYNC_SECONDS[lang].format(elapsed),
+                                    ).filterNot { it.isNullOrBlank() }.joinToString(" · "),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ink,
+                                )
+                            }
+                            // This step: measured while there is a count, running while there is not.
+                            val pct = sync.percent
+                            val bar = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                            if (pct != null) LinearProgressIndicator(progress = { pct / 100f }, modifier = bar)
+                            else LinearProgressIndicator(modifier = bar)
+                            if (sync.count.isNotBlank()) {
+                                Text(sync.count, style = MaterialTheme.typography.bodySmall, color = ink)
+                            }
+                            // The whole run, in steps.
+                            if (whole != null) {
+                                LinearProgressIndicator(
+                                    progress = { whole.first },
+                                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                    color = ink.copy(alpha = 0.75f),
+                                )
+                                Text(
+                                    SYNC_STEP_OF[lang].format(
+                                        whole.second,
+                                        if (sync.running == SyncJob.WORKOUTS) WORKOUT_STEPS.size else SYNC_STEPS.size,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ink,
+                                )
+                            }
+                        }
                     }
-                    if (sync.records.isNotBlank()) NoteText(sync.records)
                 }
                 if (sync.summary.isNotBlank()) {
-                    Text(
-                        sync.summary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    Text(sync.summary, style = MaterialTheme.typography.bodyMedium, color = ink)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { onAction(SYNC_FULL_TASK) },
-                        enabled = !sync.running,
-                        shape = RoundedCornerShape(10.dp),
-                    ) { Text(SYNC_FULL[lang]) }
-                    OutlinedButton(
-                        onClick = { onAction(SYNC_STATE_TASK) },
-                        enabled = !sync.running,
-                        shape = RoundedCornerShape(10.dp),
-                    ) { Text(SYNC_STATE[lang]) }
+                for (job in SyncJob.entries) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val label = when (job) {
+                            SyncJob.NORMAL -> SYNC_NORMAL
+                            SyncJob.WORKOUTS -> SYNC_WORKOUTS
+                            SyncJob.FULL -> SYNC_FULL
+                            SyncJob.STATE -> SYNC_STATE
+                        }
+                        // The everyday sync is the main pill: it is what this dialog is for.
+                        if (job == SyncJob.NORMAL) {
+                            Button(
+                                onClick = { onAction(job) },
+                                enabled = sync.running == null,
+                                modifier = Modifier.weight(1f),
+                            ) { Text(label[lang]) }
+                        } else {
+                            OutlinedButton(
+                                onClick = { onAction(job) },
+                                enabled = sync.running == null,
+                                modifier = Modifier.weight(1f),
+                            ) { Text(label[lang]) }
+                        }
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = "info",
+                            tint = ink,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onInfo(if (sync.info == job) null else job) }
+                                .padding(8.dp)
+                                .size(24.dp),
+                        )
+                    }
+                    if (sync.info == job) {
+                        Text(
+                            SYNC_INFO.getValue(job)[lang],
+                            modifier = Modifier.fillMaxWidth().framed(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ink,
+                        )
+                    }
                 }
             }
         },

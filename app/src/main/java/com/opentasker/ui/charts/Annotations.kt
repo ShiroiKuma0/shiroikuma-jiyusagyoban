@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -97,6 +98,21 @@ object AnnotationText {
     )
     val weightInvalid = Loc("A weight in kg, e.g. 134.2", "kg の数値で、例 134.2")
     val weightWhenInvalid = Loc("A real date and time, not in the future.", "正しい日付と時刻で、未来は不可。")
+    val asleepAdd = Loc("Fell asleep at…", "就寝時刻を直す")
+    val asleepAt = Loc("Fell asleep %s", "就寝 %s")
+    val asleepTitle = Loc("Fell asleep — night to %s", "就寝時刻 — %s の朝までの夜")
+    val asleepHint = Loc(
+        "When you really fell asleep, where the watch started the night late or early — tap a digit to " +
+            "overwrite it. Time before the watch's own start counts as sleep with no stage: in the night's " +
+            "length and asleep minutes, never in deep, REM or their share.",
+        "時計が夜を遅く（または早く）始めたときの、本当の就寝時刻。数字を押すと上書きできる。時計の開始より前の時間は" +
+            "段階なしの睡眠として、夜の長さと睡眠時間には入り、深い睡眠・REM・その割合には入らない。",
+    )
+    val asleepInvalid = Loc(
+        "A real date and time, before the night ended and at most 18 hours before it.",
+        "正しい日付と時刻で、夜の終わりより前、18 時間以内。",
+    )
+    val asleepWithdraw = Loc("Back to the watch's", "時計の時刻に戻す")
     /** The card that holds a walk's own answers, as opposed to the band's measurements of it. */
     val own = Loc("Your own record", "自分の記録")
     val stops = Loc("Stops", "休憩")
@@ -403,15 +419,19 @@ fun NoteDialog(
                 maxLines = 8,
                 modifier = Modifier.fillMaxWidth(),
             )
-            NoteText(AnnotationText.noteBlankDeletes[lang])
+            Text(
+                AnnotationText.noteBlankDeletes[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                color = sectionInk,
+            )
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DialogAction(AnnotationText.cancel[lang], sectionNote, onDismiss)
-                Spacer(Modifier.width(6.dp))
-                DialogAction(AnnotationText.save[lang], sectionInk) { onSave(typed) }
+                DialogAction(AnnotationText.cancel[lang], main = false, onDismiss)
+                Spacer(Modifier.width(10.dp))
+                DialogAction(AnnotationText.save[lang], main = true) { onSave(typed) }
             }
         }
     }
@@ -419,17 +439,14 @@ fun NoteDialog(
 
 /** A dialog's text action — the register's own close-button shape, shared so they match. */
 @Composable
-private fun DialogAction(text: String, ink: Color, onClick: () -> Unit) {
-    Text(
-        text,
-        Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Bold,
-        color = ink,
-    )
+private fun DialogAction(text: String, main: Boolean, onClick: () -> Unit) {
+    // Pills, not bare words (白い熊, 2026-11-03): Save the main one, Cancel a regular one — see
+    // ui/components/Pills.kt. Both in yellow; the blue Cancel read as a note, not a button.
+    if (main) {
+        com.opentasker.ui.components.Button(onClick = onClick) { Text(text) }
+    } else {
+        com.opentasker.ui.components.OutlinedButton(onClick = onClick) { Text(text) }
+    }
 }
 
 /**
@@ -528,9 +545,13 @@ fun CountPickerDialog(
                     }
                 }
             }
-            NoteText(AnnotationText.stopsClear[lang])
+            Text(
+                AnnotationText.stopsClear[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                color = sectionInk,
+            )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                DialogAction(AnnotationText.cancel[lang], sectionInk, onDismiss)
+                DialogAction(AnnotationText.cancel[lang], main = false, onDismiss)
             }
         }
     }
@@ -584,7 +605,8 @@ fun parseWeightKg(typed: String): Double? =
  * Ask for a weight in kg, and when it was taken — [NoteDialog]'s shape, with a number pad.
  *
  * Opens on [dateKey]'s reading when there is one ([currentKg] at [currentAtMs]), so a second weighing
- * is an edit of a number in place; a day with none opens at **07:00**, the time 白い熊 weighs (2026-11-01).
+ * is an edit of a number in place; today with none opens at the current minute, a past day at **07:00**,
+ * the time 白い熊 weighs (2026-11-01).
  * The same dialog serves today's pill and any past morning in the register, so the date is editable
  * here too, not only the time.
  *
@@ -609,7 +631,13 @@ fun WeightDialog(
     var digits by rememberSaveable {
         val start = currentAtMs?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime() }
             ?: java.time.LocalDate.of((dateKey / 10_000L).toInt(), ((dateKey / 100L) % 100L).toInt(), (dateKey % 100L).toInt())
-                .atTime(7, 0)
+                .let { day ->
+                    // Today opens at the minute it is now — a weighing being entered as it happens;
+                    // 07:00 on today's pill was a time 白い熊 then had to correct (2026-11-03).
+                    // A past morning has no "now", so it keeps the usual weighing time.
+                    val now = java.time.LocalDateTime.now(zone)
+                    if (day == now.toLocalDate()) now.withSecond(0).withNano(0) else day.atTime(7, 0)
+                }
         mutableStateOf(start.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmm")))
     }
     val chosen = weighingTimeOf(digits)
@@ -700,15 +728,19 @@ fun WeightDialog(
                     color = ANNOTATION_INK,
                 )
             }
-            NoteText(AnnotationText.weightHint[lang])
+            Text(
+                AnnotationText.weightHint[lang],
+                style = MaterialTheme.typography.bodyMedium,
+                color = sectionInk,
+            )
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DialogAction(AnnotationText.cancel[lang], sectionNote, onDismiss)
-                Spacer(Modifier.width(6.dp))
-                DialogAction(AnnotationText.save[lang], sectionInk) { save() }
+                DialogAction(AnnotationText.cancel[lang], main = false, onDismiss)
+                Spacer(Modifier.width(10.dp))
+                DialogAction(AnnotationText.save[lang], main = true) { save() }
             }
         }
     }
@@ -771,4 +803,135 @@ private fun DigitBox(
             }
         },
     )
+}
+
+/**
+ * The night's own start, on a pill in the night dialog — the weight pill's shape. Shows the start in
+ * use; [authored] says whether that is 白い熊's correction or still the watch's.
+ */
+@Composable
+fun NightStartPill(startMs: Long?, authored: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val lang = LocalBandLanguage.current
+    val ink = if (authored) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
+    val clock = startMs?.let {
+        java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    }
+    Row(
+        modifier
+            .clip(RoundedCornerShape(100.dp))
+            .border(1.5.dp, ink, RoundedCornerShape(100.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(Icons.Filled.Bedtime, contentDescription = AnnotationText.asleepAdd[lang], tint = ink, modifier = Modifier.size(20.dp))
+        Text(
+            if (authored && clock != null) AnnotationText.asleepAt[lang].format(clock) else AnnotationText.asleepAdd[lang],
+            style = if (authored) MaterialTheme.typography.bodyLarge
+            else MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
+            fontWeight = if (authored) FontWeight.Bold else FontWeight.Normal,
+            color = ink,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * When 白い熊 really fell asleep, for the night ending on the morning [dateKey] — the weight dialog's
+ * digit boxes, date and time, so a bedtime before midnight is as easy as one after it.
+ *
+ * Opens on the start in use ([currentStartMs]): the correction if there is one, else the watch's own.
+ * Save hands back the instant; a time that is not real, not before the night's end ([endMs]) or more
+ * than 18 hours before it keeps the dialog open. [authored] adds the way back to the watch's start.
+ */
+@Composable
+fun NightStartDialog(
+    dateKey: Long,
+    currentStartMs: Long?,
+    endMs: Long?,
+    authored: Boolean,
+    onSave: (atMs: Long?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val lang = LocalBandLanguage.current
+    val zone = remember { java.time.ZoneId.systemDefault() }
+    var invalid by rememberSaveable { mutableStateOf(false) }
+    var digits by rememberSaveable {
+        val start = currentStartMs?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime() }
+            ?: java.time.LocalDate.of((dateKey / 10_000L).toInt(), ((dateKey / 100L) % 100L).toInt(), (dateKey % 100L).toInt())
+                .atTime(0, 0)
+        mutableStateOf(start.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmm")))
+    }
+    val boxes = remember { List(12) { FocusRequester() } }
+    fun save() {
+        val at = weighingTimeOf(digits)?.atZone(zone)?.toInstant()?.toEpochMilli()
+        val end = endMs ?: System.currentTimeMillis()
+        if (at == null || at >= end || at < end - 18 * 3_600_000L) { invalid = true; return }
+        onSave(at)
+    }
+    fun box(i: Int, width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp): @Composable () -> Unit = {
+        DigitBox(
+            digit = digits[i],
+            focus = boxes[i],
+            width = width,
+            height = height,
+            onDigit = { c ->
+                digits = digits.substring(0, i) + c + digits.substring(i + 1)
+                invalid = false
+                runCatching { if (i < 11) boxes[i + 1].requestFocus() }
+            },
+        )
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.5.dp, sectionInk, RoundedCornerShape(18.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                AnnotationText.asleepTitle[lang].format(nightDateFull(dateKey, lang)),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = sectionInk,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                for (i in 0..3) box(i, 32.dp, 40.dp)()
+                BoxSeparator("-")
+                for (i in 4..5) box(i, 32.dp, 40.dp)()
+                BoxSeparator("-")
+                for (i in 6..7) box(i, 32.dp, 40.dp)()
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                for (i in 8..9) box(i, 44.dp, 44.dp)()
+                BoxSeparator(":")
+                for (i in 10..11) box(i, 44.dp, 44.dp)()
+            }
+            if (invalid) {
+                Text(AnnotationText.asleepInvalid[lang], style = MaterialTheme.typography.bodyMedium, color = ANNOTATION_INK)
+            }
+            Text(AnnotationText.asleepHint[lang], style = MaterialTheme.typography.bodyMedium, color = sectionInk)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (authored) DialogAction(AnnotationText.asleepWithdraw[lang], main = false) { onSave(null) }
+                DialogAction(AnnotationText.cancel[lang], main = false, onDismiss)
+                DialogAction(AnnotationText.save[lang], main = true) { save() }
+            }
+        }
+    }
+    // The 2-digit hour first: the date is almost always right, the time is what is being corrected.
+    androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { boxes[8].requestFocus() } }
 }

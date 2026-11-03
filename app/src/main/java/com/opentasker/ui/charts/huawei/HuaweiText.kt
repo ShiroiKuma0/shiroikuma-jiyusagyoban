@@ -559,6 +559,14 @@ object HuaweiText {
     val phaseWriting = Loc("writing", "書き込み中")
     val phaseServing = Loc("answering the watch", "時計に応答中")
     val phaseDone = Loc("done", "完了")
+    val phaseSatellite = Loc("satellite data", "衛星データ")
+    val phaseSleep = Loc("sleep and beats", "睡眠と心拍")
+    val phaseDictionary = Loc("blood pressure, temperature, daily summary", "血圧・皮膚温・一日のまとめ")
+    val phaseEcg = Loc("ECG", "心電図")
+    val phasePairing = Loc("pairing", "ペアリング中")
+    val phaseConfiguring = Loc("configuring", "設定中")
+    val phaseListing = Loc("listing workouts", "運動の一覧を取得中")
+    val phaseWorkouts = Loc("fetching workouts", "運動を取得中")
 
     /**
      * Worded as a FLOOR and as ONE sync's reach. It is the deepest the watch has answered from in a

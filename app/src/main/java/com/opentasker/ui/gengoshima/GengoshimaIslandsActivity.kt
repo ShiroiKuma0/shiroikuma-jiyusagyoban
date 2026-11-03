@@ -1,6 +1,6 @@
 package com.opentasker.ui.gengoshima
 
-import androidx.compose.material3.OutlinedButton
+import com.opentasker.ui.components.OutlinedButton
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -36,7 +36,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.Button
+import com.opentasker.ui.components.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue

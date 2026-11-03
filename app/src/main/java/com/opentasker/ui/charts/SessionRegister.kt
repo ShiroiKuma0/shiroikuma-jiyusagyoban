@@ -261,9 +261,11 @@ object SessionRegister {
      */
     fun readNights(
         history: List<RecoverySource.NightMetrics>,
+        /** Whether a night may serve as a baseline for the ones after it; a short night may not. */
+        inBaseline: (RecoverySource.NightMetrics) -> Boolean = { true },
         feltFor: (RecoverySource.NightMetrics) -> Double?,
     ): List<NightReading> = history.indices.map { i ->
-        val prior = history.subList(maxOf(0, i - Recovery.BASELINE_NIGHTS), i)
+        val prior = history.subList(0, i).filter(inBaseline).takeLast(Recovery.BASELINE_NIGHTS)
         val night = history[i]
         // The SAME construction the strip and the 回復 card use for last night, so a night carries
         // one grade per number whichever screen it is read on (2026-10-25).
