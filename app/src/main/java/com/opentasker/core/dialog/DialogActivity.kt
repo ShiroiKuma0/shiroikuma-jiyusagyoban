@@ -1,7 +1,7 @@
 package com.opentasker.core.dialog
 
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import com.opentasker.ui.components.Button
+import com.opentasker.ui.components.OutlinedButton
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent

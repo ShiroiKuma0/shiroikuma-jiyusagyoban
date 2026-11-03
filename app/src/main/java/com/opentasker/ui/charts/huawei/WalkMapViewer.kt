@@ -1,6 +1,6 @@
 package com.opentasker.ui.charts.huawei
 
-import androidx.compose.material3.Button
+import com.opentasker.ui.components.Button
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures

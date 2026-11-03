@@ -34,6 +34,8 @@ data class SleepSession(
     val light: Int get() = minutesOf('2')
     val rem: Int get() = minutesOf('3')
     val awake: Int get() = minutesOf('5')
+    /** Asleep with no stage — the authored stretch before the watch began scoring; see [SleepShape.withNightStarts]. */
+    val unstaged: Int get() = minutesOf(SleepShape.UNSTAGED)
 
     /**
      * Deep + REM as a share of the session — the "restorative" fraction the index uses.
@@ -42,7 +44,7 @@ data class SleepSession(
      * night genuinely does make the night less restorative, and excluding it would flatter exactly
      * the nights worth noticing.
      */
-    val deepRemShare: Double? get() = totalMinutes.takeIf { it > 0 }?.let { (deep + rem).toDouble() / it }
+    val deepRemShare: Double? get() = (totalMinutes - unstaged).takeIf { it > 0 }?.let { (deep + rem).toDouble() / it }
 }
 
 /** One stored segment, already converted to epoch millis by the caller. */
@@ -187,6 +189,45 @@ object SleepShape {
         '2' -> Loc("Light", "浅い")
         '3' -> Loc("REM", "REM")
         '5' -> Loc("Awake", "覚醒")
+        UNSTAGED -> Loc("Asleep, unstaged", "睡眠（段階なし）")
         else -> Loc("Unknown", "不明")
     }
+
+    /**
+     * Asleep, stage unknown. Counted as sleep, never as a stage: it is in the night's length and
+     * its asleep minutes, and out of every stage figure and the deep+REM share's denominator — a
+     * share diluted by minutes nobody staged would be a share the watch never measured. Not drawn on
+     * the hypnogram, which has no row for "no stage".
+     */
+    const val UNSTAGED = '0'
+
+    /**
+     * Apply 白い熊's own bedtimes ([com.opentasker.core.band.NightStarts]) to the stitched nights.
+     *
+     * [starts] maps the morning a night ended on (`yyyyMMdd`, via [morningOf]) to when 白い熊 fell
+     * asleep. Earlier than the watch's start: the gap is added as [UNSTAGED] sleep. Later: the runs
+     * before it are cut off. A bedtime that is not before the night's end, or lies more than 18 hours
+     * before it, is not a bedtime for that night and is ignored rather than stretching the night
+     * into the previous day.
+     */
+    fun withNightStarts(
+        sessions: List<SleepSession>,
+        starts: Map<Long, Long>,
+        morningOf: (Long) -> Long,
+    ): List<SleepSession> {
+        if (starts.isEmpty()) return sessions
+        return sessions.map { s ->
+            val at = starts[morningOf(s.endMs)] ?: return@map s
+            when {
+                at >= s.endMs || at < s.endMs - MAX_AUTHORED_NIGHT_MS || at == s.startMs -> s
+                at < s.startMs -> SleepSession(at, s.endMs, listOf(SleepRun(at, s.startMs, UNSTAGED)) + s.runs)
+                else -> SleepSession(
+                    at, s.endMs,
+                    s.runs.filter { it.endMs > at }.map { if (it.startMs < at) it.copy(startMs = at) else it },
+                )
+            }
+        }
+    }
+
+    private const val MAX_AUTHORED_NIGHT_MS = 18 * 3_600_000L
 }
