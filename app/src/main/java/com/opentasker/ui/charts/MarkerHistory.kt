@@ -56,7 +56,7 @@ object MarkerHistory {
                 RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.BEDTIME_HR, RecoveryMarker.TEMPERATURE,
                 RecoveryMarker.FELT, RecoveryMarker.RESPIRATION,
                 RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC, RecoveryMarker.RESTING_HR,
-                RecoveryMarker.PWV -> false
+                RecoveryMarker.PWV, RecoveryMarker.LOWEST_HR -> false
             }
             return nights.sortedBy { if (higherIsBetter) -it.value else it.value }.take(n)
         }

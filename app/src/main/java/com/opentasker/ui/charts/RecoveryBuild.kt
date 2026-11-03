@@ -408,11 +408,18 @@ object RecoveryBuild {
         val graded = history.indices.map { i ->
             readingsFor(history[i], history.subList(maxOf(0, i - Recovery.BASELINE_NIGHTS), i)) { null }
         }
-        fun series(marker: RecoveryMarker, pick: (RecoverySource.NightMetrics) -> Double?) =
+        fun series(
+            marker: RecoveryMarker,
+            /** The night's grade when the marker has no banded reading — the table's own ladder. */
+            grade: ((Double) -> Int)? = null,
+            pick: (RecoverySource.NightMetrics) -> Double?,
+        ) =
             marker to MarkerHistory.Series(
                 marker = marker,
                 nights = history.mapIndexedNotNull { i, n ->
-                    pick(n)?.let { MarkerHistory.Night(n.endMs, it, graded[i].of(marker)?.displayStep) }
+                    pick(n)?.let {
+                        MarkerHistory.Night(n.endMs, it, grade?.invoke(it) ?: graded[i].of(marker)?.displayStep)
+                    }
                 },
                 latest = markers[marker],
             )
@@ -433,6 +440,8 @@ object RecoveryBuild {
             series(RecoveryMarker.SPO2) { it.spo2 },
             series(RecoveryMarker.PWV) { it.pwv },
             series(RecoveryMarker.STEPS) { it.steps },
+            // The table's Low HR, graded on the ladder the table colours it with.
+            series(RecoveryMarker.LOWEST_HR, RecoveryReference::lowestHrStep) { it.lowestHr },
         ).toMap()
     }
 

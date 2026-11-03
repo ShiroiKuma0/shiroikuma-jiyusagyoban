@@ -578,6 +578,7 @@ fun markerLabel(m: RecoveryMarker): Loc = when (m) {
     RecoveryMarker.HR_SWING -> BandText.markerHrSwing
     RecoveryMarker.BP_SYSTOLIC -> BandText.markerBpSystolic
     RecoveryMarker.BP_DIASTOLIC -> BandText.markerBpDiastolic
+    RecoveryMarker.LOWEST_HR -> BandText.markerLowestHr
     RecoveryMarker.RESTING_HR -> BandText.markerRestingHr
     RecoveryMarker.SPO2 -> BandText.markerSpo2
     RecoveryMarker.PWV -> BandText.markerPwv
@@ -793,7 +794,8 @@ fun markerValue(marker: RecoveryMarker, v: Double, lang: BandLanguage, unit: Boo
         RecoveryMarker.HR_SWING -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
         RecoveryMarker.BP_SYSTOLIC, RecoveryMarker.BP_DIASTOLIC ->
             if (unit) "${v.roundToInt()} mmHg" else "${v.roundToInt()}"
-        RecoveryMarker.RESTING_HR -> if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
+        RecoveryMarker.RESTING_HR, RecoveryMarker.LOWEST_HR ->
+            if (unit) "${v.roundToInt()} bpm" else "${v.roundToInt()}"
         RecoveryMarker.SPO2 -> if (unit) "${v.roundToInt()} %" else "${v.roundToInt()}"
         RecoveryMarker.PWV -> if (unit) String.format("%.1f m/s", v) else String.format("%.1f", v)
         RecoveryMarker.STEPS -> String.format(java.util.Locale.US, "%,d", v.roundToInt())
