@@ -8,6 +8,18 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+140 — 2026-11-03
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+139`.
+
+### 健康
+
+- **Lowest heart rate has its own history page.** The night table's `Low HR` was the one cell of the
+  night score with no page behind it, so its **Graph** pill on the score weights page was missing. It
+  is now a marker of its own (`LOWEST_HR`): each night's lowest heart rate in bpm, in the heart-rate
+  colour, graded on Jensen's decades exactly as the table's cell is. Display-only — it is never
+  counted by the 回復 headline. A test fails if any score cell is left without a history page.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+139 — 2026-11-03
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+133`.
