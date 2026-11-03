@@ -469,6 +469,8 @@ object BandText {
     val regColWeight = Loc("Weight", "体重")
     /** The night score's column — see [NightScore]. */
     val regColScore = Loc("Score", "点数")
+    /** The table's Low HR as a history page of its own (2026-11-03). */
+    val markerLowestHr = Loc("Lowest heart rate", "最低心拍")
 
     // ---- 夜の点数 — the night score (2026-11-03) ------------------------------------------
     val scoreTrendTitle = Loc("Night score", "夜の点数")

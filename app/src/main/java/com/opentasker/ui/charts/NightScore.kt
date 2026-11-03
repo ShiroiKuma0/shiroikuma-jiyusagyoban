@@ -144,7 +144,7 @@ object NightScore {
                     "thing twice.",
                 "夜の最低心拍、Jensen の 10 拍区分で。良い体力の指標だが夜間心拍と大きく重なる。両方を全量で数えると同じものを二度量ることになる。",
             ),
-            null,
+            RecoveryMarker.LOWEST_HR,
         ),
         HRV(
             BandText.regColHrv, 14,

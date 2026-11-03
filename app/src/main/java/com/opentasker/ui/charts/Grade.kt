@@ -49,6 +49,7 @@ object Grade {
         RecoveryMarker.SLEEP -> RecoveryReference.sleepStep(value)
         RecoveryMarker.NOCTURNAL_HR, RecoveryMarker.RESTING_HR -> RecoveryReference.nocturnalHrStep(value)
         RecoveryMarker.SPO2 -> RecoveryReference.spo2Step(value)
+        RecoveryMarker.LOWEST_HR -> RecoveryReference.lowestHrStep(value)
         RecoveryMarker.BP_SYSTOLIC -> BpGrade.ofSystolic(value)
         RecoveryMarker.BP_DIASTOLIC -> BpGrade.ofDiastolic(value)
         RecoveryMarker.HRV -> HealthIndex.step(HealthIndex.hrvScore(value))
