@@ -28,7 +28,7 @@ class HuaweiBoardStateTest {
 
     @Test
     fun `a sync in flight makes the board busy, with no task handed over`() {
-        val state = HuaweiBoardState(sync = BoardSync(phase = "接続しています", running = true))
+        val state = HuaweiBoardState(sync = BoardSync(phase = "connecting", running = SyncJob.NORMAL))
         assertTrue(
             "a running sync is in flight whether or not a task is also open",
             state.anyBusy,
@@ -44,7 +44,7 @@ class HuaweiBoardStateTest {
      */
     @Test
     fun `a finished sync still on screen does not hold the board`() {
-        val state = HuaweiBoardState(sync = BoardSync(summary = "1137 samples", running = false))
+        val state = HuaweiBoardState(sync = BoardSync(summary = "1137 samples", last = SyncJob.NORMAL))
         assertFalse(state.anyBusy)
     }
 

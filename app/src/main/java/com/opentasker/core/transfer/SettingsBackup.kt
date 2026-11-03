@@ -248,6 +248,10 @@ object SettingsBackup {
             // is explicit on purpose, so a store nobody adds to it is a store that silently does not
             // survive a restore — which is exactly what happened to `shutdown_settings`.
             "walk_notes", "lift_notes",
+            // When 白い熊 really fell asleep, where the watch began the night late (2026-11-03).
+            "night_starts",
+            // 白い熊's own weights for the night score, where moved off their defaults (2026-11-03).
+            "night_score_weights",
             "training_sessions", "band_settings", "huawei_band_settings",
             // The 健康 board's own tile arrangement. Small, authored, and un-recreatable by any
             // device — 白い熊 dragged those tiles into that order for a reason.

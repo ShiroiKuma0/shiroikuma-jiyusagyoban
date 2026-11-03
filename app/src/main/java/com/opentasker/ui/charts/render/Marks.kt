@@ -261,6 +261,8 @@ fun DrawScope.drawHypnogram(
     var previous: SleepRun? = null
     for (r in runs) {
         if (r.endMs < frame.viewport.startMs || r.startMs > frame.viewport.endMs) { previous = r; continue }
+        // A code with no row — unstaged sleep — is left undrawn rather than drawn off the plot.
+        if (rowOf(r.code) !in 0 until rows) { previous = null; continue }
         val x0 = frame.x(r.startMs)
         val x1 = frame.x(r.endMs)
         val cy = rowCentre(r.code)

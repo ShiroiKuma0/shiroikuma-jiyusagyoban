@@ -467,6 +467,69 @@ object BandText {
     val regColHrv = Loc("HRV", "心拍変動")
     val regColSpo2 = Loc("SpO₂", "血中酸素")
     val regColWeight = Loc("Weight", "体重")
+    /** The night score's column — see [NightScore]. */
+    val regColScore = Loc("Score", "点数")
+
+    // ---- 夜の点数 — the night score (2026-11-03) ------------------------------------------
+    val scoreTrendTitle = Loc("Night score", "夜の点数")
+    val scoreTrendSub = Loc(
+        "The last %d nights · the line is the 7-night median.",
+        "直近 %d 夜 ・ 線は 7 夜の中央値。",
+    )
+    val scoreLatest = Loc("Last night %s", "昨夜 %s")
+    val scoreWeightsOpen = Loc("Score weights", "点数の重み")
+    val scorePartialMark = Loc(
+        "* partial — some cells were empty; the score is over the rest. Tap a score for its parts.",
+        "* 一部 — 空の欄があり、残りで計算。点数を押すと内訳。",
+    )
+    val scoreBreakdownTitle = Loc("Night score — %s", "夜の点数 — %s")
+    val scoreBreakdownNone = Loc(
+        "Too few cells were measured for a score: %d %% of the weight, %d %% needed.",
+        "点数を出すには測定が足りません：重みの %d %%、必要なのは %d %%。",
+    )
+    val scoreBreakdownHow = Loc(
+        "Each cell's step is worth points — 1 = 100, 2 = 75, 3 = 50, 4 = 25, 5 = 0 — and the score is their weighted mean. Empty cells are left out and the rest renormalised.",
+        "各欄の段階を点に — 1 = 100、2 = 75、3 = 50、4 = 25、5 = 0 — その加重平均が点数。空の欄は除き、残りで正規化。",
+    )
+    val scoreMissing = Loc("not measured", "測定なし")
+    val scoreAdds = Loc("%s × %d %% = %.1f", "%s × %d %% = %.1f")
+    val scoreClose = Loc("Close", "閉じる")
+    val scoreWeightsTitle = Loc("Night score weights", "夜の点数の重み")
+    val scoreWeightsIntro = Loc(
+        "The score is a summary you tune, not a verdict. No weighted readiness score has been validated anywhere; the count of markers outside usual (≥ 2 of 3) stays the alarm on the 回復 card. How you woke is not a component — it is what the score is checked against below.",
+        "点数は調整する要約で、判定ではありません。重み付きの回復スコアで検証済みのものはどこにもなく、警報は回復カードの「平常外の指標の数（3 つ中 2 つ以上）」のまま。目覚めは成分ではなく、下で点数を照らし合わせる相手です。",
+    )
+    val scoreFit = Loc(
+        "Against how you woke: ρ = %.2f (95 %% %.2f – %.2f), %d nights.",
+        "目覚めとの相関：ρ = %.2f（95 %% %.2f〜%.2f）、%d 夜。",
+    )
+    val scoreFitNone = Loc(
+        "Against how you woke: needs %d rated, scored nights.",
+        "目覚めとの相関：評価済みで点数のある夜が %d 必要。",
+    )
+    val scoreFitHelp = Loc(
+        "ρ is Spearman's rank correlation: 1 would mean every better-scored night was one you woke better from, 0 no relation. It moves live with the sliders.",
+        "ρ はスピアマンの順位相関：1 なら点数の高い夜ほど必ずよく目覚めた、0 なら無関係。スライダーと連動。",
+    )
+    val scorePartFit = Loc("alone vs woke ρ %.2f (%d)", "単独で目覚めと ρ %.2f（%d）")
+    val scoreWeightShare = Loc("weight %d → %d %%", "重み %d → %d %%")
+    val scoreDefaultIs = Loc("default %d", "既定 %d")
+    val scoreGraph = Loc("Graph", "グラフ")
+    val scoreDefaults = Loc("Back to defaults", "既定に戻す")
+    val scoreSuggest = Loc("Suggest from my ratings", "自分の評価から提案")
+    val scoreSuggestNone = Loc(
+        "No suggestion yet: no cell correlates positively with your ratings over enough nights.",
+        "提案なし：十分な夜数で評価と正に相関する欄がありません。",
+    )
+    val scoreSuggestTitle = Loc("Proposed weights", "提案された重み")
+    val scoreSuggestBody = Loc(
+        "Half the defaults, half each cell's own correlation with how you woke — shrunk toward the defaults on purpose, because %d nights against 13 weights would otherwise fit the noise. With these the score would track your ratings at ρ = %s (now %s).",
+        "既定の半分と、各欄の目覚めとの相関の半分。%d 夜で 13 の重みを自由に当てはめると雑音に合わせてしまうので、意図的に既定へ寄せています。これで点数と評価の相関は ρ = %s（現在 %s）。",
+    )
+    val scoreApply = Loc("Apply", "適用")
+    val scoreCancel = Loc("Cancel", "キャンセル")
+    val scoreNoGraph = Loc("no page of its own yet", "専用ページはまだなし")
+    val scoreOnCard = Loc("Night score", "夜の点数")
 
     // Added 2026-09-26: 白い熊, on the table — "it lacks the going-to-bed-hr, hr-through-the-night:
     // it must have all the metrics, so it's more descriptive." Every quantity the strip and the
@@ -495,7 +558,7 @@ object BandText {
      * the column cannot spell it.
      */
     val registerColumns = listOf(
-        regColDate, regColBp, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
+        regColDate, regColScore, regColBp, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
         regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2, regColWeight,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------

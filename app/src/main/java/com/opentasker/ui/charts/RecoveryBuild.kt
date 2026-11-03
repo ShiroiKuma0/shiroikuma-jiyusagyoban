@@ -176,9 +176,21 @@ object RecoveryBuild {
         }
         // By the night's END: the morning it is filed under. See [ratableMorning].
         val feltFor = { m: RecoverySource.NightMetrics -> ratings[localDateOf(m.endMs)]?.toDouble() }
+        // The table's rows: every night, short ones too (see [RecoverySource.tableNights]). A short
+        // night has no four-hour window, so its nocturnal figure is dropped rather than computed from
+        // a window it cannot fill — and it never joins a baseline, so every full night keeps exactly
+        // the grade it had before short nights were shown.
+        val fullStarts = nights.mapTo(HashSet()) { it.startMs }
+        val tableHistory = RecoverySource.tableNights(sessions, minuteOfDayOf, localDateOf).map { n ->
+            history.firstOrNull { it.startMs == n.startMs }
+                ?: RecoverySource.metricsFor(
+                    n, hrPoints, tempPoints, spo2Points, hrvPoints, respirationPoints, hfPoints,
+                    watch, stepPoints,
+                ).copy(nocturnalHr = null)
+        }
         val register = SessionRegister.build(
             sessions = sessions_,
-            nights = SessionRegister.readNights(history, feltFor),
+            nights = SessionRegister.readNights(tableHistory, inBaseline = { it.startMs in fullStarts }, feltFor = feltFor),
             spotPoints = spotPoints,
             restingHr = restingSpot,
             zoneOffsetMs = zoneOffsetMs,

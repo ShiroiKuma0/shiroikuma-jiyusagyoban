@@ -96,6 +96,8 @@ object HuaweiSyncRunner {
         context: Context,
         address: String,
         timeoutMs: Long = SESSION_TIMEOUT_MS,
+        /** The opening steps as they happen — `connecting`, `handshake`, `device` — for a caller that shows them. */
+        onPhase: (String) -> Unit = {},
         block: suspend (HuaweiSession, HuaweiClient) -> T,
     ): Result<T> {
         val client = HuaweiRfcommClient(context)
@@ -106,9 +108,11 @@ object HuaweiSyncRunner {
             // INSIDE the guard, which it used to not be. `connect()` blocks uninterruptibly, so a
             // band that is switched off or already speaking to somebody else parked the session
             // before any watchdog covering the session had been armed.
+            onPhase("connecting")
             client.open(address)?.let { throw IllegalStateException(it) }
             val session = HuaweiSession(client)
             val api = HuaweiClient(session, HuaweiSettings.accountId(context))
+            onPhase("handshake")
             val link = api.linkParams()
             api.deviceStatus()
             val authId = HuaweiSettings.authIdSelf(context, address)
@@ -131,6 +135,7 @@ object HuaweiSyncRunner {
             //
             // All six are reads or declarations Health issues on every ordinary connect; none
             // writes a setting, a clock, a language or any wizard state. They cost ~200 ms.
+            onPhase("device")
             runCatching { api.announceCompanion() }
                 .onSuccess { HuaweiSettings.saveCapabilities(context, it, address) }
             block(session, api)
@@ -583,13 +588,19 @@ object HuaweiSyncRunner {
         toSeconds: Long,
         /** Where workouts are stored. Null runs the fetch without keeping anything — tests only. */
         dao: com.opentasker.core.storage.HuaweiWorkoutDao?,
-    ): Result<List<Walk>> = withSession(context, address) { session, _ ->
+        /** The session's opening steps, then `listing`; see [withSession]. */
+        onPhase: (String) -> Unit = {},
+        /** Workouts fetched so far out of those listed — called with (0, n) once the list is in. */
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): Result<List<Walk>> = withSession(context, address, onPhase = onPhase) { session, _ ->
         val cfg = HuaweiCommands
+        onPhase("listing")
         val listReply = session.decrypt(
             session.request(cfg.SVC_WORKOUT, cfg.WORKOUT_LIST, cfg.workoutList(fromSeconds, toSeconds)),
         )
         val listed = HuaweiWorkout.parseList(listReply)
-        listed.map { entry ->
+        onProgress(0, listed.size)
+        listed.mapIndexed { index, entry ->
             // The summary's whole container, kept as it arrived. Thirty-one tags, twelve understood;
             // the parse below reads those twelve and the bytes stay for the other nineteen.
             val summaryReply = runCatching {
@@ -665,6 +676,7 @@ object HuaweiSyncRunner {
                     intervalSeconds = blocks.firstOrNull()?.intervalSeconds ?: 0,
                 )
             }
+            onProgress(index + 1, listed.size)
             Walk(summary, track?.points?.size ?: 0, null, why)
         }
     }
