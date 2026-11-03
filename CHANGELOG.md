@@ -8,6 +8,57 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+139 — 2026-11-03
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+133`.
+
+### 健康 — the night score
+
+- **A 0–100 score as the night table's first column.** Each graded cell of the row (blood pressure,
+  skin temperature, night HR, bed HR, HR swing, night curve, asleep, deep, deep+REM, low HR, HRV,
+  breaths, SpO₂) is turned into points by its own 1–5 step (1 = 100 … 5 = 0, 25 a step) and the
+  score is their weighted mean, painted in the nearest step — so it never disagrees with the colours
+  beside it. Empty cells are left out and the rest renormalised; the score is marked `*` (partial),
+  and below half the weight it is a dash. How you woke is not a component.
+- **Score weights page** (⚖ pill above the table, or from a breakdown): a 0–30 slider per cell with
+  its share, its default and the reasoning for it, its own rank correlation with how you woke, and a
+  **Graph** pill to that cell's history page (Back returns to the weights page). **Back to defaults**
+  restores them. A slider writes on release; weights are stored in `night_score_weights` (only the
+  ones moved off their defaults) and are part of the settings backup.
+- **Calibration:** the score's Spearman correlation with your 1–5 ratings, with its 95 % interval
+  (Fisher, with the 1.06 Spearman correction) and the number of nights, updating live while a slider
+  is dragged. **Suggest from my ratings** proposes weights halfway between the defaults and each
+  cell's own positive correlation, shows old → new and the resulting correlation, and applies only on
+  **Apply**.
+- **Trend card** above the table: the last 30 nights as dots in their step's colour with the 7-night
+  median line, and last night's score.
+- **Breakdown dialog** on tapping a score: every cell's step, points, weight share and contribution,
+  and what was not measured.
+- **The 回復 card** carries the newest night's score; tapping it opens the register.
+
+### 健康 — sync, nights, weight
+
+- **The sync dialog opens idle**, with pills for an ordinary sync, **walks and lifting** (the last 30
+  days), **full sync** and **sync state**, each with an ⓘ explanation in its own thin yellow frame.
+  While it runs, the phase lines scroll inside a yellow-framed portal with a step bar, an overall bar
+  and a step counter, following the sync runner's live progress (it used to sit at 0 % for 50 seconds
+  and then jump to the end). All its text is yellow.
+- **A short night is a row of the night table** — a three-hour night came up as an empty line,
+  because the table used the four-hour floor that exists for the nocturnal-HR window. Short nights are
+  shown with no nocturnal HR and are kept out of the baselines.
+- **A night's start can be corrected by hand** (a bedtime pill in the rating dialog): an earlier start
+  adds the gap as *asleep, unstaged* — counted in time asleep, left out of the deep/REM share — and a
+  later one trims the front. Stored per morning in `night_starts`, in the settings backup.
+- **The weight dialog opens today at the current minute**, not 07:00; a past day still opens at 07:00.
+
+### UI
+
+- **Outlined pills everywhere.** `ui/components/Pills.kt` replaces Material's `Button`,
+  `OutlinedButton` and `TextButton` across the app: never filled; the main action of a block has a
+  3 dp yellow frame and bold text, every other action a 1.25 dp frame; a coloured (e.g. destructive)
+  button lends its colour to the frame and the text. Bare-text buttons (Cancel, No, Clear) are pills
+  too, in yellow, and dialog hints are yellow rather than blue or white.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+133 — 2026-11-02
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+113`.
