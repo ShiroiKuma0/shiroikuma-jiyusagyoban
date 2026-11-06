@@ -250,6 +250,8 @@ object SettingsBackup {
             "walk_notes", "lift_notes",
             // When 白い熊 really fell asleep, where the watch began the night late (2026-11-03).
             "night_starts",
+            // …and when 白い熊 really woke, where the watch ended it wrong (2026-11-06).
+            "night_ends",
             // 白い熊's own weights for the night score, where moved off their defaults (2026-11-03).
             "night_score_weights",
             "training_sessions", "band_settings", "huawei_band_settings",

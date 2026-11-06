@@ -88,4 +88,40 @@ class NightStartsTest {
         val dayBefore = day - 20 * hour
         assertEquals(listOf(watch), SleepShape.withNightStarts(listOf(watch), mapOf(10L to dayBefore), morningOf))
     }
+
+    @Test
+    fun `a later wake time adds the gap as unstaged sleep`() {
+        val at = day + 9 * hour
+        val fixed = SleepShape.withNightEdges(listOf(watch), emptyMap(), mapOf(10L to at), morningOf).single()
+        assertEquals(watch.startMs, fixed.startMs)
+        assertEquals(at, fixed.endMs)
+        assertEquals(((at - watch.endMs) / 60_000L).toInt(), fixed.unstaged)
+        assertEquals(watch.deepRemShare!!, fixed.deepRemShare!!, 1e-9)
+    }
+
+    @Test
+    fun `an earlier wake time trims the back`() {
+        val at = day + 6 * hour
+        val fixed = SleepShape.withNightEdges(listOf(watch), emptyMap(), mapOf(10L to at), morningOf).single()
+        assertEquals(at, fixed.endMs)
+        assertEquals(at, fixed.runs.last().endMs)
+        assertEquals(0, fixed.unstaged)
+        assertEquals(watch.deep, fixed.deep)
+    }
+
+    @Test
+    fun `both ends at once`() {
+        val bed = day + (1.5 * hour).toLong()
+        val woke = day + 9 * hour
+        val fixed = SleepShape.withNightEdges(listOf(watch), mapOf(10L to bed), mapOf(10L to woke), morningOf).single()
+        assertEquals(bed, fixed.startMs)
+        assertEquals(woke, fixed.endMs)
+        assertEquals(((watch.startMs - bed) / 60_000L + (woke - watch.endMs) / 60_000L).toInt(), fixed.unstaged)
+    }
+
+    @Test
+    fun `a wake time not after the start or too far after it changes nothing`() {
+        assertEquals(listOf(watch), SleepShape.withNightEdges(listOf(watch), emptyMap(), mapOf(10L to watch.startMs - hour), morningOf))
+        assertEquals(listOf(watch), SleepShape.withNightEdges(listOf(watch), emptyMap(), mapOf(10L to watch.startMs + 19 * hour), morningOf))
+    }
 }

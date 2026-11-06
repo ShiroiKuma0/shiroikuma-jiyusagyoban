@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,6 +104,10 @@ fun SessionRegisterScreen(
     nightStarts: Map<Long, Long> = emptyMap(),
     /** Correct (or, with null, withdraw) a night's start; no pill in the dialog when null. */
     onNightStart: ((morningKey: Long, atMs: Long?) -> Unit)? = null,
+    /** 白い熊's own wake times, morning key → instant; see `NightEnds`. */
+    nightEnds: Map<Long, Long> = emptyMap(),
+    /** Correct (or, with null, withdraw) a night's end; no pill in the dialog when null. */
+    onNightEnd: ((morningKey: Long, atMs: Long?) -> Unit)? = null,
     /** The night score's weights — see [NightScore]. */
     scoreWeights: Map<NightScore.Part, Int> = NightScore.DEFAULTS,
     /** Store new weights; null hides the weights pill and page (the Hume report keeps the defaults). */
@@ -115,6 +120,13 @@ fun SessionRegisterScreen(
     onScoreWeightsOpen: (Boolean) -> Unit = {},
     /** A cell's history page, from the weights page. */
     onOpenMarker: ((RecoveryMarker) -> Unit)? = null,
+    /**
+     * The page's and the table's scroll positions. Hoisted for the same reason as [scoreWeightsOpen]:
+     * a table value opens its history page, this screen leaves composition, and coming back must
+     * land on the line that was tapped rather than at the top of the page.
+     */
+    pageScroll: ScrollState = rememberScrollState(),
+    tableScroll: ScrollState = rememberScrollState(),
     onBack: () -> Unit,
     onSwitchLanguage: suspend () -> Loc? = { null },
 ) {
@@ -148,6 +160,7 @@ fun SessionRegisterScreen(
     // a past morning gets its weight from the same place it gets its rating and its note.
     var weighing by rememberSaveable { mutableStateOf<Long?>(null) }
     var bedtiming by remember { mutableStateOf<Long?>(null) }
+    var waking by remember { mutableStateOf<Long?>(null) }
     // The night whose score breakdown is open.
     var scoring by remember { mutableStateOf<Long?>(null) }
     // Every row's score, recomputed only when the rows or the weights change.
@@ -160,7 +173,7 @@ fun SessionRegisterScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(pageScroll)
             .padding(
                 top = contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding() + 24.dp,
@@ -231,6 +244,9 @@ fun SessionRegisterScreen(
                     onRate = { rating = it },
                     onScore = { scoring = it },
                     onOpenWeights = onScoreWeights?.let { { onScoreWeightsOpen(true) } },
+                    onOpenMarker = onOpenMarker,
+                    onWeight = onWeight?.let { { key -> weighing = key } },
+                    tableScroll = tableScroll,
                 )
 
                 scoring?.let { key ->
@@ -249,7 +265,7 @@ fun SessionRegisterScreen(
                     }
                 }
 
-                rating?.takeIf { noting == null && weighing == null && bedtiming == null }?.let { key ->
+                rating?.takeIf { noting == null && weighing == null && bedtiming == null && waking == null }?.let { key ->
                     RateNightDialog(
                         dateKey = key,
                         note = r.rows.firstOrNull { it.dateKey == key }?.note,
@@ -259,6 +275,9 @@ fun SessionRegisterScreen(
                         nightStartMs = r.rows.firstOrNull { it.dateKey == key }?.night?.startMs,
                         nightStartAuthored = key in nightStarts,
                         onEditNightStart = onNightStart?.let { { bedtiming = key } },
+                        nightEndMs = r.rows.firstOrNull { it.dateKey == key }?.night?.endMs,
+                        nightEndAuthored = key in nightEnds,
+                        onEditNightEnd = onNightEnd?.let { { waking = key } },
                         // Straight from the store's own row, never from the night's banded marker: the
                         // dialog offers back the number 白い熊 typed, so tapping it again withdraws it
                         // rather than re-writing something adjacent to it. A day with neither a night
@@ -301,16 +320,33 @@ fun SessionRegisterScreen(
 
                 bedtiming?.let { key ->
                     val night = r.rows.firstOrNull { it.dateKey == key }?.night
-                    NightStartDialog(
+                    NightEdgeDialog(
                         dateKey = key,
-                        currentStartMs = night?.startMs,
-                        endMs = night?.endMs,
+                        end = false,
+                        currentMs = night?.startMs,
+                        otherMs = night?.endMs,
                         authored = key in nightStarts,
                         onSave = { atMs ->
                             onNightStart?.invoke(key, atMs)
                             bedtiming = null
                         },
                         onDismiss = { bedtiming = null },
+                    )
+                }
+
+                waking?.let { key ->
+                    val night = r.rows.firstOrNull { it.dateKey == key }?.night
+                    NightEdgeDialog(
+                        dateKey = key,
+                        end = true,
+                        currentMs = night?.endMs,
+                        otherMs = night?.startMs,
+                        authored = key in nightEnds,
+                        onSave = { atMs ->
+                            onNightEnd?.invoke(key, atMs)
+                            waking = null
+                        },
+                        onDismiss = { waking = null },
                     )
                 }
 
@@ -369,6 +405,11 @@ private fun NightsCard(
     onRate: (Long) -> Unit,
     onScore: (Long) -> Unit,
     onOpenWeights: (() -> Unit)?,
+    /** A value's history page; null (the Hume report) leaves every value opening the rating. */
+    onOpenMarker: ((RecoveryMarker) -> Unit)?,
+    /** The weight dialog for a morning; null when there is no weight store. */
+    onWeight: ((Long) -> Unit)?,
+    tableScroll: ScrollState,
 ) {
     val lang = LocalBandLanguage.current
     val style = LocalChartStyle.current
@@ -395,6 +436,13 @@ private fun NightsCard(
                 ScaleLegend(onInfo = { showBands = !showBands })
                 if (showBands) ReferenceBandsPanel()
                 RateHint()
+                if (onOpenMarker != null) {
+                    Text(
+                        BandText.registerCellHint[lang],
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = sectionNote,
+                    )
+                }
                 // The way to the score's weights, at the table whose first column they decide.
                 onOpenWeights?.let {
                     com.opentasker.ui.components.OutlinedButton(onClick = it) {
@@ -417,7 +465,6 @@ private fun NightsCard(
                 // moment anyone scrolls, which is worse than no header at all. That is also why the
                 // scroll wraps the whole block rather than each row — independent per-row scrolls
                 // would let two lines disagree about which column you are looking at.
-                val tableScroll = rememberScrollState()
                 Column(Modifier.horizontalScroll(tableScroll)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     for (heading in BandText.registerColumns) HeadCell(heading[lang])
@@ -450,6 +497,8 @@ private fun NightsCard(
                         score = scores[row.dateKey],
                         onRate = { onRate(row.dateKey) },
                         onScore = { onScore(row.dateKey) },
+                        onOpenMarker = onOpenMarker,
+                        onWeight = onWeight?.let { { it(row.dateKey) } },
                     )
                     // Never under the last line of a month: the month rule below it says the same
                     // thing louder, and two rules three pixels apart read as a rendering fault.
@@ -797,18 +846,25 @@ private fun NightTableRow(
     score: NightScore.Score?,
     onRate: () -> Unit,
     onScore: () -> Unit,
+    onOpenMarker: ((RecoveryMarker) -> Unit)?,
+    onWeight: (() -> Unit)?,
 ) {
     val lang = LocalBandLanguage.current
     val n = row.night
+    // A value opens ITS OWN history page — the blood pressure the pressure page, the skin
+    // temperature the temperature's (白い熊, 2026-11-04: every cell used to open the rating dialog,
+    // which is the right answer for the date and the wrong one for a number). The date and the note
+    // line keep the rating, so every past morning can still be scored from here. Without history
+    // pages (the Hume report) everything falls back to the rating, as before.
+    fun to(marker: RecoveryMarker): () -> Unit = onOpenMarker?.let { { it(marker) } } ?: onRate
     // A Column so a written note can sit UNDER the columns rather than inside one of them.
     // There is no width for it up there — the table is five weighted cells on a phone — and a note is
     // a sentence, not a value: it belongs across the row it annotates, in the ink the rest of this
     // screen uses for explanation.
     Column(
-        // clickable OUTSIDE the padding, so the gap between two lines belongs to one of them rather
-        // than to neither — the rows are 3 dp apart and a dead strip there would be most of the misses.
-        // It wraps the note line too, so tapping the note opens the same editor the row does.
-        modifier = Modifier.clickable(onClick = onRate).padding(vertical = 3.dp),
+        // Each cell carries its own tap now, so the row has none; the date and the note line open
+        // the rating, every value its own page.
+        modifier = Modifier.padding(vertical = 3.dp),
     ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -823,7 +879,7 @@ private fun NightTableRow(
                 append(" ")
                 withStyle(SpanStyle(color = sectionNote, fontSize = 12.sp)) { append(weekday) }
             },
-            Modifier.width(NightColumns.CELL).padding(end = 4.dp),
+            Modifier.width(NightColumns.CELL).clickable(onClick = onRate).padding(end = 4.dp),
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             softWrap = false,
@@ -833,20 +889,25 @@ private fun NightTableRow(
         ScoreCell(score, onScore)
         // Blood pressure first (白い熊, 2026-10-25 — measured every morning now), on the ESH ladder
         // the blood-pressure bars use, each half in its own pressure's grade (2026-10-28).
-        BpCell(n?.bpSystolic, n?.bpDiastolic)
+        Tap(to(RecoveryMarker.BP_SYSTOLIC)) { BpCell(n?.bpSystolic, n?.bpDiastolic) }
         // Skin temperature next (白い熊, 2026-10-18), with one decimal: the whole signal is a few
         // tenths of a degree. Yellow while its baseline is still being collected, then the 1–5 steps.
-        ValueCell(
-            n?.temperature?.value?.let { String.format("%.1f", it) },
-            n?.temperature?.displayStep,
-        )
+        Tap(to(RecoveryMarker.TEMPERATURE)) {
+            ValueCell(
+                n?.temperature?.value?.let { String.format("%.1f", it) },
+                n?.temperature?.displayStep,
+            )
+        }
         // The step ALONE — no word. "Below par" cannot share one line with its number at any width
         // this table can afford, and the legend directly above the table names all five in full, so
         // the cell can be the thing the legend is a key TO rather than a second copy of it.
-        ValueCell(
-            text = row.felt?.toString() ?: BandText.registerNightUnrated[lang],
-            step = row.felt,
-        )
+        // The rating's own column opens the rating: it has no history page, and this is its editor.
+        Tap(onRate) {
+            ValueCell(
+                text = row.felt?.toString() ?: BandText.registerNightUnrated[lang],
+                step = row.felt,
+            )
+        }
         // ## Every column carries a colour, and not every colour means the same thing
         //
         // Every cell takes [Grade] — the one grading the strip, the 回復 card and the index draw
@@ -857,51 +918,73 @@ private fun NightTableRow(
         // breathing are graded WITHIN-PERSON, against the nights before them, because no absolute
         // ladder fits a consumer band's staging or a sensor that measures the bedroom. The ⓘ panel
         // says which is which on screen.
-        ValueCell(
-            n?.nocturnalHr?.value?.let {
-                "${it.roundToInt()}" +
-                    (n.nocturnalHr.delta?.let { d -> " %+d".format(d.roundToInt()) } ?: "")
-            },
-            n?.nocturnalHr?.displayStep,
-        )
+        Tap(to(RecoveryMarker.NOCTURNAL_HR)) {
+            ValueCell(
+                n?.nocturnalHr?.value?.let {
+                    "${it.roundToInt()}" +
+                        (n.nocturnalHr.delta?.let { d -> " %+d".format(d.roundToInt()) } ?: "")
+                },
+                n?.nocturnalHr?.displayStep,
+            )
+        }
         // Going to bed and the night's own spread, beside the nocturnal rate they belong with —
         // the night in the order it happened (白い熊, 2026-09-26).
-        ValueCell(n?.bedtimeHr?.let { "${it.roundToInt()}" }, n?.bedtimeHrStep)
-        ValueCell(n?.hrSwing?.let { "${it.roundToInt()}" }, n?.hrSwingStep)
+        Tap(to(RecoveryMarker.BEDTIME_HR)) {
+            ValueCell(n?.bedtimeHr?.let { "${it.roundToInt()}" }, n?.bedtimeHrStep)
+        }
+        Tap(to(RecoveryMarker.HR_SWING)) {
+            ValueCell(n?.hrSwing?.let { "${it.roundToInt()}" }, n?.hrSwingStep)
+        }
         // …and the shape itself, which is the half a number cannot carry. Scored by its own
         // DESCENT — the report's grading — and deliberately not by the swing beside it: see
         // [SessionRegister.NightReading.hrCurveStep] for the night that made the difference visible.
-        CurveCell(n?.hrCurve.orEmpty(), n?.hrCurveStep)
-        ValueCell(
-            n?.sleep?.value?.let { hoursAndMinutes(it) },
-            n?.sleep?.displayStep,
-        )
-        ValueCell(n?.deepMinutes?.let { hoursAndMinutes(it) }, n?.deepStep)
-        ValueCell(n?.deepRemShare?.let { "${(it * 100).roundToInt()}%" }, n?.deepRemStep)
-        ValueCell(
-            n?.lowestHr?.let { "${it.roundToInt()}" },
-            n?.lowestHrStep,
-        )
+        // The swing's page, because that is the one that carries the night curves themselves.
+        Tap(to(RecoveryMarker.HR_SWING)) { CurveCell(n?.hrCurve.orEmpty(), n?.hrCurveStep) }
+        Tap(to(RecoveryMarker.SLEEP)) {
+            ValueCell(
+                n?.sleep?.value?.let { hoursAndMinutes(it) },
+                n?.sleep?.displayStep,
+            )
+        }
+        Tap(to(RecoveryMarker.DEEP)) {
+            ValueCell(n?.deepMinutes?.let { hoursAndMinutes(it) }, n?.deepStep)
+        }
+        Tap(to(RecoveryMarker.DEEP_REM)) {
+            ValueCell(n?.deepRemShare?.let { "${(it * 100).roundToInt()}%" }, n?.deepRemStep)
+        }
+        Tap(to(RecoveryMarker.LOWEST_HR)) {
+            ValueCell(
+                n?.lowestHr?.let { "${it.roundToInt()}" },
+                n?.lowestHrStep,
+            )
+        }
         // RMSSD, in the milliseconds it is measured in — the unit is part of the reading, and a bare
         // "38" in a table of heart rates would be read as a heart rate.
         // One decimal, as everywhere (2026-10-26) — and a size down, so "29.9 ms" fits the column.
-        ValueCell(n?.hrvMs?.let { String.format("%.1f ms", it) }, n?.hrvStep, compact = true)
+        Tap(to(RecoveryMarker.HRV)) {
+            ValueCell(n?.hrvMs?.let { String.format("%.1f ms", it) }, n?.hrvStep, compact = true)
+        }
         // One decimal, because the whole useful range of this quantity is about three breaths wide
         // and rounding it to an integer would paint most nights the same number.
-        ValueCell(n?.respirationBpm?.let { String.format("%.1f", it) }, n?.respirationStep)
-        ValueCell(
-            n?.spo2?.let { "${it.roundToInt()}%" },
-            n?.spo2Step,
-        )
+        Tap(to(RecoveryMarker.RESPIRATION)) {
+            ValueCell(n?.respirationBpm?.let { String.format("%.1f", it) }, n?.respirationStep)
+        }
+        Tap(to(RecoveryMarker.SPO2)) {
+            ValueCell(
+                n?.spo2?.let { "${it.roundToInt()}%" },
+                n?.spo2Step,
+            )
+        }
         // Body weight last (白い熊, 2026-10-30) — typed in, not measured, so it wears the authored
         // livery rather than a grade: the calendar's black chip with the yellow ring.
-        WeightCell(row.weightKg)
+        // No history page for a typed-in weight yet, so its cell opens that morning's weight.
+        Tap(onWeight ?: onRate) { WeightCell(row.weightKg) }
     }
     row.note?.takeIf { it.isNotBlank() }?.let { note ->
         Row(
             // The table's own width, not the viewport's: inside a horizontal scroll `fillMaxWidth`
             // has nothing to fill, and a note is worth the whole line it annotates.
-            Modifier.width(NightColumns.TOTAL).padding(top = 2.dp),
+            Modifier.width(NightColumns.TOTAL).clickable(onClick = onRate).padding(top = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
@@ -1038,6 +1121,12 @@ private fun WeightCell(kg: Double?) {
             }
         }
     }
+}
+
+/** One table cell's own tap target. */
+@Composable
+private fun Tap(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(Modifier.clickable(onClick = onClick)) { content() }
 }
 
 /** Tall enough for a descent to have a shape, short enough not to change the row's height. */
@@ -1206,6 +1295,10 @@ private fun RateNightDialog(
     nightStartMs: Long? = null,
     nightStartAuthored: Boolean = false,
     onEditNightStart: (() -> Unit)? = null,
+    /** The night's end in use, and whether it is 白い熊's correction; no pill when [onEditNightEnd] is null. */
+    nightEndMs: Long? = null,
+    nightEndAuthored: Boolean = false,
+    onEditNightEnd: (() -> Unit)? = null,
     onPick: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1281,7 +1374,9 @@ private fun RateNightDialog(
             // in afterwards, like a rating or a note (白い熊, 2026-11-01).
             onEditWeight?.let { WeightPill(kg = weightKg, onClick = it) }
             // …and when the night really began, for a night the watch started late (白い熊, 2026-11-03).
-            onEditNightStart?.let { NightStartPill(startMs = nightStartMs, authored = nightStartAuthored, onClick = it) }
+            onEditNightStart?.let { NightEdgePill(atMs = nightStartMs, end = false, authored = nightStartAuthored, onClick = it) }
+            // …and when it really ended, for a night the watch ended early or late (白い熊, 2026-11-06).
+            onEditNightEnd?.let { NightEdgePill(atMs = nightEndMs, end = true, authored = nightEndAuthored, onClick = it) }
             NoteText(BandText.rateClearHint[lang])
             NoteText(BandText.rateLateNote[lang])
             // A pill like every other action — a bare word reads as a note (白い熊, 2026-11-03).

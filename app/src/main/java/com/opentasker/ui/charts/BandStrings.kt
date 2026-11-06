@@ -278,8 +278,13 @@ object BandText {
     // a mistaken one corrected. The hint is printed on both cards, in the same words, because the
     // gesture is invisible until someone says it exists.
     val registerRateHint = Loc(
-        "Tap any morning — a tile above, or a line of the table — to score it, or to change a score already given.",
-        "どの朝でも押せる。上のタイルでも、表の行でも、押せばその朝の目覚めを付けられる。付け直しも同じ。",
+        "Tap any morning — a tile above, or a date in the table — to score it, or to change a score already given.",
+        "どの朝でも押せる。上のタイルでも、表の日付でも、押せばその朝の目覚めを付けられる。付け直しも同じ。",
+    )
+    /** Under the table's rate hint, where its values open their own pages (2026-11-04). */
+    val registerCellHint = Loc(
+        "Tap a value to open that column’s history; Woke opens the score, the weight that morning’s weighing.",
+        "値を押すとその列の推移が開く。目覚めは評価、体重はその朝の体重の入力が開く。",
     )
     val rateClearHint = Loc(
         "Tapping the number already chosen removes the score — a morning can always go back to unscored.",

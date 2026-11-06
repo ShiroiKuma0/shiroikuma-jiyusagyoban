@@ -34,7 +34,7 @@ data class SleepSession(
     val light: Int get() = minutesOf('2')
     val rem: Int get() = minutesOf('3')
     val awake: Int get() = minutesOf('5')
-    /** Asleep with no stage — the authored stretch before the watch began scoring; see [SleepShape.withNightStarts]. */
+    /** Asleep with no stage — an authored stretch the watch never scored; see [SleepShape.withNightEdges]. */
     val unstaged: Int get() = minutesOf(SleepShape.UNSTAGED)
 
     /**
@@ -201,32 +201,56 @@ object SleepShape {
      */
     const val UNSTAGED = '0'
 
-    /**
-     * Apply 白い熊's own bedtimes ([com.opentasker.core.band.NightStarts]) to the stitched nights.
-     *
-     * [starts] maps the morning a night ended on (`yyyyMMdd`, via [morningOf]) to when 白い熊 fell
-     * asleep. Earlier than the watch's start: the gap is added as [UNSTAGED] sleep. Later: the runs
-     * before it are cut off. A bedtime that is not before the night's end, or lies more than 18 hours
-     * before it, is not a bedtime for that night and is ignored rather than stretching the night
-     * into the previous day.
-     */
+    /** Only the bedtimes — [withNightEdges] with no wake times. */
     fun withNightStarts(
         sessions: List<SleepSession>,
         starts: Map<Long, Long>,
         morningOf: (Long) -> Long,
+    ): List<SleepSession> = withNightEdges(sessions, starts, emptyMap(), morningOf)
+
+    /**
+     * Apply 白い熊's own bedtimes ([com.opentasker.core.band.NightStarts]) and wake times
+     * ([com.opentasker.core.band.NightEnds]) to the stitched nights.
+     *
+     * Both map the morning the WATCH ended a night on (`yyyyMMdd`, via [morningOf]) to an instant; the
+     * key is read once, from the watch's own end, so a corrected end past midnight keeps its row.
+     *
+     * A bedtime earlier than the watch's start adds the gap as [UNSTAGED] sleep; a later one cuts off
+     * the runs before it. One not before the night's end, or more than 18 hours before it, is ignored.
+     * Then the wake time, against the start just settled: later than the watch's end adds the gap as
+     * [UNSTAGED] sleep, earlier trims the back. One not after the start, or more than 18 hours after
+     * it, is ignored — neither may stretch a night into another day.
+     */
+    fun withNightEdges(
+        sessions: List<SleepSession>,
+        starts: Map<Long, Long>,
+        ends: Map<Long, Long>,
+        morningOf: (Long) -> Long,
     ): List<SleepSession> {
-        if (starts.isEmpty()) return sessions
+        if (starts.isEmpty() && ends.isEmpty()) return sessions
         return sessions.map { s ->
-            val at = starts[morningOf(s.endMs)] ?: return@map s
-            when {
-                at >= s.endMs || at < s.endMs - MAX_AUTHORED_NIGHT_MS || at == s.startMs -> s
-                at < s.startMs -> SleepSession(at, s.endMs, listOf(SleepRun(at, s.startMs, UNSTAGED)) + s.runs)
-                else -> SleepSession(
-                    at, s.endMs,
-                    s.runs.filter { it.endMs > at }.map { if (it.startMs < at) it.copy(startMs = at) else it },
-                )
-            }
+            val key = morningOf(s.endMs)
+            val started = starts[key]?.let { withStart(s, it) } ?: s
+            ends[key]?.let { withEnd(started, it) } ?: started
         }
+    }
+
+    private fun withStart(s: SleepSession, at: Long): SleepSession = when {
+        at >= s.endMs || at < s.endMs - MAX_AUTHORED_NIGHT_MS || at == s.startMs -> s
+        at < s.startMs -> SleepSession(at, s.endMs, listOf(SleepRun(at, s.startMs, UNSTAGED)) + s.runs)
+        else -> SleepSession(
+            at, s.endMs,
+            s.runs.filter { it.endMs > at }.map { if (it.startMs < at) it.copy(startMs = at) else it },
+        )
+    }
+
+    private fun withEnd(s: SleepSession, at: Long): SleepSession = when {
+        at <= s.startMs || at > s.startMs + MAX_AUTHORED_NIGHT_MS || at == s.endMs -> s
+        at > s.endMs -> SleepSession(s.startMs, at, s.runs + SleepRun(s.endMs, at, UNSTAGED))
+        else -> SleepSession(
+            s.startMs, at,
+            s.runs.filter { it.startMs < at }.map { if (it.endMs > at) it.copy(endMs = at) else it },
+        )
     }
 
     private const val MAX_AUTHORED_NIGHT_MS = 18 * 3_600_000L
