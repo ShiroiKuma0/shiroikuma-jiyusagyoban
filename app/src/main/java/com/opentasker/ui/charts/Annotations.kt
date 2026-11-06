@@ -24,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -113,6 +114,20 @@ object AnnotationText {
         "正しい日付と時刻で、夜の終わりより前、18 時間以内。",
     )
     val asleepWithdraw = Loc("Back to the watch's", "時計の時刻に戻す")
+    val wokeAdd = Loc("Woke at…", "起床時刻を直す")
+    val wokeAt = Loc("Woke %s", "起床 %s")
+    val wokeTitle = Loc("Woke — night to %s", "起床時刻 — %s の朝までの夜")
+    val wokeHint = Loc(
+        "When you really woke, where the watch ended the night early or late — tap a digit to overwrite " +
+            "it. Time after the watch's own end counts as sleep with no stage: in the night's length and " +
+            "asleep minutes, never in deep, REM or their share.",
+        "時計が夜を早く（または遅く）終えたときの、本当の起床時刻。数字を押すと上書きできる。時計の終了より後の時間は" +
+            "段階なしの睡眠として、夜の長さと睡眠時間には入り、深い睡眠・REM・その割合には入らない。",
+    )
+    val wokeInvalid = Loc(
+        "A real time on this night's morning, after the night began, at most 18 hours after it, not in the future.",
+        "この夜の朝の正しい時刻で、夜の始まりより後、18 時間以内、未来は不可。",
+    )
     /** The card that holds a walk's own answers, as opposed to the band's measurements of it. */
     val own = Loc("Your own record", "自分の記録")
     val stops = Loc("Stops", "休憩")
@@ -806,17 +821,20 @@ private fun DigitBox(
 }
 
 /**
- * The night's own start, on a pill in the night dialog — the weight pill's shape. Shows the start in
- * use; [authored] says whether that is 白い熊's correction or still the watch's.
+ * One end of the night — the start ([end] false) or the end — on a pill in the night dialog, the
+ * weight pill's shape. Shows the instant in use; [authored] says whether that is 白い熊's correction
+ * or still the watch's.
  */
 @Composable
-fun NightStartPill(startMs: Long?, authored: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun NightEdgePill(atMs: Long?, end: Boolean, authored: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val lang = LocalBandLanguage.current
     val ink = if (authored) ANNOTATION_INK else ANNOTATION_INK.copy(alpha = ADD_ALPHA)
-    val clock = startMs?.let {
+    val clock = atMs?.let {
         java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault())
             .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
     }
+    val add = if (end) AnnotationText.wokeAdd else AnnotationText.asleepAdd
+    val at = if (end) AnnotationText.wokeAt else AnnotationText.asleepAt
     Row(
         modifier
             .clip(RoundedCornerShape(100.dp))
@@ -826,9 +844,12 @@ fun NightStartPill(startMs: Long?, authored: Boolean, modifier: Modifier = Modif
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(Icons.Filled.Bedtime, contentDescription = AnnotationText.asleepAdd[lang], tint = ink, modifier = Modifier.size(20.dp))
+        Icon(
+            if (end) Icons.Filled.WbSunny else Icons.Filled.Bedtime,
+            contentDescription = add[lang], tint = ink, modifier = Modifier.size(20.dp),
+        )
         Text(
-            if (authored && clock != null) AnnotationText.asleepAt[lang].format(clock) else AnnotationText.asleepAdd[lang],
+            if (authored && clock != null) at[lang].format(clock) else add[lang],
             style = if (authored) MaterialTheme.typography.bodyLarge
             else MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp),
             fontWeight = if (authored) FontWeight.Bold else FontWeight.Normal,
@@ -839,18 +860,22 @@ fun NightStartPill(startMs: Long?, authored: Boolean, modifier: Modifier = Modif
 }
 
 /**
- * When 白い熊 really fell asleep, for the night ending on the morning [dateKey] — the weight dialog's
- * digit boxes, date and time, so a bedtime before midnight is as easy as one after it.
+ * When 白い熊 really fell asleep ([end] false) or woke, for the night ending on the morning [dateKey] —
+ * the weight dialog's digit boxes, date and time, so a bedtime before midnight is as easy as one after.
  *
- * Opens on the start in use ([currentStartMs]): the correction if there is one, else the watch's own.
- * Save hands back the instant; a time that is not real, not before the night's end ([endMs]) or more
- * than 18 hours before it keeps the dialog open. [authored] adds the way back to the watch's start.
+ * Opens on the instant in use ([currentMs]): the correction if there is one, else the watch's own.
+ * Save hands back the instant. [otherMs] is the night's other end, and a time that is not real, or on
+ * the wrong side of it, or more than 18 hours from it, keeps the dialog open. A wake time must also
+ * fall on [dateKey]'s own day and not in the future: the row is found by the night's end, so a wake
+ * time on another day would move the night out from under its correction. [authored] adds the way
+ * back to the watch's own.
  */
 @Composable
-fun NightStartDialog(
+fun NightEdgeDialog(
     dateKey: Long,
-    currentStartMs: Long?,
-    endMs: Long?,
+    end: Boolean,
+    currentMs: Long?,
+    otherMs: Long?,
     authored: Boolean,
     onSave: (atMs: Long?) -> Unit,
     onDismiss: () -> Unit,
@@ -859,7 +884,7 @@ fun NightStartDialog(
     val zone = remember { java.time.ZoneId.systemDefault() }
     var invalid by rememberSaveable { mutableStateOf(false) }
     var digits by rememberSaveable {
-        val start = currentStartMs?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime() }
+        val start = currentMs?.let { java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDateTime() }
             ?: java.time.LocalDate.of((dateKey / 10_000L).toInt(), ((dateKey / 100L) % 100L).toInt(), (dateKey % 100L).toInt())
                 .atTime(0, 0)
         mutableStateOf(start.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmm")))
@@ -867,8 +892,16 @@ fun NightStartDialog(
     val boxes = remember { List(12) { FocusRequester() } }
     fun save() {
         val at = weighingTimeOf(digits)?.atZone(zone)?.toInstant()?.toEpochMilli()
-        val end = endMs ?: System.currentTimeMillis()
-        if (at == null || at >= end || at < end - 18 * 3_600_000L) { invalid = true; return }
+        val bad = if (at == null) true else if (end) {
+            val day = java.time.Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
+            val key = day.year * 10_000L + day.monthValue * 100L + day.dayOfMonth
+            val start = otherMs ?: (at - 1)
+            key != dateKey || at <= start || at > start + 18 * 3_600_000L || at > System.currentTimeMillis()
+        } else {
+            val stop = otherMs ?: System.currentTimeMillis()
+            at >= stop || at < stop - 18 * 3_600_000L
+        }
+        if (bad) { invalid = true; return }
         onSave(at)
     }
     fun box(i: Int, width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp): @Composable () -> Unit = {
@@ -900,7 +933,7 @@ fun NightStartDialog(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                AnnotationText.asleepTitle[lang].format(nightDateFull(dateKey, lang)),
+                (if (end) AnnotationText.wokeTitle else AnnotationText.asleepTitle)[lang].format(nightDateFull(dateKey, lang)),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = sectionInk,
@@ -918,9 +951,9 @@ fun NightStartDialog(
                 for (i in 10..11) box(i, 44.dp, 44.dp)()
             }
             if (invalid) {
-                Text(AnnotationText.asleepInvalid[lang], style = MaterialTheme.typography.bodyMedium, color = ANNOTATION_INK)
+                Text((if (end) AnnotationText.wokeInvalid else AnnotationText.asleepInvalid)[lang], style = MaterialTheme.typography.bodyMedium, color = ANNOTATION_INK)
             }
-            Text(AnnotationText.asleepHint[lang], style = MaterialTheme.typography.bodyMedium, color = sectionInk)
+            Text((if (end) AnnotationText.wokeHint else AnnotationText.asleepHint)[lang], style = MaterialTheme.typography.bodyMedium, color = sectionInk)
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
