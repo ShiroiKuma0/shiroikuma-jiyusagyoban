@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import com.opentasker.core.engine.variables.PersistentGlobalScope
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import org.junit.Assert.assertEquals
@@ -467,5 +468,19 @@ class ContextMatchEvaluatorTest {
                 bootEvent,
             )
         )
+    }
+
+    @Test
+    fun `a minute tick's interval may name a variable`() {
+        PersistentGlobalScope.set(7L, "WD_Interval", "15")
+        try {
+            assertEquals(15, ContextMatchEvaluator.minuteInterval("%WD_Interval"))
+            assertEquals(5, ContextMatchEvaluator.minuteInterval("5"))
+            // Unset, or not a number: every minute rather than never.
+            assertEquals(1, ContextMatchEvaluator.minuteInterval("%WD_Unset"))
+            assertEquals(1, ContextMatchEvaluator.minuteInterval(""))
+        } finally {
+            PersistentGlobalScope.unset(7L, "WD_Interval")
+        }
     }
 }
