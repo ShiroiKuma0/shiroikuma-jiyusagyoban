@@ -16,25 +16,30 @@ import androidx.core.content.edit
  * epoch-millisecond instant, not a clock time, because a bedtime of 23:30 and one of 01:30 belong
  * to different calendar days and a bare "HH:mm" could not say which.
  *
- * What it does to the night is `SleepShape.withNightStarts`: an earlier start adds the gap as
+ * What it does to the night is `SleepShape.withNightEdges`: an earlier start adds the gap as
  * unstaged sleep — asleep, but no stage the watch never measured; a later one trims the front off.
  * SharedPreferences for the same reason as the rating: a few bytes, authored, no schema.
+ * Its twin for the other end of the night is [NightEnds].
  */
-object NightStarts {
+object NightStarts : NightEdges("night_starts")
 
-    private const val PREFS = "night_starts"
+/**
+ * One authored instant per night, keyed by the morning (`yyyyMMdd`) the WATCH ended that night on —
+ * the store behind [NightStarts] and [NightEnds].
+ */
+open class NightEdges(private val prefsName: String) {
 
     private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        context.applicationContext.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
-    /** Every correction on file, morning key → the instant 白い熊 fell asleep. */
+    /** Every correction on file, morning key → the instant. */
     fun all(context: Context): Map<Long, Long> =
         prefs(context).all.mapNotNull { (k, v) ->
             val key = k.toLongOrNull() ?: return@mapNotNull null
             (v as? Long)?.let { key to it }
         }.toMap()
 
-    /** Set the night ending on [morningKey] to start at [atMs]; null withdraws the correction. */
+    /** Set the night ending on [morningKey] to this instant; null withdraws the correction. */
     fun set(context: Context, morningKey: Long, atMs: Long?) {
         prefs(context).edit {
             if (atMs == null) remove(morningKey.toString()) else putLong(morningKey.toString(), atMs)
