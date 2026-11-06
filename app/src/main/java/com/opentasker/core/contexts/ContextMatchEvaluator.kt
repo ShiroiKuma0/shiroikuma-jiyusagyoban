@@ -4,6 +4,7 @@ import com.google.re2j.Pattern as Re2Pattern
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.location.FossGeofenceEvaluator
+import com.opentasker.core.engine.variables.expandAgainstGlobals
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
@@ -320,17 +321,27 @@ object ContextMatchEvaluator {
     /**
      * A periodic clock tick. Rides the internal per-minute `sun_tick` pulse, so it fires once every
      * minute (the natural cadence for a clock widget); an optional `everyMinutes`/`interval` config
-     * fires only every N minutes, aligned to the top of the hour.
+     * fires only every N minutes, aligned to the top of the hour. N may be a variable — see [minuteInterval].
      */
     private fun matchesMinuteTick(spec: ContextSpec, event: ContextEvent): Boolean {
         if (!event.metadata["event"].orEmpty().equals("sun_tick", ignoreCase = true)) return false
-        val every = firstConfig(spec, "everyMinutes", "interval", "minutes").toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val every = minuteInterval(firstConfig(spec, "everyMinutes", "interval", "minutes"))
         if (every <= 1) return true  // every-minute consumers (clock, battery line) also take the one-shot refresh tick
         // Interval profiles (everyMinutes>1, e.g. 話す時計) fire ONLY on a real minute boundary — never on the
         // one-shot refresh tick the engine emits on each (re)subscription, which would double-fire them at :00/:30.
         if (event.metadata["refresh"] == "true") return false
         val minute = event.metadata["time"]?.let(::parseClockMinutes) ?: currentMinuteOfDay()
         return minute % every == 0
+    }
+
+    /**
+     * The interval of a minute tick. It may name a variable (`%WD_Interval`), so a project's 01 task
+     * sets how often its profile fires — read on every tick, so a changed value applies from the next
+     * minute without a reload. An unset or non-numeric value falls back to every minute.
+     */
+    internal fun minuteInterval(raw: String): Int {
+        val value = if ('%' in raw) expandAgainstGlobals(raw) else raw
+        return value.trim().toIntOrNull()?.coerceAtLeast(1) ?: 1
     }
 
     /** Sub-minute periodic trigger: fires every `interval` seconds (config `interval`/`everySeconds`/
