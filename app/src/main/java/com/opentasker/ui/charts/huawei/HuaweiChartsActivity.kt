@@ -100,6 +100,10 @@ class HuaweiChartsActivity : ComponentActivity() {
                         // returns to — the register, with the page still open, not the report.
                         var scoreWeightsOpen by rememberSaveable { mutableStateOf(false) }
                         var markerBack by rememberSaveable { mutableStateOf<String?>(null) }
+                        // The register's scroll positions, held out here so a history page opened
+                        // from a table value returns to the same line (2026-11-04).
+                        val registerScroll = androidx.compose.foundation.rememberScrollState()
+                        val registerTableScroll = androidx.compose.foundation.rememberScrollState()
                         // Up one level: back to whatever opened this page, else to the report.
                         val up = {
                             selected = markerBack
@@ -199,10 +203,14 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 onWeight = { atMs, kg, replacingMs -> model.setWeight(atMs, kg, replacingMs) },
                                 nightStarts = state.nightStarts,
                                 onNightStart = { morning, atMs -> model.setNightStart(morning, atMs) },
+                                nightEnds = state.nightEnds,
+                                onNightEnd = { morning, atMs -> model.setNightEnd(morning, atMs) },
                                 scoreWeights = state.nightScoreWeights,
                                 onScoreWeights = model::setNightScoreWeights,
                                 scoreWeightsOpen = scoreWeightsOpen,
                                 onScoreWeightsOpen = { scoreWeightsOpen = it },
+                                pageScroll = registerScroll,
+                                tableScroll = registerTableScroll,
                                 onOpenMarker = { marker ->
                                     markerBack = com.opentasker.ui.charts.MetricSpecs.KEY_REGISTER
                                     selected = if (
