@@ -109,6 +109,8 @@ data class HuaweiDashboardState(
     val weightReadings: Map<Long, com.opentasker.core.storage.BodyWeightEntity> = emptyMap(),
     /** 白い熊's own bedtimes, morning key → instant — see NightStarts. */
     val nightStarts: Map<Long, Long> = emptyMap(),
+    /** 白い熊's own wake times, morning key → instant — see NightEnds. */
+    val nightEnds: Map<Long, Long> = emptyMap(),
     /** 白い熊's weights for the night score — see NightScore and NightScoreWeights. */
     val nightScoreWeights: Map<com.opentasker.ui.charts.NightScore.Part, Int> =
         com.opentasker.ui.charts.NightScore.DEFAULTS,
@@ -305,6 +307,7 @@ class HuaweiDashboardModel(
             weightToday = weightsByDay(zone)[com.opentasker.core.band.RehabLog.today(zone)],
             weightReadings = latestWeighings(zone),
             nightStarts = com.opentasker.core.band.NightStarts.all(appContext),
+            nightEnds = com.opentasker.core.band.NightEnds.all(appContext),
             nightScoreWeights = com.opentasker.core.band.NightScoreWeights.all(appContext),
             // The band's own rehab sessions AND anything 白い熊 ticked by hand.
                 //
@@ -394,10 +397,11 @@ class HuaweiDashboardModel(
         }
 
         val humeSessions = loadHumeSessions(zone)
-        // 白い熊's own bedtimes over the watch's, where one was authored — see NightStarts.
-        val nights = com.opentasker.ui.charts.SleepShape.withNightStarts(
+        // 白い熊's own bedtimes and wake times over the watch's, where authored — see NightStarts, NightEnds.
+        val nights = com.opentasker.ui.charts.SleepShape.withNightEdges(
             HuaweiNights.all(db, cutoverMs, humeSessions),
             com.opentasker.core.band.NightStarts.all(appContext),
+            com.opentasker.core.band.NightEnds.all(appContext),
         ) { ms -> com.opentasker.core.band.RehabLog.dateKeyOf(java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()) }
         val boundary = cutoverMs ?: Long.MAX_VALUE
         val humeNights = nights.count { it.endMs < boundary }
@@ -682,6 +686,11 @@ class HuaweiDashboardModel(
 
     fun setNightStart(morningKey: Long, atMs: Long?) {
         com.opentasker.core.band.NightStarts.set(appContext, morningKey, atMs)
+        refresh()
+    }
+
+    fun setNightEnd(morningKey: Long, atMs: Long?) {
+        com.opentasker.core.band.NightEnds.set(appContext, morningKey, atMs)
         refresh()
     }
 
