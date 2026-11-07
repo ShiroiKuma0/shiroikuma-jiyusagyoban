@@ -154,6 +154,10 @@ class SendIntentAction : Action {
                                     intent.putExtra(IntentReplyBridge.EXTRA_REPLY_ACTION, IntentReplyBridge.ACTION_INTENT_REPLY)
                                     intent.putExtra(IntentReplyBridge.EXTRA_REPLY_PACKAGE, ctx.app.packageName)
                                     intent.putExtra(IntentReplyBridge.EXTRA_REPLY_ID, replyId)
+                                    // Sent under both names: kojiki's guard contract calls it request_id.
+                                    if (!intent.hasExtra(IntentReplyBridge.EXTRA_REQUEST_ID)) {
+                                        intent.putExtra(IntentReplyBridge.EXTRA_REQUEST_ID, replyId)
+                                    }
                                     intent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
                                     ctx.app.sendOrderedBroadcast(intent, null)
                                     val watcher = if (watchdogSec == 0) null else launch {
