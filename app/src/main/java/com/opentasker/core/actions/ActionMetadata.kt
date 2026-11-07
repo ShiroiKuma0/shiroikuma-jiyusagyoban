@@ -2326,6 +2326,7 @@ fun registerActionMetadata() {
                 ActionField("screen", "Screen on → variable", hint = "var for on/off (e.g. SCR)"),
                 ActionField("app", "Foreground app → variable", hint = "var for the package name (e.g. APP)"),
                 ActionField("ringer", "Ringer mode → variable", hint = "var for normal/vibrate/silent (e.g. RNG)"),
+                ActionField("network", "Internet network → variable", hint = "var for true/false: a validated Wi-Fi or mobile network, never the VPN (e.g. NET)"),
             )
         )
     )
