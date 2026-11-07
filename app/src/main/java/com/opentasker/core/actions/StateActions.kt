@@ -26,6 +26,8 @@ import com.opentasker.core.engine.ActionResult
  *   - `screen`   → "on" / "off".
  *   - `app`      → the foreground app's package name ("" if unknown).
  *   - `ringer`   → "normal" / "vibrate" / "silent".
+ *   - `network`  → "true" / "false": some real network (Wi-Fi, mobile data, Ethernet — never a VPN)
+ *                  that Android itself has validated as reaching the internet.
  */
 class StateGetAction : Action {
     override val id = "state.get"
@@ -78,7 +80,29 @@ class StateGetAction : Action {
         }
         store("ringer", ringer)
 
-        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"} app=$foreground ringer=$ringer")
+        val network = hasValidatedNetwork(app)
+        store("network", network.toString())
+
+        ctx.logger("State: battery=$pct% charging=$charging wifi=$wifi airplane=$airplane screen=${if (screenOn) "on" else "off"} app=$foreground ringer=$ringer network=$network")
         return ActionResult.Success
+    }
+}
+
+/**
+ * True when a real network — not a VPN — carries Android's own VALIDATED mark.
+ *
+ * The VPN itself is skipped on purpose: a guard asking "is the VPN broken, or is there simply no
+ * network?" needs the answer about what lies UNDER the tunnel. Android validates each underlying
+ * network with its own probe, which bypasses the VPN, so a validated Wi-Fi or mobile network means
+ * the internet is there and any failure to reach it is the tunnel's.
+ */
+@Suppress("DEPRECATION") // allNetworks: the one call that lists the networks under an active VPN.
+internal fun hasValidatedNetwork(context: Context): Boolean {
+    val manager = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+    return manager.allNetworks.any { network ->
+        val caps = manager.getNetworkCapabilities(network) ?: return@any false
+        !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

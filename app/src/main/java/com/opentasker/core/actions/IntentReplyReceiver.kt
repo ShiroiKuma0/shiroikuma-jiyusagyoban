@@ -45,7 +45,7 @@ object IntentReplyBridge {
     fun deliver(id: String, reply: Reply) { forget(id); waiters.remove(id)?.invoke(reply) }
 
     /** The keys that are protocol rather than payload, and so are never surfaced as variables. */
-    val PLUMBING = setOf(EXTRA_REPLY_ACTION, EXTRA_REPLY_PACKAGE, EXTRA_REPLY_ID, EXTRA_RESULT)
+    val PLUMBING = setOf(EXTRA_REPLY_ACTION, EXTRA_REPLY_PACKAGE, EXTRA_REPLY_ID, EXTRA_REQUEST_ID, EXTRA_RESULT)
 
     private fun forget(id: String) {
         lastSeen.remove(id); lastChange.remove(id); lastReport.remove(id)
@@ -80,13 +80,16 @@ object IntentReplyBridge {
     const val EXTRA_REPLY_ACTION = "reply_action"
     const val EXTRA_REPLY_PACKAGE = "reply_package"
     const val EXTRA_REPLY_ID = "reply_id"
+    /** The same correlation id under the name some sister apps echo instead (白い熊 kojiki). */
+    const val EXTRA_REQUEST_ID = "request_id"
     const val EXTRA_RESULT = "result"
 }
 
 class IntentReplyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != IntentReplyBridge.ACTION_INTENT_REPLY) return
-        val id = intent.getStringExtra(IntentReplyBridge.EXTRA_REPLY_ID) ?: return
+        val id = intent.getStringExtra(IntentReplyBridge.EXTRA_REPLY_ID)
+            ?: intent.getStringExtra(IntentReplyBridge.EXTRA_REQUEST_ID) ?: return
         // Every string extra the target sent, minus the plumbing. Only strings: this channel exists
         // because EMUI will not carry anything richer between two third-party apps, and a value that
         // arrived as some other type would be a sign the contract was not followed, not a bonus.
