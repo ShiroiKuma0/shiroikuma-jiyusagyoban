@@ -8,6 +8,34 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.94+2026-09-30.11-19.ga3b4fda4+145 — 2026-11-07
+
+Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+140`.
+
+### 健康
+
+- **A night's wake time can be corrected.** Next to 🛏 “就寝時刻を直す” in a night's dialog, a ☀
+  “起床時刻を直す” / “Woke at…” pill opens the same date-and-time dialog. A later wake time adds the gap
+  as unstaged sleep (counted in length and asleep minutes, never in deep, REM or their share); an
+  earlier one trims the back of the night. Bedtime and wake time apply together, so the sleep cell,
+  the sleep score, the night score and regularity all follow the corrected night; measured values
+  stay what the watch recorded. The time must fall on that row's morning, after the start, within
+  18 hours and not in the future. Corrections live in `night_ends`, which is in the settings backup.
+- **Table values open their history pages**, and the night register keeps its scroll position.
+
+### Engine
+
+- **A profile's minute interval may name a variable** (e.g. `%WD_Interval`), so a project's 01 task
+  decides how often its profile fires.
+- **Get Device State has a `network` value:** `true` when a real network (Wi-Fi, mobile, Ethernet —
+  never the VPN) carries Android's own VALIDATED mark. It tells “no network at all” apart from “the
+  tunnel is broken”.
+- **Send Intent's reply mode also matches replies by `request_id`**, sent alongside `reply_id`, for
+  sister apps whose contract echoes that name (白い熊 考直's VPN guard receiver).
+- **The run trace is `run-trace.txt`, never a `.log`** — EMUI's nightly clean-up deletes `*.log` under
+  `Android/data`. Old files are migrated on start, and the file is reopened for every line, so a
+  trace deleted under the writer is simply recreated.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+140 — 2026-11-03
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+139`.
