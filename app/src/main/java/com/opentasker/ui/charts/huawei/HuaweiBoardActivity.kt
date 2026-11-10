@@ -68,11 +68,20 @@ class HuaweiBoardActivity : ComponentActivity() {
                 )
             }
             val scope = androidx.compose.runtime.rememberCoroutineScope()
+            // The sync dialog shows the app's one sync run (HuaweiSyncSession), so hiding the dialog
+            // or closing this window leaves the run going; this only says whether it is on screen.
+            var syncOpen by remember { mutableStateOf(autoSync || showSync) }
+            var syncInfo by remember { mutableStateOf<SyncJob?>(null) }
+            val run by HuaweiSyncSession.state.collectAsState()
 
             // The two real photographs, read once and off the main thread: the earth watch face out
             // of the library's own archive, and a piece of a walk 地図 has drawn a map for. Both are
             // optional — a missing one falls through to the drawn artwork rather than a hole.
             androidx.compose.runtime.LaunchedEffect(Unit) {
+                // Opened by the report's Sync button: the dialog, already running the everyday sync
+                // (白い熊, 2026-11-10) — one place where every sync is watched, whoever started it.
+                // A run already going is shown, not started twice.
+                if (autoSync) HuaweiSyncSession.start(applicationContext, SyncJob.NORMAL)
                 val face = withContext(Dispatchers.IO) { faceArt() }
                 val walk = withContext(Dispatchers.IO) { walkCutout() }
                 state = state.copy(faceArt = face, walkArt = walk)
@@ -85,7 +94,7 @@ class HuaweiBoardActivity : ComponentActivity() {
                 ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         HuaweiBoardScreen(
-                            state = state,
+                            state = state.copy(sync = if (syncOpen) run.copy(info = syncInfo) else null),
                             contentPadding = WindowInsets.systemBars.asPaddingValues(),
                             onRun = { tile ->
                                 // A tile that is ALREADY running and knows how to show itself again
@@ -95,12 +104,14 @@ class HuaweiBoardActivity : ComponentActivity() {
                                     runTask(tile.reopenTask) {}
                                     return@HuaweiBoardScreen
                                 }
-                                if (state.anyBusy) return@HuaweiBoardScreen
+                                // Opens the dialog and nothing else: a sync starts from one of its
+                                // buttons (白い熊, 2026-11-03). A hidden run is shown again, going.
                                 if (tile.key == "sync") {
-                                    // Opens the dialog and nothing else: a sync starts from one of
-                                    // its buttons (白い熊, 2026-11-03).
-                                    state = state.copy(sync = BoardSync())
-                                } else if (tile.key == "lang") {
+                                    syncOpen = true
+                                    return@HuaweiBoardScreen
+                                }
+                                if (state.anyBusy) return@HuaweiBoardScreen
+                                if (tile.key == "lang") {
                                     // Opens at once, with no radio: there is nothing to ask the band
                                     // (it cannot report its language — see [BoardLanguage]), so the
                                     // dialog would have been spending a whole Bluetooth session to
@@ -121,9 +132,10 @@ class HuaweiBoardActivity : ComponentActivity() {
                             },
                             onSyncAction = { job ->
                                 if (state.anyBusy) return@HuaweiBoardScreen
-                                startSync(job, { state.sync }) { next -> state = state.copy(sync = next) }
+                                HuaweiSyncSession.start(applicationContext, job)
                             },
-                            onSyncInfo = { job -> state = state.copy(sync = state.sync?.copy(info = job)) },
+                            onSyncInfo = { job -> syncInfo = job },
+                            onCancelSync = { HuaweiSyncSession.cancel() },
                             onSwitchLanguage = { target ->
                                 state = state.copy(
                                     language = state.language?.copy(switching = true, failed = null),
@@ -132,12 +144,13 @@ class HuaweiBoardActivity : ComponentActivity() {
                             },
                             onCloseLanguage = { state = state.copy(language = null) },
                             onCloseSync = {
-                                // The watcher outlived the dialog it was feeding, and every tick
-                                // wrote the sync state back — so OK cleared it and 700 ms later it
-                                // returned. The dialog could not be dismissed at all (白い熊,
-                                // 2026-08-29). Closing it stops the thing that reopens it.
-                                stopWatchingSync()
-                                state = state.copy(sync = null, busy = null)
+                                // Close when idle, Hide while a sync runs: the run goes on, and its
+                                // notification, the report's Sync or this board's Sync shows it again.
+                                syncOpen = false
+                                syncInfo = null
+                                HuaweiSyncSession.clearNotification(applicationContext)
+                                // Back to where it was opened from — the report reloads what it brought.
+                                if (autoSync || showSync) finish()
                             },
                         )
                     }
@@ -150,6 +163,9 @@ class HuaweiBoardActivity : ComponentActivity() {
     }
 
     private var scope: kotlinx.coroutines.CoroutineScope? = null
+
+    private val autoSync: Boolean get() = intent?.getBooleanExtra(EXTRA_AUTO_SYNC, false) == true
+    private val showSync: Boolean get() = intent?.getBooleanExtra(EXTRA_SHOW_SYNC, false) == true
 
     private fun runTask(name: String, onDone: () -> Unit) {
         HuaweiSyncRunner.scope.launch {
@@ -201,152 +217,6 @@ class HuaweiBoardActivity : ComponentActivity() {
             )
             scope?.launch { onDone(next) }
         }
-    }
-
-    /**
-     * Run one of the sync dialog's jobs and keep the dialog fed while it runs.
-     *
-     * [current] and [publish] go through the composable's state so the dialog and this agree on
-     * one value; every write happens on the window's own scope.
-     */
-    private fun startSync(job: SyncJob, current: () -> BoardSync?, publish: (BoardSync) -> Unit) {
-        val startedAt = System.currentTimeMillis()
-        fun at() = ((System.currentTimeMillis() - startedAt) / 1000).toInt()
-        fun update(f: (BoardSync) -> BoardSync) {
-            scope?.launch { current()?.let { publish(f(it)) } }
-        }
-        // A step as a new line — only when it is actually a new step, since the runner re-announces
-        // its phase with every record counted.
-        fun step(phase: String, message: String = "") = update { s ->
-            val last = s.lines.lastOrNull()
-            // A full sync walks many windows, each counting then reading: one line for each of the
-            // two, with the window number in the counter, rather than two lines per window.
-            val repeating = phase in REPEATING_PHASES && s.lines.any { it.phase == phase }
-            if (repeating || (last != null && last.phase == phase && last.message == message)) s.copy(phase = phase)
-            else s.copy(phase = phase, message = message, lines = s.lines + SyncLine(at(), phase, message))
-        }
-        publish(
-            (current() ?: BoardSync()).copy(
-                running = job, phase = "starting", message = "", percent = null, count = "",
-                lines = listOf(SyncLine(0, "starting")), startedAtMs = startedAt, summary = "",
-            ),
-        )
-        fun finish(summary: String) {
-            stopWatchingSync()
-            update { s ->
-                s.copy(
-                    running = null, last = job, phase = "done", percent = null, count = "",
-                    summary = summary, lines = s.lines + SyncLine(at(), "done"),
-                )
-            }
-        }
-        when (job) {
-            SyncJob.NORMAL, SyncJob.FULL -> {
-                watchSync(startedAt, ::step) { pct, count -> update { it.copy(percent = pct, count = count) } }
-                runTask(if (job == SyncJob.NORMAL) BOARD_TILES.first { it.key == "sync" }.task else SYNC_FULL_TASK) {
-                    finish(PersistentGlobalScope.snapshotAll()["HUAWEI_Summary"].orEmpty())
-                }
-            }
-            SyncJob.STATE -> runTask(SYNC_STATE_TASK) { finish(syncStateReadout()) }
-            SyncJob.WORKOUTS -> HuaweiSyncRunner.scope.launch {
-                val now = System.currentTimeMillis() / 1000
-                val result = HuaweiSyncRunner.fetchWorkouts(
-                    applicationContext,
-                    HuaweiSettings.address(applicationContext),
-                    now - WORKOUT_DAYS * 86_400L,
-                    now,
-                    OpenTaskerApp_NoHilt.db.huaweiWorkoutDao(),
-                    onPhase = { step(it) },
-                    onProgress = { done, total ->
-                        if (done == 0) step("workouts")
-                        update {
-                            it.copy(
-                                percent = if (total > 0) done * 100 / total else 100,
-                                count = "$done / $total",
-                            )
-                        }
-                    },
-                )
-                val lang = BandLanguage.parse(HuaweiSettings.language(applicationContext))
-                val summary = result.fold(
-                    onSuccess = { fetched ->
-                        HuaweiWorkoutStore.Kind.entries.joinToString(" · ") { kind ->
-                            "${HuaweiText.titleFor(kind)[lang]} ${fetched.count { kind.matches(it.summary.type) }}"
-                        }
-                    },
-                    onFailure = { it.message ?: it::class.java.simpleName },
-                )
-                scope?.launch { finish(summary) }
-            }
-        }
-    }
-
-    /** What 同期状態 decided, said in the dialog too — the task itself only raises or clears a notification. */
-    private fun syncStateReadout(): String {
-        val g = PersistentGlobalScope.snapshotAll()
-        val last = g["HUAWEI_LastSuccess"].orEmpty()
-        if (last.isBlank()) return Loc("No sync has ever succeeded.", "一度も同期に成功していません。")[
-            BandLanguage.parse(HuaweiSettings.language(applicationContext))]
-        val lang = BandLanguage.parse(HuaweiSettings.language(applicationContext))
-        return listOfNotNull(
-            Loc("Last success %s", "最後の成功 %s")[lang].format(last),
-            g["HUAWEI_AgeHours"]?.takeIf { it.isNotBlank() }?.let { Loc("%s h ago", "%s 時間前")[lang].format(it) },
-            g["Huawei_WarnAfterHours"]?.takeIf { it.isNotBlank() && !it.startsWith("%") }
-                ?.let { Loc("warns after %s h", "警告 %s 時間後")[lang].format(it) },
-            g["HUAWEI_BatteryPct"]?.takeIf { it.isNotBlank() }?.let { Loc("battery %s %%", "電池 %s %%")[lang].format(it) },
-            g["HUAWEI_SyncCount"]?.takeIf { it.isNotBlank() }?.let { Loc("%s syncs", "同期 %s 回")[lang].format(it) },
-        ).joinToString(" · ")
-    }
-
-    /**
-     * Follow the runner's own progress flow while a sync task runs.
-     *
-     * Held as a job, and there is only ever one. A watcher with no handle on it is a watcher nothing
-     * can stop: the old poll loop was `while (true)` writing into the dialog's state, which made
-     * closing the dialog impossible — OK cleared it, the next tick wrote it back.
-     *
-     * Only emissions from a run that began after [since] count: until the runner calls `begin`, the
-     * flow still holds the previous sync's finished state, and showing that as this run's progress
-     * would be the same lie as the old "starting · 0 %".
-     */
-    private var syncWatch: kotlinx.coroutines.Job? = null
-
-    private val REPEATING_PHASES = setOf("counting", "reading")
-
-    private fun watchSync(
-        since: Long,
-        onStep: (phase: String, message: String) -> Unit,
-        onCount: (percent: Int?, count: String) -> Unit,
-    ) {
-        stopWatchingSync()
-        syncWatch = scope?.launch {
-            HuaweiSyncState.progress.collect { p ->
-                if (!p.running || p.startedAtMillis < since - 1_000) return@collect
-                onStep(p.phase, p.message)
-                val reading = p.phase == "reading" && p.recordCount > 0
-                val lang = BandLanguage.parse(HuaweiSettings.language(applicationContext))
-                onCount(
-                    if (reading) p.percent else null,
-                    listOfNotNull(
-                        p.windowCount.takeIf { it > 1 && p.windowIndex > 0 }
-                            ?.let { Loc("window %d / %d", "窓 %d / %d")[lang].format(p.windowIndex, it) },
-                        if (reading) Loc("record %d / %d", "記録 %d / %d")[lang].format(p.recordIndex, p.recordCount) else null,
-                        p.samples.takeIf { it > 0 }?.let { Loc("%d samples", "標本 %d")[lang].format(it) },
-                    ).joinToString(" · "),
-                )
-            }
-        }
-    }
-
-    private fun stopWatchingSync() {
-        syncWatch?.cancel()
-        syncWatch = null
-    }
-
-    /** Nothing may outlive the window that owns it. */
-    override fun onDestroy() {
-        stopWatchingSync()
-        super.onDestroy()
     }
 
     /**
@@ -417,6 +287,22 @@ class HuaweiBoardActivity : ComponentActivity() {
 
         /** How far back the dialog's workout fetch asks — the same 30 days the walks window lists. */
         const val WORKOUT_DAYS = 30
+
+        /** Open straight into the sync dialog with the everyday sync running — the report's button. */
+        const val EXTRA_AUTO_SYNC = "shiroikuma.jiyusagyoban.extra.HUAWEI_AUTO_SYNC"
+
+        /** Open onto the sync dialog showing the current or last run — the notification's tap. */
+        const val EXTRA_SHOW_SYNC = "shiroikuma.jiyusagyoban.extra.HUAWEI_SHOW_SYNC"
+
+        /** Over the activity that asks, so closing the dialog lands back on it. */
+        fun openSync(context: Context) {
+            context.startActivity(
+                Intent(context, HuaweiBoardActivity::class.java).apply {
+                    putExtra(EXTRA_AUTO_SYNC, true)
+                    if (context !is android.app.Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+            )
+        }
 
         fun open(context: Context) {
             context.startActivity(
