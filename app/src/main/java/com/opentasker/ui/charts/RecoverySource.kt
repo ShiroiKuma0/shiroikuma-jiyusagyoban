@@ -55,6 +55,8 @@ object RecoverySource {
          */
         val deepMinutes: Double? = null,
         val deepRemShare: Double? = null,
+        /** How whole the night was — see [SleepShape.Continuity]. Null for a night with no sleep. */
+        val continuity: SleepShape.Continuity? = null,
         val lowestHr: Double? = null,
         val spo2: Double? = null,
         val hrvMs: Double? = null,
@@ -256,6 +258,12 @@ object RecoverySource {
         (session.totalMinutes - session.awake).toDouble()
 
     /**
+     * The sleep the time-asleep grade is given on: the main sleep, without what was caught up on
+     * after a long spell up (白い熊, 2026-11-08). The total stays in [NightMetrics.sleepMinutes].
+     */
+    fun gradedSleepMinutes(n: NightMetrics): Double? = n.continuity?.mainSleepMinutes ?: n.sleepMinutes
+
+    /**
      * Median skin temperature inside the sleep window. Never a raw absolute — only a deviation.
      *
      * Readings below [SKIN_TEMP_ON_WRIST_C] are left out: they are the watch off the wrist, not 白い熊
@@ -292,6 +300,7 @@ object RecoverySource {
         nocturnalHr = nocturnalHr(session, hrPoints),
         sleepMinutes = sleepMinutes(session),
         skinTemp = skinTemp(session, tempPoints),
+        continuity = SleepShape.continuity(session),
         // A session with no runs at all has no staging to report, and 0 minutes of deep sleep is a
         // very different claim from "this night was never staged".
         deepMinutes = session.deep.toDouble().takeIf { session.totalMinutes > 0 },
