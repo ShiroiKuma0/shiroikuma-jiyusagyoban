@@ -148,7 +148,7 @@ fun ScoreChip(score: NightScore.Score) {
             .padding(horizontal = 6.dp, vertical = 3.dp),
     ) {
         Text(
-            score.value?.let { "$it" + if (score.partial) "*" else "" } ?: "—",
+            score.value?.let { "$it" + score.marks } ?: "—",
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
             color = skin.ink,
@@ -232,8 +232,38 @@ fun NightScoreBreakdownDialog(
                     }
                 }
             }
+            // What each mark on the chip means for THIS night — the mark names its cause here.
             if (score.partial) {
-                Text(BandText.scorePartialMark[lang], style = MaterialTheme.typography.bodySmall, color = sectionNote)
+                Text(
+                    BandText.scorePartialWhich[lang].format(score.missing.joinToString(", ") { it.part.label[lang] }),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sectionInk,
+                )
+            }
+            if (score.capped) {
+                Text(
+                    BandText.scoreCappedWhy[lang].format(
+                        score.cappedBy.joinToString(", ") { it.label[lang] }, NightScore.CAP,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sectionInk,
+                )
+            }
+            score.continuity?.takeIf { score.broken }?.let { c ->
+                val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                    .withZone(java.time.ZoneId.systemDefault())
+                val up = if (c.longestWakeFromMs != null && c.longestWakeToMs != null) {
+                    BandText.scoreBrokenUp[lang].format(
+                        clock.format(java.time.Instant.ofEpochMilli(c.longestWakeFromMs)),
+                        clock.format(java.time.Instant.ofEpochMilli(c.longestWakeToMs)),
+                    )
+                } else ""
+                Text(
+                    BandText.scoreBrokenWhy[lang].format(hoursAndMinutes(c.wasoMinutes), up) +
+                        if (c.catchUpMinutes >= 1) BandText.scoreCatchUp[lang].format(hoursAndMinutes(c.catchUpMinutes)) else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sectionInk,
+                )
             }
             Text(BandText.scoreBreakdownHow[lang], style = MaterialTheme.typography.bodySmall, color = sectionNote)
             Row(

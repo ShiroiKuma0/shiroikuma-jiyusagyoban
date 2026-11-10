@@ -48,7 +48,7 @@ object NightScore {
         val marker: RecoveryMarker?,
     ) {
         BP(
-            BandText.regColBp, 5,
+            BandText.regColBp, 3,
             Loc(
                 "The morning cuff reading. Blood pressure is the largest modifiable cardiovascular " +
                     "risk, but it is a state of the day rather than of the night just slept, and one " +
@@ -58,7 +58,7 @@ object NightScore {
             RecoveryMarker.BP_SYSTOLIC,
         ),
         TEMP(
-            BandText.regColTemp, 8,
+            BandText.regColTemp, 6,
             Loc(
                 "Skin temperature against your own nights. A rise of a few tenths is one of the " +
                     "earliest signs of an oncoming illness in the wearable studies (TemPredict and " +
@@ -68,7 +68,7 @@ object NightScore {
             RecoveryMarker.TEMPERATURE,
         ),
         NIGHT_HR(
-            BandText.regColHr, 18,
+            BandText.regColHr, 12,
             Loc(
                 "Nocturnal heart rate against your usual — one of the three counted markers, and " +
                     "the best-evidenced overnight sign of strain, late training, alcohol and " +
@@ -78,7 +78,7 @@ object NightScore {
             RecoveryMarker.NOCTURNAL_HR,
         ),
         BED_HR(
-            BandText.regColBedHr, 4,
+            BandText.regColBedHr, 3,
             Loc(
                 "The first hour in bed. It caught the 2026-09-12 episode that every counted marker " +
                     "missed, but it is one night's evening, within-person only, and moves with " +
@@ -88,7 +88,7 @@ object NightScore {
             RecoveryMarker.BEDTIME_HR,
         ),
         SWING(
-            BandText.regColSwing, 3,
+            BandText.regColSwing, 2,
             Loc(
                 "How far the heart rate moved across the night. Largely the same information as " +
                     "the curve beside it, and on your own data it lagged the illness rather than " +
@@ -98,7 +98,7 @@ object NightScore {
             RecoveryMarker.HR_SWING,
         ),
         CURVE(
-            BandText.regColCurve, 8,
+            BandText.regColCurve, 5,
             Loc(
                 "The night's descent against your usual one. A heart rate that does not fall at " +
                     "night (non-dipping) is a recognised adverse sign, and the curve is the cell " +
@@ -108,7 +108,7 @@ object NightScore {
             RecoveryMarker.HR_SWING,
         ),
         SLEEP(
-            BandText.regColSleep, 18,
+            BandText.regColSleep, 12,
             Loc(
                 "Time asleep, on the NSF / AASM ladder. Sleep duration has the deepest literature " +
                     "of anything in this row, and it is what a watch measures best — tied for the " +
@@ -128,7 +128,7 @@ object NightScore {
             RecoveryMarker.DEEP,
         ),
         DEEP_REM(
-            BandText.regColDeepRem, 3,
+            BandText.regColDeepRem, 2,
             Loc(
                 "Deep + REM as a share of the night. The same staging weakness as deep, a little " +
                     "steadier as a share — a small weight.",
@@ -137,7 +137,7 @@ object NightScore {
             RecoveryMarker.DEEP_REM,
         ),
         LOW_HR(
-            BandText.regColLowHr, 8,
+            BandText.regColLowHr, 5,
             Loc(
                 "The night's lowest heart rate, on Jensen's decades. A good fitness reading, but " +
                     "it overlaps the nocturnal rate heavily — counting both fully would weigh one " +
@@ -147,7 +147,7 @@ object NightScore {
             RecoveryMarker.LOWEST_HR,
         ),
         HRV(
-            BandText.regColHrv, 14,
+            BandText.regColHrv, 10,
             Loc(
                 "RMSSD from the watch's own beat-to-beat intervals. Overnight HRV is the most-used " +
                     "recovery signal in the literature and here it is a real measurement, checked " +
@@ -157,7 +157,7 @@ object NightScore {
             RecoveryMarker.HRV,
         ),
         BREATHS(
-            BandText.regColResp, 6,
+            BandText.regColResp, 4,
             Loc(
                 "Breathing rate against your own nights. A rise is an early illness sign in the " +
                     "wearable studies; here it is estimated from the beat series, not measured — " +
@@ -167,13 +167,34 @@ object NightScore {
             RecoveryMarker.RESPIRATION,
         ),
         SPO2(
-            BandText.regColSpo2, 4,
+            BandText.regColSpo2, 2,
             Loc(
                 "Blood oxygen on the clinical ranges. A wrist oximeter's error is about twice the " +
                     "swing it measures, so a low reading is worth a look and little more — a small share.",
                 "臨床区分での血中酸素。手首の酸素計の誤差は測る振れ幅の約二倍。低い値は気に留める程度。小さめ。",
             ),
             RecoveryMarker.SPO2,
+        ),
+        CONTINUITY(
+            BandText.regColWaso, 8,
+            Loc(
+                "Time awake after first falling asleep (WASO) — the standard measure of a broken " +
+                    "night: under 20 min, 20–40, 40–60, 60–90, over 90. Getting up in pain and catching " +
+                    "up on sleep later is a bad night however long the total (白い熊, 2026-11-08).",
+                "入眠後の覚醒時間（WASO）— 途切れた夜の標準的な指標。20 分未満・20〜40・40〜60・60〜90・90 分超。痛みで起き、後で寝足した夜は、合計が長くても悪い夜（白い熊、2026-11-08）。",
+            ),
+            RecoveryMarker.SLEEP,
+        ),
+        WOKE(
+            BandText.regColFelt, 25,
+            Loc(
+                "How you woke, your own 1–5. The heaviest weight: the cells measure the body, the " +
+                    "rating is how the morning actually is, and a green score on a morning rated 4 " +
+                    "was the score being wrong (白い熊, 2026-11-08). The fit at the top of this page " +
+                    "is computed WITHOUT it, so it still says how well the measurements alone track you.",
+                "目覚め、自分でつける 1〜5。最も重い。セルは体を測り、評価は朝の実際。4 と付けた朝の緑の点数は点数の誤り（白い熊、2026-11-08）。上の相関はこれを除いて計算するので、測定だけがどれだけ合うかを示し続ける。",
+            ),
+            RecoveryMarker.FELT,
         ),
     }
 
@@ -202,8 +223,21 @@ object NightScore {
         val components: List<Component>,
         /** Measured weight over all weight, 0..1. */
         val share: Double,
+        /** The illness signs that held the score down to [CAP]; empty when it was not capped. */
+        val cappedBy: List<Part> = emptyList(),
+        /** How the night was broken, when it was — see [broken]. */
+        val continuity: SleepShape.Continuity? = null,
     ) {
         val partial: Boolean get() = components.any { it.step == null && it.weight > 0 }
+        val capped: Boolean get() = cappedBy.isNotEmpty()
+
+        /** A night broken by a long spell up, or by an hour or more awake in all. */
+        val broken: Boolean
+            get() = continuity != null &&
+                (continuity.catchUpMinutes > 0 || SleepShape.wasoStep(continuity.wasoMinutes) >= 4)
+
+        /** `*` partial, `!` capped or broken — both explained in the breakdown. */
+        val marks: String get() = (if (partial) "*" else "") + (if (capped || broken) "!" else "")
         val step: Int? get() = value?.let(::stepOf)
         val missing: List<Component> get() = components.filter { it.step == null && it.weight > 0 }
 
@@ -229,10 +263,29 @@ object NightScore {
         Part.HRV to n.hrvStep,
         Part.BREATHS to n.respirationStep,
         Part.SPO2 to n.spo2Step,
+        Part.CONTINUITY to n.wasoStep,
+        Part.WOKE to n.felt.value?.roundToInt()?.coerceIn(1, 5),
     )
 
     fun score(n: SessionRegister.NightReading, weights: Map<Part, Int>): Score =
-        score(steps(n), weights)
+        score(steps(n), weights).copy(continuity = n.continuity)
+
+    /**
+     * The ceiling illness signs put on a night: no better than 4, “below par” (白い熊, 2026-11-08).
+     *
+     * An average lets a fever night come out ordinary — temperature was 8 of 100, and on 2026-11-06
+     * and -07, sick with a temperature, the nights scored a blue 54 and 44. Illness is not something
+     * the other cells can make up for, so it is a ceiling, not a weight: the night is capped when the
+     * temperature is graded 4 or 5, or when two of the three illness markers (temperature, night
+     * heart rate, HRV) are.
+     */
+    const val CAP = 37
+
+    /** Which illness signs cap a night with these steps; empty when none does. */
+    fun illness(steps: Map<Part, Int?>): List<Part> {
+        val off = listOf(Part.TEMP, Part.NIGHT_HR, Part.HRV).filter { (steps[it] ?: 0) >= 4 }
+        return if (Part.TEMP in off || off.size >= 2) off else emptyList()
+    }
 
     fun score(steps: Map<Part, Int?>, weights: Map<Part, Int>): Score {
         val components = Part.entries.map { Component(it, steps[it], weights[it] ?: it.default) }
@@ -245,7 +298,8 @@ object NightScore {
         } else {
             (measured.sumOf { it.points!! * it.weight }.toDouble() / measuredWeight).roundToInt()
         }
-        return Score(value, components, share)
+        val cappedBy = if (value != null && value > CAP) illness(steps) else emptyList()
+        return Score(if (cappedBy.isEmpty()) value else CAP, components, share, cappedBy)
     }
 
     // ---- calibration against how 白い熊 woke ---------------------------------------------------
@@ -267,7 +321,8 @@ object NightScore {
     fun calibration(rows: List<SessionRegister.NightRow>, weights: Map<Part, Int>): Fit? {
         val pairs = rows.mapNotNull { row ->
             val felt = row.felt ?: return@mapNotNull null
-            val s = row.night?.let { score(it, weights).value } ?: return@mapNotNull null
+            // Without the rating itself, or the fit would be a rating correlated with itself.
+            val s = row.night?.let { score(it, weights + (Part.WOKE to 0)).value } ?: return@mapNotNull null
             s.toDouble() to points(felt).toDouble()
         }
         return fit(pairs)
@@ -281,6 +336,7 @@ object NightScore {
             steps(n) to points(felt).toDouble()
         }
         return Part.entries.associateWith { part ->
+            if (part == Part.WOKE) return@associateWith null   // the rating against itself
             fit(rated.mapNotNull { (s, felt) -> s[part]?.let { points(it).toDouble() to felt } })
         }
     }
@@ -299,8 +355,11 @@ object NightScore {
         val positive = fits.mapValues { (_, f) -> f?.rho?.coerceAtLeast(0.0) ?: 0.0 }
         val sum = positive.values.sum()
         if (sum <= 0.0) return null
+        // The rating keeps its own weight; the measurements share out the rest.
+        val rest = 100 - Part.WOKE.default
         return Part.entries.associateWith { part ->
-            (0.5 * part.default + 0.5 * 100.0 * (positive[part] ?: 0.0) / sum)
+            if (part == Part.WOKE) return@associateWith part.default
+            (0.5 * part.default + 0.5 * rest * (positive[part] ?: 0.0) / sum)
                 .roundToInt().coerceIn(0, MAX_WEIGHT)
         }
     }

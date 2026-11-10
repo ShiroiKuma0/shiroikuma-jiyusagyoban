@@ -95,7 +95,8 @@ class NightCurveScoreTest {
         }
         // 16 since 2026-10-30: the day's latest weighing is the last column. 17 since 2026-11-03:
         // the night score is the first column after the date.
-        assertEquals(17, BandText.registerColumns.size)
+        // 18 since 2026-11-08: time awake in the night, the broken-night cell the score weighs.
+        assertEquals(18, BandText.registerColumns.size)
         // Every heading is translated: a column that falls back to English is a column nobody
         // reviewed, and this table is read in both languages.
         for (c in BandText.registerColumns) {

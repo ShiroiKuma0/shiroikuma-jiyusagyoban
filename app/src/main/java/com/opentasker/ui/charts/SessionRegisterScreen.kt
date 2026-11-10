@@ -940,11 +940,21 @@ private fun NightTableRow(
         // [SessionRegister.NightReading.hrCurveStep] for the night that made the difference visible.
         // The swing's page, because that is the one that carries the night curves themselves.
         Tap(to(RecoveryMarker.HR_SWING)) { CurveCell(n?.hrCurve.orEmpty(), n?.hrCurveStep) }
+        // Graded on the main sleep; sleep caught up on after a long spell up rides beside it as
+        // “+2h13”, so the total is still there but cannot make a broken night look long (2026-11-08).
         Tap(to(RecoveryMarker.SLEEP)) {
             ValueCell(
-                n?.sleep?.value?.let { hoursAndMinutes(it) },
+                n?.sleep?.value?.let { main ->
+                    hoursAndMinutes(main) +
+                        (n.continuity?.catchUpMinutes?.takeIf { it >= 1 }?.let { " +" + hoursAndMinutes(it) } ?: "")
+                },
                 n?.sleep?.displayStep,
+                compact = (n?.continuity?.catchUpMinutes ?: 0.0) >= 1,
             )
+        }
+        // Awake after first falling asleep — the broken-night cell the score now weighs.
+        Tap(to(RecoveryMarker.SLEEP)) {
+            ValueCell(n?.continuity?.let { hoursAndMinutes(it.wasoMinutes) }, n?.wasoStep)
         }
         Tap(to(RecoveryMarker.DEEP)) {
             ValueCell(n?.deepMinutes?.let { hoursAndMinutes(it) }, n?.deepStep)
@@ -1140,7 +1150,7 @@ private fun ScoreCell(score: NightScore.Score?, onClick: () -> Unit) {
         if (score != null) Modifier.clickable(onClick = onClick) else Modifier,
     ) {
         ValueCell(
-            value?.let { "$it" + if (score.partial) "*" else "" },
+            value?.let { "$it" + score.marks },
             score?.step,
         )
     }
@@ -1242,7 +1252,7 @@ private fun RowScope.BpHalf(text: String, grade: Int) {
  * Shared so the two columns cannot drift into saying the same quantity two ways, which is exactly
  * what happens when a second duration is added beside a first and formatted where it is printed.
  */
-private fun hoursAndMinutes(minutes: Double): String =
+internal fun hoursAndMinutes(minutes: Double): String =
     "${(minutes / 60).toInt()}h${"%02d".format((minutes % 60).roundToInt())}"
 
 /**
