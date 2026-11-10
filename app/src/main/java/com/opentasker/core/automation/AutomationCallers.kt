@@ -91,8 +91,16 @@ object AutomationCallers {
     // verbatim copy lints clean everywhere rather than each port patching it. Collapsing the guards
     // into one expression would be the wrong fix: each `return` is a distinct refusal with its own
     // ERROR: line, and merging them costs the caller the reason. (shiroikuma-kabukahyoji.)
+    fun verify(context: Context, declared: String?): Verdict = verify(context, declared, Binder.getCallingUid())
+
+    /**
+     * The same check against a uid the system vouched for some other way than an incoming binder
+     * call. A broadcast receiver has no calling uid below API 34 — [Binder.getCallingUid] there is
+     * this app's own — so [SisterTaskReceiver] takes it from a `PendingIntent` the caller created,
+     * whose creator the system records and the caller cannot forge.
+     */
     @Suppress("ReturnCount")
-    fun verify(context: Context, declared: String?): Verdict {
+    fun verify(context: Context, declared: String?, uid: Int): Verdict {
         val name = declared?.takeIf { it.isNotEmpty() }
             ?: return Verdict.Refused("ERROR:caller unknown")
         val pin = CALLERS[name] ?: return Verdict.Refused("ERROR:caller not permitted: $name")
@@ -100,7 +108,7 @@ object AutomationCallers {
         // The kernel's answer, not the caller's. A package may declare an attribution it does not
         // own; the uid cannot be borrowed.
         val real = runCatching {
-            context.packageManager.getPackagesForUid(Binder.getCallingUid())
+            context.packageManager.getPackagesForUid(uid)
         }.getOrNull().orEmpty()
         if (name !in real) return Verdict.Refused("ERROR:caller uid mismatch: $name")
 

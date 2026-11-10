@@ -173,6 +173,7 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
             candidates: List<String>,
             packageName: String? = null,
             timeoutMs: Long = 3_000,
+            skipFields: Boolean = false,
         ): String? {
             val want = candidates.map { it.trim() }.filter { it.isNotEmpty() }
             if (want.isEmpty()) return null
@@ -187,24 +188,68 @@ class ShiroiKumaAccessibilityService : AccessibilityService() {
                 }
                 for (root in roots) {
                     if (packageName != null && root.packageName?.toString() != packageName) continue
-                    findAndClick(root, want)?.let { return it }
+                    findAndClick(root, want, skipFields)?.let { return it }
                 }
                 Thread.sleep(120)
             }
             return null
         }
 
-        private fun findAndClick(node: AccessibilityNodeInfo?, want: List<String>): String? {
+        private fun findAndClick(node: AccessibilityNodeInfo?, want: List<String>, skipFields: Boolean): String? {
             if (node == null) return null
             val label = (node.text?.toString() ?: node.contentDescription?.toString())?.trim()
-            if (label != null && want.any { it.equals(label, ignoreCase = true) }) {
+            // [skipFields]: a text field's content is what was typed, not a label. Right after
+            // typing an app's name into a search box, the box holds the same words as the result
+            // row below it — and comes first in the tree.
+            if (label != null && !(skipFields && node.isEditable) && want.any { it.equals(label, ignoreCase = true) }) {
                 var target: AccessibilityNodeInfo? = node
                 while (target != null && !target.isClickable) target = target.parent
                 if (target != null && target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return label
             }
             for (i in 0 until node.childCount) {
-                findAndClick(node.getChild(i), want)?.let { return it }
+                findAndClick(node.getChild(i), want, skipFields)?.let { return it }
             }
+            return null
+        }
+
+        /**
+         * Type [text] into a text field of the app in front — the focused one when it is a text
+         * field, else the first in the tree. Returns the field's hint or label (for the run log),
+         * or null when no field turned up within [timeoutMs].
+         *
+         * By ACTION_SET_TEXT, not key events: `input text` cannot type Japanese, and an app's name
+         * often is Japanese.
+         */
+        fun typeIntoField(text: String, packageName: String? = null, timeoutMs: Long = 3_000): String? {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                val svc = instance
+                val roots = buildList {
+                    svc?.rootInActiveWindow?.let { add(it) }
+                    svc?.windows?.forEach { w -> w.root?.let { add(it) } }
+                }
+                for (root in roots) {
+                    if (packageName != null && root.packageName?.toString() != packageName) continue
+                    val field = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.takeIf { it.isEditable }
+                        ?: firstEditable(root)
+                        ?: continue
+                    field.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                    val args = android.os.Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                    }
+                    if (field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+                        return (field.hintText ?: field.viewIdResourceName ?: "text field").toString()
+                    }
+                }
+                Thread.sleep(120)
+            }
+            return null
+        }
+
+        private fun firstEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+            if (node == null) return null
+            if (node.isEditable && node.isVisibleToUser) return node
+            for (i in 0 until node.childCount) firstEditable(node.getChild(i))?.let { return it }
             return null
         }
 

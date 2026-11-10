@@ -269,6 +269,7 @@ object AutomationSensitivityRegistry {
         // Presses controls in OTHER apps. Device control in a fairly direct sense: it can drive
         // any interface the accessibility service can see.
         "ui.click",
+        "ui.type",
         "huawei.workouts",
         "band.compare",
         // Drops a bond and a credential — device control in its most consequential form here.
