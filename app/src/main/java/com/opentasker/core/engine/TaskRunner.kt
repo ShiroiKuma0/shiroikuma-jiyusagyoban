@@ -1044,15 +1044,13 @@ class TaskRunner(
         return evaluateConditionString(condition)
     }
 
-    /** Evaluates a condition string with legacy `%var` then bounded `{{ ... }}` expansion. */
-    private fun evaluateConditionString(condition: String): Boolean {
-        val legacyExpanded = ctx.variables.expand(rewriteParamSugar(condition))
-        if (!legacyExpanded.contains("{{")) return ctx.variables.evaluateCondition(legacyExpanded)
-
-        val expanded = templateExpressionEngine.expand(legacyExpanded, ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters))
-        if (expanded.warnings.isNotEmpty()) return false
-        return ctx.variables.evaluateCondition(expanded.value)
-    }
+    /**
+     * Evaluates a condition as typed: structure first, then legacy `%var` and bounded `{{ ... }}`
+     * expansion of each operand (upstream 0.2.96). The condition is never expanded as a whole, so a
+     * value — an SMS body, a broadcast extra — can't change what it asks.
+     */
+    private fun evaluateConditionString(condition: String): Boolean =
+        ctx.variables.evaluateCondition(rewriteParamSugar(condition), templateExpressionEngine, ctx.eventVariables, ctx.parameters)
 
     private fun traceFor(
         index: Int,

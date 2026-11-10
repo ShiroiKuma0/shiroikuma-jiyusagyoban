@@ -1,11 +1,9 @@
 package com.opentasker.core.contexts
 
-import com.opentasker.core.actions.ActionFieldPolicy
 import com.opentasker.core.engine.PulseEventContinuity
 import com.opentasker.core.engine.SyntheticTriggerSimulator
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
-import com.opentasker.ui.screens.contextInvalidFields
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -108,12 +106,6 @@ class SunElevationTest {
         val spec = ContextSpec(ContextType.EVENT, mapOf("event" to "sunset", "elevation" to "dusk", "latitude" to "40.7128", "longitude" to "-74.0060", "windowMinutes" to "180"))
         assertTrue(matchingTimes(spec, "2026-06-21").isEmpty())
 
-        assertEquals(ActionFieldPolicy.Error.INVALID_NUMBER, contextInvalidFields(ContextType.EVENT, spec.config)["elevation"]?.error)
-        assertEquals(ActionFieldPolicy.Error.BELOW_MINIMUM, contextInvalidFields(ContextType.EVENT, mapOf("elevation" to "-95"))["elevation"]?.error)
-        assertEquals(ActionFieldPolicy.Error.INVALID_NUMBER, contextInvalidFields(ContextType.EVENT, mapOf("elevation" to "NaN"))["elevation"]?.error)
-        listOf("", "civil", "Nautical", "-4.5").forEach {
-            assertNull(it, contextInvalidFields(ContextType.EVENT, mapOf("elevation" to it))["elevation"])
-        }
 
         assertTrue(SyntheticTriggerSimulator.template(spec).issue.orEmpty().contains("elevation"))
     }

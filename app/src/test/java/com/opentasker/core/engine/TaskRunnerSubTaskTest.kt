@@ -174,33 +174,7 @@ class TaskRunnerSubTaskTest {
         assertEquals("hello", variables.get("RESULT"))
     }
 
-    @Test
-    fun aSubTaskReadsAnInputThroughATemplateAndHandsBackAGlobal() = runBlocking {
-        // The editor's Inputs section saves `city = Boston` as a plain argument (A-354).
-        registerRecorderAction("test.sub.template")
-        val subTask = Task(
-            name = "Weather",
-            actions = listOf(ActionSpec(type = "test.sub.template", args = mapOf("key" to "FORECAST", "value" to "Rain in {{ city }}"))),
-        )
-        val variables = VariableStore()
-        val report = runner(variables) { ref -> subTask.takeIf { ref == "Weather" } }.run(
-            Task(
-                name = "Morning",
-                actions = listOf(
-                    ActionSpec(type = "task.run", args = mapOf("task" to "Weather", "city" to "Boston")),
-                    ActionSpec(type = "test.sub.template", args = mapOf("key" to "SEEN", "value" to "{{ global.FORECAST }}")),
-                ),
-            ),
-        )
-
-        assertTrue(report.success)
-        assertEquals("Rain in Boston", variables.get("FORECAST"))
-        assertEquals("Rain in Boston", variables.get("SEEN"))
-        assertEquals(null, variables.get("city"))
-        // The run log shows what was passed on the Run Task step itself.
-        assertTrue(report.traces.first { it.actionType == "task.run" }.expandedArgSummary.orEmpty().contains("city=Boston"))
-    }
-
+    // RETIRED on the 0.2.96 sync — aSubTaskReadsAnInputThroughATemplateAndHandsBackAGlobal: upstream's Inputs editor passes `{{ city }}`; the fork's Perform Task passes %par1/%par2 and named params.
     @Test
     fun subTaskInputVariablesDoNotLeakIntoParentScope() = runBlocking {
         registerRecorderAction("test.sub.recorder")

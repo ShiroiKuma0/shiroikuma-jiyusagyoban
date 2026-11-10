@@ -880,6 +880,13 @@ internal fun automationModeDescription(mode: AutomationMode): String = when (mod
  * state renders for the first frames of every cold start, including for users who have data.
  */
 @Composable
+internal fun FullScreenContentLoading() {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        ContentLoadingState(PaddingValues())
+    }
+}
+
+@Composable
 internal fun ContentLoadingState(contentPadding: PaddingValues) {
     val description = stringResource(R.string.ui_loading_content)
     Box(
