@@ -24,6 +24,12 @@ import java.util.Locale
  * broadcast actions used by the currently-enabled profiles, so we only listen for what's needed.
  */
 object BroadcastContextEvents {
+    /** The `event` value of a broadcast context; upstream's code (EventTaskVariables, PlatformSupport) names it. */
+    const val EVENT_BROADCAST = "broadcast"
+
+    /** Android 14: the first release that tells a receiver which app sent a broadcast. */
+    const val SENDER_IDENTITY_API = 34
+
     private val flow = MutableSharedFlow<ContextEvent>(extraBufferCapacity = 32)
     val events: SharedFlow<ContextEvent> = flow.asSharedFlow()
 
