@@ -1,5 +1,6 @@
 package com.opentasker.widget
 
+import com.opentasker.ui.theme.ThemedSwitch
 import com.opentasker.ui.components.Button
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,7 +42,6 @@ import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -381,7 +381,7 @@ private fun NumberField(label: String, value: Int?, range: IntRange = 0..300, on
 private fun BoolField(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Switch(checked = value, onCheckedChange = onChange)
+        ThemedSwitch(checked = value, onCheckedChange = onChange)
     }
 }
 

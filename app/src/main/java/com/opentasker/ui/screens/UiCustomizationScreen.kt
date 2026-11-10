@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import com.opentasker.ui.components.Button
 import android.content.Context
 import android.content.Intent
@@ -62,7 +63,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -1687,7 +1687,7 @@ private fun SwitchRow(level: Int, label: String, description: String, checked: B
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp,
         ) {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            ThemedSwitch(checked = checked, onCheckedChange = onCheckedChange)
         }
     }
 }
