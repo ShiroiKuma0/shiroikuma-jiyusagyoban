@@ -58,6 +58,9 @@ class ActionRegistrationCompletenessTest {
             "reboot",
             // Android 13+ blocks direct Bluetooth enable/disable for ordinary apps.
             "bluetooth.set",
+            // Upstream 0.2.95's hotspot needs Android 11. A JVM test reports SDK 0, so it reads as
+            // Unsupported here; on the phone it is Shizuku-gated (ActionCapabilitiesTest pins both).
+            "hotspot.toggle",
         )
         val actual = catalogIds()
             .filter { ActionCapabilityRegistry.get(it).level == CapabilityLevel.Unsupported }
