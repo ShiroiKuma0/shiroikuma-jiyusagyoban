@@ -275,6 +275,7 @@ object ActionCatalog {
         define("gengoshima.inbox", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaInboxAction),
         define("gengoshima.stats", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::GengoshimaStatsAction),
         define("ui.click", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiClickAction),
+        define("ui.type", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::UiTypeAction),
         define("huawei.workouts", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::HuaweiWorkoutsAction),
         define("band.compare", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::BandCompareAction),
         define("ocr.recognize", ActionCategory.VARIABLE, ActionRetrySafety.NEVER, ::OcrRecognizeAction),

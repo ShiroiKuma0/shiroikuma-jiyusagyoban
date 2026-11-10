@@ -935,6 +935,18 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            A sister app (白い熊 応用管理) runs a task about one app, with %pkg / %label injected.
+            Gated by AutomationCallers through a caller-created PendingIntent; see SisterTaskReceiver.
+        -->
+        <receiver
+            android:name="com.opentasker.core.automation.SisterTaskReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="shiroikuma.jiyusagyoban.action.RUN_TASK_WITH_TARGET" />
+            </intent-filter>
+        </receiver>
+
         <!-- Sister-app state-export automation contract (保存復元): headless category-ZIP export +
              category listing, gated by the automation token (AutomationAuth); replies ride a fresh
              broadcast back to the caller's reply receiver (renrakusaki shape). -->
