@@ -8,6 +8,21 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+002 — 2026-11-10
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
+as `+001`.
+
+### UI & theming
+
+- **Switches are black-yellow now, and never filled.** Every switch in the app — the UI page, the
+  task, action and condition editors, the monitor, the scene library, scene toggle elements, the
+  widget editor and the band clock — is one shared `ThemedSwitch` in place of Material's. Both
+  states are a 2 dp outlined track with a small solid dot: **on** is the accent (#FFFF00) with the
+  dot on the right, **off** the accent dimmed to an opaque 55 % (#8C8C00) with the dot on the left.
+  The dot keeps one size in both states (Material grows it when on), the track stays black, and a
+  disabled switch fades further to 38 %. It follows a changed accent colour.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+001 — 2026-11-10
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since (127 upstream
