@@ -343,24 +343,12 @@ class HuaweiDashboardModel(
         )
     }
 
-    /** The newest stored night, or null when none has been synced. */
-    private suspend fun loadLatestNight(): HuaweiSleepNight? {
-        val dao = db.huaweiSleepDao()
-        val start = dao.newestSession() ?: return null
-        val rows = dao.session(start)
-        if (rows.isEmpty()) return null
-        return HuaweiSleepNight(
-            HuaweiSleep.Session(
-                startSeconds = start,
-                endSeconds = rows.first().sessionEnd,
-                segments = rows.map {
-                    HuaweiSleep.Segment(
-                        it.startSeconds, it.durationSeconds, HuaweiSleep.Stage.of(it.stage),
-                    )
-                },
-            ),
-        )
-    }
+    /**
+     * The newest stored night, or null when none has been synced — joined across a spell awake and
+     * cleared of superseded copies by [HuaweiNights.latestNight], like every other night figure.
+     */
+    private suspend fun loadLatestNight(): HuaweiSleepNight? =
+        HuaweiNights.latestNight(db)?.let { HuaweiSleepNight(it) }
 
     /**
      * The index, the recovery and the register — built by the SAME code the Hume report uses.
@@ -933,7 +921,7 @@ class HuaweiDashboardModel(
                 )
             }.onFailure {
                 // The one path where arming without reaching the runner would leave it spinning.
-                HuaweiSyncState.finish(it.message ?: "failed")
+                HuaweiSyncState.finish(it.message ?: "failed", ok = false)
             }
             refresh()
         }

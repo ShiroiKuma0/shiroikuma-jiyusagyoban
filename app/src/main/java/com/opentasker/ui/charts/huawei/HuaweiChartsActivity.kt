@@ -83,6 +83,20 @@ class HuaweiChartsActivity : ComponentActivity() {
                         )
                         val state by model.state.collectAsState()
                         val progress by model.progress.collectAsState()
+                        // The sync runs in the board's dialog (白い熊, 2026-11-10); coming back from it
+                        // reloads the report, so what the sync brought is on screen.
+                        var syncOpened by remember { mutableStateOf(false) }
+                        val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                        androidx.compose.runtime.DisposableEffect(owner) {
+                            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && syncOpened) {
+                                    syncOpened = false
+                                    model.refresh()
+                                }
+                            }
+                            owner.lifecycle.addObserver(observer)
+                            onDispose { owner.lifecycle.removeObserver(observer) }
+                        }
                         var selected by rememberSaveable(deepLink) { mutableStateOf(deepLink) }
                         // The report's scroll position, kept out here so a page opened over the report
                         // and closed again returns to the same card, not to the top.
@@ -290,7 +304,10 @@ class HuaweiChartsActivity : ComponentActivity() {
                                 state = state,
                                 progress = progress,
                                 contentPadding = insets,
-                                onSync = model::sync,
+                                onSync = {
+                                    syncOpened = true
+                                    HuaweiBoardActivity.openSync(this@HuaweiChartsActivity)
+                                },
                                 onOpenMetric = { selected = it },
                                 // Both pressure rows open the ONE blood-pressure page, the main
                                 // card's, rather than a systolic page and a diastolic page: a reading

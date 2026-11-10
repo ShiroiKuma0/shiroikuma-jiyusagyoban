@@ -111,8 +111,11 @@ data class BoardTile(
  */
 enum class SyncJob { NORMAL, WORKOUTS, FULL, STATE }
 
-/** One step of a run as it happened: [atSec] after the press, a phase key and its detail. */
-data class SyncLine(val atSec: Int, val phase: String, val message: String = "")
+/**
+ * One step of a run as it happened: [atSec] after the press, a phase key and its detail. An [alarm]
+ * line is the link being cut mid-sync, written in red where the run is being watched.
+ */
+data class SyncLine(val atSec: Int, val phase: String, val message: String = "", val alarm: Boolean = false)
 
 /**
  * What the sync dialog is showing.
@@ -138,6 +141,8 @@ data class BoardSync(
     val summary: String = "",
     /** Which button's explanation is open under the buttons. */
     val info: SyncJob? = null,
+    /** How many times this run's link was cut and the sync restarted — the red banner. */
+    val cuts: Int = 0,
 )
 
 /**
@@ -230,6 +235,9 @@ private val BOARD_REOPEN = Loc("Show", "画面")
 private val BOARD_TITLE = Loc("Health — HUAWEI WATCH D3", "健康 — HUAWEI WATCH D3")
 private val SYNC_TITLE = Loc("Sync", "同期")
 private val SYNC_OK = Loc("OK", "OK")
+private val SYNC_CLOSE = Loc("Close", "閉じる")
+private val SYNC_HIDE = Loc("Hide", "隠す")
+private val SYNC_CANCEL = Loc("Cancel", "中止")
 private val SYNC_NORMAL = Loc("Sync", "同期")
 private val SYNC_WORKOUTS = Loc("Walks, lifting, rehab", "運動・重量挙げ・機能訓練")
 private val SYNC_FULL = Loc("Full sync", "全部同期")
@@ -239,6 +247,16 @@ private val SYNC_IDLE = Loc(
     "ボタンを押すまで何も始まりません。",
 )
 private val SYNC_SECONDS = Loc("%d s", "%d 秒")
+
+/**
+ * The link cut mid-sync. On this phone that has been Bluetooth itself crashing (`com.android.bluetooth`,
+ * SIGSEGV in its input-device code, 2026-11-10) — the sync only ever sees “Broken pipe”.
+ */
+private val SYNC_ALARM_INK = androidx.compose.ui.graphics.Color(0xFFFF3B30)
+private val SYNC_CUTS = Loc(
+    "The Bluetooth link was cut %d× during this run (Broken pipe). The sync restarts by itself.",
+    "この実行中に Bluetooth 接続が %d 回切れました（Broken pipe）。同期は自動で再開します。",
+)
 
 /** What each button does — behind its ⓘ, because the names alone did not say (白い熊, 2026-11-03). */
 private val SYNC_INFO = mapOf(
@@ -324,6 +342,8 @@ fun HuaweiBoardScreen(
     onSyncAction: (SyncJob) -> Unit = {},
     onSyncInfo: (SyncJob?) -> Unit = {},
     onCloseSync: () -> Unit = {},
+    /** Stop the running sync — the dialog stays, showing that it was cancelled. */
+    onCancelSync: () -> Unit = {},
     onSwitchLanguage: (BandLanguage) -> Unit = {},
     onCloseLanguage: () -> Unit = {},
 ) {
@@ -454,7 +474,7 @@ fun HuaweiBoardScreen(
             )
         }
     }
-    state.sync?.let { SyncDialog(it, lang, onSyncAction, onSyncInfo, onCloseSync) }
+    state.sync?.let { SyncDialog(it, lang, onSyncAction, onSyncInfo, onCloseSync, onCancelSync) }
     state.language?.let { LanguageDialog(it, lang, onSwitchLanguage, onCloseLanguage) }
 }
 
@@ -614,31 +634,14 @@ private fun BoardCard(
     }
 }
 
-/**
- * The steps a run goes through, in order — what the second, overall bar counts against.
- *
- * Only the record reading has an item count of its own (the watch says how many records a window
- * holds before they are fetched); sleep, the dictionary and the ECG do not, so the overall bar moves
- * a step at a time there and smoothly only through the records. A band that is not a watch skips
- * the last two steps, and its bar jumps to the end — a jump forward, never a false promise.
- */
-private val SYNC_STEPS = listOf(
-    "starting", "connecting", "handshake", "device", "satellite",
-    "counting", "reading", "writing", "sleep", "dictionary", "ecg",
-)
-private val WORKOUT_STEPS = listOf("starting", "connecting", "handshake", "device", "listing", "workouts")
-private val SYNC_STEP_OF = Loc("step %d / %d", "段階 %d / %d")
-
 /** The run's place in its whole sequence, 0–1, and the step it is on; null for a job with no steps. */
 private fun overall(sync: BoardSync): Pair<Float, Int>? {
     val steps = when (sync.running) {
-        SyncJob.NORMAL, SyncJob.FULL -> SYNC_STEPS
-        SyncJob.WORKOUTS -> WORKOUT_STEPS
+        SyncJob.NORMAL, SyncJob.FULL -> SyncSteps.SYNC
+        SyncJob.WORKOUTS -> SyncSteps.WORKOUTS
         else -> return null
     }
-    val at = steps.indexOf(sync.phase).takeIf { it >= 0 } ?: return null
-    val within = if (sync.phase == "reading" || sync.phase == "workouts") (sync.percent ?: 0) / 100f else 0f
-    return ((at + within) / steps.size).coerceIn(0f, 1f) to (at + 1)
+    return SyncSteps.overall(steps, sync.phase, sync.percent)
 }
 
 /** A thin yellow frame around a block of the dialog. [thick] for the running portal. */
@@ -672,7 +675,9 @@ private fun SyncDialog(
     lang: BandLanguage,
     onAction: (SyncJob) -> Unit,
     onInfo: (SyncJob?) -> Unit,
+    /** Close when idle; Hide while a sync runs — the run goes on without the dialog. */
     onClose: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.primary
     // The seconds counter: ticks only while something runs.
@@ -698,6 +703,19 @@ private fun SyncDialog(
                 if (sync.lines.isEmpty() && sync.running == null && sync.summary.isBlank()) {
                     Text(SYNC_IDLE[lang], style = MaterialTheme.typography.bodyMedium, color = ink)
                 }
+                // Loud, and above everything else, for as long as the dialog is open.
+                if (sync.cuts > 0) {
+                    Text(
+                        SYNC_CUTS[lang].format(sync.cuts),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(3.dp, SYNC_ALARM_INK, RoundedCornerShape(10.dp))
+                            .padding(10.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SYNC_ALARM_INK,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
                 if (sync.lines.isNotEmpty()) {
                     Column(Modifier.fillMaxWidth().framed(thick = true), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Column(
@@ -707,10 +725,11 @@ private fun SyncDialog(
                             for (line in sync.lines) {
                                 Text(
                                     "+" + SYNC_SECONDS[lang].format(line.atSec) + "  " +
-                                        listOf(phaseLabel(line.phase)[lang], line.message)
+                                        listOf(if (line.alarm) "" else phaseLabel(line.phase)[lang], line.message)
                                             .filter { it.isNotBlank() }.joinToString(" — "),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = ink,
+                                    color = if (line.alarm) SYNC_ALARM_INK else ink,
+                                    fontWeight = if (line.alarm) FontWeight.Bold else null,
                                 )
                             }
                         }
@@ -748,9 +767,9 @@ private fun SyncDialog(
                                     color = ink.copy(alpha = 0.75f),
                                 )
                                 Text(
-                                    SYNC_STEP_OF[lang].format(
+                                    SyncSteps.STEP_OF[lang].format(
                                         whole.second,
-                                        if (sync.running == SyncJob.WORKOUTS) WORKOUT_STEPS.size else SYNC_STEPS.size,
+                                        if (sync.running == SyncJob.WORKOUTS) SyncSteps.WORKOUTS.size else SyncSteps.SYNC.size,
                                     ),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ink,
@@ -806,6 +825,25 @@ private fun SyncDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = onClose) { Text(SYNC_OK[lang]) } },
+        // No OK: while a sync runs there is nothing to confirm (白い熊, 2026-11-10). Hide leaves it
+        // running — the notification, the report's Sync and this board's Sync bring it back — and
+        // Cancel stops it. Idle, the one way out is Close; the dialog's main pill is Sync itself.
+        confirmButton = {
+            if (sync.running != null) {
+                OutlinedButton(onClick = onClose) { Text(SYNC_HIDE[lang]) }
+            } else {
+                OutlinedButton(onClick = onClose) { Text(SYNC_CLOSE[lang]) }
+            }
+        },
+        dismissButton = if (sync.running != null) {
+            {
+                OutlinedButton(
+                    onClick = onCancel,
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = SYNC_ALARM_INK),
+                ) { Text(SYNC_CANCEL[lang]) }
+            }
+        } else {
+            null
+        },
     )
 }
