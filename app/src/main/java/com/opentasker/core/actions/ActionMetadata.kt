@@ -1223,6 +1223,21 @@ fun registerActionMetadata() {
                 ActionField("package", "Only in this app", hint = "package name, e.g. com.huawei.camera — leave empty to search whatever is in front"),
                 ActionField("timeout", "Wait for it (ms)", FieldType.NUMBER, hint = "default 3000. The control often appears a moment after the app does"),
                 ActionField("store", "Store what was clicked in", hint = "the label actually matched, or empty when nothing did"),
+                ActionField("skip_fields", "Skip text fields", FieldType.CHECKBOX, hint = "on: never press a text field whose content matches — after typing a name into a search box, the box holds the same words as the result"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "ui.type",
+            name = "Type into field",
+            description = "Put text into a text field of the app in front (a search box), using the accessibility service",
+            category = "System",
+            fields = listOf(
+                ActionField("text", "Text", required = true, hint = "what to type — Japanese works, e.g. %label"),
+                ActionField("package", "Only in this app", hint = "package name — leave empty for whatever is in front"),
+                ActionField("timeout", "Wait for the field (ms)", FieldType.NUMBER, hint = "default 3000"),
             )
         )
     )

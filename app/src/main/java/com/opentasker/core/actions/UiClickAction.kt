@@ -43,7 +43,8 @@ class UiClickAction : Action {
             return ActionResult.Failure(why)
         }
 
-        val hit = withContextIO { ShiroiKumaAccessibilityService.clickByLabel(candidates, pkg, timeout) }
+        val skipFields = args["skip_fields"]?.trim()?.let { it == "1" || it.equals("true", ignoreCase = true) } ?: false
+        val hit = withContextIO { ShiroiKumaAccessibilityService.clickByLabel(candidates, pkg, timeout, skipFields) }
         store?.let { ctx.variables.set(it, hit ?: "") }
         return if (hit != null) {
             ctx.logger("Tap by label: clicked \"$hit\"")
