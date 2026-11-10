@@ -131,15 +131,7 @@ class TaskerExportLayoutTest {
         assertEquals("file.append", roundTrip("file.append", "path" to "a", "text" to "b").type)
     }
 
-    @Test
-    fun clipboardTextStaysOutOfTheExportAndTheReportSaysToReenterIt() {
-        val report = export(ActionSpec(type = "clipboard.set", args = mapOf("text" to "hello")))
-
-        assertHas(report.xml, "<code>105</code>")
-        assertFalse(report.xml, "hello" in report.xml)
-        assertTrue(report.warnings.toString(), report.warnings.any { "re-entered" in it })
-    }
-
+    // RETIRED on the 0.2.96 sync — clipboardTextStaysOutOfTheExportAndTheReportSaysToReenterIt: the fork exports action arguments verbatim (its bundles are the workspace backup), so clipboard text is not withheld.
     @Test
     fun mediaKeysExportAsMediaControlBecauseThatIsWhatTheyDo() {
         mapOf("track.next" to "0", "sound.pause" to "1", "track.previous" to "2", "sound.stop" to "4").forEach { (type, cmd) ->

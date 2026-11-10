@@ -27,7 +27,8 @@ class ActionCapabilitiesTest {
     fun elevatedActionsAreSetupGatedOnShizuku() {
         // `reboot` is the exception and stays unsupported: shell access is not enough for it, it wants
         // device-owner or system-app privilege, so it fails closed rather than pretending Shizuku helps.
-        (ShizukuPowerBackend.elevatedActionIds - "reboot").forEach { actionId ->
+        // The hotspot is a framework call with its own SDK floor; theHotspotActionNeedsAndroidEleven… covers it.
+        (ShizukuPowerBackend.elevatedActionIds - ShizukuPowerBackend.frameworkActionIds - "reboot").forEach { actionId ->
             val capability = ActionCapabilityRegistry.get(actionId)
             assertEquals("$actionId should be setup-gated", CapabilityLevel.RequiresSetup, capability.level)
             assertTrue("$actionId must remain addable", capability.canAdd)

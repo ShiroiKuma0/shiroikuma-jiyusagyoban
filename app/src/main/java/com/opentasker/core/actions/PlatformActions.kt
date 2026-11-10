@@ -147,7 +147,8 @@ class SetWallpaperAction : Action {
         val bitmap = BitmapFactory.decodeFile(file.path) ?: return ActionResult.Failure("not a readable image")
 
         val manager = android.app.WallpaperManager.getInstance(ctx.app)
-        val flags = when (args["where"]?.trim()?.lowercase()) {
+        // `target` is upstream's name for the same choice (its sunrise/sunset wallpaper templates).
+        val flags = when ((args["where"] ?: args["target"])?.trim()?.lowercase()) {
             "lock", "lockscreen" -> android.app.WallpaperManager.FLAG_LOCK
             "home", "system" -> android.app.WallpaperManager.FLAG_SYSTEM
             "both", "all" -> android.app.WallpaperManager.FLAG_SYSTEM or android.app.WallpaperManager.FLAG_LOCK

@@ -299,8 +299,9 @@ class VariableStore private constructor(
         expr: String,
         templates: TemplateExpressionEngine,
         eventVariables: Map<String, String> = emptyMap(),
+        parameters: Map<String, String> = emptyMap(),
     ): Boolean {
-        val scope by lazy(LazyThreadSafetyMode.NONE) { toTemplateScope(eventVariables) }
+        val scope by lazy(LazyThreadSafetyMode.NONE) { toTemplateScope(eventVariables, parameters) }
         // A template the engine can't read fails the whole condition, whichever branch holds it.
         if (expr.contains("{{") && templates.expand(expandTracked(expr).value, scope).warnings.isNotEmpty()) {
             return false

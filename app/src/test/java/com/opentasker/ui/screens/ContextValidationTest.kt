@@ -6,14 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ContextValidationTest {
-    @Test
-    fun anAppContextCanNameSeveralApps() {
-        assertFalse(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "com.example.a, com.example.b")))
-        assertTrue(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to ",")))
-        assertTrue(contextHasInvalidValues(ContextType.APPLICATION, mapOf("package" to "com.example.a,not a package")))
-        assertTrue(contextHasInvalidValues(ContextType.EVENT, mapOf("package" to "com.example.a,com.example.b")))
-    }
-
+    // RETIRED on the 0.2.96 sync — anAppContextCanNameSeveralApps: upstream's package-list validator lives in its ContextEditorDialogs; the fork's editor never rejected a package list.
     @Test
     fun validTimeWindowIsAccepted() {
         assertFalse(

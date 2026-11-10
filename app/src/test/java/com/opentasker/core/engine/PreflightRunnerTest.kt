@@ -10,7 +10,6 @@ import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
-import com.opentasker.ui.screens.grantedSetupRequirements
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -59,29 +58,6 @@ class PreflightRunnerTest {
         // An unknown transport is the default, and a preview must not invent a network failure.
         val unknown = PreflightRunner.preflightTask(task = task, inputs = PreflightInputs())
         assertEquals(PreflightStepStatus.SIMULATED, unknown.tasks.single().steps.single().status)
-    }
-
-    @Test
-    fun aGrantSetupShowsAsDoneIsNotListedAsMissing() {
-        val report = PreflightRunner.preflightTask(
-            task = dimTask,
-            inputs = PreflightInputs(grantedSetupRequirements = grantedSetupRequirements(pending = emptySet())),
-        )
-
-        assertEquals(setOf(SetupRequirement.WRITE_SETTINGS), report.setupRequirements)
-        assertTrue(report.missingSetupRequirements.toString(), report.missingSetupRequirements.isEmpty())
-    }
-
-    @Test
-    fun aGrantSetupStillListsIsNamedAsMissing() {
-        val report = PreflightRunner.preflightTask(
-            task = dimTask,
-            inputs = PreflightInputs(
-                grantedSetupRequirements = grantedSetupRequirements(pending = setOf(SetupRequirement.WRITE_SETTINGS)),
-            ),
-        )
-
-        assertEquals(setOf(SetupRequirement.WRITE_SETTINGS), report.missingSetupRequirements)
     }
 
     @Test

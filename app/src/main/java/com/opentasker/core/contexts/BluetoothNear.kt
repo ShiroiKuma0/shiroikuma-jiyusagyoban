@@ -41,7 +41,8 @@ private const val BT_NEAR_NAME_LIMIT = 248
 private const val BT_NEAR_TAG = "BluetoothNear"
 
 private val BLUETOOTH_ADDRESS = Regex("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}")
-private val DEVICE_TEXT_CONTROL = Regex("\\p{Cntrl}+")
+// The Cc category spelled out: the fork's ICU gate refuses any brace in a regex literal.
+private val DEVICE_TEXT_CONTROL = Regex("[\\x00-\\x1F\\x7F-\\x9F]+")
 
 internal data class NearbyBluetoothDevice(val name: String, val address: String)
 

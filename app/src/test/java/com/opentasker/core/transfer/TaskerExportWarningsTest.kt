@@ -76,7 +76,7 @@ class TaskerExportWarningsTest {
         val report = TaskerXmlExporter.export(
             listOf(Profile(id = 1, name = "P", enterTaskId = 1, contexts = listOf(ContextSpec(ContextType.LOCATION, mapOf("lat" to "1"))))),
             listOf(task),
-            listOf(Variable(name = "API_TOKEN", value = "x", isGlobal = true, isSecret = true)),
+            listOf(Variable(name = "API_TOKEN", value = "x", isSecret = true)),
         )
 
         assertEquals(2, report.warnings.size)

@@ -1951,4 +1951,10 @@
     <string name="widget_task_label">白い熊 自由作業盤 (Task)</string>
     <string name="widget_styled_label">白い熊 自由作業盤 (Styled)</string>
     <string name="widget_styled_description">Designable widget — a styled layout a task can update (e.g. a clock).</string>
+    <!-- Restored on the 0.2.96 sync: upstream dropped these, fork screens still use them. -->
+    <string name="automation_mode_parallel">allow overlap</string>
+    <string name="automation_mode_queued">run again in order</string>
+    <string name="automation_mode_restart">cancel and restart</string>
+    <string name="automation_mode_single">ignore while running</string>
+    <string name="scenes_add_element_content_description">Add element</string>
 </resources>

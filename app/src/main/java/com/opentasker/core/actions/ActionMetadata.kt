@@ -2402,19 +2402,6 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
-            id = "wallpaper.set",
-            name = "Set Wallpaper",
-            description = "Set the home screen, the lock screen or both to an image.",
-            category = "Settings",
-            fields = listOf(
-                ActionField("path", "Image", required = true, hint = "A file path or content URI of an image", pathPicker = true),
-                ActionField("target", "Where", FieldType.DROPDOWN, hint = "both (default), home or lock", options = listOf("both", "home", "lock")),
-            )
-        )
-    )
-
-    ActionMetadataRegistry.register(
-        ActionMetadata(
             id = "settings.write",
             name = "Write Setting",
             description = "Change one Android setting by name. Global and Secure need one-time access granted from a computer; System uses Modify system settings.",

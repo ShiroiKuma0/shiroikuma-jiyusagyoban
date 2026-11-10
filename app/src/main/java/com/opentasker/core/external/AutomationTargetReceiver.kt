@@ -229,7 +229,7 @@ class AutomationTargetReceiver : BroadcastReceiver() {
         val runSource = AutomationTargetContract.runSourceLabel(
             intent.getStringExtra(AutomationTargetContract.EXTRA_RUN_SOURCE),
         )
-        val executionId = ExternalExecutions.accept(appContext, task.id, task.name)
+        val executionId = ExternalExecutions.accept(appContext, task.id, task.name).record.executionId
 
         val serviceIntent = Intent(appContext, AutomationService::class.java).apply {
             action = AutomationService.ACTION_RUN_EXTERNAL_TASK

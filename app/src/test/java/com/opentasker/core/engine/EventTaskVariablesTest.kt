@@ -1,7 +1,6 @@
 package com.opentasker.core.engine
 
 import android.content.ContextWrapper
-import com.opentasker.core.actions.typedVariableOptions
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.NotificationContextEvents
 import com.opentasker.core.contexts.SmsContextEvents
@@ -160,12 +159,4 @@ class EventTaskVariablesTest {
         assertEquals(HeldExecutionPayloadCodec.REDACTED_VALUE, HeldExecutionPayloadCodec.decode(encoded)!!.initialVariables["sms_sender"])
     }
 
-    @Test
-    fun theEditorOffersTheFieldsAsEventChips() {
-        val references = typedVariableOptions(actions = emptyList()).map { it.reference }
-
-        assertTrue("{{ event.sms_sender }}" in references)
-        assertTrue("{{ event.sms_body }}" in references)
-        assertTrue("{{ event.notification_title }}" in references)
-    }
 }

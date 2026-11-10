@@ -49,7 +49,6 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.screens.FullScreenContentLoading
-import com.opentasker.ui.screens.contextTitleRes
 import com.opentasker.ui.theme.ThemeStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.catch
@@ -79,7 +78,7 @@ class LocaleConditionEditActivity : ComponentActivity() {
                             profileId = decoded.value.id,
                             profileName = decoded.value.name,
                             index = index,
-                            label = getString(contextTitleRes(context.type)),
+                            label = contextLabel(context.type),
                         )
                     },
                 )
@@ -420,3 +419,13 @@ private fun operatorLabel(operator: LocaleConditionOperator): String = stringRes
         LocaleConditionOperator.ENDS_WITH -> R.string.locale_condition_operator_ends_with
     },
 )
+
+private fun contextLabel(type: com.opentasker.core.model.ContextType): String = when (type) {
+    com.opentasker.core.model.ContextType.APPLICATION -> "Application"
+    com.opentasker.core.model.ContextType.TIME -> "Time"
+    com.opentasker.core.model.ContextType.DAY -> "Day"
+    com.opentasker.core.model.ContextType.LOCATION -> "Location"
+    com.opentasker.core.model.ContextType.STATE -> "Device state"
+    com.opentasker.core.model.ContextType.EVENT -> "Event"
+    com.opentasker.core.model.ContextType.PLUGIN -> "Plugin condition"
+}

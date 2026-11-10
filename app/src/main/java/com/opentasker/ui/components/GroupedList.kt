@@ -50,6 +50,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import com.opentasker.core.storage.ItemGroupEntity
 import com.opentasker.ui.theme.ThemeStore
@@ -474,7 +476,10 @@ fun GroupHeaderRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         // Compact (32dp) so the ⋮ doesn't force the header taller than its padding setting (白い熊).
-        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(32.dp)) {
+        IconButton(
+            onClick = { menuOpen = true },
+            modifier = Modifier.size(32.dp).semantics { contentDescription = "Group actions" },
+        ) {
             Icon(Icons.Filled.MoreVert, contentDescription = "Group actions")
             ThemedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
