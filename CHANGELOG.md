@@ -8,6 +8,70 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+001 — 2026-11-10
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since (127 upstream
+commits after `+145`'s `a3b4fda4`). The build counter restarts at `+001` because upstream's own
+version code moved 96 → 98; the version code (980001) still rises, so it installs as an update.
+
+### 健康 — sync
+
+- **One sync, owned by the app, not by a window.** Sync in the report now opens the same sync
+  dialog as the board and runs the full sync itself. Its buttons say what they do: **Close** when
+  idle; while a sync runs, **Hide** (the sync keeps going) and a red **Cancel** (stops it, closes
+  the Bluetooth link properly, records it as cancelled). Back and tapping outside do the same as
+  Close / Hide.
+- **A hidden sync is never lost.** An ongoing notification, “健康: sync running”, reopens the dialog
+  on the running sync, and so does pressing Sync again in the report or on the board — never a
+  second run. When it ends the notification becomes “健康: sync finished”, with the result and how
+  many times the link was cut.
+- **A cut Bluetooth link restarts the sync instead of losing data.** The phone's own Bluetooth stack
+  crashes in its HID host while the watch is connected, which surfaced as “Broken pipe” and silently
+  cost parts of a sync (sleep, the dictionary, ECG). Each cut is now a red, bold line in the running
+  dialog with a red-framed banner at the top, and the sync waits for Bluetooth and restarts, up to
+  ten tries.
+
+### 健康 — nights and the night score
+
+- **Sleeps are joined into nights.** A mid-night snapshot stored under the same bed time is dropped
+  rather than added (one night had read 13 h asleep); two sleeps under two hours apart are one night,
+  the time between shown as awake; and back to bed before 10:00 joins the night before, even when the
+  watch files it as a nap. Unstaged sleep counts as asleep.
+- **The night score is reworked:** the cells are weighted, illness caps the score, time awake after
+  falling asleep counts, and `*` / `!` mark a capped or a doubtful night.
+
+### Engine and sister apps
+
+- **RUN_TASK_WITH_TARGET** runs a task with the app it is about in `%pkg` and `%label` — what
+  白い熊 応用管理's 起動マネージャー button sends.
+- **A new `ui.type` action** types into a field through the accessibility service (Japanese
+  included); **`ui.click` can be held to one app's windows** and told to skip input fields.
+- **Conditions are read before they are filled in** (from upstream): an If or a loop compares each
+  side as a value, so a text message reading `true ||` can no longer turn a condition true, nor name
+  another variable to read it.
+- **Bluetooth connect and disconnect triggers reach Android 12 and older** (from upstream): the
+  receiver used to shut out the Bluetooth app's own broadcasts there.
+
+### UI
+
+- **The UI page's action rows are pills**, and every row has minimal padding.
+
+### From upstream (0.2.95, 0.2.96 and after)
+
+- New actions: **Run Shizuku Script** (an approved script, by hash), **Toggle Wi-Fi Hotspot**
+  (Shizuku, Android 11+), **Connect or Disconnect VPN** (WireGuard / Tailscale). The fork's own Set
+  Wallpaper stays; it now also accepts upstream's `target` for `where`.
+- New contexts: an incoming call, a Bluetooth device nearby, and twilight for sun contexts (civil,
+  nautical, astronomical or any angle).
+- Security: text from outside the phone is never expanded as a template, logs redact more
+  credential names, and local backups stay out of device-to-device transfer.
+- Many fixes: scene buttons and Locale fires run their tasks again, an interrupted Say ends at once,
+  a delayed lock is noticed, all-day calendar events last until the day ends, Play Sound opens a
+  file with `#` or `?` in its name, and Tasker import/export reads and writes Tasker's real layouts.
+- Not taken: upstream's rewrites of the screens the fork replaced (its Run Task Inputs editor, its
+  new Setup rows) and its music/alarm rewrite of Play Sound, which would drop the notification,
+  ring and system streams 通知明滅 uses.
+
 ## 0.2.94+2026-09-30.11-19.ga3b4fda4+145 — 2026-11-07
 
 Built on upstream `a3b4fda4` — OpenTasker **0.2.94**, the same base as `+140`.
