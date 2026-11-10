@@ -179,6 +179,61 @@ object SleepShape {
     fun latestNight(sessions: List<SleepSession>, zone: ZoneId): SleepSession? =
         sessions.filter { isNight(it, zone) }.maxByOrNull { it.endMs }
 
+    /**
+     * How whole a night was: minutes awake between falling asleep and the final waking (WASO, the
+     * standard measure of a broken night), and — when the night was broken by a long spell up — which
+     * part of it was the main sleep and which the catch-up after.
+     *
+     * 白い熊, 2026-11-08: “sleep was broken due to pain, so I had to get up and then catch up on some
+     * sleep — this should be taken as bad.” Joining the two sleeps into one night (HuaweiNights) is
+     * right for the record, but graded on the total the catch-up made the night look long and good.
+     */
+    data class Continuity(
+        /** Awake minutes after sleep onset and before the final waking. */
+        val wasoMinutes: Double,
+        /** Asleep minutes in the longest stretch between spells up of [BREAK_MINUTES] or more. */
+        val mainSleepMinutes: Double,
+        /** Asleep minutes outside that stretch — sleep caught up on after getting up. */
+        val catchUpMinutes: Double,
+        /** The longest spell awake inside the night, or null when there was none. */
+        val longestWakeFromMs: Long?,
+        val longestWakeToMs: Long?,
+    )
+
+    /** A spell awake at least this long splits a night into a main sleep and a catch-up. */
+    const val BREAK_MINUTES = 60
+
+    fun continuity(session: SleepSession): Continuity? {
+        val runs = session.runs.sortedBy { it.startMs }
+        val asleep = runs.filter { it.code != '5' }
+        if (asleep.isEmpty()) return null
+        val onset = asleep.first().startMs
+        val final = asleep.maxOf { it.endMs }
+        val wakes = runs.filter { it.code == '5' && it.startMs >= onset && it.endMs <= final }
+        val waso = wakes.sumOf { it.minutes }.toDouble()
+        val longest = wakes.maxByOrNull { it.endMs - it.startMs }
+        // Split at every long spell up; the block with the most sleep is the main one.
+        val cuts = wakes.filter { it.minutes >= BREAK_MINUTES }
+        val blocks = ArrayList<Double>()
+        var from = Long.MIN_VALUE
+        for (cut in cuts + listOf(SleepRun(Long.MAX_VALUE, Long.MAX_VALUE, '5'))) {
+            blocks += asleep.filter { it.startMs >= from && it.endMs <= cut.startMs }.sumOf { it.minutes }.toDouble()
+            from = cut.endMs
+        }
+        val total = asleep.sumOf { it.minutes }.toDouble()
+        val main = blocks.maxOrNull() ?: total
+        return Continuity(waso, main, total - main, longest?.startMs, longest?.endMs)
+    }
+
+    /** WASO as a 1–5 step: under 20 min, 20–40, 40–60, 60–90, over 90 (白い熊's steps, 2026-11-08). */
+    fun wasoStep(minutes: Double): Int = when {
+        minutes < 20 -> 1
+        minutes < 40 -> 2
+        minutes < 60 -> 3
+        minutes <= 90 -> 4
+        else -> 5
+    }
+
     /** The stages, in the order their rows stack on the hypnogram: deep at the bottom. */
     val ROWS: List<Char> = listOf('5', '3', '2', '1')
 

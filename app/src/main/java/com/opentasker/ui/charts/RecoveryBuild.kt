@@ -312,7 +312,10 @@ object RecoveryBuild {
             latest.nocturnalHr, prior.mapNotNull { it.nocturnalHr }, confidence,
         )
         val sleep = Recovery.band(
-            RecoveryMarker.SLEEP, latest.sleepMinutes, prior.mapNotNull { it.sleepMinutes },
+            // Graded on the main sleep: catch-up sleep after a long spell up does not make a broken
+            // night a long one (白い熊, 2026-11-08). The catch-up is shown beside it in the table.
+            RecoveryMarker.SLEEP, RecoverySource.gradedSleepMinutes(latest),
+            prior.mapNotNull { RecoverySource.gradedSleepMinutes(it) },
             Recovery.SLEEP_MEANINGFUL_MIN, confidence, counted = true,
         )
         val felt = Recovery.band(

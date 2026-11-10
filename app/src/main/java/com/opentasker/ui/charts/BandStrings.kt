@@ -462,6 +462,8 @@ object BandText {
     val regColFelt = Loc("Woke", "目覚め")
     val regColHr = Loc("Night HR", "夜間心拍")
     val regColSleep = Loc("Asleep", "実睡眠")
+    /** Awake after first falling asleep — WASO, the broken-night cell (2026-11-08). */
+    val regColWaso = Loc("Awake in night", "夜中の覚醒")
     // Dropped from the night table on 2026-09-03, when the Band 11 Pro measured no temperature, and
     // back as the FIRST column on 2026-10-18 with the Watch D3's skin sensor (白い熊). A skin
     // temperature, so it says so: 体温 would read as a body temperature, which a wrist cannot give.
@@ -486,8 +488,26 @@ object BandText {
     val scoreLatest = Loc("Last night %s", "昨夜 %s")
     val scoreWeightsOpen = Loc("Score weights", "点数の重み")
     val scorePartialMark = Loc(
-        "* partial — some cells were empty; the score is over the rest. Tap a score for its parts.",
-        "* 一部 — 空の欄があり、残りで計算。点数を押すと内訳。",
+        "* partial — some cells were empty; the score is over the rest. ! a broken night, or one held " +
+            "down by illness signs. Tap a score for its parts and the reason.",
+        "* 一部 — 空の欄があり、残りで計算。! 途切れた夜、または体調不良の兆しで抑えた夜。点数を押すと内訳と理由。",
+    )
+    val scorePartialWhich = Loc(
+        "* Partial: no reading for %s — the score is over the other cells.",
+        "* 一部: %s の値が無い — 残りの欄で計算。",
+    )
+    val scoreCappedWhy = Loc(
+        "! Held down by illness signs (%s): a night with these is no better than 4, below par — at most %d.",
+        "! 体調不良の兆し（%s）で抑えた: これがある夜は 4（不調）より良くならない — 最高 %d。",
+    )
+    val scoreBrokenWhy = Loc(
+        "! Broken night: %s awake after first falling asleep%s.",
+        "! 途切れた夜: 入眠後 %s 覚醒%s。",
+    )
+    val scoreBrokenUp = Loc(", the longest spell up %s–%s", "、最も長く起きていたのは %s〜%s")
+    val scoreCatchUp = Loc(
+        " %s of catch-up sleep after it counts in the total, not in the time-asleep grade.",
+        " その後の寝足し %s は合計に入るが、睡眠時間の評価には入らない。",
     )
     val scoreBreakdownTitle = Loc("Night score — %s", "夜の点数 — %s")
     val scoreBreakdownNone = Loc(
@@ -566,7 +586,7 @@ object BandText {
      */
     val registerColumns = listOf(
         regColDate, regColScore, regColBp, regColTemp, regColFelt, regColHr, regColBedHr, regColSwing, regColCurve, regColSleep,
-        regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2, regColWeight,
+        regColWaso, regColDeep, regColDeepRem, regColLowHr, regColHrv, regColResp, regColSpo2, regColWeight,
     )
     // ---- 変化 — the deviation strip (2026-09-12) -------------------------------------------
     //

@@ -171,6 +171,9 @@ object SessionRegister {
         val bpSystolic: Double? = null,
         val bpDiastolic: Double? = null,
         val bpStep: Int? = null,
+        /** How whole the night was, and its 1–5 step on [SleepShape.wasoStep] — see [NightScore]. */
+        val continuity: SleepShape.Continuity? = null,
+        val wasoStep: Int? = null,
     )
 
     /** One square of the grid. */
@@ -310,6 +313,8 @@ object SessionRegister {
             bpSystolic = night.bpSystolic,
             bpDiastolic = night.bpDiastolic,
             bpStep = bpStep,
+            continuity = night.continuity,
+            wasoStep = night.continuity?.let { SleepShape.wasoStep(it.wasoMinutes) },
         )
     }
 
