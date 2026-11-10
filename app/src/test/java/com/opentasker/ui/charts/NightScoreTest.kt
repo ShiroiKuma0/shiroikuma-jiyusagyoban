@@ -35,6 +35,7 @@ class NightScoreTest {
         val steps = all(2) + (NightScore.Part.HRV to null)
         val s = NightScore.score(steps, NightScore.DEFAULTS)
         assertEquals(75, s.value)
+        assertEquals("*", s.marks)
         assertTrue(s.partial)
         assertEquals(listOf(NightScore.Part.HRV), s.missing.map { it.part })
     }
@@ -53,15 +54,49 @@ class NightScoreTest {
         assertTrue(!s.partial)
     }
 
+    /** The three illness markers at 3, so the ceiling stays out of a test about weights. */
+    private val well = listOf(NightScore.Part.TEMP, NightScore.Part.NIGHT_HR, NightScore.Part.HRV).associateWith { 3 }
+
     @Test
     fun `the weights decide the mix`() {
-        val steps = all(5) + (NightScore.Part.SLEEP to 1)
+        val steps = all(5) + well + (NightScore.Part.SLEEP to 1)
         val onlySleep = NightScore.Part.entries.associateWith { 0 } + (NightScore.Part.SLEEP to 10)
         assertEquals(100, NightScore.score(steps, onlySleep).value)
         val s = NightScore.score(steps, NightScore.DEFAULTS)
-        assertEquals(18, s.value)
+        // Sleep 12 × 100 + temperature, night HR and HRV (6 + 12 + 10) × 50, over 100.
+        assertEquals(26, s.value)
         // The contributions add up to the score.
-        assertEquals(18.0, s.components.sumOf { s.contribution(it) }, 0.01)
+        assertEquals(26.0, s.components.sumOf { s.contribution(it) }, 0.01)
+    }
+
+    @Test
+    fun `a raised temperature caps a night that would otherwise score well`() {
+        // 2026-11-07: temperature graded 4 under a row of ordinary cells.
+        val s = NightScore.score(all(2) + (NightScore.Part.TEMP to 4), NightScore.DEFAULTS)
+        assertEquals(NightScore.CAP, s.value)
+        assertEquals(4, s.step)
+        assertEquals(listOf(NightScore.Part.TEMP), s.cappedBy)
+        assertEquals("!", s.marks)
+    }
+
+    @Test
+    fun `two illness markers off cap the night, one alone does not`() {
+        val two = all(2) + (NightScore.Part.NIGHT_HR to 4) + (NightScore.Part.HRV to 5)
+        assertEquals(NightScore.CAP, NightScore.score(two, NightScore.DEFAULTS).value)
+        val one = all(2) + (NightScore.Part.NIGHT_HR to 4)
+        assertTrue(NightScore.score(one, NightScore.DEFAULTS).cappedBy.isEmpty())
+    }
+
+    @Test
+    fun `waking at 4 pulls an otherwise good night down`() {
+        // 2026-11-08: ordinary cells, woke 4 — it was a green 65.
+        val s = NightScore.score(all(2) + (NightScore.Part.WOKE to 4), NightScore.DEFAULTS)
+        assertTrue("${s.value}", s.value!! < 65)
+    }
+
+    @Test
+    fun `the calibration never correlates the rating with itself`() {
+        assertNull(NightScore.perPart(emptyList())[NightScore.Part.WOKE])
     }
 
     @Test

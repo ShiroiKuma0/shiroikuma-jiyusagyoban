@@ -249,4 +249,35 @@ class SleepShapeTest {
         assertTrue(SleepShape.runs(SleepSegmentInput(0, 0, "")).isEmpty())
         assertTrue(SleepShape.sessions(emptyList()).isEmpty())
     }
+
+    @Test
+    fun `a night broken by a long spell up splits into the main sleep and the catch-up`() {
+        // 2026-11-07/08 in minutes from 20:54: asleep 427, a 5-minute wake, up 146, asleep 133.
+        val m = 60_000L
+        val night = SleepSession(
+            0, 711 * m,
+            listOf(
+                SleepRun(0, 300 * m, '2'),
+                SleepRun(300 * m, 305 * m, '5'),
+                SleepRun(305 * m, 432 * m, '1'),
+                SleepRun(432 * m, 578 * m, '5'),
+                SleepRun(578 * m, 711 * m, SleepShape.UNSTAGED),
+            ),
+        )
+        val c = SleepShape.continuity(night)!!
+        assertEquals(151.0, c.wasoMinutes, 0.01)
+        assertEquals(427.0, c.mainSleepMinutes, 0.01)
+        assertEquals(133.0, c.catchUpMinutes, 0.01)
+        assertEquals(432 * m, c.longestWakeFromMs)
+        assertEquals(5, SleepShape.wasoStep(c.wasoMinutes))
+    }
+
+    @Test
+    fun `the broken-night steps are 20, 40, 60 and 90 minutes`() {
+        assertEquals(1, SleepShape.wasoStep(19.0))
+        assertEquals(2, SleepShape.wasoStep(20.0))
+        assertEquals(3, SleepShape.wasoStep(45.0))
+        assertEquals(4, SleepShape.wasoStep(90.0))
+        assertEquals(5, SleepShape.wasoStep(91.0))
+    }
 }
