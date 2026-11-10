@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -54,7 +55,6 @@ import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1483,11 +1483,11 @@ private fun SceneEditorDialog(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Modal (block underneath)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Switch(checked = defaultModal, onCheckedChange = { defaultModal = it })
+                    ThemedSwitch(checked = defaultModal, onCheckedChange = { defaultModal = it })
                 }
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Tap outside dismisses", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Switch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
+                    ThemedSwitch(checked = defaultDismissOnOutside, onCheckedChange = { defaultDismissOnOutside = it }, enabled = defaultModal)
                 }
                 Text(
                     "How this scene shows when scene.show omits position/modal/dismiss. An explicit action argument still wins. Non-modal is a tap-through HUD (can't take text input).",

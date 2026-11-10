@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -29,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -175,7 +175,7 @@ internal fun ShareAppsScreen(onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = copyStreams, onCheckedChange = { copyStreams = it; ShareRelayStore.copyStreams = it })
+                    ThemedSwitch(checked = copyStreams, onCheckedChange = { copyStreams = it; ShareRelayStore.copyStreams = it })
                 }
             }
         }

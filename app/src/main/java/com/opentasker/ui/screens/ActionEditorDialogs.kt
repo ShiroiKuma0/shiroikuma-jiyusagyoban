@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
@@ -478,7 +478,7 @@ internal fun ActionFieldInput(field: ActionField, value: String, onChange: (Stri
                         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Switch(checked = checked, onCheckedChange = null)
+                ThemedSwitch(checked = checked, onCheckedChange = null)
             }
         }
         }

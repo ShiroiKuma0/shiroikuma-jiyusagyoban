@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -60,7 +61,6 @@ import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
@@ -748,7 +748,7 @@ private fun ProfileCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Switch(checked = profile.enabled, onCheckedChange = onToggle)
+                ThemedSwitch(checked = profile.enabled, onCheckedChange = onToggle)
                 Spacer(Modifier.width(4.dp))
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,

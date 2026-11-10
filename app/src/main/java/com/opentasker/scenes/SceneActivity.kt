@@ -1,5 +1,6 @@
 package com.opentasker.scenes
 
+import com.opentasker.ui.theme.ThemedSwitch
 import android.graphics.BitmapFactory
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -83,7 +84,6 @@ import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -866,7 +866,7 @@ internal fun SceneElementView(
                     Text(v("label", "Checkbox"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
                 } else {
                     Text(v("label", "Toggle"), color = styleLabelColor ?: MaterialTheme.colorScheme.onSurface, fontSize = styleSize, fontWeight = styleWeightOrNull, modifier = Modifier.weight(1f))
-                    Switch(checked = checked, onCheckedChange = onChanged)
+                    ThemedSwitch(checked = checked, onCheckedChange = onChanged)
                 }
             }
         }
