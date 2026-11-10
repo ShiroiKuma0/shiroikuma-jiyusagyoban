@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
@@ -226,7 +226,7 @@ internal fun ContextConfigDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Switch(checked = invert, onCheckedChange = null)
+                            ThemedSwitch(checked = invert, onCheckedChange = null)
                         }
                     }
                     HorizontalDivider()

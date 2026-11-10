@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -32,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
@@ -370,7 +370,7 @@ fun MonitorScreen(
                             fontSize = 13.sp,
                         )
                     }
-                    Switch(checked = bootStart, onCheckedChange = { BootStartSettings.set(context, it) })
+                    ThemedSwitch(checked = bootStart, onCheckedChange = { BootStartSettings.set(context, it) })
                 }
             }
         }

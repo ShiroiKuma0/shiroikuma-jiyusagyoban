@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +40,6 @@ import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.opentasker.ui.components.TextButton
 import androidx.compose.runtime.Composable
@@ -608,7 +608,7 @@ internal fun ProfileEditorDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = enabled, onCheckedChange = null)
+                        ThemedSwitch(checked = enabled, onCheckedChange = null)
                     }
                 }
                 Text(stringResource(R.string.profile_enter_task), style = MaterialTheme.typography.labelLarge)

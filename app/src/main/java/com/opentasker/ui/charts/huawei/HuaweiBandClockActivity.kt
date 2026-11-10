@@ -1,5 +1,6 @@
 package com.opentasker.ui.charts.huawei
 
+import com.opentasker.ui.theme.ThemedSwitch
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -26,7 +27,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import com.opentasker.ui.components.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
@@ -196,7 +196,7 @@ private fun BandClockScreen(address: String, context: Context) {
         NoteText(HuaweiText.clockWhy[lang])
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = useNow, onCheckedChange = { useNow = it })
+            ThemedSwitch(checked = useNow, onCheckedChange = { useNow = it })
             Spacer(Modifier.width(12.dp))
             BodyText(HuaweiText.clockUseNow[lang])
         }
