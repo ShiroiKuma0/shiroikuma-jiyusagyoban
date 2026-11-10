@@ -416,16 +416,14 @@ fun UiCustomizationScreen(
                 )
             }
             item {
-                RowScaffold(1, onClick = { showEximPanel = true }) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Export / Import…", style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            "Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                PillRow(
+                    level = 1,
+                    label = "Export / Import…",
+                    description = "Back up or restore everything settable — the whole workspace and all app settings — as one ZIP.",
+                    main = true,
+                    opens = true,
+                    onClick = { showEximPanel = true },
+                )
             }
             item {
                 SwitchRow(
@@ -472,16 +470,15 @@ fun UiCustomizationScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    Text(
-                        "Regenerate",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = EximWarnColor,
-                        modifier = Modifier.clickable {
+                    // A pill, never a bare clickable word (the black-yellow theme); red, as the
+                    // destructive one, by lending its colour to the frame and the text.
+                    OutlinedButton(
+                        onClick = {
                             automationToken = AutomationAuth.regenerateToken(context)
                             scope.launch { snackbarHostState.showSnackbar("Automation token regenerated — update pasted copies") }
                         },
-                    )
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EximWarnColor),
+                    ) { Text("Regenerate") }
                 }
             }
 
@@ -1092,24 +1089,22 @@ fun UiCustomizationScreen(
             item { ChartColorRow(1, ChartColorTarget.SleepRem, prefs) { chartColorTarget = it } }
             item { ChartColorRow(1, ChartColorTarget.SleepAwake, prefs) { chartColorTarget = it } }
             item {
-                ActionRow(
+                PillRow(
                     level = 1,
                     label = "Restore the validated chart palette",
                     description = "Puts every chart knob above back to what shipped — the colours that pass the checks in the preview.",
-                    actionLabel = "Restore",
-                    onAction = { ThemeStore.resetChartsToDefault() },
+                    onClick = { ThemeStore.resetChartsToDefault() },
                 )
             }
 
             // --- Presets — at the very bottom (白い熊 2026-07-25), like Kōjiki's trailing Reset row ---
             item { SectionHeader("Presets") }
             item {
-                ActionRow(
+                PillRow(
                     level = 1,
                     label = "Reset to black & yellow",
                     description = "Restore the default appearance — black background, yellow text and borders.",
-                    actionLabel = "Reset",
-                    onAction = { ThemeStore.resetToDefault() },
+                    onClick = { ThemeStore.resetToDefault() },
                 )
             }
         }
@@ -1255,12 +1250,14 @@ private fun RowScaffold(
 ) {
     val base = Modifier.fillMaxWidth()
     val clickable = if (onClick != null) base.clickable(onClick = onClick) else base
+    // Minimal padding (the black-yellow theme, 白い熊 2026-11-07): a row is as tall as its content.
+    // 12 dp above and below made a list of one-line rows read as double-spaced.
     Row(
         modifier = clickable.padding(
             start = rowStartPadding(level),
             end = 16.dp,
-            top = 12.dp,
-            bottom = 12.dp,
+            top = 2.dp,
+            bottom = 2.dp,
         ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1640,16 +1637,44 @@ private fun ImportReviewPreview(level: Int, prefs: ThemePrefs) {
     }
 }
 
+/**
+ * A row that DOES something — a full-width outlined pill with its explanation beneath (the
+ * black-yellow theme's settings-page rule, 白い熊 2026-11-07). A plain row that runs an action reads as
+ * a heading or a note; the pill says “press me”. [opens] adds the › of a row that leads somewhere
+ * (a panel, a screen); an in-place action (Reset) has none. [main] is the section's one main action:
+ * thick frame, bold label. Only the pill is the touch target, never the explanation.
+ */
 @Composable
-private fun ActionRow(level: Int, label: String, description: String, actionLabel: String, onAction: () -> Unit) {
-    RowScaffold(level) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun PillRow(
+    level: Int,
+    label: String,
+    description: String,
+    main: Boolean = false,
+    opens: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(start = rowStartPadding(level), end = 16.dp, top = 3.dp, bottom = 3.dp)) {
+        val inner = PaddingValues(horizontal = PILL_TEXT_INSET, vertical = 9.dp)
+        val content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            if (opens) Text("›", style = MaterialTheme.typography.bodyLarge)
         }
-        OutlinedButton(onClick = onAction) { Text(actionLabel) }
+        if (main) {
+            Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = inner, content = content)
+        } else {
+            OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth(), contentPadding = inner, content = content)
+        }
+        Text(
+            description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = PILL_TEXT_INSET, top = 2.dp),
+        )
     }
 }
+
+/** Inside a [PillRow]: where the label starts, so the explanation beneath lines up with it. */
+private val PILL_TEXT_INSET = 16.dp
 
 @Composable
 private fun SwitchRow(level: Int, label: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
@@ -1658,7 +1683,12 @@ private fun SwitchRow(level: Int, label: String, description: String, checked: B
             Text(label, style = MaterialTheme.typography.bodyLarge)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        // No 48 dp touch-target floor: the whole row toggles, so the switch needs no padding of its own.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp,
+        ) {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
