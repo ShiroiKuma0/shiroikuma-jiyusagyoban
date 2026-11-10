@@ -103,7 +103,10 @@ class AutomationContractTest {
      */
     @Test
     fun `the declared package is confirmed against the calling uid`() {
-        assertTrue(callers.contains("getPackagesForUid(Binder.getCallingUid())"))
+        // The binder door passes the kernel's calling uid; the broadcast door (SisterTaskReceiver)
+        // passes a PendingIntent creator's uid, which the system records. Both meet the same check.
+        assertTrue(callers.contains("verify(context, declared, Binder.getCallingUid())"))
+        assertTrue(callers.contains("getPackagesForUid(uid)"))
         assertTrue(callers.contains("name !in real"))
     }
 
