@@ -79,7 +79,7 @@ class HuaweiSyncStateTest {
         HuaweiSyncState.arm()
         HuaweiSyncState.begin(1)
         HuaweiSyncState.counted(samples = 120, inserted = 118)
-        HuaweiSyncState.finish("120 samples")
+        HuaweiSyncState.finish("120 samples", ok = true)
         val p = HuaweiSyncState.progress.value
         assertFalse(p.running)
         assertEquals("done", p.phase)
@@ -92,7 +92,7 @@ class HuaweiSyncStateTest {
     @Test
     fun `arm is available again after finish`() {
         HuaweiSyncState.arm()
-        HuaweiSyncState.finish("done")
+        HuaweiSyncState.finish("done", ok = true)
         assertTrue("a finished sync must not block the next one", HuaweiSyncState.arm())
     }
 
