@@ -1677,7 +1677,7 @@ object HuaweiSyncRunner {
                 recordsFetched = recordsFetched, oldestReturnedSeconds = oldestReturned,
                 samplesWritten = written, message = message,
             )
-            HuaweiSyncState.finish(message)
+            HuaweiSyncState.finish(message, ok)
             return if (ok) {
                 Outcome.Ok(
                     syncId, message,
@@ -1859,6 +1859,7 @@ object HuaweiSyncRunner {
                     val fetch = HuaweiSyncEngine.fetchHistory(
                         session, w.first, w.last, request.maxRecords,
                     ) { done, total -> HuaweiSyncState.record(done, total) }
+                    HuaweiSyncState.windowDone()
                     recordCount += fetch.recordCount
                     recordsFetched += fetch.recordsFetched
                     missing += fetch.missing.size
@@ -1949,6 +1950,12 @@ object HuaweiSyncRunner {
                 )
             }
             return outcome ?: close(false, "timed out after ${request.timeoutSec}s")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Cancelled from the sync dialog. The row and the progress are still closed — an
+            // ordinary suspending write here would be dropped, and the progress left "running"
+            // would refuse every sync after it — and the cancellation goes on up.
+            withContext(NonCancellable) { close(false, "cancelled") }
+            throw e
         } catch (e: Throwable) {
             return close(false, e.message ?: e::class.java.simpleName)
         } finally {

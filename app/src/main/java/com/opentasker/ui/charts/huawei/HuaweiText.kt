@@ -658,4 +658,5 @@ object HuaweiText {
         "このスマホと時計が接続されていません。「時計接続（D3）」を実行してください。",
     )
     val syncFailed = Loc("Sync failed: %s", "同期できませんでした: %s")
+
 }

@@ -497,16 +497,18 @@ private fun SyncProgressRow(progress: HuaweiSyncProgress) {
         }
     }
     val seconds = if (progress.startedAtMillis > 0) (now - progress.startedAtMillis) / 1000 else 0
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    // Two lines, as in the sync dialog (白い熊, 2026-11-08): the step it is on, and the whole run.
+    // The counts belong to the record reading only — shown after it, "(2/2) · 4/5" sat beside the
+    // ECG step and read as a bar stuck at 4 of 5.
+    val reading = progress.phase == "reading" && progress.recordCount > 0
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             buildString {
                 append(phaseLabel(progress.phase)[lang])
-                if (progress.windowCount > 0) {
+                if (reading && progress.windowCount > 1) {
                     append(" (${progress.windowIndex}/${progress.windowCount})")
                 }
-                if (progress.recordCount > 0) {
-                    append(" · ${progress.recordIndex}/${progress.recordCount}")
-                }
+                if (reading) append(" · ${progress.recordIndex}/${progress.recordCount}")
                 if (progress.running) append(" · ${seconds}s")
                 if (progress.inserted > 0) append(" · ${progress.inserted}")
             },
@@ -514,10 +516,25 @@ private fun SyncProgressRow(progress: HuaweiSyncProgress) {
             color = axisInk,
         )
         if (progress.running) {
-            LinearProgressIndicator(
-                progress = { (progress.percent / 100f).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape),
-            )
+            val bar = Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
+            // This step: measured while records are read (their count is known), running otherwise.
+            if (reading) {
+                LinearProgressIndicator(progress = { (progress.percent / 100f).coerceIn(0f, 1f) }, modifier = bar)
+            } else {
+                LinearProgressIndicator(modifier = bar)
+            }
+            SyncSteps.overall(SyncSteps.SYNC, progress.phase, progress.percent)?.let { (whole, step) ->
+                Text(
+                    SyncSteps.STEP_OF[lang].format(step, SyncSteps.SYNC.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = axisInk,
+                )
+                LinearProgressIndicator(
+                    progress = { whole },
+                    modifier = bar,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                )
+            }
         }
     }
 }
@@ -620,3 +637,4 @@ private val DAY: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault())
 
 private fun stamp(millis: Long): String = STAMP.format(Instant.ofEpochMilli(millis))
+
