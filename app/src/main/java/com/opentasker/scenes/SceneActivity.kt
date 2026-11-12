@@ -92,6 +92,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.DisposableEffect
@@ -131,6 +132,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.opentasker.app.OpenTaskerApp_NoHilt
+import com.opentasker.core.bubbles.FlashBubbleOverlayManager
+import com.opentasker.core.bubbles.FlashBubbleStore
 import com.opentasker.core.engine.executeAndLogTask
 import com.opentasker.core.engine.resolveTaskByName
 import com.opentasker.core.engine.variables.PersistentGlobalScope
@@ -242,16 +245,7 @@ open class SceneActivity : ComponentActivity() {
                 if (timeoutMs > 0) {
                     LaunchedEffect(sceneId) {
                         kotlinx.coroutines.delay(timeoutMs)
-                        if (showWhenLocked) {
-                            // Sleep the screen OURSELVES (wakelock released first) so the lockscreen never
-                            // flashes between this Activity finishing and a separate screen.off.
-                            runCatching { wakeLock?.let { if (it.isHeld) it.release() } }
-                            withContext(Dispatchers.IO) { runCatching { ShizukuShell.exec("input keyevent 223") } }
-                            // Wait for the display to actually power down before finishing — otherwise the
-                            // Activity tears down while the screen is still on, flashing the wallpaper.
-                            kotlinx.coroutines.delay(450)
-                        }
-                        finish()
+                        sleepThenFinish(showWhenLocked)
                     }
                 }
                 // showWhenLocked scenes render fullscreen (the wakedance black mask fills the screen);
@@ -261,8 +255,47 @@ open class SceneActivity : ComponentActivity() {
                 } else {
                     SceneOverlay(scene, modal = true, position = position, dismissOnOutside = dismissOnOutside, onDismiss = { finish() }, onRunTask = { ref -> runTask(ref, scene?.projectId) }, onSetVar = ::setVar)
                 }
+                // The wakedance carries the kill-all icon too (白い熊, 2026-11-12). On the Desktop it is an
+                // overlay window, and overlays sit UNDER the EMUI keyguard — so while the flash runs over
+                // the lockscreen the icon has to be drawn by this Activity. Same view, same tap: run the
+                // kill-all task, then end the dance at once instead of blinking on to the timeout.
+                // A sibling of the scene rather than a wrapper, so the scene's own constraints stay as
+                // they were; the Box takes no pointer input, only the icon does.
+                if (showWhenLocked && fullscreen) {
+                    val flash by FlashBubbleStore.state.collectAsState()
+                    if (flash.killVisible || flash.bubbles.isNotEmpty()) {
+                        val ui = rememberCoroutineScope()
+                        Box(Modifier.fillMaxSize().padding(end = 4.dp, bottom = 24.dp), contentAlignment = Alignment.BottomEnd) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    (FlashBubbleOverlayManager.killView() ?: android.view.View(ctx)).apply {
+                                        setOnClickListener {
+                                            FlashBubbleOverlayManager.killAll()
+                                            ui.launch { sleepThenFinish(sleep = true) }
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+
+    /**
+     * Close the scene; a show-when-locked one puts the screen to sleep first. It sleeps the screen ITSELF
+     * (wakelock released first) so the lockscreen never flashes between this Activity finishing and a
+     * separate screen.off, then waits for the display to actually power down — otherwise the Activity
+     * tears down while the screen is still on, flashing the wallpaper.
+     */
+    private suspend fun sleepThenFinish(sleep: Boolean) {
+        if (sleep) {
+            runCatching { wakeLock?.let { if (it.isHeld) it.release() } }
+            withContext(Dispatchers.IO) { runCatching { ShizukuShell.exec("input keyevent 223") } }
+            delay(450)
+        }
+        finish()
     }
 
     private fun runTask(ref: String, projectId: Long?) {

@@ -210,6 +210,16 @@ object FlashBubbleOverlayManager {
         }
     }
 
+    /**
+     * The kill-all icon as a plain view, for a host that is not this overlay: the wakedance draws it
+     * itself, because an overlay window sits under the EMUI keyguard. The icon is right-aligned over
+     * its (wider) label there, so it sits against the screen edge rather than half a label away from it.
+     */
+    fun killView(): View? = buildKillView()?.also { (it as? LinearLayout)?.gravity = Gravity.END }
+
+    /** What a tap on the kill-all icon does: run the kill-all task and retire the icon. */
+    fun killAll() = onGesture(KILL_KEY, longTap = false)
+
     private fun buildBubbleView(ctx: Context, label: String, badgeText: String, setIcon: (ImageView) -> Unit): View {
         val prefs = ThemeStore.state.value
         val accent = prefs.accent
