@@ -999,6 +999,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- The tap on the "recording" notification: stop and save. Explicit intents only. -->
+        <receiver
+            android:name="com.opentasker.core.actions.RecordingStopReceiver"
+            android:exported="false" />
+
         <receiver
             android:name="com.opentasker.core.actions.NotificationActionReceiver"
             android:exported="false">

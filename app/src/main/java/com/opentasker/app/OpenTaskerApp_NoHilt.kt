@@ -108,6 +108,8 @@ class OpenTaskerApp_NoHilt : Application() {
         // journal against rows the running engine is still writing — marking live tasks as
         // interrupted — and schedule the workers twice. The player needs none of it.
         if (isSideProcess()) return
+        // A recorder dies with its process, so a "recording" notification still up now is a lie.
+        com.opentasker.core.actions.RecordingNotification.clear(this)
         installStrictModeInDebug()
         if (DirectBootTriggerStore.isUserUnlocked(this)) {
             initializeAfterUnlock()
