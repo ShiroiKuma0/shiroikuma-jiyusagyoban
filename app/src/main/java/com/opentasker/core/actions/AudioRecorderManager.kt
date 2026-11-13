@@ -59,6 +59,7 @@ object AudioRecorderManager {
             tmpFile = tmp
             targetDir = dir.trim()
             DeviceStateEvents.publishRecording(true)
+            RecordingNotification.show(app)
             AppLogger.info(TAG, "Recording started → ${tmp.absolutePath}")
             Result.success(Unit)
         } catch (e: Exception) {
@@ -66,6 +67,7 @@ object AudioRecorderManager {
             recorder = null
             tmpFile = null
             DeviceStateEvents.publishRecording(false)
+            RecordingNotification.clear(app)
             Result.failure(e)
         }
     }
@@ -81,6 +83,7 @@ object AudioRecorderManager {
             recorder = null
             tmpFile = null
             DeviceStateEvents.publishRecording(false)
+            RecordingNotification.clear(app)
             if (tmp == null || !tmp.exists()) return Result.failure(IllegalStateException("no recording file produced"))
 
             val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
@@ -93,6 +96,7 @@ object AudioRecorderManager {
             recorder = null
             tmpFile = null
             DeviceStateEvents.publishRecording(false)
+            RecordingNotification.clear(app)
             Result.failure(e)
         }
     }
