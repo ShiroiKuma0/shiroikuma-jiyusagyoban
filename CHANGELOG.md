@@ -8,6 +8,26 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+005 — 2026-11-13
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
+as `+002`.
+
+### Recording
+
+- **A recording is never invisible again.** For as long as the voice recorder (`audio.record.start`)
+  holds the microphone, the app shows an ongoing notification, “録音中 · Recording”, with a running
+  timer in the status bar. A tap stops the recording and saves it, exactly as `audio.record.stop`
+  does. The channel is silent, so no sound lands in the recording, and a notification left over
+  from a killed process is cleared at the next start. Before this the recorder's only sign of life
+  was one buzz at the start, and EMUI draws no microphone indicator of its own — a stray long press
+  of volume-down recorded for nine hours unnoticed.
+
+### 通知明滅
+
+- **A kill-all icon on the wakedance.** Bottom right, right-aligned over its label; a tap runs the
+  kill-all task and puts the screen to sleep at once.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+002 — 2026-11-10
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
