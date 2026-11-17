@@ -104,7 +104,7 @@ private fun ProgressPanel(onHide: () -> Unit, onClose: () -> Unit) {
             delay(1_000)
         }
     }
-    ProgressPanelContent(progress, now, onHide, onClose)
+    ProgressPanelContent(progress, now, onHide, onClose, onCancel = { GenerationRunner.cancel() })
 }
 
 /** The panel itself, stateless, so a screenshot preview can draw every stage of a run. */
@@ -114,6 +114,7 @@ internal fun ProgressPanelContent(
     now: Long,
     onHide: () -> Unit,
     onClose: () -> Unit,
+    onCancel: () -> Unit = {},
 ) {
     val running = p?.running == true
     Box(
@@ -205,6 +206,15 @@ internal fun ProgressPanelContent(
                 OutlinedButton(onClick = onHide, modifier = Modifier.fillMaxWidth()) {
                     Text("隠す — 裏で続きます / Hide — it keeps running", fontSize = 16.sp)
                 }
+                // 中止, in red — the one pill here that ends something (白い熊, 2026-11-16). What the
+                // run has finished stays; the rest waits for the next run.
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = CANCEL_RED),
+                ) {
+                    Text("中止 / Cancel the run", fontSize = 16.sp, color = CANCEL_RED)
+                }
                 Text(
                     "通知を押すとこの画面に戻ります。\nTap the notification to come back here.",
                     fontSize = 13.sp,
@@ -218,6 +228,9 @@ internal fun ProgressPanelContent(
         }
     }
 }
+
+/** 中止's red: pure, like the yellow beside it. */
+private val CANCEL_RED = Color(0xFFFF0000)
 
 /** One step: a glyph AND a colour for its state, never the colour alone. */
 @Composable

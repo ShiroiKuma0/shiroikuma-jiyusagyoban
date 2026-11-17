@@ -355,6 +355,34 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "dialog.pickdir",
+            name = "Pick Directory",
+            description = "Open the system directory picker and store the chosen directory's path. Cancel stores an empty value",
+            category = "Alert",
+            fields = listOf(
+                ActionField("store", "Result variable", hint = "gets the path; %<name>_ok gets true/false. Default 'dir'"),
+                ActionField("timeout", "Timeout (seconds)", hint = "blank = wait until answered"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "project.export",
+            name = "Export Project (clean)",
+            description = "Write one project — tasks, profiles and scenes with their notes and groups, no variables — as an importable bundle into a directory. The clean setup another phone imports",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("project", "Project name", required = true),
+                ActionField("dir", "Directory to write into", required = true, hint = "e.g. the variable a Pick Directory action filled", pathPicker = true),
+                ActionField("basename", "File name stem", hint = "the file is <stem>_<yyyy-MM-dd_HH-mm-ss>.json. Default: the project name"),
+                ActionField("store", "Result variable", hint = "gets the file's path; %<name>_tasks / _profiles / _scenes get the counts. Default 'export_path'"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "task.exists",
             name = "Task Exists",
             description = "Store true/false for whether a task of this name exists — so a task can generate a missing sub-task instead of failing on it",
@@ -1323,6 +1351,26 @@ fun registerActionMetadata() {
             id = "gengoshima.stats",
             name = "言語島: statistics",
             description = "Open 言語島's statistics — the listening calendar, time of day, per-island progress, what is due",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.import",
+            name = "言語島: import",
+            description = "Open 言語島's import window — paste a 「言語島 取込」 text of terms, examples and sentences, check the preview, file and voice it",
+            category = "App",
+            fields = emptyList(),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "gengoshima.vocab",
+            name = "言語島: vocabulary",
+            description = "Open 言語島's vocabulary reference — 白い熊's own terms by island, Japanese→English and back, searchable, with examples and 辞書's entry",
             category = "App",
             fields = emptyList(),
         )

@@ -109,6 +109,13 @@ class MainActivity : ComponentActivity() {
         handleNfcIntent(intent, restored = savedInstanceState != null)
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Anything the Setup page lists that has been switched off since — say so now, not through
+        // a task that fails later.
+        com.opentasker.ui.screens.SetupWarning.onAppOpened(applicationContext)
+    }
+
     override fun onDestroy() {
         unregisterPredictiveBackCallback()
         super.onDestroy()

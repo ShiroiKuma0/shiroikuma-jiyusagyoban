@@ -82,6 +82,27 @@ class DialogActivity : ComponentActivity() {
         DialogBridge.takeSpec(id)?.let { intent.putExtras(it) }
         cancelWhenHidden = intent.getBooleanExtra(EXTRA_CANCEL_WHEN_HIDDEN, false)
         val type = intent.getStringExtra(EXTRA_TYPE) ?: TYPE_TEXT
+        if (type == TYPE_DIRECTORY) {
+            // No dialog of our own: the system directory picker is the whole interaction, and its
+            // answer (a real path, or nothing) settles the request. Registered here, before the
+            // Activity starts, as the result API demands; launched once — a recreated Activity
+            // (rotation, fold) gets the pending result delivered to the re-registered launcher.
+            val launcher = registerForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+            ) { uri ->
+                val path = com.opentasker.ui.screens.documentUriToFsPath(uri, isTree = true)
+                if (path == null) {
+                    if (uri != null) toast("That place has no path on the phone's storage")
+                    settle(DialogOutcome.Cancelled)
+                } else {
+                    settle(DialogOutcome.Confirmed(path))
+                }
+            }
+            if (savedInstanceState == null) {
+                runCatching { launcher.launch(null) }.onFailure { settle(DialogOutcome.Cancelled) }
+            }
+            return
+        }
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
         val default = intent.getStringExtra(EXTRA_DEFAULT).orEmpty()
@@ -270,6 +291,7 @@ class DialogActivity : ComponentActivity() {
         const val TYPE_APP_SINGLESELECT = "app_singleselect"
         const val TYPE_LIST_MULTISELECT = "list_multiselect"
         const val TYPE_FORM = "form"
+        const val TYPE_DIRECTORY = "directory" // no dialog: the system directory picker, answered as a path
         const val EXTRA_FORM = "form"   // FORM: the resolved fields, a JSON array (see FormField)
         const val EXTRA_SKIP = "skip"   // FORM: label of the optional middle "leave as it is" button
     }
@@ -532,7 +554,12 @@ private fun DialogSize.surfaceModifier(): Modifier = when (this) {
  *   `# text`   title      `## text` section (underlined)   `### text` / `#### text` sub-headings
  *   `- text`   bullet     `---`     horizontal rule
  *   `::: text` … `:::`   a rounded box titled `text` around the lines between (one level, no nesting)
- *   inline: `**bold**`, `__underline__`, `*italic*`
+ *   inline: `**bold**`, `__underline__`, `*italic*`, and a back-quoted span, which is literal
+ *
+ * The literal span is what makes a command writable at all: `**21*number#` in running text lost two
+ * of its three asterisks to the italic rule, and `/ussd *#21#` its pair (携帯's guide, 2026-11-17).
+ * Between back quotes nothing is read as markup, and the text is set in a fixed-width face so it
+ * reads as something to type.
  *
  * A line that matches nothing is body text, so plain text stays plain.
  *
@@ -620,22 +647,26 @@ private fun AnnotatedString.Builder.appendItalic(text: String) {
     if (last < text.length) withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { append(text.substring(last)) }
 }
 
-// Ordered alternation: `**` is tried before `*`, so bold never decays into two italics.
-private val INLINE_MARKUP_RE = Regex("""\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*""")
+// Ordered alternation: the literal span first, so nothing inside it is read as markup; then `**`
+// before `*`, so bold never decays into two italics.
+private val INLINE_MARKUP_RE = Regex("""`([^`]+)`|\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*""")
 
 private fun inlineSpans(text: String): AnnotatedString {
-    if ('*' !in text && '_' !in text) return AnnotatedString(text)
+    if ('*' !in text && '_' !in text && '`' !in text) return AnnotatedString(text)
     return buildAnnotatedString {
         var last = 0
         for (m in INLINE_MARKUP_RE.findAll(text)) {
             if (m.range.first > last) append(text.substring(last, m.range.first))
-            val bold = m.groupValues[1]
-            val underline = m.groupValues[2]
+            val literal = m.groupValues[1]
+            val bold = m.groupValues[2]
+            val underline = m.groupValues[3]
             when {
+                literal.isNotEmpty() ->
+                    withStyle(SpanStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) { append(literal) }
                 bold.isNotEmpty() -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(bold) }
                 underline.isNotEmpty() ->
                     withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { append(underline) }
-                else -> appendItalic(m.groupValues[3])
+                else -> appendItalic(m.groupValues[4])
             }
             last = m.range.last + 1
         }

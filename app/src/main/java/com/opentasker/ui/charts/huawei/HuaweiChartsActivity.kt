@@ -210,6 +210,7 @@ class HuaweiChartsActivity : ComponentActivity() {
                             // watching.
                             com.opentasker.ui.charts.SessionRegisterScreen(
                                 register = state.register,
+                                sleepHeldAtMs = state.sleepHeldAtMs,
                                 contentPadding = insets,
                                 onRate = { night, step -> model.setFeltFor(night, step) },
                                 onNote = { morning, text -> model.setNoteFor(morning, text) },

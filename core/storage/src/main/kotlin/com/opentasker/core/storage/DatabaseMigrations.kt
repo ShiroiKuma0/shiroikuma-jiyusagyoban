@@ -736,6 +736,23 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * 言語島 語彙: the `gengoshima_vocab` table (one term of 白い熊's vocabulary per row, with 辞書's
+     * cached answer) and `gengoshima_sentences.vocabId`, which marks a sentence as a term's example.
+     * Additive; the CREATE statements are Room's own from `40.json`, the DEFAULT spelt out.
+     */
+    val MIGRATION_39_40 = object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `gengoshima_vocab` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `islandId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `term` TEXT NOT NULL, `reading` TEXT NOT NULL, `meaning` TEXT NOT NULL, `note` TEXT NOT NULL, `starred` INTEGER NOT NULL, `jishoJson` TEXT NOT NULL, `jishoAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_gengoshima_vocab_islandId_position` ON `gengoshima_vocab` (`islandId`, `position`)",
+            )
+            db.execSQL("ALTER TABLE `gengoshima_sentences` ADD COLUMN `vocabId` INTEGER DEFAULT NULL")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -776,6 +793,7 @@ object DatabaseMigrations {
             MIGRATION_36_37,
             MIGRATION_37_38,
             MIGRATION_38_39,
+            MIGRATION_39_40,
         )
     }
 }

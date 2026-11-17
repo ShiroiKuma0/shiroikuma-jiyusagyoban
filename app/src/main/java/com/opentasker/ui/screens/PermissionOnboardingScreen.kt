@@ -91,7 +91,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import com.opentasker.core.icons.TaskIconStore
 
-private data class PermissionSetupItem(
+internal data class PermissionSetupItem(
     val title: String,
     val body: String,
     val granted: Boolean,
@@ -101,7 +101,7 @@ private data class PermissionSetupItem(
     val optional: Boolean = false,
 )
 
-private sealed interface PermissionAction {
+internal sealed interface PermissionAction {
     /**
      * A runtime permission dialog for [permission], which decides the outcome. [requestedWith] is
      * asked for in the same dialog, because Android 12+ ignores a fine-location request that does
@@ -136,14 +136,7 @@ fun PermissionOnboardingScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshTick by remember { mutableIntStateOf(0) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        refreshTick++
-    }
-    // Device-admin add must be started for-result from the Activity (NOT as a new task, which makes the
-    // system's translucent DeviceAdminAdd screen open and instantly finish).
-    val deviceAdminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        refreshTick++
-    }
+    val runAction = rememberPermissionActionRunner(onMessage) { refreshTick++ }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -265,58 +258,99 @@ fun PermissionOnboardingScreen(
         items(orderedItems, key = { it.title }) { item ->
             PermissionSetupCard(
                 item = item,
-                onRunAction = {
-                    when (val action = item.action) {
-                        PermissionAction.None -> onMessage("${item.title} is already ready.")
-                        is PermissionAction.RuntimePermission ->
-                            // Not yet granted → ask. Already granted → open this app's details page so it
-                            // can be toggled off (re-requesting a granted runtime permission does nothing).
-                            if (item.granted) {
-                                openSettingsIntent(
-                                    context,
-                                    Intent(
-                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        Uri.fromParts("package", context.packageName, null),
-                                    ),
-                                    onMessage,
-                                )
-                            } else {
-                                permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())
-                            }
-                        is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
-                        is PermissionAction.Custom -> action.run()
-                        is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
-                        is PermissionAction.DeviceAdmin -> {
-                            val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
-                            val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
-                            if (dpm?.isAdminActive(admin) == true) {
-                                // Already active → open the device-admin LIST to review / disable it. (EMUI buries
-                                // it under Security → Advanced; ACTION_ADD_DEVICE_ADMIN no-ops once active.)
-                                openDeviceAdminSettings(context, onMessage)
-                            } else {
-                                // Not active → the direct "activate this admin?" screen (for-result so it doesn't
-                                // blink shut); if the OEM won't honor it, fall back to the device-admin list.
-                                try {
-                                    deviceAdminLauncher.launch(
-                                        Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
-                                            .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
-                                            .putExtra(
-                                                android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                                                "Enable so 物理鍵 lockdown (screen.lockdown) can lock the device.",
-                                            ),
-                                    )
-                                } catch (ex: Exception) {
-                                    openDeviceAdminSettings(context, onMessage)
-                                }
-                            }
-                        }
-                    }
-                },
+                onRunAction = { runAction(item) },
             )
         }
 
     }
 }
+
+/**
+ * Runs a setup item's shortcut — the permission dialog, the settings page, the device-admin screen.
+ * Shared by the Setup page and the switched-off warning, so both open exactly the same places.
+ * [onChanged] fires when a dialog launched for-result comes back.
+ */
+@Composable
+internal fun rememberPermissionActionRunner(
+    onMessage: (String) -> Unit,
+    onChanged: () -> Unit,
+): (PermissionSetupItem) -> Unit {
+    val context = LocalContext.current
+    // Android stops showing the permission dialog once it has been refused twice (and EMUI after it
+    // has revoked the permission itself): the request then comes straight back refused and the
+    // button looks dead. An answer faster than anyone can tap means no dialog was shown, so the
+    // app's own permission page is opened instead.
+    val askedAt = remember { longArrayOf(0L) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val refusedUnasked = result.values.any { !it } &&
+            android.os.SystemClock.elapsedRealtime() - askedAt[0] < SILENT_REFUSAL_MS
+        if (refusedUnasked) {
+            onMessage("Android no longer asks for this one — set it under 権限 (Permissions); off and on again if it already reads 許可.")
+            openSettingsIntent(context, appDetailsIntent(context), onMessage)
+        }
+        onChanged()
+    }
+    // Device-admin add must be started for-result from the Activity (NOT as a new task, which makes the
+    // system's translucent DeviceAdminAdd screen open and instantly finish).
+    val deviceAdminLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        onChanged()
+    }
+    return { item ->
+        when (val action = item.action) {
+            PermissionAction.None -> onMessage("${item.title} is already ready.")
+            is PermissionAction.RuntimePermission ->
+                // Not yet granted → ask. Already granted → open this app's details page so it
+                // can be toggled off (re-requesting a granted runtime permission does nothing).
+                if (item.granted) {
+                    openSettingsIntent(
+                        context,
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", context.packageName, null),
+                        ),
+                        onMessage,
+                    )
+                } else {
+                    askedAt[0] = android.os.SystemClock.elapsedRealtime()
+                    permissionLauncher.launch((listOf(action.permission) + action.requestedWith).toTypedArray())
+                }
+            is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
+            is PermissionAction.Custom -> action.run()
+            is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
+            is PermissionAction.DeviceAdmin -> {
+                val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
+                val dpm = context.getSystemService(android.app.admin.DevicePolicyManager::class.java)
+                if (dpm?.isAdminActive(admin) == true) {
+                    // Already active → open the device-admin LIST to review / disable it. (EMUI buries
+                    // it under Security → Advanced; ACTION_ADD_DEVICE_ADMIN no-ops once active.)
+                    openDeviceAdminSettings(context, onMessage)
+                } else {
+                    // Not active → the direct "activate this admin?" screen (for-result so it doesn't
+                    // blink shut); if the OEM won't honor it, fall back to the device-admin list.
+                    try {
+                        deviceAdminLauncher.launch(
+                            Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                                .putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, admin)
+                                .putExtra(
+                                    android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                    "Enable so 物理鍵 lockdown (screen.lockdown) can lock the device.",
+                                ),
+                        )
+                    } catch (ex: Exception) {
+                        openDeviceAdminSettings(context, onMessage)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The setup items that are switched off and that the warning lists: every required item, plus
+ * Shizuku — optional on paper, but shell, wake, freeze and 物理鍵 all stand on it.
+ */
+internal fun switchedOffSetupItems(context: Context): List<PermissionSetupItem> =
+    buildPermissionItems(context).filter { !it.granted && (!it.optional || it.title == "Shizuku") }
 
 // Upstream's theme picker (ThemeSetupCard/ThemeChoice, a radio group over ThemeMode) is not part of
 // this fork's Setup screen: appearance here comes from ThemeStore's ThemePrefs — the black-yellow
@@ -333,7 +367,7 @@ fun PermissionOnboardingScreen(
 // left in place unreferenced — deleting files upstream still develops would turn their clean
 // auto-merges into a modify/delete conflict on every sync. (白い熊, 2026-08-14.)
 @Composable
-private fun PermissionSetupCard(
+internal fun PermissionSetupCard(
     item: PermissionSetupItem,
     onRunAction: () -> Unit,
 ) {
@@ -467,7 +501,7 @@ private fun PermissionRequirement(label: String) {
     }
 }
 
-private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
+internal fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
     val shizukuRunning = ShizukuShell.isRunning()
     val shizukuReady = shizukuRunning && ShizukuShell.hasPermission()
@@ -567,15 +601,23 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         // in which slot by it. Both were declared but nothing asked for them, so a new phone had them off.
         PermissionSetupItem(
             title = "Phone (SIMs and numbers)",
-            body = "Needed to read the SIM slots, their service state and their numbers, and the call state. 携帯 uses it to tell which SIM is in which slot.",
+            // The second paragraph is for the case 白い熊 met on 2026-11-16: the numbers half was gone,
+            // Android would not ask for it, and the permission page showed the permission as on.
+            // Dialing joined on 2026-11-17: Run USSD needs CALL_PHONE, which the manifest declared and
+            // nothing requested — 携帯's /balance, /forward and /ussd failed on every freshly set-up relay.
+            body = "Needed to read the SIM slots, their service state and their numbers, and the call state, and to dial — a USSD code is dialled. 携帯 uses it to tell which SIM is in which slot, and for /balance, /forward and /ussd.\n\n" +
+                "If Request shows no dialog, the app's page in Settings (アプリ情報) opens instead. Under 権限, " +
+                "電話 (Phone) covers the phone state, the phone numbers and dialing: if it already reads 許可, " +
+                "set it to 許可しない and back to 許可.",
             granted = hasPermission(context, Manifest.permission.READ_PHONE_STATE) &&
-                hasPermission(context, Manifest.permission.READ_PHONE_NUMBERS),
+                hasPermission(context, Manifest.permission.READ_PHONE_NUMBERS) &&
+                hasPermission(context, Manifest.permission.CALL_PHONE),
             actionLabel = "Request",
             action = PermissionAction.RuntimePermission(
                 Manifest.permission.READ_PHONE_STATE,
-                requestedWith = listOf(Manifest.permission.READ_PHONE_NUMBERS),
+                requestedWith = listOf(Manifest.permission.READ_PHONE_NUMBERS, Manifest.permission.CALL_PHONE),
             ),
-            requiredFor = "SIM actions, call-state trigger, 携帯",
+            requiredFor = "SIM actions, USSD, call-state trigger, 携帯",
         ),
         PermissionSetupItem(
             title = "Overlay access",
@@ -768,6 +810,9 @@ private fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
 }
 
 private const val ANDROID_17_API = 37
+
+/** A permission answer sooner than this was given by the system, not by a tap on a dialog. */
+private const val SILENT_REFUSAL_MS = 700L
 
 private fun hasPermission(context: Context, permission: String): Boolean =
     ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED

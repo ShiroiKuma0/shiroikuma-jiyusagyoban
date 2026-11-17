@@ -5,6 +5,7 @@ import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,6 +131,7 @@ internal class CardPlayer {
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun SentenceCard(
     s: GengoshimaSentenceEntity,
@@ -146,6 +148,8 @@ internal fun SentenceCard(
     onEditSource: () -> Unit,
     onEditJapanese: () -> Unit,
     onWord: (Int) -> Unit,
+    /** A long press on a word: 「語彙に追加」. */
+    onWordLong: ((Int) -> Unit)? = null,
     onFinish: () -> Unit,
     onAction: (SentenceAction) -> Unit,
 ) {
@@ -177,7 +181,10 @@ internal fun SentenceCard(
                         tokens.forEachIndexed { k, t ->
                             val over = !t.reading_override.isNullOrBlank()
                             Column(
-                                Modifier.clickable(enabled = !working) { onWord(k) }.padding(horizontal = 1.dp),
+                                Modifier.combinedClickable(
+                                    enabled = !working,
+                                    onLongClick = onWordLong?.let { long -> { long(k) } },
+                                ) { onWord(k) }.padding(horizontal = 1.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(

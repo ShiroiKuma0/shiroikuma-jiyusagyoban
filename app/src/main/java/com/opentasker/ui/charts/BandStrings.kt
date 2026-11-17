@@ -486,6 +486,12 @@ object BandText {
         "直近 %d 夜 ・ 線は 7 夜の中央値。",
     )
     val scoreLatest = Loc("Last night %s", "昨夜 %s")
+    val sleepHeld = Loc(
+        "Last night is not in yet. At the %s sync the watch had not closed the night, and until it " +
+            "does it hands over no sleep at all. Sync again once you have been up for about half an hour.",
+        "昨夜の記録はまだ届いていません。%s の同期の時点で時計が夜を閉じておらず、閉じるまで睡眠は一切渡されません。" +
+            "起きてから30分ほど後にもう一度同期してください。",
+    )
     val scoreWeightsOpen = Loc("Score weights", "点数の重み")
     val scorePartialMark = Loc(
         "* partial — some cells were empty; the score is over the rest. ! a broken night, or one held " +
