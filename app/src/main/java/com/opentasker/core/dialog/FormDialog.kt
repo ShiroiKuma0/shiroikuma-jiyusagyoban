@@ -491,7 +491,7 @@ private fun BadgePreview(f: FormField, values: Map<String, String>) {
 }
 
 @Composable
-private fun Badge(text: String, fill: Color, ink: Color, border: Color, height: Dp, stroke: Dp, fontSize: Int) {
+internal fun Badge(text: String, fill: Color, ink: Color, border: Color, height: Dp, stroke: Dp, fontSize: Int) {
     Box(
         Modifier
             .height(height)
