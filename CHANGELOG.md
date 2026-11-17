@@ -8,6 +8,53 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+018 — 2026-11-17
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
+as `+005`.
+
+### 言語島
+
+- **語彙, a personal vocabulary reference.** Terms with reading, translation, note and example
+  sentences, kept per island (Room v40: the table `gengoshima_vocab`, and `vocabId` on a sentence
+  that is an example of a term). Island tabs in the paper-tab shape with 全部 first, both
+  directions (日→英 and a true 英→日 reverse index), search over term, reading, meaning, note and
+  examples, a one-line list and a full-card view, and listings that are sorted and split under
+  foldable headings.
+- **Terms are edited by hand** as well as imported: translation, reading, note, island, examples.
+- **取り込む, the paste import.** A line-oriented text format (`島:` / `語:` / `例:` / `注:` / `文:`,
+  with ASCII aliases) files terms and sentences into islands in one run; a translation is
+  mandatory, and a faulty line is reported with its number rather than dropped. Three ways in — the
+  import dialog, a share target for plain text, and the adb bridge broadcast `GENGOSHIMA_IMPORT`.
+  The format is specified in `docs/gengoshima-import-format.md`.
+- **The lookup door to 白い熊の辞書** on this side: the cards read a cached answer per term, so
+  browsing never wakes the dictionary.
+- New actions `gengoshima.vocab` and `gengoshima.import`, with their tiles on the 言語島 board.
+
+### 携帯 — the SMS bridge over Jami
+
+- **Dialing is asked for in Setup.** The item “Phone (SIMs and numbers)” now also requests
+  `CALL_PHONE`. Run USSD needed it and nothing asked for it, so `/balance`, `/forward` and `/ussd`
+  failed on every freshly set-up relay.
+- **Export Project (clean)** (`project.export`). Writes one project — its tasks, profiles and scenes
+  with their notes and groups, and no variables — as an importable bundle
+  `<stem>_<yyyy-MM-dd_HH-mm-ss>.json` into a directory. Settings live in variables, so this is the
+  clean setup a second phone imports.
+- **Pick Directory** (`dialog.pickdir`). Opens the system directory picker from a task and stores
+  the chosen directory's path; cancelling stores an empty value.
+
+### Dialogs
+
+- **A literal span in the text-dialog markup.** Text between back quotes is not read as markup and
+  is set in a fixed-width face, so a code such as `**21*…#` keeps all its asterisks.
+- **Colour sliders in forms.** Every colour field of `dialog.form` has R, G and B sliders under the
+  hex box; a badge preview follows the thumb.
+
+### Setup and 健康
+
+- **A warning for switched-off setup items** that the app needs.
+- **健康:** a note on the board while a night's sleep data is being held back.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+005 — 2026-11-13
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
