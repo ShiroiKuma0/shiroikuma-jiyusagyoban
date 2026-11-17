@@ -383,6 +383,26 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "image.badge",
+            name = "Badge Picture (PNG)",
+            description = "Draw a badge — short text on a fill, with a border — as a square PNG for a round avatar: the badge sits inside the circle, the rest is black, so no corner is cut off",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("text", "Badge text", required = true, hint = "e.g. J3"),
+                ActionField("fill", "Fill colour", required = true, hint = "#RRGGBB"),
+                ActionField("ink", "Text colour", hint = "#RRGGBB. Default black"),
+                ActionField("border", "Border colour", hint = "#RRGGBB. Default: the fill"),
+                ActionField("dir", "Directory to write into", required = true, pathPicker = true),
+                ActionField("name", "File name (no extension)", hint = "the file is <name>.png and replaces an existing one. Default: the badge text"),
+                ActionField("size", "Side in pixels", hint = "Default 512"),
+                ActionField("background", "Background colour", hint = "#RRGGBB. Default black"),
+                ActionField("store", "Result variable", hint = "gets the file's path. Default 'badge_path'"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "task.exists",
             name = "Task Exists",
             description = "Store true/false for whether a task of this name exists — so a task can generate a missing sub-task instead of failing on it",

@@ -338,8 +338,28 @@ class FormDialogAction : Action {
                 val named = opts.mapIndexed { i, label ->
                     label.ifBlank { "(無題 / untitled) · " + vals.getOrNull(i).orEmpty().take(8) }
                 }
-                o.put("options", org.json.JSONArray((listOfNotNull(none) + named)))
-                o.put("values", org.json.JSONArray((listOfNotNull(none?.let { "" }) + vals)))
+                // "sort": "alpha" — a long list (conversations) in an order one can find things in:
+                // titles that start with a digit first, then the rest alphabetically, untitled last.
+                val order = if (f.optString("sort") == "alpha") {
+                    val collator = java.text.Collator.getInstance()
+                    opts.indices.sortedWith(
+                        compareBy<Int> { i ->
+                            val first = opts[i].trim().firstOrNull()
+                            when {
+                                first == null -> 2
+                                first.isDigit() -> 0
+                                else -> 1
+                            }
+                        }.thenComparator { a, b -> collator.compare(opts[a].trim(), opts[b].trim()) },
+                    )
+                } else {
+                    opts.indices.toList()
+                }
+                o.put("options", org.json.JSONArray(listOfNotNull(none) + order.map { named[it] }))
+                o.put(
+                    "values",
+                    org.json.JSONArray(listOfNotNull(none?.let { "" }) + order.map { vals.getOrNull(it).orEmpty() }),
+                )
             }
             resolved.put(o)
         }
