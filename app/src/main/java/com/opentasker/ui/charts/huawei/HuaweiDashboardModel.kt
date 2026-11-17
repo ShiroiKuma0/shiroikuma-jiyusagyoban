@@ -68,6 +68,8 @@ data class HuaweiDashboardState(
     val sri: Double? = null,
     val sleepScore: com.opentasker.ui.charts.SleepScore.Breakdown? = null,
     val register: com.opentasker.ui.charts.SessionRegister.Register? = null,
+    /** When the latest sync found the watch holding the night back; null when sleep came through. */
+    val sleepHeldAtMs: Long? = null,
     val nights: List<com.opentasker.ui.charts.SleepSession> = emptyList(),
     /**
      * Last night's heart rate in twelfths, for the deviation strip's sparkline.
@@ -297,6 +299,8 @@ class HuaweiDashboardModel(
             sri = derived.sri,
             sleepScore = derived.sleepScore,
             register = derived.register,
+            sleepHeldAtMs = runCatching { db.huaweiSyncDao().recent(1).firstOrNull() }.getOrNull()
+                ?.takeIf { it.ok && com.opentasker.core.huawei.HuaweiSleepHeld.isIn(it.message) }?.startedAt,
             nights = derived.nights,
             days = derived.days,
             humeNights = derived.humeNights,

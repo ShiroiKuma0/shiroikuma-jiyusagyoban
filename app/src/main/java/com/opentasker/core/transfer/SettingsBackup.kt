@@ -347,7 +347,7 @@ object SettingsBackup {
     /** 言語島's tables, carried the same generic way as [HEALTH_TABLES]. */
     private val GENGOSHIMA_TABLES = listOf(
         "gengoshima_islands", "gengoshima_sentences", "gengoshima_sessions", "gengoshima_plays",
-        "gengoshima_tombstones", "gengoshima_inbox",
+        "gengoshima_tombstones", "gengoshima_inbox", "gengoshima_vocab",
     )
     private const val GENGOSHIMA_DIR = "gengoshima"
 

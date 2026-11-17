@@ -185,6 +185,38 @@ fun GsBoardArt(key: String, modifier: Modifier = Modifier) {
             }
 
             // Statistics: a calendar of listening days and a rising line of reviews.
+            // 取り込む: a pasted page of terms dropping into an island.
+            "import" -> {
+                sky(Color(0xFF0B1D2A), Color(0xFF15384A))
+                glow(Offset(w * 0.5f, h * 0.4f), w * 0.45f, Color(0xFF26A69A))
+                drawRoundRect(Color(0xFFF5F1E6), topLeft = Offset(w * 0.3f, h * 0.08f), size = Size(w * 0.4f, h * 0.44f),
+                    cornerRadius = CornerRadius(h * 0.03f))
+                listOf(0.18f, 0.28f, 0.38f).forEach { y ->
+                    line(listOf(Offset(w * 0.36f, h * y), Offset(w * 0.46f, h * y)), Color(0xFF1A237E), h * 0.03f)
+                    line(listOf(Offset(w * 0.5f, h * y), Offset(w * 0.64f, h * y)), Color(0xFF90A4AE), h * 0.02f)
+                }
+                line(listOf(Offset(w * 0.5f, h * 0.56f), Offset(w * 0.5f, h * 0.74f)), Ink, h * 0.045f)
+                line(listOf(Offset(w * 0.42f, h * 0.66f), Offset(w * 0.5f, h * 0.76f), Offset(w * 0.58f, h * 0.66f)), Ink, h * 0.045f)
+                drawRoundRect(Color(0xFF26A69A), topLeft = Offset(w * 0.2f, h * 0.82f), size = Size(w * 0.6f, h * 0.1f),
+                    cornerRadius = CornerRadius(h * 0.05f))
+            }
+
+            // 語彙: an open dictionary, a word on each page — the Japanese and its English.
+            "vocab" -> {
+                sky(Color(0xFF1B1408), Color(0xFF3A2A10))
+                glow(Offset(w * 0.5f, h * 0.55f), w * 0.5f, Color(0xFFFFB300))
+                drawRoundRect(Color(0xFFF5F1E6), topLeft = Offset(w * 0.12f, h * 0.2f), size = Size(w * 0.37f, h * 0.62f),
+                    cornerRadius = CornerRadius(h * 0.03f))
+                drawRoundRect(Color(0xFFEDE6D2), topLeft = Offset(w * 0.51f, h * 0.2f), size = Size(w * 0.37f, h * 0.62f),
+                    cornerRadius = CornerRadius(h * 0.03f))
+                glyph(tm, "語", Offset(w * 0.305f, h * 0.44f), h * 0.3f, Color(0xFF1A237E))
+                listOf(0.36f, 0.48f, 0.6f).forEach { y ->
+                    line(listOf(Offset(w * 0.57f, h * y), Offset(w * 0.82f, h * y)), Color(0xFF5D4037), h * 0.025f)
+                }
+                line(listOf(Offset(w * 0.18f, h * 0.7f), Offset(w * 0.43f, h * 0.7f)), Color(0xFF90A4AE), h * 0.015f)
+                line(listOf(Offset(w * 0.5f, h * 0.18f), Offset(w * 0.5f, h * 0.84f)), Ink, h * 0.03f)
+            }
+
             "stats" -> {
                 sky(Color(0xFF10132B), Color(0xFF241A46))
                 for (row in 0 until 3) for (col in 0 until 7) {

@@ -185,6 +185,11 @@ private fun EntryScreen(onClose: () -> Unit, onGenerate: () -> Unit) {
                 SelectionChip(label = islandLabel(i), selected = i.id == selected, onSelect = { selected = i.id })
             }
             item { OutlinedButton(onClick = { newIsland = true }) { Text("＋ 新しい島") } }
+            item {
+                // Vocabulary and sentences another chat handed over as text, pasted in one go.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                OutlinedButton(onClick = { context.startActivity(GengoshimaImportActivity.intent(context)) }) { Text("取り込む / Import") }
+            }
         }
 
         if (island == null) {

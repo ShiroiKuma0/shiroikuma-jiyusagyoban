@@ -54,6 +54,30 @@ object GenerationRunner {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
 
+    /** The run in progress, so 中止 can end it. */
+    @Volatile
+    private var job: kotlinx.coroutines.Job? = null
+
+    /**
+     * 中止: end the run now. Whatever it had finished is kept — every sentence is saved the moment it
+     * is done — and 白い熊 音声 is told to drop the rest of its batch. What was not reached waits for
+     * the next run.
+     */
+    fun cancel() {
+        job?.cancel(kotlinx.coroutines.CancellationException("中止"))
+    }
+
+    /** A step's failure handler must not swallow 中止: the run has to end, not go on to the next step. */
+    private fun rethrowCancel(e: Throwable) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+    }
+
+    /**
+     * What 音声 said it read, by sentence, for the files voiced in this run — kept so a sentence
+     * split into words AFTER it was voiced can still be held against its audio ([splitVoiced]).
+     */
+    private val heardKana = java.util.concurrent.ConcurrentHashMap<Long, String>()
+
     /** What the runner is doing now, one line, for the entry screen; null when idle. */
     private val _status = MutableStateFlow<String?>(null)
     val status: StateFlow<String?> = _status
@@ -63,7 +87,7 @@ object GenerationRunner {
 
     /** The run's steps; a run shows the ones it does ([newProgress]). */
     @kotlinx.serialization.Serializable
-    enum class K { ADOPT, TRANSLATE, VOICE, ENGLISH, TIDY, EXPORT, ANKI }
+    enum class K { ADOPT, TRANSLATE, VOICE, ENGLISH, TIDY, EXPORT, ANKI, JISHO, SPLIT }
 
     /**
      * What a run is for: the usual one, a full 暗記 sync on demand, the one-time adoption, or what the
@@ -202,7 +226,7 @@ object GenerationRunner {
         // Shown at once, so the window that opens with it is never blank while the run spins up.
         _progress.value = newProgress(mode, settings.ankiSync, splitOnly)
         _working.value = only.orEmpty()
-        scope.launch { run(context.applicationContext, settings, mode, only, splitOnly) }
+        job = scope.launch { run(context.applicationContext, settings, mode, only, splitOnly) }
         return true
     }
 
@@ -260,8 +284,18 @@ object GenerationRunner {
         val notes = Notes(app, if (mode == Mode.EDITOR) "言語島：暗記と同期中 / syncing with 暗記" else "言語島：作成中 / generating")
         try {
             val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
+            heardKana.clear()
             val adoptError = if (mode == Mode.ADOPT) adoptFromAnki(app, dao, settings, notes) else null
             repairImportedText(dao)
+            // Japanese that came in whole and has never been split — an import, an adoption — needs
+            // no Claude before it can be heard: it is voiced as it stands, and split afterwards.
+            if (mode != Mode.EDITOR && !splitOnly) {
+                val now = System.currentTimeMillis()
+                dao.allSentences()
+                    .filter { it.state == GengoshimaSentenceEntity.STATE_ANNOTATE && it.tokensJson.isBlank() && it.ja.isNotBlank() }
+                    .filter { only == null || it.id in only }
+                    .forEach { dao.updateSentence(it.copy(state = GengoshimaSentenceEntity.STATE_TRANSLATED, updatedAt = now)) }
+            }
             val editor = mode == Mode.EDITOR
             val translated = if (editor) Translated(0, 0, null) else translateAll(dao, settings, notes, only)
             if (splitOnly) {
@@ -272,11 +306,18 @@ object GenerationRunner {
             }
             val (voiced, failed, renderError) = if (editor) Voiced(0, 0, null) else voiceAll(app, dao, settings, notes, only = only)
             val english = if (editor) Voiced(0, 0, null) else voiceEnglish(app, dao, settings, notes, only)
+            // Both voices exist: now the words. A reading the split corrects is voiced once more.
+            val corrected = if (editor) 0 else splitVoiced(dao, settings, notes, only)
+            if (corrected > 0) {
+                log("→ 読みを直した $corrected 文をもう一度 / voicing $corrected corrected sentences again")
+                voiceAll(app, dao, settings, notes, pass = 2, only = only)
+            }
             notes.progress("整理 / tidying the directories", -1)
             step(K.TIDY, StepState.RUN, "ディレクトリを付け合わせています / matching the directories to the list", -1)
             val tidy = runCatching {
                 AudioTree.reconcile(dao.islands(), dao.allSentences(), settings, dao::updateIsland, dao::updateSentence)
             }.onFailure {
+                rethrowCancel(it)
                 AppLogger.warn(TAG, "整理 failed: ${it.message}")
                 step(K.TIDY, StepState.FAIL, it.message.orEmpty())
             }.getOrNull()
@@ -291,9 +332,11 @@ object GenerationRunner {
                 step(K.EXPORT, StepState.DONE, "${it.islands} 島 · 書き換え ${it.rewritten}")
                 if (it.rewritten > 0) log("✓ 辞書用: ${it.rewritten} 島を書き換え")
             }.onFailure {
+                rethrowCancel(it)
                 step(K.EXPORT, StepState.FAIL, it.message.orEmpty())
                 log("✕ 辞書用: ${it.message}")
             }
+            if (!editor) askJisho(app, dao, notes)
             // Last: 暗記 takes the sentences at their final text, audio and island.
             val anki = if (settings.ankiSync || mode != Mode.GENERATE) {
                 notes.progress("暗記 / syncing with 暗記", -1)
@@ -307,6 +350,16 @@ object GenerationRunner {
             finish(app, summary)
             notes.done(summary)
             AppLogger.info(TAG, "言語島 generation: ${summary.line()}")
+            return summary
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            val summary = Summary(0, 0, 0, null, "中止しました / cancelled")
+            // The step it was in did not finish; the ones after it never began.
+            _progress.value = _progress.value?.let { p ->
+                p.copy(steps = p.steps.map { if (it.state == StepState.RUN) it.copy(state = StepState.FAIL, detail = "中止 / cancelled") else it })
+            }
+            log("■ 中止 / cancelled — できた分は保存済み / what was finished is kept")
+            finish(app, summary, cancelled = true)
+            notes.done(summary)
             return summary
         } catch (e: Exception) {
             val summary = Summary(0, 0, 0, null, e.message ?: e.javaClass.simpleName)
@@ -322,18 +375,114 @@ object GenerationRunner {
         }
     }
 
+    /**
+     * 語彙: ask 白い熊の辞書 about every term it has not been asked about yet ([VocabJisho]). The step
+     * exists only in a run that has such terms — it is added to the window here, before 暗記 — and
+     * its failure fails nothing else: the terms simply stay without 辞書's part until the next run.
+     */
+    private suspend fun askJisho(app: Context, dao: GengoshimaDao, notes: Notes) {
+        val waiting = VocabJisho.pending(dao).size
+        if (waiting == 0) return
+        _progress.value = _progress.value?.let { p ->
+            val at = p.steps.indexOfFirst { it.key == K.ANKI }.let { if (it < 0) p.steps.size else it }
+            p.copy(steps = p.steps.toMutableList().apply { add(at, Step("辞書に聞く / Ask 辞書 about the terms", key = K.JISHO)) })
+        }
+        notes.progress("辞書 / asking 辞書 about $waiting terms", -1)
+        step(K.JISHO, StepState.RUN, "0 / $waiting — 辞書を起こしています / waking 辞書", -1)
+        val outcome = runCatching {
+            VocabJisho.fetch(app, dao) { done, total -> step(K.JISHO, StepState.RUN, "$done / $total") }
+        }.getOrElse { rethrowCancel(it); VocabJisho.Outcome(0, 0, it.message ?: it.toString()) }
+        step(K.JISHO, if (outcome.error == null) StepState.DONE else StepState.FAIL, outcome.line)
+        log((if (outcome.error == null) "✓" else "✕") + " 辞書: ${outcome.line}")
+    }
+
+    /**
+     * 単語に分ける, for sentences that were voiced before they had words: Japanese handed in whole
+     * (an import, an adoption). The text is 白い熊's and is not touched; Claude only says where the
+     * words are and how they read. 語彙 terms stay whole with their imported readings
+     * ([VocabReadings]) — asked for in the prompt and enforced on the answer.
+     *
+     * The step exists only in a run that has such sentences; it is added to the window before 整理.
+     * Each split is then held against what 音声 said it read ([heardKana]): a word voiced otherwise
+     * than its furigana gets the furigana as an override, and the number of sentences so corrected
+     * is returned, for the caller to voice them once more.
+     */
+    private suspend fun splitVoiced(dao: GengoshimaDao, s: GengoshimaSettings, notes: Notes, only: Set<Long>?): Int {
+        val waiting = dao.allSentences().filter {
+            it.ja.isNotBlank() && it.tokensJson.isBlank() && (only == null || it.id in only) &&
+                (it.state == GengoshimaSentenceEntity.STATE_READY || it.state == GengoshimaSentenceEntity.STATE_TRANSLATED ||
+                    it.state == GengoshimaSentenceEntity.STATE_ERROR)
+        }
+        if (waiting.isEmpty()) return 0
+        _progress.value = _progress.value?.let { p ->
+            val at = p.steps.indexOfFirst { it.key == K.TIDY }.let { if (it < 0) p.steps.size else it }
+            p.copy(steps = p.steps.toMutableList().apply { add(at, Step("単語に分ける / Split into words", key = K.SPLIT)) })
+        }
+        log("→ Claude: ${waiting.size} 文を単語に分ける / splitting ${waiting.size} into words")
+        val vocab = dao.allVocab()
+        var before = 0
+        var done = 0
+        var failed = 0
+        var corrected = 0
+        var error: String? = null
+        step(K.SPLIT, StepState.RUN, "0 / ${waiting.size}", 0)
+        // By island, so each call carries that island's own terms first.
+        for (chunk in waiting.groupBy { it.islandId }.values.flatMap { it.chunked(CHUNK) }) {
+            val known = VocabReadings.known(vocab, chunk.first().islandId)
+            runCatching {
+                Translator.annotate(chunk, s, VocabReadings.promptLines(known, chunk.map { it.ja })) { live ->
+                    val (n, last) = Translator.completed(live.text)
+                    val overall = before + n.coerceAtMost(chunk.size)
+                    step(K.SPLIT, StepState.RUN, "$overall / ${waiting.size}" + (last?.let { "\n$it" } ?: ""), overall * 100 / waiting.size)
+                    notes.progress("単語に分ける / splitting $overall / ${waiting.size}", overall * 100 / waiting.size)
+                }
+            }.onSuccess { map ->
+                val now = System.currentTimeMillis()
+                chunk.forEach { was ->
+                    // Read again: the voices ran before this, and the row may have changed since.
+                    val sentence = dao.sentence(was.id) ?: return@forEach
+                    var tokens = VocabReadings.enforce(sentence.ja, map[was.id].orEmpty(), known)
+                    if (tokens.isEmpty()) { failed++; return@forEach }
+                    heardKana[sentence.id]?.let { kana ->
+                        val check = ReadingCheck.fix(tokens, kana)
+                        check.fixed.forEach { log("  読 ${it.surface}: 振り仮名 ${it.furigana} · 声 ${it.voice}") }
+                        check.stuck.forEach { log("  ✕ 読 ${it.surface}: 振り仮名 ${it.furigana} · 声 ${it.voice} — 直せません / cannot fix") }
+                        tokens = check.tokens
+                        if (check.revoice) corrected++
+                    }
+                    dao.updateSentence(sentence.copy(tokensJson = Translator.tokensJson(tokens), wordsEdited = false, updatedAt = now))
+                    done++
+                }
+                before += chunk.size
+                log("✓ 単語 $before / ${waiting.size} 文")
+            }.onFailure { e ->
+                rethrowCancel(e)
+                before += chunk.size
+                failed += chunk.size
+                error = e.message
+                log("✕ 単語: ${e.message}")
+            }
+        }
+        step(K.SPLIT, if (failed == 0) StepState.DONE else StepState.FAIL, "$done / ${waiting.size}" + if (failed > 0) " — 失敗 $failed: $error" else "", 100)
+        return corrected
+    }
+
     /** The last finished run's summary, for a caller that waited on [progress]. */
     @Volatile
     var lastSummary: Summary? = null
         private set
 
-    private fun finish(app: Context, summary: Summary) {
+    private fun finish(app: Context, summary: Summary, cancelled: Boolean = false) {
         lastSummary = summary
         val ok = summary.error == null && summary.failed == 0
         _progress.value = _progress.value?.copy(
             running = false,
             ok = ok,
-            result = if (ok) "できました — ${summary.line()}" else "終わらなかったものがあります — ${summary.line()}",
+            result = when {
+                cancelled -> "中止しました — できた分は保存済みです / cancelled — what was finished is kept"
+                ok -> "できました — ${summary.line()}"
+                else -> "終わらなかったものがあります — ${summary.line()}"
+            },
             percent = 100,
             finishedAt = System.currentTimeMillis(),
         )
@@ -419,6 +568,7 @@ object GenerationRunner {
                         notes.progress("訳す / translating $overall / $total — $name", overall * 100 / total)
                     }
                 }.getOrElse { e ->
+                    rethrowCancel(e)
                     failed += pending.size
                     error = e.message
                     val now = System.currentTimeMillis()
@@ -461,8 +611,10 @@ object GenerationRunner {
         if (edited.isNotEmpty()) {
             log("→ Claude: 手直しした日本語 ${edited.size} 文を単語に分ける / re-splitting ${edited.size} edited")
             var before = 0
+            val vocab = dao.allVocab()
             for (chunk in edited.chunked(CHUNK)) runCatching {
-                Translator.annotate(chunk, s) { live ->
+                val fixed = VocabReadings.promptLines(VocabReadings.known(vocab, chunk.first().islandId), chunk.map { it.ja })
+                Translator.annotate(chunk, s, fixed) { live ->
                     val (done, last) = Translator.completed(live.text)
                     val overall = before + done.coerceAtMost(chunk.size)
                     step(K.TRANSLATE, StepState.RUN, "手直し / edited $overall / ${edited.size}" + (last?.let { "\n$it" } ?: ""), overall * 100 / edited.size)
@@ -472,7 +624,8 @@ object GenerationRunner {
                 before += chunk.size
                 val now = System.currentTimeMillis()
                 chunk.forEach { sentence ->
-                    map[sentence.id]?.let { tokens ->
+                    map[sentence.id]?.let { split ->
+                        val tokens = VocabReadings.enforce(sentence.ja, split, VocabReadings.known(vocab, sentence.islandId))
                         dao.updateSentence(
                             sentence.copy(
                                 tokensJson = Translator.tokensJson(tokens),
@@ -487,6 +640,7 @@ object GenerationRunner {
                 }
                 log("✓ 手直し $before / ${edited.size} 文")
             }.onFailure { e ->
+                rethrowCancel(e)
                 before += chunk.size
                 failed += chunk.size
                 error = e.message
@@ -609,6 +763,7 @@ object GenerationRunner {
                     val took = (now - lastAt) / 100 / 10.0
                     if (reply.ok) {
                         ok++
+                        reply.kana?.let { heardKana[job.sentence.id] = it }
                         // Does the audio say what the furigana says? A corrected sentence keeps this
                         // file for now; its new override makes it stale, so the second pass re-voices it.
                         val check = reply.kana?.let { ReadingCheck.fix(Translator.tokens(job.sentence.tokensJson), it) }
@@ -851,6 +1006,7 @@ object GenerationRunner {
             show(if (missed.isEmpty()) StepState.DONE else StepState.FAIL, line, 100)
             AnkiOutcome(line, if (missed.isEmpty()) null else "暗記: ${missed.size} 文が取られませんでした")
         } catch (e: Exception) {
+            rethrowCancel(e)
             show(StepState.FAIL, e.message.orEmpty())
             AnkiOutcome(null, "暗記: ${e.message}")
         } finally {

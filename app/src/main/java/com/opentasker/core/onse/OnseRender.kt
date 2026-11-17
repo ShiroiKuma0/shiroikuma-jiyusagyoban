@@ -227,10 +227,14 @@ object OnseRender {
                     )
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // The caller gave up (言語島's 中止): 音声 must not go on rendering the rest of the batch.
+            runCatching { cancel(app, requestId, token) }
+            throw e
         } finally {
             runCatching { app.unregisterReceiver(receiver) }
             inbox.close()
-            withContext(Dispatchers.IO) { runCatching { batch.delete() } }
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { runCatching { batch.delete() } }
         }
     }
 

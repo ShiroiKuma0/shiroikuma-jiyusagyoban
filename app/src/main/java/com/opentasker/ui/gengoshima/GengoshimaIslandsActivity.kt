@@ -226,6 +226,12 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
     var deleting by remember { mutableStateOf<GengoshimaSentenceEntity?>(null) }
     var deletingIsland by remember { mutableStateOf(false) }
     var word by remember { mutableStateOf<Pair<GengoshimaSentenceEntity, Int>?>(null) }
+    // The word a long press picked out for 語彙.
+    var addingWord by remember { mutableStateOf<Pair<GengoshimaSentenceEntity, Int>?>(null) }
+    addingWord?.let { (s, k) ->
+        val t = Translator.tokens(s.tokensJson).getOrNull(k)
+        if (t == null) addingWord = null else AddTermFromWord(t, s.id, s.islandId) { addingWord = null }
+    }
     var discarding by remember { mutableStateOf<Pair<GengoshimaSentenceEntity, SentenceAction>?>(null) }
     var studyMessage by remember { mutableStateOf<String?>(null) }
     studyMessage?.let { msg ->
@@ -348,6 +354,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                 onEditSource = { editingSource = s },
                 onEditJapanese = { editingJapanese = s },
                 onWord = { k -> word = s to k },
+                onWordLong = { k -> addingWord = s to k },
                 onFinish = {
                     if (s.state == GengoshimaSentenceEntity.STATE_READY) launch(setOf(s.id), ankiOnly = true) else launch(setOf(s.id))
                 },
@@ -468,6 +475,7 @@ private fun IslandDetail(dao: GengoshimaDao, island: GengoshimaIslandEntity, isl
                 dao.sentences(island.id).forEach { dao.insertTombstone(com.opentasker.core.storage.GengoshimaTombstoneEntity(it.uuid, "sentence", now)) }
                 dao.insertTombstone(com.opentasker.core.storage.GengoshimaTombstoneEntity(island.uuid, "island", now))
                 dao.deleteSentencesOf(island.id)
+                dao.deleteVocabOf(island.id)
                 dao.deleteIsland(island.id)
                 dao.islands().forEachIndexed { k, i -> if (i.position != k + 1) dao.updateIsland(i.copy(position = k + 1)) }
                 onDeleted()
@@ -584,7 +592,7 @@ private fun ConfirmDialog(title: String, body: String, onDismiss: () -> Unit, on
  * word tappable for the pop-up dictionary and Anki. Returns a message to show, or null when 辞書
  * opened it.
  */
-private fun studyInJisho(context: Context, island: GengoshimaIslandEntity): String? {
+internal fun studyInJisho(context: Context, island: GengoshimaIslandEntity): String? {
     val s = GengoshimaSettings.last(context)
     val ogg = com.opentasker.core.gengoshima.IslandExport.oggFile(island, s)
     if (!ogg.isFile) {

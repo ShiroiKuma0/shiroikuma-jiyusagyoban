@@ -340,6 +340,25 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- 言語島's import window: vocabulary and sentences handed over as text. Exported as a
+             share target for plain text; it only shows what the text would add, and files nothing
+             until 白い熊 presses its button. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaImportActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.import"
+            android:label="言語島 取り込む"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- 言語島's 未分類 page: walk-captured sentences reviewed in kxkb, filed into islands.
              Same window family as the entry. -->
         <activity
@@ -399,6 +418,17 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
 
+        <!-- 言語島's vocabulary reference. -->
+        <activity
+            android:name="com.opentasker.ui.gengoshima.GengoshimaVocabActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".gengoshima.vocab"
+            android:label="言語島 語彙"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
+            android:theme="@style/Theme.OpenTasker" />
+
         <!-- 言語島's island editor. -->
         <activity
             android:name="com.opentasker.ui.gengoshima.GengoshimaIslandsActivity"
@@ -420,6 +450,17 @@
             android:showWhenLocked="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden"
             android:theme="@style/Theme.OpenTasker" />
+
+        <!-- The list of setup items switched off behind the app's back (after a reboot, a force-stop):
+             a translucent near page-size window in its own task, raised at boot and on app open. -->
+        <activity
+            android:name="com.opentasker.ui.screens.SetupWarningActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=".setup.warning"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden" />
 
         <!-- 言語島's progress window: translucent, over whatever app is in front, reopened from the
              run's notification. Its own affinity, so returning to it never drags the entry screen or
@@ -960,6 +1001,7 @@
                 <action android:name="shiroikuma.jiyusagyoban.action.RUN_TASK" />
                 <action android:name="shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS" />
                 <action android:name="shiroikuma.jiyusagyoban.action.GENGOSHIMA_TOKENS" />
+                <action android:name="shiroikuma.jiyusagyoban.action.GENGOSHIMA_IMPORT" />
             </intent-filter>
         </receiver>
 

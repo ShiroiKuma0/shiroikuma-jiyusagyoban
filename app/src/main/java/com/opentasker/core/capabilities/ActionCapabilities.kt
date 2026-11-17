@@ -146,6 +146,7 @@ object ActionCapabilityRegistry {
         "dialog.input" to dialogCapability(),
         "dialog.list" to dialogCapability(),
         "dialog.text" to dialogCapability(),
+        "dialog.pickdir" to dialogCapability(),
         "shell.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires Shizuku installed, started, and access granted to this app.", CapabilityRequirement.Shizuku, blocking = true),
         // Switching which SIM carries data goes through ISub.setDefaultDataSubId, which needs
         // MODIFY_PHONE_STATE — held by shell, so Shizuku is the whole requirement.
@@ -181,6 +182,8 @@ object ActionCapabilityRegistry {
         "gengoshima.anki_sync" to ActionCapability(CapabilityLevel.RequiresSetup, "Runs 言語島's generation and then sends every sentence to 白い熊 暗記, deleting 言語島 notes no sentence owns — needs 白い熊 暗記 installed."),
         "gengoshima.anki_adopt" to ActionCapability(CapabilityLevel.RequiresSetup, "Takes the Language Islands notes in 白い熊 暗記 into 言語島 once, voices them afresh and hands them back adopted — needs 白い熊 暗記, an Anthropic API key and 白い熊 音声."),
         "gengoshima.listen" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's player: islands played sentence by sentence (Listen, Shadow, Recall), furigana on screen, a tapped word looked up in 白い熊の辞書."),
+        "gengoshima.import" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's import window: a pasted 「言語島 取込」 text of terms, examples and sentences is previewed, filed into its islands and handed to the usual run."),
+        "gengoshima.vocab" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's vocabulary reference: 白い熊's own terms by island, in both directions, searchable, each with its example sentences and 白い熊の辞書's entry."),
         "gengoshima.stats" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's statistics: the listening calendar, time of day, per-island progress and which islands are due."),
         "gengoshima.islands" to ActionCapability(CapabilityLevel.Supported, "Opens 言語島's island editor: reorder, move and delete sentences, edit their English or Japanese, set a word's reading."),
         "onse.render" to ActionCapability(CapabilityLevel.RequiresSetup, "Has 白い熊 音声 voice Japanese sentences into OGG files at the paths given — needs 白い熊 音声 installed with All-Files access, and Shizuku so it may start its render service from the background."),

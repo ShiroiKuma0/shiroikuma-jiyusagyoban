@@ -52,6 +52,10 @@ import java.util.Locale
  *   project name to disambiguate). Runs through [executeAndLogTask] like a manual run and answers
  *   with success + duration. Exists so the dev loop can trigger a project's 起動/71 reload task
  *   right after a settings-bundle import (白い熊 2026-07-20: never leave that reload to the user).
+ * - [ACTION_GENGOSHIMA_IMPORT]: file a 言語島 取込 text (terms, examples, sentences —
+ *   `docs/gengoshima-import-format.md`) at [EXTRA_PATH], as the import window does; with
+ *   [EXTRA_GENERATE] `true` the run that splits, voices and syncs them starts at once. A file with
+ *   a line that cannot be read is refused whole, the lines named in the reply.
  * - [ACTION_GENGOSHIMA_TOKENS]: replace the word split (furigana, reading overrides) of named 言語島
  *   sentences — [EXTRA_PATH] names a [GengoshimaTokensManifest]. A sentence is changed only when its
  *   Japanese still matches the manifest's, so a correction worked out from an old export never lands
@@ -225,6 +229,30 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
                                 putStringArray(EXTRA_WARNINGS, result.warnings.toTypedArray())
                             })
                         }
+                    }
+                    ACTION_GENGOSHIMA_IMPORT -> {
+                        require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
+                        val file = resolveInTmp(path)
+                        require(file.isFile) { "no such file: ${file.absolutePath}" }
+                        val parsed = com.opentasker.core.gengoshima.VocabImport.parse(file.readText(Charsets.UTF_8))
+                        // Nothing is filed around a line that could not be read: from here there is
+                        // no preview to show it in, so the whole file is refused with the lines named.
+                        require(parsed.problems.isEmpty()) {
+                            "not imported — " + parsed.problems.joinToString("; ") { "line ${it.line}: ${it.message}" }
+                        }
+                        require(!parsed.empty) { "nothing to import in ${file.name}" }
+                        val plan = com.opentasker.core.gengoshima.VocabImporter.plan(parsed)
+                        require(plan.ready) { "a block has no 島: line" }
+                        val receipt = com.opentasker.core.gengoshima.VocabImporter.file(app, parsed)
+                        val generate = intent.getStringExtra(EXTRA_GENERATE)?.trim()?.lowercase() in setOf("true", "1")
+                        val started = generate && com.opentasker.core.gengoshima.GenerationRunner.start(
+                            app, com.opentasker.core.gengoshima.GengoshimaSettings.last(app),
+                        )
+                        pending.setResultCode(Activity.RESULT_OK)
+                        pending.setResultData(
+                            "imported ${receipt.summary} (already there: 語 ${plan.knownTerms} · 文 ${plan.knownSentences})" +
+                                if (generate) if (started) " · 言語島 run started" else " · 言語島 run NOT started (already running?)" else "",
+                        )
                     }
                     ACTION_GENGOSHIMA_TOKENS -> {
                         require(path.isNotEmpty()) { "missing $EXTRA_PATH" }
@@ -488,6 +516,9 @@ class WorkspaceTransferReceiver : BroadcastReceiver() {
         const val ACTION_RUN_TASK = "shiroikuma.jiyusagyoban.action.RUN_TASK"
         const val ACTION_GENGOSHIMA_TOKENS = "shiroikuma.jiyusagyoban.action.GENGOSHIMA_TOKENS"
         const val ACTION_SET_STARTUP_TASKS = "shiroikuma.jiyusagyoban.action.SET_STARTUP_TASKS"
+        const val ACTION_GENGOSHIMA_IMPORT = "shiroikuma.jiyusagyoban.action.GENGOSHIMA_IMPORT"
+        /** "true"/"1" — start the 言語島 run once [ACTION_GENGOSHIMA_IMPORT] has filed the text. */
+        const val EXTRA_GENERATE = "shiroikuma.jiyusagyoban.extra.GENERATE"
 
         /** Comma-separated task NAMES for the run-on-start list; omit to leave it alone, "" to clear. */
         const val EXTRA_START_TASKS = "shiroikuma.jiyusagyoban.extra.START_TASKS"
