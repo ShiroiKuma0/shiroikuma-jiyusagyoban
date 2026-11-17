@@ -72,6 +72,36 @@ class GengoshimaStatsAction : Action {
     }
 }
 
+/**
+ * Open 言語島's vocabulary reference: 白い熊's own terms by island, both directions, searchable, each
+ * with its example sentences and what 白い熊の辞書 knows about it.
+ */
+class GengoshimaVocabAction : Action {
+    override val id = "gengoshima.vocab"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaVocabActivity.intent(ctx.app))
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Open 言語島's import window: paste (or find on the clipboard) a 「言語島 取込」 text — terms,
+ * examples, sentences — see what it would add, and file it with one tap.
+ */
+class GengoshimaImportAction : Action {
+    override val id = "gengoshima.import"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        GengoshimaSettings.remember(ctx.app, GengoshimaSettings.from(ctx.variables))
+        ctx.app.startActivity(com.opentasker.ui.gengoshima.GengoshimaImportActivity.intent(ctx.app, fromBoard = true))
+        return ActionResult.Success
+    }
+}
+
 /** Open 言語島's island editor: reorder, move, delete, edit the English or Japanese, set readings. */
 class GengoshimaIslandsAction : Action {
     override val id = "gengoshima.islands"

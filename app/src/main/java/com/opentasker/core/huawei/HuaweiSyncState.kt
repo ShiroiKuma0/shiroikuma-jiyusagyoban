@@ -70,6 +70,26 @@ data class HuaweiSyncTrouble(
     }
 }
 
+/**
+ * A sync that went through but got no sleep because the watch is still holding the night open.
+ *
+ * The Watch D3 serves an EMPTY sleep file from the moment a night starts until some time after it
+ * has registered 白い熊 as up — under half an hour by the record (nights ending 07:28 and 07:31 were
+ * there at 08:00; one ending 08:00 was not). Not just the open night: the nights it served four
+ * hours earlier vanish with it and come back afterwards. Every 00:00 and 04:00 sync shows it, and
+ * so does a sync run on waking (白い熊, 2026-11-17 07:10), where the old note “no night in the last
+ * 3 days” read as data gone missing.
+ */
+object HuaweiSleepHeld {
+    const val NOTE = "sleep held back — the watch has not closed the night yet"
+
+    /** What the same state was called before 2026-11-17; still in the stored sync records. */
+    private const val LEGACY = "no night in the last"
+
+    fun isIn(message: String?): Boolean =
+        message != null && (message.contains(NOTE) || message.contains(LEGACY))
+}
+
 object HuaweiSyncState {
     private val _progress = MutableStateFlow(HuaweiSyncProgress.IDLE)
     val progress: StateFlow<HuaweiSyncProgress> = _progress.asStateFlow()

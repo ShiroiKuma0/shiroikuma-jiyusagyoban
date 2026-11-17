@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -98,6 +99,7 @@ private fun StatsScreen(onClose: () -> Unit) {
     val islands by dao.observeIslands().collectAsState(initial = emptyList())
     val sentences by dao.observeAllSentences().collectAsState(initial = emptyList())
     val plays by dao.observePlays().collectAsState(initial = emptyList())
+    val vocab by dao.observeVocab().collectAsState(initial = emptyList())
     val stats = remember(sessions) { ListeningStats.summarise(sessions, zone, today) }
     var picked by remember { mutableStateOf<Long?>(today.toEpochDay()) }
 
@@ -169,8 +171,80 @@ private fun StatsScreen(onClose: () -> Unit) {
             }
             Text("● = 今日の島（復習の日）。島の全文を一度に聴くと一回の復習になる。\n● = due today. Hearing every sentence of an island in one session counts as one review.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
+        if (vocab.isNotEmpty()) VocabStats(vocab, islands, sentences, plays.associate { it.sentenceId to it.plays })
     }
 }
+
+/** A term with how often it has been heard: every play of every sentence that says it. */
+private data class TermHeard(val vocab: com.opentasker.core.storage.GengoshimaVocabEntity, val sentences: Int, val heard: Int)
+
+/**
+ * 語彙 — the terms per island, and how often each term has been heard. A term is heard whenever a
+ * sentence that says it is played: its own examples, and every other sentence whose word split
+ * holds it in dictionary form. The list leads with the terms heard least, since those are the ones
+ * to do something about; a tap on a term opens its entry.
+ */
+@Composable
+private fun VocabStats(
+    vocab: List<com.opentasker.core.storage.GengoshimaVocabEntity>,
+    islands: List<GengoshimaIslandEntity>,
+    sentences: List<GengoshimaSentenceEntity>,
+    playsBy: Map<Long, Int>,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val terms = remember(vocab, sentences, playsBy) {
+        val wanted = vocab.mapTo(HashSet()) { it.term }
+        val saidIn = HashMap<String, MutableSet<Long>>()
+        for (s in sentences) {
+            if (s.tokensJson.isBlank()) continue
+            com.opentasker.core.gengoshima.Translator.tokens(s.tokensJson)
+                .mapNotNullTo(HashSet()) { t -> t.base.ifBlank { t.surface }.takeIf { it in wanted } }
+                .forEach { saidIn.getOrPut(it) { HashSet() } += s.id }
+        }
+        val examples = sentences.filter { it.vocabId != null }.groupBy({ it.vocabId }, { it.id })
+        vocab.map { v ->
+            val ids = saidIn[v.term].orEmpty() + examples[v.id].orEmpty()
+            TermHeard(v, ids.size, ids.sumOf { playsBy[it] ?: 0 })
+        }
+    }
+    var all by remember { mutableStateOf(false) }
+    Card("語彙 / Vocabulary") {
+        Line("語 / terms", "${terms.size}")
+        Line("まだ聴いていない語 / never heard", "${terms.count { it.heard == 0 }}")
+        islands.forEach { i ->
+            val mine = terms.filter { it.vocab.islandId == i.id }
+            if (mine.isNotEmpty()) Line(
+                "${i.position}. ${i.nameJa.ifBlank { i.nameEn }}",
+                "${mine.size} 語 · 聴いた ${mine.sumOf { it.heard }} 回 · 未聴 ${mine.count { it.heard == 0 }}",
+            )
+        }
+        Text("聴いた回数の少ない順 / heard least first", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val ordered = terms.sortedWith(compareBy({ it.heard }, { it.vocab.term }))
+        (if (all) ordered else ordered.take(TERMS_SHOWN)).forEach { t ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .clickable { context.startActivity(GengoshimaVocabActivity.intent(context, t.vocab.id)) }
+                    .padding(vertical = 4.dp),
+            ) {
+                Text(t.vocab.term, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("　${t.vocab.meaning}", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.weight(1f))
+                Text("${t.heard} 回 · ${t.sentences} 文", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        if (ordered.size > TERMS_SHOWN) {
+            com.opentasker.ui.components.OutlinedButton(onClick = { all = !all }) {
+                Text(if (all) "少なく表示 / show fewer" else "全 ${ordered.size} 語を表示 / show all ${ordered.size}")
+            }
+        }
+        Text(
+            "回 = その語を言う文が再生された回数（例文と、単語分けでその語を含む他の文）。\n回 = plays of the sentences that say the term: its examples, and any other sentence whose word split holds it.",
+            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private const val TERMS_SHOWN = 20
 
 private fun statusLabel(s: String) = when (s) {
     "new" -> "新しい / new"

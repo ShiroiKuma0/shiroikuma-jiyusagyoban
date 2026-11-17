@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -438,6 +439,32 @@ private fun ColorField(value: String, onPick: (String) -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        // Sliders (白い熊, 2026-11-17): a colour between the named ones was reachable only by typing
+        // hex blind. Each drag writes the value at once, so the badge preview above follows the thumb.
+        val argb = (parseFormColor(value) ?: Color.Black).toArgb()
+        for ((label, shift) in listOf("R" to 16, "G" to 8, "B" to 0)) {
+            val channel = (argb ushr shift) and 0xFF
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, Modifier.width(16.dp), style = MaterialTheme.typography.labelMedium)
+                androidx.compose.material3.Slider(
+                    value = channel.toFloat(),
+                    onValueChange = { v ->
+                        val rgb = (argb and 0xFFFFFF and (0xFF shl shift).inv()) or (v.toInt().coerceIn(0, 255) shl shift)
+                        val hex = "#%06X".format(rgb)
+                        typed = hex
+                        onPick(hex)
+                    },
+                    valueRange = 0f..255f,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    channel.toString(),
+                    Modifier.width(32.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                )
+            }
         }
     }
 }

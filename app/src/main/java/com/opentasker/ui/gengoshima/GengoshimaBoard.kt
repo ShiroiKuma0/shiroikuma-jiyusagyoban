@@ -3,6 +3,7 @@ package com.opentasker.ui.gengoshima
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +81,8 @@ val GS_TILES = listOf(
     GsTile("listen", "言語島 聴く -- [227]", "聴く", "Listen", wide = true),
     GsTile("shadow", "言語島 シャドーイング -- [227]", "シャドーイング", "Shadow"),
     GsTile("recall", "言語島 思い出す -- [227]", "思い出す", "Recall"),
+    GsTile("import", "言語島 取り込む -- [227]", "取り込む", "Import"),
+    GsTile("vocab", "言語島 語彙 -- [227]", "語彙", "Vocabulary"),
     GsTile("edit", "言語島 編集 -- [227]", "編集", "Edit islands"),
     GsTile("stats", "言語島 統計 -- [227]", "統計", "Statistics"),
     GsTile("anki", "暗記と同期 -- [227]", "暗記と同期", "Sync with 暗記"),
@@ -255,7 +258,9 @@ private fun GsCard(
             Modifier.fillMaxWidth().aspectRatio(if (tile.wide) 2.4f else 4f / 3f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                // The picture opens the page exactly as the pill under it does (白い熊, 2026-11-17).
+                .clickable(enabled = enabled, onClickLabel = tile.en, onClick = onOpen),
             contentAlignment = Alignment.TopEnd,
         ) {
             GsBoardArt(tile.key, Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)))

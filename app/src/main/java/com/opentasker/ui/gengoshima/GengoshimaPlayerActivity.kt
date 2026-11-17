@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,6 +131,7 @@ class GengoshimaPlayerActivity : ComponentActivity() {
         setShowWhenLocked(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedMode = modeOf(intent)
+        takeDirect(intent)
         setContent {
             val themePrefs by ThemeStore.state.collectAsState()
             OpenTaskerTheme(prefs = themePrefs) {
@@ -140,17 +142,44 @@ class GengoshimaPlayerActivity : ComponentActivity() {
         }
     }
 
+    /** Already open (singleTask): an island asked for from 語彙 still starts at once. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        modeOf(intent)?.let { requestedMode = it }
+        takeDirect(intent)
+    }
+
+    private fun takeDirect(intent: Intent?) {
+        val island = intent?.getLongExtra(EXTRA_ISLAND, 0L) ?: 0L
+        if (island > 0) {
+            direct.value = DirectPlay(island, modeOf(intent) ?: ListenMode.LISTEN)
+            // Taken once: a re-created window must not start the island over.
+            intent?.removeExtra(EXTRA_ISLAND)
+        }
+    }
+
+    /** One island to play straight away, past the picker — 語彙's 聴く / シャドー / 思い出す. */
+    internal data class DirectPlay(val islandId: Long, val mode: ListenMode)
+
     companion object {
+        /** An island id: play it at once in [EXTRA_MODE], skipping the picker. */
+        const val EXTRA_ISLAND = "gengoshima_island"
+
+        internal val direct = kotlinx.coroutines.flow.MutableStateFlow<DirectPlay?>(null)
+
         /** The mode the picker opens on (the 言語島 board's Shadow / Recall tiles); null = Listen. */
         const val EXTRA_MODE = "gengoshima_mode"
 
         /** The picker's mode as last asked for by an intent, so a board tile can open it on Shadow. */
         internal var requestedMode: ListenMode? = null
 
-        fun intent(context: Context, mode: ListenMode? = null): Intent =
+        fun intent(context: Context, mode: ListenMode? = null, islandId: Long? = null): Intent =
             Intent(context, GengoshimaPlayerActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .apply { if (mode != null) putExtra(EXTRA_MODE, mode.name) }
+                .apply {
+                    if (mode != null) putExtra(EXTRA_MODE, mode.name)
+                    if (islandId != null) putExtra(EXTRA_ISLAND, islandId)
+                }
 
         internal fun modeOf(intent: Intent?): ListenMode? =
             intent?.getStringExtra(EXTRA_MODE)?.let { n -> ListenMode.entries.firstOrNull { it.name.equals(n, true) } }
@@ -250,10 +279,46 @@ private fun PlayerRoot(onClose: () -> Unit) {
     }
     // Reopened from the notification while something is queued: straight back to it.
     var playing by remember { mutableStateOf(c.mediaItemCount > 0) }
+    // 語彙 asked for one island: whatever was playing is closed as 閉じる would, and it starts.
+    val direct by GengoshimaPlayerActivity.direct.collectAsState()
+    var starting by remember { mutableStateOf(direct != null) }
+    direct?.let { ask ->
+        LaunchedEffect(ask) {
+            starting = true
+            if (c.mediaItemCount > 0) {
+                finishSession(context, c, false)
+                c.stop()
+                c.clearMediaItems()
+            }
+            val dao = OpenTaskerApp_NoHilt.db.gengoshimaDao()
+            val island = dao.island(ask.islandId)
+            val sentences = island?.let { i ->
+                dao.sentences(i.id).filter { it.state == GengoshimaSentenceEntity.STATE_READY && File(it.audioPath).exists() }.map { i to it }
+            }.orEmpty()
+            if (sentences.isEmpty()) {
+                // Nothing voiced in it yet: the picker, which says so island by island.
+                GengoshimaPlayerActivity.requestedMode = ask.mode
+                playing = false
+            } else {
+                ListenPlace.clear(context)
+                startSession(ask.mode, listOf(ask.islandId), false)
+                c.setMediaItems(queue(sentences, ask.mode, GengoshimaSettings.last(context)))
+                c.prepare()
+                c.play()
+                playing = true
+            }
+            GengoshimaPlayerActivity.direct.value = null
+            starting = false
+        }
+    }
+    if (starting) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("…") }
+        return
+    }
     // Nothing queued, but a place was kept: rebuild that queue and open on it, paused, instead of
     // the picker. A board tile asking for another mode gets the picker; the place stays for later.
     val place = remember {
-        if (c.mediaItemCount > 0) null
+        if (c.mediaItemCount > 0 || GengoshimaPlayerActivity.direct.value != null) null
         else ListenPlace.load(context)?.takeIf { p ->
             val asked = GengoshimaPlayerActivity.requestedMode
             asked == null || asked.name.equals(p.mode, true)
@@ -689,6 +754,12 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
     // During a Recall gap the line to show is the one coming NEXT: say it before you hear it.
     val shown = if (inGap && ListenLog.mode == ListenMode.RECALL && index + 1 < count) c.getMediaItemAt(index + 1) else item
     val shownExtras = shown.mediaMetadata.extras ?: Bundle()
+    val vocabDao = remember { com.opentasker.app.OpenTaskerApp_NoHilt.db.gengoshimaDao() }
+    val filed by vocabDao.observeVocab().collectAsState(initial = emptyList())
+    val filedTerms = remember(filed) { filed.associate { it.term to it.id } }
+    // The word being added to 語彙 by a long press: the word, its sentence, its island.
+    var adding by remember { mutableStateOf<Triple<Translator.Token, Long, Long>?>(null) }
+    adding?.let { (t, sentenceId, islandId) -> AddTermFromWord(t, sentenceId, islandId) { adding = null } }
     val ja = shown.mediaMetadata.title?.toString().orEmpty()
     val en = shownExtras.getString(EXTRA_EN).orEmpty()
     val tokens = Translator.tokens(shownExtras.getString(EXTRA_TOKENS).orEmpty())
@@ -740,10 +811,20 @@ private fun PlayingScreen(c: MediaController, onClose: () -> Unit) {
             if (hideJa) {
                 Text("…", fontSize = 40.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                FuriganaLine(ja, tokens) { word ->
-                    c.pause()
-                    lookUp(context, word)
-                }
+                FuriganaLine(
+                    ja, tokens,
+                    // A word 白い熊 has filed opens their own entry; any other goes to 辞書 as before.
+                    onWord = { t ->
+                        c.pause()
+                        val word = t.base.ifBlank { t.surface }
+                        val filed = filedTerms[word] ?: filedTerms[t.surface]
+                        if (filed != null) context.startActivity(GengoshimaVocabActivity.intent(context, filed)) else lookUp(context, word)
+                    },
+                    onWordLong = { t ->
+                        c.pause()
+                        adding = Triple(t, shownExtras.getLong(EXTRA_SENTENCE_ID), shownExtras.getLong(EXTRA_ISLAND_ID))
+                    },
+                )
             }
             Spacer(Modifier.height(16.dp))
             if (showEn || hideJa) {
@@ -834,10 +915,17 @@ private fun BigButton(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 
 /**
  * The Japanese line, word by word, with furigana over every word that holds a kanji — and each word
- * a button: tapping it looks up its DICTIONARY form (白い熊, 2026-09-30).
+ * a button: tapping it looks up its DICTIONARY form (白い熊, 2026-09-30); a long press offers to file
+ * it in 語彙.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun FuriganaLine(ja: String, tokens: List<Translator.Token>, onWord: (String) -> Unit) {
+private fun FuriganaLine(
+    ja: String,
+    tokens: List<Translator.Token>,
+    onWord: (Translator.Token) -> Unit,
+    onWordLong: (Translator.Token) -> Unit,
+) {
     if (tokens.isEmpty() || tokens.joinToString("") { it.surface } != ja) {
         Text(ja, fontSize = 36.sp, textAlign = TextAlign.Center, lineHeight = 48.sp)
         return
@@ -849,7 +937,10 @@ private fun FuriganaLine(ja: String, tokens: List<Translator.Token>, onWord: (St
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clickable(enabled = t.base.isNotBlank() || t.surface.isNotBlank()) { onWord(t.base.ifBlank { t.surface }) }
+                    .combinedClickable(
+                        enabled = t.base.isNotBlank() || t.surface.isNotBlank(),
+                        onLongClick = { onWordLong(t) },
+                    ) { onWord(t) }
                     .padding(horizontal = 1.dp),
             ) {
                 Text(ruby, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -869,7 +960,7 @@ internal fun hiragana(katakana: String): String = buildString {
  * PROCESS_TEXT, so a package-only intent matched two and Android put up a chooser. Builds older than
  * that have no OPEN_DICTIONARY action and get the PROCESS_TEXT one instead.
  */
-private fun lookUp(context: Context, word: String) {
+internal fun lookUp(context: Context, word: String) {
     val dictionary = Intent("shiroikuma.jisho.action.OPEN_DICTIONARY")
         .setClassName(JISHO, "$JISHO.MainActivity")
         .putExtra("language", "ja")
