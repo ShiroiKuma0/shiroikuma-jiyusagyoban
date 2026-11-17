@@ -100,6 +100,11 @@ fun SessionRegisterScreen(
      * Null hides the weight pill — the Hume report has no weight store.
      */
     onWeight: ((atMs: Long, kg: Double?, replacingMs: Long?) -> Unit)? = null,
+    /**
+     * When the latest sync found the watch still holding the night back (`HuaweiSleepHeld`): said
+     * above the score, so a sync on waking that brings no night does not look like a failed one.
+     */
+    sleepHeldAtMs: Long? = null,
     /** 白い熊's own bedtimes, morning key → instant; see `NightStarts`. */
     nightStarts: Map<Long, Long> = emptyMap(),
     /** Correct (or, with null, withdraw) a night's start; no pill in the dialog when null. */
@@ -229,6 +234,23 @@ fun SessionRegisterScreen(
                             BandText.registerLegend[lang],
                             style = MaterialTheme.typography.bodyMedium,
                             color = sectionNote,
+                        )
+                    }
+                }
+
+                sleepHeldAtMs?.let { at ->
+                    val time = java.time.Instant.ofEpochMilli(at).atZone(zone)
+                        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, sectionInk),
+                    ) {
+                        Text(
+                            BandText.sleepHeld[lang].format(time),
+                            Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = sectionInk,
                         )
                     }
                 }

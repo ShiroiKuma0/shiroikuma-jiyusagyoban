@@ -41,6 +41,8 @@ data class AutomationRiskSummary(
 object AutomationSensitivityRegistry {
     private val localOnlyActionIds = setOf(
         "gengoshima.stats",
+        "gengoshima.vocab",
+        "gengoshima.import",
         "gengoshima.listen",
         "gengoshima.islands",
         "gengoshima.entry",
@@ -95,6 +97,8 @@ object AutomationSensitivityRegistry {
         "backup.edititems",
         "dialog.pickmulti",
         "dialog.form",
+        "dialog.pickdir",
+        "project.export",
         "flow.fail",
         "system.get_locale",
         "task.return",

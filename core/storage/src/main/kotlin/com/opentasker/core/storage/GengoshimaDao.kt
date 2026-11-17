@@ -111,6 +111,11 @@ data class GengoshimaSentenceEntity(
      * an edit of the Japanese itself (the words no longer spell it) or 白い熊's own 「分け直す」.
      */
     @ColumnInfo(defaultValue = "0") val wordsEdited: Boolean = false,
+    /**
+     * The 語彙 term this sentence is an example of (v40), or null for a sentence of the monologue.
+     * An example is otherwise an ordinary island sentence — voiced, played, synced to 暗記.
+     */
+    @ColumnInfo(defaultValue = "NULL") val vocabId: Long? = null,
 ) {
     companion object {
         const val STATE_NEW = "new"
@@ -193,6 +198,35 @@ data class GengoshimaInboxEntity(
         const val STATE_FILED = "filed"
     }
 }
+
+/**
+ * 言語島 語彙 (v40) — one term of 白い熊's personal vocabulary, filed under an island. What 白い熊
+ * handed in is the term, its reading, its translation and a note; the example sentences are island
+ * sentences pointing back here through `gengoshima_sentences.vocabId`. Everything 白い熊の辞書 knows
+ * about the term (pitch accent, kanji, glosses, further examples) is its answer cached verbatim in
+ * [jishoJson], so browsing never wakes 辞書.
+ */
+@Entity(tableName = "gengoshima_vocab", indices = [Index(value = ["islandId", "position"])])
+data class GengoshimaVocabEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val uuid: String = java.util.UUID.randomUUID().toString(),
+    val islandId: Long,
+    /** 1-based order within the island — the order the terms were handed in. */
+    val position: Int,
+    val term: String,
+    /** Hiragana; blank for a term written in kana only. */
+    val reading: String = "",
+    /** 白い熊's translation; several senses are separated by `;`. */
+    val meaning: String,
+    val note: String = "",
+    val starred: Boolean = false,
+    /** 辞書's lookup answer for this term, as it came; blank until asked. */
+    val jishoJson: String = "",
+    /** When [jishoJson] was fetched (epoch ms), 0 = never. A miss is stored too, so it is not re-asked. */
+    val jishoAt: Long = 0,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
 
 @Dao
 interface GengoshimaDao {
@@ -319,6 +353,46 @@ interface GengoshimaDao {
 
     @Query("SELECT islandId AS islandId, COUNT(*) AS total, SUM(CASE WHEN state = 'ready' THEN 1 ELSE 0 END) AS ready FROM gengoshima_sentences GROUP BY islandId")
     fun observeCounts(): Flow<List<IslandCount>>
+
+    // ── vocabulary (語彙) ───────────────────────────────────────────────────────────────────────
+
+    @Query("SELECT * FROM gengoshima_vocab ORDER BY islandId, position, id")
+    fun observeVocab(): Flow<List<GengoshimaVocabEntity>>
+
+    @Query("SELECT * FROM gengoshima_vocab ORDER BY islandId, position, id")
+    suspend fun allVocab(): List<GengoshimaVocabEntity>
+
+    @Query("SELECT * FROM gengoshima_vocab WHERE islandId = :islandId ORDER BY position, id")
+    suspend fun vocabOf(islandId: Long): List<GengoshimaVocabEntity>
+
+    @Query("SELECT * FROM gengoshima_vocab WHERE id = :id")
+    suspend fun vocab(id: Long): GengoshimaVocabEntity?
+
+    @Query("SELECT COALESCE(MAX(position), 0) FROM gengoshima_vocab WHERE islandId = :islandId")
+    suspend fun lastVocabPosition(islandId: Long): Int
+
+    /** Terms 辞書 has not been asked about yet. */
+    @Query("SELECT * FROM gengoshima_vocab WHERE jishoAt = 0 ORDER BY islandId, position, id")
+    suspend fun vocabWithoutJisho(): List<GengoshimaVocabEntity>
+
+    @Insert
+    suspend fun insertVocab(vocab: GengoshimaVocabEntity): Long
+
+    @Update
+    suspend fun updateVocab(vocab: GengoshimaVocabEntity)
+
+    @Query("DELETE FROM gengoshima_vocab WHERE id = :id")
+    suspend fun deleteVocabRow(id: Long)
+
+    @Query("DELETE FROM gengoshima_vocab WHERE islandId = :islandId")
+    suspend fun deleteVocabOf(islandId: Long)
+
+    /** The examples of a deleted term stay in their island as plain sentences. */
+    @Query("UPDATE gengoshima_sentences SET vocabId = NULL WHERE vocabId = :vocabId")
+    suspend fun unlinkExamples(vocabId: Long)
+
+    @Query("SELECT * FROM gengoshima_sentences WHERE vocabId = :vocabId ORDER BY position, id")
+    suspend fun examplesOf(vocabId: Long): List<GengoshimaSentenceEntity>
 }
 
 /** How often one sentence has been played, over every session. */

@@ -205,9 +205,12 @@ object Translator {
     suspend fun annotate(
         sentences: List<GengoshimaSentenceEntity>,
         settings: GengoshimaSettings,
+        /** [VocabReadings.promptLines]: 白い熊's own terms, to be kept whole with their readings. */
+        fixedWords: String = "",
         onLive: suspend (ClaudeClient.Live) -> Unit = {},
     ): Map<Long, List<Token>> {
         val prompt = buildString {
+            append(fixedWords)
             append("Split these (return each with its id):\n")
             sentences.forEach { append("id ").append(it.id).append(": ").append(it.ja).append('\n') }
         }

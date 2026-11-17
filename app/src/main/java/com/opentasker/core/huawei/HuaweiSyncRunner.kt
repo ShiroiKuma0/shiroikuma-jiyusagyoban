@@ -1911,6 +1911,12 @@ object HuaweiSyncRunner {
                     val to = request.windows.first().last
                     storeSleep(db, session, syncId, to - SLEEP_LOOKBACK_SEC, to)
                 }.getOrElse { sleepNote = it.message ?: it::class.java.simpleName; 0 }
+                // An empty answer while nights this window covers are already stored is the watch
+                // holding its sleep file back over an open night — see HuaweiSleepHeld.
+                val sleepHeld = nights == 0 && sleepNote.isEmpty() && runCatching {
+                    val to = request.windows.first().last
+                    db.huaweiSleepDao().window(to - SLEEP_LOOKBACK_SEC, to).isNotEmpty()
+                }.getOrDefault(false)
 
                 // The Watch D3's own data: the dictionary (blood pressure, skin temperature, arterial
                 // stiffness, the daily summary) and the ECG file. Tolerant like sleep — none of it may
@@ -1941,6 +1947,7 @@ object HuaweiSyncRunner {
                         (
                             if (sleepNote.isNotEmpty()) " · sleep: $sleepNote"
                             else if (nights > 0) " · $nights sleep segments"
+                            else if (sleepHeld) " · ${HuaweiSleepHeld.NOTE}"
                             else " · no night in the last ${SLEEP_LOOKBACK_SEC / 86_400} days"
                             ) +
                         (if (beats > 0) " · $beats RR windows" else "") +

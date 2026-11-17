@@ -680,7 +680,7 @@ private fun PathPickerTrailingIcon(onPath: (String) -> Unit) {
  * filesystem path. Handles the primary volume (/storage/emulated/0) and named secondary volumes
  * (/storage/<id>). Returns null for other providers (a content Uri that has no filesystem path).
  */
-private fun documentUriToFsPath(uri: Uri?, isTree: Boolean): String? {
+internal fun documentUriToFsPath(uri: Uri?, isTree: Boolean): String? {
     if (uri == null || uri.authority != "com.android.externalstorage.documents") return null
     val docId = runCatching {
         if (isTree) DocumentsContract.getTreeDocumentId(uri) else DocumentsContract.getDocumentId(uri)

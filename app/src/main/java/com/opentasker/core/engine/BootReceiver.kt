@@ -42,6 +42,8 @@ class BootReceiver : BroadcastReceiver() {
                     }.onFailure { error ->
                         AppLogger.error("OpenTasker", "Failed to start automation service after boot", error)
                     }
+                    // A reboot is when EMUI drops the accessibility service and the odd permission.
+                    com.opentasker.ui.screens.SetupWarning.scheduleAfterBoot(context.applicationContext)
                 }
             }
         }

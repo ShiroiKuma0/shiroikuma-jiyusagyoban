@@ -154,7 +154,64 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
 - Changing a filed sentence's language re-translates it and deletes its old source file.
 - The 未分類 title counts Czech rows: `未分類 (12 · CS 3)`.
 
-## Data — Room v33 → v38
+## 語彙 (2026-11-16) — the personal vocabulary reference and the paste import
+
+Plan: `~/.claude/plans/happy-wishing-sundae.md`. 白い熊's decisions: tabs in the Messēji / 書類管理
+paper shape; the import carries only term + reading + mandatory translation + example sentences;
+白い熊の辞書 supplies everything else, shown **below** 白い熊's own content (folded in the list, open
+on a term's own page); examples are **appended to the island** as ordinary sentences, terms are
+not; no term cards in 暗記.
+
+- **Import** — `VocabImport` (parse → plan → apply → undo → export, pure and tested),
+  `VocabImporter` (the transaction, the receipt for 「直前の取り込みを取り消す」),
+  `GengoshimaImportActivity` (paste / clipboard / share target, the preview),
+  bridge `GENGOSHIMA_IMPORT`. Format: **`docs/gengoshima-import-format.md`** — that file is the
+  hand-off to the chat that prepares the vocabulary. Sentences go in as `translated` + `jaEdited`
+  with no word split: the run voices them in both languages first and splits them afterwards
+  (`GenerationRunner.splitVoiced`, step 「単語に分ける」, added to the window only when needed) —
+  never translating. Nothing already entered in ANY island is entered again. `VocabReadings` keeps
+  every term whole with its imported reading in the split, and a split made after voicing is still
+  held against what 音声 read (`heardKana`), re-voicing what it corrects. The same treatment is
+  given to any never-split `annotate` sentence (an adoption).
+- **中止** — `GenerationRunner.cancel()`: the run's coroutine is cancelled, every step's failure
+  handler lets the cancellation through (`rethrowCancel`), and `OnseRender` sends 音声 its
+  `CANCEL_RENDER`. The red pill in the progress window.
+- **Screen** — `GengoshimaVocabActivity` (action `gengoshima.vocab`, task `言語島 語彙 -- [227]`,
+  board tile `vocab`): `PaperTabBar` (`ui/components`, a Compose port of Messēji's `FolderTabBar`,
+  measure for measure; 全部 pinned first, the term count as the badge, a sideways fling over the
+  list changes tab, long-press = the island's menu), search (`VocabSearch`: spelling, kana,
+  romaji, translation, note, examples), 日→英 / 英→日 (one line per English sense), 見出し / 詳細,
+  four orders, ★. A heading opens the term alone in a pager — a swipe is the next term.
+- **Card** — `VocabCard`: headword, the reading drawn as its pitch pattern (`PitchReading`), boxed
+  markers, then 白い熊's translation, note and examples (`RubyLine`, the term bold, a play button
+  each), 「他の文にも」 (every other sentence whose word split holds the term), then the 辞書 section.
+- **Direct play** — `GengoshimaPlayerActivity.intent(context, mode, islandId)`: one island, at
+  once, past the picker; whatever was playing is closed as 閉じる closes it.
+- **辞書** — `core/jisho/JishoLookup.kt` against 辞書's lookup door
+  (`~/git/shiroikuma-jisho/docs/sister-app-contract-jisho-lookup.md`, 辞書 ≥ 1.6.0+033):
+  discovery by manifest meta-data, `call("lookup")` with a regular file's descriptor, batches of
+  100. `VocabJisho` stores each answer verbatim in `gengoshima_vocab.jishoJson` (a miss too), so
+  browsing never wakes 辞書; the run's 「辞書に聞く」 step appears only when a term is still unasked,
+  and 「辞書を更新」 asks for everything again. Lookup is exact — terms are filed in dictionary form.
+
+### By hand (2026-11-17, +014) — `ui/gengoshima/VocabEdit.kt`
+
+- **A filed word tapped in the player** opens 白い熊's own entry (`GengoshimaVocabActivity.intent(context,
+  termId)`); Back returns to the player. Any other word goes to 辞書 as before.
+- **A long press on a word** in the player or the island editor is 「語彙に追加」: the dictionary form,
+  the sentence's island, the sentence as first example. A word already filed opens instead.
+- **編集** and **例文を追加** on the single-term view. A changed spelling or reading drops 辞書's cached
+  answer; a move to another island leaves the example sentences where they are. A new example is
+  inserted like an imported one and run for that sentence alone.
+- **The no-duplicates rule holds here too** (`VocabEdits`): a term is the same term when written the
+  same, in any island; a sentence when its Japanese is (`VocabImport.sentenceKey`).
+- **Tabs ★ and 最近** after 全部 (ids −1 and −2). 最近 is the last 60 terms opened, newest first.
+- **統計** has a 語彙 card: terms per island, and per term the plays of every sentence that says it
+  (its examples and any sentence whose word split holds it), least heard first.
+- Not built, 白い熊's call: term as image, Markdown/TSV export, term audio, a 語彙 listen mode, a
+  self-test.
+
+## Data — Room v33 → v40
 
 `core/storage/.../GengoshimaDao.kt`. **The database is authoritative; the audio tree is a view.**
 
@@ -171,6 +228,10 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
   adopted from). v36 adds `language` (`en` | `cs`, default `en`) — the language `en` is in. v38 adds
   `wordsEdited` (default 0): 白い熊 cut, joined or re-read words in the editor's word dialog, so no run,
   register change or voice check splits the sentence again (cleared only by 訳し直す / 分け直す, which ask).
+- `gengoshima_vocab` (v40) — one term per row: island, position, `term`, `reading`, `meaning`
+  (`;` between senses), `note`, `starred`, `jishoJson` / `jishoAt` (辞書's cached answer).
+  `gengoshima_sentences.vocabId` (v40) ties an example sentence to its term; deleting a term only
+  clears it.
 - `gengoshima_sessions`, `gengoshima_plays` — listening history (a sentence counts as heard at
   ≥ 60 % played).
 - `gengoshima_tombstones` (v34) — uuids of deleted sentences/islands not yet told to 暗記.
@@ -178,9 +239,9 @@ settable on 未分類 (tap the chip), in the islands editor (edit dialog) and on
   `en`, `recognized`, the target (`islandId` or `newIslandName`/`newIslandRegister`), `proposed`,
   `state` (`pending` → `filed`, kept so a re-send is still answered OK), `sentenceId`.
 
-Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`, `MIGRATION_35_36`, `MIGRATION_37_38`);
+Migrations are registered by hand (`DatabaseMigrations.kt`, `MIGRATION_32_33`, `MIGRATION_33_34`, `MIGRATION_34_35`, `MIGRATION_35_36`, `MIGRATION_37_38`, `MIGRATION_39_40`);
 `python3 scripts/check-room-migration.py --all` passes. The backup category `gengoshima` carries all
-six tables.
+seven tables.
 
 ## Files
 

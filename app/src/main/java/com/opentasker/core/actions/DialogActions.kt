@@ -238,6 +238,28 @@ class PickListToVariableAction : Action {
 }
 
 /**
+ * Pick a DIRECTORY with the system picker and store its real path (白い熊, 2026-11-17 — 携帯's clean
+ * export goes “to a directory picked on the phone”). Cancel stores "" — the task decides what an
+ * unanswered question means — and `%<store>_ok` says true/false, so a task need not compare against
+ * an empty string. Only places on the phone's own storage have a path; anything else counts as cancel.
+ */
+class PickDirectoryAction : Action {
+    override val id = "dialog.pickdir"
+    override val category = ActionCategory.SYSTEM
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val store = args["store"]?.trim()?.removePrefix("%")?.takeIf { it.isNotEmpty() } ?: "dir"
+        val outcome = showDialog(ctx, args["timeout"]?.toIntOrNull()) {
+            putExtra(DialogActivity.EXTRA_TYPE, DialogActivity.TYPE_DIRECTORY)
+        }
+        val path = (outcome as? DialogOutcome.Confirmed)?.value.orEmpty()
+        ctx.variables.set(store, path)
+        ctx.variables.set("${store}_ok", path.isNotEmpty().toString())
+        ctx.logger(if (path.isEmpty()) "Directory pick cancelled" else "Directory → %$store = $path")
+        return ActionResult.Success
+    }
+}
+
+/**
  * `Text Dialog` (Tasker 377) — show text with OK/Cancel; store which was pressed.
  *
  * `size` ("normal" / "large" / "full") and `markup` turn the same action into a readable page: a
