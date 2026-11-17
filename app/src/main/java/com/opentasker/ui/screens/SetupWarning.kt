@@ -110,6 +110,8 @@ object SetupWarning {
         if (ShiroiKumaAccessibilityService.isEnabledButNotRunning(app)) {
             ShiroiKumaAccessibilityService.awaitConnected(app, timeoutMs = 5_000L)
         }
+        // Which items count as required depends on what the tasks use.
+        com.opentasker.core.capabilities.LocaleSwitchUse.refresh()
         return withContext(Dispatchers.Main) { switchedOffSetupItems(app).map { it.title } }
     }
 

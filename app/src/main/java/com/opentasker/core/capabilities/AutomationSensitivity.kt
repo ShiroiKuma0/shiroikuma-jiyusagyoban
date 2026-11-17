@@ -99,6 +99,7 @@ object AutomationSensitivityRegistry {
         "dialog.form",
         "dialog.pickdir",
         "project.export",
+        "image.badge",
         "flow.fail",
         "system.get_locale",
         "task.return",
