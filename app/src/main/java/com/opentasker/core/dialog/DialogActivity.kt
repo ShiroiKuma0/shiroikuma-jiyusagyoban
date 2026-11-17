@@ -555,6 +555,7 @@ private fun DialogSize.surfaceModifier(): Modifier = when (this) {
  *   `- text`   bullet     `---`     horizontal rule
  *   `::: text` … `:::`   a rounded box titled `text` around the lines between (one level, no nesting)
  *   inline: `**bold**`, `__underline__`, `*italic*`, and a back-quoted span, which is literal
+ *   `{badge:TEXT|#fill|#ink|#border}` a badge drawn in full colour, as a form's badge preview
  *
  * The literal span is what makes a command writable at all: `**21*number#` in running text lost two
  * of its three asterisks to the italic rule, and `/ussd *#21#` its pair (携帯's guide, 2026-11-17).
@@ -864,17 +865,55 @@ private fun MarkupLines(run: List<MarkupBlock>, scale: Float) {
                 Modifier.fillMaxWidth().padding(start = step * block.extraIndent, bottom = 3.dp),
             ) {
                 Text("•  ", style = body, color = MaterialTheme.colorScheme.primary)
-                Text(inlineSpans(block.text), style = body)
+                MarkupText(block.text, body, scale, Modifier)
             }
-            is MarkupBlock.Body -> Text(
-                inlineSpans(block.text),
-                style = body,
-                modifier = Modifier.fillMaxWidth()
-                    .padding(start = step * block.extraIndent, bottom = 3.dp),
+            is MarkupBlock.Body -> MarkupText(
+                block.text,
+                body,
+                scale,
+                Modifier.fillMaxWidth().padding(start = step * block.extraIndent, bottom = 3.dp),
             )
             // Headings and rules are consumed by the caller and never reach a run.
             else -> Unit
         }
+    }
+}
+
+/**
+ * `{badge:TEXT|#fill|#ink|#border}` inside a line draws that badge in full colour, as the form's own
+ * preview does (ink and border may be left out). The braces keep it clear of `%variables`.
+ */
+private val BADGE_MARKUP_RE = Regex("""\{badge:([^|\}]*)\|([^|\}]*)(?:\|([^|\}]*))?(?:\|([^|\}]*))?\}""")
+
+/** One line of text; with a badge in it, the pieces flow in a row and wrap together. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun MarkupText(text: String, style: TextStyle, scale: Float, modifier: Modifier) {
+    if ("{badge:" !in text) {
+        Text(inlineSpans(text), style = style, modifier = modifier)
+        return
+    }
+    androidx.compose.foundation.layout.FlowRow(
+        modifier,
+        verticalArrangement = Arrangement.Center,
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        var last = 0
+        for (m in BADGE_MARKUP_RE.findAll(text)) {
+            if (m.range.first > last) Text(inlineSpans(text.substring(last, m.range.first)), style = style)
+            val fill = parseFormColor(m.groupValues[2]) ?: androidx.compose.ui.graphics.Color.Gray
+            Badge(
+                text = m.groupValues[1].trim(),
+                fill = fill,
+                ink = parseFormColor(m.groupValues[3]) ?: androidx.compose.ui.graphics.Color.Black,
+                border = parseFormColor(m.groupValues[4]) ?: fill,
+                height = 26.dp * scale,
+                stroke = 1.75.dp * scale,
+                fontSize = (14 * scale).toInt(),
+            )
+            last = m.range.last + 1
+        }
+        if (last < text.length) Text(inlineSpans(text.substring(last)), style = style)
     }
 }
 

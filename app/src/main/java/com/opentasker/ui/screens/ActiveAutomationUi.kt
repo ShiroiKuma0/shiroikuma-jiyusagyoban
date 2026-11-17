@@ -372,6 +372,10 @@ fun ActiveAutomationUi(
     // tasks drive the red ❗ on task rows, project chips, the Tasks nav tab, and Setup's health card.
     val healthTick = rememberResumeTick()
     val blockedTasks = remember(tasks, healthTick) { WorkspaceHealth.blockedTasks(tasks, context) }
+    // Setup asks for the locale switch's adb-level grant only when a task switches the locale.
+    val localeSwitchUsed = remember(tasks) {
+        tasks.any { task -> task.actions.any { it.type == com.opentasker.core.capabilities.LocaleSwitchUse.ACTION_TYPE } }
+    }
     val brokenTaskIds = remember(blockedTasks) { blockedTasks.map { it.taskId }.toSet() }
     val alertProjectIds = remember(blockedTasks) {
         val byId = tasks.associateBy { it.id }
@@ -1351,6 +1355,7 @@ fun ActiveAutomationUi(
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
                 blockedTasks = blockedTasks,
                 onOpenTasks = { screenOrdinal = OpenTaskerScreen.Tasks.ordinal },
+                localeSwitchUsed = localeSwitchUsed,
             )
 
             OpenTaskerScreen.Inspector -> ContextInspectorScreen(db = db, contentPadding = innerPadding)

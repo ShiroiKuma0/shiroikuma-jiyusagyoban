@@ -78,7 +78,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.opentasker.core.location.LocationPolicyDisclosures
 import com.opentasker.core.permissions.OemBatteryGuidance
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.opentasker.core.permissions.UsageAccess
 import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.scheduling.ExactAlarmSupport
@@ -124,6 +126,11 @@ internal sealed interface PermissionAction {
     data object DeviceAdmin : PermissionAction
     /** Fork: arbitrary side effect (e.g. pop Shizuku's own grant dialog) — refresh happens on resume. */
     data class Custom(val run: () -> Unit) : PermissionAction
+    /**
+     * Fork: a grant that has no dialog and no settings page — [command] is run through Shizuku or
+     * root ([com.opentasker.core.shizuku.PrivilegedShell]) and the outcome is reported.
+     */
+    data class PrivilegedGrant(val command: String) : PermissionAction
     data object None : PermissionAction
 }
 
@@ -135,6 +142,8 @@ fun PermissionOnboardingScreen(
     // at the very top so Setup and the red ❗ marks on the Tasks tab always tell the same story.
     blockedTasks: List<com.opentasker.core.capabilities.WorkspaceHealth.BlockedTask> = emptyList(),
     onOpenTasks: (() -> Unit)? = null,
+    // Whether a task uses the locale switch — decides if its adb-level grant counts as required.
+    localeSwitchUsed: Boolean = com.opentasker.core.capabilities.LocaleSwitchUse.used,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -151,7 +160,7 @@ fun PermissionOnboardingScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val items = remember(context, refreshTick) { buildPermissionItems(context) }
+    val items = remember(context, refreshTick, localeSwitchUsed) { buildPermissionItems(context, localeSwitchUsed) }
     val orderedItems = remember(items) {
         items.sortedWith(compareBy<PermissionSetupItem> { it.optional }.thenBy { it.granted }.thenBy { it.title })
     }
@@ -279,6 +288,7 @@ internal fun rememberPermissionActionRunner(
     onChanged: () -> Unit,
 ): (PermissionSetupItem) -> Unit {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Android stops showing the permission dialog once it has been refused twice (and EMUI after it
     // has revoked the permission itself): the request then comes straight back refused and the
     // button looks dead. An answer faster than anyone can tap means no dialog was shown, so the
@@ -319,6 +329,19 @@ internal fun rememberPermissionActionRunner(
                 }
             is PermissionAction.SettingsIntent -> openSettingsIntent(context, action.intent, onMessage)
             is PermissionAction.Custom -> action.run()
+            is PermissionAction.PrivilegedGrant -> {
+                onMessage("${item.title}: granting…")
+                scope.launch {
+                    val outcome = withContext(Dispatchers.IO) {
+                        com.opentasker.core.shizuku.PrivilegedShell.run(action.command)
+                    }
+                    onMessage(
+                        if (outcome.ok) "${item.title}: granted through ${outcome.route}."
+                        else "${item.title}: not granted — ${outcome.detail}.",
+                    )
+                    onChanged()
+                }
+            }
             is PermissionAction.OemSettings -> openOemSettings(context, action, onMessage)
             is PermissionAction.DeviceAdmin -> {
                 val admin = android.content.ComponentName(context, com.opentasker.core.admin.DeviceAdmin::class.java)
@@ -504,7 +527,11 @@ private fun PermissionRequirement(label: String) {
     }
 }
 
-internal fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
+internal fun buildPermissionItems(
+    context: Context,
+    localeSwitchUsed: Boolean = com.opentasker.core.capabilities.LocaleSwitchUse.used,
+): List<PermissionSetupItem> {
+    val changeConfigurationGranted = hasPermission(context, Manifest.permission.CHANGE_CONFIGURATION)
     val shizukuStatus = ShizukuPowerBackend.inspect(context)
     val shizukuRunning = ShizukuShell.isRunning()
     val shizukuReady = shizukuRunning && ShizukuShell.hasPermission()
@@ -645,13 +672,23 @@ internal fun buildPermissionItems(context: Context): List<PermissionSetupItem> {
         ),
         PermissionSetupItem(
             title = "Change configuration (locale)",
-            body = "Dev-flagged system permission for the locale switch; only adb can grant it, once, surviving reboots:\n" +
+            body = "System permission for the locale switch. Android has no dialog and no settings page " +
+                "for it: Grant runs the command below through Shizuku when it is running, otherwise " +
+                "through root. Without either, run it once over adb. The grant survives reboots and updates.\n" +
                 "pm grant ${context.packageName} android.permission.CHANGE_CONFIGURATION",
-            granted = hasPermission(context, Manifest.permission.CHANGE_CONFIGURATION),
-            // adb-only — no settings page to deep-link.
-            actionLabel = "",
-            action = PermissionAction.None,
+            granted = changeConfigurationGranted,
+            actionLabel = "Grant (Shizuku or root)",
+            // Once granted there is nothing to review — no settings page shows this permission.
+            action = if (changeConfigurationGranted) {
+                PermissionAction.None
+            } else {
+                PermissionAction.PrivilegedGrant(
+                    "pm grant ${context.packageName} android.permission.CHANGE_CONFIGURATION",
+                )
+            },
             requiredFor = "Locale switch (system.set_locale)",
+            // Required only on a phone whose tasks switch the locale.
+            optional = !localeSwitchUsed,
         ),
         PermissionSetupItem(
             title = "All files access",
