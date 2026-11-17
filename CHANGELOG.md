@@ -8,6 +8,50 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+021 — 2026-11-17
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
+as `+018`. Builds `+019` and `+020` were steps on the way and are contained in this one.
+
+### Setup
+
+- **“Grant (Shizuku or root)” on the “Change configuration (locale)” item.** Android offers neither a
+  dialog nor a settings page for `CHANGE_CONFIGURATION`, and the item used to print the `pm grant`
+  command and stop there. The pill now runs it — through Shizuku when it is running and has granted
+  access, otherwise through root (`su`) — and reports the route used, or exactly what was missing.
+  With Shizuku running but access not yet given, it opens Shizuku's own access dialog.
+- **The item is required only where it is used.** A phone none of whose tasks switch the locale
+  lists it under the optional items; it no longer counts as pending there and the setup warning
+  leaves it out.
+
+### Forms and dialogs
+
+- **A choice field can sort its options:** `"sort": "alpha"` puts entries that start with a digit
+  first, then the rest alphabetically, untitled ones last; a `"none"` entry stays on top. Meant for
+  long lists read from an array, such as conversations.
+- **Badges in a text dialog's markup:** `{badge:TEXT|#fill|#ink|#border}` inside a line draws that
+  badge in full colour, the way a form's badge preview does.
+
+### Actions
+
+- **Badge Picture (PNG)** (`image.badge`): draws a badge — short text on a fill, with a border — as
+  a square PNG for use as a round avatar. The badge is scaled so that its rounded corners end just
+  inside the inscribed circle and the rest is black, so an app that shows the picture in a circle
+  cuts nothing off. Arguments: text, fill, text and border colours, directory, file name, size
+  (512 px by default), background, result variable.
+
+### 携帯
+
+- The conversation pickers of the settings task are sorted, SIM chats (named by number) first.
+- The check page draws each pseudo-SIM's badge in its colours.
+- New task 「携帯のバッジ書き出し -- [71]」: writes every pseudo-SIM's badge as a PNG into a directory
+  picked on the phone, named after the pseudo-SIM, ready to be set as the icon of that SIM's Jami
+  group.
+
+### Packaging
+
+- One signed `arm64-v8a` APK: `shiroikuma-jiyusagyoban_0.2.96+2026-11-10.19-01.g2f677fa0+021_arm64-v8a.apk`.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+018 — 2026-11-17
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
