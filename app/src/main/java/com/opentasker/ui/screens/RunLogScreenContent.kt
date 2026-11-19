@@ -662,12 +662,12 @@ private fun RunLogCard(entry: RunLogEntry, onReplayHeld: (RunLogEntry) -> Unit, 
  * title it with that id while Tasks shows "Show Notification". Returns the action's name for those
  * steps, and null for a step with its own label or a type the registry doesn't know.
  */
-internal fun runLogTraceTitleRes(trace: RunLogActionDiagnostic): Int? =
-    if (trace.label == trace.actionType) ActionMetadataRegistry.get(trace.actionType)?.nameRes else null
+internal fun runLogTraceTitle(trace: RunLogActionDiagnostic): String? =
+    if (trace.label == trace.actionType) ActionMetadataRegistry.get(trace.actionType)?.name else null
 
 @Composable
 private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
-    val title = runLogTraceTitleRes(trace)?.let { stringResource(it) } ?: trace.label
+    val title = runLogTraceTitle(trace) ?: trace.label
     val color = when (trace.status) {
         ActionTraceStatus.SUCCESS -> MaterialTheme.colorScheme.primary
         ActionTraceStatus.FAILURE -> MaterialTheme.colorScheme.error

@@ -237,7 +237,6 @@
     <string name="context_picker_no_results">No contexts match your search.</string>
     <string name="dialog_delete_variable">Delete %%%1$s?</string>
     <string name="dialog_review_bundle">Review import</string>
-    <string name="dialog_review_bundle">Review OpenTasker bundle</string>
     <string name="dialog_review_tasker">Review Tasker import</string>
     <string name="dialog_review_macrodroid">Review MacroDroid import</string>
     <string name="dialog_profile_share_review">Review community share</string>
@@ -856,12 +855,10 @@
     <string name="import_paste_json_review">Review bundle</string>
     <string name="import_opentasker_bundle">Import</string>
     <string name="import_paste_too_long">Too long to paste, so the end was cut off. Save it as a file and use Import JSON or Import Tasker or MacroDroid instead.</string>
-    <string name="import_paste_json_review">Review import</string>
     <plurals name="import_paste_hidden">
         <item quantity="one">%1$s character pasted, too many to show here.</item>
         <item quantity="other">%1$s characters pasted, too many to show here.</item>
     </plurals>
-    <string name="import_opentasker_bundle">OpenTasker bundle</string>
     <string name="import_count_tasks">Tasks</string>
     <string name="import_count_profiles">Profiles</string>
     <string name="import_count_variables">Variables</string>
@@ -2042,4 +2039,18 @@
     <string name="automation_mode_restart">cancel and restart</string>
     <string name="automation_mode_single">ignore while running</string>
     <string name="scenes_add_element_content_description">Add element</string>
+    <!-- Fork: strings upstream dropped (delete-with-undo) that the fork's own screens still show. -->
+    <string name="action_remove_element">Remove Element</string>
+    <string name="delete_profile_body">This removes &quot;%1$s&quot; and its contexts. The linked task remains available; you can restore the profile from the snackbar.</string>
+    <string name="delete_scene_body">This removes &quot;%1$s&quot; and its %2$d element(s). You can restore it from the snackbar.</string>
+    <string name="delete_task_body">This removes &quot;%1$s&quot; and its %2$d action(s). You can restore it from the snackbar.</string>
+    <string name="delete_undo_helper">You can restore this from the Undo action in the snackbar.</string>
+    <string name="dialog_delete_profile">Delete profile?</string>
+    <string name="dialog_delete_scene">Delete scene?</string>
+    <string name="dialog_delete_task">Delete task?</string>
+    <string name="dialog_remove_action">Remove action?</string>
+    <string name="dialog_remove_context">Remove context?</string>
+    <string name="dialog_remove_element">Remove element?</string>
+    <string name="scenes_remove_element_body">This removes the %1$s element from &quot;%2$s&quot;.</string>
+    <string name="scenes_remove_element_content_description">Remove element</string>
 </resources>

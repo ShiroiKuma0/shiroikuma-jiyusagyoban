@@ -283,6 +283,119 @@ fun registerActionMetadata() {
         )
     )
 
+    // ---- Upstream's steps of 2026-11-10 … 11-12, in the fork's own (string) metadata. ----
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "var.set_multiple",
+            name = "Multiple Variables Set",
+            description = "Set several variables in one step: a list of names and a list of values, matched in order",
+            category = "Variable",
+            fields = listOf(
+                ActionField("names", "Names", FieldType.MULTILINE, required = true, hint = "one per line (or split by the names splitter), e.g. %a"),
+                ActionField("values", "Values", FieldType.MULTILINE, hint = "one per line (or split by the values splitter), in the names' order"),
+                ActionField("names_splitter", "Names splitter", hint = "blank = one name per line"),
+                ActionField("values_splitter", "Values splitter", hint = "blank = one value per line"),
+                ActionField("keep_existing", "Keep existing", FieldType.CHECKBOX, hint = "leave a variable that already has a value as it is"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "text.length",
+            name = "Text Length",
+            description = "Count the characters of a text",
+            category = "Variable",
+            fields = listOf(
+                ActionField("source", "Source text"),
+                ActionField("var", "Result variable", hint = "gets the length"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "sun.times",
+            name = "Sunrise / Sunset Times",
+            description = "Work out sunrise, sunset and the twilights for a place and a day",
+            category = "Variable",
+            fields = listOf(
+                ActionField("latitude", "Latitude", FieldType.NUMBER, hint = "blank = the phone's position (needs location access)"),
+                ActionField("longitude", "Longitude", FieldType.NUMBER, hint = "blank = the phone's position (needs location access)"),
+                ActionField("time", "Day (epoch seconds)", FieldType.NUMBER, hint = "blank = today"),
+                ActionField("elevations", "Sun elevations", FieldType.MULTILINE, hint = "optional: one elevation in degrees per line, for custom twilights"),
+                ActionField("var", "Result prefix", hint = "the variables are written under this name"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "profile.set",
+            name = "Profile Status",
+            description = "Switch one of this app's profiles on or off, or toggle it",
+            category = "Flow",
+            fields = listOf(
+                ActionField("profile", "Profile", required = true, hint = "name or id"),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, options = listOf("on", "off", "toggle")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "sound.beep",
+            name = "Beep",
+            description = "Play a generated tone",
+            category = "Media",
+            fields = listOf(
+                ActionField("frequency", "Frequency (Hz)", FieldType.NUMBER, required = true, hint = "0 – 10000"),
+                ActionField("duration", "Duration (ms)", FieldType.NUMBER, required = true, hint = "1 – 10000"),
+                ActionField("amplitude", "Amplitude (%)", FieldType.NUMBER, hint = "0 – 100. Default 50"),
+                ActionField("stream", "Stream", FieldType.DROPDOWN, hint = "blank = music", options = listOf("music", "alarm", "ring", "notification")),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(id = "sound.resume", name = "Resume Playback", description = "Send the media key Play to the player in front", category = "Media", fields = emptyList())
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(id = "sound.toggle", name = "Play / Pause", description = "Send the media key Play/Pause", category = "Media", fields = emptyList())
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(id = "track.rewind", name = "Rewind", description = "Send the media key Rewind", category = "Media", fields = emptyList())
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(id = "track.fastforward", name = "Fast Forward", description = "Send the media key Fast Forward", category = "Media", fields = emptyList())
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(id = "flow.anchor", name = "Anchor", description = "Does nothing: a step that only carries a label", category = "Flow", fields = emptyList())
+    )
+    // Upstream's Go To and Stop Task, ported into the fork's runner on 2026-11-19.
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "flow.goto",
+            name = "Go To",
+            description = "Jump to a labelled step or a step number, or to the top of the loop (continue), out of the loop (break) or to the end of the If this step sits in",
+            category = "Flow",
+            fields = listOf(
+                ActionField("label", "Label", hint = "the label of the step to jump to; wins over the step number"),
+                ActionField("step", "Step number", hint = "counted from 1; may come from a variable"),
+                ActionField("to", "Or: in this block", FieldType.DROPDOWN, hint = "loop_top = next item, loop_end = leave the loop, if_end = leave the If", options = listOf("", "loop_top", "loop_end", "if_end")),
+            )
+        )
+    )
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "task.stop",
+            name = "Stop Task",
+            description = "Stop every running copy of a task by name. Naming this task itself ends this run",
+            category = "Flow",
+            fields = listOf(ActionField("task", "Task", required = true, hint = "name or id"))
+        )
+    )
+
     ActionMetadataRegistry.register(
         ActionMetadata(
             id = "http.request",
@@ -2066,6 +2179,8 @@ fun registerActionMetadata() {
             fields = listOf(
                 ActionField("task", "Task id or name", required = true, hint = "Toggle WiFi"),
                 ActionField("results_prefix", "Store results into (prefix)", hint = "e.g. r_  →  %r_<name>, %r_ok, %r_error"),
+                ActionField("returnVariable", "Return variable", hint = "optional: gets the value the task's Stop hands back (Tasker's Return Value Variable)"),
+                ActionField("resetReturnVariable", "Clear the return variable first", FieldType.CHECKBOX, hint = "so a task that returns nothing leaves it unset"),
             )
         )
     )
@@ -2149,6 +2264,9 @@ fun registerActionMetadata() {
             name = "Stop",
             description = "Halt the rest of the task immediately",
             category = "Flow",
+            fields = listOf(
+                ActionField("value", "Return value", hint = "optional: handed back to the Run Task step that called this task, into its return variable"),
+            )
         )
     )
 

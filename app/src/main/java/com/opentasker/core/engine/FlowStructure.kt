@@ -197,7 +197,11 @@ data class FlowStructure(
 
             actions.forEachIndexed { index, spec ->
                 // A marker turned off isn't there, so the body it held runs as part of the block around it.
-                if (!spec.enabled) return@forEachIndexed
+                // FORK: a switched-off marker is still paired. 白い熊, 2026-09-10: any action can be
+                // disabled, flow control included, and the pairing must never shift underneath — a
+                // disabled `flow.if` removes the test and lets its body run. Upstream leaves a
+                // switched-off marker out of the structure here, which turned such a task into a
+                // "flow control error" before its first step.
                 when (spec.type) {
                     FlowControl.IF -> stack.addLast(Frame(FlowControl.IF, index))
                     FlowControl.FOREACH -> stack.addLast(Frame(FlowControl.FOREACH, index))

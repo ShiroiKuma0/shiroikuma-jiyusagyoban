@@ -474,7 +474,7 @@ internal fun timeBoundedEvents(
 ): Flow<ContextEvent> = if (TimeContextBounds.variableBounds(spec).isEmpty()) {
     events
 } else {
-    TimeContextBounds.resolving(spec, events, globalValues(profile.projectId))
+    TimeContextBounds.resolving(spec, events, globalValues(profile.projectId ?: 0L))
 }
 
 /**
@@ -501,7 +501,7 @@ internal fun retryingGlobalValues(
 }
 
 private fun savedGlobalValues(projectId: Long): Flow<Map<String, String>> = retryingGlobalValues {
-    VariableRepository(OpenTaskerApp_NoHilt.db.variableDao()).observeGlobals(projectId)
+    VariableRepository(OpenTaskerApp_NoHilt.db.variableDao()).observeGlobals()
         .map { variables -> TimeContextBounds.valuesByProject(variables)[projectId].orEmpty() }
 }
 

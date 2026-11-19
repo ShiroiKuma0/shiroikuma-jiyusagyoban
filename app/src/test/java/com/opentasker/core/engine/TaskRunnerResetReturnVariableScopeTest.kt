@@ -19,6 +19,11 @@ import org.junit.Test
  * locals are its own, so clearing one never touches the task that called it.
  */
 class TaskRunnerResetReturnVariableScopeTest {
+    // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
+    // class — an unset variable left as written (here it reads as nothing), a called task that reads
+    // its caller's locals (here a called task has locals of its own), Preflight's preview of those,
+    // and Tasker's quirk of running on into an Else after a jump into the If branch.
+
 
     private val recorded = mutableListOf<String>()
 
@@ -86,17 +91,6 @@ class TaskRunnerResetReturnVariableScopeTest {
         )
 
         assertEquals(listOf("C:answer=unset", "B:answer=unset", "B:answer=again", "A:answer=old"), recorded)
-    }
-
-    @Test
-    fun thePreviewLeavesTheCallersVariableAloneToo() {
-        val a = Task(id = 1, name = "A", actions = listOf(set("answer", "old"), runTask("B"), set("seen", "[%answer]")))
-        val b = Task(id = 2, name = "B", actions = listOf(resetting("C"), set("seen", "[%answer]")))
-        val c = Task(id = 3, name = "C", actions = listOf(stop()))
-        val reports = PreflightRunner.preflightTask(a, tasks = listOf(a, b, c)).tasks
-
-        assertEquals("[%answer]", reports.first { it.taskId == 2L }.steps[1].expandedArguments["value"])
-        assertEquals("[old]", reports.first { it.taskId == 1L }.steps[2].expandedArguments["value"])
     }
 
     @Test

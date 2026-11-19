@@ -14,7 +14,7 @@ internal const val FLOW_DETAIL_SEPARATOR = " · "
  * for a type this build doesn't register.
  */
 internal fun flowActionName(type: String, getString: (Int) -> String): String =
-    ActionMetadataRegistry.get(type)?.let { getString(it.nameRes) } ?: type
+    ActionMetadataRegistry.get(type)?.name ?: type
 
 /** Presentation copy for the flow graph; production UI supplies the current locale's resources. */
 interface AutomationFlowStrings {

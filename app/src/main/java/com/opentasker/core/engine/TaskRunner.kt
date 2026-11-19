@@ -1,22 +1,16 @@
 package com.opentasker.core.engine
 
-import com.opentasker.core.actions.ActionArgumentSensitivity
-import com.opentasker.core.actions.ArrayPositionArguments
-import com.opentasker.core.actions.LineListArguments
-import com.opentasker.core.actions.PluginBundleArguments
-import com.opentasker.core.actions.declaredActionOutputs
-import com.opentasker.core.actions.multipleVariablesFilledNames
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.actions.ActionArgumentSensitivity
 import com.opentasker.core.capabilities.CapabilityPrompt
 import com.opentasker.core.capabilities.CapabilityState
 import com.opentasker.core.diagnostics.ExportRedactionPolicy
-import com.opentasker.core.engine.variables.TaskerBuiltIns
 import com.opentasker.core.dialog.DialogActivity
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpansionTrace
 import com.opentasker.core.expressions.TemplateExpressionEngine
+import com.opentasker.core.engine.variables.TaskerBuiltIns
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
@@ -80,19 +74,26 @@ class TaskRunner(
         var phase: TryPhase = TryPhase.BODY,
     )
 
-    /** The task [run] is running, for a Stop Task step that names it. */
+    // ---- Ported from upstream (2026-11-11), sync follow-up of 2026-11-19: Go To, Stop Task, a Stop
+    // that hands a value back to the Run Task step that called this task, and For over values. ----
+
+    /** The task this runner is running, for a Go To's labels and a Stop Task that names it. */
     private var runningTask: Task? = null
 
     /** Set when a Stop Task step names [runningTask], which ends the run like `flow.stop`. */
     private var stopThisRun = false
 
-    /** What a Stop with a value handed back, for the Run Task step that ran this task (Tasker's Return). */
+    /** What a Stop with a value handed back, and whether a secret went into it. */
     internal class ReturnedValue(val text: String, val sensitive: Boolean)
 
+    /** The value the last run's Stop handed back; read by the Run Task step that ran it. */
     internal var returnedValue: ReturnedValue? = null
         private set
 
     suspend fun run(task: Task): TaskRunReport {
+        runningTask = task
+        stopThisRun = false
+        returnedValue = null
         // Pre-flight permission gate: if the task uses an action whose special access isn't granted,
         // DON'T run any action — show a modal OK dialog naming the task, project, and missing permission(s).
         val missing = CapabilityState.missingForTask(task, ctx.app)
@@ -128,15 +129,10 @@ class TaskRunner(
 
         ctx.variables.pushScope()
         val started = now()
-        runningTask = task
-        stopThisRun = false
-        returnedValue = null
         val results = mutableListOf<ActionResult>()
         val traces = mutableListOf<ActionExecutionTrace>()
 
-        // A step turned off never runs, so it can't hold the rest of the task back.
         val unknownActionIds = task.actions
-            .filter(ActionSpec::enabled)
             .map(ActionSpec::type)
             .filter { actionId ->
                 !AutomationSensitivityRegistry.isKnown(actionId) && ActionRegistry.get(actionId) == null
@@ -169,7 +165,6 @@ class TaskRunner(
         }
 
         val unsupportedActionIds = task.actions
-            .filter(ActionSpec::enabled)
             .map(ActionSpec::type)
             .filter { actionId ->
                 AutomationSensitivityRegistry.isKnown(actionId) &&
@@ -229,7 +224,6 @@ class TaskRunner(
         val loopStack = ArrayDeque<LoopFrame>()
         val tryStack = ArrayDeque<TryFrame>()
         val armedElseIndices = mutableSetOf<Int>()
-        val ifResults = mutableMapOf<Int, Boolean>()
         val handledFailureIndices = mutableSetOf<Int>()
         var unhandledFailure = false
         // Only the FIRST unhandled failure is kept: it is the one that actually ended the run, and a
@@ -282,7 +276,7 @@ class TaskRunner(
                     continue
                 }
                 if (FlowControl.isControl(spec.type)) {
-                    val outcome = stepControl(pc, spec, task.actions, structure, loopStack, tryStack, armedElseIndices, ifResults)
+                    val outcome = stepControl(pc, spec, structure, loopStack, tryStack, armedElseIndices)
                     results += outcome.result
                     traces += outcome.trace
                     if (outcome.halt) {
@@ -343,12 +337,10 @@ class TaskRunner(
     private fun stepControl(
         pc: Int,
         spec: ActionSpec,
-        actions: List<ActionSpec>,
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
         tryStack: ArrayDeque<TryFrame>,
         armedElseIndices: MutableSet<Int>,
-        ifResults: MutableMap<Int, Boolean>,
     ): ControlOutcome {
         fun outcome(message: String, nextPc: Int, halt: Boolean = false) = ControlOutcome(
             result = ActionResult.Success,
@@ -387,7 +379,6 @@ class TaskRunner(
                 val distinctGuard = guard != null && argCondition != null && guard != argCondition
                 val display = if (distinctGuard) "$condition, only if $guard" else condition
                 val matched = evaluateConditionString(condition) && (!distinctGuard || guardMet())
-                ifResults[pc] = matched
                 if (matched) {
                     outcome("if ($display) -> true", pc + 1)
                 } else {
@@ -403,10 +394,7 @@ class TaskRunner(
                 }
             }
             FlowControl.ELSE -> {
-                val openedByIf = armedElseIndices.remove(pc)
-                // Tasker skips an else only when its If was found true, so a goto from outside the
-                // block into the if branch runs on into the else, as it does there.
-                if (openedByIf || structure.ifForElse(pc)?.let(ifResults::get) != true) {
+                if (armedElseIndices.remove(pc)) {
                     // Reached from a false if: this marker opens the else branch. A guard here is
                     // Tasker's "Else If" — unmet means the branch is skipped, not run.
                     if (guardMet()) {
@@ -430,13 +418,24 @@ class TaskRunner(
                         }
                     }
                 val itemVar = spec.args["var"]?.trim()?.takeIf { it.isNotBlank() } ?: "item"
-                // Values (Tasker's For items) apply only when no array is named.
+                // Values (Tasker's For items: a written list, a range such as 1:5, a whole array) apply
+                // only when no array is named.
                 val values = spec.args["values"]?.trim()?.takeIf { listName == null && it.isNotBlank() }
                 val loop = values?.let { raw ->
-                    val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables)
+                    val templateScope by lazy(LazyThreadSafetyMode.NONE) {
+                        ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
+                    }
                     ForItems.resolve(raw, ctx.variables) { piece ->
-                        val (text, trace) = expandValue(spec.type, "values", piece, templateScope, conditionals = false)
-                        ForItems.Expanded(text, secret = trace?.isSecretDerived == true)
+                        val legacy = ctx.variables.expandTracked(rewriteParamSugar(piece), conditionals = false)
+                        if (!legacy.value.contains("{{")) {
+                            ForItems.Expanded(legacy.text, secret = legacy.isSecretDerived)
+                        } else {
+                            val result = templateExpressionEngine.expand(legacy.value, templateScope)
+                            ForItems.Expanded(
+                                InertTemplateText.restore(result.value),
+                                secret = legacy.isSecretDerived || result.traces.any { it.isSecretDerived },
+                            )
+                        }
                     }
                 } ?: ForItems.Resolved(
                     items = listName?.let { ctx.variables.getArrayItems(it) }.orEmpty(),
@@ -536,12 +535,12 @@ class TaskRunner(
                 skipped("stop skipped: condition ($guard) -> false", pc + 1)
             } else if (!spec.args["value"].isNullOrBlank()) {
                 // Tasker's Return: the value goes back to the Run Task step that called this task, if any.
-                val expansion = expandArgs(spec.type, mapOf("value" to spec.args.getValue("value")))
+                val expansion = expandArgs(mapOf("value" to spec.args.getValue("value")))
                 val value = expansion.args["value"].orEmpty()
                 val sensitive = expansion.isArgumentSensitive("value")
                 returnedValue = ReturnedValue(value, sensitive)
                 val shown = summarizeArgValue(spec.type, "value", value, forceRedact = sensitive)
-                outcome(expansion.redactSensitiveValues("stop, returning $shown"), pc + 1, halt = true)
+                outcome(expansion.redactSecretDerivedValues("stop, returning $shown"), pc + 1, halt = true)
             } else {
                 outcome("stop", pc + 1, halt = true)
             }
@@ -550,22 +549,22 @@ class TaskRunner(
             } else if (!spec.args["to"].isNullOrBlank()) {
                 gotoBlock(pc, spec, spec.args.getValue("to").trim(), structure, loopStack, tryStack)
             } else {
-                val expansion = expandArgs(spec.type, spec.args)
-                val target = FlowControl.gotoTarget(actions, expansion.args, spec.args)
+                val expansion = expandArgs(spec.args)
+                val target = FlowControl.gotoTarget(runningTask?.actions.orEmpty(), expansion.args, spec.args)
                 val index = target.index
                 // A step number or label read from a secret stays out of the trace and the error.
                 if (index == null) {
-                    val failure = ActionResult.Failure(expansion.redactSensitiveValues(target.error ?: "goto has no target"))
+                    val failure = ActionResult.Failure(expansion.redactSecretDerivedValues(target.error ?: "goto has no target"))
                     ControlOutcome(failure, markerTrace(pc, spec, failure, ActionTraceStatus.FAILURE), pc + 1, halt = true)
                 } else {
                     val unopened = leaveBlocksFor(index, structure, loopStack, tryStack)
                     if (unopened != null) {
                         val failure = ActionResult.Failure(
-                            expansion.redactSensitiveValues("goto step ${index + 1} lands inside the block that opens at step ${unopened + 1}, which isn't running"),
+                            expansion.redactSecretDerivedValues("goto step ${index + 1} lands inside the block that opens at step ${unopened + 1}, which isn't running"),
                         )
                         ControlOutcome(failure, markerTrace(pc, spec, failure, ActionTraceStatus.FAILURE), pc + 1, halt = true)
                     } else {
-                        outcome(expansion.redactSensitiveValues("goto -> step ${index + 1}"), index)
+                        outcome(expansion.redactSecretDerivedValues("goto -> step ${index + 1}"), index)
                     }
                 }
             }
@@ -644,25 +643,6 @@ class TaskRunner(
         return go("goto top of loop -> loop done", endfor + 1)
     }
 
-    /**
-     * Whether replaying the whole try body is safe.
-     *
-     * A retry restarts at `tryIndex + 1`, so every action in the body runs again - not just the one
-     * that failed. Checking only the failing action let a body like `[sms.send, http.get]` re-send
-     * the message each time the HTTP call failed. Control markers carry no side effects and are
-     * skipped, and so are steps turned off, which a replay passes over too; an unknown action id
-     * is treated as unsafe.
-     */
-    private fun tryBodyIsRetrySafe(task: Task, frame: TryFrame): Boolean {
-        val bodyEnd = frame.catchIndex ?: frame.endIndex
-        return ((frame.tryIndex + 1) until bodyEnd)
-            .mapNotNull { index -> task.actions.getOrNull(index) }
-            .filterNot { bodySpec -> FlowControl.isControl(bodySpec.type) || !bodySpec.enabled }
-            .all { bodySpec ->
-                ActionRegistry.get(bodySpec.type)?.retrySafetyFor(bodySpec.args) == ActionRetrySafety.IDEMPOTENT
-            }
-    }
-
     private suspend fun recoverFailure(
         pc: Int,
         spec: ActionSpec,
@@ -670,19 +650,17 @@ class TaskRunner(
         structure: FlowStructure,
         loopStack: ArrayDeque<LoopFrame>,
         tryStack: ArrayDeque<TryFrame>,
-    ): FailureRecovery {
-        var nonRetryReason: String? = null
-        var lastAttempt = 1
-        // Innermost first. Frames come off the stack only once one of them retries or catches, so a
-        // failure nothing handles leaves every Try open for a step that carries on past it.
-        val enclosing = tryStack.asReversed().filter { candidate ->
-            candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
-        }
-        for (frame in enclosing) {
-            lastAttempt = frame.attempt
-            if (frame.attempt < frame.config.maxAttempts && tryBodyIsRetrySafe(task, frame)) {
-                while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
-                setFailureVariables(task, pc, spec, failure, frame.attempt, retrying = true, retryReason = null)
+    ): Int? {
+        while (true) {
+            val frame = tryStack.asReversed().firstOrNull { candidate ->
+                candidate.phase == TryPhase.BODY && pc > candidate.tryIndex && pc < candidate.endIndex
+            } ?: return null
+
+            while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
+            if (frame.attempt < frame.config.maxAttempts &&
+                ActionRegistry.get(spec.type)?.retrySafety == ActionRetrySafety.IDEMPOTENT
+            ) {
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = true)
                 frame.attempt++
                 clearLoopsToDepth(loopStack, frame.loopDepth)
                 val waitMs = retryBackoffMs(frame.config.backoffMs, frame.attempt - 1)
@@ -691,23 +669,16 @@ class TaskRunner(
             }
 
             frame.catchIndex?.let { catchIndex ->
-                while (tryStack.lastOrNull() !== frame) tryStack.removeLast()
-                setFailureVariables(
-                    task,
-                    pc,
-                    spec,
-                    failure,
-                    frame.attempt,
-                    retrying = false,
-                    retryReason = nonRetryReason,
-                )
+                setFailureVariables(pc, spec, failure, frame.attempt, retrying = false)
+                ctx.variables.set(FLOW_ERROR_CAUGHT, "false")
                 frame.phase = TryPhase.CATCH
                 clearLoopsToDepth(loopStack, frame.loopDepth)
                 return catchIndex + 1
             }
+
             // An uncaught nested failure propagates to the enclosing try block.
+            tryStack.removeLast()
         }
-        return FailureRecovery(nextPc = null, reason = nonRetryReason, attemptCount = lastAttempt)
     }
 
     private fun setFailureVariables(
@@ -753,6 +724,7 @@ class TaskRunner(
         if (spec.type == SUB_TASK_ACTION_ID) {
             return runSubTask(index, spec, started)
         }
+
         if (spec.type == STOP_TASK_ACTION_ID) {
             return stopTask(index, spec, started)
         }
@@ -761,11 +733,7 @@ class TaskRunner(
             ?: ActionResult.Failure("unknown action: ${spec.type}").let { result ->
                 return result to traceFor(index, spec, started, result, ActionArgumentExpansionReport.Empty)
             }
-        val expansionReport = expandArgs(spec.type, spec.args)
-        expansionReport.failure?.let { message ->
-            val result = ActionResult.Failure(message)
-            return result to traceFor(index, spec, started, result, expansionReport)
-        }
+        val expansionReport = expandArgs(spec.args)
         val timeoutMs = actionTimeoutMs(spec.type)
         val rawResult = try {
             runStepWithinLimit(timeoutMs) {
@@ -789,12 +757,57 @@ class TaskRunner(
         } else {
             rawResult
         }
-        val changes = variableChangesBetween(before, ctx.variables.toTemplateScope()).map { change ->
-            val hidden = ActionArgumentSensitivity.hidesWrittenValue(spec.type, spec.args, change.name) ||
-                ActionArgumentSensitivity.hidesWrittenValue(spec.type, expansionReport.args, change.name)
-            if (change.sensitive || !hidden) change else change.copy(sensitive = true)
+        return result to traceFor(index, spec, started, result, expansionReport)
+    }
+
+    /**
+     * Stops every running copy of the task the step names, Tasker's Stop with a task given.
+     *
+     * Naming the task this step runs in ends this run the way `flow.stop` does and cancels its other
+     * runs. Naming a task that called this one, directly or further up, stops that caller and this
+     * run with it. Another task's runs are cancelled, and a task running the stopped one as a
+     * sub-task sees that step fail. A task that isn't running is not an error.
+     */
+    private suspend fun stopTask(
+        index: Int,
+        spec: ActionSpec,
+        started: Long,
+    ): Pair<ActionResult, ActionExecutionTrace> {
+        val expansionReport = expandArgs(spec.args)
+
+        fun finish(result: ActionResult): Pair<ActionResult, ActionExecutionTrace> =
+            result to traceFor(index, spec, started, result, expansionReport)
+
+        val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { expansionReport.args[it]?.trim()?.takeIf(String::isNotBlank) }
+            ?: return finish(ActionResult.Failure("task.stop requires a 'task' (id or name)"))
+        val resolver = resolveTask ?: return finish(ActionResult.Failure("stopping a task is not available in this context"))
+        val target = resolver(ref) ?: return finish(ActionResult.Failure("task not found: $ref"))
+        val running = runningTask
+        val reason = "Stopped by a Stop Task step in '${running?.name.orEmpty()}'"
+        if (target.id > 0L && target.id == running?.id) {
+            // Tasker stops every copy of the task, so the other runs of this one end as well.
+            val others = collisionCoordinator?.cancelRunning(target.id, reason, sparing = currentCoroutineContext()[Job]) ?: 0
+            if (others > 0) ctx.logger("Stopped '${target.name}'")
+            stopThisRun = true
+            return finish(ActionResult.Success)
         }
-        return result to traceFor(index, spec, started, result, expansionReport, changes)
+        val coordinator = collisionCoordinator
+            ?: return finish(ActionResult.Failure("stopping another task is not available in this context"))
+        val stopped = coordinator.cancelRunning(target.id, reason)
+        ctx.logger(if (stopped == 0) "'${target.name}' wasn't running" else "Stopped '${target.name}'")
+        // Stopping a task that called this one cancelled this run too, so end before another step.
+        currentCoroutineContext().ensureActive()
+        return finish(ActionResult.Success)
+    }
+
+    /** Tasker's %TRUN lists a task run by another one too, for as long as it actually runs. */
+    private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
+        val running = TaskerBuiltIns.subTaskStarted(target.name)
+        try {
+            return child.run(target)
+        } finally {
+            TaskerBuiltIns.subTaskEnded(running)
+        }
     }
 
     private suspend fun runSubTask(
@@ -802,7 +815,7 @@ class TaskRunner(
         spec: ActionSpec,
         started: Long,
     ): Pair<ActionResult, ActionExecutionTrace> {
-        val expansionReport = expandArgs(spec.type, spec.args)
+        val expansionReport = expandArgs(spec.args)
         val args = expansionReport.args
 
         fun fail(message: String): Pair<ActionResult, ActionExecutionTrace> {
@@ -813,15 +826,6 @@ class TaskRunner(
         val resolver = resolveTask ?: return fail("sub-tasks are not available in this context")
         if (depth >= MAX_SUBTASK_DEPTH) {
             return fail("sub-task depth limit ($MAX_SUBTASK_DEPTH) exceeded; possible recursion")
-        }
-        // Checked before the task runs, so a typo doesn't run the task and then lose what it returns.
-        val returnVariable = spec.args[SUB_TASK_RETURN_KEY]?.takeIf(String::isNotBlank)?.let { written ->
-            val expanded = args[SUB_TASK_RETURN_KEY].orEmpty()
-            VariableNamePolicy.normalize(expanded) ?: return fail(
-                expansionReport.redactSensitiveValues(
-                    unusableReturnVariable(written, expanded, expansionReport.isArgumentSensitive(SUB_TASK_RETURN_KEY)),
-                ),
-            )
         }
 
         val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { args[it]?.trim()?.takeIf(String::isNotBlank) }
@@ -877,14 +881,37 @@ class TaskRunner(
             now = now,
             projectNameResolver = projectNameResolver,
         )
-        // Upstream's return variable (Tasker's Return Value Variable): cleared before the task runs
-        // when asked, so a task that returns nothing leaves it unset.
-        if (returnVariable != null && resetsReturnVariable(args)) ctx.variables.clearForTask(returnVariable)
-
         // Upstream's global last-mile rule: the target task's own collision policy decides whether a
         // nested run starts, waits behind the active one, or is skipped outright. The nested run goes
         // through its own Job (see runNestedUnderItsOwnJob) so a collision on the sub-task can no
         // longer cancel the caller that invoked it.
+        // Upstream's return variable (Tasker's Return Value Variable): the caller's variable for what
+        // the task's Stop hands back, beside the fork's own `ret:` results. Cleared first when asked,
+        // so a task that returns nothing leaves it unset instead of holding an earlier call's value.
+        val returnVariable = spec.args[SUB_TASK_RETURN_KEY]?.takeIf(String::isNotBlank)?.let { written ->
+            // Written as one `%name`, it names that variable (Tasker's field holds a name, and an
+            // import writes it that way); anything else is filled in first, like the fork's other names.
+            val asWritten = written.trim().takeIf { SINGLE_PERCENT_NAME.matches(it) }?.removePrefix("%")
+            val expanded = asWritten ?: args[SUB_TASK_RETURN_KEY].orEmpty().trim().removePrefix("%")
+            expanded.takeIf { RETURN_VARIABLE_NAME.matches(it) } ?: return fail(
+                expansionReport.redactSecretDerivedValues(
+                    unusableReturnVariable(written, expanded, expansionReport.isArgumentSensitive(SUB_TASK_RETURN_KEY)),
+                ),
+            )
+        }
+        if (returnVariable != null && resetsReturnVariable(args)) ctx.variables.clearForTask(returnVariable)
+
+        // Upstream's inputs (Tasker's %par1, %par2): any other argument of the step becomes a local
+        // variable of the called task, beside the fork's own `param:` parameters. The fork's tasks
+        // carry no such arguments, so this only serves a task that came from Tasker.
+        args.forEach { (key, value) ->
+            if (key !in SUB_TASK_REF_KEYS && key !in SUB_TASK_SETTING_KEYS &&
+                key != SUB_TASK_RESULTS_PREFIX_KEY && !key.startsWith(SUB_TASK_PARAM_PREFIX)
+            ) {
+                childCtx.variables.set(key, value, sensitive = expansionReport.isArgumentSensitive(key))
+            }
+        }
+
         val coordinator = collisionCoordinator
         val report = if (coordinator == null) {
             runListed(child, target)
@@ -904,6 +931,7 @@ class TaskRunner(
         if (report.success && returnVariable != null && returned != null) {
             ctx.variables.set(returnVariable, returned.text, sensitive = returned.sensitive)
         }
+
         val result = if (report.success) {
             ActionResult.Success
         } else {
@@ -913,13 +941,13 @@ class TaskRunner(
     }
 
     /**
-     * Runs a sub-task in a coroutine of its own, so stopping the sub-task cancels *it*.
+     * Runs a sub-task in a coroutine of its own so the collision coordinator registers *it*.
      *
-     * A stopped run cancels the Job the coordinator was called from. A sub-task used to run
-     * directly in the caller's coroutine, so that Job was the caller's whole execution: a later
-     * Abort existing run of the sub-task cancelled the caller, which had no collision of its own
-     * and was logged as "Replaced by a newer run", and an Abort new run of the sub-task was
-     * refused because the caller looked like a run of it.
+     * The coordinator identifies a running invocation by the current Job. A sub-task used to run
+     * directly in the caller's coroutine, so the Job it registered for the sub-task was the
+     * caller's whole execution: a later Abort existing run of the sub-task cancelled the caller,
+     * which had no collision of its own and was logged as "Replaced by a newer run", and an Abort
+     * new run of the sub-task was refused because the caller looked like a run of it.
      *
      * `supervisorScope` keeps that cancellation from reaching the caller, so the sub-task step
      * fails and the caller's own `continueOnError` decides what happens next. A cancellation of
@@ -939,60 +967,6 @@ class TaskRunner(
                 cancelled.message ?: "The sub-task was replaced by a newer run.",
             )
         }
-    }
-
-    /**
-     * Tasker's %TRUN lists a task run by another one too, from when its collision rule lets it run,
-     * so one still waiting its turn or skipped isn't listed.
-     */
-    private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
-        val running = TaskerBuiltIns.subTaskStarted(target.name)
-        try {
-            return child.run(target)
-        } finally {
-            TaskerBuiltIns.subTaskEnded(running)
-        }
-    }
-
-    /**
-     * Stops every running copy of the task the step names, Tasker's Stop with a task given.
-     *
-     * Naming the task this step runs in ends this run the way `flow.stop` does and cancels its other
-     * runs. Naming a task that called this one, directly or further up, stops that caller and this
-     * run with it. Another task's runs are cancelled, and a task running the stopped one as a
-     * sub-task sees that step fail. A task that isn't running is not an error.
-     */
-    private suspend fun stopTask(
-        index: Int,
-        spec: ActionSpec,
-        started: Long,
-    ): Pair<ActionResult, ActionExecutionTrace> {
-        val expansionReport = expandArgs(spec.type, spec.args)
-
-        fun finish(result: ActionResult): Pair<ActionResult, ActionExecutionTrace> =
-            result to traceFor(index, spec, started, result, expansionReport)
-
-        expansionReport.failure?.let { return finish(ActionResult.Failure(it)) }
-        val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { expansionReport.args[it]?.trim()?.takeIf(String::isNotBlank) }
-            ?: return finish(ActionResult.Failure("task.stop requires a 'task' (id or name)"))
-        val resolver = resolveTask ?: return finish(ActionResult.Failure("stopping a task is not available in this context"))
-        val target = resolver(ref) ?: return finish(ActionResult.Failure("task not found: $ref"))
-        val running = runningTask
-        val reason = "Stopped by a Stop Task step in '${running?.name.orEmpty()}'"
-        if (target.id > 0L && target.id == running?.id) {
-            // Tasker stops every copy of the task, so the other runs of this one end as well.
-            val others = collisionCoordinator?.cancelRunning(target.id, reason, sparing = currentCoroutineContext()[Job]) ?: 0
-            if (others > 0) ctx.logger("Stopped '${target.name}'")
-            stopThisRun = true
-            return finish(ActionResult.Success)
-        }
-        val coordinator = collisionCoordinator
-            ?: return finish(ActionResult.Failure("stopping another task is not available in this context"))
-        val stopped = coordinator.cancelRunning(target.id, reason)
-        ctx.logger(if (stopped == 0) "'${target.name}' wasn't running" else "Stopped '${target.name}'")
-        // Stopping a task that called this one cancelled this run too, so end before another step.
-        currentCoroutineContext().ensureActive()
-        return finish(ActionResult.Success)
     }
 
     /**
@@ -1080,197 +1054,49 @@ class TaskRunner(
         argumentExpansions = expansionReport.expansions,
     )
 
-    private fun expandArgs(actionType: String, args: Map<String, String>): ActionArgumentExpansionReport {
+    private fun expandArgs(args: Map<String, String>): ActionArgumentExpansionReport {
         if (args.isEmpty()) return ActionArgumentExpansionReport.Empty
 
         val templateScope = ctx.variables.toTemplateScope(ctx.eventVariables, ctx.parameters)
         val expansions = mutableListOf<ActionArgumentExpansionTrace>()
-        val outputNames = OutputNameArguments(actionType)
-        var failure: String? = null
         val expandedArgs = args.mapValues { (name, rawValue) ->
-            arrayReferenceName(actionType, name, rawValue)?.let { arrayName ->
-                return@mapValues arrayName
-            }
-            if (outputNames.keepsAsWritten(name, rawValue)) return@mapValues rawValue
-            if (LineListArguments.applies(actionType, name)) {
-                val lines = rawValue.lines().map { line -> expandValue(actionType, name, line, templateScope) }
-                val expanded = lines.joinToString("\n") { it.first }
-                LineListArguments.lineBreakFailure(actionType, name, lines.map { it.first })?.let { failure = it }
-                combinedTrace(name, rawValue, expanded, lines.mapNotNull { it.second })?.let { expansions += it }
-                return@mapValues expanded
-            }
-            if (PluginBundleArguments.applies(actionType, name)) {
-                val traces = mutableListOf<ActionArgumentExpansionTrace>()
-                val expanded = PluginBundleArguments.expand(rawValue) { text ->
-                    val (value, trace) = expandValue(actionType, name, text, templateScope, conditionals = false)
-                    trace?.let(traces::add)
-                    value
+            val legacy = ctx.variables.expandTracked(rewriteParamSugar(rawValue))
+            if (!legacy.value.contains("{{")) {
+                if (legacy.isSecretDerived) {
+                    expansions += ActionArgumentExpansionTrace(
+                        argName = name,
+                        rawValue = rawValue,
+                        expandedValue = ActionArgumentSensitivity.REDACTED,
+                        expressions = emptyList(),
+                        warnings = emptyList(),
+                        isSecretDerived = true,
+                    )
                 }
-                combinedTrace(name, rawValue, expanded ?: rawValue, traces)?.let { expansions += it }
-                return@mapValues expanded ?: rawValue
+                return@mapValues legacy.text
             }
-            val (expanded, trace) = expandValue(actionType, name, rawValue, templateScope)
-            trace?.let { expansions += it }
-            ArrayPositionArguments.emptyFailure(actionType, name, rawValue, expanded)?.let { failure = it }
+
+            val result = templateExpressionEngine.expand(legacy.value, templateScope)
+            val expanded = InertTemplateText.restore(result.value)
+            val isSecretDerived = legacy.isSecretDerived || result.traces.any { it.isSecretDerived }
+            if (result.traces.isNotEmpty() || result.warnings.isNotEmpty() || isSecretDerived) {
+                expansions += ActionArgumentExpansionTrace(
+                    argName = name,
+                    rawValue = rawValue,
+                    expandedValue = if (isSecretDerived) ActionArgumentSensitivity.REDACTED else expanded,
+                    expressions = result.traces.map { trace ->
+                        if (trace.isSecretDerived) trace.copy(value = ActionArgumentSensitivity.REDACTED) else trace
+                    },
+                    warnings = result.warnings,
+                    isSecretDerived = isSecretDerived,
+                )
+            }
             expanded
         }
 
-        // A value hidden because of the name it's given, like Set Variable's value for %api_key, only
-        // shows in its trace as hidden, so the run log's args and template lines never print it. The
-        // name counts as written and as filled in, so item_%slot is item_api_key while %slot holds
-        // api_key. Multiple Variables Set's names are never filled in here, so the step's own walk
-        // fills them in, an earlier name in the list setting a later one's variable included.
-        fun namesFilledInAsSecret() = actionType == "var.set_multiple" &&
-            ctx.variables.multipleVariablesFilledNames(expandedArgs, ctx.eventVariables).any(ActionArgumentSensitivity::isSensitiveArgumentName)
-        val traces = expansions.map { trace ->
-            val hidden = ActionArgumentSensitivity.isSensitive(actionType, trace.argName, args) ||
-                ActionArgumentSensitivity.isSensitive(actionType, trace.argName, expandedArgs) ||
-                (trace.argName == "values" && namesFilledInAsSecret())
-            if (hidden) trace.withValueHidden() else trace
-        }
-        return ActionArgumentExpansionReport(expandedArgs, traces, actionType, failure)
-    }
-
-    // A warning can quote the text typed for the value, like a missing `{{ hunter2 }}`.
-    private fun ActionArgumentExpansionTrace.withValueHidden() = copy(
-        rawValue = REDACTED_VALUE,
-        expandedValue = REDACTED_VALUE,
-        expressions = expressions.map {
-            it.copy(
-                rawExpression = REDACTED_VALUE,
-                expression = REDACTED_VALUE,
-                value = REDACTED_VALUE,
-                path = REDACTED_VALUE,
-                warning = it.warning?.let { REDACTED_VALUE },
-            )
-        },
-        warnings = warnings.map { REDACTED_VALUE },
-    )
-
-    /** One trace for an argument expanded in pieces, or null when no piece needed one. */
-    private fun combinedTrace(
-        name: String,
-        rawValue: String,
-        expanded: String,
-        traces: List<ActionArgumentExpansionTrace>,
-    ): ActionArgumentExpansionTrace? {
-        if (traces.isEmpty()) return null
-        val isSecretDerived = traces.any { it.isSecretDerived }
-        return ActionArgumentExpansionTrace(
-            argName = name,
-            rawValue = rawValue,
-            expandedValue = if (isSecretDerived) REDACTED_VALUE else expanded,
-            expressions = traces.flatMap { it.expressions },
-            warnings = traces.flatMap { it.warnings },
-            isSecretDerived = isSecretDerived,
-        )
-    }
-
-    private fun expandValue(
-        actionType: String,
-        name: String,
-        rawValue: String,
-        templateScope: TemplateScope,
-        conditionals: Boolean = true,
-    ): Pair<String, ActionArgumentExpansionTrace?> {
-        // Fork: `%@name` is sugar for the sub-task parameter `{{ param.name }}`.
-        val legacy = ctx.variables.expandTracked(rewriteParamSugar(rawValue), conditionals)
-        if (!legacy.value.contains("{{")) {
-            val trace = if (legacy.isSecretDerived) {
-                ActionArgumentExpansionTrace(
-                    argName = name,
-                    rawValue = rawValue,
-                    expandedValue = REDACTED_VALUE,
-                    expressions = emptyList(),
-                    warnings = emptyList(),
-                    isSecretDerived = true,
-                )
-            } else if (actionType == SUB_TASK_ACTION_ID && name !in SUB_TASK_REF_KEYS) {
-                // Only expansions get a trace, so a sub-task input typed as plain text would
-                // otherwise never appear in the run log of the step that passed it.
-                val shown = if (ActionArgumentSensitivity.isSensitive(actionType, name)) REDACTED_VALUE else legacy.text
-                ActionArgumentExpansionTrace(
-                    argName = name,
-                    rawValue = shown,
-                    expandedValue = shown,
-                    expressions = emptyList(),
-                    warnings = emptyList(),
-                    isSecretDerived = false,
-                )
-            } else {
-                null
-            }
-            return legacy.text to trace
-        }
-
-        val result = templateExpressionEngine.expand(legacy.value, templateScope)
-        val expanded = InertTemplateText.restore(result.value)
-        val isSecretDerived = legacy.isSecretDerived || result.traces.any { it.isSecretDerived }
-        val trace = if (result.traces.isNotEmpty() || result.warnings.isNotEmpty() || isSecretDerived) {
-            ActionArgumentExpansionTrace(
-                argName = name,
-                rawValue = rawValue,
-                expandedValue = if (isSecretDerived) REDACTED_VALUE else expanded,
-                expressions = result.traces.map { trace ->
-                    if (trace.isSecretDerived) trace.copy(value = REDACTED_VALUE) else trace
-                },
-                warnings = result.warnings,
-                isSecretDerived = isSecretDerived,
-            )
-        } else {
-            null
-        }
-        return expanded to trace
-    }
-
-    /**
-     * Array inputs consume a variable name, not the array's rendered contents. A typed chip uses
-     * `{{ array.parts }}` so the reference remains explicit in stored text; preserve that exact
-     * name for the two actions whose contracts expect an array slot.
-     */
-    private fun arrayReferenceName(actionType: String, argumentName: String, rawValue: String): String? {
-        val validArgument = when (actionType) {
-            "text.join" -> argumentName == "array"
-            FlowControl.FOREACH -> argumentName in setOf("list", "in", "array", "items")
-            else -> false
-        }
-        if (!validArgument) return null
-        val match = ARRAY_REFERENCE.matchEntire(rawValue.trim()) ?: return null
-        return VariableNamePolicy.normalize(match.groupValues[1])
-    }
-
-    private companion object {
-        // The closing braces must be escaped: Android's ICU regex engine rejects a bare "}}"
-        // where desktop java.util.regex accepts it. Because this sits in a companion
-        // initializer, the failure was an ExceptionInInitializerError that made TaskRunner
-        // unusable on device - every task execution, not only ones using array references.
-        val ARRAY_REFERENCE = Regex("\\{\\{\\s*array\\.([A-Za-z][A-Za-z0-9_-]*)\\s*\\}\\}")
-    }
-}
-
-/**
- * "%count" in an argument that names an action's output is the variable to write, the way the
- * editor reads it. Expanded like other text, it named whatever count held, so a second run wrote
- * to a different variable. A name built from parts, like "item_%slot", still expands. Variable
- * Clear's name is never filled in, since it can be a pattern like "%item*", as in Tasker. Join
- * Text's "%parts" names the array to join, the way an output name does: filled in, it was the
- * first part's text, so the step joined nothing. Multiple Variables Set fills in each of its names
- * itself, one at a time, since the whole list is never one variable.
- */
-internal class OutputNameArguments(private val actionType: String) {
-    private val keys = declaredActionOutputs(actionType).flatMapTo(hashSetOf()) { it.nameArgumentKeys }
-
-    fun keepsAsWritten(argumentName: String, rawValue: String): Boolean =
-        // FORK: an output name written as "%target" is still filled in — it names the variable whose
-        // name %target holds. 白い熊's tasks write through a name held in a variable (保存中核 sets
-        // `%catvar`), which upstream's "the editor reads %count as count" rule would silently turn
-        // into a write to a variable called catvar. Only Tasker's own steps below keep the name.
-        ((actionType == "text.join" && argumentName == "array") && SINGLE_VARIABLE.matches(rawValue.trim())) ||
-            (actionType == "var.clear" && argumentName == "name") ||
-            (actionType == "var.set_multiple" && argumentName == "names")
-
-    private companion object {
-        val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
+        // The fork keeps arrayReferenceName and ARRAY_REFERENCE at file level rather than in a
+        // companion object, and already escapes the closing braces there — which is why upstream's
+        // ICU-rejects-"}}" defect, fatal on device from 2026-08-10, never reached this build.
+        return ActionArgumentExpansionReport(expandedArgs, expansions)
     }
 }
 
@@ -1315,9 +1141,6 @@ internal suspend fun runStepWithinLimit(timeoutMs: Long, step: suspend () -> Act
 
 internal fun actionTimeoutMs(actionType: String): Long = when {
     actionType == "flow.wait" -> MAX_WAIT_TIMEOUT_MS
-    // A plugin step waits for its plugin's answer up to LocalePluginContract.MAX_SETTING_WAIT_MS,
-    // the same 30 minutes, and reports its own timeout.
-    actionType == "plugin.locale.fire" -> MAX_WAIT_TIMEOUT_MS
     // MQTT allows a 30 s connect plus three 30 s reads, so the 60 s default silently truncated
     // work the user configured and reported a timeout instead.
     actionType.startsWith("http.") || actionType == "download" || actionType == "ping" ||
@@ -1439,25 +1262,12 @@ private const val HUAWEI_WATCHFACE_TIMEOUT_MS = 480_000L
 private const val MAX_WAIT_TIMEOUT_MS = 1_860_000L // 30 minutes + 60 s margin
 
 const val SUB_TASK_ACTION_ID = "task.run"
-/** Stops another task's running copies; takes its target through [SUB_TASK_REF_KEYS] like `task.run`. */
-const val STOP_TASK_ACTION_ID = "task.stop"
+
+/** A name a Run Task return variable may carry: the fork keeps names as written, Japanese included. */
+private val RETURN_VARIABLE_NAME = Regex("""[\p{L}_][\p{L}\p{N}_-]*""")
+private val SINGLE_PERCENT_NAME = Regex("""%[\p{L}_][\p{L}\p{N}_-]*""")
 const val MAX_SUBTASK_DEPTH = 8
-/** Argument keys `task.run` accepts as its target, in precedence order. */
-val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
-/** The `task.run` argument naming the caller's variable for the value a Stop hands back, Tasker's Return Value Variable. */
-const val SUB_TASK_RETURN_KEY = "returnVariable"
-/** The `task.run` switch that clears that variable before the task runs, Tasker's Reset Return Variable. */
-const val SUB_TASK_RESET_RETURN_KEY = "resetReturnVariable"
-/** `task.run` arguments that set up the step itself, so they never reach the sub-task as inputs. */
-val SUB_TASK_SETTING_KEYS = setOf(SUB_TASK_RETURN_KEY, SUB_TASK_RESET_RETURN_KEY)
-
-/** Whether [args] turn on [SUB_TASK_RESET_RETURN_KEY]. The run, the preview and an export all read it this way. */
-fun resetsReturnVariable(args: Map<String, String>): Boolean =
-    args[SUB_TASK_RESET_RETURN_KEY]?.trim().equals("true", ignoreCase = true)
-
-/** What the run log and Preflight say for a step turned off. */
-const val STEP_TURNED_OFF = "step is turned off"
-
+internal val SUB_TASK_REF_KEYS = listOf("task", "name", "id")
 
 /** Run Task arg keys: each `param:<name>` is a named parameter; results land under this prefix. */
 const val SUB_TASK_PARAM_PREFIX = "param:"
@@ -1518,9 +1328,6 @@ fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
 private data class ActionArgumentExpansionReport(
     val args: Map<String, String>,
     val expansions: List<ActionArgumentExpansionTrace>,
-    val actionType: String? = null,
-    /** Set when the expanded arguments can't be handed to the action at all. */
-    val failure: String? = null,
 ) {
     fun templateWarnings(): List<String> =
         expansions.flatMap { expansion -> expansion.warnings.map { "${expansion.argName}: $it" } }.distinct()
@@ -1625,24 +1432,9 @@ private fun ActionArgumentExpansionTrace.toTemplateDiagnosticLines(): List<Strin
         ).joinToString("\t")
     }
 
-/**
- * Why a Run Task step's return variable can't hold the returned value, from the name as written and
- * as it came out. The run and Preflight both say this.
- */
-internal fun unusableReturnVariable(written: String, expanded: String, sensitive: Boolean): String = when {
-    expanded.isBlank() -> "'${written.trim()}' came out empty, so the returned value has nowhere to go"
-    sensitive -> "$REDACTED_VALUE isn't a variable name, so the returned value has nowhere to go"
-    else -> "'${expanded.trim()}' isn't a variable name, so the returned value has nowhere to go"
-}
-
-internal fun summarizeArgValue(
-    actionType: String?,
-    argName: String,
-    value: String,
-    forceRedact: Boolean = false,
-): String {
-    if (forceRedact || ActionArgumentSensitivity.isSensitive(actionType, argName)) {
-        return REDACTED_VALUE
+private fun summarizeArgValue(argName: String, value: String, forceRedact: Boolean = false): String {
+    if (forceRedact || isSensitiveArgName(argName)) {
+        return ActionArgumentSensitivity.REDACTED
     }
     val singleLine = value.replace(Regex("""\s+"""), " ").trim()
     return if (singleLine.length <= MAX_SUMMARY_VALUE_LENGTH) {
