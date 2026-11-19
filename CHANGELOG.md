@@ -8,6 +8,73 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-13.00-28.g70b0571a+026 — 2026-11-19
+
+Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
+226 upstream commits newer than the base of `+022`. Builds `+023` to `+025` were steps on the way
+and are contained in this one.
+
+### From upstream
+
+- **New steps:** Multiple Variables Set, Text Length, Get Sunrise/Sunset Times, Profile Status,
+  Beep, Play/Pause, Resume, Rewind, Fast Forward, Anchor.
+- **Go To** (a labelled step, a step number, or within the block: top of loop, out of loop, end of
+  If), **Stop Task**, a **Stop that hands a value back** with Run Task's **return variable**, and
+  **For Each over values** (a written list or a range such as `1:5`). Upstream runs these in its
+  task runner; here they are ported into the fork's own, with upstream's tests.
+- **Tasker's built-in variables** (`%TIME`, `%DATE`, `%BATT`, `%SCREEN`, `%PACTIVE`, `%PENABLED`,
+  `%TRUN` and others), filled in when nothing is stored under the name.
+- **Profile matching:** a sensor's unknown or stand-in value no longer flips a profile, and a Time
+  context's start and end can read a global such as `%Sunrise`.
+- **Tasker import and export:** many more steps map across (Array Set, Get Clipboard, Sound Mode,
+  Auto Brightness, Reboot, Delete File, Notify Sound, conditions joined by And/Or, plugin steps),
+  and a step that stays a placeholder says why.
+- **Safety:** signing keys of Termux and plugin targets pinned, NFC tags accepted only from the NFC
+  service, deeply nested JSON refused before a parser recurses into it, secret-named values kept
+  out of more places.
+- **Build:** Gradle 9.9.1, Android Gradle Plugin 9.5.1, SQLCipher 4.20.0, Room 2.8.5.
+
+### Where the fork keeps its own behaviour
+
+Upstream moved its engine toward Tasker's own rules. These would have changed what existing tasks
+do, so the fork keeps what it had:
+
+- **An unset variable reads as nothing.** Upstream now leaves `%name` as written.
+- **`~` and `!~` are the plain `*` wildcard.** Upstream added `/` alternatives, `+`, a leading `!`
+  and case-folding.
+- **A variable name written as `%target` is filled in**, so a task can write through a name held in
+  a variable. A Run Task return variable written as one `%name` names that variable.
+- **A switched-off flow marker stays paired**: switching off an If removes the test and lets its
+  body run.
+- **The fork's own Variable Clear, Split, Join, Convert and Array steps** keep their ids and
+  arguments; upstream's new ones under the same ids are not registered.
+
+### Fixes of the fork's own
+
+- **A profile reload no longer re-runs profiles that were already on.** Any change to the profile
+  table rebuilt every matcher, and a rebuilt matcher started "off": a state profile that was on ran
+  its enter task again, and one whose edited conditions no longer matched never ran its exit task.
+  A profile whose conditions did not change now keeps its matcher, and a rebuilt one remembers that
+  the profile was on. Re-importing a profile therefore no longer runs its enter task as a side
+  effect.
+- **物理鍵 and 白い熊 臨電話:** while a SIP call rings in 臨電話, a short volume tap silences its
+  ringer. 臨電話 announces its ring (`shiroikuma.rindenwa.RINGING`), and the key grabber answers a
+  tap by calling 臨電話's `silence_ringer` door instead of handing the key back — Android's call
+  layer swallows a volume key during a self-managed ring. The state is dropped after two minutes if
+  臨電話 never says the ring ended. A ringing phone call is handled as before. Needs 臨電話
+  `6.3.0-alpha+2026-11-09.14-07.g92318a24+035` or later.
+
+### Not taken in
+
+- Upstream's screens stay replaced by the fork's: delete-with-undo, the run log's variable
+  inspector and the Health Connect setup row are not present.
+- Per-line filling-in of intent extras and HTTP headers, and plugin-bundle arguments, remain in
+  upstream's runner only.
+
+### Packaging
+
+- One signed `arm64-v8a` APK: `shiroikuma-jiyusagyoban_0.2.96+2026-11-13.00-28.g70b0571a+026_arm64-v8a.apk`.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+022 — 2026-11-19
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
