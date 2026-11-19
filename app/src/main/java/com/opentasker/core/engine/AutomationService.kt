@@ -71,6 +71,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.withTimeoutOrNull
+import com.opentasker.core.engine.variables.TaskerBuiltIns
 import kotlinx.coroutines.launch
 import java.util.ArrayDeque
 import java.util.Collections
@@ -387,14 +390,50 @@ class AutomationService : Service() {
         }
     }
 
-    private suspend fun reloadProfiles() {
-        val oldJobs = matcherJobs.values.toList()
-        matcherJobs.clear()
-        matchers.clear()
-        oldJobs.forEach { it.cancel() }
+    /**
+     * The enabled profiles as the last reload saw them, by id.
+     *
+     * A reload used to cancel every matcher and build each one afresh. A fresh matcher starts out
+     * "off", so every state profile that was on ran its enter task AGAIN on any change to the
+     * profile table — an edit, an import, a switch flipped on some other profile — and one whose
+     * edited contexts no longer matched never ran its exit task and stayed in the arbitration set.
+     * Upstream fixed both (2026-11-11); this is that fix on the fork's own service:
+     * - a profile whose matching rules did not change KEEPS its matcher, so nothing is read again;
+     * - a rebuilt matcher of a profile that was on starts out on: no second enter task, and its
+     *   exit task runs when the fresh readings no longer match.
+     */
+    private val registeredProfiles = Collections.synchronizedMap(mutableMapOf<Long, Profile>())
 
+    /** What decides WHEN a profile is on. Name, tasks, priority and limits only matter afterwards. */
+    private fun sameMatchingRules(a: Profile, b: Profile): Boolean =
+        a.contexts == b.contexts && a.contextExpression == b.contextExpression && a.projectId == b.projectId
+
+    private suspend fun reloadProfiles() {
         val profiles = db.profileDao().getAllEnabled()
         val activeIds = profiles.map { it.id }.toSet()
+        val loaded = profiles.map { it.toDomain() }
+        val kept = loaded.filter { profile ->
+            val before = registeredProfiles[profile.id]
+            before != null && matcherJobs[profile.id]?.isActive == true && sameMatchingRules(before, profile)
+        }.mapTo(mutableSetOf()) { it.id }
+        // On = admitted by priority, whether or not there was an enter task to run.
+        val stillOn = synchronized(matchedProfiles) { admittedProfiles.filterTo(mutableSetOf()) { it in activeIds && it !in kept } }
+
+        val oldJobs = synchronized(matcherJobs) {
+            matcherJobs.filterKeys { it !in kept }.values.toList().also { matcherJobs.keys.retainAll(kept) }
+        }
+        matchers.keys.retainAll(kept)
+        oldJobs.forEach { it.cancel() }
+        // A cancelled matcher must be gone before its replacement starts, or the two could both
+        // report the same change. Bounded: a matcher that is slow to let go is not waited on for ever.
+        withTimeoutOrNull(2_000) { oldJobs.joinAll() }
+        synchronized(registeredProfiles) {
+            registeredProfiles.clear()
+            loaded.associateByTo(registeredProfiles) { it.id }
+        }
+        // %PENABLED / %PACTIVE: the names behind the ids, and no state for a profile that is gone.
+        TaskerBuiltIns.watchProfiles(loaded.associate { it.id to it.name })
+        AutomationLiveConditionState.retainProfiles(activeIds)
         // Prune against profiles that still exist, not the enabled ones: activeIds comes from
         // getAllEnabled(), so disabling a profile mid-cooldown deleted its persisted deadline while
         // the in-memory reservation survived. Whether the cooldown still applied then depended on
@@ -404,7 +443,7 @@ class AutomationService : Service() {
             // Slots are keyed +id for enter tasks and -id for exit tasks; prune both.
             queuedProfileTasks.keys.removeAll { kotlin.math.abs(it) !in activeIds }
         }
-        val domains = profiles.map { it.toDomain() }
+        val domains = loaded
         // Keep the arbitration set in step with the reload: drop profiles that were deleted or
         // disabled, and refresh the ones still matched so an edited priority takes effect on the
         // next activation rather than at the next service restart.
@@ -427,7 +466,11 @@ class AutomationService : Service() {
         BroadcastContextEvents.setActions(this, broadcastActions)
         applyContextSourceGating(domains)
         for (domain in domains) {
-            val matcher = ProfileMatcher(this, domain)
+            if (domain.id in kept) continue
+            // A later reload can keep this matcher for an edited profile, so the handlers read the
+            // profile as it is NOW (its tasks, its priority), not as it was when the matcher started.
+            fun current() = registeredProfiles[domain.id] ?: domain
+            var matcher = ProfileMatcher(this, domain, initiallyActive = domain.id in stillOn)
 
             val matcherJob = scope.launch {
                 // Self-healing: if a matcher's flow ever errors, re-collect after a short backoff
@@ -439,8 +482,8 @@ class AutomationService : Service() {
                         matcher.stateChanges().collect { change ->
                             try {
                                 when (change) {
-                                    is ProfileStateChange.Activated -> onProfileActivated(domain, change.vars)
-                                    is ProfileStateChange.Deactivated -> onProfileDeactivated(domain)
+                                    is ProfileStateChange.Activated -> onProfileActivated(current(), change.vars)
+                                    is ProfileStateChange.Deactivated -> onProfileDeactivated(current())
                                 }
                             } catch (e: CancellationException) {
                                 throw e
@@ -458,6 +501,12 @@ class AutomationService : Service() {
                     }
                     if (!errored) break
                     if (isActive) delay(3_000)
+                    // The restarted matcher starts from what the profile is right now, for the same
+                    // reason a reload does: a profile that is on must not run its enter task again.
+                    if (isActive) {
+                        matcher = ProfileMatcher(this@AutomationService, domain, initiallyActive = domain.id in admittedProfiles)
+                        matchers[domain.id] = matcher
+                    }
                 }
             }
             
@@ -544,6 +593,7 @@ class AutomationService : Service() {
         // instead would silently stop the exit task of every profile that carries only one, which is
         // a perfectly ordinary way to write a profile.
         if (!pulseProfile) admittedProfiles += profile.id
+        AutomationLiveConditionState.updateProfile(profile.id, active = !pulseProfile)
 
         if (!hasEnterTask) return
         val domain = resolveTask(profile.enterTaskName, profile.enterTaskId)
@@ -563,6 +613,7 @@ class AutomationService : Service() {
             val before = matchedProfiles.values.toList()
             matchedProfiles.remove(profile.id)
             wasAdmitted = admittedProfiles.remove(profile.id)
+            AutomationLiveConditionState.updateProfile(profile.id, false)
             val remaining = matchedProfiles.values.toList()
             released = ProfileLifecyclePolicy.released(before, remaining)
         }
