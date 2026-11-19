@@ -35,9 +35,8 @@ class HealthPermissionsRationaleActivity : ComponentActivity() {
         // See LocaleSettingEditActivity: without this a Light-theme user gets dark icons on black bars.
         enableEdgeToEdge()
         setContent {
-            val themeMode by ThemePreference.observe(this).collectAsState(initial = null)
-            val resolvedTheme = themeMode ?: return@setContent
-            OpenTaskerTheme(resolvedTheme) {
+            val themePrefs by com.opentasker.ui.theme.ThemeStore.state.collectAsState()
+            OpenTaskerTheme(prefs = themePrefs) {
                 Scaffold(
                     topBar = { TopAppBar(title = { Text(stringResource(R.string.health_rationale_title)) }) },
                 ) { padding ->

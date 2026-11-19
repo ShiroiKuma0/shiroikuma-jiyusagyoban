@@ -12,6 +12,11 @@ import org.junit.Before
 import org.junit.Test
 
 class TaskRunnerGotoTest {
+    // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
+    // class — an unset variable left as written (here it reads as nothing), a called task that reads
+    // its caller's locals (here a called task has locals of its own), Preflight's preview of those,
+    // and Tasker's quirk of running on into an Else after a jump into the If branch.
+
 
     private val recorded = mutableListOf<String>()
 
@@ -168,23 +173,6 @@ class TaskRunnerGotoTest {
         assertTrue(landed.failures().toString(), landed.success)
         assertEquals(listOf("three"), recorded)
         assertEquals("goto -> step ${ActionArgumentSensitivity.REDACTED}", landed.traces.first().message)
-    }
-
-    @Test
-    fun aGotoIntoAnIfBranchFromOutsideRunsOnIntoItsElseAsInTasker() {
-        // Tasker skips an Else only when its If was found true, and a jump past the If doesn't test it.
-        val report = run(
-            VariableStore().apply { set("x", "1") },
-            goto(label = "then"),
-            ctrl(FlowControl.IF, mapOf("condition" to "%x == 1")),
-            record("then", label = "then"),
-            ctrl(FlowControl.ELSE),
-            record("else"),
-            ctrl(FlowControl.ENDIF),
-        )
-
-        assertTrue(report.failures().toString(), report.success)
-        assertEquals(listOf("then", "else"), recorded)
     }
 
     @Test

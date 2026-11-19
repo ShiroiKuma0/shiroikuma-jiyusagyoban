@@ -105,7 +105,8 @@ class ForItemsTest {
     fun aStrayBracketOrBraceDoesNotSwallowTheRest() {
         assertEquals(listOf("sad :(", "apple", "pear, ripe", "plum"), items("sad :(, %arr()"))
         assertEquals(listOf("a", "{{", "apple", "pear, ripe", "plum"), items("a, {{, %arr()"))
-        assertEquals(listOf("%x(", "apple", "pear, ripe", "plum"), items("%x(, %arr()"))
+        // FORK: an unset %x reads as nothing here (upstream leaves it as written), so "(" is what stays.
+        assertEquals(listOf("(", "apple", "pear, ripe", "plum"), items("%x(, %arr()"))
     }
 
     @Test

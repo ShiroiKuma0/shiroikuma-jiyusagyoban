@@ -746,8 +746,10 @@ class VariableExpander {
         // upstream's AS_WRITTEN / ZERO (Tasker's reading) would turn every `x%var == x` check in
         // 白い熊's tasks around, and make an unset `%n < 5` true.
         val unset = Unset.BLANK
-        val left = expandOperand(comparison.left, unset).let { if (numeric) it else it.trim() }
-        val right = expandOperand(comparison.right, unset).let { if (numeric) it else it.trim() }
+        // FORK: both sides are trimmed on every comparison, numeric ones included, as before — a
+        // number read from a file or a command ends with a line break.
+        val left = expandOperand(comparison.left, unset).trim()
+        val right = expandOperand(comparison.right, unset).trim()
 
         return when (comparison.operator) {
             ComparisonOperator.EQ -> left.isNotEmpty() && left == right

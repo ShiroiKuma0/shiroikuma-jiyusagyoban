@@ -418,10 +418,9 @@ private suspend fun persistChangedGlobals(
     beforeSensitive: Set<String>,
     afterSensitive: Set<String>,
     logTag: String,
-    projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
-    arrays: Set<String> = emptySet(),
+    projectId: Long = 0L,
 ): List<String> {
-    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive, projectId)
+    val changed = changedGlobals(before, after, beforeSensitive, afterSensitive)
     val removed = removedGlobals(before, after)
     if (changed.isEmpty() && removed.isEmpty()) return emptyList()
     val commit = runCatching {

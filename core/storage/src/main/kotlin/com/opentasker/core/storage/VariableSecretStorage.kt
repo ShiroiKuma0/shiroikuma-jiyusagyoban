@@ -280,8 +280,7 @@ class VariableRepository(
         expected: RuntimeVariableSeed,
         values: List<RuntimeVariableValue>,
         removedNames: List<String> = emptyList(),
-        projectId: Long = values.firstOrNull()?.projectId ?: DEFAULT_PROJECT_ID,
-        arrays: Set<String> = emptySet(),
+        projectId: Long = 0L,
     ): RuntimeVariableCommitResult {
         if (values.isEmpty() && removedNames.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
         migrateLegacySensitiveVariables()

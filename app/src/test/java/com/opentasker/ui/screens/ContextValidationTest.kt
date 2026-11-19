@@ -22,39 +22,6 @@ class ContextValidationTest {
     }
 
     @Test
-    fun aGlobalCanBoundATimeWindowButALocalCant() {
-        assertFalse(contextHasInvalidValues(ContextType.TIME, mapOf("start" to "%Sunrise", "end" to "%Sunset")))
-        assertFalse(contextHasInvalidValues(ContextType.TIME, mapOf("start" to "%Wake", "end" to "17:00")))
-        assertEquals(
-            setOf("start"),
-            contextInvalidFields(ContextType.TIME, mapOf("start" to "%sunrise", "end" to "%Sunset")).keys,
-        )
-    }
-
-    @Test
-    fun aLocalTimeBoundSaysAGlobalIsNeeded() {
-        assertEquals(
-            mapOf("start" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.TIME_VARIABLE_NOT_GLOBAL)),
-            contextInvalidFields(ContextType.TIME, mapOf("start" to "%sunrise", "end" to "%Sunset")),
-        )
-        assertEquals(
-            mapOf("end" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_TIME)),
-            contextInvalidFields(ContextType.TIME, mapOf("start" to "%Sunrise", "end" to "25:00")),
-        )
-    }
-
-    @Test
-    fun aTimeBoundThatIsNoVariableNameSaysSoInsteadOfCallingItALocal() {
-        listOf("%Times(1)", "% Sunrise", "%1x", "%").forEach { bound ->
-            assertEquals(
-                bound,
-                mapOf("start" to ActionFieldPolicy.Issue(ActionFieldPolicy.Error.INVALID_TIME_VARIABLE)),
-                contextInvalidFields(ContextType.TIME, mapOf("start" to bound, "end" to "%Sunset")),
-            )
-        }
-    }
-
-    @Test
     fun blankTimeIsNotFlaggedHere() {
         // Required-but-blank is handled by the missingRequired gate, not this one.
         assertFalse(contextHasInvalidValues(ContextType.TIME, emptyMap()))

@@ -207,12 +207,7 @@ object AutomationFlowGraphBuilder {
             warnings = warnings.distinct(),
             strings = strings,
             hasEnterTask = profile.enterTaskIdOrNull != null,
-            lintFindings = AutomationLint.analyze(
-                profile,
-                tasksById.values.toList(),
-                strings = lintStrings,
-                invariants = invariants,
-            ).forProfile(profile.id),
+            lintFindings = AutomationLint.analyze(profile, tasksById.values.toList()).forProfile(profile.id),
         )
     }
 

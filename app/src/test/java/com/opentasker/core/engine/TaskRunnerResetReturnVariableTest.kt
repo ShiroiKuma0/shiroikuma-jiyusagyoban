@@ -17,6 +17,11 @@ import org.junit.Test
 
 /** Run Task's switch that clears the return variable before the task runs, Tasker's Reset Return Variable. */
 class TaskRunnerResetReturnVariableTest {
+    // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
+    // class — an unset variable left as written (here it reads as nothing), a called task that reads
+    // its caller's locals (here a called task has locals of its own), Preflight's preview of those,
+    // and Tasker's quirk of running on into an Else after a jump into the If branch.
+
 
     private val recorded = mutableListOf<String>()
 
@@ -136,16 +141,6 @@ class TaskRunnerResetReturnVariableTest {
     }
 
     @Test
-    fun thePreviewClearsItTheSameWay() {
-        val returnsNothing = Task(id = 2, name = "Nothing", actions = listOf(stop()))
-        val returnsNew = Task(id = 3, name = "New", actions = listOf(stop("new")))
-
-        assertEquals("[%answer]", previewed(runTask("Nothing", SUB_TASK_RETURN_KEY to "%answer", SUB_TASK_RESET_RETURN_KEY to "true"), returnsNothing))
-        assertEquals("[new]", previewed(runTask("New", SUB_TASK_RETURN_KEY to "%answer", SUB_TASK_RESET_RETURN_KEY to "true"), returnsNew))
-        assertEquals("[old]", previewed(runTask("Nothing", SUB_TASK_RETURN_KEY to "%answer"), returnsNothing))
-    }
-
-    @Test
     fun theInputsEditorLeavesTheSwitchAlone() {
         val args = mapOf("task" to "Child", SUB_TASK_RESET_RETURN_KEY to "true", "city" to "Oslo")
 
@@ -159,12 +154,4 @@ class TaskRunnerResetReturnVariableTest {
     }
 
     // The import notes for Tasker's Limit Passthrough To and Allow Overwrite Variables rest on this.
-    @Test
-    fun aCalledTaskReadsTheCallersLocalsAndASetVariableThereStaysItsOwn() {
-        val child = Task(id = 2, name = "Child", actions = listOf(record("city"), set("city", "Bergen"), record("city")))
-        val report = run(listOf(set("city", "Oslo"), runTask("Child"), record("city")), child)
-
-        assertTrue(report.failures().toString(), report.success)
-        assertEquals(listOf("city=Oslo", "city=Bergen", "city=Oslo"), recorded)
-    }
 }

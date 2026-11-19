@@ -216,7 +216,7 @@ class ArraySetAction : Action {
 }
 
 /** `Array Push` (Tasker 355) — insert a value into an array (1-based position, default end). */
-class ArrayPushAction : Action {
+class ForkArrayPushAction : Action {
     override val id = "array.push"
     override val category = ActionCategory.VARIABLE
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -234,7 +234,7 @@ class ArrayPushAction : Action {
 }
 
 /** `Array Pop` (Tasker 356) — remove an element (1-based position, default end) into a variable. */
-class ArrayPopAction : Action {
+class ForkArrayPopAction : Action {
     override val id = "array.pop"
     override val category = ActionCategory.VARIABLE
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -253,7 +253,7 @@ class ArrayPopAction : Action {
 }
 
 /** `Array Clear` (Tasker 357) — empty an array. */
-class ArrayClearAction : Action {
+class ForkArrayClearAction : Action {
     override val id = "array.clear"
     override val category = ActionCategory.VARIABLE
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
@@ -266,7 +266,7 @@ class ArrayClearAction : Action {
 }
 
 /** `Array Process` (Tasker 369) — sort / reverse / shuffle / dedupe / squash an array. */
-class ArrayProcessAction : Action {
+class ForkArrayProcessAction : Action {
     override val id = "array.process"
     override val category = ActionCategory.VARIABLE
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
