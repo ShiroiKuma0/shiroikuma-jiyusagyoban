@@ -9,8 +9,10 @@ import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import com.opentasker.app.BuildConfig
@@ -98,6 +100,63 @@ class ShizukuKeyEventListener {
      */
     @Volatile private var ringing = false
 
+    /** The cellular half of [ringing]: what the phone state (or the audio mode) says. */
+    @Volatile private var cellRinging = false
+
+    /**
+     * The SIP half: 臨電話 (白い熊's SIP phone) is ringing unsilenced until this moment of
+     * [SystemClock.elapsedRealtime], 0 = not ringing.
+     *
+     * A SIP call raises no phone-state broadcast, so the grabber kept the volume tap for itself and
+     * 臨電話's ringer could not be silenced with it (白い熊, 2026-11-19). 臨電話 announces its ring
+     * instead — see [SIP_RINGING_ACTION] — and while it rings a short volume tap calls its
+     * `silence_ringer` door ([silenceSipRinger]). The
+     * state is a deadline rather than a flag because 臨電話 can be killed while ringing and never say
+     * `false`: a ring does not outlast [SIP_RING_MAX_MS], and a flag that stuck would hand every
+     * volume tap to the framework for good.
+     */
+    @Volatile private var sipRingingUntil = 0L
+    private var sipTimeoutJob: Job? = null
+    private var sipReceiver: BroadcastReceiver? = null
+
+    private fun sipRinging(): Boolean = SystemClock.elapsedRealtime() < sipRingingUntil
+
+    /**
+     * Ask 臨電話 to stop its ringtone and vibration; the call stays up. Off the calling thread — this
+     * arrives on a binder thread of the grabber. Anything but `OK` is written to the grab log, so a
+     * silence that did not happen can be read back.
+     */
+    private fun silenceSipRinger(key: String) {
+        val ctx = appContext ?: return
+        val scope = appScope ?: return
+        scope.launch(Dispatchers.IO) {
+            val answer = runCatching {
+                ctx.contentResolver.call(SIP_CALLS_URI, SIP_SILENCE_METHOD, null, null)?.getString("result")
+            }
+            val result = answer.getOrNull()
+            when {
+                result == "OK" -> AppLogger.info(TAG, "$key short press silenced 臨電話's ringer")
+                answer.isFailure -> trace("臨電話 silence_ringer failed: ${answer.exceptionOrNull()?.message}")
+                else -> trace("臨電話 silence_ringer answered: ${result ?: "nothing (no such provider?)"}")
+            }
+        }
+    }
+
+    /** 臨電話 said it is (or is no longer) ringing. */
+    private fun onSipRinging(on: Boolean) {
+        sipTimeoutJob?.cancel(); sipTimeoutJob = null
+        sipRingingUntil = if (on) SystemClock.elapsedRealtime() + SIP_RING_MAX_MS else 0L
+        if (on) {
+            sipTimeoutJob = appScope?.launch(Dispatchers.IO) {
+                delay(SIP_RING_MAX_MS + 250)
+                AppLogger.warn(TAG, "臨電話 never said its ring ended; dropping the SIP ringing state after ${SIP_RING_MAX_MS / 1000} s")
+                pushEffectiveRinging()
+            }
+        }
+        trace("臨電話 ringing=$on")
+        pushEffectiveRinging()
+    }
+
     private fun pushConsumeShort(on: Boolean) {
         runCatching { service?.setConsumeShort(on) }
     }
@@ -107,7 +166,21 @@ class ShizukuKeyEventListener {
         runCatching { service?.setScreenOn(on) }
     }
 
+    /** The cellular state changed; the grabber gets the OR of it and the SIP half. */
     private fun pushRinging(on: Boolean) {
+        cellRinging = on
+        pushEffectiveRinging()
+    }
+
+    /**
+     * Only the CELLULAR half goes to the grabber. Re-injecting the tap is right for the phone's own
+     * ring — Telecom silences that ringer — and useless for a SIP ring: Telecom takes the key as
+     * "silence" for 臨電話's self-managed call too, swallows it, and never tells the app (measured
+     * 2026-11-19: `SILENCE:TSI.sR` in dumpsys telecom, the ring went on). The SIP half is handled in
+     * [callback], which asks 臨電話 directly.
+     */
+    private fun pushEffectiveRinging() {
+        val on = cellRinging
         if (ringing == on) return
         ringing = on
         runCatching { service?.setRinging(on) }
@@ -152,9 +225,16 @@ class ShizukuKeyEventListener {
             // While ringing the grabber re-injects this press for the framework, so publishing it as well
             // would run the profile too — and the volume panel would open over the call screen. Only the
             // short press is affected: long/double/triple are still consumed and still ours.
-            if (ringing && press == HardwareKeyContextEvents.PRESS_SHORT && evCode in REINJECTED_CODES) {
-                AppLogger.info(TAG, "${mapped.first} short press re-injected for the ringing call (not published)")
-                return
+            if (press == HardwareKeyContextEvents.PRESS_SHORT && evCode in REINJECTED_CODES) {
+                // 臨電話 rings: the tap silences its ringer through 臨電話's own door, and is not
+                // published either. When the phone rings as well, both happen.
+                val sip = sipRinging()
+                if (sip) silenceSipRinger(mapped.first)
+                if (ringing) {
+                    AppLogger.info(TAG, "${mapped.first} short press re-injected for the ringing call (not published)")
+                    return
+                }
+                if (sip) return
             }
             HardwareKeyContextEvents.publish(mapped.first, press, mapped.second)
             AppLogger.info(TAG, "${mapped.first} $press press (grab)")
@@ -186,7 +266,8 @@ class ShizukuKeyEventListener {
                 grabFailures = 0
                 // Seed the fresh service with the current gates; a rebind mid-call must not land ringing=false.
                 runCatching { svc.setScreenOn(screenOn) }
-                ringing = readRinging()
+                cellRinging = readRinging()
+                ringing = cellRinging
                 runCatching { svc.setRinging(ringing) }
                 runCatching { svc.setConsumeShort(consumeShort) }  // seeded on every (re)bind
                 trace("grab active on $devs device(s)")
@@ -218,7 +299,31 @@ class ShizukuKeyEventListener {
         appScope = scope
         // Track screen on/off and forward to the grabber (gates single-tap consume vs re-inject).
         screenOn = (appContext?.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive != false
-        ringing = readRinging()
+        cellRinging = readRinging()
+        ringing = cellRinging
+        // 臨電話's ringing announcement. Not a protected system broadcast, so this receiver has to be
+        // exported; it is addressed to this package by name. Where the platform tells us the sender
+        // (Android 14+), anything but 臨電話 is ignored. A forged one could do no more than hand volume
+        // taps back to the framework for two minutes.
+        sipReceiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                if (intent?.action != SIP_RINGING_ACTION) return
+                if (Build.VERSION.SDK_INT >= 34) {
+                    val sender = sentFromPackage
+                    if (sender != null && sender !in SIP_RINGING_SENDERS) {
+                        AppLogger.warn(TAG, "ignored $SIP_RINGING_ACTION from $sender")
+                        return
+                    }
+                }
+                onSipRinging(intent.getBooleanExtra(SIP_RINGING_EXTRA, false))
+            }
+        }.also { recv ->
+            runCatching {
+                ContextCompat.registerReceiver(
+                    context.applicationContext, recv, IntentFilter(SIP_RINGING_ACTION), ContextCompat.RECEIVER_EXPORTED,
+                )
+            }.onFailure { AppLogger.warn(TAG, "臨電話 ringing receiver not registered: ${it.message}") }
+        }
         screenReceiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
                 when (intent?.action) {
@@ -284,6 +389,9 @@ class ShizukuKeyEventListener {
         job?.cancel(); job = null
         killSwitchJob?.cancel(); killSwitchJob = null
         screenReceiver?.let { recv -> runCatching { appContext?.unregisterReceiver(recv) } }; screenReceiver = null
+        sipReceiver?.let { recv -> runCatching { appContext?.unregisterReceiver(recv) } }; sipReceiver = null
+        sipTimeoutJob?.cancel(); sipTimeoutJob = null
+        sipRingingUntil = 0L
         teardownBind()
         runCatching { currentProcess?.destroy() }; currentProcess = null
         states.values.forEach { it.longJob?.cancel() }
@@ -547,6 +655,22 @@ class ShizukuKeyEventListener {
 
     companion object {
         private const val TAG = "OpenTasker"
+
+        /**
+         * 臨電話's announcement, an explicit broadcast addressed to this package: boolean extra
+         * [SIP_RINGING_EXTRA] is true the moment an incoming SIP call starts ringing unsilenced and
+         * false when nothing rings unsilenced any more (answered, ended, or silenced).
+         */
+        const val SIP_RINGING_ACTION = "shiroikuma.rindenwa.RINGING"
+        const val SIP_RINGING_EXTRA = "ringing"
+        private val SIP_RINGING_SENDERS = setOf("shiroikuma.rindenwa", "shiroikuma.rindenwa.debug")
+
+        /** 臨電話's door for silencing its ringer; this app is admitted by its signing certificate. */
+        private val SIP_CALLS_URI: android.net.Uri = android.net.Uri.parse("content://shiroikuma.rindenwa.calls")
+        private const val SIP_SILENCE_METHOD = "silence_ringer"
+
+        /** A ring does not outlast this; past it the SIP half is dropped even if no `false` came. */
+        private const val SIP_RING_MAX_MS = 120_000L
 
         /** The running listener (the engine owns one); null while the engine is down. */
         @Volatile private var live: ShizukuKeyEventListener? = null
