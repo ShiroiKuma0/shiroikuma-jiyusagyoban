@@ -104,6 +104,11 @@ class ProviderCallAction : Action {
             }
         }
 
+        // An answer with no items publishes no arrays, and a failed call publishes nothing — so the
+        // arrays of an earlier call under this prefix are emptied first. Arrays are shared with the
+        // calling task: left standing, the loop after this call walked the PREVIOUS answer again.
+        ctx.variables.clearArraysWithPrefix("${prefix}_")
+
         val answer = try {
             withTimeoutOrNull(timeoutSec * 1000L) {
                 withContext(Dispatchers.IO) {
