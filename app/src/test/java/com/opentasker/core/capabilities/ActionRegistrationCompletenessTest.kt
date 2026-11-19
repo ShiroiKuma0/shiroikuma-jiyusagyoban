@@ -80,7 +80,7 @@ class ActionRegistrationCompletenessTest {
         // The engine interprets these itself rather than dispatching them through the catalogue, so
         // they are legitimately classified without appearing in it: the nine flow-control constructs
         // plus task.run, which is the sub-task call.
-        val engineHandled = FlowControl.ALL + SUB_TASK_ACTION_ID
+        val engineHandled = FlowControl.ALL + SUB_TASK_ACTION_ID + com.opentasker.core.engine.STOP_TASK_ACTION_ID
         val stale = (AutomationSensitivityRegistry.classifiedActionIds() - catalogIds() - engineHandled)
             .sorted()
         assertEquals(

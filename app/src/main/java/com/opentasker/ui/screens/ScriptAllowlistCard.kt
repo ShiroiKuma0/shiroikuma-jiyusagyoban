@@ -227,3 +227,8 @@ private fun ScriptAllowlistCard(
         }
     }
 }
+
+/** Fork: lives in upstream's SetupRows.kt, which the fork does not carry. */
+internal fun logFailedCheck(name: String, error: Throwable) {
+    com.opentasker.core.logging.AppLogger.warn("OpenTasker.Setup", "Setup couldn't check $name on this device", error)
+}

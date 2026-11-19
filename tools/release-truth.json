@@ -1,8 +1,8 @@
 {
     "schemaVersion": 1,
-    "requiredArtifactCommit": "6e4ac1f15375b6cb1871b3583c4ce90751c41a8c",
+    "requiredArtifactCommit": "a9f818f6573ca7377de3c73e72893efd5b8c771c",
     "releaseTag": "v0.2.96",
-    "releaseTagCommit": "",
+    "releaseTagCommit": "a34c0425880693518998e799088fcaa8d9cfab21",
     "application": {
         "versionName": "0.2.96",
         "versionCode": 98
@@ -15,19 +15,19 @@
     },
     "dependencies": {
         "kotlin": "2.4.20",
-        "gradle": "9.7.1",
-        "agp": "9.3.2",
+        "gradle": "9.9.1",
+        "agp": "9.5.1",
         "ksp": "2.3.12",
-        "room": "2.8.4",
-        "composeBom": "2026.08.00",
-        "work": "2.11.2"
+        "room": "2.8.5",
+        "composeBom": "2026.09.00",
+        "work": "2.12.0"
     },
     "capabilities": {
-        "registeredActions": 229,
-        "engineHandledActions": 10,
+        "registeredActions": 241,
+        "engineHandledActions": 13,
         "contextFamilies": 7,
         "bundleSchemaVersion": 5,
         "bundleSupportedSchemaVersions": "5..5",
-        "roomSchemaVersion": 39
+        "roomSchemaVersion": 40
     }
 }

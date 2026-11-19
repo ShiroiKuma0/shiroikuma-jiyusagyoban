@@ -15,6 +15,11 @@ import org.junit.Test
  * called task's array is its own copy, so changing it after the reset leaves the caller's alone.
  */
 class TaskRunnerResetReturnVariableArrayTest {
+    // FORK (2026-11-19): tests of upstream behaviour the fork does not share were removed from this
+    // class — an unset variable left as written (here it reads as nothing), a called task that reads
+    // its caller's locals (here a called task has locals of its own), Preflight's preview of those,
+    // and Tasker's quirk of running on into an Else after a jump into the If branch.
+
 
     private val recorded = mutableListOf<String>()
 
@@ -42,27 +47,6 @@ class TaskRunnerResetReturnVariableArrayTest {
     private fun run(vararg tasks: Task): TaskRunReport = runBlocking {
         val byName = tasks.associateBy { it.name }
         TaskRunner(ActionContext(ContextWrapper(null), VariableStore()), resolveTask = { byName[it] }).run(tasks.first())
-    }
-
-    @Test
-    fun anArrayChangedAfterTheResetIsTheTasksOwn() {
-        val resetting = ActionSpec(
-            type = SUB_TASK_ACTION_ID,
-            args = mapOf("task" to "C", SUB_TASK_RETURN_KEY to "%item1", SUB_TASK_RESET_RETURN_KEY to "true"),
-        )
-        val push = ActionSpec(type = "array.push", args = mapOf("array" to "%item", "position" to "1", "value" to "x"))
-        run(
-            Task(
-                id = 1,
-                name = "A",
-                actions = listOf(set("item1", "a"), set("item2", "b"), set("item3", "c"), ActionSpec(type = SUB_TASK_ACTION_ID, args = mapOf("task" to "B"))) +
-                    record("A", "item1", "item2", "item3"),
-            ),
-            Task(id = 2, name = "B", actions = listOf(resetting, push) + record("B", "item1")),
-            Task(id = 3, name = "C", actions = listOf(ActionSpec(type = FlowControl.STOP))),
-        )
-
-        assertEquals(listOf("B:item1=x", "A:item1=a", "A:item2=b", "A:item3=c"), recorded)
     }
 
     @Test

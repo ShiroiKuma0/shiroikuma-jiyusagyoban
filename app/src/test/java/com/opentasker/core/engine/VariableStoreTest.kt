@@ -61,10 +61,10 @@ class VariableStoreTest {
     }
 
     @Test
-    fun missingVariablesStayAsWritten() {
+    fun missingVariablesExpandToEmptyString() {
         val store = VariableStore()
 
-        assertEquals("before %missing after", store.expand("before %missing after"))
+        assertEquals("before  after", store.expand("before %missing after"))
     }
 
     @Test
@@ -89,7 +89,7 @@ class VariableStoreTest {
         // The hyphen and everything after it stay in the text, exactly as before.
         assertEquals("5-1", store.expand("%count-1"))
         assertEquals("20-20 > 0", store.expand("%battery-20 > 0"))
-        assertEquals("%unknown-thing", store.expand("%unknown-thing"))
+        assertEquals("", store.expand("%unknown-thing"))
     }
 
     @Test

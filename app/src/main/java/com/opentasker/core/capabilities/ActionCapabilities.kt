@@ -46,11 +46,10 @@ data class ActionCapability(
 }
 
 object ActionCapabilityRegistry {
-    private val supported = ActionCapability(CapabilityLevel.Supported, "Ready", R.string.capability_ready)
+    private val supported = ActionCapability(CapabilityLevel.Supported, "Ready")
     private val unknown = ActionCapability(
         CapabilityLevel.Unsupported,
-        "Unknown actions are not classified and cannot be added, imported, or enabled.",
-        R.string.capability_unknown_action,
+        "Unknown actions are not classified and cannot be added, imported, or enabled."
     )
 
     /**
@@ -161,11 +160,10 @@ object ActionCapabilityRegistry {
         "airplane.toggle" to shizukuCapability("Airplane mode"),
         "mobile.toggle" to shizukuCapability("Mobile data"),
         "hotspot.toggle" to hotspotCapabilityForSdk(android.os.Build.VERSION.SDK_INT),
-        "aod.set" to elevatedUnsupported("aod.set", "Always-on display is a protected secure setting, and not every build honours it.", R.string.capability_aod_unsupported),
-        "vpn.tunnel" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on.", R.string.capability_vpn_tunnel_setup),
-        "wifi.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires location access, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so results may be a cached scan.", R.string.capability_wifi_scan_setup),
-        "location.get" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs location access, and Background location when a profile runs it.", R.string.capability_location_get_setup),
-        "sun.times" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs location access only when latitude or longitude is left blank.", R.string.capability_sun_times_setup),
+        "aod.set" to elevatedUnsupported("aod.set", "Always-on display is a protected secure setting, and not every build honours it."),
+        "vpn.tunnel" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires WireGuard or Tailscale. WireGuard also needs its control permission and Allow remote control apps turned on."),
+        "wifi.scan" to ActionCapability(CapabilityLevel.RequiresSetup, "Requires location access, and Nearby Wi-Fi devices on Android 13+. Android rate-limits scans, so results may be a cached scan."),
+        "sun.times" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs location access only when latitude or longitude is left blank."),
         "sms.send" to smsCapability(),
         "screenshot.take" to shizukuCapability("Screenshot"),
         "window.mode" to shizukuCapability("Window mode"),
