@@ -252,6 +252,21 @@ class VariableStore private constructor(
     }
 
     /**
+     * Empty every stored array whose name starts with [prefix].
+     *
+     * Arrays are shared between a task and the tasks it calls, and an action that publishes "one
+     * array per field of each item" writes nothing at all when there are no items. Without this, the
+     * arrays of an earlier call under the same prefix stay behind and a loop walks them again
+     * (携帯, 2026-11-19: one chat's messages were handled a second time as the next chat's).
+     */
+    fun clearArraysWithPrefix(prefix: String) {
+        if (prefix.isEmpty()) return
+        for (name in arrayStore.snapshot().keys) {
+            if (name.startsWith(prefix)) arrayStore.put(name, emptyList())
+        }
+    }
+
+    /**
      * Returns the elements of a stored array by name, or null if no array with that name exists.
      * Used by the `flow.foreach` control action to iterate over array variables.
      */
