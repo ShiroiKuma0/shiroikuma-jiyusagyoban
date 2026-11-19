@@ -8,6 +8,38 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-10.19-01.g2f677fa0+022 — 2026-11-19
+
+Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
+as `+021`.
+
+### Fixes
+
+- **A provider call no longer leaves an earlier answer behind.** `provider.call` publishes a list of
+  items as one array per field, and an answer with no items — or a call that failed — wrote no array
+  at all. Arrays are shared between a task and the tasks it calls, so the arrays of the previous
+  call under the same prefix stayed standing and the loop after the call walked them again. Every
+  call now empties the arrays under its prefix before it asks.
+
+  In 携帯 this made a message that arrived in one SIM's Jami chat be handled a second time as the
+  next chat's: an incoming SMS was shown under two pseudo-SIMs, and a reply was sent from both SIMs
+  of the relay.
+
+### 携帯
+
+- The two chat readers skip their loop when Jami returns nothing new.
+- The send-result profile queues instead of skipping a result that arrives while the previous one is
+  still being reported — two messages sent back to back used to lose one result, and the message
+  stayed on “Sending…”.
+- Send results are recovered: on every round a relay asks Messēji for the state of its last sends
+  and reports whatever the phone at hand was not yet told. Each result is reported once; one that
+  cannot be delivered is retried and given up after three failures. New tasks 「中継 結果報告」 and
+  「中継 結果確認」.
+
+### Packaging
+
+- One signed `arm64-v8a` APK: `shiroikuma-jiyusagyoban_0.2.96+2026-11-10.19-01.g2f677fa0+022_arm64-v8a.apk`.
+
 ## 0.2.96+2026-11-10.19-01.g2f677fa0+021 — 2026-11-17
 
 Built on upstream `2f677fa0` — OpenTasker **0.2.96** plus its unreleased work since, the same base
