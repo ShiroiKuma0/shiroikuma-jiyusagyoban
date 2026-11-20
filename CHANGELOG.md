@@ -8,6 +8,27 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-13.00-28.g70b0571a+027 — 2026-11-20
+
+Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
+the same base as `+026`.
+
+### 言語島 — 聴く
+
+- **An island lifts the moment its ⠿ handle is touched.** The handle used to need a long press
+  before the row would move.
+- **The island box scrolls under a held row.** While a dragged island is at the top or bottom edge
+  of the box, the list scrolls beneath it — faster the further the finger pushes past the edge — so
+  an island can travel past the rows that were visible when it was picked up, without being
+  dropped, scrolled by hand and picked up again.
+- **An island dragged past either end of the list drops at that end** instead of returning to where
+  it started.
+- The handle's touch area is larger (36 × 48 dp).
+
+### Packaging
+
+- One signed `arm64-v8a` APK: `shiroikuma-jiyusagyoban_0.2.96+2026-11-13.00-28.g70b0571a+027_arm64-v8a.apk`.
+
 ## 0.2.96+2026-11-13.00-28.g70b0571a+026 — 2026-11-19
 
 Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
