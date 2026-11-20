@@ -30,9 +30,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,8 +92,7 @@ import com.opentasker.core.storage.GengoshimaPlayEntity
 import com.opentasker.core.storage.GengoshimaSentenceEntity
 import com.opentasker.core.storage.GengoshimaSessionEntity
 import com.opentasker.ui.components.SelectionChip
-import com.opentasker.ui.components.ReorderableRow
-import com.opentasker.ui.components.rememberListReorderState
+import com.opentasker.ui.components.ReorderableColumn
 import com.opentasker.ui.theme.OpenTaskerTheme
 import com.opentasker.ui.theme.ThemeStore
 import java.io.File
@@ -515,20 +511,18 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>, Bool
             HeaderPill("閉じる", onClose)
         }
         Text("島 / Islands", fontWeight = FontWeight.Bold)
-        // Long-press the handle and drag: the islands' order is their order everywhere — here, in the
-        // editor, the audio tree and 暗記 — so a drop renumbers them for good (白い熊, 2026-10-12).
-        val listState = rememberLazyListState()
-        val reorder = rememberListReorderState()
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
-            items(islands, key = { it.id }) { i ->
+        // Drag a row by its handle — it lifts on touch, and the box scrolls under it at its edges. The
+        // islands' order is their order everywhere — here, in the editor, the audio tree and 暗記 — so
+        // a drop renumbers them for good (白い熊, 2026-10-12).
+        ReorderableColumn(
+            items = islands, keyOf = { it.id },
+            onReorder = { order ->
+                scope.launch { order.forEachIndexed { k, row -> if (row.position != k + 1) dao.updateIsland(row.copy(position = k + 1)) } }
+            },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) { i ->
                 val n = ready[i.id] ?: 0
                 val on = chosen[i.id] ?: (n > 0)
-                ReorderableRow(
-                    state = reorder, listState = listState, items = islands, item = i, keyOf = { it.id }, enabled = true,
-                    onReorder = { order ->
-                        scope.launch { order.forEachIndexed { k, row -> if (row.position != k + 1) dao.updateIsland(row.copy(position = k + 1)) } }
-                    },
-                ) {
                 Row(
                     Modifier.fillMaxWidth().clickable(enabled = n > 0) { chosen[i.id] = !on },
                     verticalAlignment = Alignment.CenterVertically,
@@ -542,8 +536,6 @@ private fun PickerScreen(onStart: (List<MediaItem>, ListenMode, List<Long>, Bool
                         )
                     }
                 }
-                }
-            }
         }
         // Spaced rotation's pick: every island due today, and every island never yet reviewed.
         val zone = remember { java.time.ZoneId.systemDefault() }
