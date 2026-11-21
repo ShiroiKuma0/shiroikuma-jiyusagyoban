@@ -577,6 +577,12 @@
     <string name="setup_shizuku_status_transport_unavailable">Shizuku has given permission, but OpenTasker cannot reach its helper service. Actions that need elevated access refuse to run until that connection comes back.</string>
     <string name="setup_shizuku_status_ready">Shizuku is running, it has given permission, and OpenTasker can reach its helper service.</string>
     <string name="setup_shizuku_android17_note">On Android 17 the original Shizuku may not start. The thedjchi fork of Shizuku on GitHub supports it, and its home screen showing version 13.6 is expected. Some phones turn wireless debugging off when they restart, and OpenTasker can\'t turn it back on, so after a reboot turn it on in Developer options and start Shizuku again.</string>
+    <string name="setup_assistant_title">Digital assistant app</string>
+    <string name="setup_assistant_required_for">Airplane mode without Shizuku</string>
+    <string name="setup_assistant_status_active">OpenTasker is the digital assistant app, so Airplane Mode works even when Shizuku isn\'t running.</string>
+    <string name="setup_assistant_status_inactive">Android lets the digital assistant app switch airplane mode. Pick OpenTasker under Digital assistant app in Default apps if you can\'t use Shizuku.</string>
+    <string name="setup_assistant_status_disconnected">OpenTasker is the digital assistant app, but Android hasn\'t connected it. That happens after OpenTasker is force stopped. Pick another assistant in Default apps, then OpenTasker again.</string>
+    <string name="setup_assistant_note">This replaces your current assistant, so long pressing home or power opens OpenTasker instead. Switch back in the same screen any time.</string>
     <string name="setup_wireguard_title">WireGuard tunnel control</string>
     <string name="setup_wireguard_body">Lets a profile turn your WireGuard tunnels on and off. Also turn on Allow remote control apps in the WireGuard settings, or it ignores the request.</string>
     <string name="setup_wireguard_required_for">Connect or Disconnect VPN with WireGuard</string>

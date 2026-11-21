@@ -16,6 +16,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
+import com.opentasker.core.assistant.AssistantAirplane
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.contexts.QuickSettingsTileStore
@@ -23,6 +24,7 @@ import com.opentasker.core.contexts.requestRefresh
 import com.opentasker.core.platform.AndroidAudioHardening
 import com.opentasker.core.platform.AudioUsageEligibility
 import com.opentasker.core.power.ShellResult
+import com.opentasker.core.power.ShizukuPowerBackend
 import com.opentasker.core.power.ShizukuShellRunner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -185,7 +187,16 @@ class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle
             else -> return ActionResult.Failure("invalid airplane mode state: $state")
         }
         ctx.logger("Airplane mode: $state")
+        val assistantActive = AssistantAirplane.isActive(ctx.app)
+        if (airplaneRoute(ShizukuPowerBackend.isReady(), assistantActive) == AirplaneRoute.ASSISTANT) {
+            val refused = AssistantAirplane.set(target, readEnabled = { readAirplaneMode(ctx) })
+                ?: return ActionResult.Success.also { ctx.logger("Airplane mode switched through the assistant app") }
+            return ActionResult.Failure(refused)
+        }
         val result = ctx.runShizukuAction("airplane.toggle", "Airplane mode", if (target) 0 else 1)
+        if (result is ActionResult.Failure && !assistantActive) {
+            return result.copy(message = "${result.message} $AIRPLANE_ASSISTANT_HINT")
+        }
         if (result !is ActionResult.Success) return result
 
         // Android 8 has no such command, and it still exits 0, so only the setting can prove it ran.
@@ -198,6 +209,18 @@ class AirplaneModeAction : DeclaredAction(ActionCatalog.require("airplane.toggle
     private fun readAirplaneMode(ctx: ActionContext): Boolean =
         Settings.Global.getInt(ctx.app.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
 }
+
+internal enum class AirplaneRoute { SHIZUKU, ASSISTANT }
+
+/**
+ * Shizuku when it's ready, since it needs nothing on screen. The assistant route is for phones
+ * where Shizuku can't run, and only when the person made OpenTasker the assistant app.
+ */
+internal fun airplaneRoute(shizukuReady: Boolean, assistantActive: Boolean): AirplaneRoute =
+    if (!shizukuReady && assistantActive) AirplaneRoute.ASSISTANT else AirplaneRoute.SHIZUKU
+
+internal const val AIRPLANE_ASSISTANT_HINT =
+    "Without Shizuku, make OpenTasker the digital assistant app from Setup and it can switch airplane mode instead."
 
 internal fun airplaneModeOutcome(target: Boolean, applied: Boolean): ActionResult =
     if (applied == target) {

@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.app.BuildConfig
 import com.opentasker.app.R
 import com.opentasker.core.apps.TargetSignerGuard
+import com.opentasker.core.assistant.AssistantAirplane
 import com.opentasker.core.apps.TargetSignerState
 import com.opentasker.core.contexts.NfcTagIntentGate
 import com.opentasker.core.contexts.bluetoothScanPermission
@@ -526,6 +527,28 @@ internal fun buildPermissionItems(
             note = context.getString(R.string.setup_shizuku_android17_note)
                 .takeIf { shizukuNeedsAndroid17Note(shizukuStatus, Build.VERSION.SDK_INT) },
         ),
+        // Android has no request dialog for the assistant role, so this opens Default apps.
+        AssistantAirplane.isActive(context).let { assistantActive ->
+            val connected = assistantActive && AssistantAirplane.isConnected()
+            PermissionSetupItem(
+                title = context.getString(R.string.setup_assistant_title),
+                body = context.getString(
+                    when {
+                        connected -> R.string.setup_assistant_status_active
+                        assistantActive -> R.string.setup_assistant_status_disconnected
+                        else -> R.string.setup_assistant_status_inactive
+                    },
+                ),
+                granted = connected,
+                actionLabel = context.getString(R.string.setup_action_open_settings),
+                action = PermissionAction.SettingsIntent(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)),
+                requiredFor = context.getString(R.string.setup_assistant_required_for),
+                optional = true,
+                allowActionWhenGranted = true,
+                section = SetupSection.OPTIONAL,
+                note = context.getString(R.string.setup_assistant_note),
+            )
+        },
         if (VpnClient.WIREGUARD.isInstalled(context)) PermissionSetupItem(
             title = context.getString(R.string.setup_wireguard_title),
             body = context.getString(R.string.setup_wireguard_body),

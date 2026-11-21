@@ -283,6 +283,40 @@
         </service>
 
         <!--
+            The digital assistant route for airplane mode. Android binds these only after the person
+            picks OpenTasker as the assistant app, and only the system holds BIND_VOICE_INTERACTION.
+            The recognizer is the one Android requires an assistant to name; it answers every request
+            with an error and never records.
+        -->
+        <service
+            android:name="com.opentasker.core.assistant.OpenTaskerVoiceInteractionService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/voice_interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="com.opentasker.core.assistant.OpenTaskerVoiceSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+        <service
+            android:name="com.opentasker.core.assistant.OpenTaskerRecognitionService"
+            android:exported="true"
+            android:label="@string/app_name">
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+        </service>
+
+        <!--
             Exported because DEVICE_ADMIN_ENABLED is delivered by the system, and guarded by
             BIND_DEVICE_ADMIN, which only the system holds. Its policy set is force-lock alone.
         -->

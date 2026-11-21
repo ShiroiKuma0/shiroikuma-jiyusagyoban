@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- supportsAssist is what lets Android offer OpenTasker as the digital assistant app. -->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:recognitionService="com.opentasker.core.assistant.OpenTaskerRecognitionService"
+    android:sessionService="com.opentasker.core.assistant.OpenTaskerVoiceSessionService"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="false"
+    android:supportsLocalInteraction="false" />
