@@ -69,7 +69,7 @@ class LocationContextSourceImpl(
 
         @SuppressLint("MissingPermission")
         fun startUpdatesIfReady() {
-            if (!hasLocationPermission(app)) {
+            if (!hasForegroundLocationAccess(app)) {
                 stopUpdates()
                 emitBlocked(
                     reason = "missing_location_permission",
@@ -172,22 +172,28 @@ class LocationContextSourceImpl(
             provider = provider,
         )
 
-    private fun hasLocationPermission(context: Context): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-    private fun enabledLocationProviders(locationManager: LocationManager): List<String> {
-        val active = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
-        val passive = if (runCatching { locationManager.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) }.getOrDefault(false))
-            listOf(LocationManager.PASSIVE_PROVIDER) else emptyList()
-        return active + passive
-    }
-
     companion object {
         private const val DEFAULT_SETUP_RECHECK_MS = 60_000L
     }
 }
+
+/** Fine or approximate location, either of which lets the platform hand out a fix. */
+internal fun hasForegroundLocationAccess(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+/**
+ * The providers a location read listens to: GPS and network when they're switched on, then the
+ * passive provider, which costs nothing and hands over fixes other apps asked for.
+ */
+internal fun enabledLocationProviders(isEnabled: (String) -> Boolean): List<String> {
+    val active = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter(isEnabled)
+    val passive = if (isEnabled(LocationManager.PASSIVE_PROVIDER)) listOf(LocationManager.PASSIVE_PROVIDER) else emptyList()
+    return active + passive
+}
+
+internal fun enabledLocationProviders(locationManager: LocationManager): List<String> =
+    enabledLocationProviders { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
 
 internal class LocationListenerRegistrationState(
     private val removeUpdates: (LocationListener) -> Unit,

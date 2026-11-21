@@ -47,6 +47,14 @@ object LocationPolicyDisclosures {
                 "Foreground location permission is missing; live location contexts remain blocked until setup is complete."
         }
 
+    /** Why Get Location stopped before asking Android for anything, naming the Setup row that fixes it. */
+    const val actionPermissionMissing: String =
+        "location.get needs location access, so nothing was asked of Android. Grant it on the Foreground location row in Setup."
+
+    /** Said with a fix that never came, since a backgrounded app without "Allow all the time" gets none. */
+    const val actionBackgroundNote: String =
+        "When a profile runs this with OpenTasker in the background, Android also wants the Background location row in Setup."
+
     private fun android14ForegroundServiceNote(apiLevel: Int): String =
         if (apiLevel >= 34) {
             " Android 14+ location foreground-service use remains gated to these granted location prerequisites."

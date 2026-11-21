@@ -311,6 +311,9 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
     "var.split" -> listOf(output("array", ActionValueType.ARRAY, nameArgumentKeys = listOf("name")))
     "var.join" -> listOf(output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("name")))
     "var.convert" -> listOf(output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("var", "name")))
+    "location.get" -> listOf("lat", "lon", "accuracy", "age").map { key ->
+        output(key, ActionValueType.NUMBER, nameArgumentKeys = listOf("var"), defaultName = LocationGetAction.DEFAULT_PREFIX, suffix = "_$key")
+    }
     "sun.times" -> listOf(
         "sunrise", "sunset", "solar_noon", "civil_dawn", "civil_dusk", "nautical_dawn", "nautical_dusk",
         "astronomical_dawn", "astronomical_dusk", "day_or_night_code", "sunlight_duration",

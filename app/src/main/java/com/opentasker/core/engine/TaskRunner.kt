@@ -1277,7 +1277,7 @@ internal fun actionTimeoutMs(actionType: String): Long = when {
     // HASH_TIMEOUT_MS, and the contact picker waits two minutes for a choice. Each reports its
     // own limit, which the engine must outlast for that message to reach the run log.
     actionType == "script.termux.run" || actionType == "script.shizuku.run" ||
-        actionType == "contacts.lookup" -> LONG_REQUEST_TIMEOUT_MS
+        actionType == "contacts.lookup" || actionType == "location.get" -> LONG_REQUEST_TIMEOUT_MS
     // Playback and speech suspend until completion; a long sound file or near-limit TTS
     // text legitimately outlives the default 60 s budget.
     actionType == "sound.play" || actionType == "tts.speak" -> MEDIA_ACTION_TIMEOUT_MS

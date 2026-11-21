@@ -74,6 +74,8 @@ object ActionCatalog {
         // IDEMPOTENT: a retry works the same day out again. Without coordinates it asks for a fix,
         // which only reads.
         define("sun.times", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::SunTimesAction),
+        // IDEMPOTENT: it only reads where the phone is, and a retry reads it again.
+        define("location.get", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::LocationGetAction),
         define("tts.speak", ActionCategory.NOTIFICATION, ActionRetrySafety.NEVER, ::SayAction),
         define("flow.wait", ActionCategory.FLOW, ActionRetrySafety.NEVER, ::WaitAction),
         // NEVER, not IDEMPOTENT: "toggle" reads the profile again, so a retry flips it back.

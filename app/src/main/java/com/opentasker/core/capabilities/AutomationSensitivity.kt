@@ -85,6 +85,7 @@ object AutomationSensitivityRegistry {
         "contacts.lookup",
         // Reads the phone's location when a coordinate is blank.
         "sun.times",
+        "location.get",
         "plugin.locale.query",
         "script.termux.run",
         "script.shizuku.run",

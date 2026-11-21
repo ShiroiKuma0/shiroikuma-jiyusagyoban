@@ -206,6 +206,10 @@ object SetupRequirementResolver {
                 add(SetupRequirement.FOREGROUND_LOCATION)
                 add(SetupRequirement.BACKGROUND_LOCATION)
             }
+            "location.get" -> {
+                add(SetupRequirement.FOREGROUND_LOCATION)
+                add(SetupRequirement.BACKGROUND_LOCATION)
+            }
             "lock" -> add(SetupRequirement.DEVICE_ADMIN)
             // A profile runs in the background, where Android silently drops an activity start
             // unless the app can draw over others.

@@ -126,6 +126,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "array.clear",
     "array.process",
     "sun.times",
+    "location.get",
     "tts.speak",
     "flow.wait",
     "profile.set",
@@ -714,6 +715,21 @@ fun registerActionMetadata() {
                 ActionField("time", R.string.catalog_action_sun_times_field_time_label, FieldType.NUMBER, hintRes = R.string.catalog_action_sun_times_field_time_hint, numberRule = integerRule()),
                 ActionField("elevations", R.string.catalog_action_sun_times_field_elevations_label, FieldType.MULTILINE, hintRes = R.string.catalog_action_sun_times_field_elevations_hint),
                 ActionField("var", R.string.catalog_action_sun_times_field_var_label, hintRes = R.string.catalog_action_sun_times_field_var_hint),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "location.get",
+            nameRes = R.string.catalog_action_location_get_name,
+            descriptionRes = R.string.catalog_action_location_get_description,
+            categoryRes = R.string.catalog_category_variable,
+            fields = listOf(
+                ActionField("mode", R.string.catalog_action_location_get_field_mode_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_location_get_field_mode_hint, options = listOf(option(LocationGetAction.MODE_FIX, R.string.action_option_location_fix), option(LocationGetAction.MODE_LAST_KNOWN, R.string.action_option_location_last_known))),
+                ActionField("accuracy", R.string.catalog_action_location_get_field_accuracy_label, FieldType.NUMBER, hintRes = R.string.catalog_action_location_get_field_accuracy_hint, numberRule = decimalRule(1.0)),
+                ActionField("timeout", R.string.catalog_action_location_get_field_timeout_label, FieldType.NUMBER, hintRes = R.string.catalog_action_location_get_field_timeout_hint, numberRule = integerRule(1, LocationGetAction.MAX_TIMEOUT_SECONDS)),
+                ActionField("var", R.string.catalog_action_location_get_field_var_label, hintRes = R.string.catalog_action_location_get_field_var_hint),
             )
         )
     )
