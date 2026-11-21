@@ -374,12 +374,25 @@ class VariableStore {
         unset: VariableExpander.Unset = VariableExpander.Unset.AS_WRITTEN,
     ): TrackedExpansion = TrackedExpansion(
         value = expander.expand(s, this, arrayStore, InertTemplateText::hide, conditionals, unset),
-        isSecretDerived = variableReference.findAll(s).any { match ->
-            val name = match.groupValues[1]
-            isSensitive(name) || name in sensitiveArrayNames ||
-                (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(name))
-        },
+        isSecretDerived = variableReference.findAll(s).any { match -> readsASecret(s, match) },
     )
+
+    /**
+     * True when a secret's `%name` sits inside a `{{ ... }}` block of [s]. Its value is then the
+     * template's own text, which the template's warnings and traces quote.
+     */
+    fun readsASecretInsideATemplate(s: String): Boolean {
+        val blocks = templateBlock.findAll(s).map { it.range }.toList()
+        return blocks.isNotEmpty() && variableReference.findAll(s).any { match ->
+            blocks.any { match.range.first in it } && readsASecret(s, match)
+        }
+    }
+
+    private fun readsASecret(s: String, match: MatchResult): Boolean {
+        val name = match.groupValues[1]
+        return isSensitive(name) || name in sensitiveArrayNames ||
+            (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(name))
+    }
 
     /**
      * Expand with operator support. Examples:
@@ -587,6 +600,7 @@ class VariableStore {
     companion object {
         private val jsonCodec = Json { ignoreUnknownKeys = true }
         private val variableReference = Regex("%([A-Za-z][A-Za-z0-9_-]*)")
+        private val templateBlock = Regex("""\{\{.*?}}""", RegexOption.DOT_MATCHES_ALL)
 
         /**
          * Upper bound for a nested/array write index. A `var.set` name such as `X[2000000000]`

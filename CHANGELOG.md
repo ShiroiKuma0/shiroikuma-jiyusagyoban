@@ -25,6 +25,7 @@
 - A space typed as the splitter or joiner in Split Text, Join Text, Variable Split or Variable Join now stays when you save the step. Saving used to drop it. Join Text then went back to commas and Variable Join to no joiner at all, while Variable Split split on any run of spaces and new lines. Split Text splits on a single space now, where it used to say there was no delimiter.
 - Opening the app on the Light theme no longer flashes a black screen first. The main screen drew one frame in the AMOLED theme while it read your saved theme, and now it waits for it, like the setup screens already did.
 - Set Variable's line in the app log names the variable the same way however you typed it, so `%color` shows as `$color` like Persist's line does, where it used to read `$%color`.
+- A secret read inside a template, like `{{ %Token }}`, no longer shows up in the run log's template warnings or in Preflight. The secret's value was filled in before the template ran, so a warning such as "Missing template value" quoted it. That covers HTTP headers and query lines, Send Intent extras and plugin settings too. A secret read outside the braces keeps its warnings.
 
 ## v0.2.96 - 2026-11-12
 

@@ -1002,7 +1002,7 @@ object PreflightRunner {
                     !ActionArgumentSensitivity.isSensitiveArgumentName(key) &&
                     ActionArgumentSensitivity.isSensitive(spec.type, key, expanded))
             if (hiddenForItsName) expansion.warnings.map { "$key: ${ActionArgumentSensitivity.REDACTED}" }
-            else expansion.warnings
+            else expansion.warnings.map { if (it == ActionArgumentSensitivity.REDACTED) "$key: $it" else it }
         }
         val secretKeys = rawValues.filterValues { expansion -> expansion.traces.any { it.isSecretDerived } }.keys
         val secretValues = secretKeys.mapNotNullTo(mutableSetOf()) { rawValues.getValue(it).value.takeIf(String::isNotBlank) }
@@ -1054,10 +1054,17 @@ object PreflightRunner {
         scope: TemplateScope? = null,
     ): TemplateExpansionResult {
         val legacy = variables.expandTracked(raw, conditionals)
+        // A secret read inside `{{ }}` is the template's own text by now, so its warnings would quote it.
+        val quotesASecret = legacy.isSecretDerived && variables.readsASecretInsideATemplate(raw)
         val result = TemplateExpressionEngine().expand(
             legacy.value,
             scope ?: variables.toTemplateScope(input.eventVariables),
-        ).let { it.copy(value = InertTemplateText.restore(it.value)) }
+        ).let { expanded ->
+            expanded.copy(
+                value = InertTemplateText.restore(expanded.value),
+                warnings = if (quotesASecret) expanded.warnings.map { ActionArgumentSensitivity.REDACTED } else expanded.warnings,
+            )
+        }
         return if (legacy.isSecretDerived && result.traces.none { it.isSecretDerived }) {
             result.copy(
                 traces = result.traces + TemplateExpansionTrace(

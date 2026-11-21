@@ -1178,7 +1178,10 @@ class TaskRunner(
         } else {
             null
         }
-        return expanded to trace
+        // A secret read inside `{{ }}` is the template's own text by now, so its warnings and
+        // expressions would quote it.
+        val quotesASecret = legacy.isSecretDerived && ctx.variables.readsASecretInsideATemplate(rawValue)
+        return expanded to if (quotesASecret) trace?.withValueHidden() else trace
     }
 
     /**
