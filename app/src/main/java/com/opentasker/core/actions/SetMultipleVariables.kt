@@ -2,6 +2,7 @@ package com.opentasker.core.actions
 
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.engine.ActionVariableChange
 import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
@@ -163,6 +164,31 @@ internal fun VariableStore.multipleVariablesFilledNames(
         scope.arrays.forEach { (name, items) -> setArray(name, items) }
     }
     return copy.setMultipleVariables(args, eventVariables).let { it.set + it.kept }
+}
+
+/**
+ * The changes a run shows for this step. When the names list may hold a secret, a word written
+ * there without its `%` may be a typed value read as a bare name, so a change to a variable of that
+ * name becomes part of one counted line, the way the step's app log line only counts names. A name
+ * written with `%` still shows.
+ */
+internal fun multipleVariablesShownChanges(
+    args: Map<String, String>,
+    changes: List<ActionVariableChange>,
+): List<ActionVariableChange> {
+    if (!ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", args)) return changes
+    val bare = multipleVariablesEntries(args).mapNotNullTo(hashSetOf()) { entry ->
+        entry?.first?.takeUnless { it.startsWith('%') }?.let(VariableNamePolicy::normalize)
+    }
+    val (hidden, shown) = changes.partition { it.name in bare }
+    if (hidden.isEmpty()) return changes
+    return shown + ActionVariableChange(
+        scope = hidden.first().scope,
+        name = "${hidden.size} more, names hidden",
+        value = "",
+        added = hidden.all { it.added },
+        sensitive = true,
+    )
 }
 
 /** True when a name in [args] carries its own value after [multipleVariablesInlineSplitter]. */

@@ -6,6 +6,7 @@ import com.opentasker.core.actions.LineListArguments
 import com.opentasker.core.actions.PluginBundleArguments
 import com.opentasker.core.actions.declaredActionOutputs
 import com.opentasker.core.actions.multipleVariablesFilledNames
+import com.opentasker.core.actions.multipleVariablesShownChanges
 import com.opentasker.core.capabilities.AutomationSensitivityRegistry
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.diagnostics.ExportRedactionPolicy
@@ -821,6 +822,9 @@ class TaskRunner(
             val hidden = ActionArgumentSensitivity.hidesWrittenValue(spec.type, spec.args, change.name) ||
                 ActionArgumentSensitivity.hidesWrittenValue(spec.type, expansionReport.args, change.name)
             if (change.sensitive || !hidden) change else change.copy(sensitive = true)
+        }.let { changes ->
+            if (spec.type != "var.set_multiple") changes
+            else multipleVariablesShownChanges(spec.args, changes)
         }
         return result to traceFor(index, spec, started, result, expansionReport, changes)
     }
