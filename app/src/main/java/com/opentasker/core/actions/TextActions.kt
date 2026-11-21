@@ -35,6 +35,11 @@ class TextMatchAction : DeclaredAction(ActionCatalog.require("text.match")) {
  * replaced, or only the first with `first_only`. `matches` names an array that's emptied and then
  * holds each match as %found1, %found2, ..., only the first with `first_only`. With `search_only`
  * the step only collects the matches and leaves `%var` alone.
+ *
+ * `in_place` edits `%var` the way Tasker's Search Replace does (decompiled 6.7.8,
+ * `ExecuteService.V2`): an unset `%var` fails the step before the array is touched, `%var` is
+ * written only when something matched, a result with nothing left unsets it, and a replacement that
+ * can't be made (`$9` with no ninth group) is logged and leaves it as it was.
  */
 class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) {
 
@@ -42,6 +47,11 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
         val source = args["source"] ?: return ActionResult.Failure("missing source")
         val firstOnly = args["first_only"]?.toBooleanStrictOrNull() == true
         val searchOnly = args["search_only"]?.toBooleanStrictOrNull() == true
+        val inPlace = args["in_place"]?.toBooleanStrictOrNull() == true
+        val varName = outputVar(args, "result")
+        if (inPlace && !isSet(ctx, varName)) {
+            return ActionResult.Failure("%${VariableNamePolicy.normalize(varName) ?: varName.removePrefix("%")} isn't set")
+        }
         val array = args["matches"]?.trim()?.ifEmpty { null }?.let { name ->
             VariableNamePolicy.normalize(name) ?: return ActionResult.Failure("invalid array name '$name'")
         }
@@ -55,7 +65,7 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
             return ActionResult.Failure(reason)
         }
         val pattern = args["pattern"]?.ifBlank { null } ?: return failed("missing pattern")
-        if (array != null || searchOnly) {
+        if (array != null || searchOnly || inPlace) {
             // With no array to fill, one match is enough to check the pattern.
             val found = TextOps.findAll(source, pattern, limit = if (firstOnly || array == null) 1 else MAX_ELEMENTS + 1)
                 ?: return failed("invalid or oversized pattern")
@@ -68,15 +78,31 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
                 ctx.variables.replaceNumberedItems(array, found.withIndex().associate { (index, match) -> index + 1 to (match to sensitive) })
                 ctx.logger("text.replace -> %$array (${found.size} match(es))")
             }
-            if (searchOnly) return ActionResult.Success
+            if (searchOnly || (inPlace && found.isEmpty())) return ActionResult.Success
         }
         val replacement = args["replacement"] ?: ""
-        val varName = outputVar(args, "result")
+        // In place the pattern and the text already passed findAll, so only the replacement can fail here.
         val replaced = (if (firstOnly) TextOps.replaceFirst(source, pattern, replacement) else TextOps.replaceAll(source, pattern, replacement))
-            ?: return ActionResult.Failure("invalid or oversized pattern")
+            ?: if (inPlace) {
+                ctx.logger("text.replace -> couldn't replace \$$varName, left as it was")
+                return ActionResult.Success
+            } else {
+                return ActionResult.Failure("invalid or oversized pattern")
+            }
+        if (inPlace && replaced.isEmpty()) {
+            ctx.variables.remove(varName)
+            ctx.logger("text.replace -> \$$varName unset, nothing left")
+            return ActionResult.Success
+        }
         ctx.variables.set(varName, replaced)
         ctx.logger("text.replace -> \$$varName")
         return ActionResult.Success
+    }
+
+    /** Set as `{{ name }}` reads it: stored (a Tasker built-in included) or handed in by the event. */
+    private fun isSet(ctx: ActionContext, name: String): Boolean {
+        val normalized = VariableNamePolicy.normalize(name) ?: return false
+        return ctx.variables.get(normalized) != null || normalized in ctx.eventVariables
     }
 }
 

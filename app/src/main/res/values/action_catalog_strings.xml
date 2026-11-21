@@ -155,6 +155,8 @@
     <string name="catalog_action_text_replace_field_matches_hint" formatted="false">%found gets each match as %found1, %found2, ...</string>
     <string name="catalog_action_text_replace_field_search_only_label" formatted="false">Only find matches</string>
     <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">Store the matches and leave the output variable as it is</string>
+    <string name="catalog_action_text_replace_field_in_place_label" formatted="false">Edit the output variable in place</string>
+    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">Like Tasker\'s Search Replace: fails when the variable isn\'t set, changes it only on a match, and unsets it when nothing is left</string>
     <string name="catalog_action_text_split_name" formatted="false">Split Text</string>
     <string name="catalog_action_text_split_description" formatted="false">Split into an array by a literal delimiter or a regex pattern</string>
     <string name="catalog_action_text_split_field_source_label" formatted="false">Source text</string>

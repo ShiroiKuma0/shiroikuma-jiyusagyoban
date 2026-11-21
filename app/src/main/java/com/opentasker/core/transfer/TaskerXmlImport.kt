@@ -1763,7 +1763,9 @@ object TaskerXmlImporter {
      * Search Replace runs a regular expression over a variable and writes the result back
      * (decompiled 6.7.8, `ExecuteService.V2`). Store Matches In Array empties that array and fills
      * it with each match, One Match Only keeps and replaces only the first, and with Replace Matches
-     * off the variable stays as it is. Search and Replace With are read untrimmed, because a space
+     * off the variable stays as it is. The step runs in place, so an unset variable fails it, nothing
+     * is written without a match, and a result with nothing left unsets the variable, as in Tasker.
+     * Search and Replace With are read untrimmed, because a space
      * there is part of the pattern. Replace With is filled in after the matches are stored, so one
      * that reads the array the step fills stays a placeholder.
      */
@@ -1815,6 +1817,7 @@ object TaskerXmlImporter {
                     put("var", name)
                     if ((ints[4] ?: 0) != 0) put("first_only", "true")
                     if (matches.isNotEmpty()) put("matches", matches)
+                    put("in_place", "true")
                 },
             ),
             lossyWarning = "Tasker Search Replace's $ also matches just before a final line break, and here it matches only at the very end"

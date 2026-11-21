@@ -147,6 +147,8 @@
     <string name="catalog_action_text_replace_field_matches_hint" formatted="false">%found 依次得到每个匹配：%found1、%found2……</string>
     <string name="catalog_action_text_replace_field_search_only_label" formatted="false">仅查找匹配</string>
     <string name="catalog_action_text_replace_field_search_only_hint" formatted="false">只存储匹配，不改动输出变量</string>
+    <string name="catalog_action_text_replace_field_in_place_label" formatted="false">直接修改输出变量</string>
+    <string name="catalog_action_text_replace_field_in_place_hint" formatted="false">与 Tasker 的搜索替换相同：变量未设置时失败，仅在有匹配时修改，结果为空时取消设置</string>
     <string name="catalog_action_text_split_name" formatted="false">拆分文本</string>
     <string name="catalog_action_text_split_description" formatted="false">按字面分隔符或正则模式拆分为数组</string>
     <string name="catalog_action_text_split_field_source_label" formatted="false">源文本</string>

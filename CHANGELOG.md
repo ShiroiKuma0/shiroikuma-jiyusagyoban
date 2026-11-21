@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- An imported Tasker Search Replace now acts like Tasker's. If the variable isn't set, the step fails and leaves the matches array alone. The variable only changes when something matched, and a result with nothing left unsets it. A Replace With that names a group the search doesn't have, like `$9`, is logged and the variable stays as it was. Before, an unset variable was searched as empty text and written back, and a missing group failed the step. Replace Text has a new Edit the output variable in place switch for this, and the import turns it on. Tasks imported earlier keep the old behavior until they're imported again.
 - Always On Display works on Samsung phones. One UI ignores the setting the step used to change and keeps its own, so the step now flips Samsung's switch through Shizuku and checks it afterwards, the way it already did on other phones.
 - A MacroDroid loop that imports as a placeholder, like Iterate dictionary, no longer leaves its End Loop behind with nothing to close, which stopped the whole task from running. Its End Loop and any Break inside it are placeholders now too.
 - MacroDroid local variables stay local when imported. MacroDroid marks them in a field the importer didn't read, so most of them came in as globals.

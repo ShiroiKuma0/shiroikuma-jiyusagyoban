@@ -35,7 +35,7 @@ class TaskerSearchReplaceTransferTest {
         assertEquals(
             mapOf(
                 "source" to "{{ text }}", "pattern" to "\\d+", "replacement" to "#", "var" to "%text",
-                "first_only" to "true", "matches" to "%found",
+                "first_only" to "true", "matches" to "%found", "in_place" to "true",
             ),
             action(step).args,
         )
@@ -46,7 +46,10 @@ class TaskerSearchReplaceTransferTest {
     @Test
     fun replaceMatchesOffOnlyCollectsTheMatches() {
         assertEquals(
-            mapOf("source" to "{{ text }}", "pattern" to "\\d+", "search_only" to "true", "var" to "%text", "matches" to "%Found"),
+            mapOf(
+                "source" to "{{ text }}", "pattern" to "\\d+", "search_only" to "true", "var" to "%text", "matches" to "%Found",
+                "in_place" to "true",
+            ),
             action(searchReplace(store = "%Found", replace = 0, replaceWith = "unused")).args,
         )
     }

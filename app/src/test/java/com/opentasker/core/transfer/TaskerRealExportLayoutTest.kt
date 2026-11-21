@@ -734,7 +734,10 @@ class TaskerRealExportLayoutTest {
         )
 
         assertEquals("text.replace", replace.type)
-        assertEquals(mapOf("source" to "{{ par1 }}", "pattern" to "<", "replacement" to "~lt~", "var" to "%par1"), replace.args)
+        assertEquals(
+            mapOf("source" to "{{ par1 }}", "pattern" to "<", "replacement" to "~lt~", "var" to "%par1", "in_place" to "true"),
+            replace.args,
+        )
     }
 
     @Test
