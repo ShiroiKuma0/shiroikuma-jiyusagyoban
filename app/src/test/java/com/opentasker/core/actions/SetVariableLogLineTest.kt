@@ -23,10 +23,10 @@ class SetVariableLogLineTest {
         assertEquals("Set \$color = red", logLine("color", "red"))
     }
 
-    // A path only runs written bare; `%config.theme` fails as an invalid path before anything is logged.
     @Test
     fun aPathLogsWithoutAPercentSign() {
         assertEquals("Set path \$config.theme = dark", logLine("config.theme", "dark", VariableStore().apply { set("config", "{}") }))
+        assertEquals("Set path \$config.theme = dark", logLine("%config.theme", "dark", VariableStore().apply { set("config", "{}") }))
     }
 
     @Test

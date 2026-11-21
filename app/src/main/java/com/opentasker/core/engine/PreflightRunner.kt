@@ -961,8 +961,10 @@ object PreflightRunner {
         var failure: String? = null
         var unsetPosition: Pair<String, String>? = null
         val rawValues = spec.args.mapValues { (key, raw) ->
+            val pathBase = outputNames.pathBase(key, raw)
             when {
                 outputNames.keepsAsWritten(key, raw) -> TemplateExpansionResult(raw, emptyList(), emptyList())
+                pathBase != null -> expand(raw.substring(pathBase.length), variables, input).let { it.copy(value = pathBase + it.value) }
                 LineListArguments.applies(spec.type, key) -> {
                     val lines = raw.lines().map { line -> expand(line, variables, input) }
                     LineListArguments.lineBreakFailure(spec.type, key, lines.map { it.value })?.let { failure = it }
@@ -1110,7 +1112,12 @@ object PreflightRunner {
         when (spec.type) {
             "var.set" -> {
                 val name = values["name"]?.trim().orEmpty()
-                if (name.isNotBlank()) variables.set(name, values["value"].orEmpty())
+                // A path writes into the variable the way the run does.
+                if (name.contains('.') || name.contains('[')) {
+                    variables.setAtPath(name, values["value"].orEmpty())
+                } else if (name.isNotBlank()) {
+                    variables.set(name, values["value"].orEmpty())
+                }
             }
             "var.persist" -> {
                 val source = values["name"]?.trim().orEmpty()

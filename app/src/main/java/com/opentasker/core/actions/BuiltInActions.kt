@@ -297,7 +297,7 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
             } else {
                 value
             }
-            ctx.logger("Set path \$$name = $loggedValue")
+            ctx.logger("Set path \$${name.removePrefix("%")} = $loggedValue")
         } else {
             ctx.variables.set(name, value)
             val loggedValue = if (typedSecret || ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(name)) {

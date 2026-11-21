@@ -550,10 +550,12 @@ class VariableStore {
 
     private fun parsePathSelectors(fullPath: String): ParsedPath? {
         if (fullPath.isBlank()) return null
-        var cursor = 0
+        // `%config.theme` names the same variable as `config.theme`.
+        val start = if (fullPath.startsWith('%')) 1 else 0
+        var cursor = start
         while (cursor < fullPath.length && isPathBaseChar(fullPath[cursor])) cursor++
-        if (cursor == 0) return null
-        val base = fullPath.substring(0, cursor)
+        if (cursor == start) return null
+        val base = fullPath.substring(start, cursor)
         val selectors = mutableListOf<PathSelector>()
 
         while (cursor < fullPath.length) {

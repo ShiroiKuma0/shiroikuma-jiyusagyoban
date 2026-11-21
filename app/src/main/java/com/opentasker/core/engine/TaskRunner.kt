@@ -1051,6 +1051,11 @@ class TaskRunner(
                 return@mapValues arrayName
             }
             if (outputNames.keepsAsWritten(name, rawValue)) return@mapValues rawValue
+            outputNames.pathBase(name, rawValue)?.let { base ->
+                val (rest, trace) = expandValue(actionType, name, rawValue.substring(base.length), templateScope)
+                trace?.let { expansions += it }
+                return@mapValues base + rest
+            }
             if (LineListArguments.applies(actionType, name)) {
                 val lines = rawValue.lines().map { line -> expandValue(actionType, name, line, templateScope) }
                 val expanded = lines.joinToString("\n") { it.first }
@@ -1226,8 +1231,17 @@ internal class OutputNameArguments(private val actionType: String) {
             (actionType == "var.clear" && argumentName == "name") ||
             (actionType == "var.set_multiple" && argumentName == "names")
 
+    /**
+     * The `%config` of a Set Variable path like `%config.theme` or `%items[0]`, which names the
+     * variable to write into rather than reading it. The rest of the path is still filled in, so
+     * `%config.%key` writes the key `%key` holds.
+     */
+    fun pathBase(argumentName: String, rawValue: String): String? =
+        if (actionType == "var.set" && argumentName == "name") PATH_BASE.find(rawValue)?.value else null
+
     private companion object {
         val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
+        val PATH_BASE = Regex("^%[A-Za-z][A-Za-z0-9_-]*(?=[.\\[])")
     }
 }
 

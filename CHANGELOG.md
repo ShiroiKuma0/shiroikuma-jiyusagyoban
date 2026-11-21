@@ -26,6 +26,7 @@
 - Opening the app on the Light theme no longer flashes a black screen first. The main screen drew one frame in the AMOLED theme while it read your saved theme, and now it waits for it, like the setup screens already did.
 - Set Variable's line in the app log names the variable the same way however you typed it, so `%color` shows as `$color` like Persist's line does, where it used to read `$%color`.
 - A secret read inside a template, like `{{ %Token }}`, no longer shows up in the run log's template warnings or in Preflight. The secret's value was filled in before the template ran, so a warning such as "Missing template value" quoted it. That covers HTTP headers and query lines, Send Intent extras and plugin settings too. A secret read outside the braces keeps its warnings.
+- Set Variable on a path written with `%`, like `%config.theme`, `%Config.user.name` or `%items[0]`, works the same as the bare `config.theme` now. It used to fail as an invalid path whether or not `%config` was set. A key read from a variable, as in `%config.%key`, still fills in. Preflight now plays a path write too, so a later step there sees what it wrote.
 
 ## v0.2.96 - 2026-11-12
 
