@@ -9,6 +9,7 @@ import java.util.Locale
 import com.google.re2j.Pattern as Re2Pattern
 import kotlin.math.floor
 import kotlin.math.roundToLong
+import kotlin.random.Random
 
 /**
  * Enhanced variable expression evaluator supporting:
@@ -360,17 +361,53 @@ class VariableExpander {
         if (form.isEmpty() && '%' in op) return ""
         if (':' in op && op.split(':', limit = 2).any { side -> '%' in side && expandText(side, store, arrays) { it }.isBlank() }) return ""
         val size = arrays.length(name)
+        // Ahead of the joiner fallback below, which would read `+=` or `*` as the text to join with.
+        when (val pick = taskerJoinOrPick(expanded)) {
+            TaskerJoinOrPick.AtRandom -> return if (size == 0) "" else arrays.get(name, Random.nextInt(size))
+            is TaskerJoinOrPick.Join -> return storedRange(name, pick.range, size, arrays)?.joinToString(pick.separator).orEmpty()
+            null -> Unit
+        }
         return when {
             form == "#" -> size.toString()
             form.isEmpty() || !arrayForm -> arrays.join(name, expanded)
             ':' !in form -> form.toIntOrNull()?.let { arrays.get(name, it) }.orEmpty()
-            else -> {
-                val from = form.substringBefore(':').ifEmpty { "0" }.toIntOrNull() ?: return ""
-                val to = form.substringAfter(':').ifEmpty { null }?.let { it.toIntOrNull() ?: return "" } ?: (size - 1)
-                val range = if (from <= to) from..to else from downTo to
-                range.filter { it in 0 until size }.joinToString(",") { arrays.get(name, it) }
-            }
+            else -> storedRange(name, form, size, arrays)?.joinToString(",").orEmpty()
         }
+    }
+
+    /** The stored array's values a `a:b`, `:b`, `a:`, `:`, empty or single-index [form] names, 0-based; null when it isn't one. */
+    private fun storedRange(name: String, form: String, size: Int, arrays: ArrayStore): List<String>? {
+        if (form.isNotEmpty() && ':' !in form) {
+            val index = form.toIntOrNull() ?: return null
+            return if (index in 0 until size) listOf(arrays.get(name, index)) else emptyList()
+        }
+        val from = form.substringBefore(':').ifEmpty { "0" }.toIntOrNull() ?: return null
+        val to = form.substringAfter(':', "").ifEmpty { null }?.let { it.toIntOrNull() ?: return null } ?: (size - 1)
+        val range = if (from <= to) from..to else from downTo to
+        return range.filter { it in 0 until size }.map { arrays.get(name, it) }
+    }
+
+    /**
+     * Tasker's `+sep` (every element, joined by sep), `+sep+range` (the elements in range, as in
+     * `%arr(+>+2:4)`) and `*` (one element at random), read from the form with its variables filled
+     * in. Null for any other form. The separator is everything after the first `+`, unless a second
+     * `+` is followed by a range, so `%arr(+, )` joins with a comma and a space.
+     */
+    private sealed interface TaskerJoinOrPick {
+        data class Join(val separator: String, val range: String) : TaskerJoinOrPick
+        data object AtRandom : TaskerJoinOrPick
+    }
+
+    private fun taskerJoinOrPick(expanded: String): TaskerJoinOrPick? {
+        if (expanded.trim() == "*") return TaskerJoinOrPick.AtRandom
+        if (!expanded.startsWith('+')) return null
+        val rest = expanded.substring(1)
+        val split = rest.lastIndexOf('+')
+        if (split >= 0) {
+            val range = rest.substring(split + 1)
+            if (range.isNotEmpty() && TASKER_RANGE_FORM.matches(range)) return TaskerJoinOrPick.Join(rest.substring(0, split), range)
+        }
+        return TaskerJoinOrPick.Join(rest, "")
     }
 
     /**
@@ -390,10 +427,18 @@ class VariableExpander {
         store: VariableStore,
         arrays: ArrayStore,
     ): String? {
-        val form = (if ('%' in op) expandText(op, store, arrays) { it } else op).trim()
-        if (!TASKER_ARRAY_FORM.matches(form)) return null
+        val expanded = if ('%' in op) expandText(op, store, arrays) { it } else op
+        val form = expanded.trim()
+        val pick = taskerJoinOrPick(expanded)
+        if (pick == null && !TASKER_ARRAY_FORM.matches(form)) return null
         val items = store.numberedItems(name)
+        // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5.
         if (items.isEmpty() && baseValue != null) return null
+        when (pick) {
+            TaskerJoinOrPick.AtRandom -> return items.values.randomOrNull().orEmpty()
+            is TaskerJoinOrPick.Join -> return numberedRange(items, pick.range)?.joinToString(pick.separator).orEmpty()
+            null -> Unit
+        }
         // An index variable that came out empty names no element, so it isn't the empty form
         // that joins them all, nor the open side of a range (%arr(%a:%b) isn't %arr(:)).
         if (form.isEmpty() && '%' in op) return ""
@@ -405,14 +450,18 @@ class VariableExpander {
             "#<" -> lastIndex.toString()
             ">" -> items.firstEntry()?.value.orEmpty()
             "<" -> items.lastEntry()?.value.orEmpty()
-            else -> {
-                if (':' !in form && form.isNotEmpty()) return form.toIntOrNull()?.let(items::get).orEmpty()
-                val from = form.substringBefore(':').ifEmpty { "1" }.toIntOrNull() ?: return ""
-                val to = form.substringAfter(':', "").ifEmpty { null }?.let { it.toIntOrNull() ?: return "" } ?: lastIndex
-                val range = if (from <= to) items.subMap(from, true, to, true) else items.subMap(to, true, from, true).descendingMap()
-                range.values.joinToString(",")
-            }
+            else -> numberedRange(items, form)?.joinToString(",").orEmpty()
         }
+    }
+
+    /** The numbered elements a `a:b`, `:b`, `a:`, `:`, empty or single-index [form] names; null when it isn't one. */
+    private fun numberedRange(items: java.util.NavigableMap<Int, String>, form: String): List<String>? {
+        if (form.isNotEmpty() && ':' !in form) return listOfNotNull(items[form.toIntOrNull() ?: return null])
+        val lastIndex = if (items.isEmpty()) 0 else items.lastKey()
+        val from = form.substringBefore(':').ifEmpty { "1" }.toIntOrNull() ?: return null
+        val to = form.substringAfter(':', "").ifEmpty { null }?.let { it.toIntOrNull() ?: return null } ?: lastIndex
+        val range = if (from <= to) items.subMap(from, true, to, true) else items.subMap(to, true, from, true).descendingMap()
+        return range.values.toList()
     }
 
     private fun parseRegexOp(body: String): Pair<String, Int> {
@@ -1000,6 +1049,7 @@ class VariableExpander {
         private val PATTERN_WILDCARD = Regex("[*+]")
         private val TASKER_ARRAY_FORM = Regex("""#[<>]?|[<>]|\d*(?::\d*)?""")
         private val STORED_ARRAY_FORM = Regex("""#|\d*(?::\d*)?""")
+        private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
 
         private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
