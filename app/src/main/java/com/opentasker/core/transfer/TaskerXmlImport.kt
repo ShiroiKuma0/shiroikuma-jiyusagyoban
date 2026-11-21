@@ -3,6 +3,7 @@ package com.opentasker.core.transfer
 import com.opentasker.core.actions.ArrayProcessAction
 import com.opentasker.core.actions.IntentDispatchParseResult
 import com.opentasker.core.actions.IntentDispatchPolicy
+import com.opentasker.core.actions.WaitAction
 import com.opentasker.core.actions.multipleVariablesNamesCarryValues
 import com.opentasker.core.actions.writtenScalarVariables
 import com.opentasker.core.apps.PackageNamePolicy
@@ -15,6 +16,7 @@ import com.opentasker.core.contexts.WIFI_DISCONNECTED_WORDS
 import com.opentasker.core.data.TextOps
 import com.opentasker.core.data.VariableConvert
 import com.opentasker.core.engine.FlowControl
+import com.opentasker.core.engine.FlowStructure
 import com.opentasker.core.engine.MAX_FLOW_STEPS
 import com.opentasker.core.engine.STOP_TASK_ACTION_ID
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
@@ -120,23 +122,39 @@ private fun taskerStreamWarning(actionName: String, stream: Int?, variable: Stri
  * [MAX_FLOW_STEPS] steps, so a poll (a Wait, then a Goto back) is named with roughly how long it
  * lasts here when its waits are written as numbers.
  */
-private fun taskerPollLoopWarnings(taskName: String, actions: List<ActionSpec>): List<String> =
-    actions.withIndex().mapNotNull { (index, goto) ->
-        if (goto.type != "flow.goto" || !goto.args["to"].isNullOrBlank()) return@mapNotNull null
+private fun taskerPollLoopWarnings(taskName: String, actions: List<ActionSpec>): List<String> {
+    val structure by lazy { FlowStructure.analyze(actions) }
+    return actions.withIndex().mapNotNull { (index, goto) ->
+        // A switched-off step doesn't run: such a Goto never loops and such a Wait never waits.
+        if (!goto.enabled || goto.type != "flow.goto" || !goto.args["to"].isNullOrBlank()) return@mapNotNull null
         val target = FlowControl.gotoTarget(actions, goto.args["label"], goto.args["step"]).index
         if (target == null || target > index) return@mapNotNull null
-        val waits = actions.subList(target, index + 1).filter { it.type == "flow.wait" }
+        // The runner refuses a task whose blocks don't match, and halts on a jump into a For Each or
+        // Try that the Goto isn't inside, so neither loops.
+        if (structure.error != null) return@mapNotNull null
+        fun running(blocks: Map<Int, Int>) = blocks.filter { (open, end) -> index in open + 1..end }.keys
+        if (structure.unopenedBlockAt(target, running(structure.foreachToEndfor), running(structure.tryToEndtry)) != null) {
+            return@mapNotNull null
+        }
+        val waits = actions.subList(target, index + 1).filter { it.enabled && it.type == "flow.wait" }
         if (waits.isEmpty()) return@mapNotNull null
-        val passMillis = waits.map { it.args["millis"]?.trim()?.toLongOrNull() }.takeIf { null !in it }?.sumOf { it ?: 0L }
+        val waitMillis = waits.map { it.args["millis"]?.trim()?.toLongOrNull() }
+        // A Wait past its limit fails the run on the first pass.
+        if (waitMillis.any { it != null && it > WaitAction.MAX_WAIT_MS }) return@mapNotNull null
+        val passMillis = waitMillis.takeIf { null !in it }?.sumOf { it ?: 0L }
         val lasts = passMillis?.takeIf { it > 0 }?.let { ", about ${roughDuration(MAX_FLOW_STEPS / (index - target + 1) * it)} of this loop" }.orEmpty()
         "Task '$taskName' action ${index + 1}: this Goto jumps back over a Wait. Tasker keeps a loop like that going, " +
             "but a run here stops after ${String.format(Locale.US, "%,d", MAX_FLOW_STEPS)} steps$lasts."
     }
+}
 
-private fun roughDuration(millis: Long): String = when {
-    millis < 3_600_000L -> "${maxOf(1L, (millis / 60_000.0).roundToLong())} minutes"
-    millis < 172_800_000L -> "${(millis / 3_600_000.0).roundToLong()} hours"
-    else -> "${(millis / 86_400_000.0).roundToLong()} days"
+private fun roughDuration(millis: Long): String {
+    val (count, unit) = when {
+        millis < 3_600_000L -> maxOf(1L, (millis / 60_000.0).roundToLong()) to "minute"
+        millis < 172_800_000L -> (millis / 3_600_000.0).roundToLong() to "hour"
+        else -> (millis / 86_400_000.0).roundToLong() to "day"
+    }
+    return if (count == 1L) "1 $unit" else "$count ${unit}s"
 }
 
 /** Names the Tasker built-ins a task reads that this app leaves as written. */

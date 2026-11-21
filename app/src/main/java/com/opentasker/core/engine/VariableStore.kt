@@ -407,7 +407,19 @@ class VariableStore {
             (isOperatorForm(s, match) && anyNumberedItemSensitive(match.groupValues[1]))
     }
 
-    private fun isOperatorForm(s: String, match: MatchResult): Boolean = s.startsWith("(", match.range.last + 1)
+    /** A `(` right after the name that closes, as [VariableExpander] reads one; an unclosed `(` is a plain read. */
+    private fun isOperatorForm(s: String, match: MatchResult): Boolean {
+        val open = match.range.last + 1
+        if (!s.startsWith("(", open)) return false
+        var depth = 0
+        for (index in open until s.length) {
+            when (s[index]) {
+                '(' -> depth++
+                ')' -> if (--depth == 0) return true
+            }
+        }
+        return false
+    }
 
     /** An operator form like `%my-arr(1)` reads its whole name, as [VariableExpander] does; only a plain read falls back. */
     private fun nameRead(s: String, match: MatchResult): String =

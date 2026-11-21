@@ -175,6 +175,17 @@ class SecretInsideTemplateTest {
     }
 
     @Test
+    fun aHyphenatedReadFollowedByAnUnclosedBracketStaysSecret() {
+        // `(` with no `)` isn't an operator, so %Token-x( reads %Token followed by -x(.
+        val store = VariableStore().apply { set("Token", "abc123", sensitive = true) }
+        val logs = mutableListOf<String>()
+        val (log, traces) = runOn(store, logs, ActionSpec(type = "var.set", args = mapOf("name" to "%out", "value" to "%Token-x(")))
+        assertTrue(traces.single().variableChanges.single { it.name == "out" }.sensitive)
+        assertFalse(log, log.contains("abc123"))
+        assertFalse(logs.toString(), logs.any { "abc123" in it })
+    }
+
+    @Test
     fun anItemReadFromASecretArrayWithAHyphenInItsNameStaysSecret() {
         // %my-arr(1) reads the array my-arr, never %my followed by -arr(1), even with %my set.
         val store = VariableStore().apply {

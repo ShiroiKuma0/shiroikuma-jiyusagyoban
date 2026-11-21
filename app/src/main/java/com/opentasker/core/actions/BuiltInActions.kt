@@ -442,7 +442,7 @@ class WaitAction : DeclaredAction(ActionCatalog.require("flow.wait")) {
     }
 
     companion object {
-        private const val MAX_WAIT_MS = 1_800_000L // 30 minutes
+        internal const val MAX_WAIT_MS = 1_800_000L // 30 minutes
     }
 }
 
@@ -509,13 +509,15 @@ class LaunchIntentAction : DeclaredAction(ActionCatalog.require("intent.launch")
         if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
         if (component != null) {
             if (component.packageName != plan.packageName) return null
-            // A class the step names in this app is held to mayReachUnexported. One Android picked
-            // for the step's action in this app is reached as before.
-            val ownComponent = component.packageName == ctx.app.packageName && (
-                explicitComponent == null ||
-                    IntentDispatchPolicy.mayReachUnexported(component.packageName, component.className, ctx.app.packageName)
-                )
-            if (!ownComponent && !isExported(packageManager, plan.mode, component)) {
+            // A class a step names in this app must be the app's own code. A library's component
+            // merged in (WorkManager's receivers, a BIND_* service) isn't for steps, and this app's
+            // own uid passes whatever permission guards it, so exported or not it's refused.
+            if (explicitComponent != null && component.packageName == ctx.app.packageName &&
+                !IntentDispatchPolicy.isOwnClass(component.packageName, component.className, ctx.app.packageName)
+            ) {
+                return null
+            }
+            if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
                 return null
             }
             intent.component = component

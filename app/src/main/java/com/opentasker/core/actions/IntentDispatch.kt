@@ -156,11 +156,10 @@ internal object IntentDispatchPolicy {
     }
 
     /**
-     * Whether a step may reach [className] in [componentPackage] when it isn't exported: only this
-     * app's own classes under its own package name. Any other class, a library's component merged
-     * into this app included, has to be exported like another app's.
+     * Whether [className] in [componentPackage] is this app's own code, under its own package name,
+     * the only classes a step may name inside this app. Another app's classes can sit anywhere.
      */
-    fun mayReachUnexported(componentPackage: String, className: String, appPackage: String): Boolean =
+    fun isOwnClass(componentPackage: String, className: String, appPackage: String): Boolean =
         componentPackage == appPackage && (className == appPackage || className.startsWith("$appPackage."))
 
     private fun parseUri(raw: String?): UriResult {

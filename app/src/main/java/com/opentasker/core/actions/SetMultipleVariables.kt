@@ -7,6 +7,7 @@ import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.engine.countHiddenChanges
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
+import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.model.VariableNamePolicy
 
 /**
@@ -53,16 +54,18 @@ internal fun multipleVariablesFailure(args: Map<String, String>, outcome: Multip
 
 /**
  * What [setMultipleVariables] did with each name, by canonical name; [invalid] keeps the text as
- * written, with `(blank name)` standing in for an empty one. [builtFromSecret] says a name was
- * filled in from a secret, like `%cache_%Pin`.
+ * written, with `(blank name)` standing in for an empty one. [secretNames] are the names filled in
+ * from a secret, like `cache_1234` from `%cache_%Pin`, as each was settled.
  */
 internal data class MultipleVariablesOutcome(
     val set: List<String>,
     val cleared: List<String>,
     val kept: List<String>,
     val invalid: List<String>,
-    val builtFromSecret: Boolean = false,
+    val secretNames: List<String> = emptyList(),
 ) {
+    val builtFromSecret: Boolean get() = secretNames.isNotEmpty()
+
     fun isEmpty(): Boolean = set.isEmpty() && cleared.isEmpty() && kept.isEmpty() && invalid.isEmpty()
 }
 
@@ -82,7 +85,7 @@ internal fun VariableStore.setMultipleVariables(
     val cleared = mutableListOf<String>()
     val kept = mutableListOf<String>()
     val invalid = mutableListOf<String>()
-    var builtFromSecret = false
+    val secretNames = mutableListOf<String>()
     // A blank entry still takes its place, so the names after it keep lining up with their values.
     multipleVariablesEntries(args).forEachIndexed { index, entry ->
         val (written, inlineValue) = entry ?: return@forEachIndexed
@@ -95,7 +98,7 @@ internal fun VariableStore.setMultipleVariables(
             return@forEachIndexed
         }
         val secretName = built?.isSecretDerived == true
-        builtFromSecret = builtFromSecret || secretName
+        if (secretName) secretNames += name
         when {
             keepExisting && !get(name).isNullOrEmpty() -> kept += name
             // Filled in here for the same reason.
@@ -104,7 +107,7 @@ internal fun VariableStore.setMultipleVariables(
             else -> clearForTask(name).also { cleared += name }
         }
     }
-    return MultipleVariablesOutcome(assigned, cleared, kept, invalid, builtFromSecret)
+    return MultipleVariablesOutcome(assigned, cleared, kept, invalid, secretNames)
 }
 
 /**
@@ -168,30 +171,32 @@ internal fun VariableStore.multipleVariablesFilledNames(
 }
 
 /**
- * The changes a run shows for this step, which ran on [expanded] ([written] as the step has them).
- * A name built from a secret, like `%cache_%Pin`, gives the secret away, and when the names list may
- * hold a secret a word written there without its `%` may be a typed value read as a bare name. A
- * change to either becomes part of one counted line, the way the step's app log line only counts
- * names. Any other name written with `%` still shows.
+ * The changes a run shows for this step, which ran on [expanded] ([written] as the step has them)
+ * against the variables in [before]. A name built from a secret, like `%cache_%Pin`, gives the
+ * secret away, and when the names list may hold a secret a word written there without its `%` may
+ * be a typed value read as a bare name. A change to either becomes part of one counted line, the way
+ * the step's app log line only counts names. Any other name written with `%` still shows.
  */
 internal fun multipleVariablesShownChanges(
     written: Map<String, String>,
     expanded: Map<String, String>,
     changes: List<ActionVariableChange>,
-    variables: VariableStore,
+    before: TemplateScope,
+    eventVariables: Map<String, String>,
 ): List<ActionVariableChange> {
     val mayHoldASecret = ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", written) ||
         ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", expanded)
-    // Settled the way setMultipleVariables settles each name.
-    val hiddenNames = multipleVariablesEntries(expanded).mapNotNullTo(hashSetOf()) { entry ->
-        val name = entry?.first ?: return@mapNotNullTo null
-        val direct = VariableNamePolicy.normalize(name)
-        when {
-            direct == null -> variables.expandTracked(name).takeIf { it.isSecretDerived }?.text?.let(VariableNamePolicy::normalize)
-            mayHoldASecret && !name.startsWith('%') -> direct
-            else -> null
-        }
+    // Played again from where the step started, secrets and all, since a name settled earlier in the
+    // list can change what a later one is built from, as in `%Pin` and then `%cache_%Pin`.
+    val replay = VariableStore().apply {
+        before.global.forEach { (name, value) -> set(name, value, sensitive = name in before.sensitiveGlobal) }
+        before.task.forEach { (name, value) -> set(name, value, sensitive = name in before.sensitiveTask) }
+        before.arrays.forEach { (name, items) -> setArray(name, items, sensitive = name in before.sensitiveArrays) }
     }
+    val bare = if (!mayHoldASecret) emptyList() else multipleVariablesEntries(expanded).mapNotNull { entry ->
+        entry?.first?.takeUnless { it.startsWith('%') }?.let(VariableNamePolicy::normalize)
+    }
+    val hiddenNames = (replay.setMultipleVariables(expanded, eventVariables).secretNames + bare).toHashSet()
     return countHiddenChanges(changes) { it.name in hiddenNames }
 }
 

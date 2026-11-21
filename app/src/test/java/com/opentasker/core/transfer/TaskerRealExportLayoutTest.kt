@@ -1259,6 +1259,27 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
+    fun aLoopUnderAnHourSaysOneHour() {
+        // 33,333 passes of 120 ms is about 1.1 hours.
+        val wait = """<code>30</code><Int sr="arg0" val="120"/><Int sr="arg1" val="0"/><Int sr="arg2" val="0"/><Int sr="arg3" val="0"/><Int sr="arg4" val="0"/>"""
+        val note = pollNotes(wait, countUp, gotoStep(1)).single()
+        assertTrue(note, note.endsWith(", about 1 hour of this loop."))
+    }
+
+    @Test
+    fun aLoopThatCanNeverPollGetsNoNote() {
+        val off = "<on>false</on>"
+        val waitOneHour = """<code>30</code><Int sr="arg0" val="0"/><Int sr="arg1" val="0"/><Int sr="arg2" val="0"/><Int sr="arg3" val="1"/><Int sr="arg4" val="0"/>"""
+        val forEach = """<code>39</code><Str sr="arg0" ve="3">%pair</Str><Str sr="arg1" ve="3">a,b</Str>"""
+        // A switched-off Goto, a switched-off Wait, a Wait past the 30 minute limit (the run fails on
+        // it), and a jump into a For loop from outside it (the run halts there).
+        assertEquals(emptyList<String>(), pollNotes(waitOneSecond, countUp, gotoStep(1) + off))
+        assertEquals(emptyList<String>(), pollNotes(waitOneSecond + off, countUp, gotoStep(1)))
+        assertEquals(emptyList<String>(), pollNotes(waitOneHour, countUp, gotoStep(1)))
+        assertEquals(emptyList<String>(), pollNotes(forEach, waitOneSecond, "<code>40</code>", gotoStep(2)))
+    }
+
+    @Test
     fun onlyAGotoBackOverAWaitGetsTheNote() {
         assertEquals(emptyList<String>(), pollNotes(countUp, gotoStep(1)))
         assertEquals(emptyList<String>(), pollNotes(gotoStep(3), waitOneSecond, countUp))

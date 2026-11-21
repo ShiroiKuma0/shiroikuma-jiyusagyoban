@@ -139,12 +139,12 @@ class IntentDispatchPolicyTest {
     }
 
     @Test
-    fun onlyThisAppsOwnClassesAreReachedUnexported() {
+    fun onlyThisAppsOwnClassesCanBeNamedInsideIt() {
         val app = "com.opentasker.app"
-        assertTrue(IntentDispatchPolicy.mayReachUnexported(app, "com.opentasker.app.Receiver", app))
-        // A library's component merged into this app, or a class outside the app's name, must be exported.
-        assertEquals(false, IntentDispatchPolicy.mayReachUnexported(app, "androidx.work.impl.background.systemalarm.RescheduleReceiver", app))
-        assertEquals(false, IntentDispatchPolicy.mayReachUnexported(app, "com.opentasker.application.Receiver", app))
-        assertEquals(false, IntentDispatchPolicy.mayReachUnexported("org.autojs.autojs6", "org.autojs.autojs6.Main", app))
+        assertTrue(IntentDispatchPolicy.isOwnClass(app, "com.opentasker.app.Receiver", app))
+        // A library's component merged into this app, or a class outside the app's name, is refused.
+        assertEquals(false, IntentDispatchPolicy.isOwnClass(app, "androidx.work.impl.background.systemalarm.RescheduleReceiver", app))
+        assertEquals(false, IntentDispatchPolicy.isOwnClass(app, "com.opentasker.application.Receiver", app))
+        assertEquals(false, IntentDispatchPolicy.isOwnClass("org.autojs.autojs6", "org.autojs.autojs6.Main", app))
     }
 }

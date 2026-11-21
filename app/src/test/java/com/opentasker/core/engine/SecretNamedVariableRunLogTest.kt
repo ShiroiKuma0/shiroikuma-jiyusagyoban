@@ -81,6 +81,22 @@ class SecretNamedVariableRunLogTest {
     }
 
     @Test
+    fun aNameBuiltFromASecretStaysHiddenWhenALaterNameChangesTheSecret() {
+        val variables = VariableStore()
+        variables.set("Pin", "1234", sensitive = true)
+        val (serialized, _) = run(variables, setMultiple("names" to "%cache_%Pin\n%Pin", "values" to "warm\n0000"))
+        assertFalse(serialized, "cache_1234" in serialized)
+    }
+
+    @Test
+    fun aNameBuiltFromASecretAnEarlierNameChangedStaysHidden() {
+        val variables = VariableStore()
+        variables.set("Pin", "1234", sensitive = true)
+        val (serialized, _) = run(variables, setMultiple("names" to "%Pin\n%cache_%Pin", "values" to "0000\nwarm"))
+        assertFalse(serialized, "cache_0000" in serialized)
+    }
+
+    @Test
     fun setVariableOnANameBuiltFromASecretKeepsTheNameOut() {
         val variables = VariableStore()
         variables.set("Pin", "1234", sensitive = true)

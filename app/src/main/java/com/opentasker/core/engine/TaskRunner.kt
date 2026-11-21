@@ -824,7 +824,8 @@ class TaskRunner(
             if (change.sensitive || !hidden) change else change.copy(sensitive = true)
         }.let { changes ->
             when {
-                spec.type == "var.set_multiple" -> multipleVariablesShownChanges(spec.args, expansionReport.args, changes, ctx.variables)
+                spec.type == "var.set_multiple" ->
+                    multipleVariablesShownChanges(spec.args, expansionReport.args, changes, before, ctx.eventVariables)
                 // A name filled in from a secret, like %cache_%Pin, holds that secret.
                 spec.type == "var.set" && expansionReport.expansions.any { it.argName == "name" && it.isSecretDerived } ->
                     countHiddenChanges(changes) { true }
