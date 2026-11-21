@@ -8,6 +8,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.opentasker.core.registerCoreRuntime
 import com.opentasker.core.actions.registerActionMetadata
+import com.opentasker.core.contexts.CompanionDeviceAssociation
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.AppDatabaseProvider
@@ -167,6 +168,14 @@ class OpenTaskerApp_NoHilt : Application() {
                     VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
                 }.onFailure { error ->
                     AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
+                }
+            }
+            // Devices paired before presence was watched (or by an older version) get watched too.
+            applicationScope.launch {
+                runCatching {
+                    CompanionDeviceAssociation.observePresence(this@OpenTaskerApp_NoHilt, CompanionDeviceAssociation.list(this@OpenTaskerApp_NoHilt))
+                }.onFailure { error ->
+                    AppLogger.error("OpenTasker", "Watching paired devices failed", error)
                 }
             }
 

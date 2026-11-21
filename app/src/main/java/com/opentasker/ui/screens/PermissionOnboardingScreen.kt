@@ -433,7 +433,10 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
             // Each read stands alone: this runs on every open of Setup and Settings, and one
             // uncaught throw here took both screens down with the app (#20).
             val probes = SetupProbes(::logFailedCheck)
-            _associations.value = probes.read("paired devices", emptyList()) { CompanionDeviceAssociation.list(context) }
+            // Pairing in either flow ends here, so a new device gets watched as soon as it's listed.
+            _associations.value = probes.read("paired devices", emptyList()) {
+                CompanionDeviceAssociation.list(context).also { CompanionDeviceAssociation.observePresence(context, it) }
+            }
             _pushToken.value = probes.read("the push token", "") { PushTriggerTokenStore(context).token() }
             _pushRegistration.value = probes.read("UnifiedPush registration", UnifiedPushRegistrationState()) {
                 UnifiedPushEndpointStore(context).state()
