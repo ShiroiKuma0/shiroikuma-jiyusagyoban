@@ -238,6 +238,8 @@ object ActionCatalog {
         define("dialog.text", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::TextDialogAction),
         define("dialog.pickdir", ActionCategory.SYSTEM, ActionRetrySafety.NEVER, ::PickDirectoryAction),
         define("project.export", ActionCategory.APP, ActionRetrySafety.NEVER, ::ProjectExportAction),
+        define("package.install", ActionCategory.APP, ActionRetrySafety.NEVER, ::PackageInstallAction),
+        define("workspace.import", ActionCategory.APP, ActionRetrySafety.NEVER, ::WorkspaceImportAction),
         define("image.badge", ActionCategory.APP, ActionRetrySafety.IDEMPOTENT, ::BadgeImageAction),
         define("scene.gestures", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::SceneGesturesAction),
         define("key.bindings", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::KeyBindingsAction),
