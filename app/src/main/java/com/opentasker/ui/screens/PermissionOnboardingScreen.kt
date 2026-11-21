@@ -600,6 +600,19 @@ internal fun buildPermissionItems(
             optional = true,
         ) else null,
         PermissionSetupItem(
+            title = "Install unknown apps",
+            body = "Lets a task install or update an app from an APK file — the remote update of a 携帯 relay phone " +
+                "(“/install” in a SIM's Jami group). An update of 白い熊 自由作業盤 itself, or of an app it installed " +
+                "before, then needs no tap. On Samsung, “Auto Blocker” must be off as well.",
+            granted = context.packageManager.canRequestPackageInstalls(),
+            actionLabel = "Open settings",
+            action = PermissionAction.SettingsIntent(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${context.packageName}")),
+            ),
+            requiredFor = "Remote updates (package.install)",
+            optional = true,
+        ),
+        PermissionSetupItem(
             title = "Usage access",
             body = "Needed to detect foreground apps without an accessibility service.",
             granted = UsageAccess.hasUsageStatsAccess(context),

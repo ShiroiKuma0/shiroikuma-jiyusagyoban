@@ -5,6 +5,8 @@ import com.opentasker.core.engine.ActionCategory
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.telephony.DataSimSwitch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * `Set data SIM` — point mobile data at a SIM slot, so a task can measure each SIM in turn.
@@ -172,6 +174,9 @@ class SimStatusAction : Action {
     }
 }
 
+/** Serialises [UssdAction] across every task: see the comment where it is taken. */
+private val ussdLock = Mutex()
+
 /**
  * `Run USSD` — send a USSD code (`*#21#`, a balance code…) from one SIM slot and wait for the
  * network's answer, so the SMS bridge can report call forwarding and credit without anyone touching
@@ -206,8 +211,11 @@ class UssdAction : Action {
             ?.createForSubscriptionId(sim.subId)
             ?: return ActionResult.Failure("this phone has no telephony service")
 
+        // One code at a time, on the whole phone: the modem answers one request, and a second one
+        // sent meanwhile (the other SIM's conversation, the daily forwarding check) is refused. The
+        // wait for the lock is inside the timeout, so a queue of codes cannot outlast the budget.
         // first = the network's answer, second = its failure code.
-        val outcome: Pair<String?, Int?>? = kotlinx.coroutines.withTimeoutOrNull(timeoutSec * 1000L) {
+        val outcome: Pair<String?, Int?>? = kotlinx.coroutines.withTimeoutOrNull(timeoutSec * 1000L) { ussdLock.withLock {
             kotlinx.coroutines.suspendCancellableCoroutine { cont ->
                 val callback = object : android.telephony.TelephonyManager.UssdResponseCallback() {
                     override fun onReceiveUssdResponse(t: android.telephony.TelephonyManager, request: String, response: CharSequence) {
@@ -225,7 +233,7 @@ class UssdAction : Action {
                     if (cont.isActive) cont.resumeWith(Result.failure(ex))
                 }
             }
-        }
+        } }
         return when {
             outcome == null -> {
                 ctx.variables.set(resultVar, "")

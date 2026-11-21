@@ -247,6 +247,8 @@ object ActionCapabilityRegistry {
         "sim.list" to ActionCapability(CapabilityLevel.Supported, "Reads the active SIM slots and which one carries data."),
         "sim.status" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (READ_PHONE_STATE) permission to read a SIM slot's service state and signal."),
         "ussd.run" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs the Phone (CALL_PHONE) permission to send a USSD code from a SIM slot."),
+        "package.install" to ActionCapability(CapabilityLevel.RequiresSetup, "Needs “Install unknown apps” allowed for this app. Silent on Android 12+ for an update of this app itself, and for another app from the second install on; otherwise the accessibility service presses the confirmation."),
+        "workspace.import" to ActionCapability(CapabilityLevel.Supported, "Imports an OpenTasker bundle file into this workspace, overwriting same-name items in place."),
         "provider.call" to ActionCapability(CapabilityLevel.Supported, "Calls another app's content provider; that app decides whether to answer us."),
         "file.from_uri" to ActionCapability(CapabilityLevel.Supported, "Copies a content URI another app has lent us into a local file."),
         // Reads a fix through the framework LocationManager; the permission is the whole requirement.

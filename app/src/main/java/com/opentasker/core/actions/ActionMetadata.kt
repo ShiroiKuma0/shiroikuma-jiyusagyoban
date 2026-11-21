@@ -1905,6 +1905,37 @@ fun registerActionMetadata() {
 
     ActionMetadataRegistry.register(
         ActionMetadata(
+            id = "package.install",
+            name = "Install Package",
+            description = "Install or update an APK from a file — silently where Android allows it (an update of this app, or of an app this app installed before). An update of this app restarts it and then runs the report task",
+            category = "App",
+            fields = listOf(
+                ActionField("path", "APK file", required = true, pathPicker = true),
+                ActionField("name", "File name for the kept copy", hint = "default: the file's own name"),
+                ActionField("keep_dir", "Keep a copy in", hint = "default /sdcard/tmp; - keeps none. An existing file is never overwritten"),
+                ActionField("reinstall", "Reinstall the same build", FieldType.CHECKBOX, hint = "off: a build that is already installed is refused"),
+                ActionField("report_task", "Task to run after a self-update", hint = "runs once this app has restarted; gets every param:<name> argument and the result variables as locals"),
+                ActionField("prefix", "Variable prefix", hint = "default pi — writes %pi_ok (true/false), %pi_message, %pi_package, %pi_label, %pi_version, %pi_old_version, %pi_self, %pi_kept"),
+                ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "default 180, max 280"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "workspace.import",
+            name = "Import Bundle",
+            description = "Import an OpenTasker bundle file: projects merged by name, same-name items overwritten in place. Overwritten profiles keep their on/off state; new profiles arrive off",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("path", "Bundle file (JSON)", required = true, pathPicker = true),
+                ActionField("prefix", "Variable prefix", hint = "default wi — writes %wi_ok, %wi_message, %wi_tasks, %wi_profiles, %wi_scenes, %wi_variables, %wi_projects, %wi_warnings"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
             id = "provider.call",
             name = "Call Provider",
             description = "Call another app's content provider method (e.g. 白い熊 GNU Jami's or 白い熊 メッセージ's bridge methods) and spread its answer into variables",
