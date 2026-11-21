@@ -123,6 +123,9 @@ class ShizukuPowerBackendTest {
             "aod.set" to listOf(
                 listOf("settings", "put", "secure", "doze_always_on", "1"),
                 listOf("settings", "put", "secure", "doze_always_on", "0"),
+                listOf("settings", "put", "system", "aod_mode", "1"),
+                listOf("settings", "put", "system", "aod_mode", "0"),
+                listOf("settings", "get", "system", "aod_mode"),
             ),
             "screenshot.take" to listOf(listOf("screencap", "-p")),
             "reboot" to listOf(listOf("svc", "power", "reboot")),

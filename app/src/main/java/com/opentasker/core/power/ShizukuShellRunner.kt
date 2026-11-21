@@ -310,10 +310,15 @@ internal object ShizukuCommandPolicy {
             listOf("svc", "data", "disable"),
         ),
         // Writing the key succeeds on builds that ignore it, so the action reads the value back
-        // rather than trusting a zero exit code.
+        // rather than trusting a zero exit code. One UI ignores doze_always_on and follows its own
+        // system aod_mode, which an app can't count on reading, so its read goes through here too.
+        // The action picks these by index (AlwaysOnDisplaySwitch), so the order is fixed.
         "aod.set" to listOf(
             listOf("settings", "put", "secure", "doze_always_on", "1"),
             listOf("settings", "put", "secure", "doze_always_on", "0"),
+            listOf("settings", "put", "system", "aod_mode", "1"),
+            listOf("settings", "put", "system", "aod_mode", "0"),
+            listOf("settings", "get", "system", "aod_mode"),
         ),
         "screenshot.take" to listOf(
             listOf("screencap", "-p"),

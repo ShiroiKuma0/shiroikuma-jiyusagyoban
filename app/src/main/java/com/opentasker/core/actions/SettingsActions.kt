@@ -510,43 +510,114 @@ class ScreenTimeoutAction : DeclaredAction(ActionCatalog.require("screen.timeout
  * the key, so writing it proves nothing. The value is read before and after the write and the
  * action fails when the device did not actually change, rather than reporting a Success the user
  * can see is false.
+ *
+ * One UI ignores that key (a Galaxy S22 on Android 16 reads it as null) and follows its own
+ * `system aod_mode` instead, so [AlwaysOnDisplaySwitch] picks the switch from the maker and the
+ * keys that are there. aod_mode isn't an AOSP key and an app can't count on reading it, so it's
+ * read through Shizuku's allowlisted `settings get`, before and after the write alike.
  */
-class AlwaysOnDisplayAction : DeclaredAction(ActionCatalog.require("aod.set")) {
+class AlwaysOnDisplayAction(
+    private val manufacturer: () -> String? = { Build.MANUFACTURER },
+    private val readDozeAlwaysOn: (Context) -> Int? = { context ->
+        runCatching { Settings.Secure.getInt(context.contentResolver, ALWAYS_ON_DISPLAY_KEY) }.getOrNull()
+    },
+    /** Runs one of aod.set's allowlisted Shizuku commands by its index. */
+    private val shell: (variantIndex: Int) -> ShellResult = { variant -> ShizukuShellRunner.execute("aod.set", variant) },
+) : DeclaredAction(ActionCatalog.require("aod.set")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val state = args["state"]?.lowercase() ?: "toggle"
-        val current = readAlwaysOnDisplay(ctx)
+        if (state !in STATES) return ActionResult.Failure("invalid always-on display state: $state")
+
+        val maker = manufacturer()
+        val doze = readDozeAlwaysOn(ctx.app)
+        val aodMode = if (AlwaysOnDisplaySwitch.needsSamsungKey(maker, doze)) {
+            when (val read = shell(AlwaysOnDisplaySwitch.SAMSUNG_READ_VARIANT)) {
+                is ShellResult.Success -> AlwaysOnDisplaySwitch.parseSettingsGet(read.output)
+                // On a Samsung the switch can only be read through Shizuku, which the write needs too.
+                is ShellResult.Failure -> if (AlwaysOnDisplaySwitch.isSamsung(maker)) return ActionResult.Failure(read.reason) else null
+            }
+        } else {
+            null
+        }
+        val switch = AlwaysOnDisplaySwitch.choose(maker, doze, aodMode)
             ?: return ActionResult.Failure(
-                "This device does not expose the always-on display setting ($ALWAYS_ON_DISPLAY_KEY), so it cannot be changed.",
+                "This device does not expose the always-on display setting ($ALWAYS_ON_DISPLAY_KEY, or aod_mode on Samsung), so it cannot be changed.",
             )
+        val current = when (switch) {
+            AlwaysOnDisplaySwitch.AOSP -> doze
+            AlwaysOnDisplaySwitch.SAMSUNG -> aodMode
+        }
         val target = when (state) {
             "on" -> 1
             "off" -> 0
-            "toggle" -> if (current == 1) 0 else 1
-            else -> return ActionResult.Failure("invalid always-on display state: $state")
+            else -> if (current == 1) 0 else 1
         }
-        ctx.logger("Always-on display: $state")
+        ctx.logger("Always-on display: $state (${switch.table} ${switch.key})")
         if (target == current) return ActionResult.Success
 
-        val result = ctx.runShizukuAction("aod.set", "Always-on display", if (target == 1) 0 else 1)
-        if (result !is ActionResult.Success) return result
+        when (val write = shell(if (target == 1) switch.onVariant else switch.offVariant)) {
+            is ShellResult.Failure -> return ActionResult.Failure(write.reason)
+            is ShellResult.Success -> ctx.logger("Always-on display completed")
+        }
 
-        val applied = readAlwaysOnDisplay(ctx)
-        return if (applied == target) {
-            ActionResult.Success
-        } else {
-            ActionResult.Failure(
+        val applied = when (switch) {
+            AlwaysOnDisplaySwitch.AOSP -> readDozeAlwaysOn(ctx.app)
+            AlwaysOnDisplaySwitch.SAMSUNG -> (shell(AlwaysOnDisplaySwitch.SAMSUNG_READ_VARIANT) as? ShellResult.Success)
+                ?.output
+                ?.let(AlwaysOnDisplaySwitch::parseSettingsGet)
+        }
+        return when (applied) {
+            target -> ActionResult.Success
+            null -> ActionResult.Failure(
+                "Always-on display couldn't be read back after the write (${switch.key}), so it may not have changed.",
+            )
+            else -> ActionResult.Failure(
                 "Always-on display is still ${if (applied == 1) "on" else "off"}; this build accepted the write and ignored it.",
             )
         }
     }
 
-    private fun readAlwaysOnDisplay(ctx: ActionContext): Int? = runCatching {
-        Settings.Secure.getInt(ctx.app.contentResolver, ALWAYS_ON_DISPLAY_KEY)
-    }.getOrNull()
-
     companion object {
         internal const val ALWAYS_ON_DISPLAY_KEY = "doze_always_on"
+        private val STATES = setOf("on", "off", "toggle")
+    }
+}
+
+/**
+ * The setting a device's always-on display follows, with the indexes of aod.set's allowlisted
+ * Shizuku commands that turn it on and off.
+ */
+internal enum class AlwaysOnDisplaySwitch(val table: String, val key: String, val onVariant: Int, val offVariant: Int) {
+    /** AOSP's switch, which the app reads itself. */
+    AOSP("secure", AlwaysOnDisplayAction.ALWAYS_ON_DISPLAY_KEY, onVariant = 0, offVariant = 1),
+
+    /** One UI's switch, read through Shizuku. */
+    SAMSUNG("system", "aod_mode", onVariant = 2, offVariant = 3),
+    ;
+
+    companion object {
+        /** `settings get system aod_mode`. */
+        const val SAMSUNG_READ_VARIANT = 4
+
+        fun isSamsung(manufacturer: String?): Boolean = manufacturer?.trim().equals("samsung", ignoreCase = true)
+
+        /** Whether aod_mode has to be read before a switch can be picked. */
+        fun needsSamsungKey(manufacturer: String?, dozeAlwaysOn: Int?): Boolean =
+            isSamsung(manufacturer) || dozeAlwaysOn == null
+
+        /**
+         * aod_mode on a Samsung, or wherever doze_always_on is missing and aod_mode is there; else
+         * doze_always_on when it's there (a Samsung running an AOSP build, say); null when neither is.
+         */
+        fun choose(manufacturer: String?, dozeAlwaysOn: Int?, aodMode: Int?): AlwaysOnDisplaySwitch? = when {
+            aodMode != null && needsSamsungKey(manufacturer, dozeAlwaysOn) -> SAMSUNG
+            dozeAlwaysOn != null -> AOSP
+            else -> null
+        }
+
+        /** `settings get` prints the value, or `null` for a key the device doesn't have. */
+        fun parseSettingsGet(output: String): Int? = output.trim().toIntOrNull()
     }
 }
 
