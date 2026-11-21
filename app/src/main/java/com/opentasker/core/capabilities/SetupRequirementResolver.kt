@@ -138,20 +138,17 @@ object SetupRequirementResolver {
                     add(SetupRequirement.BACKGROUND_LOCATION)
                 }
                 ContextType.STATE -> {
-                    // The value is a device name here, so the word matching below would read
-                    // "Sam's Phone" as a phone-state context and "Home Network" as a Wi-Fi one.
-                    if (stateContextKey(context) == BT_NEAR_STATE_KEY) {
+                    val key = stateContextKey(context)
+                    if (key == BT_NEAR_STATE_KEY) {
                         add(SetupRequirement.BLUETOOTH)
                         add(SetupRequirement.BLUETOOTH_SCAN)
                         return@buildSet
                     }
-                    // Health Connect has its own permissions, and "health_exercise_minutes" shouldn't
-                    // read as a physical activity context below.
-                    if (HealthMetric.forStateKey(stateContextKey(context)) != null) {
+                    // Health Connect has its own permissions.
+                    if (HealthMetric.forStateKey(key) != null) {
                         add(SetupRequirement.HEALTH_CONNECT)
                         return@buildSet
                     }
-                    if (tokens.containsAny("wifi", "ssid", "network")) add(SetupRequirement.NEARBY_WIFI)
                     // Android withholds a network's name without precise location, and withholds it
                     // from a backgrounded app without "allow all the time", so an SSID profile that
                     // skipped these grants read Unknown forever (issue #17).
@@ -159,14 +156,9 @@ object SetupRequirementResolver {
                         add(SetupRequirement.FOREGROUND_LOCATION)
                         add(SetupRequirement.BACKGROUND_LOCATION)
                     }
-                    if (tokens.containsAny("bluetooth", "bt")) add(SetupRequirement.BLUETOOTH)
-                    if (tokens.containsAny("activity", "physical_activity", "motion")) {
-                        add(SetupRequirement.PHYSICAL_ACTIVITY)
-                    }
-                    if (tokens.containsAny("speed", "velocity")) add(SetupRequirement.FOREGROUND_LOCATION)
-                    if (tokens.containsAny("roaming", "phone_call", "call_state", "phone", "call")) {
-                        add(SetupRequirement.PHONE_STATE)
-                    }
+                    // Read from the key, never from words inside it or the value: "headphones" holds
+                    // "phone", and a Wi-Fi network can be named "Phone Hotspot".
+                    addAll(if (key != null) stateKeyRequirements(key) else stateWordRequirements(tokens))
                 }
                 ContextType.EVENT -> when {
                     // Read from the event key alone: a tag ID or another event's text could spell "nfc".
@@ -227,6 +219,31 @@ object SetupRequirementResolver {
             "scene.show", "scene.overlay" -> add(SetupRequirement.OVERLAY)
         }
     }
+
+    /** What a state context's key reads, already through [stateContextKey]'s spellings. */
+    private fun stateKeyRequirements(key: String): Set<SetupRequirement> = when {
+        key == "wifi" || key.startsWith("wifi_") -> setOf(SetupRequirement.NEARBY_WIFI)
+        key == "activity" -> setOf(SetupRequirement.PHYSICAL_ACTIVITY)
+        key == "speed" -> setOf(SetupRequirement.FOREGROUND_LOCATION)
+        key == "roaming" || key == "call_state" -> setOf(SetupRequirement.PHONE_STATE)
+        key.startsWith("bluetooth") || key.startsWith("bt_") -> setOf(SetupRequirement.BLUETOOTH)
+        else -> emptySet()
+    }
+
+    /** A context with no key to read keeps its family's grant, matched by whole words only. */
+    private fun stateWordRequirements(tokens: String): Set<SetupRequirement> {
+        val words = tokens.split(NON_WORD).filter(String::isNotEmpty).toSet()
+        fun any(vararg values: String) = values.any { it in words }
+        return buildSet {
+            if (any("wifi", "ssid", "network")) add(SetupRequirement.NEARBY_WIFI)
+            if (any("bluetooth", "bt")) add(SetupRequirement.BLUETOOTH)
+            if (any("activity", "physical_activity", "motion")) add(SetupRequirement.PHYSICAL_ACTIVITY)
+            if (any("speed", "velocity")) add(SetupRequirement.FOREGROUND_LOCATION)
+            if (any("roaming", "phone_call", "call_state", "phone", "call")) add(SetupRequirement.PHONE_STATE)
+        }
+    }
+
+    private val NON_WORD = Regex("[^a-z0-9_]+")
 
     private fun String.containsAny(vararg values: String): Boolean = values.any(::contains)
 
