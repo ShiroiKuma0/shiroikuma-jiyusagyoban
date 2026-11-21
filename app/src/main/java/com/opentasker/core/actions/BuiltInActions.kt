@@ -287,6 +287,9 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
         val value = args["value"] ?: ""
         // A value typed under a name like %api_token is hidden in the editor, so it is here too.
         val typedSecret = ActionArgumentSensitivity.isSensitive(id, "value", args)
+        // A name filled in from a secret, like %cache_%Pin, holds that secret, so the line leaves it out.
+        val namedFromSecret = ctx.isArgumentSensitive("name")
+        fun shown(written: String) = if (namedFromSecret) "a name filled in from a secret" else "\$$written"
         if (name.contains('.') || name.contains('[')) {
             // Trimmed like a plain name, which `set` trims, and like Preflight reads it.
             val path = name.trim()
@@ -299,7 +302,7 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
             } else {
                 value
             }
-            ctx.logger("Set path \$${path.removePrefix("%")} = $loggedValue")
+            ctx.logger("Set path ${shown(path.removePrefix("%"))} = $loggedValue")
         } else {
             ctx.variables.set(name, value)
             val loggedValue = if (typedSecret || ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(name)) {
@@ -308,7 +311,7 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
                 value
             }
             // Shown as stored, so %api_token and api_token both read as $api_token.
-            ctx.logger("Set \$${VariableNamePolicy.normalize(name) ?: name} = $loggedValue")
+            ctx.logger("Set ${shown(VariableNamePolicy.normalize(name) ?: name)} = $loggedValue")
         }
         return ActionResult.Success
     }

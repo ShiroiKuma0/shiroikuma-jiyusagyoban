@@ -823,8 +823,13 @@ class TaskRunner(
                 ActionArgumentSensitivity.hidesWrittenValue(spec.type, expansionReport.args, change.name)
             if (change.sensitive || !hidden) change else change.copy(sensitive = true)
         }.let { changes ->
-            if (spec.type != "var.set_multiple") changes
-            else multipleVariablesShownChanges(spec.args, changes)
+            when {
+                spec.type == "var.set_multiple" -> multipleVariablesShownChanges(spec.args, expansionReport.args, changes, ctx.variables)
+                // A name filled in from a secret, like %cache_%Pin, holds that secret.
+                spec.type == "var.set" && expansionReport.expansions.any { it.argName == "name" && it.isSecretDerived } ->
+                    countHiddenChanges(changes) { true }
+                else -> changes
+            }
         }
         return result to traceFor(index, spec, started, result, expansionReport, changes)
     }
@@ -1336,6 +1341,25 @@ const val STEP_TURNED_OFF = "step is turned off"
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
 internal const val MAX_FLOW_STEPS = 100_000
+
+/**
+ * [changes] with the ones [hidden] picks folded into one counted line that shows neither their
+ * names nor their values, for names that would give a secret away.
+ */
+internal fun countHiddenChanges(
+    changes: List<ActionVariableChange>,
+    hidden: (ActionVariableChange) -> Boolean,
+): List<ActionVariableChange> {
+    val (counted, shown) = changes.partition(hidden)
+    if (counted.isEmpty()) return changes
+    return shown + ActionVariableChange(
+        scope = counted.first().scope,
+        name = "${counted.size} hidden name(s)",
+        value = "",
+        added = counted.all { it.added },
+        sensitive = true,
+    )
+}
 private const val FLOW_ERROR_JSON = TaskFailureVariables.JSON
 private const val FLOW_ERROR_TASK_ID = TaskFailureVariables.TASK_ID
 private const val FLOW_ERROR_TASK_NAME = TaskFailureVariables.TASK_NAME

@@ -354,10 +354,15 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
 
     fun refreshAssociations() {
         viewModelScope.launch(Dispatchers.IO) {
-            _associations.value = SetupProbes(::logFailedCheck).read("paired devices", emptyList()) {
-                CompanionDeviceAssociation.list(context)
-            }
+            _associations.value = listAndWatchAssociations(SetupProbes(::logFailedCheck))
         }
+    }
+
+    /** The paired devices, each watched so its presence profile fires. A failed watch leaves the list alone. */
+    private fun listAndWatchAssociations(probes: SetupProbes): List<CompanionAssociation> {
+        val associations = probes.read("paired devices", emptyList()) { CompanionDeviceAssociation.list(context) }
+        probes.read("watching paired devices", Unit) { CompanionDeviceAssociation.observePresence(context, associations) }
+        return associations
     }
 
     fun revokeLocaleGrant(token: String) {
@@ -434,9 +439,7 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
             // uncaught throw here took both screens down with the app (#20).
             val probes = SetupProbes(::logFailedCheck)
             // Pairing in either flow ends here, so a new device gets watched as soon as it's listed.
-            _associations.value = probes.read("paired devices", emptyList()) {
-                CompanionDeviceAssociation.list(context).also { CompanionDeviceAssociation.observePresence(context, it) }
-            }
+            _associations.value = listAndWatchAssociations(probes)
             _pushToken.value = probes.read("the push token", "") { PushTriggerTokenStore(context).token() }
             _pushRegistration.value = probes.read("UnifiedPush registration", UnifiedPushRegistrationState()) {
                 UnifiedPushEndpointStore(context).state()
@@ -1067,9 +1070,10 @@ internal fun CompanionSetupCard(
     val failureMessage = stringResource(R.string.setup_companion_failed)
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult(),
-    ) {
+    ) { result ->
         onRefresh()
-        onMessage(associatedMessage)
+        // From 33 onAssociationCreated says so; a cancelled chooser changed nothing.
+        if (result.resultCode == Activity.RESULT_OK && Build.VERSION.SDK_INT < 33) onMessage(associatedMessage)
     }
 
     Card(

@@ -138,4 +138,53 @@ class SecretInsideTemplateTest {
         val warnings = preflightAllWarnings(copy, setColor("{{ %copy }}"))
         assertTrue(warnings.toString(), warnings.none { "abc123" in it })
     }
+
+    @Test
+    fun preflightKeepsACopyMadeByMultipleVariablesSetSecret() {
+        val copy = ActionSpec(type = "var.set_multiple", args = mapOf("names" to "%copy", "values" to "%Token"))
+        val warnings = preflightAllWarnings(copy, setColor("{{ %copy }}"))
+        assertTrue(warnings.toString(), warnings.none { "abc123" in it })
+    }
+
+    /**
+     * The stored run log and the traces of steps run on [store], with the app log lines in [logs].
+     * A trace keeps a secret change's value in memory, marked sensitive, for the run log to hide.
+     */
+    private fun runOn(store: VariableStore, logs: MutableList<String>, vararg steps: ActionSpec): Pair<String, List<ActionExecutionTrace>> {
+        val report = runBlocking {
+            TaskRunner(ActionContext(ContextWrapper(null), store, logger = { logs += it })).run(Task(name = "T", actions = steps.toList()))
+        }
+        return runLogMessage(source = "manual", traces = report.traces) to report.traces
+    }
+
+    @Test
+    fun aChangedReadOfASecretInABlockClosedByAnotherVariableStaysHidden() {
+        assertFalse(runLog(setColor("{{ %Token(upper)%Close")).contains("ABC123"))
+        assertTrue(preflightAllWarnings(setColor("{{ %Token(upper)%Close")).none { "ABC123" in it })
+    }
+
+    @Test
+    fun anItemOfASecretArrayInABlockClosedByAnotherVariableStaysHidden() {
+        val store = VariableStore().apply {
+            setArray("Secrets", listOf("abc123", "abc123"), sensitive = true)
+            plainGlobals.forEach { (name, value) -> set(name, value) }
+        }
+        val (log, traces) = runOn(store, mutableListOf(), setColor("{{ %Secrets(1)%Close"))
+        assertFalse(log, log.contains("abc123"))
+        assertFalse(traces.toString(), traces.single().templateWarnings.any { "abc123" in it })
+    }
+
+    @Test
+    fun anItemReadFromASecretArrayWithAHyphenInItsNameStaysSecret() {
+        // %my-arr(1) reads the array my-arr, never %my followed by -arr(1), even with %my set.
+        val store = VariableStore().apply {
+            setArray("my-arr", listOf("abc123", "abc123"), sensitive = true)
+            set("my", "plain")
+        }
+        val logs = mutableListOf<String>()
+        val (log, traces) = runOn(store, logs, ActionSpec(type = "var.set", args = mapOf("name" to "%out", "value" to "%my-arr(1)")))
+        assertTrue(traces.single().variableChanges.single { it.name == "out" }.sensitive)
+        assertFalse(log, log.contains("abc123"))
+        assertFalse(logs.toString(), logs.any { "abc123" in it })
+    }
 }

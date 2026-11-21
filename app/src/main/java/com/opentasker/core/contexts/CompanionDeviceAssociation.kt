@@ -172,6 +172,11 @@ object CompanionDeviceAssociation {
                 request,
                 activity.mainExecutor,
                 object : CompanionDeviceManager.Callback() {
+                    // From 33 the chooser comes here; left alone it goes to onDeviceFound, which does nothing.
+                    override fun onAssociationPending(intentSender: IntentSender) {
+                        callback(CompanionAssociationResult.Found(intentSender))
+                    }
+
                     override fun onAssociationCreated(associationInfo: AssociationInfo) {
                         callback(
                             CompanionAssociationResult.Created(

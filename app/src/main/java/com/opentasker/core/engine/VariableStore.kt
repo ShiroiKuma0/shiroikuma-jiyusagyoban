@@ -384,18 +384,34 @@ class VariableStore {
      */
     fun readsASecretInsideATemplate(s: String, expanded: String): Boolean {
         val secretReads = variableReference.findAll(s).filter { readsASecret(s, it) }.toList()
-        if (secretReads.isEmpty()) return false
-        val blocks = templateBlock.findAll(s).map { it.range }.toList()
-        if (secretReads.any { match -> blocks.any { match.range.first in it } }) return true
-        val values = secretReads.mapNotNull { get(readName(it.groupValues[1])) }.filter(String::isNotEmpty)
+        if (secretReads.isEmpty() || !templateBlock.containsMatchIn(expanded)) return false
+        // A read after a `{{` that's still open lands in a block however the block closes, as written
+        // or from another variable, and whatever the read gives, `(upper)` or an array item included.
+        if (secretReads.any { opensATemplateBefore(s, it.range.first) }) return true
+        // A `{{` from another variable: the secret's own text inside a block gives it away.
+        val values = secretReads.mapNotNull { get(nameRead(s, it)) }.filter(String::isNotEmpty)
         return values.isNotEmpty() && templateBlock.findAll(expanded).any { block -> values.any(block.value::contains) }
     }
 
-    private fun readsASecret(s: String, match: MatchResult): Boolean {
-        val name = readName(match.groupValues[1])
-        return isSensitive(name) || name in sensitiveArrayNames ||
-            (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(match.groupValues[1]))
+    /** Whether a `{{` written before [at] in [s] hasn't closed by then. */
+    private fun opensATemplateBefore(s: String, at: Int): Boolean {
+        val open = s.lastIndexOf("{{", at - 2)
+        if (open < 0) return false
+        val close = s.indexOf("}}", open + 2)
+        return close < 0 || close + 2 > at
     }
+
+    private fun readsASecret(s: String, match: MatchResult): Boolean {
+        val name = nameRead(s, match)
+        return isSensitive(name) || name in sensitiveArrayNames ||
+            (isOperatorForm(s, match) && anyNumberedItemSensitive(match.groupValues[1]))
+    }
+
+    private fun isOperatorForm(s: String, match: MatchResult): Boolean = s.startsWith("(", match.range.last + 1)
+
+    /** An operator form like `%my-arr(1)` reads its whole name, as [VariableExpander] does; only a plain read falls back. */
+    private fun nameRead(s: String, match: MatchResult): String =
+        if (isOperatorForm(s, match)) match.groupValues[1] else readName(match.groupValues[1])
 
     /**
      * The variable `%name` reads: itself, or for an unset name with a hyphen the longest set prefix,

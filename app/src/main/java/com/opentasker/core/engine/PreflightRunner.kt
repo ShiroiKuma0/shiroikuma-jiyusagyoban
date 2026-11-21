@@ -1132,6 +1132,8 @@ object PreflightRunner {
             "var.clear" -> variables.clearVariables(values)
             "var.set_multiple" -> {
                 val outcome = variables.setMultipleVariables(values, eventVariables)
+                // A run keeps every variable a step sets from a secret secret, so this does too.
+                if (readsASecret) outcome.set.forEach { name -> variables.get(name)?.let { variables.set(name, it, sensitive = true) } }
                 val failure = multipleVariablesFailure(values, outcome) ?: return null
                 // Only a name that reads as one once its variables are filled in, like %item%n or
                 // %Title(lower); a line such as `Total %count` fails whatever %count holds.

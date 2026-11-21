@@ -676,7 +676,7 @@
     <string name="run_log_export_json">Export JSON</string>
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
-    <string name="run_log_export_note">Share sends the Diagnostics report; JSON and CSV save this run history with secrets hidden, which helps with a bug about a run.</string>
+    <string name="run_log_export_note">Share sends the Diagnostics report. JSON and CSV save this run history with secrets hidden, which helps with a bug about a run.</string>
     <string name="run_log_export_csv">Export CSV</string>
     <string name="run_log_show_all_actions">Show all %1$d actions</string>
     <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>

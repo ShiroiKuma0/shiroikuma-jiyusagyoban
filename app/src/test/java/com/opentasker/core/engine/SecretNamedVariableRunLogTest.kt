@@ -72,8 +72,20 @@ class SecretNamedVariableRunLogTest {
     fun aNameBuiltFromASecretIsOnlyCountedAndItsValueHidden() {
         val variables = VariableStore()
         variables.set("Pin", "1234", sensitive = true)
-        val (_, changes) = run(variables, setMultiple("names" to "%cache_%Pin,warm\n%b,1"))
-        assertEquals(mapOf("cache_1234" to "<redacted>", "b" to "1"), changes)
+        val (serialized, changes) = run(variables, setMultiple("names" to "%cache_%Pin,warm\n%b,1"))
+        // The name itself holds the PIN, so the change list counts it as the app log line does.
+        assertFalse(serialized, "cache_1234" in serialized)
+        assertEquals("1", changes["b"])
+        assertEquals(2, changes.size)
         assertEquals(listOf("var.set_multiple -> set 2 variable(s)"), logs)
+    }
+
+    @Test
+    fun setVariableOnANameBuiltFromASecretKeepsTheNameOut() {
+        val variables = VariableStore()
+        variables.set("Pin", "1234", sensitive = true)
+        val (serialized, _) = run(variables, setVariable("%cache_%Pin", "warm"))
+        assertFalse(serialized, "cache_1234" in serialized)
+        assertFalse(logs.toString(), logs.any { "cache_1234" in it })
     }
 }

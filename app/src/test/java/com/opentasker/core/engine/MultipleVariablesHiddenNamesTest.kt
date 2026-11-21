@@ -28,8 +28,7 @@ class MultipleVariablesHiddenNamesTest {
     private fun setMultiple(names: String, values: String) =
         ActionSpec(type = "var.set_multiple", args = mapOf("names" to names, "values" to values))
 
-    private fun run(step: ActionSpec): Pair<String, ActionExecutionTrace> {
-        val store = VariableStore().apply { set("Pin", "1234", sensitive = true) }
+    private fun run(step: ActionSpec, store: VariableStore = VariableStore().apply { set("Pin", "1234", sensitive = true) }): Pair<String, ActionExecutionTrace> {
         val report = runBlocking {
             TaskRunner(ActionContext(ContextWrapper(null), store, logger = {})).run(Task(name = "T", actions = listOf(step)))
         }
@@ -60,6 +59,15 @@ class MultipleVariablesHiddenNamesTest {
     fun aBareWordInAnOrdinaryListStillShows() {
         val (_, trace) = run(setMultiple("%color\nsize", "red\n2"))
         assertEquals(setOf("color", "size"), trace.variableChanges.map { it.name }.toSet())
+    }
+
+    @Test
+    fun aBareWordSplitOffWhenTheValuesComeOutEmptyIsOnlyCounted() {
+        // Values fills in empty, so the step reads each name's own value off its line, as it ran.
+        val store = VariableStore().apply { set("None", "") }
+        val (serialized, trace) = run(setMultiple("%api_token,abc\nhunter2,xyz", "%None"), store)
+        assertFalse(serialized, "hunter2" in serialized)
+        assertTrue(trace.variableChanges.toString(), trace.variableChanges.any { it.name == "api_token" })
     }
 
     @Test
