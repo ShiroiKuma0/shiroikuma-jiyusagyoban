@@ -40,6 +40,11 @@ private const val BT_NEAR_FORGET_AFTER_MS = 6 * 60_000L
  */
 internal const val BT_NEAR_ABSENCE_SETTLES_MS = BT_NEAR_FORGET_AFTER_MS + 2 * BT_NEAR_CYCLE_MS
 private const val BT_NEAR_CLASSIC_EVERY_CYCLES = 5
+private const val BT_NEAR_PAGE_EVERY_CYCLES = 2
+private const val BT_NEAR_PAGE_EVERY_CYCLES_WITH_AUDIO = 3
+
+/** Each page of a device that's away keeps the radio paging for about five seconds. */
+private const val BT_NEAR_MAX_PAGES = 3
 private const val BT_NEAR_MAX_DEVICES = 64
 
 /** Well below what controllers offload; past their limit a filter silently stops matching with the screen off. */
@@ -189,6 +194,40 @@ internal fun bluetoothNearSighting(
 internal fun bluetoothNearRunsClassicDiscovery(cycle: Int, audioConnected: Boolean): Boolean =
     cycle % BT_NEAR_CLASSIC_EVERY_CYCLES == 0 && !audioConnected
 
+/** A paired device Android knows, and whether it can be paged (anything but Bluetooth Low Energy only). */
+internal data class BondedBluetoothDevice(val name: String, val address: String, val pageable: Boolean)
+
+/**
+ * A page is one connection attempt to one known device, far lighter than discovery, so it still runs
+ * over a call or music, just less often. Never in a cycle that starts discovery, which holds the radio.
+ * Either way the gap between pages stays well inside the time a device is kept after its last sighting.
+ */
+internal fun bluetoothNearPagesBondedTargets(cycle: Int, audioConnected: Boolean): Boolean =
+    !bluetoothNearRunsClassicDiscovery(cycle, audioConnected) &&
+        cycle % (if (audioConnected) BT_NEAR_PAGE_EVERY_CYCLES_WITH_AUDIO else BT_NEAR_PAGE_EVERY_CYCLES) == 0
+
+/**
+ * The paired devices to page this cycle: ones a profile waits for by name or address, that can
+ * answer a page and aren't linked already (a link is a sighting every cycle anyway). Never an
+ * address nobody paired, which would be paging a stranger.
+ */
+internal fun bluetoothNearPageTargets(
+    targets: Set<String>,
+    bonded: List<BondedBluetoothDevice>,
+    connected: Set<String>,
+    limit: Int = BT_NEAR_MAX_PAGES,
+): List<String> {
+    val wanted = targets.map(String::trim).filter(String::isNotEmpty)
+    val linked = connected.mapTo(HashSet()) { it.uppercase() }
+    return bonded.asSequence()
+        .filter { it.pageable && it.address.uppercase() !in linked }
+        .filter { device -> wanted.any { it.equals(device.address, ignoreCase = true) || it.equals(device.name, ignoreCase = true) } }
+        .map { it.address.uppercase() }
+        .distinct()
+        .take(limit)
+        .toList()
+}
+
 /** Below Android 12 a Bluetooth scan is gated on location instead of a Bluetooth permission. */
 internal fun bluetoothScanPermission(sdkInt: Int = Build.VERSION.SDK_INT): String =
     if (sdkInt >= 31) Manifest.permission.BLUETOOTH_SCAN else Manifest.permission.ACCESS_FINE_LOCATION
@@ -329,8 +368,12 @@ internal class NearbyBluetoothScanner(
             }
             activeScanner = leScanner
         }.onFailure { AppLogger.debug(BT_NEAR_TAG, "BLE scan did not start: ${it.message}") }
-        if (bluetoothNearRunsClassicDiscovery(cycle, audioConnected(adapter)) && !adapter.isDiscovering) {
+        val audio = audioConnected(adapter)
+        if (bluetoothNearRunsClassicDiscovery(cycle, audio) && !adapter.isDiscovering) {
             startedDiscovery = runCatching { adapter.startDiscovery() }.getOrDefault(false)
+        }
+        if (wanted != null && bluetoothNearPagesBondedTargets(cycle, audio) && !adapter.isDiscovering) {
+            pageBondedTargets(adapter, wanted)
         }
         cycle++
         handler.removeCallbacks(finishScan)
@@ -406,6 +449,23 @@ internal class NearbyBluetoothScanner(
                     profile,
                 )
             }
+        }
+    }
+
+    /**
+     * A paired phone with its screen off usually advertises nothing, so no scan finds it (#25). Paging
+     * its paired address does: a phone in range answers, and the link that comes up lands in the
+     * receiver as a connection, which is a sighting. One that's away just doesn't answer.
+     */
+    private fun pageBondedTargets(adapter: BluetoothAdapter, wanted: Set<String>) {
+        val bonded = runCatching {
+            adapter.bondedDevices.orEmpty().map {
+                BondedBluetoothDevice(it.bluetoothNameOrNull().orEmpty(), it.address, it.type != BluetoothDevice.DEVICE_TYPE_LE)
+            }
+        }.getOrDefault(emptyList())
+        bluetoothNearPageTargets(wanted, bonded, connected.keys.toSet()).forEach { address ->
+            runCatching { adapter.getRemoteDevice(address).fetchUuidsWithSdp() }
+                .onFailure { AppLogger.debug(BT_NEAR_TAG, "Page did not start: ${it.message}") }
         }
     }
 
