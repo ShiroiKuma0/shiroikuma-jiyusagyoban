@@ -676,6 +676,7 @@
     <string name="run_log_export_json">Export JSON</string>
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
+    <string name="run_log_export_note">Share sends the Diagnostics report; JSON and CSV save this run history with secrets hidden, which helps with a bug about a run.</string>
     <string name="run_log_export_csv">Export CSV</string>
     <string name="run_log_show_all_actions">Show all %1$d actions</string>
     <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>
@@ -1375,6 +1376,7 @@
     <string name="diagnostics_refresh">Refresh diagnostics</string>
     <string name="diagnostics_share">Share redacted report</string>
     <string name="diagnostics_copy">Copy redacted report</string>
+    <string name="diagnostics_export_note">Copy or share gives a redacted report of engine health, permissions, recent runs and any crash log, ready to paste into a bug report.</string>
     <string name="diagnostics_engine_health">Engine health</string>
     <string name="diagnostics_admission_title">Run limits</string>
     <string name="diagnostics_admission_status">Limit checks</string>

@@ -52,8 +52,12 @@ object ProjectLinks {
             appendLine("- Android: ${bounded(androidRelease)} (API $sdkInt)")
             appendLine("- Device: ${bounded(device)}")
             appendLine()
-            append("Settings has a Diagnostics screen with a Copy button; its report is redacted and ")
-            append("says a great deal more than this block does.")
+            // GitHub shows a single line break in an issue, so each sentence stays on one line.
+            appendLine(
+                "Settings has a Diagnostics screen with a Copy button. Its report is redacted and covers " +
+                    "engine health, permissions and any crash log, so please paste it here.",
+            )
+            append("If the problem is with a run, the Run Log's JSON export (also redacted) shows each step.")
         }
         return "$NEW_ISSUE_URL?body=${encode(body)}"
     }

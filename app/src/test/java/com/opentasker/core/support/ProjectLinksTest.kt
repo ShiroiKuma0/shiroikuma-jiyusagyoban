@@ -47,6 +47,13 @@ class ProjectLinksTest {
     }
 
     @Test
+    fun `the report body asks for both diagnostic exports`() {
+        val body = decodedBody(ProjectLinks.reportProblemUrl("0.2.96", 98, "standard", "16", 36, "Google Pixel 7"))
+        assertTrue(body, "Diagnostics" in body && "crash log" in body)
+        assertTrue(body, "Run Log's JSON export" in body)
+    }
+
+    @Test
     fun `an oversized vendor string cannot bloat the url`() {
         val url = ProjectLinks.reportProblemUrl(
             appVersion = "0.2.93",

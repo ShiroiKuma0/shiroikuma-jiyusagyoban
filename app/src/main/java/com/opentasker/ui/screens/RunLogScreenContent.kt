@@ -569,6 +569,11 @@ private fun RunLogSummaryCard(
                     Text(stringResource(R.string.run_log_export_csv_short), style = MaterialTheme.typography.labelMedium)
                 } }
             }
+            Text(
+                stringResource(R.string.run_log_export_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

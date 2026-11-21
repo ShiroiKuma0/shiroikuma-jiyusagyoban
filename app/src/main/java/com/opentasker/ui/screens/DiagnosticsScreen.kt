@@ -205,6 +205,11 @@ private fun DiagnosticSummaryCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Text(
+                    stringResource(R.string.diagnostics_export_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             IconButton(onClick = onRefresh) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))

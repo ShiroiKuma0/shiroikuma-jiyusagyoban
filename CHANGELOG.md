@@ -11,6 +11,7 @@
 
 ### Changed
 
+- Report a problem now asks for both diagnostic exports: the Diagnostics report (engine health, permissions and any crash log) and, for a problem with a run, the Run Log's JSON export. Each screen also says in one line what its export holds and that secrets are hidden. The Run Log's Share button sends the Diagnostics report, which wasn't obvious before.
 - Bluetooth nearby can now find a paired phone that isn't advertising, which most phones don't do with the screen off. Every other scan cycle (every third while Bluetooth audio is playing) it asks up to three paired devices from the profile's list to answer, which brings up a short link the scan already counts as a sighting. A paired device that only speaks Bluetooth Low Energy, or one that's already connected, is left alone, and no cycle that runs a full discovery scan asks.
 - Flow's context cards read like the Inspector now, so a battery check shows as `battery level <= 20` instead of `key=battery_level, operator=<=, value=20`. Sun and day contexts name the moment and the days. A field with a password or token in its name stays hidden. A long state name is cut short the same way a long value is, and a line break in one doesn't split the card.
 
