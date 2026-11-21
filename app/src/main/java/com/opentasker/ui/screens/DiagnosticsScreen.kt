@@ -180,48 +180,53 @@ private fun DiagnosticSummaryCard(
         border = BorderStroke(1.dp, statusColor.copy(alpha = 0.38f)),
         shape = RoundedCornerShape(DesignSystem.Radii.md),
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(
-                when {
-                    healthy == true -> Icons.Filled.CheckCircle
-                    healthy == false || checkFailed -> Icons.Filled.Error
-                    else -> Icons.Filled.HourglassEmpty
-                },
-                contentDescription = statusLabel,
-                tint = statusColor,
-            )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(statusLabel, style = MaterialTheme.typography.titleSmall, color = statusColor)
-                reason?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    stringResource(R.string.diagnostics_export_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    when {
+                        healthy == true -> Icons.Filled.CheckCircle
+                        healthy == false || checkFailed -> Icons.Filled.Error
+                        else -> Icons.Filled.HourglassEmpty
+                    },
+                    contentDescription = statusLabel,
+                    tint = statusColor,
                 )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(statusLabel, style = MaterialTheme.typography.titleSmall, color = statusColor)
+                    reason?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
+                }
+                // Share opens a chooser, which is a poor fit for pasting into a bug report. #14 came in
+                // as screenshots partly because there was no way to get this text out as text.
+                IconButton(onClick = onCopy) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.diagnostics_copy))
+                }
+                IconButton(onClick = onShare) {
+                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.diagnostics_share))
+                }
             }
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.diagnostics_refresh))
-            }
-            // Share opens a chooser, which is a poor fit for pasting into a bug report. #14 came in
-            // as screenshots partly because there was no way to get this text out as text.
-            IconButton(onClick = onCopy) {
-                Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.diagnostics_copy))
-            }
-            IconButton(onClick = onShare) {
-                Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.diagnostics_share))
-            }
+            // Full width under the buttons, so it doesn't squeeze into the status column.
+            Text(
+                stringResource(R.string.diagnostics_export_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
