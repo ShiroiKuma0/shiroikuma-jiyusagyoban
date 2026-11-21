@@ -8,6 +8,61 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-13.00-28.g70b0571a+030 — 2026-11-22
+
+Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
+the same base as `+027`. Builds `+028` and `+029` were steps on the way and are contained in this
+one; `+030` fixes a self-update report that arrived without its version and parameters.
+
+### 携帯 — call forwarding by command
+
+- **`/fwd` in a SIM's Jami group** checks, sets and erases call forwarding on that SIM of a relay
+  phone: `/fwd` shows all four kinds (all, busy, noanswer, away), `/fwd all` sets unconditional
+  forwarding to the SIM's default target, `/fwd all +420…` to a given number, `/fwd all ?` shows one
+  kind, `/fwd all off` erases one, `/fwd off` erases everything. `/fwd noanswer +420… 20` sets the
+  ring time (5–30 s). `/forward` remains as an alias.
+- The codes are those of T-Mobile CZ's network, which Odorik's SIMs use: set `**<code>*<number>*11#`,
+  erase `##<code>#`, check `*#<code>#`. Only voice is forwarded, so SMS keep arriving on the SIM.
+- **Every change is followed by a check**, and the network's own answer is what comes back.
+- **A default forward target per SIM** in 「携帯の設定 -- [71][01]」, shown in 「携帯の設定確認 -- [71]」;
+  a successful `/fwd all <number>` rewrites it.
+- **The 20:00 heartbeat carries each SIM's unconditional forwarding**, and a forwarding that changed
+  without a command is reported in a message of its own.
+
+### 携帯 — remote updates of a relay phone
+
+- **`/install`, typed as a reply to an `.apk` or `.json` sent into a SIM group**, installs the APK
+  (白い熊 自由作業盤 itself, 白い熊 GNU Jami, any other app) or imports the bundle on that relay phone,
+  and answers in the conversation with the result — for an APK, the new and the old version.
+- A relay asks Jami to fetch such a file as soon as it is announced, so a large APK arrives without
+  a tap on that phone.
+- After a bundle import, 「携帯 ⇨ 起動 -- [71][71]」 runs. Overwritten profiles keep their on/off
+  state and settings keep their values.
+- The guide 「携帯の設定情報 -- [71]」 has a rewritten section 7 (calls) and a new section 10 (remote
+  updates).
+
+### Engine
+
+- **New step `package.install`** — install or update an APK from a file through an installer session
+  that asks for no user action. On Android 12+ an update of this app, or of an app it installed
+  before, needs no tap; where a confirmation still appears, the accessibility service presses it.
+  A copy of the APK is kept in `/sdcard/tmp`, a downgrade is refused with a plain message, and a
+  build that is already installed is refused unless asked for.
+- **A self-update reports after the restart.** The step stores a report task and its parameters
+  before the app is replaced; the new process runs that task.
+- **The engine restarts after every update of the app**, unless it had been stopped by hand.
+  Until now an update left it down until the app was opened.
+- **New step `workspace.import`** — import a bundle file with the Import screen's defaults, with
+  the counts and warnings in variables.
+- **`ussd.run` sends one code at a time on the whole phone**, so two SIM conversations or the daily
+  check cannot have a code refused by colliding.
+- **Setup tab: an optional “Install unknown apps” item** that opens this app's switch directly.
+- New permission `UPDATE_PACKAGES_WITHOUT_USER_ACTION` (a normal permission, granted at install).
+
+### Packaging
+
+- One signed `arm64-v8a` APK: `shiroikuma-jiyusagyoban_0.2.96+2026-11-13.00-28.g70b0571a+030_arm64-v8a.apk`.
+
 ## 0.2.96+2026-11-13.00-28.g70b0571a+027 — 2026-11-20
 
 Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
