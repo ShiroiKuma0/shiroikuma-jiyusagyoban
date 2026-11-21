@@ -1,6 +1,8 @@
 package com.opentasker.core.transfer
 
 import com.opentasker.core.contexts.DaySchedule
+import com.opentasker.core.engine.FlowControl
+import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextExpressionNode
@@ -21,6 +23,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
+import java.math.BigDecimal
 import java.util.Locale
 
 const val MACRODROID_UNSUPPORTED_ACTION_ID = "macrodroid.unsupported"
@@ -150,17 +153,21 @@ object MacroDroidImporter {
             val taskId = uniquePositiveId(guid, macroIndex, usedTaskIds)
             val profileId = uniquePositiveId(guid, macroIndex, usedProfileIds)
             val actionObjects = macro.objectArray("m_actionList")
-            val actions = actionObjects.flatMapIndexed { actionIndex, action ->
-                parseAction(
-                    macroName = name,
-                    action = action,
-                    actionIndex = actionIndex,
-                    mappedActions = mappedActions,
-                    unsupportedActions = unsupportedActions,
-                    unsupportedConstraints = unsupportedConstraints,
-                    lossyWarnings = lossyWarnings,
-                )
-            }.ifEmpty {
+            val blocks = OpenBlocks()
+            val actions = (
+                actionObjects.flatMapIndexed { actionIndex, action ->
+                    parseAction(
+                        macroName = name,
+                        action = action,
+                        actionIndex = actionIndex,
+                        blocks = blocks,
+                        mappedActions = mappedActions,
+                        unsupportedActions = unsupportedActions,
+                        unsupportedConstraints = unsupportedConstraints,
+                        lossyWarnings = lossyWarnings,
+                    )
+                } + blocks.closeRemaining(name, lossyWarnings)
+                ).ifEmpty {
                 val reason = "The source macro has no actions."
                 unsupportedActions += MacroDroidUnsupportedAction(name, "EmptyActionList", 0, reason)
                 lossyWarnings += "Macro '$name' has no actions. A disabled placeholder step was added."
@@ -265,6 +272,7 @@ object MacroDroidImporter {
         macroName: String,
         action: JsonObject,
         actionIndex: Int,
+        blocks: OpenBlocks,
         mappedActions: MutableList<MacroDroidMappedAction>,
         unsupportedActions: MutableList<MacroDroidUnsupportedAction>,
         unsupportedConstraints: MutableList<MacroDroidUnsupportedConstraint>,
@@ -272,24 +280,54 @@ object MacroDroidImporter {
     ): List<ActionSpec> {
         val classType = action.classType("UnknownAction")
         val constraints = action.objectArray("m_constraintList")
-        constraints.forEachIndexed { index, constraint ->
-            unsupportedConstraints += MacroDroidUnsupportedConstraint(
-                owner = "Macro '$macroName' action ${actionIndex + 1} constraint ${index + 1}",
-                classType = constraint.classType("UnknownConstraint"),
-                reason = "Action-level MacroDroid constraints cannot be represented safely.",
-            )
+        // An If or Else If keeps its own conditions in this list.
+        val holdsConditions = classType in CONDITION_CLASSES
+        if (!holdsConditions) {
+            constraints.forEachIndexed { index, constraint ->
+                unsupportedConstraints += MacroDroidUnsupportedConstraint(
+                    owner = "Macro '$macroName' action ${actionIndex + 1} constraint ${index + 1}",
+                    classType = constraint.classType("UnknownConstraint"),
+                    reason = "Action-level MacroDroid constraints cannot be represented safely.",
+                )
+            }
         }
+        val frame = blocks.frames.lastOrNull()
         val refusalReason = when {
+            // A disabled Else or End If of an If that came across is still handled by mapIfStep,
+            // since leaving it out would unbalance the block.
+            classType in IF_BRANCH_CLASSES -> when {
+                frame == null || frame.loop -> "It has no If block of its own to belong to."
+                !frame.mapped -> "Its If was imported as a placeholder, so this step was too."
+                else -> null
+            }
+            classType == "EndLoopAction" -> when {
+                frame == null || !frame.loop -> "It has no loop of its own to close."
+                !frame.mapped -> "Its loop was imported as a placeholder, so this step was too."
+                else -> null
+            }
+            classType == "BreakFromLoopAction" && blocks.innermostLoop()?.mapped != true ->
+                "Its loop was imported as a placeholder, so this step was too."
             action.boolean("m_isDisabled") -> "The source action is disabled."
-            constraints.isNotEmpty() -> "The source action has unsupported action-level constraints."
+            !holdsConditions && constraints.isNotEmpty() -> "The source action has unsupported action-level constraints."
             else -> null
         }
-        val mapping = if (refusalReason == null) mapAction(action, actionIndex) else null
-        if (mapping == null) {
-            val reason = refusalReason ?: "No reviewed OpenTasker mapping exists for this class."
+        val mapping = when {
+            refusalReason != null -> null
+            classType in IF_FAMILY_CLASSES -> mapIfStep(action, classType, frame)
+            else -> mapAction(action, actionIndex)
+        }
+        val opened = mapping != null && mapping.unsupportedReason == null
+        when (classType) {
+            "IfConditionAction" -> blocks.frames.addLast(OpenBlocks.Frame(loop = false, mapped = opened))
+            "LoopAction", "IterateDictionaryAction" -> blocks.frames.addLast(OpenBlocks.Frame(loop = true, mapped = opened))
+            "EndIfAction" -> if (frame != null && !frame.loop) blocks.frames.removeLast()
+            "EndLoopAction" -> if (frame != null && frame.loop) blocks.frames.removeLast()
+        }
+        if (mapping == null || mapping.unsupportedReason != null) {
+            val reason = refusalReason ?: mapping?.unsupportedReason ?: "No reviewed OpenTasker mapping exists for this class."
             unsupportedActions += MacroDroidUnsupportedAction(macroName, classType, actionIndex, reason)
             lossyWarnings += "Macro '$macroName' action ${actionIndex + 1} ($classType) is an unsupported placeholder. $reason"
-            return listOf(unsupportedAction(classType, reason))
+            return mapping?.actions ?: listOf(unsupportedAction(classType, reason))
         }
 
         mappedActions += MacroDroidMappedAction(
@@ -393,7 +431,16 @@ object MacroDroidImporter {
             )
         }
         "EndLoopAction" -> ActionMapping(
-            actions = listOf(ActionSpec(type = "flow.endfor", label = "MacroDroid end loop")),
+            actions = listOf(ActionSpec(type = FlowControl.ENDFOR, label = "MacroDroid end loop")),
+        )
+        "BreakFromLoopAction" -> ActionMapping(
+            actions = listOf(
+                ActionSpec(
+                    type = FlowControl.GOTO,
+                    label = "MacroDroid break from loop",
+                    args = mapOf("to" to FlowControl.GOTO_LOOP_END),
+                ),
+            ),
         )
         "ControlMediaAction" -> {
             val target = when (action.string("m_option").lowercase(Locale.US)) {
@@ -444,6 +491,246 @@ object MacroDroidImporter {
                 "variable '$it' was normalized to '$mappedName'"
             },
         )
+    }
+
+    /**
+     * An If, Else If, Else or End If. [frame] is the If's open block, which a branch updates: an
+     * Else If becomes an Else holding a nested If, so End If closes those nested Ifs too. A branch
+     * that can't come across still keeps its Else, so the steps above it run and skip it as before,
+     * and the placeholder after the Else stops the task only when that branch is reached. Any later
+     * branch of the same If is left out as a placeholder, since an If takes one Else.
+     */
+    private fun mapIfStep(action: JsonObject, classType: String, frame: OpenBlocks.Frame?): ActionMapping {
+        if (classType == "IfConditionAction") {
+            val condition = ifCondition(action)
+            val text = condition.text ?: return placeholderMapping(classType, condition.refusal.orEmpty())
+            return ActionMapping(
+                actions = listOf(ActionSpec(type = FlowControl.IF, label = "MacroDroid if", args = mapOf("condition" to text))),
+            )
+        }
+        val block = checkNotNull(frame) { "An If branch needs its If block." }
+        if (classType == "EndIfAction") {
+            return ActionMapping(
+                actions = List(1 + block.nestedIfs) { ActionSpec(type = FlowControl.ENDIF, label = "MacroDroid end if") },
+            )
+        }
+        if (block.branchesEnded) {
+            return placeholderMapping(
+                classType,
+                "An earlier Else or Else If of the same If couldn't be imported, so this one was left out too.",
+            )
+        }
+        val elseStep = ActionSpec(type = FlowControl.ELSE, label = if (classType == "ElseAction") "MacroDroid else" else "MacroDroid else if")
+        val refusal = when {
+            action.boolean("m_isDisabled") -> "The source action is disabled."
+            classType == "ElseAction" -> return ActionMapping(actions = listOf(elseStep))
+            else -> ifCondition(action).let { condition ->
+                condition.text?.let { text ->
+                    block.nestedIfs++
+                    return ActionMapping(
+                        actions = listOf(
+                            elseStep,
+                            ActionSpec(type = FlowControl.IF, label = "MacroDroid else if", args = mapOf("condition" to text)),
+                        ),
+                    )
+                }
+                condition.refusal.orEmpty()
+            }
+        }
+        block.branchesEnded = true
+        return ActionMapping(actions = listOf(elseStep, unsupportedAction(classType, refusal)), unsupportedReason = refusal)
+    }
+
+    private fun placeholderMapping(classType: String, reason: String): ActionMapping =
+        ActionMapping(actions = listOf(unsupportedAction(classType, reason)), unsupportedReason = reason)
+
+    /** An If's or Else If's conditions as one OpenTasker condition, or why they can't be. */
+    private fun ifCondition(action: JsonObject): IfCondition {
+        val constraints = action.objectArray("m_constraintList")
+        if (constraints.isEmpty()) return IfCondition(refusal = "It has no conditions to check.")
+        val clauses = constraints.map { constraint ->
+            val classType = constraint.classType("UnknownConstraint")
+            if (classType != VARIABLE_CONSTRAINT_CLASS) {
+                return IfCondition(refusal = "It checks a $classType condition, which has no reviewed OpenTasker mapping yet.")
+            }
+            variableClause(constraint).let { it.clause ?: return IfCondition(refusal = it.refusal) }
+        }
+        val joiner = if (action.boolean("m_isOrCondition")) "||" else "&&"
+        val text = if (clauses.size == 1) {
+            clauses.single().text
+        } else {
+            clauses.joinToString(" $joiner ") { if (it.parts.size > 1) "(${it.text})" else it.text }
+        }
+        // Read back the way the task will run it, so a value can't add a joiner or an operator.
+        val (topJoiner, topParts) = conditionGrammar.conditionParts(text)
+        val readsBack = if (clauses.size == 1) {
+            clauses.single().readsBack(text)
+        } else {
+            topJoiner == joiner && topParts.size == clauses.size &&
+                topParts.zip(clauses).all { (part, clause) -> clause.readsBack(part) }
+        }
+        return if (readsBack) {
+            IfCondition(text = text)
+        } else {
+            IfCondition(refusal = "Its value can't be written as an OpenTasker condition that reads the same way.")
+        }
+    }
+
+    /** One MacroDroid variable condition as an OpenTasker clause, or why it can't be. */
+    private fun variableClause(constraint: JsonObject): ClauseResult {
+        fun refuse(reason: String) = ClauseResult(refusal = reason)
+        val variable = constraint.objectValue("m_variable") ?: return refuse("A condition names no variable.")
+        val rawName = variable.string("m_name")
+        when {
+            constraint.boolean("m_isDisabled") -> return refuse("One of its conditions is turned off.")
+            constraint.objectArray("m_constraintList").isNotEmpty() -> return refuse("One of its conditions holds conditions of its own.")
+            variable.boolean("isActionBlockWorkingVar") -> return refuse("It checks action block variable '$rawName'.")
+            constraint.boolean("m_intCompareVariable") || constraint["workingOtherVarToCompare"].isPresentValue() ->
+                return refuse("It compares '$rawName' with another variable.")
+            constraint.string("m_expression").isNotBlank() -> return refuse("It compares '$rawName' with an expression.")
+            constraint.boolean("enableRegex") -> return refuse("It matches '$rawName' against a MacroDroid regular expression.")
+            (constraint["dictionaryKeys"] as? JsonObject)?.let { (it["keys"] as? JsonArray)?.isNotEmpty() } == true ->
+                return refuse("It checks a dictionary entry of '$rawName'.")
+        }
+        val name = mappedVariableName(variable) ?: return refuse("Variable '$rawName' has a name OpenTasker can't use.")
+        val ref = "%$name"
+        return when (variable.int("m_type")) {
+            0 -> {
+                val op = if (constraint.boolean("m_booleanValue")) "==" else "!="
+                ClauseResult(ConditionClause.compare(ref, op, "true"))
+            }
+            1, 3 -> {
+                val value = if (variable.int("m_type") == 1) {
+                    constraint.long("m_intValue")?.toString()
+                } else {
+                    constraint.double("m_doubleValue")?.takeIf(Double::isFinite)?.let {
+                        BigDecimal.valueOf(it).stripTrailingZeros().toPlainString()
+                    }
+                } ?: return refuse("Its number for '$rawName' is missing.")
+                ClauseResult(
+                    when {
+                        constraint.boolean("m_intGreaterThan") -> ConditionClause.compare(ref, ">", value)
+                        constraint.boolean("m_intLessThan") -> ConditionClause.compare(ref, "<", value)
+                        // Equal and not equal compare as numbers, since a stored decimal reads 2.0.
+                        constraint.boolean("m_intNotEqual") -> ConditionClause.join("||", ref to "<", ref to ">", value)
+                        else -> ConditionClause.join("&&", ref to "<=", ref to ">=", value)
+                    },
+                )
+            }
+            2 -> stringClause(constraint, ref, rawName)
+            else -> refuse("It checks '$rawName', a dictionary or array variable.")
+        }
+    }
+
+    private fun stringClause(constraint: JsonObject, ref: String, rawName: String): ClauseResult {
+        val value = constraint.string("m_stringValue")
+        val equal = (constraint["m_stringEqual"] as? JsonPrimitive)?.booleanOrNull
+            ?: return ClauseResult(refusal = "Its comparison for '$rawName' is missing.")
+        val reason = when {
+            '%' in value || "{{" in value || MACRODROID_MAGIC_TEXT.containsMatchIn(value) ->
+                "Its value for '$rawName' fills in other text, which OpenTasker reads differently."
+            value != value.trim() -> "Its value for '$rawName' starts or ends with a space, which OpenTasker trims."
+            else -> null
+        }
+        if (reason != null) return ClauseResult(refusal = reason)
+        // MacroDroid ignores case unless Check case is on.
+        val ignoreCase = !constraint.boolean("checkCase") && value.any(Char::isLetter)
+        return when (constraint.int("m_stringComparisonType") ?: 0) {
+            0 -> ClauseResult(
+                when {
+                    value.isEmpty() -> ConditionClause.unary(ref, if (equal) "not_set" else "is_set")
+                    !ignoreCase && plainValue(value) -> ConditionClause.compare(ref, if (equal) "==" else "!=", value)
+                    else -> ConditionClause.compare(ref, if (equal) "~R" else "!~R", regexFor(value, ignoreCase, whole = true))
+                },
+            )
+            1 -> if (value.isEmpty()) {
+                // Everything contains nothing.
+                ClauseResult(ConditionClause.compare(ref, if (equal) "~R" else "!~R", "^"))
+            } else {
+                ClauseResult(ConditionClause.compare(ref, if (equal) "~R" else "!~R", regexFor(value, ignoreCase, whole = false)))
+            }
+            else -> ClauseResult(refusal = "It compares '$rawName' in a way OpenTasker doesn't have yet.")
+        }
+    }
+
+    /** True when [value] has nothing a condition reads as an operator, joiner or bracket. */
+    private fun plainValue(value: String): Boolean = value.none { it in "=!<>~&|()" }
+
+    /**
+     * [value] as a regular expression that finds it literally. Brackets and `&` are written as
+     * hex escapes, so they can't change how the condition around it is split.
+     */
+    private fun regexFor(value: String, ignoreCase: Boolean, whole: Boolean): String = buildString {
+        if (ignoreCase) append("(?i)")
+        if (whole) append('^')
+        value.forEach { c ->
+            when (c) {
+                '(', ')', '&' -> append("\\x").append(String.format(Locale.US, "%02x", c.code))
+                in REGEX_SPECIAL -> append('\\').append(c)
+                else -> append(c)
+            }
+        }
+        if (whole) append('$')
+    }
+
+    private class IfCondition(val text: String? = null, val refusal: String? = null)
+
+    private class ClauseResult(val clause: ConditionClause? = null, val refusal: String? = null)
+
+    /** A clause's text and the comparisons the condition grammar should find in it. */
+    private class ConditionClause(val text: String, val joiner: String?, val parts: List<Triple<String, String, String>?>, private val unaryText: String? = null) {
+        fun readsBack(written: String): Boolean {
+            val (foundJoiner, found) = conditionGrammar.conditionParts(written)
+            if (foundJoiner != joiner || found.size != parts.size) return false
+            return found.zip(parts).all { (part, expected) ->
+                if (expected == null) part == unaryText && conditionGrammar.comparisonParts(part) == null
+                else conditionGrammar.comparisonParts(part) == expected
+            }
+        }
+
+        companion object {
+            fun compare(left: String, op: String, right: String) =
+                ConditionClause("$left $op $right", null, listOf(Triple(left, op, right)))
+
+            fun unary(operand: String, op: String) = "$operand $op".let { ConditionClause(it, null, listOf(null), unaryText = it) }
+
+            fun join(joiner: String, first: Pair<String, String>, second: Pair<String, String>, value: String): ConditionClause {
+                val parts = listOf(first, second).map { (left, op) -> Triple(left, op, value) }
+                return ConditionClause(parts.joinToString(" $joiner ") { "${it.first} ${it.second} ${it.third}" }, joiner, parts)
+            }
+        }
+    }
+
+    /**
+     * The If and loop blocks open at the current step. A block whose opening step came across as
+     * a placeholder makes its Else, End If, End Loop and Break placeholders too, so the task never
+     * holds a closing step with nothing to close.
+     */
+    private class OpenBlocks {
+        class Frame(val loop: Boolean, val mapped: Boolean) {
+            var nestedIfs = 0
+            var branchesEnded = false
+        }
+
+        val frames = ArrayDeque<Frame>()
+
+        fun innermostLoop(): Frame? = frames.lastOrNull { it.loop }
+
+        /** Closing steps for blocks the macro never closed, so the task's blocks still balance. */
+        fun closeRemaining(macroName: String, lossyWarnings: MutableList<String>): List<ActionSpec> {
+            val closers = frames.reversed().filter { it.mapped }.flatMap { frame ->
+                if (frame.loop) {
+                    listOf(ActionSpec(type = FlowControl.ENDFOR, label = "MacroDroid end loop"))
+                } else {
+                    List(1 + frame.nestedIfs) { ActionSpec(type = FlowControl.ENDIF, label = "MacroDroid end if") }
+                }
+            }
+            if (closers.isNotEmpty()) {
+                lossyWarnings += "Macro '$macroName' leaves an If or loop open at its end. OpenTasker closes it after the last step."
+            }
+            frames.clear()
+            return closers
+        }
     }
 
     private fun parseTrigger(
@@ -589,7 +876,8 @@ object MacroDroidImporter {
     private fun mappedVariableName(variable: JsonObject): String? {
         val rawName = variable.string("m_name")
         val normalized = VariableNamePolicy.normalize(rawName) ?: return null
-        return if (variable.boolean("isLocal")) {
+        // MacroDroid writes isLocalVar; a few older exports say isLocal.
+        return if (variable.boolean("isLocalVar") || variable.boolean("isLocal")) {
             normalized.lowercase(Locale.US)
         } else {
             VariableNamePolicy.promoteToGlobal(normalized)
@@ -682,9 +970,14 @@ object MacroDroidImporter {
         totalMinutes % 60,
     )
 
+    /**
+     * [unsupportedReason] marks a step that came across as a placeholder but still needs the
+     * [actions] it carries, like the Else in front of a branch that couldn't be imported.
+     */
     private data class ActionMapping(
         val actions: List<ActionSpec>,
         val lossyWarning: String? = null,
+        val unsupportedReason: String? = null,
     )
 
     private data class TriggerMapping(
@@ -696,5 +989,13 @@ object MacroDroidImporter {
     private const val LOOP_DELIMITER = "|"
     private const val MAX_FIXED_LOOP_COUNT = 1_000
     private const val UNSUPPORTED_EVENT_NAME = "macrodroid_unsupported"
+    private const val VARIABLE_CONSTRAINT_CLASS = "MacroDroidVariableConstraint"
     private val MACRODROID_MAGIC_TEXT = Regex("""\[[^\]\s]+\]|\{l?v=[^}]+\}""")
+    private val REGEX_SPECIAL = setOf('\\', '.', '^', '$', '|', '?', '*', '+', '[', ']', '{', '}')
+
+    /** Actions that keep their own conditions in `m_constraintList`. */
+    private val CONDITION_CLASSES = setOf("IfConditionAction", "ElseIfConditionAction")
+    private val IF_BRANCH_CLASSES = setOf("ElseIfConditionAction", "ElseAction", "EndIfAction")
+    private val IF_FAMILY_CLASSES = IF_BRANCH_CLASSES + "IfConditionAction"
+    private val conditionGrammar = VariableExpander()
 }

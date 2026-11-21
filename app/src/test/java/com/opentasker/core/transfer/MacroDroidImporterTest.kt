@@ -1,10 +1,13 @@
 package com.opentasker.core.transfer
 
+import com.opentasker.core.engine.FlowStructure
+import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.model.ContextBooleanOperator
 import com.opentasker.core.model.ContextType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -200,6 +203,293 @@ class MacroDroidImporterTest {
 
         assertNotNull(error)
         assertTrue(error!!.message.orEmpty().contains("no macros"))
+    }
+
+    @Test
+    fun ifElseIfElseChainBecomesNestedBlocksThatBalance() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                step("IfConditionAction", condition(variable("mode", 2), "m_stringValue" to "\"home\"", "checkCase" to "true")),
+                setVariable("branch", "one"),
+                step("ElseIfConditionAction", condition(variable("away", 0), "m_booleanValue" to "true")),
+                setVariable("branch", "two"),
+                step("ElseAction"),
+                setVariable("branch", "three"),
+                step("EndIfAction"),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(
+            listOf("flow.if", "var.set", "flow.else", "flow.if", "var.set", "flow.else", "var.set", "flow.endif", "flow.endif"),
+            actions.map { it.type },
+        )
+        assertNull(FlowStructure.analyze(actions).error)
+        assertEquals("%mode == home", actions[0].args["condition"])
+        assertEquals("%away == true", actions[3].args["condition"])
+        // MacroDroid marks a local variable with isLocalVar, so it stays local here.
+        assertEquals("branch", actions[1].args["name"])
+        assertTrue(report.unsupportedActions.isEmpty())
+        assertEquals(report.sourceActionCount, report.mappedActions.size)
+    }
+
+    @Test
+    fun stringConditionsKeepMacroDroidsCaseRuleAndReadTheValueLiterally() {
+        fun conditionFor(vararg fields: Pair<String, String>): String =
+            onlyIfCondition(condition(variable("reply", 2, local = false), *fields))
+
+        fun holds(condition: String, value: String?): Boolean =
+            VariableStore().apply { value?.let { set("Reply", it) } }.evaluateCondition(condition)
+
+        // Check case is off unless the user turned it on.
+        val anyCase = conditionFor("m_stringValue" to "\"Yes\"")
+        assertTrue(holds(anyCase, "yes"))
+        assertTrue(holds(anyCase, "YES"))
+        assertFalse(holds(anyCase, "yes please"))
+        val exactCase = conditionFor("m_stringValue" to "\"Yes\"", "checkCase" to "true")
+        assertEquals("%Reply == Yes", exactCase)
+        assertTrue(holds(exactCase, "Yes"))
+        assertFalse(holds(exactCase, "yes"))
+
+        // Brackets, dots and a joiner in the value are only text.
+        val contains = conditionFor("m_stringValue" to "\"(1.5) && x\"", "m_stringComparisonType" to "1")
+        assertTrue(holds(contains, "got (1.5) && X here"))
+        assertFalse(holds(contains, "got 1x5) && x"))
+        val operatorText = conditionFor("m_stringValue" to "\"a == b\"", "checkCase" to "true")
+        assertTrue(holds(operatorText, "a == b"))
+        assertFalse(holds(operatorText, "a == bc"))
+
+        val lacks = conditionFor("m_stringValue" to "\"error\"", "m_stringComparisonType" to "1", "m_stringEqual" to "false")
+        assertTrue(holds(lacks, "all good"))
+        assertFalse(holds(lacks, "an ERROR here"))
+
+        val notEmpty = conditionFor("m_stringEqual" to "false")
+        assertTrue(holds(notEmpty, "a"))
+        assertFalse(holds(notEmpty, null))
+        val empty = conditionFor()
+        assertTrue(holds(empty, null))
+        assertFalse(holds(empty, "a"))
+    }
+
+    @Test
+    fun numberConditionsCompareAsNumbers() {
+        fun holds(condition: String, value: String): Boolean =
+            VariableStore().apply { set("Level", value) }.evaluateCondition(condition)
+
+        val equals = onlyIfCondition(condition(variable("level", 1, local = false), "m_intValue" to "5"))
+        assertTrue(holds(equals, "5"))
+        assertTrue(holds(equals, "5.0"))
+        assertFalse(holds(equals, "6"))
+        val notEqual = onlyIfCondition(condition(variable("level", 1, local = false), "m_intValue" to "5", "m_intNotEqual" to "true"))
+        assertTrue(holds(notEqual, "4"))
+        assertFalse(holds(notEqual, "5.0"))
+        val greater = onlyIfCondition(condition(variable("level", 1, local = false), "m_intValue" to "200", "m_intGreaterThan" to "true"))
+        assertTrue(holds(greater, "201"))
+        assertFalse(holds(greater, "200"))
+        val less = onlyIfCondition(condition(variable("level", 1, local = false), "m_intValue" to "-3", "m_intLessThan" to "true"))
+        assertTrue(holds(less, "-4"))
+        assertFalse(holds(less, "-3"))
+        val decimal = onlyIfCondition(condition(variable("level", 3, local = false), "m_doubleValue" to "2.50", "m_intGreaterThan" to "true"))
+        assertEquals("%Level > 2.5", decimal)
+    }
+
+    @Test
+    fun orConditionsJoinWithTheirOwnGroupsIntact() {
+        val joined = onlyIfCondition(
+            condition(variable("count", 1, local = false), "m_intValue" to "1"),
+            condition(variable("Flag", 0, local = false), "m_booleanValue" to "true"),
+            isOr = true,
+        )
+
+        assertEquals("(%Count <= 1 && %Count >= 1) || %Flag == true", joined)
+        assertTrue(VariableStore().apply { set("Count", "1") }.evaluateCondition(joined))
+        assertTrue(VariableStore().apply { set("Count", "2"); set("Flag", "true") }.evaluateCondition(joined))
+        assertFalse(VariableStore().apply { set("Count", "2"); set("Flag", "false") }.evaluateCondition(joined))
+    }
+
+    @Test
+    fun aBranchThatCantComeAcrossStopsTheTaskOnlyWhenItsReached() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                step("IfConditionAction", condition(variable("ok", 0), "m_booleanValue" to "true")),
+                setVariable("branch", "one"),
+                step("ElseIfConditionAction", condition(variable("name", 2), "m_stringValue" to "\"^a+$\"", "enableRegex" to "true")),
+                setVariable("branch", "two"),
+                step("ElseAction"),
+                setVariable("branch", "three"),
+                step("EndIfAction", disabled = true),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(
+            listOf(
+                "flow.if", "var.set", "flow.else", MACRODROID_UNSUPPORTED_ACTION_ID, "var.set",
+                MACRODROID_UNSUPPORTED_ACTION_ID, "var.set", "flow.endif",
+            ),
+            actions.map { it.type },
+        )
+        assertNull(FlowStructure.analyze(actions).error)
+        assertEquals(listOf("ElseIfConditionAction", "ElseAction"), report.unsupportedActions.map { it.classType })
+        assertTrue(report.unsupportedActions[0].reason.contains("regular expression"))
+        assertEquals(report.sourceActionCount, report.mappedActions.size + report.unsupportedActions.size)
+    }
+
+    @Test
+    fun anIfThatCantComeAcrossTakesItsElseAndEndIfWithIt() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                step("IfConditionAction", """{"m_classType":"WifiConstraint","m_constraintList":[],"m_isDisabled":false}"""),
+                setVariable("branch", "one"),
+                step("ElseAction"),
+                setVariable("branch", "two"),
+                step("EndIfAction"),
+                step("IfConditionAction", condition(variable("cost", 2), "m_stringValue" to "\"50%\"")),
+                step("EndIfAction"),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(
+            listOf(
+                MACRODROID_UNSUPPORTED_ACTION_ID, "var.set", MACRODROID_UNSUPPORTED_ACTION_ID, "var.set",
+                MACRODROID_UNSUPPORTED_ACTION_ID, MACRODROID_UNSUPPORTED_ACTION_ID, MACRODROID_UNSUPPORTED_ACTION_ID,
+            ),
+            actions.map { it.type },
+        )
+        assertNull(FlowStructure.analyze(actions).error)
+        assertTrue(report.unsupportedActions[0].reason.contains("WifiConstraint"))
+        assertTrue(report.unsupportedActions[3].reason.contains("fills in other text"))
+    }
+
+    @Test
+    fun aLoopThatCantComeAcrossTakesItsBreakAndEndLoopWithIt() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                """{"dictionaryKeys":{"keys":[]},"isArray":false,"variableName":"queue","m_fixedOptionCount":1,"m_option":0,"m_SIGUID":3,"m_classType":"IterateDictionaryAction","m_constraintList":[],"m_isDisabled":false,"m_isOrCondition":false}""",
+                step("BreakFromLoopAction"),
+                step("EndLoopAction"),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertTrue(actions.all { it.type == MACRODROID_UNSUPPORTED_ACTION_ID })
+        assertNull(FlowStructure.analyze(actions).error)
+        assertEquals(3, report.unsupportedActions.size)
+    }
+
+    @Test
+    fun breakInsideAnIfLeavesTheFixedLoopAroundIt() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                """{"m_classType":"LoopAction","m_option":0,"m_fixedOptionCount":3,"m_constraintList":[],"m_isDisabled":false}""",
+                step("IfConditionAction", condition(variable("done", 0), "m_booleanValue" to "true")),
+                step("BreakFromLoopAction"),
+                step("EndIfAction"),
+                step("EndLoopAction"),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(
+            listOf("text.split", "flow.foreach", "flow.if", "flow.goto", "flow.endif", "flow.endfor"),
+            actions.map { it.type },
+        )
+        assertEquals("loop_end", actions[3].args["to"])
+        assertNull(FlowStructure.analyze(actions).error)
+    }
+
+    @Test
+    fun anIfLeftOpenAtTheEndIsClosedAfterTheLastStep() {
+        val report = MacroDroidImporter.parse(
+            blockMacro(
+                step("IfConditionAction", condition(variable("done", 0), "m_booleanValue" to "true")),
+                setVariable("branch", "one"),
+            ),
+            "test",
+            0L,
+        )
+
+        val actions = report.bundle.tasks.single().actions
+        assertEquals(listOf("flow.if", "var.set", "flow.endif"), actions.map { it.type })
+        assertNull(FlowStructure.analyze(actions).error)
+        assertTrue(report.lossyWarnings.any { "left open" in it || "open at its end" in it })
+    }
+
+    private fun onlyIfCondition(vararg conditions: String, isOr: Boolean = false): String {
+        val report = MacroDroidImporter.parse(
+            blockMacro(step("IfConditionAction", *conditions, isOr = isOr), step("EndIfAction")),
+            "test",
+            0L,
+        )
+        assertTrue(report.unsupportedActions.toString(), report.unsupportedActions.isEmpty())
+        return report.bundle.tasks.single().actions.first().args.getValue("condition")
+    }
+
+    // The block steps, variables and conditions below follow what MacroDroid 5.4x wrote in 2024.
+    private fun blockMacro(vararg actions: String): String = """
+        {
+          "macroExportVersion": 1,
+          "macro": {
+            "m_GUID": 42,
+            "m_name": "Blocks",
+            "m_isOrCondition": false,
+            "m_triggerList": [
+              {"m_classType":"ScreenOnOffTrigger","m_screenOn":true,"m_constraintList":[],"m_isDisabled":false}
+            ],
+            "m_actionList": [${actions.joinToString(",")}],
+            "m_constraintList": [],
+            "localVariables": []
+          }
+        }
+    """.trimIndent()
+
+    private fun step(classType: String, vararg conditions: String, isOr: Boolean = false, disabled: Boolean = false): String =
+        """{"disableLogging":false,"m_SIGUID":1,"m_classType":"$classType","m_constraintList":[${conditions.joinToString(",")}],"m_isDisabled":$disabled,"m_isOrCondition":$isOr}"""
+
+    private fun setVariable(name: String, value: String): String =
+        """{"m_classType":"SetVariableAction","m_newStringValue":"$value","m_variable":${variable(name, 2)},"m_constraintList":[],"m_isDisabled":false}"""
+
+    private fun variable(name: String, type: Int, local: Boolean = true): String =
+        """{"dictionary":{"entries":[],"isArray":false,"variableType":4,"type":"Dictionary"},"isActionBlockWorkingVar":false,"isLocalVar":$local,"isSecure":false,"m_booleanValue":false,"m_decimalValue":0.0,"m_intValue":0,"m_name":"$name","m_stringValue":"","m_type":$type,"supportsInput":true,"supportsOutput":true}"""
+
+    private fun condition(variableJson: String, vararg fields: Pair<String, String>): String {
+        val values = linkedMapOf(
+            "checkCase" to "false",
+            "dictionaryKeys" to """{"keys":[]}""",
+            "dictionaryType" to "2",
+            "enableRegex" to "false",
+            "m_booleanValue" to "false",
+            "m_doubleValue" to "0.0",
+            "m_intCompareVariable" to "false",
+            "m_intGreaterThan" to "false",
+            "m_intLessThan" to "false",
+            "m_intNotEqual" to "false",
+            "m_intValue" to "0",
+            "m_otherValueToCompare" to variable("other", 2),
+            "m_stringComparisonType" to "0",
+            "m_stringEqual" to "true",
+            "m_stringValue" to "\"\"",
+            "m_variable" to variableJson,
+            "disableLogging" to "false",
+            "m_SIGUID" to "2",
+            "m_classType" to "\"MacroDroidVariableConstraint\"",
+            "m_constraintList" to "[]",
+            "m_isDisabled" to "false",
+            "m_isOrCondition" to "false",
+        )
+        values.putAll(fields)
+        return values.entries.joinToString(",", "{", "}") { (key, value) -> "\"$key\":$value" }
     }
 
     private fun fullBackup(): String = """
