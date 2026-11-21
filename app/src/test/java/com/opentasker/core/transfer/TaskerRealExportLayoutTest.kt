@@ -1133,6 +1133,21 @@ class TaskerRealExportLayoutTest {
         listOf(anki, camsung, autojs).forEach { assertEquals(it, placeholder, action(it).type) }
         assertWarns(anki, "names no app")
         assertWarns(camsung, "not allowlisted")
+        // Its class may sit outside org.autojs.autojs6's name, but a file:// URI can't go to another app.
+        assertWarns(autojs, "file:// URIs are not allowed")
+    }
+
+    @Test
+    fun sendIntentToAClassOutsideItsPackagesNameImports() {
+        val autojs = """<code>877</code><Str sr="arg0" ve="3"/><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">text/javascript</Str>""" +
+            """<Str sr="arg3" ve="3">content://media/external/file/42</Str><Str sr="arg7" ve="3">org.autojs.autojs6</Str>""" +
+            """<Str sr="arg8" ve="3">org.autojs.autojs.external.open.RunIntentActivity</Str><Int sr="arg9" val="1"/>"""
+        val action = action(autojs)
+
+        assertEquals("intent.launch", action.type)
+        assertEquals("org.autojs.autojs6", action.args["package"])
+        assertEquals("org.autojs.autojs.external.open.RunIntentActivity", action.args["component"])
+        assertWarns(autojs, "needs grant_read_uri")
     }
 
     // In-Call Volume (306)

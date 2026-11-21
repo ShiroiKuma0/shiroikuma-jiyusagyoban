@@ -506,7 +506,13 @@ class LaunchIntentAction : DeclaredAction(ActionCatalog.require("intent.launch")
         if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
         if (component != null) {
             if (component.packageName != plan.packageName) return null
-            if (component.packageName != ctx.app.packageName && !isExported(packageManager, plan.mode, component)) {
+            // A class the step names in this app is held to mayReachUnexported. One Android picked
+            // for the step's action in this app is reached as before.
+            val ownComponent = component.packageName == ctx.app.packageName && (
+                explicitComponent == null ||
+                    IntentDispatchPolicy.mayReachUnexported(component.packageName, component.className, ctx.app.packageName)
+                )
+            if (!ownComponent && !isExported(packageManager, plan.mode, component)) {
                 return null
             }
             intent.component = component

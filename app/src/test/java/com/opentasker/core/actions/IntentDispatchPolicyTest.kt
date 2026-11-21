@@ -115,4 +115,36 @@ class IntentDispatchPolicyTest {
         assertEquals("res-x", (parse("%res-x") as IntentDispatchParseResult.Valid).plan.resultVariable)
         assertEquals(null, (parse("  ") as IntentDispatchParseResult.Valid).plan.resultVariable)
     }
+
+    private fun component(packageName: String, component: String): String? =
+        when (val result = IntentDispatchPolicy.parse(mapOf("package" to packageName, "component" to component))) {
+            is IntentDispatchParseResult.Valid -> result.plan.componentClassName
+            is IntentDispatchParseResult.Invalid -> null
+        }
+
+    @Test
+    fun aComponentClassCanSitOutsideItsPackagesName() {
+        // AutoJs6's id is org.autojs.autojs6 and its classes are org.autojs.autojs.*.
+        val runner = "org.autojs.autojs.external.open.RunIntentActivity"
+        assertEquals(runner, component("org.autojs.autojs6", runner))
+        assertEquals(runner, component("org.autojs.autojs6", "org.autojs.autojs6/$runner"))
+        assertEquals("org.autojs.autojs6.Main", component("org.autojs.autojs6", ".Main"))
+    }
+
+    @Test
+    fun aPackageSlashClassFormMustNameTheStepsPackage() {
+        assertEquals(null, component("org.autojs.autojs6", "com.example.other/org.autojs.autojs.external.open.RunIntentActivity"))
+        assertEquals(null, component("org.autojs.autojs6", "/org.autojs.autojs.Main"))
+        assertEquals(null, component("org.autojs.autojs6", "org.autojs.autojs6/not a class"))
+    }
+
+    @Test
+    fun onlyThisAppsOwnClassesAreReachedUnexported() {
+        val app = "com.opentasker.app"
+        assertTrue(IntentDispatchPolicy.mayReachUnexported(app, "com.opentasker.app.Receiver", app))
+        // A library's component merged into this app, or a class outside the app's name, must be exported.
+        assertEquals(false, IntentDispatchPolicy.mayReachUnexported(app, "androidx.work.impl.background.systemalarm.RescheduleReceiver", app))
+        assertEquals(false, IntentDispatchPolicy.mayReachUnexported(app, "com.opentasker.application.Receiver", app))
+        assertEquals(false, IntentDispatchPolicy.mayReachUnexported("org.autojs.autojs6", "org.autojs.autojs6.Main", app))
+    }
 }

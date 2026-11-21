@@ -141,14 +141,27 @@ internal object IntentDispatchPolicy {
         )
     }
 
+    /**
+     * The component's class. It can sit outside the package's name (an app's id often differs from
+     * its code's, like org.autojs.autojs6 running org.autojs.autojs classes), since the intent goes
+     * to [packageName] either way. A `package/class` form must name that same package.
+     */
     private fun parseComponent(raw: String?, packageName: String): String? {
         val value = raw?.trim()?.takeIf(String::isNotBlank) ?: return null
         if (value.length > MAX_COMPONENT_LENGTH) return null
-        val className = value.substringAfter('/', value)
+        if ('/' in value && value.substringBefore('/').trim() != packageName) return null
+        val className = value.substringAfter('/', value).trim()
             .let { if (it.startsWith('.')) packageName + it else it }
-        if (!componentPattern.matches(className)) return null
-        return className.takeIf { it == packageName || it.startsWith("$packageName.") }
+        return className.takeIf { componentPattern.matches(it) }
     }
+
+    /**
+     * Whether a step may reach [className] in [componentPackage] when it isn't exported: only this
+     * app's own classes under its own package name. Any other class, a library's component merged
+     * into this app included, has to be exported like another app's.
+     */
+    fun mayReachUnexported(componentPackage: String, className: String, appPackage: String): Boolean =
+        componentPackage == appPackage && (className == appPackage || className.startsWith("$appPackage."))
 
     private fun parseUri(raw: String?): UriResult {
         val value = raw?.trim()?.takeIf(String::isNotBlank) ?: return UriResult.Valid(null)
