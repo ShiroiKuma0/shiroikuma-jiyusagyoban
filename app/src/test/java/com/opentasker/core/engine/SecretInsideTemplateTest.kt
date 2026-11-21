@@ -99,4 +99,43 @@ class SecretInsideTemplateTest {
         assertTrue(warnings.toString(), "bundleJson: ${ActionArgumentSensitivity.REDACTED}" in warnings)
         assertTrue(warnings.toString(), warnings.none { "abc123" in it })
     }
+
+    // A plain `}}` held in another variable, for text that closes a block only once it's filled in.
+    private val plainGlobals = mapOf("Close" to "}}")
+
+    private fun runLog(vararg steps: ActionSpec): String {
+        val store = VariableStore().apply {
+            set("Token", "abc123", sensitive = true)
+            plainGlobals.forEach { (name, value) -> set(name, value) }
+        }
+        val report = runBlocking {
+            TaskRunner(ActionContext(ContextWrapper(null), store, logger = {})).run(Task(name = "T", actions = steps.toList()))
+        }
+        return runLogMessage(source = "manual", traces = report.traces) + report.traces
+    }
+
+    private fun preflightAllWarnings(vararg steps: ActionSpec) = PreflightRunner.preflightTask(
+        Task(id = 1, name = "T", actions = steps.toList()),
+        inputs = PreflightInputs(globalVariables = mapOf("Token" to "abc123") + plainGlobals, secretGlobalNames = setOf("Token")),
+    ).tasks.single().steps.flatMap { it.warnings }
+
+    @Test
+    fun aSecretReadThroughAHyphenatedNameStaysHidden() {
+        // `Token-x` isn't set, so `%Token-x` reads `%Token` followed by `-x`.
+        assertFalse(runLog(setColor("{{ %Token-x }}")).contains("abc123"))
+        assertTrue(preflightAllWarnings(setColor("{{ %Token-x }}")).none { "abc123" in it })
+    }
+
+    @Test
+    fun aBlockClosedByAnotherVariableStillHidesTheSecret() {
+        assertFalse(runLog(setColor("{{ %Token%Close")).contains("abc123"))
+        assertTrue(preflightAllWarnings(setColor("{{ %Token%Close")).none { "abc123" in it })
+    }
+
+    @Test
+    fun preflightKeepsACopyOfASecretSecret() {
+        val copy = ActionSpec(type = "var.set", args = mapOf("name" to "%copy", "value" to "%Token"))
+        val warnings = preflightAllWarnings(copy, setColor("{{ %copy }}"))
+        assertTrue(warnings.toString(), warnings.none { "abc123" in it })
+    }
 }

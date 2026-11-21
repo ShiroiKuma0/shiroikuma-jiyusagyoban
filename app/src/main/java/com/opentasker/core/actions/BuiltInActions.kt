@@ -288,16 +288,18 @@ class SetVariableAction : DeclaredAction(ActionCatalog.require("var.set")) {
         // A value typed under a name like %api_token is hidden in the editor, so it is here too.
         val typedSecret = ActionArgumentSensitivity.isSensitive(id, "value", args)
         if (name.contains('.') || name.contains('[')) {
-            if (!ctx.variables.setAtPath(name, value)) {
-                return ActionResult.Failure("invalid path, or the variable's JSON nests too deep: $name")
+            // Trimmed like a plain name, which `set` trims, and like Preflight reads it.
+            val path = name.trim()
+            if (!ctx.variables.setAtPath(path, value)) {
+                return ActionResult.Failure("invalid path, or the variable's JSON nests too deep: $path")
             }
-            val baseName = name.takeWhile { it != '.' && it != '[' }
+            val baseName = path.takeWhile { it != '.' && it != '[' }
             val loggedValue = if (typedSecret || ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(baseName)) {
                 REDACTED_VARIABLE_VALUE
             } else {
                 value
             }
-            ctx.logger("Set path \$${name.removePrefix("%")} = $loggedValue")
+            ctx.logger("Set path \$${path.removePrefix("%")} = $loggedValue")
         } else {
             ctx.variables.set(name, value)
             val loggedValue = if (typedSecret || ctx.isArgumentSensitive("value") || ctx.variables.isSensitive(name)) {

@@ -431,7 +431,7 @@ object PreflightRunner {
                 failsHere = true
             }
             if (effectiveStatus != PreflightStepStatus.BLOCKED) {
-                simulateVariableWrite(spec, expansion.rawValues, variables, input.eventVariables)?.let { (failure, builtFromOthers) ->
+                simulateVariableWrite(spec, expansion.rawValues, variables, input.eventVariables, expansion.secretKeys.isNotEmpty())?.let { (failure, builtFromOthers) ->
                     if (builtFromOthers) {
                         // Something Preflight doesn't play may set those variables first, so this only warns.
                         val note = "A name built from other variables isn't a variable name here. If nothing changes those variables before this step, the run stops the step."
@@ -1057,7 +1057,7 @@ object PreflightRunner {
     ): TemplateExpansionResult {
         val legacy = variables.expandTracked(raw, conditionals)
         // A secret read inside `{{ }}` is the template's own text by now, so its warnings would quote it.
-        val quotesASecret = legacy.isSecretDerived && variables.readsASecretInsideATemplate(raw)
+        val quotesASecret = legacy.isSecretDerived && variables.readsASecretInsideATemplate(raw, legacy.value)
         val result = TemplateExpressionEngine().expand(
             legacy.value,
             scope ?: variables.toTemplateScope(input.eventVariables),
@@ -1102,21 +1102,23 @@ object PreflightRunner {
     /**
      * Plays [spec]'s variable write on [variables]. For Multiple Variables Set, returns why the run
      * fails the step, if it does, and whether only names built from other variables caused it.
+     * [readsASecret] marks what Set Variable writes as secret, as the run does for a step that reads one.
      */
     private fun simulateVariableWrite(
         spec: ActionSpec,
         values: Map<String, String>,
         variables: VariableStore,
         eventVariables: Map<String, String>,
+        readsASecret: Boolean,
     ): Pair<String, Boolean>? {
         when (spec.type) {
             "var.set" -> {
                 val name = values["name"]?.trim().orEmpty()
                 // A path writes into the variable the way the run does.
                 if (name.contains('.') || name.contains('[')) {
-                    variables.setAtPath(name, values["value"].orEmpty())
+                    variables.setAtPath(name, values["value"].orEmpty(), readsASecret)
                 } else if (name.isNotBlank()) {
-                    variables.set(name, values["value"].orEmpty())
+                    variables.set(name, values["value"].orEmpty(), readsASecret)
                 }
             }
             "var.persist" -> {

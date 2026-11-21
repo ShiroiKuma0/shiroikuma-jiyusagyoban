@@ -1185,7 +1185,7 @@ class TaskRunner(
         }
         // A secret read inside `{{ }}` is the template's own text by now, so its warnings and
         // expressions would quote it.
-        val quotesASecret = legacy.isSecretDerived && ctx.variables.readsASecretInsideATemplate(rawValue)
+        val quotesASecret = legacy.isSecretDerived && ctx.variables.readsASecretInsideATemplate(rawValue, legacy.value)
         return expanded to if (quotesASecret) trace?.withValueHidden() else trace
     }
 
@@ -1241,7 +1241,7 @@ internal class OutputNameArguments(private val actionType: String) {
 
     private companion object {
         val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
-        val PATH_BASE = Regex("^%[A-Za-z][A-Za-z0-9_-]*(?=[.\\[])")
+        val PATH_BASE = Regex("^\\s*%[A-Za-z][A-Za-z0-9_-]*(?=[.\\[])")
     }
 }
 

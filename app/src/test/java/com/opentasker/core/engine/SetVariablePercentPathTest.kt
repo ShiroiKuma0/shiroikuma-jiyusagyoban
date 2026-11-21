@@ -79,6 +79,23 @@ class SetVariablePercentPathTest {
         ).tasks.single().steps.last().expandedArguments["value"]
 
     @Test
+    fun spacesAroundAPathAreTrimmedInTheRunAsInPreflight() {
+        assertWritesLikeTheBarePath("%config.theme", "dark")
+        assertEquals(run(setStep("%config.theme", "dark")), run(setStep(" %config.theme ", "dark")))
+        assertEquals(run(setStep("config.theme", "dark")), run(setStep("config.theme ", "dark")))
+        assertEquals("""{"theme":"dark"}""", preflightShows(setStep(" %Config.theme ", "dark")))
+    }
+
+    @Test
+    fun preflightKeepsAPathWrittenFromASecretSecret() {
+        val shown = PreflightRunner.preflightTask(
+            Task(id = 1, name = "T", actions = listOf(setStep("%Config.key", "%Token"), setStep("%Out", "%Config"))),
+            inputs = PreflightInputs(globalVariables = mapOf("Token" to "abc123"), secretGlobalNames = setOf("Token")),
+        ).tasks.single().steps.last()
+        assertTrue(shown.toString(), "abc123" !in shown.toString())
+    }
+
+    @Test
     fun preflightWritesAPathWithAPercentSignLikeTheRun() {
         val withJson = mapOf("Config" to """{"theme":"light"}""")
         assertEquals("""{"theme":"dark"}""", preflightShows(setStep("%Config.theme", "dark"), globals = withJson))

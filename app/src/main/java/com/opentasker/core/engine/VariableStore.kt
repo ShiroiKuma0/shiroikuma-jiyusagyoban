@@ -378,20 +378,38 @@ class VariableStore {
     )
 
     /**
-     * True when a secret's `%name` sits inside a `{{ ... }}` block of [s]. Its value is then the
-     * template's own text, which the template's warnings and traces quote.
+     * True when a secret's `%name` sits inside a `{{ ... }}` block of [s], or its value sits inside
+     * a block of [expanded], the filled-in text the template runs on (a `}}` can come from another
+     * variable). The secret is then the template's own text, which its warnings and traces quote.
      */
-    fun readsASecretInsideATemplate(s: String): Boolean {
+    fun readsASecretInsideATemplate(s: String, expanded: String): Boolean {
+        val secretReads = variableReference.findAll(s).filter { readsASecret(s, it) }.toList()
+        if (secretReads.isEmpty()) return false
         val blocks = templateBlock.findAll(s).map { it.range }.toList()
-        return blocks.isNotEmpty() && variableReference.findAll(s).any { match ->
-            blocks.any { match.range.first in it } && readsASecret(s, match)
-        }
+        if (secretReads.any { match -> blocks.any { match.range.first in it } }) return true
+        val values = secretReads.mapNotNull { get(readName(it.groupValues[1])) }.filter(String::isNotEmpty)
+        return values.isNotEmpty() && templateBlock.findAll(expanded).any { block -> values.any(block.value::contains) }
     }
 
     private fun readsASecret(s: String, match: MatchResult): Boolean {
-        val name = match.groupValues[1]
+        val name = readName(match.groupValues[1])
         return isSensitive(name) || name in sensitiveArrayNames ||
-            (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(name))
+            (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(match.groupValues[1]))
+    }
+
+    /**
+     * The variable `%name` reads: itself, or for an unset name with a hyphen the longest set prefix,
+     * the way [VariableExpander] falls back, so `%Token-x` reads `%Token` when `Token-x` is unset.
+     */
+    private fun readName(name: String): String {
+        if (get(name) != null) return name
+        var separator = name.lastIndexOf('-')
+        while (separator > 0) {
+            val prefix = name.substring(0, separator)
+            if (get(prefix) != null) return prefix
+            separator = name.lastIndexOf('-', separator - 1)
+        }
+        return name
     }
 
     /**
@@ -478,10 +496,10 @@ class VariableStore {
      * Returns true if the write succeeded, false if the path is unparseable or the variable holds
      * JSON nested deeper than [JsonNesting.MAX_DATA_DEPTH], which is left as it is.
      */
-    fun setAtPath(fullPath: String, value: String): Boolean {
+    fun setAtPath(fullPath: String, value: String, sensitive: Boolean = false): Boolean {
         val parsed = parsePathSelectors(fullPath) ?: return false
         if (parsed.selectors.isEmpty()) {
-            set(parsed.base, value)
+            set(parsed.base, value, sensitive)
             return true
         }
 
@@ -495,7 +513,7 @@ class VariableStore {
         }
 
         val updated = setInJson(root, parsed.selectors, JsonPrimitive(value)) ?: return false
-        set(parsed.base, updated.toString())
+        set(parsed.base, updated.toString(), sensitive)
         return true
     }
 
