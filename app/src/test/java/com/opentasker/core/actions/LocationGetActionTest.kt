@@ -136,6 +136,35 @@ class LocationGetActionTest {
         assertEquals("9", variables.get("location_accuracy"))
     }
 
+    // An API 35 emulator handed a new GPS listener the fix it took four minutes earlier, within 39 ms.
+    @Test
+    fun aFixAndroidHadCachedIsSkippedForOneTakenNow() {
+        val readings = FakeReadings(
+            fixes = listOf(
+                fix(latitude = 1.0, ageMs = 243_000L, provider = "gps"),
+                fix(ageMs = 1_200L, provider = "gps"),
+            ),
+        )
+
+        assertEquals(ActionResult.Success, run(readings))
+
+        assertEquals(NY_LAT.toString(), variables.get("location_lat"))
+        assertEquals("1", variables.get("location_age"))
+    }
+
+    @Test
+    fun onlyAStaleFixInTimeFailsAndPointsAtLastKnown() {
+        val readings = FakeReadings(fixes = listOf(fix(ageMs = 243_000L, provider = "gps")))
+
+        val result = run(readings, "timeout" to "1")
+
+        assertTrue(result is ActionResult.Failure)
+        val message = (result as ActionResult.Failure).message
+        assertTrue(message, "no fix in 1 s" in message && "243 s ago" in message && "Last known only" in message)
+        assertEquals(1, readings.stopped)
+        assertNull(variables.get("location_lat"))
+    }
+
     @Test
     fun onlyLooseFixesInTimeFailAndSayHowCloseTheyCame() {
         val readings = FakeReadings(fixes = listOf(fix(accuracy = 800.0), fix(accuracy = 140.2)))

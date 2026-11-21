@@ -99,7 +99,7 @@ class LocationGetAction internal constructor(
             when (val outcome = freshFix(source, providers, wanted, timeoutSeconds * 1000L)) {
                 is FreshFix.Got -> outcome.reading
                 is FreshFix.CouldNotStart -> return ActionResult.Failure("location.get couldn't start location updates: ${outcome.reason}")
-                is FreshFix.TimedOut -> return ActionResult.Failure(timeoutMessage(timeoutSeconds, wanted, outcome.closestMeters))
+                is FreshFix.TimedOut -> return ActionResult.Failure(timeoutMessage(timeoutSeconds, wanted, outcome))
             }
         }
 
@@ -119,10 +119,15 @@ class LocationGetAction internal constructor(
     private sealed interface FreshFix {
         data class Got(val reading: LocationReading) : FreshFix
         data class CouldNotStart(val reason: String) : FreshFix
-        data class TimedOut(val closestMeters: Double?) : FreshFix
+        data class TimedOut(val closestMeters: Double?, val staleAgeMs: Long?) : FreshFix
     }
 
-    /** The first fix good enough, or what came closest when none is in time. Updates always stop. */
+    /**
+     * The first fix good enough, or what came closest when none is in time. Updates always stop.
+     * A fix older than [MAX_FRESH_AGE_MS] doesn't count: a new listener can be handed the last fix
+     * Android had, however old (an emulator's GPS replayed one four minutes old), and Fresh fix
+     * promises one taken now. Android's own getCurrentLocation draws the line at the same 30 s.
+     */
     private suspend fun freshFix(
         source: LocationReadings,
         providers: List<String>,
@@ -131,13 +136,15 @@ class LocationGetAction internal constructor(
     ): FreshFix {
         val lock = Any()
         var closest: Double? = null
+        var staleAgeMs: Long? = null
         val good = CompletableDeferred<LocationReading>()
         val stop = try {
             source.start(providers) { reading ->
-                if (reading.meets(wanted)) {
-                    good.complete(reading)
-                } else {
-                    reading.accuracyMeters?.let { accuracy ->
+                when {
+                    reading.ageMs > MAX_FRESH_AGE_MS ->
+                        synchronized(lock) { staleAgeMs = minOf(staleAgeMs ?: reading.ageMs, reading.ageMs) }
+                    reading.meets(wanted) -> good.complete(reading)
+                    else -> reading.accuracyMeters?.let { accuracy ->
                         synchronized(lock) { closest = minOf(closest ?: accuracy, accuracy) }
                     }
                 }
@@ -148,19 +155,23 @@ class LocationGetAction internal constructor(
         }
         return try {
             withTimeoutOrNull(timeoutMs) { good.await() }?.let { FreshFix.Got(it) }
-                ?: FreshFix.TimedOut(synchronized(lock) { closest })
+                ?: synchronized(lock) { FreshFix.TimedOut(closest, staleAgeMs) }
         } finally {
             stop()
         }
     }
 
-    private fun timeoutMessage(timeoutSeconds: Long, wanted: Double?, closestMeters: Double?): String {
+    private fun timeoutMessage(timeoutSeconds: Long, wanted: Double?, outcome: FreshFix.TimedOut): String {
+        val closestMeters = outcome.closestMeters
         val got = if (wanted != null && closestMeters != null) {
             "location.get got no fix within ${meters(wanted)} m in $timeoutSeconds s; the closest was ${closestMeters.roundToLong()} m."
         } else {
             "location.get got no fix in $timeoutSeconds s."
         }
-        return "$got ${LocationPolicyDisclosures.actionBackgroundNote}"
+        val stale = outcome.staleAgeMs?.let {
+            " Android only offered one from ${it / 1000L} s ago. Pick Last known only to take that."
+        }.orEmpty()
+        return "$got$stale ${LocationPolicyDisclosures.actionBackgroundNote}"
     }
 
     companion object {
@@ -169,6 +180,7 @@ class LocationGetAction internal constructor(
         internal const val MODE_LAST_KNOWN = "last_known"
         internal const val DEFAULT_TIMEOUT_SECONDS = 30L
         internal const val MAX_TIMEOUT_SECONDS = 120L
+        internal const val MAX_FRESH_AGE_MS = 30_000L
         private const val LONGEST_SUFFIX = "_accuracy"
 
         private fun LocationReading.meets(wanted: Double?): Boolean =
