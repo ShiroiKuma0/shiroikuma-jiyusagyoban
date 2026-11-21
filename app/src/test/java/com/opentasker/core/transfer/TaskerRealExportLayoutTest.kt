@@ -1211,4 +1211,42 @@ class TaskerRealExportLayoutTest {
         assertEquals(listOf("Wait Loop", "Count", "Tasker goto"), task.actions.map { it.label })
         assertEquals(0, FlowControl.gotoTarget(task.actions, task.actions[2].args["label"], null).index)
     }
+
+    private val waitOneSecond = """<code>30</code><Int sr="arg0" val="0"/><Int sr="arg1" val="1"/><Int sr="arg2" val="0"/><Int sr="arg3" val="0"/><Int sr="arg4" val="0"/>"""
+    private val waitOneMinute = """<code>30</code><Int sr="arg0" val="0"/><Int sr="arg1" val="0"/><Int sr="arg2" val="1"/><Int sr="arg3" val="0"/><Int sr="arg4" val="0"/>"""
+    private val countUp = """<code>888</code><Str sr="arg0" ve="3">%n</Str><Int sr="arg1" val="1"/><Int sr="arg2" val="0"/>"""
+
+    private fun gotoStep(step: Int) = """<code>135</code><Int sr="arg0" val="0"/><Int sr="arg1" val="$step"/><Str sr="arg2" ve="3"/>"""
+
+    private fun pollNotes(vararg actions: String) = parse(*actions).lossyWarnings.filter { "100,000 steps" in it }
+
+    @Test
+    fun aGotoBackOverAWaitSaysARunHereStopsAndRoughlyWhen() {
+        // 100,000 steps over a three-step loop is 33,333 passes: of one second each about 9 hours,
+        // of one minute each about 23 days.
+        val bySecond = pollNotes(waitOneSecond, countUp, gotoStep(1))
+        val byMinute = pollNotes(
+            """<code>300</code><label>Wait Loop</label>""",
+            waitOneMinute,
+            """<code>135</code><Int sr="arg0" val="1"/><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">Wait Loop</Str>""",
+        )
+
+        assertEquals(1, bySecond.size)
+        assertTrue(bySecond.single(), bySecond.single().startsWith("Task 'Imported' action 3: "))
+        assertTrue(bySecond.single(), bySecond.single().endsWith(", about 9 hours of this loop."))
+        assertTrue(byMinute.single(), byMinute.single().endsWith(", about 23 days of this loop."))
+    }
+
+    @Test
+    fun aWaitFromAVariableGetsTheNoteWithoutATime() {
+        val note = pollNotes("""<code>30</code><Int sr="arg0"><var>%wait_ms</var></Int>""", gotoStep(1)).single()
+        assertTrue(note, note.endsWith("after 100,000 steps."))
+    }
+
+    @Test
+    fun onlyAGotoBackOverAWaitGetsTheNote() {
+        assertEquals(emptyList<String>(), pollNotes(countUp, gotoStep(1)))
+        assertEquals(emptyList<String>(), pollNotes(gotoStep(3), waitOneSecond, countUp))
+        assertEquals(emptyList<String>(), pollNotes(waitOneSecond, """<code>135</code><Int sr="arg0" val="0"/><Int sr="arg1"><var>%back</var></Int><Str sr="arg2" ve="3"/>"""))
+    }
 }

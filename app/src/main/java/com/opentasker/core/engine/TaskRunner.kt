@@ -1335,7 +1335,7 @@ fun resetsReturnVariable(args: Map<String, String>): Boolean =
 const val STEP_TURNED_OFF = "step is turned off"
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
-private const val MAX_FLOW_STEPS = 100_000
+internal const val MAX_FLOW_STEPS = 100_000
 private const val FLOW_ERROR_JSON = TaskFailureVariables.JSON
 private const val FLOW_ERROR_TASK_ID = TaskFailureVariables.TASK_ID
 private const val FLOW_ERROR_TASK_NAME = TaskFailureVariables.TASK_NAME

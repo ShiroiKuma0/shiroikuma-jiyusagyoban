@@ -15,6 +15,7 @@ import com.opentasker.core.contexts.WIFI_DISCONNECTED_WORDS
 import com.opentasker.core.data.TextOps
 import com.opentasker.core.data.VariableConvert
 import com.opentasker.core.engine.FlowControl
+import com.opentasker.core.engine.MAX_FLOW_STEPS
 import com.opentasker.core.engine.STOP_TASK_ACTION_ID
 import com.opentasker.core.engine.SUB_TASK_ACTION_ID
 import com.opentasker.core.engine.SUB_TASK_RESET_RETURN_KEY
@@ -43,6 +44,7 @@ import org.xml.sax.SAXException
 import java.io.StringReader
 import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.math.roundToLong
 
 data class TaskerXmlImportReport(
     val bundle: OpenTaskerBundle,
@@ -111,6 +113,30 @@ private fun taskerStreamWarning(actionName: String, stream: Int?, variable: Stri
         "Tasker $actionName plays on stream $stream$name, which this app doesn't offer, so it $plays on Music"
     }
     else -> null
+}
+
+/**
+ * Tasker keeps a Goto loop going for as long as it jumps, while a run here stops after
+ * [MAX_FLOW_STEPS] steps, so a poll (a Wait, then a Goto back) is named with roughly how long it
+ * lasts here when its waits are written as numbers.
+ */
+private fun taskerPollLoopWarnings(taskName: String, actions: List<ActionSpec>): List<String> =
+    actions.withIndex().mapNotNull { (index, goto) ->
+        if (goto.type != "flow.goto" || !goto.args["to"].isNullOrBlank()) return@mapNotNull null
+        val target = FlowControl.gotoTarget(actions, goto.args["label"], goto.args["step"]).index
+        if (target == null || target > index) return@mapNotNull null
+        val waits = actions.subList(target, index + 1).filter { it.type == "flow.wait" }
+        if (waits.isEmpty()) return@mapNotNull null
+        val passMillis = waits.map { it.args["millis"]?.trim()?.toLongOrNull() }.takeIf { null !in it }?.sumOf { it ?: 0L }
+        val lasts = passMillis?.takeIf { it > 0 }?.let { ", about ${roughDuration(MAX_FLOW_STEPS / (index - target + 1) * it)} of this loop" }.orEmpty()
+        "Task '$taskName' action ${index + 1}: this Goto jumps back over a Wait. Tasker keeps a loop like that going, " +
+            "but a run here stops after ${String.format(Locale.US, "%,d", MAX_FLOW_STEPS)} steps$lasts."
+    }
+
+private fun roughDuration(millis: Long): String = when {
+    millis < 3_600_000L -> "${maxOf(1L, (millis / 60_000.0).roundToLong())} minutes"
+    millis < 172_800_000L -> "${(millis / 3_600_000.0).roundToLong()} hours"
+    else -> "${(millis / 86_400_000.0).roundToLong()} days"
 }
 
 /** Names the Tasker built-ins a task reads that this app leaves as written. */
@@ -204,6 +230,7 @@ object TaskerXmlImporter {
             val written = actions.flatMap { action -> writtenScalarVariables(action.type, action.args) }.toSet()
             val builtIns = TaskerBuiltIns.unsupportedReads(element.directChildren("Action").flatMap { it.textNodes() }.joinToString("\n")) - written
             if (builtIns.isNotEmpty()) lossyWarnings += taskerBuiltInWarning(name, builtIns)
+            lossyWarnings += taskerPollLoopWarnings(name, actions)
             Task(id = id, name = name, actions = actions)
         }
     }
