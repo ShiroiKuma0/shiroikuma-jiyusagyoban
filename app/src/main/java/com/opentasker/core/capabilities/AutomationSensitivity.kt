@@ -379,6 +379,10 @@ object AutomationSensitivityRegistry {
         // that does it is called out. It can't turn on an imported profile still waiting for review.
         "profile.set",
         "ussd.run",
+        // Installs or replaces an app on the phone — this one included.
+        "package.install",
+        // Overwrites tasks, profiles and scenes of the same name with whatever the file holds.
+        "workspace.import",
     )
 
     private val destructiveActionIds = setOf(

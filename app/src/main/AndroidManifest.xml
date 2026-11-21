@@ -16,6 +16,10 @@
     <uses-permission
         android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:ignore="ProtectedPermissions" />
+    <!-- Lets `package.install` update this app, and apps it installed before, with no confirmation
+         (Android 12+). A normal permission; without it every remote update of a relay phone would
+         wait for a tap nobody is there to give. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
@@ -725,6 +729,21 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- A new build replaced this app: restart the engine, and finish a remote self-update by
+             running its report task (package.install). -->
+        <receiver
+            android:name="com.opentasker.core.actions.PackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The installer's answer to a package.install session. -->
+        <receiver
+            android:name="com.opentasker.core.actions.PackageInstallResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name="com.opentasker.core.engine.DirectBootTimeReceiver"
