@@ -361,6 +361,45 @@ class DatabaseMigrationInstrumentedTest {
         }
     }
 
+    /**
+     * The run log's task filter groups by taskId on every write while the screen is open, and
+     * startup recovery looks rows up by executionId. Both read the whole table without an index.
+     */
+    @Test
+    fun appDatabaseMigratesFrom15To16WithRunLogLookupIndexes() {
+        appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 15).apply {
+            execSQL(
+                """
+                INSERT INTO run_logs (id, taskId, taskName, timestamp, durationMs, success, message, executionId)
+                VALUES (1, 7, 'Indexed task', 1000, 5, 1, 'ok', 'run-1')
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = appDatabaseHelper.runMigrationsAndValidate(
+            APP_DATABASE_NAME,
+            16,
+            true,
+            DatabaseMigrations.MIGRATION_15_16,
+        )
+
+        fun plan(sql: String): String = migrated.query("EXPLAIN QUERY PLAN $sql").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("detail"))) }
+                .joinToString(" | ")
+        }
+        val byExecution = plan("SELECT * FROM run_logs WHERE executionId = 'run-1' ORDER BY id DESC LIMIT 1")
+        assertTrue(byExecution, "index_run_logs_executionId" in byExecution)
+        val taskOptions = plan(
+            "SELECT taskId, taskName FROM run_logs WHERE id IN (SELECT MAX(id) FROM run_logs GROUP BY taskId)",
+        )
+        assertTrue(taskOptions, "index_run_logs_taskId" in taskOptions)
+        migrated.query("SELECT taskName FROM run_logs WHERE executionId = 'run-1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Indexed task", cursor.getString(0))
+        }
+    }
+
     @Test
     fun appDatabaseMigratesFullPathFrom1ToCurrent() {
         appDatabaseHelper.createDatabase(APP_DATABASE_NAME, 1).apply {
@@ -378,7 +417,7 @@ class DatabaseMigrationInstrumentedTest {
 
         val migrated = appDatabaseHelper.runMigrationsAndValidate(
             APP_DATABASE_NAME,
-            15,
+            OPEN_TASKER_DATABASE_SCHEMA_VERSION,
             true,
             *DatabaseMigrations.getAllMigrations(),
         )

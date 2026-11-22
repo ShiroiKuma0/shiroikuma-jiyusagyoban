@@ -244,6 +244,13 @@ object DatabaseMigrations {
         }
     }
 
+    val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_run_logs_taskId` ON `run_logs` (`taskId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_run_logs_executionId` ON `run_logs` (`executionId`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -260,6 +267,7 @@ object DatabaseMigrations {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
+            MIGRATION_15_16,
         )
     }
 
@@ -276,6 +284,7 @@ object DatabaseMigrations {
             MIGRATION_6_7,
             MIGRATION_8_9,
             MIGRATION_14_15,
+            MIGRATION_15_16,
         )
     }
 }

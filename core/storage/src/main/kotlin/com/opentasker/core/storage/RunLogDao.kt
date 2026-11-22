@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.Flow
 
 // timestamp is indexed because recent summaries, anchored keyset pages, and retention pruning all
 // sort or bound the table by timestamp (with the primary key as the deterministic tie-breaker).
-@Entity("run_logs", indices = [Index("timestamp")])
+// taskId serves the run log's task filter, which groups by it on every write while the screen is
+// open, and executionId the startup recovery that looks up each interrupted run's row.
+@Entity("run_logs", indices = [Index("timestamp"), Index("taskId"), Index("executionId")])
 data class RunLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val taskId: Long,

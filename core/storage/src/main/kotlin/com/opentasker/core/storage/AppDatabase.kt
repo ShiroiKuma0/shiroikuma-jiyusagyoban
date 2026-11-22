@@ -5,7 +5,7 @@ import androidx.room.AutoMigration
 import androidx.room.RoomDatabase
 import java.util.concurrent.CountDownLatch
 
-const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 15
+const val OPEN_TASKER_DATABASE_SCHEMA_VERSION = 16
 
 @Database(
     entities = [ProjectEntity::class, ProfileEntity::class, TaskEntity::class, SceneEntity::class, VariableEntity::class, RunLogEntity::class, EditHistoryEntity::class, ExecutionJournalEntity::class],
