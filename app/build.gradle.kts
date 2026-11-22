@@ -1940,6 +1940,12 @@ val generateRegexCorpus = tasks.register<GenerateRegexCorpusTask>("generateRegex
     outputDirectory.set(layout.buildDirectory.dir("generated/regexCorpus"))
 }
 
+// The JVM unit tests read the same corpus (ProductionRegexBraceTest), so the ICU rejection this
+// project keeps shipping, a bare `}`, fails an ordinary test run instead of waiting for a device.
+tasks.withType<Test>().configureEach {
+    inputs.files(generateRegexCorpus).withPropertyName("regexCorpus").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 // Registering the directory through the variant API is what carries the task dependency. Adding it
 // to the static androidTest source set instead leaves lint and packaging reading a directory they
 // never declared they consume, which Gradle rejects as an implicit dependency.

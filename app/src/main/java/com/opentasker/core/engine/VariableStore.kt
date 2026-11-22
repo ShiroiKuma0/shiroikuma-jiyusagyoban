@@ -751,7 +751,9 @@ class VariableStore {
     companion object {
         private val jsonCodec = Json { ignoreUnknownKeys = true }
         private val variableReference = Regex("%([A-Za-z][A-Za-z0-9_-]*)")
-        private val templateBlock = Regex("""\{\{.*?}}""", RegexOption.DOT_MATCHES_ALL)
+        // Both closing braces escaped: Android's ICU engine refuses a bare `}`, which made this class
+        // fail to load on a phone while every JVM test passed.
+        private val templateBlock = Regex("""\{\{.*?\}\}""", RegexOption.DOT_MATCHES_ALL)
 
         /**
          * Upper bound for a nested/array write index. A `var.set` name such as `X[2000000000]`
