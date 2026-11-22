@@ -358,6 +358,11 @@ class ActiveAutomationViewModel(
         .map { it.toImmutableList() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
 
+    /** Tasks running as another run's sub-task, which their cards count as running too. */
+    val nestedTaskIds: StateFlow<ImmutableList<Long>> = ActiveExecutionRegistry.nestedTaskIds
+        .map { it.toImmutableList() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), persistentListOf())
+
     fun cancelExecution(executionId: Long) {
         viewModelScope.launch {
             val cancelled = ActiveExecutionRegistry.cancel(executionId)

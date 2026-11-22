@@ -63,4 +63,36 @@ class TaskerSubTaskRunningListTest {
 
         assertNull(TaskerBuiltIns.value("TRUN"))
     }
+
+    @Test
+    fun aSubTaskCountsAsRunningForItsCardUntilItEnds() {
+        val seen = mutableListOf<List<Long>>()
+        ActionRegistry.register(object : Action {
+            override val id = "test.nested_ids"
+            override val category = ActionCategory.FLOW
+            override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+                seen += ActiveExecutionRegistry.nestedTaskIds.value
+                return ActionResult.Success
+            }
+        })
+        val capture = ActionSpec(type = "test.nested_ids")
+
+        run(
+            Task(id = 1, name = "Outer", actions = listOf(runTask("Middle"), capture)),
+            Task(id = 2, name = "Middle", actions = listOf(runTask("Inner"))),
+            Task(id = 3, name = "Inner", actions = listOf(capture)),
+        )
+
+        assertEquals(listOf(listOf(2L, 3L), emptyList<Long>()), seen)
+    }
+
+    @Test
+    fun aFailedSubTaskStopsCountingAsRunning() {
+        run(
+            Task(id = 1, name = "Outer", actions = listOf(runTask("Broken").copy(continueOnError = true))),
+            Task(id = 2, name = "Broken", actions = listOf(ActionSpec(type = "no.such.action"))),
+        )
+
+        assertEquals(emptyList<Long>(), ActiveExecutionRegistry.nestedTaskIds.value)
+    }
 }

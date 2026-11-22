@@ -37,8 +37,23 @@ object ActiveExecutionRegistry {
     private val nextId = AtomicLong(1)
     private val executions = MutableStateFlow<List<ActiveExecution>>(emptyList())
     private val jobs = mutableMapOf<Long, Job>()
+    private val nested = MutableStateFlow<List<Long>>(emptyList())
 
     val active: StateFlow<List<ActiveExecution>> = executions.asStateFlow()
+
+    /**
+     * Ids of tasks running inside another run as a sub-task, once per copy. They aren't executions
+     * of their own (stopping the run that called them stops them), so they stay out of [active].
+     */
+    val nestedTaskIds: StateFlow<List<Long>> = nested.asStateFlow()
+
+    fun nestedStarted(taskId: Long) = synchronized(jobs) {
+        nested.value = nested.value + taskId
+    }
+
+    fun nestedEnded(taskId: Long) = synchronized(jobs) {
+        nested.value = nested.value - taskId
+    }
 
     fun register(
         taskId: Long,
@@ -97,6 +112,7 @@ object ActiveExecutionRegistry {
     fun reset() = synchronized(jobs) {
         jobs.clear()
         executions.value = emptyList()
+        nested.value = emptyList()
     }
 
     const val CANCELLED_BY_USER = "Cancelled by user"

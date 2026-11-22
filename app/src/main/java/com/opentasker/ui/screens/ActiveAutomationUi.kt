@@ -224,7 +224,8 @@ fun ActiveAutomationUi(
     val runLogFilters by viewModel.runLog.runLogFilters.collectAsState()
     val runLogTaskOptions by viewModel.runLog.runLogTaskOptions.collectAsState()
     val activeExecutions by viewModel.activeExecutions.collectAsState()
-    val runningTasks = remember(activeExecutions) { runningTaskIds(activeExecutions) }
+    val nestedTasks by viewModel.nestedTaskIds.collectAsState()
+    val runningTasks = remember(activeExecutions, nestedTasks) { runningTaskIds(activeExecutions, nestedTasks) }
     val globalVariables by viewModel.globalVariables.collectAsState()
     val runLogRetentionPolicy by viewModel.runLog.runLogRetentionPolicy.collectAsState()
     val globalFallbackTaskId by viewModel.globalFallbackTaskId.collectAsState()

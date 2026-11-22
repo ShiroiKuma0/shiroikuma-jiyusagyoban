@@ -958,13 +958,15 @@ class TaskRunner(
 
     /**
      * Tasker's %TRUN lists a task run by another one too, from when its collision rule lets it run,
-     * so one still waiting its turn or skipped isn't listed.
+     * so one still waiting its turn or skipped isn't listed. Its card says Running for the same span.
      */
     private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
         val running = TaskerBuiltIns.subTaskStarted(target.name)
+        ActiveExecutionRegistry.nestedStarted(target.id)
         try {
             return child.run(target)
         } finally {
+            ActiveExecutionRegistry.nestedEnded(target.id)
             TaskerBuiltIns.subTaskEnded(running)
         }
     }

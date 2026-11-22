@@ -117,6 +117,57 @@ class RunningBadgeComposeTest {
         composeTestRule.onAllNodesWithText(RUNNING).assertCountEquals(0)
     }
 
+    @Test
+    fun aProfilesFallbackTaskAndASubTaskCountAsRunning() {
+        val guarded = Profile(id = 4, name = "Guarded", enterTaskId = lights.id, fallbackTaskId = fan.id)
+        val nested = MutableStateFlow<List<Long>>(emptyList())
+        composeTestRule.setContent {
+            OpenTaskerTheme {
+                val executions by live.collectAsState()
+                val nestedIds by nested.collectAsState()
+                ProfilesScreen(
+                    profiles = listOf(guarded),
+                    tasks = listOf(lights, fan),
+                    runLogs = emptyList(),
+                    storageDecodeIssues = emptyList(),
+                    onCreateTaskFirst = {},
+                    onCreateProfile = {},
+                    onBrowseTemplates = {},
+                    onPreviewProfileShare = {},
+                    onPreflightProfile = {},
+                    onExportOpenTaskerBundle = {},
+                    onImportOpenTaskerBundle = {},
+                    onImportOpenTaskerBundleText = {},
+                    openTaskerBundleBusy = false,
+                    onImportTaskerXml = {},
+                    onExportTaskerXml = {},
+                    taskerImportBusy = false,
+                    onEditProfile = {},
+                    onDeleteProfile = {},
+                    onToggleProfile = { _, _ -> },
+                    onAddContext = {},
+                    onEditContextLogic = {},
+                    onEditContext = { _, _, _ -> },
+                    onDeleteContext = { _, _ -> },
+                    contentPadding = PaddingValues(0.dp),
+                    runningTaskIds = runningTaskIds(executions, nestedIds),
+                )
+            }
+        }
+        composeTestRule.onAllNodesWithText(RUNNING).assertCountEquals(0)
+
+        live.value = listOf(run(fan))
+        composeTestRule.onAllNodesWithText(RUNNING).assertCountEquals(1)
+
+        // The fallback task running inside another run, as a sub-task, still counts.
+        live.value = emptyList()
+        nested.value = listOf(fan.id)
+        composeTestRule.onAllNodesWithText(RUNNING).assertCountEquals(1)
+
+        nested.value = emptyList()
+        composeTestRule.onAllNodesWithText(RUNNING).assertCountEquals(0)
+    }
+
     private fun run(task: Task) = ActiveExecution(
         id = task.id * 100,
         taskId = task.id,

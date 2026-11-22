@@ -294,7 +294,7 @@ internal fun ProfilesScreen(
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> singleDelete { onDeleteContext(profile, index) } },
                 onPreflight = { onPreflightProfile(profile) },
-                running = listOfNotNull(enterTaskId, exitTaskId).any { it in runningTaskIds },
+                running = listOfNotNull(enterTaskId, exitTaskId, profile.fallbackTaskId).any { it in runningTaskIds },
             )
         }
     }
@@ -618,8 +618,12 @@ internal fun TasksScreen(
     }
 }
 
-/** The tasks with a run in flight, for the Running pill on task and profile cards. */
-internal fun runningTaskIds(executions: List<ActiveExecution>): Set<Long> = executions.mapTo(HashSet()) { it.taskId }
+/**
+ * The tasks with a run in flight, for the Running pill on task and profile cards: each run's own
+ * task and any task one of them is running as a sub-task ([nestedTaskIds]).
+ */
+internal fun runningTaskIds(executions: List<ActiveExecution>, nestedTaskIds: List<Long> = emptyList()): Set<Long> =
+    executions.mapTo(HashSet()) { it.taskId } + nestedTaskIds
 
 @Composable
 private fun TaskCard(
