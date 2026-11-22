@@ -485,6 +485,7 @@ class ActiveAutomationViewModel(
                     val duplicate = AutomationReferenceRewriter.remapDuplicateSelfReferences(
                         original = source,
                         duplicate = staged.copy(id = newId),
+                        taskIds = db.taskDao().getAll().mapTo(hashSetOf()) { it.id },
                     )
                     db.taskDao().update(duplicate.toEntity())
                     recordCreation(EditHistoryDao.TYPE_TASK, newId, StorageJson.encodeToString(duplicate))
@@ -517,7 +518,13 @@ class ActiveAutomationViewModel(
                 }
                 val previousTask = previous.toDomain()
                 val renamed = !previousTask.name.equals(task.name, ignoreCase = true)
-                if (renamed) saved = AutomationReferenceRewriter.stabilizeOwnNameReferences(previousTask, task)
+                if (renamed) {
+                    saved = AutomationReferenceRewriter.stabilizeOwnNameReferences(
+                        previousTask,
+                        task,
+                        taskIds = db.taskDao().getAll().mapTo(hashSetOf()) { it.id },
+                    )
+                }
                 recordEdit(
                     entityType = EditHistoryDao.TYPE_TASK,
                     entityId = task.id,

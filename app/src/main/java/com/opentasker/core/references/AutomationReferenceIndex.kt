@@ -176,12 +176,19 @@ data class TaskReference(
 
 object AutomationReferenceIndex {
 
-    /** Every task reference held by [profiles], [tasks], and [scenes], in a stable order. */
+    /**
+     * Every task reference held by [profiles], [tasks], and [scenes], in a stable order.
+     *
+     * [taskIds] is every task id in the workspace. The engine reads a numeric `task.run` or
+     * `task.stop` target as an id only when a task has that id, and as a name otherwise, so a task
+     * named "2025" is found by its name. Without [taskIds], every number reads as an id.
+     */
     fun build(
         profiles: List<Profile> = emptyList(),
         tasks: List<Task> = emptyList(),
         scenes: List<Scene> = emptyList(),
         globalFallbackTaskId: Long? = null,
+        taskIds: Set<Long>? = null,
     ): List<TaskReference> = buildList {
         profiles.sortedBy { it.id }.forEach { profile ->
             val enterTaskId = profile.enterTaskIdOrNull
@@ -218,7 +225,7 @@ object AutomationReferenceIndex {
 
         tasks.sortedBy { it.id }.forEach { task ->
             task.actions.forEachIndexed { actionIndex, action ->
-                actionTaskRefs(task, actionIndex, action.type, action.args).forEach(::add)
+                actionTaskRefs(task, actionIndex, action.type, action.args, taskIds).forEach(::add)
             }
         }
 
@@ -256,7 +263,13 @@ object AutomationReferenceIndex {
         scenes: List<Scene> = emptyList(),
         globalFallbackTaskId: Long? = null,
     ): List<TaskReference> = referencesTo(
-        build(profiles, tasks.filterNot { it.id == task.id }, scenes, globalFallbackTaskId),
+        build(
+            profiles,
+            tasks.filterNot { it.id == task.id },
+            scenes,
+            globalFallbackTaskId,
+            taskIds = tasks.mapTo(hashSetOf(task.id)) { it.id },
+        ),
         task,
     )
 
@@ -386,6 +399,7 @@ object AutomationReferenceIndex {
         actionIndex: Int,
         actionType: String,
         args: Map<String, String>,
+        taskIds: Set<Long>? = null,
     ): List<TaskReference> = buildList {
         if (actionType == SUB_TASK_ACTION_ID || actionType == STOP_TASK_ACTION_ID) {
             val key = SUB_TASK_REF_KEYS.firstOrNull { args[it]?.isNotBlank() == true }
@@ -399,7 +413,10 @@ object AutomationReferenceIndex {
                 add(
                     TaskReference(
                         site,
-                        raw.toLongOrNull()?.takeIf { it > 0 }?.let(TaskRef::ById) ?: TaskRef.ByName(raw),
+                        raw.toLongOrNull()
+                            ?.takeIf { it > 0 && (taskIds == null || it in taskIds) }
+                            ?.let(TaskRef::ById)
+                            ?: TaskRef.ByName(raw),
                     ),
                 )
             }

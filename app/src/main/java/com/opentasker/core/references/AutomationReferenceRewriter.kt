@@ -63,10 +63,13 @@ data class VariableReferenceRewrite(
  */
 object AutomationReferenceRewriter {
 
-    /** Rebinds references to [original] inside a copied task to that copy's stable id. */
-    fun remapDuplicateSelfReferences(original: Task, duplicate: Task): Task = duplicate.copy(
+    /**
+     * Rebinds references to [original] inside a copied task to that copy's stable id. [taskIds] is
+     * every task id, as in [AutomationReferenceIndex.build].
+     */
+    fun remapDuplicateSelfReferences(original: Task, duplicate: Task, taskIds: Set<Long>? = null): Task = duplicate.copy(
         actions = duplicate.actions.map { action ->
-            action.retargetTaskArgs(original, duplicate.id)
+            action.retargetTaskArgs(original, duplicate.id, taskIds)
         },
     )
 
@@ -166,8 +169,9 @@ object AutomationReferenceRewriter {
         globalFallbackTaskId: Long? = null,
     ): ReferenceRewrite {
         val others = tasks.filterNot { it.id == target.id }
+        val taskIds = tasks.mapTo(hashSetOf(target.id)) { it.id }
         val references = AutomationReferenceIndex.referencesTo(
-            AutomationReferenceIndex.build(profiles, others, scenes, globalFallbackTaskId),
+            AutomationReferenceIndex.build(profiles, others, scenes, globalFallbackTaskId, taskIds),
             target,
         )
         if (references.isEmpty()) return ReferenceRewrite()
@@ -179,13 +183,13 @@ object AutomationReferenceRewriter {
                 if (resolution.replacement.id == target.id) {
                     return ReferenceRewrite(blocked = references)
                 }
-                rewrite(target, profiles, others, scenes, globalFallbackTaskId) { resolution.replacement.id }
+                rewrite(target, profiles, others, scenes, globalFallbackTaskId, taskIds) { resolution.replacement.id }
             }
 
             ReferenceResolution.Clear -> {
                 val required = references.filter { it.isRequired }
                 if (required.isNotEmpty()) return ReferenceRewrite(blocked = required)
-                rewrite(target, profiles, others, scenes, globalFallbackTaskId) { null }
+                rewrite(target, profiles, others, scenes, globalFallbackTaskId, taskIds) { null }
             }
         }
     }
@@ -205,11 +209,12 @@ object AutomationReferenceRewriter {
         scenes: List<Scene> = emptyList(),
     ): ReferenceRewrite {
         val others = tasks.filterNot { it.id == target.id }
+        val taskIds = tasks.mapTo(hashSetOf(target.id)) { it.id }
         val nameReferences = AutomationReferenceIndex
-            .referencesTo(AutomationReferenceIndex.build(profiles, others, scenes), target)
+            .referencesTo(AutomationReferenceIndex.build(profiles, others, scenes, taskIds = taskIds), target)
             .filter { it.ref is TaskRef.ByName }
         if (nameReferences.isEmpty()) return ReferenceRewrite()
-        return rewrite(target, profiles, others, scenes, null) { target.id }
+        return rewrite(target, profiles, others, scenes, null, taskIds) { target.id }
     }
 
     /**
@@ -217,8 +222,8 @@ object AutomationReferenceRewriter {
      * leaves the renamed task out, but a Stop Task step naming the task it's in is a real self
      * reference, and it would otherwise go on naming a task that no longer exists.
      */
-    fun stabilizeOwnNameReferences(previous: Task, renamed: Task): Task =
-        renamed.copy(actions = renamed.actions.map { action -> action.retargetTaskArgs(previous, previous.id) })
+    fun stabilizeOwnNameReferences(previous: Task, renamed: Task, taskIds: Set<Long>? = null): Task =
+        renamed.copy(actions = renamed.actions.map { action -> action.retargetTaskArgs(previous, previous.id, taskIds) })
 
     /**
      * Rewrites every task reference through [idMap], used when a bundle's tasks are inserted under
@@ -271,6 +276,7 @@ object AutomationReferenceRewriter {
         tasks: List<Task>,
         scenes: List<Scene>,
         globalFallbackTaskId: Long?,
+        taskIds: Set<Long>,
         newId: () -> Long?,
     ): ReferenceRewrite {
         val replacement = newId()
@@ -288,7 +294,7 @@ object AutomationReferenceRewriter {
         }
 
         val changedTasks = tasks.mapNotNull { task ->
-            val actions = task.actions.map { action -> action.retargetTaskArgs(target, replacement) }
+            val actions = task.actions.map { action -> action.retargetTaskArgs(target, replacement, taskIds) }
             task.copy(actions = actions).takeIf { it != task }
         }
 
@@ -347,14 +353,14 @@ object AutomationReferenceRewriter {
      * `task.run` or `task.stop` target leaves the action present but unbound, where the runner
      * already fails closed with "task.run requires a 'task'" (or task.stop's same message).
      */
-    private fun ActionSpec.retargetTaskArgs(target: Task, replacement: Long?): ActionSpec {
+    private fun ActionSpec.retargetTaskArgs(target: Task, replacement: Long?, taskIds: Set<Long>?): ActionSpec {
         val updated = args.toMutableMap()
         var changed = false
 
         if (type == SUB_TASK_ACTION_ID || type == STOP_TASK_ACTION_ID) {
             SUB_TASK_REF_KEYS.forEach { key ->
                 val raw = updated[key]?.trim().orEmpty()
-                if (raw.isBlank() || !raw.refersTo(target)) return@forEach
+                if (raw.isBlank() || !raw.refersTo(target, taskIds)) return@forEach
                 if (replacement == null) updated.remove(key) else updated[key] = replacement.toString()
                 changed = true
             }
@@ -364,9 +370,9 @@ object AutomationReferenceRewriter {
             val idKey = NotificationTaskBindings.taskIdKey(button)
             val nameKey = NotificationTaskBindings.legacyTaskNameKey(button)
             val labelKey = "button${button}_label"
-            val bound = listOf(idKey, nameKey).any { key ->
-                updated[key]?.trim()?.takeIf(String::isNotBlank)?.refersTo(target) == true
-            }
+            // The id key holds an id and the legacy key a name, even a name that is a number.
+            val bound = updated[idKey]?.trim()?.toLongOrNull() == target.id ||
+                updated[nameKey]?.trim()?.equals(target.name, ignoreCase = true) == true
             if (!bound) continue
             updated.remove(nameKey)
             if (replacement == null) {
@@ -381,8 +387,9 @@ object AutomationReferenceRewriter {
         return if (changed) copy(args = updated) else this
     }
 
-    private fun String.refersTo(target: Task): Boolean {
-        val id = toLongOrNull()
+    /** As the engine reads a target: a number is an id when a task has that id, and a name otherwise. */
+    private fun String.refersTo(target: Task, taskIds: Set<Long>?): Boolean {
+        val id = toLongOrNull()?.takeIf { taskIds == null || it in taskIds }
         return if (id != null) id == target.id else equals(target.name, ignoreCase = true)
     }
 }

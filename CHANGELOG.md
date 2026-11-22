@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- A task whose name is a number, like "2025", wasn't protected when you deleted it, and renaming it left every Perform Task or Stop Task step that named it pointing at nothing. Those steps run a task by its id when one has that number, and by its name otherwise. Delete and rename now read them the same way.
 - A media state context that names an app never matched. The playing app's package always came back empty, because OpenTasker asked Android for media sessions the way only system apps may. It now asks through its notification listener, so with notification access on, the app that's playing shows up.
 - Picking "All-day busy" on a calendar context and then another preset, like "15 before", kept the all-day filter. The context then only fired before all-day events and never for a meeting. Every calendar preset now sets that filter itself.
 - A profile's cooldown started even when its run never did. If the run was refused for too many runs at once, a burst, or a paused profile, was skipped because the task was already running, or was canceled before it began (stopping the service included), every trigger for the rest of the cooldown said "on cooldown" though nothing had run, and that lasted across restarts. A run that doesn't start gives the cooldown back now.
