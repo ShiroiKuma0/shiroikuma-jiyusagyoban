@@ -1,5 +1,8 @@
 package com.opentasker.core.storage
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
@@ -10,6 +13,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.opentasker.core.model.Profile
 import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
@@ -468,9 +472,12 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue("the rollback is listed", rollback.name in manager.listBackups().map { it.name })
             assertEquals(rollback.name, manager.lastRestoreRollback()?.file?.name)
             // Counted from the directory itself, not from listBackups(), which retention and the
-            // backup card read: the rollback has to be in that listing, at its full size.
+            // backup card read: the rollback has to be in that listing, at its full size. Only this
+            // database's copies: on a phone the app's own backups share the folder.
             val copyName = Regex("""_(backup|pre_restore|restore_failed)_[^/]*\.db$""")
-            val onDisk = rollback.parentFile!!.listFiles { file -> copyName.containsMatchIn(file.name) }.orEmpty()
+            val onDisk = rollback.parentFile!!.listFiles { file ->
+                file.name.startsWith("${TEST_DATABASE.removeSuffix(".db")}_") && copyName.containsMatchIn(file.name)
+            }.orEmpty()
             val listed = manager.listBackups()
             assertEquals(onDisk.size, listed.size)
             assertEquals(onDisk.sumOf { it.length() }, listed.sumOf { it.length() })
@@ -509,6 +516,209 @@ class DatabaseBackupManagerInstrumentedTest {
         } finally {
             db.close()
             cleanup(context)
+        }
+    }
+
+    /**
+     * When the write that records a restore's Undo fails and the old database can't be copied back
+     * either, the restored database stays live, so its Undo record is written again. Otherwise a
+     * restart reads the record from before and never offers or cleans up this rollback (A-438).
+     */
+    @Test
+    fun aRestoreThatKeepsItsDatabaseAfterTheUndoRecordFailsWritesTheRecordAgain() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        try {
+            val prefs = FlakyRestorePrefs(failingCommits = 1)
+            val (result, rollbackName) = restoreWithTheUndoRecordAndTheCopyBackFailing(context, prefs) { true }
+
+            assertTrue("the restore reports it failed: $result", result is PendingRestoreApplyResult.Failed)
+            assertTrue("the restored database stays live", (result as PendingRestoreApplyResult.Failed).replacementKept)
+            assertEquals(rollbackName, prefs.disk["rollback_name:$TEST_DATABASE"])
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+            try {
+                assertEquals(listOf("In the backup"), db.profileDao().getAll().map { it.name })
+            } finally {
+                db.close()
+            }
+        } finally {
+            cleanup(context)
+        }
+    }
+
+    /**
+     * A failed restore that keeps its database and can't drop what belonged to the one it replaced
+     * leaves a spent journal for the next start to finish, and its failed copy is a copy (40290d94).
+     */
+    @Test
+    fun aKeptRestoreWhoseStateDropFailsLeavesItsJournalForTheNextStart() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        try {
+            val (result, _) = restoreWithTheUndoRecordAndTheCopyBackFailing(context, FlakyRestorePrefs(failingCommits = 1)) { false }
+
+            assertTrue("the restore reports it failed: $result", result is PendingRestoreApplyResult.Failed)
+            val failed = result as PendingRestoreApplyResult.Failed
+            assertTrue("the restored database stays live", failed.replacementKept)
+            val pending = DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE)
+            val spent = File(pending.parentFile, "${pending.name}.spent")
+            assertFalse(pending.exists())
+            assertTrue("the journal waits for the next start", spent.isFile)
+            val failedCopy = requireNotNull(failed.failedBackup)
+            assertTrue("the failed copy is a copy beside the journal", failedCopy.isFile && failedCopy != spent)
+
+            var drops = 0
+            assertEquals(
+                PendingRestoreApplyResult.StoppedAfterSwap,
+                DatabaseBackupManager.applyPendingRestoreIfPresent(context, TEST_DATABASE) { drops++; true },
+            )
+            assertEquals(1, drops)
+            assertFalse("the next start finishes the journal", spent.exists())
+        } finally {
+            cleanup(context)
+        }
+    }
+
+    /** A restore record stored with another type fails the restore, and its journal goes instead of throwing at every start (A-438). */
+    @Test
+    fun aRestoreRecordOfAnotherTypeFailsTheRestoreAndItsJournalGoes() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        cleanup(context)
+        try {
+            val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+            val backup = try {
+                db.profileDao().insert(Profile(name = "In the backup", enterTaskId = 1).toEntity())
+                DatabaseBackupManager(context, db, TEST_DATABASE).backup().getOrThrow()
+            } finally {
+                db.close()
+            }
+            backup.copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
+            val prefs = FlakyRestorePrefs().also { it.memory["rollback_name:$TEST_DATABASE"] = 5L }
+            val restoring = withRestorePrefs(context, prefs)
+
+            val result = DatabaseBackupManager.applyPendingRestoreIfPresent(restoring, TEST_DATABASE)
+
+            assertTrue("the restore reports it failed: $result", result is PendingRestoreApplyResult.Failed)
+            assertFalse((result as PendingRestoreApplyResult.Failed).replacementKept)
+            assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(restoring, TEST_DATABASE))
+        } finally {
+            cleanup(context)
+        }
+    }
+
+    /**
+     * Stages a backup over a database holding a profile the backup doesn't have, then applies it
+     * with [prefs] standing in for the restore record. A failed commit moves the copy of the
+     * replaced database aside, so copying it back fails too; it's put back after. Returns the
+     * result and the name of that copy.
+     */
+    private suspend fun restoreWithTheUndoRecordAndTheCopyBackFailing(
+        context: Context,
+        prefs: FlakyRestorePrefs,
+        dropStateOfReplacedDatabase: () -> Boolean,
+    ): Pair<PendingRestoreApplyResult, String> {
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, TEST_DATABASE).build()
+        try {
+            db.profileDao().insert(Profile(name = "In the backup", enterTaskId = 1).toEntity())
+            val backup = DatabaseBackupManager(context, db, TEST_DATABASE).backup().getOrThrow()
+            db.profileDao().insert(Profile(name = "Replaced", enterTaskId = 1).toEntity())
+            backup.copyTo(DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE), overwrite = true)
+        } finally {
+            db.close()
+        }
+        val held = mutableListOf<Pair<File, File>>()
+        prefs.onFailedCommit = {
+            context.filesDir.resolve("backups")
+                .listFiles { file -> file.name.startsWith("opentasker-backup-test_pre_restore_") && file.name.endsWith(".db") }
+                .orEmpty()
+                .forEach { copy ->
+                    val aside = File(copy.parentFile, "${copy.name}.held")
+                    assertTrue(copy.renameTo(aside))
+                    held += copy to aside
+                }
+        }
+        val result = DatabaseBackupManager.applyPendingRestoreIfPresent(
+            withRestorePrefs(context, prefs),
+            TEST_DATABASE,
+            dropStateOfReplacedDatabase,
+        )
+        held.forEach { (copy, aside) -> aside.renameTo(copy) }
+        return result to held.single().first.name
+    }
+
+    private fun withRestorePrefs(context: Context, prefs: SharedPreferences): Context =
+        object : ContextWrapper(context) {
+            override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences =
+                if (name == "database_restore") prefs else super.getSharedPreferences(name, mode)
+        }
+
+    /**
+     * Restore prefs in memory, with what a restart would read kept apart in [disk]. As on Android,
+     * a commit that fails still changes what this process reads.
+     */
+    private class FlakyRestorePrefs(private var failingCommits: Int = 0) : SharedPreferences {
+        val memory = mutableMapOf<String, Any?>()
+        val disk = mutableMapOf<String, Any?>()
+        var onFailedCommit: () -> Unit = {}
+
+        override fun getAll(): MutableMap<String, *> = memory.toMutableMap()
+        override fun getString(key: String?, defValue: String?): String? = if (key in memory) memory[key] as String? else defValue
+        @Suppress("UNCHECKED_CAST")
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+            if (key in memory) memory[key] as MutableSet<String>? else defValues
+        override fun getInt(key: String?, defValue: Int): Int = (memory[key] ?: defValue) as Int
+        override fun getLong(key: String?, defValue: Long): Long = (memory[key] ?: defValue) as Long
+        override fun getFloat(key: String?, defValue: Float): Float = (memory[key] ?: defValue) as Float
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = (memory[key] ?: defValue) as Boolean
+        override fun contains(key: String?): Boolean = key in memory
+        override fun edit(): SharedPreferences.Editor = FlakyEditor()
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+
+        private inner class FlakyEditor : SharedPreferences.Editor {
+            private val changes = mutableMapOf<String, Any?>()
+            private val removals = mutableSetOf<String>()
+            private var clearFirst = false
+
+            private fun put(key: String?, value: Any?): SharedPreferences.Editor {
+                changes[requireNotNull(key)] = value
+                return this
+            }
+
+            override fun putString(key: String?, value: String?) = put(key, value)
+            override fun putStringSet(key: String?, values: MutableSet<String>?) = put(key, values?.toMutableSet())
+            override fun putInt(key: String?, value: Int) = put(key, value)
+            override fun putLong(key: String?, value: Long) = put(key, value)
+            override fun putFloat(key: String?, value: Float) = put(key, value)
+            override fun putBoolean(key: String?, value: Boolean) = put(key, value)
+
+            override fun remove(key: String?): SharedPreferences.Editor {
+                removals += requireNotNull(key)
+                return this
+            }
+
+            override fun clear(): SharedPreferences.Editor {
+                clearFirst = true
+                return this
+            }
+
+            override fun commit(): Boolean {
+                if (clearFirst) memory.clear()
+                removals.forEach { memory.remove(it) }
+                memory.putAll(changes)
+                if (failingCommits > 0) {
+                    failingCommits--
+                    onFailedCommit()
+                    return false
+                }
+                disk.clear()
+                disk.putAll(memory)
+                return true
+            }
+
+            override fun apply() {
+                commit()
+            }
         }
     }
 

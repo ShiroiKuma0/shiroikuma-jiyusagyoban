@@ -62,7 +62,10 @@ class BackupRestoreAtomicityTest {
         assertTrue(sidecarCleanup > atomicPublish)
         assertTrue(journalDelete > sidecarCleanup)
         // The spent journal is shredded only after the rollback is recorded, and its commit checked.
-        val rollbackRecorded = source.indexOf("commit()", journalDelete)
+        // Recording is a local function, since a failed restore that keeps its database tries it again.
+        val recorder = source.indexOf("fun recordRollback(): Boolean")
+        assertTrue("recording the rollback commits", recorder >= 0 && source.indexOf("commit()", recorder) in recorder until transactionStart)
+        val rollbackRecorded = source.indexOf("rollbackRecorded = recordRollback()", journalDelete)
         val commitChecked = source.indexOf("if (!rollbackRecorded", rollbackRecorded)
         val journalShred = source.indexOf("shredFile(spent)", commitChecked)
         assertTrue(rollbackRecorded > journalDelete)

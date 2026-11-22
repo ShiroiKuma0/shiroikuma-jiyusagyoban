@@ -501,11 +501,30 @@ class DatabaseBackupManager(
             var replacementPublished = false
             var temp: File? = null
             val restorePrefs = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
-            // What Undo pointed at before this restore, put back if the restore goes back.
-            val rollbackBefore = restorePrefs.getString(restoreRollbackKey(databaseName), null)
-            val restoredAtBefore = restorePrefs.getLong(restoredAtKey(databaseName), -1L)
+            // What Undo pointed at before this restore, put back if the restore goes back. Read in
+            // the try: a value stored with another type throws, and that has to fail this restore
+            // rather than escape and leave the journal to throw again at every start.
+            var rollbackBefore: String? = null
+            var restoredAtBefore = -1L
             var undoWritten = false
+            var rollbackRecorded = false
+
+            // Points Undo at the copy this restore replaced, or clears it when there was none.
+            fun recordRollback(): Boolean = restorePrefs.edit().run {
+                val previous = rollback
+                if (previous != null) {
+                    putString(restoreRollbackKey(databaseName), previous.name)
+                    putLong(restoredAtKey(databaseName), System.currentTimeMillis())
+                } else {
+                    remove(restoreRollbackKey(databaseName))
+                    remove(restoredAtKey(databaseName))
+                }
+                commit()
+            }
+
             return try {
+                rollbackBefore = restorePrefs.getString(restoreRollbackKey(databaseName), null)
+                restoredAtBefore = restorePrefs.getLong(restoredAtKey(databaseName), -1L)
                 validateDatabaseFile(context, pending)
                 dbFile.parentFile?.mkdirs()
                 rollback = if (dbFile.exists()) {
@@ -539,16 +558,7 @@ class DatabaseBackupManager(
                 deleteDatabaseSidecars(dbFile)
                 val spent = retireRestoreJournal(pending)
                 undoWritten = true
-                val rollbackRecorded = restorePrefs.edit().run {
-                    if (rollback != null) {
-                        putString(restoreRollbackKey(databaseName), rollback.name)
-                        putLong(restoredAtKey(databaseName), System.currentTimeMillis())
-                    } else {
-                        remove(restoreRollbackKey(databaseName))
-                        remove(restoredAtKey(databaseName))
-                    }
-                    commit()
-                }
+                rollbackRecorded = recordRollback()
                 // A write that fails returns false instead of throwing. Unrecorded, the rollback
                 // can't be undone from Setup, so the restore goes back as failed. With no database
                 // before it there's nothing for Undo to go back to, so the new database stays.
@@ -591,6 +601,11 @@ class DatabaseBackupManager(
                         if (restoredAtBefore >= 0) putLong(restoredAtKey(databaseName), restoredAtBefore) else remove(restoredAtKey(databaseName))
                         commit()
                     }
+                } else if (undoWritten && !rollbackRecorded) {
+                    // The restored database stays live, so its Undo is the right one, but the write
+                    // that records it failed: a restart would read the record from before and never
+                    // offer or clean up this rollback. Try the write once more.
+                    runCatching { recordRollback() }
                 }
                 val replacementKept = replacementPublished && !databaseWentBack
                 // The restored database stays live, so the replaced one's state goes before the
