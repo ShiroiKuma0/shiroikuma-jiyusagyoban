@@ -131,7 +131,9 @@ class ContextInspectorTest {
         val result = inspectProfiles(listOf(profile), listOf(source)).single()
 
         assertTrue(result.matching)
-        assertEquals("Any of (all of (Context 1 matches, Context 2 matches), Context 3 doesn't match)", result.logicExplanation)
+        assertEquals("Any of (all of (Context 1 matches, Context 2 matches), not (Context 3 doesn't match))", result.logicExplanation)
+        // Context 3 doesn't match, so the summary can't say they all do.
+        assertEquals("Enough contexts match for the profile's rule.", result.summary)
         assertEquals(listOf(true, true, false), result.contexts.map { it.effectiveMatched })
     }
 
@@ -557,5 +559,40 @@ class ContextInspectorTest {
         val check = result.contexts.single()
         assertEquals("plugin", check.sourceKey)
         assertEquals(ContextSourceStatus.Waiting, check.sourceStatus)
+    }
+
+    @Test
+    fun aRuleThatFailsWhileEveryContextMatchesSaysTheRuleDoesntHold() {
+        val profile = Profile(
+            id = 12,
+            name = "Not charging",
+            enabled = true,
+            enterTaskId = 10,
+            contexts = listOf(ContextSpec(ContextType.STATE, mapOf("key" to "charging", "value" to "true"))),
+            contextExpression = ContextExpressionNode(contextIndex = 0, invert = true),
+        )
+        val source = ContextSourceSnapshot(
+            key = "state",
+            label = "Device state",
+            registered = true,
+            lastObservation = ContextEventObservation(ContextEvent("state", true, mapOf("charging" to "true")), observedAtMs = 1000),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(source)).single()
+
+        assertFalse(result.matching)
+        assertEquals("Not (Context 1 matches)", result.logicExplanation)
+        assertEquals("The profile's context rule doesn't hold.", result.summary)
+    }
+
+    @Test
+    fun fieldNamesReadAsWordsAndKeepTheirAcronyms() {
+        assertEquals("Battery level", readableFieldName("battery_level"))
+        assertEquals("Connected count", readableFieldName("connectedCount"))
+        assertEquals("Wifi SSID", readableFieldName("wifiSSID"))
+        assertEquals("BSSID list", readableFieldName("BSSIDList"))
+        assertEquals("SSID", readableFieldName("SSID"))
+        assertEquals("Screen on", readableFieldName("SCREEN_ON"))
+        assertEquals("", readableFieldName(""))
     }
 }

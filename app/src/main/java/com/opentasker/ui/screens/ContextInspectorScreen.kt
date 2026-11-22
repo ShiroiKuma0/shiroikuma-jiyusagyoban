@@ -568,7 +568,8 @@ internal fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                Icon(sourceStatusIcon(source.status), contentDescription = stringResource(source.status.resourceId), tint = color, modifier = Modifier.size(22.dp))
+                // Decorative: the status pill in this row says the same, and TalkBack read it twice.
+                Icon(sourceStatusIcon(source.status), contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
                 Column(Modifier.weight(1f)) {
                     Text(source.label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     val lastUpdateLabel = stringResource(R.string.inspector_last_update)
@@ -648,9 +649,10 @@ internal fun ProfileInspectorCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
+                // Decorative: the status pill in this row says the same, and TalkBack read it twice.
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
-                    contentDescription = statusLabel,
+                    contentDescription = null,
                     tint = color,
                     modifier = Modifier.size(22.dp),
                 )

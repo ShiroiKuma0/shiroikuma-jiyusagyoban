@@ -144,8 +144,10 @@ fun inspectProfile(
         !profile.enabled -> "Profile is disabled."
         lifecycleSuppression != null -> lifecycleSuppression
         checks.isEmpty() -> "No contexts are configured."
-        contextsMatch -> "All contexts currently match."
-        else -> checks.firstOrNull { !it.effectiveMatched }?.reason ?: "At least one context does not match."
+        contextsMatch && checks.all { it.effectiveMatched } -> "All contexts currently match."
+        // An "any of" rule or an OR group holds while some of its contexts don't.
+        contextsMatch -> "Enough contexts match for the profile's rule."
+        else -> checks.firstOrNull { !it.effectiveMatched }?.reason ?: "The profile's context rule doesn't hold."
     }
 
     return ProfileInspection(
@@ -209,7 +211,8 @@ internal fun explainContextExpression(
                     check?.valueUnknown == true -> "is unknown"
                     else -> "doesn't match"
                 }
-                "Context ${(node.contextIndex ?: -1) + 1} $state"
+                val leaf = "Context ${(node.contextIndex ?: -1) + 1} $state"
+                if (node.invert) "not ($leaf)" else leaf
             }
             nodeOperator != null && node.children.isNotEmpty() -> {
                 val operator = when (nodeOperator) {
@@ -326,11 +329,24 @@ private val SUN_EVENT_KEYS = setOf("event", "elevation")
 private fun degreesText(value: Double): String =
     if (value == Math.rint(value)) value.toLong().toString() else value.toString()
 
-/** "battery_level" and "connectedCount" read as "Battery level" and "Connected count", so raw keys don't show as code. */
-internal fun readableFieldName(key: String): String =
-    key.replace(CAMEL_HUMP, "\$1 \$2").replace('_', ' ').trim().lowercase(Locale.ROOT).replaceFirstChar { it.uppercaseChar() }
+/**
+ * "battery_level" and "connectedCount" read as "Battery level" and "Connected count", so raw keys
+ * don't show as code. An acronym keeps its capitals, so "wifiSSID" reads as "Wifi SSID".
+ */
+internal fun readableFieldName(key: String): String {
+    // An all-caps key like SCREEN_ON is a constant's spelling, not a run of acronyms.
+    val keepAcronyms = key.any(Char::isLowerCase) || '_' !in key
+    return key.replace(CAMEL_HUMP, "\$1 \$2").replace(ACRONYM_END, "\$1 \$2").replace('_', ' ')
+        .split(' ')
+        .filter(String::isNotEmpty)
+        .joinToString(" ") { word ->
+            if (keepAcronyms && word.length > 1 && word.none(Char::isLowerCase)) word else word.lowercase(Locale.ROOT)
+        }
+        .replaceFirstChar { it.uppercaseChar() }
+}
 
 private val CAMEL_HUMP = Regex("([a-z0-9])([A-Z])")
+private val ACRONYM_END = Regex("([A-Z]+)([A-Z][a-z])")
 
 private fun configEntriesSummary(config: Map<String, String>): String =
     config.entries

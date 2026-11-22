@@ -1,11 +1,12 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import com.opentasker.core.contexts.ContextEvent
 import com.opentasker.core.contexts.ContextEventObservation
@@ -52,9 +53,10 @@ class InspectorCopyComposeTest {
         }
 
         composeTestRule.onAllNodesWithText("Needs setup").assertCountEquals(1)
-        // The freshness pill said "Ready" here before, beside "Needs setup".
-        composeTestRule.onAllNodesWithText("Ready").assertCountEquals(0)
-        composeTestRule.onAllNodesWithText("Fresh").assertCountEquals(0)
+        // No freshness pill beside "Needs setup", however old the reading is.
+        listOf("No reading yet", "Fresh", "Stale", "Error").forEach { composeTestRule.onAllNodesWithText(it).assertCountEquals(0) }
+        // The icon is decorative, so TalkBack reads the status once.
+        composeTestRule.onAllNodes(hasText("Needs setup") or hasContentDescription("Needs setup")).assertCountEquals(1)
         composeTestRule.onNodeWithText("Matched: No").assertIsDisplayed()
         // A blank value has nothing to say, so its line is left out.
         composeTestRule.onAllNodes(hasText("Foreground", substring = true)).assertCountEquals(0)
@@ -169,8 +171,10 @@ class InspectorCopyComposeTest {
         }
 
         composeTestRule.onNodeWithText("Blocked").assertIsDisplayed()
-        // The icon said "Not matching" to TalkBack while the pill said "Blocked".
-        composeTestRule.onNodeWithContentDescription("Blocked").assertExists()
+        // The icon once told TalkBack "Not matching" beside this pill, then repeated "Blocked". It's
+        // decorative now, so the status is read once and can't disagree with the pill.
+        composeTestRule.onAllNodes(hasText("Blocked") or hasContentDescription("Blocked")).assertCountEquals(1)
+        composeTestRule.onAllNodesWithContentDescription("Not matching").assertCountEquals(0)
     }
 
     private fun profile(summary: String, suppressionReason: String?) = ProfileInspection(
