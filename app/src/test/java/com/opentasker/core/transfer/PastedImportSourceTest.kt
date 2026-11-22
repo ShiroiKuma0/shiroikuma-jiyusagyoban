@@ -82,9 +82,12 @@ class PastedImportSourceTest {
     fun thePasteDialogRoutesBothFormatsThroughOneEntryPoint() {
         val viewModel = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationViewModel.kt")
         val shell = ProductionSources.read("com/opentasker/ui/screens/ActiveAutomationUi.kt")
+        // The review state builder moved out of the view model to keep it under its size ceiling.
+        val reviewState = ProductionSources.read("com/opentasker/ui/screens/ImportReviewState.kt")
 
         assertTrue("The shell must call the format-sniffing entry point", "previewPastedImport(" in shell)
         assertTrue("JSON paste must be unchanged", "OpenTaskerBundleTextImport.decode(rawText)" in viewModel)
-        assertTrue("Tasker XML paste must reach the planner", "TaskerImportPlanner.preview(report)" in viewModel)
+        assertTrue("Tasker XML paste must build the review state", "taskerImportReviewState(report)" in viewModel)
+        assertTrue("Tasker XML paste must reach the planner", "TaskerImportPlanner.preview(report)" in reviewState)
     }
 }
