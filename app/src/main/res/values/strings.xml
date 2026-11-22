@@ -21,6 +21,7 @@
     <string name="widget_task_missing">Task deleted. Tap to choose another.</string>
     <string name="widget_task_invalid">This widget or shortcut doesn\'t point to a task.</string>
     <string name="widget_task_not_found">That task no longer exists.</string>
+    <string name="shortcut_task_deleted">This shortcut\'s task was deleted.</string>
     <string name="widget_task_corrupt">%1$s can\'t be read. Restore a database backup to run it.</string>
     <string name="widget_task_result_succeeded">%1$s succeeded (%2$d ms)</string>
     <string name="widget_task_result_failed">%1$s failed (%2$d ms)</string>

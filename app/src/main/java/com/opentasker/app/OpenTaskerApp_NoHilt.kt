@@ -21,9 +21,12 @@ import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.ui.screens.LibraryEditTimes
+import com.opentasker.widget.TaskShortcutHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import com.opentasker.core.diagnostics.CrashLogHandler
@@ -171,6 +174,18 @@ class OpenTaskerApp_NoHilt : Application() {
                     VariableRepository(db.variableDao()).migrateLegacySensitiveVariables()
                 }.onFailure { error ->
                     AppLogger.error("OpenTasker", "Legacy secret migration failed", error)
+                }
+            }
+            // Shortcuts hold a task id and the name it had. Every rename, delete, undo, import and
+            // restore changes this list, so following it keeps them all current.
+            applicationScope.launch {
+                runCatching {
+                    db.taskDao().getAllAsFlow()
+                        .map { tasks -> tasks.associate { it.id to it.name } }
+                        .distinctUntilChanged()
+                        .collect { TaskShortcutHelper.reconcile(this@OpenTaskerApp_NoHilt, it) }
+                }.onFailure { error ->
+                    AppLogger.error("OpenTasker", "Keeping task shortcuts current failed", error)
                 }
             }
             // Devices paired before presence was watched (or by an older version) get watched too.

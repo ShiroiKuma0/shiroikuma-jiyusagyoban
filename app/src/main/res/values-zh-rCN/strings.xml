@@ -21,6 +21,7 @@
     <string name="widget_task_missing">任务已删除。点击选择另一个。</string>
     <string name="widget_task_invalid">此小部件或快捷方式没有指向任务。</string>
     <string name="widget_task_not_found">该任务已不存在。</string>
+    <string name="shortcut_task_deleted">此快捷方式的任务已被删除。</string>
     <string name="widget_task_corrupt">无法读取%1$s。请恢复数据库备份后再运行。</string>
     <string name="widget_task_result_succeeded">%1$s 成功（%2$d 毫秒）</string>
     <string name="widget_task_result_failed">%1$s 失败（%2$d 毫秒）</string>

@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- A home screen shortcut to a task kept the task's old name after a rename. After the task was deleted it stayed live and only said the task was gone when tapped, and a task restored later under the same number could run from it. Shortcuts now take the task's new name, turn grey when the task is deleted, and work again if the delete is undone. A label you picked when publishing a shortcut from a task stays as you set it.
 - Setting the phone's clock back could silence a profile with a cooldown for as long as the clock moved, a day back meant about a day of "on cooldown", and shortening a cooldown kept the old, longer one running. A cooldown now never has more than one of its current windows left. Shake triggers had the same problem with the clock and now time their one-second gap from the sensor.
 - Copy and Share on the Diagnostics screen built the report on the main thread. Its reads of engine health, settings and crash logs can stall, and the screen froze while they did. The report is built in the background now, as Refresh already does.
 - Clear in the run log filters only reset the date. The status, task and search stayed as they were. Clear now resets all four.
