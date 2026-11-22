@@ -253,11 +253,15 @@ internal fun selectCalendarEvents(
     .take(limit)
     .map {
         it.copy(
-            title = it.title.take(CalendarEventAddAction.MAX_TITLE_CHARS),
-            location = it.location.take(CalendarEventAddAction.MAX_TITLE_CHARS),
+            title = it.title.cutAt(CalendarEventAddAction.MAX_TITLE_CHARS),
+            location = it.location.cutAt(CalendarEventAddAction.MAX_TITLE_CHARS),
         )
     }
     .toList()
+
+/** At most [max] characters, one fewer when the cut would split an emoji or another surrogate pair. */
+private fun String.cutAt(max: Int): String =
+    if (length <= max) this else take(if (this[max - 1].isHighSurrogate()) max - 1 else max)
 
 /**
  * The end to report for [row] once [selectCalendarEvents] has it in local time: an all-day event

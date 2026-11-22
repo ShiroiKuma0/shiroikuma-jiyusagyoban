@@ -28,7 +28,7 @@ import java.time.ZoneOffset
 
 /** A-359: adding and finding calendar events, against a stand-in for the Calendar Provider. */
 class CalendarActionsTest {
-    private val zone = ZoneId.of("America/New_York")
+    private var zone = ZoneId.of("America/New_York")
     private val now = at(2026, 11, 22, 8, 0)
     private val variables = VariableStore()
     private val logs = mutableListOf<String>()
@@ -229,23 +229,38 @@ class CalendarActionsTest {
 
     @Test
     fun aFoundAllDayEventAddedBackCoversTheSameDays() {
-        val original = CalendarEventRow(1, 3, "Trip", utcMidnight(2026, 11, 23), utcMidnight(2026, 11, 26), allDay = true, location = "")
+        // West and east of UTC, and over the night New York's clocks go back.
+        for ((zoneId, first, last) in listOf(
+            Triple("America/New_York", LocalDate.of(2026, 11, 23), LocalDate.of(2026, 11, 25)),
+            Triple("Asia/Tokyo", LocalDate.of(2026, 11, 23), LocalDate.of(2026, 11, 25)),
+            Triple("America/New_York", LocalDate.of(2026, 10, 31), LocalDate.of(2026, 11, 2)),
+        )) {
+            zone = ZoneId.of(zoneId)
+            val endDay = last.plusDays(1)
+            val original = CalendarEventRow(
+                1, 3, "Trip",
+                utcMidnight(first.year, first.monthValue, first.dayOfMonth),
+                utcMidnight(endDay.year, endDay.monthValue, endDay.dayOfMonth),
+                allDay = true, location = "",
+            )
 
-        assertEquals(ActionResult.Success, query(FakeStore(calendars, listOf(original)), "from" to "2026-11-22", "to" to "2026-11-30"))
-        assertEquals(at(2026, 11, 25, 0, 0).toString(), variables.get("event_end"))
+            val found = query(FakeStore(calendars, listOf(original)), "from" to first.minusDays(1).toString(), "to" to last.plusDays(3).toString())
+            assertEquals(zoneId, ActionResult.Success, found)
+            assertEquals(zoneId, last.atStartOfDay(zone).toInstant().toEpochMilli().toString(), variables.get("event_end"))
 
-        val store = FakeStore(calendars, emptyList())
-        val copied = add(
-            store,
-            "calendar" to "3",
-            "title" to "Trip",
-            "start" to variables.get("event_start")!!,
-            "end" to variables.get("event_end")!!,
-            "all_day" to "true",
-        )
+            val store = FakeStore(calendars, emptyList())
+            val copied = add(
+                store,
+                "calendar" to "3",
+                "title" to "Trip",
+                "start" to variables.get("event_start")!!,
+                "end" to variables.get("event_end")!!,
+                "all_day" to "true",
+            )
 
-        assertEquals(ActionResult.Success, copied)
-        assertEquals(original.startMs to original.endMs, store.inserted.single().let { it.startMs to it.endMs })
+            assertEquals(zoneId, ActionResult.Success, copied)
+            assertEquals(zoneId, original.startMs to original.endMs, store.inserted.single().let { it.startMs to it.endMs })
+        }
     }
 
     @Test
@@ -272,6 +287,17 @@ class CalendarActionsTest {
 
         assertEquals(1024, variables.get("event_title")?.length)
         assertEquals(1024, variables.get("event_location")?.length)
+    }
+
+    @Test
+    fun aCutTitleKeepsWholeEmoji() {
+        // An emoji is two chars, and this one would straddle the 1024th.
+        val title = "x".repeat(1023) + "\uD83D\uDE00" + "tail"
+        val rows = listOf(CalendarEventRow(1, 2, title, now + 60_000L, now + 120_000L, allDay = false, location = ""))
+
+        assertEquals(ActionResult.Success, query(FakeStore(calendars, rows)))
+
+        assertEquals("x".repeat(1023), variables.get("event_title"))
     }
 
     @Test
