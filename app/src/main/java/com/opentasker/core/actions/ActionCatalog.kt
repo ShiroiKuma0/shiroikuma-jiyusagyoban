@@ -94,7 +94,8 @@ object ActionCatalog {
         // NEVER, not IDEMPOTENT: "toggle" recomputes from the live value, so a retry flips back.
         define("aod.set", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::AlwaysOnDisplayAction),
         define("screen.timeout", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ScreenTimeoutAction),
-        // IDEMPOTENT: the same name and value written twice leaves the same setting.
+        // IDEMPOTENT: the same name and value written twice leaves the same setting. Tasker's toggle
+        // value is the exception, NEVER through SettingsWriteAction.retrySafetyFor.
         define("settings.write", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsWriteAction),
         define("settings.read", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsReadAction),
         define("dnd.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::DoNotDisturbAction),

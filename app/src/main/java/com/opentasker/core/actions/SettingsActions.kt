@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.core.assistant.AssistantAirplane
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.engine.ActionRetrySafety
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.contexts.QuickSettingsTileStore
 import com.opentasker.core.contexts.requestRefresh
@@ -795,6 +796,11 @@ internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest
  * Tasker's toggle value, [TASKER_TOGGLE_VALUE], flips a setting at 0 or 1 instead of being written.
  */
 class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write")) {
+
+    // A toggle flips the setting each time, so a retried one would undo itself. The args are as
+    // written, so a variable that only holds the toggle value once it runs isn't caught here.
+    override fun retrySafetyFor(args: Map<String, String>): ActionRetrySafety =
+        if (args["value"] == TASKER_TOGGLE_VALUE) ActionRetrySafety.NEVER else retrySafety
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val request = when (val parsed = parseSettingsWrite(args)) {

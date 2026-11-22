@@ -1,5 +1,6 @@
 package com.opentasker.core.actions
 
+import com.opentasker.core.engine.ActionRetrySafety
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -95,6 +96,14 @@ class SettingsWriteTest {
         listOf(null, "", "2", " 1", "1 ", "01", "true", "on").forEach { current ->
             assertNull("\"$current\" can't be toggled", toggledSettingValue(current))
         }
+    }
+
+    @Test
+    fun aToggleIsNeverRetriedSinceASecondOneUndoesTheFirst() {
+        fun safety(value: String) = SettingsWriteAction().retrySafetyFor(mapOf("table" to "system", "key" to "accelerometer_rotation", "value" to value))
+
+        assertEquals(ActionRetrySafety.NEVER, safety(TASKER_TOGGLE_VALUE))
+        assertEquals(ActionRetrySafety.IDEMPOTENT, safety("1"))
     }
 
     /**
