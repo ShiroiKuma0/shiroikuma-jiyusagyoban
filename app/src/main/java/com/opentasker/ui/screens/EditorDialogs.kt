@@ -51,6 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
@@ -486,6 +487,8 @@ internal fun ProfileEditorDialog(
     siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Int, AutomationMode, String?, ProfilePolicyDraft) -> Unit,
+    // Upstream's "New profiles start on" setting (18d9c420); the fork's Settings has no row for it yet.
+    newProfileEnabled: Boolean = false,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
@@ -804,7 +807,7 @@ internal fun ProfileEditorDialog(
                 tasks.filter { it.id != enterTaskId }.forEach { candidate ->
                     SelectableOption(
                         title = candidate.name,
-                        body = stringResource(R.string.label_action_count, candidate.actions.size),
+                        body = pluralStringResource(R.plurals.label_action_count, candidate.actions.size, candidate.actions.size),
                         selected = candidate.id == fallbackTaskId,
                         onClick = { fallbackTaskId = candidate.id },
                     )

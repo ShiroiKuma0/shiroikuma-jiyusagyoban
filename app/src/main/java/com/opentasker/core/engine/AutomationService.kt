@@ -59,7 +59,6 @@ import com.opentasker.core.storage.toEntity
 import com.opentasker.core.storage.AutoStartSettings
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.minimumTimestamp
-import com.opentasker.core.text.countOf
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -182,6 +181,11 @@ class AutomationService : Service() {
         // No engine wakelock: the per-minute clock rides a Doze-exempt exact alarm and triggers ride
         // their own event sources, so the CPU is free to deep-sleep when idle (白い熊 freezes Powergenie).
         timeEventScheduler.scheduleNextMinute()
+        // Upstream (ea7b2c8b) made the monitor read the network's NAME only while a profile compares
+        // one, switched on by its ContextMonitor.WIFI_NAME handle. The fork's service has no such
+        // handles and starts the monitor outright, so it asks for the name outright too — without
+        // this every Wi-Fi name state and %WIFII would silently read "not read".
+        wifiNetworkMonitor.setNameWanted(true)
         wifiNetworkMonitor.start()
         connectivityMonitor.start()
         // Shake / orientation / app-foreground monitors are NOT started here — reloadProfiles() gates
@@ -299,13 +303,13 @@ class AutomationService : Service() {
         scope.launch {
             val entry = com.opentasker.core.storage.RunLogEntity(
                 taskId = 0,
-                taskName = "OpenTasker",
+                taskName = "AutomationService",
                 timestamp = System.currentTimeMillis(),
                 durationMs = 0,
                 success = false,
-                message = "Android stopped the engine at its time limit for running services",
-                source = RunLogSource.OTHER,
-                sourceLabel = null,
+                message = "Service stopped by system foreground-service timeout",
+                source = "system",
+                sourceLabel = "FGS timeout",
             )
             runCatching { db.runLogDao().insert(entry) }
         }
@@ -737,7 +741,6 @@ class AutomationService : Service() {
                         profileTaskJobs[slot] = launchQueuedTasks(profile, slot, task, eventVars)
                     }
                 }
-                if (reservation.deadlineMs > 0L) claim = CooldownClaim(cooldowns, profile.id, reservation)
             }
 
             AutomationMode.PARALLEL -> {
@@ -770,7 +773,7 @@ class AutomationService : Service() {
                     }
                 }
             }
-        }.givingBack(claim)
+        }
 
     private fun launchQueuedTasks(profile: Profile, slot: Long, firstTask: Task, firstEventVars: Map<String, String>): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
@@ -808,7 +811,7 @@ class AutomationService : Service() {
                     }
                 }
             }
-        }.givingBack(firstTask.claim)
+        }
 
     private suspend fun runTask(
         task: Task,
@@ -898,7 +901,7 @@ class AutomationService : Service() {
                 },
             )
         } catch (e: CancellationException) {
-            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was canceled.")
+            ExternalExecutions.update(this, executionId, ExternalExecutionState.FAILED, error = "The run was cancelled.")
             throw e
         } catch (e: Exception) {
             fail(e.message ?: "The run threw an unexpected error.")

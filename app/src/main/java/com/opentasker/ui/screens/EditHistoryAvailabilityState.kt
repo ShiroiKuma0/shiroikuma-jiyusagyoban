@@ -3,28 +3,17 @@ package com.opentasker.ui.screens
 import androidx.compose.runtime.Immutable
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.EditHistoryDao
-import com.opentasker.core.storage.VariableEditHistoryIdentity
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /** Whether the per-entity Undo and Redo controls have anything to act on. */
 @Immutable
 data class EditHistoryAvailabilityState(
     private val byKey: Map<String, Pair<Boolean, Boolean>> = emptyMap(),
-    private val lastEditedByKey: Map<String, Long> = emptyMap(),
 ) {
-    /** When the item was last created, edited, undone or redone in the app, or null if never. */
-    fun lastEditedAt(entityType: String, entityId: Long): Long? = lastEditedByKey[key(entityType, entityId)]
-
-    /** [lastEditedAt] for a variable. A name or project the history id can't be made from has none. */
-    fun lastEditedVariableAt(projectId: Long, name: String): Long? =
-        runCatching { VariableEditHistoryIdentity.entityId(projectId, name) }.getOrNull()
-            ?.let { lastEditedAt(EditHistoryDao.TYPE_VARIABLE, it) }
-
     fun canUndo(entityType: String, entityId: Long): Boolean = byKey[key(entityType, entityId)]?.first == true
 
     fun canRedo(entityType: String, entityId: Long): Boolean = byKey[key(entityType, entityId)]?.second == true
@@ -55,15 +44,13 @@ data class EditHistoryAvailabilityState(
 internal fun editHistoryAvailability(
     db: AppDatabase,
     scope: CoroutineScope,
-    editTimes: Flow<Map<String, Long>>,
 ): StateFlow<EditHistoryAvailabilityState> = db.editHistoryDao()
     .availabilityAsFlow()
-    .combine(editTimes) { rows, stamps ->
+    .map { rows ->
         EditHistoryAvailabilityState(
             rows.associate { row ->
                 EditHistoryAvailabilityState.key(row.entityType, row.entityId) to (row.canUndo to row.canRedo)
             },
-            newestEdits(rows.associate { row -> EditHistoryAvailabilityState.key(row.entityType, row.entityId) to row.lastEditedAtMs }, stamps),
         )
     }
     .stateIn(scope, SharingStarted.WhileSubscribed(5_000), EditHistoryAvailabilityState())

@@ -740,7 +740,7 @@ class TaskRunner(
         val rawResult = try {
             runStepWithinLimit(timeoutMs) {
                 ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
-                    action.run(ctx.forAction(expansionReport.sensitiveArgumentNames(), hiddenChangeNames), expansionReport.args)
+                    action.run(ctx.forAction(expansionReport.sensitiveArgumentNames()), expansionReport.args)
                 }
             }
         } catch (e: CancellationException) {
@@ -1286,7 +1286,7 @@ private fun rewriteParamSugar(text: String): String =
     if (text.contains("%@")) text.replace(PARAM_SUGAR_REGEX) { "{{ param.${it.groupValues[1]} }}" } else text
 
 /** Safety cap on total interpreted steps to bound pathological flow.foreach loops. */
-private const val MAX_FLOW_STEPS = 100_000
+internal const val MAX_FLOW_STEPS = 100_000
 private const val FLOW_ERROR_MESSAGE = "FLOW_ERROR_MESSAGE"
 private const val FLOW_ERROR_ACTION = "FLOW_ERROR_ACTION"
 private const val FLOW_ERROR_INDEX = "FLOW_ERROR_INDEX"

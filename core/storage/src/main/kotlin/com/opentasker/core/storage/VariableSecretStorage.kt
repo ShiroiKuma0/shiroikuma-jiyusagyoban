@@ -281,6 +281,7 @@ class VariableRepository(
         values: List<RuntimeVariableValue>,
         removedNames: List<String> = emptyList(),
         projectId: Long = 0L,
+        arrays: Set<String> = emptySet(),
     ): RuntimeVariableCommitResult {
         if (values.isEmpty() && removedNames.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
         migrateLegacySensitiveVariables()
@@ -350,7 +351,8 @@ class VariableRepository(
                             // Logging must never replace the encryption failure (notably in host-side
                             // migration tests where android.util.Log is unavailable).
                             runCatching {
-                                AppLogger.error(TAG, "Failed to encrypt legacy masked variable ${entity.name}", error)
+                                // No name: one built from a secret, like Cache_4831 from %Cache_%Pin, would log the secret.
+                                AppLogger.error(TAG, "Failed to encrypt a legacy secret variable", error)
                             }
                         }
                     }

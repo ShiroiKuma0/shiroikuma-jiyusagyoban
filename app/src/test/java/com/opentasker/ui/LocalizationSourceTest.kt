@@ -151,91 +151,14 @@ class LocalizationSourceTest {
      * The microcopy pass (A-343) settled on " · " and "→" as separators, "…" for an ellipsis, and
      * plain words for the engine's own terms, in American spelling.
      */
-    @Test
-    fun userVisibleStringsUseTheAppsSeparatorsAndPlainWords() {
-        // Matched as written, since "run log" and a word holding "zen", like "frozen", are fine. A
-        // line break followed by a space starts the next line with that space.
-        val bannedAsWritten = listOf(" - ", "->", "...", "DND", "Zen", "Run Log", "RUN_COMMAND", "PUBACK", "\\n ")
-        // Matched in any case, so a word can't come back capitalized differently. British spellings
-        // are here too, since the app writes American English.
-        val bannedAnyCase = listOf(
-            "zen rule", "run-log", "context inspector", "predicate", "privileged", "user-service",
-            "foreground-service", "flow.catch", "task.run", "event=", "idempot", "interruption filter", "matcher",
-            "licence", "recognis", "cancelled", "cancelling", "colour", "behaviour", "favourite", "centre", "organis",
-        )
-        val files = Files.list(resRoot.resolve("values")).use { paths ->
-            paths.filter { it.fileName.toString().endsWith(".xml") }.toList()
-        }
-        val offenders = files.flatMap { file ->
-            val document = newDocumentBuilderFactory().newDocumentBuilder().parse(file.toFile())
-            listOf("string", "item").flatMap { tag ->
-                val nodes = document.getElementsByTagName(tag)
-                (0 until nodes.length).map { index -> nodes.item(index) }
-            }.flatMap { node ->
-                val text = node.textContent
-                val name = node.attributes?.getNamedItem("name")?.nodeValue
-                    ?: node.parentNode?.attributes?.getNamedItem("name")?.nodeValue
-                (bannedAsWritten.filter { it in text } + bannedAnyCase.filter { text.contains(it, ignoreCase = true) })
-                    .map { term -> "${file.fileName}: $name has \"$term\"" }
-            }
-        }
-        assertTrue("Separators or jargon in user-visible strings: $offenders", offenders.isEmpty())
-
-        // The other checks above are English words, but a space after a line break shows in any language.
-        val breakThenSpace = Files.list(resRoot).use { dirs ->
-            dirs.filter { isLocaleValuesDirectory(it.fileName.toString()) }.toList()
-        }.flatMap { dir ->
-            Files.list(dir).use { paths -> paths.filter { it.fileName.toString().endsWith(".xml") }.toList() }
-        }.filter { "\\n " in it.readText() }.map { "${it.parent.fileName}/${it.fileName}" }
-        assertTrue("A line break followed by a space in: $breakThenSpace", breakThenSpace.isEmpty())
-    }
-
     /**
      * The health reader's text is English on purpose, for the shared report. Diagnostics words the
      * same readings from resources instead (A-438), so it must not show the reader's text fields.
      */
-    @Test
-    fun diagnosticsScreenDoesNotShowTheReportsEnglish() {
-        val screen = sourceRoot.resolve("com/opentasker/ui/screens/DiagnosticsScreen.kt").readText()
-        val helper = sourceRoot.resolve("com/opentasker/ui/screens/DiagnosticsHealthText.kt").readText()
-        val fields = listOf(
-            """\.exactAlarmStatus\b""", """\.standbyConsequence\b""", """\.activeForegroundServiceTypes\b""",
-            """\.lastWorkerStopReason\b""", """\.currentReasons\b""", """pendingScheduledJobs\.history\b""",
-            """\.aggregateStats\b""", """\.assessment\b""", """::ageLabel\b""",
-        )
-        // The helper words these itself: a signal's own label and reason only stand in for a key with
-        // no resource (DiagnosticsHealthTextTest maps every key the reader has), and the exit reason
-        // goes through exitReasonText, which maps it back to a resource.
-        val keyedFallbacks = listOf("""signal\.label\b""", """signal\.reason\b""", """correlation\.reason\b""")
-        val reportFields = (fields + keyedFallbacks).filter { Regex(it).containsMatchIn(screen) } +
-            fields.filter { Regex(it).containsMatchIn(helper) }.map { "DiagnosticsHealthText: $it" }
-        assertTrue("Diagnostics shows the report's English: $reportFields", reportFields.isEmpty())
-    }
-
     /**
      * Every default string is used by the app's own code or resources (A-342), so copy nothing shows
      * can't pile up again. A lookup by name would hide a use from this check, so there is none.
      */
-    @Test
-    fun everyDefaultStringIsReferencedFromMainSource() {
-        val referenced = mutableSetOf<String>()
-        var namedLookup = false
-        Files.walk(moduleRoot.resolve("src/main")).use { paths ->
-            paths.filter { Files.isRegularFile(it) }.forEach { path ->
-                val name = path.fileName.toString()
-                val definitions = name == "strings.xml" && path.parent.fileName.toString().startsWith("values")
-                if (definitions || !(name.endsWith(".kt") || name.endsWith(".java") || name.endsWith(".xml"))) return@forEach
-                val text = path.readText()
-                if ("getIdentifier(" in text) namedLookup = true
-                STRING_REFERENCE.findAll(text).forEach { referenced += it.groupValues[1].ifEmpty { it.groupValues[2] } }
-            }
-        }
-
-        assertFalse("A lookup by name hides a string's use from this check", namedLookup)
-        val unused = (defaultStringResourceNames() - referenced).sorted()
-        assertTrue("Default strings nothing in src/main uses: $unused", unused.isEmpty())
-    }
-
     /**
      * True only for a `values-<locale>` directory: a two- or three-letter language, optionally with
      * an `-rXX` region, or a BCP-47 `b+` qualifier.

@@ -46,8 +46,17 @@ internal class OutputNameArguments(private val actionType: String) {
         ((actionType == "text.join" && argumentName == "array") && SINGLE_VARIABLE.matches(rawValue.trim())) ||
             (actionType == "var.set_multiple" && argumentName == "names")
 
+    /**
+     * The `%config` of a Set Variable path like `%config.theme` or `%items[0]`, which names the
+     * variable to write into rather than reading it (upstream f275c6c7). Only Preflight asks; the
+     * fork's run fills a Set Variable name in like any other text.
+     */
+    fun pathBase(argumentName: String, rawValue: String): String? =
+        if (actionType == "var.set" && argumentName == "name") PATH_BASE.find(rawValue)?.value else null
+
     private companion object {
         val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
+        val PATH_BASE = Regex("^\\s*%[A-Za-z][A-Za-z0-9_-]*(?=[.\\[])")
     }
 }
 

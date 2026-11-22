@@ -81,6 +81,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id") suspend fun getById(id: Long): TaskEntity?
     @Query("SELECT * FROM tasks ORDER BY position, id") suspend fun getAll(): List<TaskEntity>
     @Query("SELECT * FROM tasks ORDER BY position, id") fun getAllAsFlow(): kotlinx.coroutines.flow.Flow<List<TaskEntity>>
+
+    /** Ids and names only, for watching renames and deletes without reading every task's steps. */
+    @Query("SELECT id, name FROM tasks") fun observeNames(): kotlinx.coroutines.flow.Flow<List<TaskNameRow>>
     @Query("SELECT * FROM tasks WHERE name = :name LIMIT 1") suspend fun getByName(name: String): TaskEntity?
 
     /** See [ProfileDao.getByNameIgnoreCase] for the ASCII-folding caveat. */

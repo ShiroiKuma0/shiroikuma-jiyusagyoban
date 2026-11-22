@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
@@ -574,7 +575,7 @@ private fun SceneCard(
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     // Collapsed: size + element count, plus an issue count when there is anything wrong.
                     Text(
-                        text = stringResource(R.string.scenes_card_summary, scene.widthDp, scene.heightDp, scene.elements.size) +
+                        text = pluralStringResource(R.plurals.scenes_card_summary, scene.elements.size, scene.widthDp, scene.heightDp, scene.elements.size) +
                             if (!expanded && issues.isNotEmpty()) " - ${issues.size} issue${plural(issues.size)}" else "",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

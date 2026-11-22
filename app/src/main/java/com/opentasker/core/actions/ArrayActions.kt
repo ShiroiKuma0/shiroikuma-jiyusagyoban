@@ -4,31 +4,69 @@ import com.opentasker.core.data.TextOps
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
-import com.opentasker.core.engine.isArgumentSensitive
+import com.opentasker.core.engine.VariableOnlyAction
+import com.opentasker.core.engine.VariableWork
+import com.opentasker.core.engine.variableWork
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 
 // Tasker's arrays are numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
-// actions work on those elements, not on the arrays text.split and text.match store. The two that
-// set a whole new array (Variable Split, Array Clear) drop a stored one of the same name, which
-// would otherwise hide the new elements from %arr(#), Join Text and For Each.
+// actions work on those elements. Variable Split, Array Clear, Push, Pop and Process drop a list
+// text.split or text.match kept under the same name, which would otherwise hide the new elements from
+// Join Text and For Each, and the last three read such a list as elements 1..n while the name has
+// none of its own.
 
 internal const val MAX_ELEMENTS = 10_000
 
 private fun arrayBase(args: Map<String, String>, key: String): String? =
     args[key]?.let(VariableNamePolicy::normalize)
 
-/** The 1-based `position` argument, 1 when it is left blank, or null when it isn't a whole number from 1. */
+/**
+ * The 1-based `position` argument, 1 when it is left blank, or null when it isn't a number from 1.
+ * A fraction counts by its whole part, as in Tasker's whole-number fields (decompiled 6.7.8, `i.F`).
+ */
 private fun position(args: Map<String, String>): Int? {
     val raw = args["position"]?.trim().orEmpty()
-    return if (raw.isEmpty()) 1 else raw.toIntOrNull()?.takeIf { it >= 1 }
+    if (raw.isEmpty()) return 1
+    // The whole part as written: through a double, 0.99999999999999999 rounds up to 1 and
+    // 2147483647.9999999 past an Int, so the two forms of one whole part would disagree.
+    val whole = if (DECIMAL_POSITION.matches(raw)) raw.substringBefore('.') else raw
+    return whole.toIntOrNull()?.takeIf { it >= 1 }
 }
+
+private val DECIMAL_POSITION = Regex("""\d+\.\d+""")
 
 internal fun elementName(base: String, index: Int): String? =
     "$base$index".takeIf { it.length <= VariableNamePolicy.MAX_LENGTH }
 
-/** [base]'s elements by index, each with its own secret flag so moving it keeps the flag. */
-private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int, Pair<String, Boolean>> =
-    numberedItems(base).mapValuesTo(java.util.TreeMap()) { (index, value) -> value to isSensitive("$base$index") }
+/**
+ * [base]'s elements by index, each with its own secret flag so moving it keeps the flag. With none,
+ * a list Split Text or Match Text kept under the name counts as elements 1..n.
+ */
+private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int, Pair<String, Boolean>> {
+    val numbered = numberedItems(base)
+    val kept = if (numbered.isEmpty()) getArrayItems(base) else null
+    if (kept != null) {
+        val secret = isArraySensitive(base)
+        return kept.withIndex().associateTo(java.util.TreeMap()) { (index, value) -> index + 1 to (value to secret) }
+    }
+    return numbered.mapValuesTo(java.util.TreeMap()) { (index, value) -> value to isSensitive("$base$index") }
+}
+
+/**
+ * Writes [items] as [base]'s elements and drops a kept list of that name, so they're what reads
+ * see, or returns why it can't before anything changes. Elements that replace a kept list go next
+ * to [base], so a sub-task changing its caller's list leaves them with the caller.
+ */
+private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<String, Boolean>>): String? {
+    if (items.size > MAX_ELEMENTS) return "%$base would have more than $MAX_ELEMENTS elements"
+    val last = items.keys.maxOrNull()
+    if (last != null && elementName(base, last) == null) {
+        return "%$base element names would pass ${VariableNamePolicy.MAX_LENGTH} characters"
+    }
+    replaceNumberedItems(base, items, besideBase = removeArray(base))
+    return null
+}
 
 /**
  * Tasker's Variable Split. Args: `name`, `splitter`, `regex`, `delete_base`, `values`. Splits %name
@@ -36,9 +74,11 @@ private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int
  * trailing empty parts are dropped the way Tasker drops them. With `values` it splits that text
  * instead of %name's own value, which is Tasker's Array Set.
  */
-class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")) {
+class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "name") ?: return ActionResult.Failure("invalid variable name")
         val values = args["values"]
         val source = values ?: ctx.variables.get(base) ?: return ActionResult.Failure("%$base is not set")
@@ -55,7 +95,7 @@ class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")) {
         ctx.variables.removeArray(base)
         ctx.variables.replaceNumberedItems(base, parts.withIndex().associate { (index, part) -> index + 1 to (part to sensitive) })
         if (args["delete_base"]?.toBooleanStrictOrNull() == true) ctx.variables.remove(base)
-        ctx.logger("var.split -> %$base (${parts.size} element(s))")
+        ctx.logger("var.split -> %$base (${countOf(parts.size, "element")})")
         return ActionResult.Success
     }
 }
@@ -64,9 +104,11 @@ class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")) {
  * Tasker's Variable Join. Args: `name`, `joiner`, `delete_parts`. Joins %name1, %name2, ... in
  * index order into %name, and unsets the elements when asked. Unset elements are skipped.
  */
-class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")) {
+class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "name") ?: return ActionResult.Failure("invalid variable name")
         val items = ctx.variables.numberedItems(base)
         val joiner = args["joiner"].orEmpty()
@@ -80,7 +122,7 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")) {
         }
         ctx.variables.set(base, joined, sensitive = ctx.variables.anyNumberedItemSensitive(base))
         if (args["delete_parts"]?.toBooleanStrictOrNull() == true) ctx.variables.replaceNumberedItems(base, emptyMap())
-        ctx.logger("var.join -> %$base (${items.size} element(s))")
+        ctx.logger("var.join -> %$base (${countOf(items.size, "element")})")
         return ActionResult.Success
     }
 }
@@ -90,11 +132,13 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")) {
  * value and moves the elements from that position up one. A position past the end appends. With
  * `fill_spaces`, only the elements up to the first unset one move, and the value fills that gap.
  */
-class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
+class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
-        val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
+        val requested = position(args) ?: return ActionResult.Failure("position must be a number from 1")
         val items = ctx.variables.elementsWithFlags(base)
         if (items.size >= MAX_ELEMENTS) return ActionResult.Failure("%$base already has $MAX_ELEMENTS elements")
         val at = requested.coerceAtMost((items.lastEntry()?.key ?: 0) + 1)
@@ -109,7 +153,7 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
             return ActionResult.Failure("%$base element names would pass ${VariableNamePolicy.MAX_LENGTH} characters")
         }
         moved[at] = args["value"].orEmpty() to false
-        ctx.variables.replaceNumberedItems(base, moved)
+        ctx.variables.replaceElements(base, moved)?.let { return ActionResult.Failure(it) }
         ctx.logger("array.push -> %$base($at)")
         return ActionResult.Success
     }
@@ -120,11 +164,13 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
  * moves the later ones down one, storing it in `to_var` when one is named. A position past the end
  * pops the last element, and an empty array is left as it is.
  */
-class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
+class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
-        val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
+        val requested = position(args) ?: return ActionResult.Failure("position must be a number from 1")
         val toVar = args["to_var"]?.trim()?.ifEmpty { null }
             ?.let { VariableNamePolicy.normalize(it) ?: return ActionResult.Failure("invalid To Var name") }
         val items = ctx.variables.elementsWithFlags(base)
@@ -136,7 +182,7 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
         val popped = items[at]
         val moved = java.util.TreeMap<Int, Pair<String, Boolean>>()
         items.forEach { (index, item) -> if (index != at) moved[if (index > at) index - 1 else index] = item }
-        ctx.variables.replaceNumberedItems(base, moved)
+        ctx.variables.replaceElements(base, moved)?.let { return ActionResult.Failure(it) }
         if (toVar != null) {
             if (popped == null) ctx.variables.remove(toVar) else ctx.variables.set(toVar, popped.first, sensitive = popped.second)
         }
@@ -146,14 +192,16 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
 }
 
 /** Tasker's Array Clear. Args: `array`. Unsets every element of the array. */
-class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")) {
+class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val count = ctx.variables.numberedItems(base).size
         ctx.variables.removeArray(base)
         ctx.variables.replaceNumberedItems(base, emptyMap())
-        ctx.logger("array.clear -> %$base ($count element(s))")
+        ctx.logger("array.clear -> %$base (${countOf(count, "element")})")
         return ActionResult.Success
     }
 }
@@ -163,9 +211,11 @@ class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")) {
  * already have, so gaps stay where they are. Remove Duplicates unsets every later copy of a value,
  * and Squash renumbers the elements from 1, dropping empty ones. Equal values keep index order.
  */
-class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")) {
+class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val type = args["type"]?.trim().orEmpty()
         if (type !in TYPES) return ActionResult.Failure("unknown array process type '$type'")
@@ -179,8 +229,8 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
             "squash" -> values.filter { it.first.isNotEmpty() }.withIndex().associate { (index, item) -> index + 1 to item }
             else -> items.keys.zip(reorder(type, values)).toMap()
         }
-        ctx.variables.replaceNumberedItems(base, processed)
-        ctx.logger("array.process -> %$base ($type, ${processed.size} element(s))")
+        ctx.variables.replaceElements(base, processed)?.let { return ActionResult.Failure(it) }
+        ctx.logger("array.process -> %$base ($type, ${countOf(processed.size, "element")})")
         return ActionResult.Success
     }
 

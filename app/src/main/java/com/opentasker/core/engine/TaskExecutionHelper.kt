@@ -53,6 +53,12 @@ suspend fun executeAndLogTask(
      * level is the whole contract — recursion here would turn one broken task into a loop.
      */
     allowFallback: Boolean = true,
+    execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
+    /**
+     * Called once the task starts: past admission, the journal and the collision policy, before
+     * its first action. A run skipped at any of those never calls it.
+     */
+    onAdmitted: () -> Unit = {},
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     RunTrace.attach(appContext)
     RunTrace.line("trigger '${task.name}' #${task.id} source=$source profile=${profileId ?: "-"}")
@@ -419,6 +425,7 @@ private suspend fun persistChangedGlobals(
     afterSensitive: Set<String>,
     logTag: String,
     projectId: Long = 0L,
+    arrays: Set<String> = emptySet(),
 ): List<String> {
     val changed = changedGlobals(before, after, beforeSensitive, afterSensitive)
     val removed = removedGlobals(before, after)
@@ -513,6 +520,24 @@ private fun maybeQueueFreezeBubble(appContext: Context, task: Task, variables: V
     }.getOrNull()?.takeIf { it.isNotBlank() } ?: task.name
     com.opentasker.core.bubbles.FreezeBubbleStore.enqueue(pkg, label, task.iconPath, targets)
 }
+
+/**
+ * [names] as the run log and app log show them: a secret global is counted, not named, since its
+ * name can be built from a secret, as `%Cache_%Pin` is. Pure for testability.
+ */
+internal fun loggableGlobalNames(names: Collection<String>, secretNames: Set<String>): String {
+    val (hidden, shown) = names.partition { it in secretNames }
+    return (shown + listOfNotNull(hidden.size.takeIf { it > 0 }?.let { countOf(it, "hidden name") })).joinToString()
+}
+
+/**
+ * The app log line for saved secrets that can't be read back, or null when there are none. Counted,
+ * not named, for the reason [loggableGlobalNames] gives; the Variables screen marks each one.
+ */
+internal fun unreadableSecretsNote(names: Set<String>): String? =
+    names.size.takeIf { it > 0 }?.let {
+        "${countOf(it, "secret variable")} can't be read and ${if (it == 1) "needs" else "need"} to be entered again on the Variables screen"
+    }
 
 /**
  * Writes an admission-refused run as a HELD entry: a skipped row that also carries a redacted

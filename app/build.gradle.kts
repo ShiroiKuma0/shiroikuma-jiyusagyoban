@@ -247,7 +247,7 @@ val keystoreProperties = Properties().apply {
 }
 val useKeystoreProperties = keystorePropertiesFile.exists()
 
-val allowedDistributions = setOf("standard", "fdroid", "play")
+val allowedDistributions = setOf("standard", "fdroid")
 val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .orElse("standard")
     .get()

@@ -6,6 +6,9 @@ package com.opentasker.core.actions
 
 import com.opentasker.core.engine.SUB_TASK_RETURN_KEY
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextType
+import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
 
 /** Value kinds exposed by an action for downstream template inputs. */
@@ -178,6 +181,8 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
     "var.split" -> listOf(output("array", ActionValueType.ARRAY, nameArgumentKeys = listOf("name")))
     "var.join" -> listOf(output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("name")))
     "var.convert" -> listOf(output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("var", "name")))
+    // FORK: no entry for location.get — the id is the fork's GetLocationAction, whose variables
+    // (<prefix>Lat, Lon, Acc, AgeMs, Provider, Ok) are not upstream's %location_lat and friends.
     "sun.times" -> listOf(
         "sunrise", "sunset", "solar_noon", "civil_dawn", "civil_dusk", "nautical_dawn", "nautical_dusk",
         "astronomical_dawn", "astronomical_dusk", "day_or_night_code", "sunlight_duration",
@@ -216,6 +221,9 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
         output("enabled", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = "IME", suffix = "_ENABLED"),
         output("count", ActionValueType.NUMBER, nameArgumentKeys = listOf("var"), defaultName = "IME", suffix = "_COUNT"),
     )
+    "settings.read" -> listOf(
+        output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = "Setting"),
+    )
     "clipboard.get" -> listOf(
         output("text", ActionValueType.TEXT, nameArgumentKeys = listOf("var", "result"), defaultName = "Clipboard"),
         output("has_text", ActionValueType.BOOLEAN, nameArgumentKeys = listOf("var", "result"), defaultName = "Clipboard", suffix = "_has_text"),
@@ -230,5 +238,25 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
         output("phones", ActionValueType.ARRAY, nameArgumentKeys = listOf("var", "result"), defaultName = "Contact", suffix = "_phones"),
         output("emails", ActionValueType.ARRAY, nameArgumentKeys = listOf("var", "result"), defaultName = "Contact", suffix = "_emails"),
     )
+    "calendar.event.add" -> listOf(
+        output("id", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = DEFAULT_CALENDAR_PREFIX, suffix = "_id"),
+    )
+    "calendar.event.query" -> listOf(
+        "count" to ActionValueType.NUMBER,
+        "id" to ActionValueType.TEXT,
+        "calendar_id" to ActionValueType.TEXT,
+        "title" to ActionValueType.TEXT,
+        "start" to ActionValueType.NUMBER,
+        "end" to ActionValueType.NUMBER,
+        "all_day" to ActionValueType.BOOLEAN,
+        "location" to ActionValueType.TEXT,
+        "ids" to ActionValueType.ARRAY,
+        "titles" to ActionValueType.ARRAY,
+        "starts" to ActionValueType.ARRAY,
+        "ends" to ActionValueType.ARRAY,
+        "locations" to ActionValueType.ARRAY,
+    ).map { (key, type) ->
+        output(key, type, nameArgumentKeys = listOf("var"), defaultName = DEFAULT_CALENDAR_PREFIX, suffix = "_$key")
+    }
     else -> emptyList()
 }

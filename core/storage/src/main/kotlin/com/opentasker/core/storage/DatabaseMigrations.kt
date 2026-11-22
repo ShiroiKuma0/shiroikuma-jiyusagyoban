@@ -753,6 +753,18 @@ object DatabaseMigrations {
         }
     }
 
+    /**
+     * Upstream's 15→16 (cb3b4c60 sync, 2026-11-22), renumbered onto the end of the fork chain: two
+     * indexes on `run_logs`, so the run log's task filter and the cut-off-run lookup at start stop
+     * reading the whole table. Index-only; nothing carries a DEFAULT.
+     */
+    val MIGRATION_40_41 = object : Migration(40, 41) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_run_logs_taskId` ON `run_logs` (`taskId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_run_logs_executionId` ON `run_logs` (`executionId`)")
+        }
+    }
+
     fun getAllMigrations(): Array<Migration> {
         return arrayOf(
             MIGRATION_1_2,
@@ -794,6 +806,7 @@ object DatabaseMigrations {
             MIGRATION_37_38,
             MIGRATION_38_39,
             MIGRATION_39_40,
+            MIGRATION_40_41,
         )
     }
 }

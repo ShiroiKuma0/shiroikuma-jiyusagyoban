@@ -514,6 +514,7 @@ internal fun DayPresetButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val selectionDescription = stringResource(if (selected) R.string.a11y_selected else R.string.a11y_not_selected)
     // Material's own, deliberately: a segment of a selector, not an action — its fill IS the selection.
     androidx.compose.material3.OutlinedButton(
         onClick = onClick,
@@ -531,43 +532,6 @@ internal fun DayPresetButton(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-    }
-}
-
-/** What the task this event starts can read, folded away until asked for so the form stays short. */
-@Composable
-internal fun EventVariablesSection(variables: List<EventVariable>) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().expandCollapseToggle(expanded) { expanded = !expanded },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.context_event_variables_title),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.weight(1f),
-            )
-            // The row already reads the title and its expanded state.
-            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
-        }
-        if (expanded) {
-            Text(
-                stringResource(R.string.context_event_variables_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            variables.forEach { variable ->
-                Column(Modifier.semantics(mergeDescendants = true) {}) {
-                    Text(variable.name, style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace)
-                    Text(
-                        stringResource(variable.meaningRes),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
     }
 }
 

@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
@@ -99,6 +100,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -707,7 +709,6 @@ private fun ProfileCard(
     onAddContext: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
-    running: Boolean,
 ) {
     Card(
         modifier = Modifier
@@ -748,7 +749,7 @@ private fun ProfileCard(
                     }
                     // Collapsed: name + a one-line status summary (state + context count). Expanded: just the task.
                     val statusWord = if (profile.enabled) stringResource(R.string.label_enabled) else stringResource(R.string.label_paused)
-                    val contextsText = stringResource(R.string.label_context_count, profile.contexts.size)
+                    val contextsText = pluralStringResource(R.plurals.label_context_count, profile.contexts.size, profile.contexts.size)
                     Text(
                         text = stringResource(R.string.workspace_runs_task, enterTaskName) +
                             if (!expanded) " - $statusWord, $contextsText" else "",
@@ -775,7 +776,7 @@ private fun ProfileCard(
                             color = if (profile.enabled) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    item { StatusPill(stringResource(R.string.label_context_count, profile.contexts.size), MaterialTheme.colorScheme.primary) }
+                    item { StatusPill(pluralStringResource(R.plurals.label_context_count, profile.contexts.size, profile.contexts.size), MaterialTheme.colorScheme.primary) }
                     item { StatusPill(stringResource(R.string.label_cooldown_seconds, profile.cooldownSec), MaterialTheme.colorScheme.secondary) }
                     item { StatusPill(profile.automationMode.name.lowercase(), MaterialTheme.colorScheme.onSurfaceVariant) }
                     profile.group?.let { group ->
@@ -1287,7 +1288,7 @@ private fun TaskCard(
             if (expanded) {
             ItemNoteSection("tasks", task.id.toString())
             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm), modifier = Modifier.fillMaxWidth()) {
-                item { StatusPill(stringResource(R.string.label_action_count, task.actions.size), MaterialTheme.colorScheme.primary) }
+                item { StatusPill(pluralStringResource(R.plurals.label_action_count, task.actions.size, task.actions.size), MaterialTheme.colorScheme.primary) }
                 item { StatusPill(stringResource(R.string.label_priority_short, task.priority), MaterialTheme.colorScheme.secondary) }
                 item { StatusPill(task.collisionMode.name.lowercase().replace('_', ' '), MaterialTheme.colorScheme.onSurfaceVariant) }
             }

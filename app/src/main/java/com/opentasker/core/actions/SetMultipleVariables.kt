@@ -2,9 +2,7 @@ package com.opentasker.core.actions
 
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
-import com.opentasker.core.engine.ActionVariableChange
 import com.opentasker.core.engine.VariableStore
-import com.opentasker.core.engine.countHiddenChanges
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.VariableNamePolicy
@@ -175,29 +173,6 @@ internal fun VariableStore.multipleVariablesFilledNames(
         scope.arrays.forEach { (name, items) -> setArray(name, items) }
     }
     return copy.setMultipleVariables(args, eventVariables).let { it.set + it.kept }
-}
-
-/**
- * The changes a run shows for this step, which ran on [expanded] ([written] as the step has them).
- * A name built from a secret, like `%cache_%Pin`, gives the secret away, so the step names those in
- * [builtFromSecret] as it writes them; and when the names list may hold a secret a word written there
- * without its `%` may be a typed value read as a bare name. A change to either becomes part of one
- * counted line, the way the step's app log line only counts names. Any other name written with `%`
- * still shows.
- */
-internal fun multipleVariablesShownChanges(
-    written: Map<String, String>,
-    expanded: Map<String, String>,
-    changes: List<ActionVariableChange>,
-    builtFromSecret: Set<String>,
-): List<ActionVariableChange> {
-    val mayHoldASecret = ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", written) ||
-        ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", expanded)
-    val bare = if (!mayHoldASecret) emptyList() else multipleVariablesEntries(expanded).mapNotNull { entry ->
-        entry?.first?.takeUnless { it.startsWith('%') }?.let(VariableNamePolicy::normalize)
-    }
-    val hiddenNames = builtFromSecret + bare
-    return countHiddenChanges(changes) { it.name in hiddenNames }
 }
 
 /** True when a name in [args] carries its own value after [multipleVariablesInlineSplitter]. */

@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
-import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -234,9 +232,8 @@ fun ContextInspectorScreen(
     }
 }
 
-@VisibleForTesting
 @Composable
-internal fun ContextInspectorSummaryCard(
+private fun ContextInspectorSummaryCard(
     snapshot: ContextInspectionSnapshot,
     onRefresh: () -> Unit,
 ) {
@@ -285,9 +282,8 @@ internal fun ContextInspectorSummaryCard(
     }
 }
 
-@VisibleForTesting
 @Composable
-internal fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
+private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     val color = sourceStatusColor(source.status)
     val observation = source.lastObservation
     Card(
@@ -331,7 +327,6 @@ internal fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     }
 }
 
-@VisibleForTesting
 @Composable
 private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
     val color = when {
@@ -353,7 +348,6 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.md)) {
-                // Decorative: the status pill in this row says the same, and TalkBack read it twice.
                 Icon(
                     if (profile.matching) Icons.Filled.CheckCircle else Icons.Filled.Info,
                     contentDescription = if (profile.matching) stringResource(R.string.status_matching) else "Not matching",
@@ -364,7 +358,14 @@ private fun ProfileInspectorCard(profile: ProfileInspection, nowMs: Long) {
                     Text(profile.profileName, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(profile.summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                InspectorStatusPill(label = statusLabel, color = color)
+                InspectorStatusPill(
+                    label = when {
+                        !profile.enabled -> stringResource(R.string.status_disabled)
+                        profile.matching -> stringResource(R.string.status_matching)
+                        else -> stringResource(R.string.status_blocked)
+                    },
+                    color = color,
+                )
             }
             if (profile.contexts.isEmpty()) {
                 InspectorNotice(
@@ -457,6 +458,11 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
             )
         }
     }
+}
+
+@Composable
+private fun InspectorMetric(value: String, label: String, modifier: Modifier = Modifier) {
+    SummaryMetric(value = value, label = label, modifier = modifier)
 }
 
 @Composable
