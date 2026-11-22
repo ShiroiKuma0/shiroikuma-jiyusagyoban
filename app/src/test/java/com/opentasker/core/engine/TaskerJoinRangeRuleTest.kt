@@ -6,8 +6,9 @@ import org.junit.Test
 /**
  * When `%arr(+sep+...)` reads a range after the second `+` and when all of it is the separator.
  * Tasker 6.7.8 (decompiled `dq.X`) takes a range only when the text after the first `+` holds
- * another `+` and also a `:` or `,` with a digit, a `+$?`, or ends in `+` and one digit. Anything
- * else joins with all of it, so `%arr(+;+12)` joins with `;+12` rather than reading element 12.
+ * another `+` and also a `:` or `,` with a digit, a `+$?`, or ends in `+` and one digit, all as
+ * Android's regex reads them. Anything else joins with all of it, so `%arr(+;+12)` joins with
+ * `;+12` rather than reading element 12.
  */
 class TaskerJoinRangeRuleTest {
 
@@ -74,9 +75,23 @@ class TaskerJoinRangeRuleTest {
     }
 
     @Test
-    fun onlyTheDigitsZeroToNineCount() {
-        // Java's \d, which Tasker runs on, is 0 to 9; ICU's on a phone takes any script's digits.
-        val arabicIndicThree = Char(0x663).toString()
-        assertEquals(animals.joinToString("x+$arabicIndicThree"), numbered().expand("%arr(+x+$arabicIndicThree)"))
+    fun aDigitInAnyScriptCounts() {
+        // Tasker runs its test on Android's regex, where \d is any script's decimal digit, and reads
+        // the range with Integer.parseInt, which takes them too.
+        val three = Char(0x663).toString()
+        val four = Char(0x664).toString()
+        assertEquals("cat;dog", numbered().expand("%arr(+;+$three,$four)"))
+        assertEquals("cat", numbered().expand("%arr(+x+$three)"))
+    }
+
+    @Test
+    fun aVerticalTabOrFormFeedHidesTheDigit() {
+        // On Android `.` stops at a vertical tab and a form feed too, so neither lets a range through.
+        listOf(Char(0x0B), Char(0x0C)).forEach { stop ->
+            assertEquals(
+                animals.joinToString("$stop+2:3"),
+                numbered().apply { set("sep", stop.toString()) }.expand("%arr(+%sep+2:3)"),
+            )
+        }
     }
 }

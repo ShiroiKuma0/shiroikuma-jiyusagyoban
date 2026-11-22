@@ -434,22 +434,38 @@ class VariableExpander {
                 )
 
     /*
-     * Tasker's `(.|\n)*\d(.|\n)*` and `.+\+\d$`, checked by hand as Java reads them. On a phone
-     * Kotlin's Regex runs on ICU, where `\d` takes any script's digits and `.` stops at more
-     * characters, and the first one overflows Java's stack on long text.
+     * Tasker's `(.|\n)*\d(.|\n)*` and `.+\+\d$`, checked by hand the way Android's java.util.regex,
+     * which Tasker runs on, reads them: `\d` is a decimal digit in any script, and `.` stops at every
+     * line terminator, a vertical tab and a form feed included. By hand so a test on the JVM, whose
+     * `\d` is 0 to 9, sees what a phone does, and since the first one overflows the stack on long text.
      */
 
-    /** A digit 0 to 9, and no line break but `\n`, which `(.|\n)` lets through. */
+    /** A decimal digit, and no line terminator but `\n`, which `(.|\n)` lets through. */
     private fun hasTaskerDigit(text: String): Boolean =
-        text.any { it in '0'..'9' } && text.none { it != '\n' && isJavaLineBreak(it) }
+        hasDecimalDigit(text) && text.none { it != '\n' && isAndroidLineTerminator(it) }
 
-    /** Something with no line break, then `+` and one digit 0 to 9 at the end. */
-    private fun endsInPlusAndOneDigit(text: String): Boolean =
-        text.length >= 3 && text.last() in '0'..'9' && text[text.length - 2] == '+' && text.dropLast(2).none(::isJavaLineBreak)
+    /** Something with no line terminator, then `+` and one decimal digit at the end. */
+    private fun endsInPlusAndOneDigit(text: String): Boolean {
+        if (text.isEmpty()) return false
+        val last = text.codePointBefore(text.length)
+        val plusAt = text.length - Character.charCount(last) - 1
+        return Character.isDigit(last) && plusAt >= 1 && text[plusAt] == '+' &&
+            text.substring(0, plusAt).none(::isAndroidLineTerminator)
+    }
 
-    /** What Java's `.` doesn't match by default. */
-    private fun isJavaLineBreak(c: Char): Boolean =
-        c == '\n' || c == '\r' || c.code == 0x85 || c.code == 0x2028 || c.code == 0x2029
+    private fun hasDecimalDigit(text: String): Boolean {
+        var at = 0
+        while (at < text.length) {
+            val codePoint = text.codePointAt(at)
+            if (Character.isDigit(codePoint)) return true
+            at += Character.charCount(codePoint)
+        }
+        return false
+    }
+
+    /** What `.` doesn't match on Android. */
+    private fun isAndroidLineTerminator(c: Char): Boolean =
+        c == '\n' || c.code == 0x0B || c.code == 0x0C || c == '\r' || c.code == 0x85 || c.code == 0x2028 || c.code == 0x2029
 
     /**
      * Tasker's array forms over numbered variables (`%arr1`, `%arr2`, ...): `#` counts the elements,
@@ -1102,10 +1118,11 @@ class VariableExpander {
         private const val MAX_REGEX_LENGTH = 256
         private const val MAX_REGEX_INPUT_LENGTH = 10_000
         private val PATTERN_WILDCARD = Regex("[*+]")
-        private val TASKER_ARRAY_FORM = Regex("""#[<>]?|[<>]|\d*(?::\d*)?""")
+        // \p{Nd} is what \d means on Android, so a test on the JVM reads these forms as a phone does.
+        private val TASKER_ARRAY_FORM = Regex("""#[<>]?|[<>]|\p{Nd}*(?::\p{Nd}*)?""")
         private val TASKER_COUNT_FORMS = setOf("#", "#<", "#>")
-        private val STORED_ARRAY_FORM = Regex("""#[<>]?|\d*(?::\d*)?""")
-        private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
+        private val STORED_ARRAY_FORM = Regex("""#[<>]?|\p{Nd}*(?::\p{Nd}*)?""")
+        private val TASKER_RANGE_FORM = Regex("""\p{Nd}*(?::\p{Nd}*)?""")
 
         private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
