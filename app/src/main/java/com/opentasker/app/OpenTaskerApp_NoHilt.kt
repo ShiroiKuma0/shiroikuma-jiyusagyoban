@@ -204,6 +204,11 @@ class OpenTaskerApp_NoHilt : Application() {
                 if (restoreResult.replacementKept) LocaleConditionGrantStore(this).revokeAllContextGrants()
                 AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
             }
+            PendingRestoreApplyResult.StoppedAfterSwap -> {
+                // The run that swapped the database in stopped before it got here to do this.
+                LocaleConditionGrantStore(this).revokeAllContextGrants()
+                AppLogger.warn("OpenTasker", "A database restore stopped after its database went in; plugin condition grants were cleared")
+            }
             PendingRestoreApplyResult.NoPending -> Unit
         }
 

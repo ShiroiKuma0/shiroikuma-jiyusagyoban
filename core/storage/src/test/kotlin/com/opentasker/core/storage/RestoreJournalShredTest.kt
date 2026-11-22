@@ -52,7 +52,17 @@ class RestoreJournalShredTest {
             override fun getFilesDir(): File = dir
         }
         val spent = spentRestoreJournal(DatabaseBackupManager.pendingRestoreFile(context)).apply { writeBytes(plaintext) }
-        assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context))
+        // A spent journal is only there once its database went in, so the start says that run
+        // stopped after the swap, and the app clears the grants that run never got to.
+        assertEquals(PendingRestoreApplyResult.StoppedAfterSwap, DatabaseBackupManager.applyPendingRestoreIfPresent(context))
         assertFalse("a spent journal stayed in files/backups", spent.exists())
+    }
+
+    @Test
+    fun aStartWithNoJournalAtAllHasNothingToReport() = inTempDir { dir ->
+        val context = object : ContextWrapper(null) {
+            override fun getFilesDir(): File = dir
+        }
+        assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context))
     }
 }

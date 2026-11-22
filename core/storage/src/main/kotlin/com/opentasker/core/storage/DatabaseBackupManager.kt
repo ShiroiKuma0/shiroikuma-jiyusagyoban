@@ -501,8 +501,15 @@ class DatabaseBackupManager(
             databaseName: String = DATABASE_NAME,
         ): PendingRestoreApplyResult {
             val pending = pendingRestoreFile(context, databaseName)
-            shredFile(spentRestoreJournal(pending))
-            if (!pending.exists()) return PendingRestoreApplyResult.NoPending
+            val spent = spentRestoreJournal(pending)
+            // A journal only goes off its name after the restored database is in place, and the run
+            // that moved it shreds it before returning. One still here means that run stopped after
+            // the swap, before the app could drop the grants made for the database it replaced.
+            val stoppedAfterSwap = spent.exists()
+            shredFile(spent)
+            if (!pending.exists()) {
+                return if (stoppedAfterSwap) PendingRestoreApplyResult.StoppedAfterSwap else PendingRestoreApplyResult.NoPending
+            }
 
             val dbFile = context.getDatabasePath(databaseName)
             var rollback: File? = null
@@ -945,6 +952,13 @@ data class RestoreRollback(val file: File, val restoredAtMs: Long)
 
 sealed interface PendingRestoreApplyResult {
     data object NoPending : PendingRestoreApplyResult
+
+    /**
+     * A restore put its database in place and the app stopped before the restore finished. The
+     * restored database is most likely live. It may have gone back if the stop came while a failed
+     * restore was being undone, so treating it as live only costs re-granting plugin conditions.
+     */
+    data object StoppedAfterSwap : PendingRestoreApplyResult
     data class Applied(val databaseFile: File, val previousBackup: File?) : PendingRestoreApplyResult
     /** [replacementKept]: the restored database is live, because there was none before it or the old one couldn't be put back. */
     data class Failed(val exception: Exception, val failedBackup: File?, val replacementKept: Boolean = false) : PendingRestoreApplyResult
