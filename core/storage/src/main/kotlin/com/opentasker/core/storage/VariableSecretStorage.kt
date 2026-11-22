@@ -503,13 +503,18 @@ class VariableRepository(
     /**
      * Applies a run's changed globals as one Room insert batch only when each row still matches the
      * snapshot that run hydrated. The first commit wins a same-name race; disjoint names merge.
-     * [removedNames] are globals the run unset, deleted on the same terms.
+     * [removedNames] are globals the run unset, deleted on the same terms. [arrays] are globals the
+     * run wrote as a whole array (Array Push, Pop and Process, Variable Split, a search's matches):
+     * their numbered elements commit together, so when another run changed any element since this
+     * one started, none of this run's go in. Name by name, a pop and a push from the same start
+     * would both pass and leave a gap.
      */
     suspend fun persistRuntimeAtomically(
         expected: RuntimeVariableSeed,
         values: List<RuntimeVariableValue>,
         removedNames: List<String> = emptyList(),
         projectId: Long = values.firstOrNull()?.projectId ?: DEFAULT_PROJECT_ID,
+        arrays: Set<String> = emptySet(),
     ): RuntimeVariableCommitResult {
         if (values.isEmpty() && removedNames.isEmpty()) return RuntimeVariableCommitResult(emptyList(), emptyList())
         migrateLegacySensitiveVariables()
@@ -518,11 +523,22 @@ class VariableRepository(
             val accepted = mutableListOf<RuntimeVariableValue>()
             val appliedNames = mutableListOf<String>()
             val conflictedNames = mutableListOf<String>()
+            // What this run wants each name to be, so its own earlier commit doesn't read as another run's.
+            val desired = values.associate { it.name to RuntimeVariableState(it.value, it.isSecret, unavailable = false) } +
+                removedNames.associateWith { RuntimeVariableState(null, isSecret = false, unavailable = false) }
+            val knownNames = current.names() + expected.names()
+            val changedArrays = arrays.filterTo(mutableSetOf()) { base ->
+                knownNames.any { name ->
+                    isArrayElement(base, name) && current.stateOf(name).let { now -> now != expected.stateOf(name) && now != desired[name] }
+                }
+            }
+            fun inChangedArray(name: String) = changedArrays.any { base -> isArrayElement(base, name) }
             values.sortedBy(RuntimeVariableValue::name).forEach { value ->
                 val currentState = current.stateOf(value.name)
                 val expectedState = expected.stateOf(value.name)
                 val desiredState = RuntimeVariableState(value.value, value.isSecret, unavailable = false)
                 when {
+                    inChangedArray(value.name) -> conflictedNames += value.name
                     currentState == desiredState -> appliedNames += value.name
                     currentState == expectedState -> {
                         accepted += value
@@ -535,6 +551,7 @@ class VariableRepository(
             removedNames.sorted().forEach { name ->
                 val currentState = current.stateOf(name)
                 when {
+                    inChangedArray(name) -> conflictedNames += name
                     currentState == RuntimeVariableState(null, isSecret = false, unavailable = false) -> appliedNames += name
                     currentState == expected.stateOf(name) -> {
                         deleteLocked(name, projectId)
@@ -637,6 +654,15 @@ private fun RuntimeVariableSeed.stateOf(name: String): RuntimeVariableState = Ru
     isSecret = name in secretNames,
     unavailable = name in unavailableSecretNames,
 )
+
+private fun RuntimeVariableSeed.names(): Set<String> = values.keys + secretNames + unavailableSecretNames
+
+/** Whether [name] is one of [base]'s numbered elements, `Arr1` for `Arr`, the way the engine numbers them (no leading 0). */
+private fun isArrayElement(base: String, name: String): Boolean {
+    if (name.length <= base.length || !name.startsWith(base)) return false
+    val digits = name.substring(base.length)
+    return digits.first() != '0' && digits.all { it in '0'..'9' }
+}
 
 // Public because the bundle codec decides what to omit on it; core:storage is a module now.
 fun VariableEntity.isEffectivelySecret(): Boolean = isSecret

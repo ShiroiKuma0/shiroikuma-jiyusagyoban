@@ -182,6 +182,7 @@ suspend fun executeAndLogTask(
         variables.globalSensitiveSnapshot(),
         logTag,
         projectId = task.projectId,
+        arrays = variables.globalArraysWritten(),
     )
     val audioEligibility = AudioRuntimeEligibility(
         appVisible = visibleActivity,
@@ -508,12 +509,13 @@ private suspend fun persistChangedGlobals(
     afterSensitive: Set<String>,
     logTag: String,
     projectId: Long = com.opentasker.core.model.DEFAULT_PROJECT_ID,
+    arrays: Set<String> = emptySet(),
 ): List<String> {
     val changed = changedGlobals(before, after, beforeSensitive, afterSensitive, projectId)
     val removed = removedGlobals(before, after)
     if (changed.isEmpty() && removed.isEmpty()) return emptyList()
     val commit = runCatching {
-        variableRepository.persistRuntimeAtomically(persistedBaseline, changed, removed, projectId)
+        variableRepository.persistRuntimeAtomically(persistedBaseline, changed, removed, projectId, arrays)
     }.getOrElse { error ->
         AppLogger.error(
             logTag,

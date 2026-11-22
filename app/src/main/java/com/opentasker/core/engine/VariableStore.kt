@@ -57,6 +57,8 @@ class VariableStore {
     /** Parallel to [localStack]: names [clearForTask] hid there, so a caller's value doesn't show through. */
     private val hiddenStack = java.util.Collections.synchronizedList(mutableListOf<MutableSet<String>>())
     private val sensitiveArrayNames = ConcurrentHashMap.newKeySet<String>()
+    /** Globals [replaceNumberedItems] wrote as a whole array, which commit together (see [globalArraysWritten]). */
+    private val globalArraysWritten = ConcurrentHashMap.newKeySet<String>()
     private val sensitiveWriteDepth = AtomicInteger(0)
     private val expander = VariableExpander()
     private val arrayStore = ArrayStore()
@@ -240,6 +242,7 @@ class VariableStore {
     fun replaceNumberedItems(base: String, items: Map<Int, Pair<String, Boolean>>, besideBase: Boolean = false) {
         val normalizedBase = VariableNamePolicy.normalize(base) ?: return
         if (VariableNamePolicy.isGlobal(normalizedBase)) {
+            globalArraysWritten += normalizedBase
             globals.keys.filter { numberedIndex(normalizedBase, it) != null }.forEach(globals::remove)
             items.forEach { (index, item) -> set("$normalizedBase$index", item.first, sensitive = item.second) }
             return
@@ -269,6 +272,12 @@ class VariableStore {
             }
         }
     }
+
+    /**
+     * The global arrays this store wrote as a whole (Array Push, Pop and Process, Variable Split, a
+     * search's matches), so a run's commit can save each one's elements together or not at all.
+     */
+    fun globalArraysWritten(): Set<String> = globalArraysWritten.toSet()
 
     /** True when any of [base]'s numbered elements holds a secret or a value derived from one. */
     fun anyNumberedItemSensitive(base: String): Boolean {

@@ -277,6 +277,60 @@ class VariableSecretStorageTest {
     }
 
     @Test
+    fun twoRunsChangingTheSameGlobalArrayDontLeaveAGap() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("Arr1", "a", isGlobal = true),
+            VariableEntity("Arr2", "b", isGlobal = true),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+        val baseline = repository.runtimeGlobals()
+
+        // One run pops %Arr2 while another, from the same start, pushes %Arr3. Name by name both
+        // would pass and leave %Arr1 and %Arr3; as one array the first commit wins it.
+        val pop = repository.persistRuntimeAtomically(baseline, emptyList(), removedNames = listOf("Arr2"), arrays = setOf("Arr"))
+        val push = repository.persistRuntimeAtomically(baseline, listOf(RuntimeVariableValue("Arr3", "c", isSecret = false)), arrays = setOf("Arr"))
+
+        assertEquals(listOf("Arr2"), pop.appliedNames)
+        assertEquals(listOf("Arr3"), push.conflictedNames)
+        assertEquals(listOf("Arr1"), dao.getAll().map { it.name }.sorted())
+    }
+
+    @Test
+    fun anElementSetOnItsOwnStillMergesByName() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("Arr1", "a", isGlobal = true),
+            VariableEntity("Arr2", "b", isGlobal = true),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+        val baseline = repository.runtimeGlobals()
+
+        repository.persistRuntimeAtomically(baseline, emptyList(), removedNames = listOf("Arr2"), arrays = setOf("Arr"))
+        // A Set Variable of %Arr3 isn't an array write, so it's one name like any other, and another array's commit doesn't hold it back.
+        val set = repository.persistRuntimeAtomically(baseline, listOf(RuntimeVariableValue("Arr3", "c", isSecret = false)))
+        val other = repository.persistRuntimeAtomically(baseline, listOf(RuntimeVariableValue("Other1", "x", isSecret = false)), arrays = setOf("Other"))
+
+        assertEquals(listOf("Arr3"), set.appliedNames)
+        assertEquals(listOf("Other1"), other.appliedNames)
+    }
+
+    @Test
+    fun aRunCommittingItsArrayAgainDoesntConflictWithItself() = runBlocking {
+        val dao = FakeVariableDao(
+            VariableEntity("Arr1", "a", isGlobal = true),
+            VariableEntity("Arr2", "b", isGlobal = true),
+        )
+        val repository = VariableRepository(dao, codec(newKey()))
+        val baseline = repository.runtimeGlobals()
+        val push = listOf(RuntimeVariableValue("Arr3", "c", isSecret = false))
+
+        repository.persistRuntimeAtomically(baseline, push, arrays = setOf("Arr"))
+        val again = repository.persistRuntimeAtomically(baseline, push, arrays = setOf("Arr"))
+
+        assertEquals(listOf("Arr3"), again.appliedNames)
+        assertEquals(emptyList<String>(), again.conflictedNames)
+    }
+
+    @Test
     fun aLegacySecretThatCantBeEncryptedIsntNamedInTheAppLog() = runBlocking {
         // A global named from a secret (%Cache_%Pin stores Cache_4831) is saved as secret too.
         val dao = FakeVariableDao(VariableEntity("Cache_4831", "legacy-plaintext", isGlobal = true, isSecret = true))

@@ -23,6 +23,7 @@
 
 ### Fixed
 
+- Two tasks changing the same global array at once, say one popping an element while another pushes one, can't leave a gap in it anymore. The first to finish saves the whole array, and the other's changes to it count as not saved, the same way two tasks setting one global already worked.
 - Tasker's array forms trim what's inside the parentheses the way Tasker does. A control character around `%arr(2)` is dropped now, and a no-break space isn't, where it used to be the other way round.
 - The `{{ array.found }}` chip that Variable Split, the array actions and Replace Text offer now fills in with their elements (`%found1`, `%found2` and so on) in any field. It only worked in Join Text and For Each before, and came out empty everywhere else. A secret element still marks the value as secret.
 - When a saved secret can't be read back (after a restore, or a lost Keystore key), the app log now says how many need entering again instead of naming them. A name built from a secret, like `%Cache_%Pin`, held the PIN. The Variables screen still marks each one. A secret saved by an older version that can't be encrypted on upgrade isn't named in the log either.
