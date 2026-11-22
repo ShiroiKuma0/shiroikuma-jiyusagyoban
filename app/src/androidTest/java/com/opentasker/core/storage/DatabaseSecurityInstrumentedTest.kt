@@ -22,8 +22,11 @@ class DatabaseSecurityInstrumentedTest {
 
     @After
     fun cleanup() {
-        context.deleteDatabase(TEST_DATABASE)
-        appKey.putBack()
+        try {
+            appKey.putBack()
+        } finally {
+            context.deleteDatabase(TEST_DATABASE)
+        }
     }
 
     @Test

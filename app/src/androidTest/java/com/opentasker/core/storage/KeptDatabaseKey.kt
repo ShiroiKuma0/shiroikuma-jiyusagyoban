@@ -8,11 +8,21 @@ import android.content.Context
  * data, so it takes this snapshot first and puts it back when it's done.
  */
 internal class KeptDatabaseKey(private val context: Context) {
-    private val saved: Map<String, Any?> = preferences().all.toMap()
+    private val saved: Map<String, Any?> = preferences().all.toMap().onEach { (key, value) ->
+        // Checked before the test clears anything, so a value this can't write back stops the test
+        // while the key is still in place.
+        check(value is String || value is Boolean || value is Int || value is Long || value is Float) {
+            "database_security holds a $key this test can't put back"
+        }
+    }
 
     private fun preferences() = context.getSharedPreferences("database_security", Context.MODE_PRIVATE)
 
-    fun putBack() {
+    /**
+     * Holds [DatabaseKeyStore]'s lock, the one its `getOrCreate` takes, so the app in the same
+     * process can't read the cleared prefs, mint a key and commit it over this one.
+     */
+    fun putBack() = synchronized(DatabaseKeyStore) {
         val editor = preferences().edit().clear()
         saved.forEach { (key, value) ->
             when (value) {
@@ -21,7 +31,6 @@ internal class KeptDatabaseKey(private val context: Context) {
                 is Int -> editor.putInt(key, value)
                 is Long -> editor.putLong(key, value)
                 is Float -> editor.putFloat(key, value)
-                else -> error("database_security holds a $key this test can't put back")
             }
         }
         check(editor.commit()) { "Could not put the app's database key back" }

@@ -237,7 +237,7 @@ class DatabaseBackupManagerInstrumentedTest {
             context.deleteDatabase(ENCRYPTED_TEST_DATABASE)
             context.getSharedPreferences("database_security", 0).edit().clear().commit()
 
-            // The path Setup's restore picker takes for a snapshot: decrypt into the review, then Stage.
+            // The path the restore picker takes for a snapshot: decrypt into the review, then Stage.
             val restoring = DatabaseBackupManager(context, db, ENCRYPTED_TEST_DATABASE)
             assertTrue(restoring.isEncryptedBackup(Uri.fromFile(exported)))
             val reviewed = restoring.inspectEncryptedRestore(Uri.fromFile(exported), passphrase.toCharArray()).getOrThrow()
@@ -250,10 +250,14 @@ class DatabaseBackupManagerInstrumentedTest {
             db = encryptedDatabase(context, key)
             assertEquals(listOf("Survives reinstall"), db.profileDao().getAll().map { it.name })
         } finally {
-            db.close()
-            exported.delete()
-            cleanupEncrypted(context)
-            appKey.putBack()
+            // First, so a cleanup step that throws can't leave the app without its key.
+            try {
+                appKey.putBack()
+            } finally {
+                db.close()
+                exported.delete()
+                cleanupEncrypted(context)
+            }
         }
     }
 
