@@ -85,8 +85,6 @@ import com.opentasker.core.templates.BlueprintInstallation
 import com.opentasker.core.templates.BlueprintInstallationStore
 import com.opentasker.core.transfer.BundleImportPlan
 import com.opentasker.core.transfer.MacroDroidEncryptedExport
-import com.opentasker.core.transfer.MacroDroidImportPlanner
-import com.opentasker.core.transfer.MacroDroidImportReport
 import com.opentasker.core.transfer.MacroDroidImporter
 import com.opentasker.core.transfer.OpenTaskerBundle
 import com.opentasker.core.transfer.OpenTaskerBundleCodec
@@ -94,11 +92,8 @@ import com.opentasker.core.transfer.OpenTaskerBundleRepository
 import com.opentasker.core.transfer.OpenTaskerBundleTextImport
 import com.opentasker.core.transfer.PastedImportKind
 import com.opentasker.core.transfer.PastedImportSource
-import com.opentasker.core.transfer.TaskerImportPlanner
 import com.opentasker.core.transfer.TaskerOrMacroDroidDocument
 import com.opentasker.core.transfer.TaskerXmlExporter
-import com.opentasker.core.transfer.TaskerImportPreview
-import com.opentasker.core.transfer.TaskerXmlImportReport
 import com.opentasker.core.transfer.TaskerXmlImporter
 import com.opentasker.core.transfer.VariableConflictResolution
 import com.opentasker.widget.TaskShortcutHelper
@@ -152,45 +147,6 @@ internal fun runLogExportName(format: RunLogExportFormat): String {
     val extension = if (format == RunLogExportFormat.JSON) "json" else "csv"
     return "opentasker_run_log_${SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())}.$extension"
 }
-
-internal data class TaskerImportReviewState(
-    val bundle: OpenTaskerBundle,
-    val preview: TaskerImportPreview,
-    @StringRes val titleRes: Int,
-    val mappedActionRows: List<String>,
-    val unsupportedActionRows: List<String>,
-)
-
-/** A picked `.emdr`, waiting for the password it was exported with. */
-internal class MacroDroidPasswordPrompt(val bytes: ByteArray, val wrongPassword: Boolean = false) {
-    fun copy(wrongPassword: Boolean) = MacroDroidPasswordPrompt(bytes, wrongPassword)
-}
-
-private fun taskerImportReviewState(report: TaskerXmlImportReport): TaskerImportReviewState =
-    TaskerImportReviewState(
-        bundle = TaskerImportPlanner.confirmedBundle(report),
-        preview = TaskerImportPlanner.preview(report),
-        titleRes = R.string.dialog_review_tasker,
-        mappedActionRows = report.mappedActions.map {
-            "${it.taskName}: ${it.taskerCode} -> ${it.openTaskerActionId}"
-        },
-        unsupportedActionRows = report.unsupportedActions.map {
-            "${it.taskName} step ${it.actionIndex + 1}: code ${it.taskerCode}"
-        },
-    )
-
-private fun macroDroidImportReviewState(report: MacroDroidImportReport): TaskerImportReviewState =
-    TaskerImportReviewState(
-        bundle = MacroDroidImportPlanner.confirmedBundle(report),
-        preview = MacroDroidImportPlanner.preview(report),
-        titleRes = R.string.dialog_review_macrodroid,
-        mappedActionRows = report.mappedActions.map {
-            "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} -> ${it.openTaskerActionIds.joinToString(" + ")}"
-        },
-        unsupportedActionRows = report.unsupportedActions.map {
-            "${it.macroName} step ${it.actionIndex + 1}: ${it.classType} (${it.reason})"
-        },
-    )
 
 /** Snackbar payloads stay as resource IDs until the Compose collector resolves them. */
 sealed interface UiMessageAction {
