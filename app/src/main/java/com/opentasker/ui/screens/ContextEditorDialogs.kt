@@ -22,6 +22,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -52,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.opentasker.app.R
@@ -73,6 +76,8 @@ import com.opentasker.core.contexts.ScreenRecordingEventPresets
 import com.opentasker.core.contexts.SunEventCalculator
 import com.opentasker.core.contexts.TimeContextBounds
 import com.opentasker.core.contexts.BT_NEAR_STATE_KEY
+import com.opentasker.core.engine.EventTaskVariables
+import com.opentasker.core.engine.EventVariable
 import com.opentasker.core.health.HealthMetric
 import com.opentasker.core.health.HealthPolling
 import com.opentasker.core.model.ContextSpec
@@ -80,6 +85,7 @@ import com.opentasker.core.model.ContextType
 import com.opentasker.core.apps.PackageNamePolicy
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.theme.selectedContainerColor
+import com.opentasker.ui.utils.expandCollapseToggle
 
 internal data class LocalizedContextType(
     val type: ContextType,
@@ -367,6 +373,14 @@ internal fun ContextConfigDialog(
                                 )
                             }
                         }
+                    }
+                    val eventVariables = if (state.type == ContextType.EVENT) {
+                        EventTaskVariables.declaredFor(config["event"])
+                    } else {
+                        emptyList()
+                    }
+                    if (eventVariables.isNotEmpty()) {
+                        item("event-variables") { EventVariablesSection(eventVariables) }
                     }
                     val eventPresets = if (state.type == ContextType.EVENT) {
                         CalendarSunEventPresets.presetsFor(config["event"].orEmpty()) +
@@ -704,6 +718,43 @@ internal fun DayPresetButton(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+/** What the task this event starts can read, folded away until asked for so the form stays short. */
+@Composable
+internal fun EventVariablesSection(variables: List<EventVariable>) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().expandCollapseToggle(expanded) { expanded = !expanded },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.context_event_variables_title),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f),
+            )
+            // The row already reads the title and its expanded state.
+            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+        }
+        if (expanded) {
+            Text(
+                stringResource(R.string.context_event_variables_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            variables.forEach { variable ->
+                Column(Modifier.semantics(mergeDescendants = true) {}) {
+                    Text(variable.name, style = MaterialTheme.typography.labelMedium, fontFamily = FontFamily.Monospace)
+                    Text(
+                        stringResource(variable.meaningRes),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
     }
 }
 

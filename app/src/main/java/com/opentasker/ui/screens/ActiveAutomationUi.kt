@@ -121,6 +121,7 @@ import com.opentasker.core.diagnostics.RunLogExportFormat
 import com.opentasker.core.actions.ActionMetadata
 import com.opentasker.core.actions.ActionMetadataRegistry
 import com.opentasker.core.actions.FieldType
+import com.opentasker.core.actions.editorEventVariablesFor
 import com.opentasker.core.capabilities.ActionCapabilityRegistry
 import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.SetupRequirement
@@ -1235,6 +1236,7 @@ fun ActiveAutomationUi(
             tasks = tasks,
             enclosingActions = state.task.actions,
             globalVariables = projectVariables,
+            eventVariables = remember(state.task.id, profiles) { editorEventVariablesFor(state.task.id, profiles) },
             onDismiss = { clearActionEdit() },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->

@@ -4,6 +4,7 @@
 
 ### Added
 
+- An Event context's editor now has a Variables this trigger provides section listing what the task it starts can read, with a line on what each one holds, for share, SMS, notification, incoming call and broadcast events. The action editor's variable chips follow the same list: a task that a share profile starts is offered `share_text` and the other share names but nothing from SMS or calls, a task that only runs on exit gets no event chips, and a task no profile uses yet still sees them all. Broadcast fields are offered as chips for the first time.
 - Task and profile cards say Running while a task runs. The task's own card shows it, and so does every profile that runs it on enter or exit, and it goes away when the run finishes or you cancel it. TalkBack reads it with the card's status line.
 - Read Setting reads one Android setting by name into a variable. A setting that isn't there reads as empty, as in Tasker, and a name Android hides from apps fails the step with a message. A Tasker Custom Setting that only reads (Read Setting To with no value) imports as Read Setting and exports back the same way. One that writes and then reads still imports as a placeholder.
 - A Tasker Array Push or Pop whose Position is a sum like `%i+1` or `%i - 1` imports now. The sum is worked out when the step runs and only its whole part counts, as in Tasker, and the step stops when `%i` isn't set. A sum that divides by 0 still imports as a placeholder, since Tasker fails that step. Exported back to Tasker, the Position is the same sum again.

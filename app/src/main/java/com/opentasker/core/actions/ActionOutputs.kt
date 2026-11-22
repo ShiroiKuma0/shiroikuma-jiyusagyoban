@@ -1,7 +1,10 @@
 package com.opentasker.core.actions
 
+import com.opentasker.core.engine.EventTaskVariables
 import com.opentasker.core.engine.SUB_TASK_RETURN_KEY
 import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.ContextType
+import com.opentasker.core.model.Profile
 import com.opentasker.core.model.VariableNamePolicy
 
 /** Value kinds exposed by an action for downstream template inputs. */
@@ -133,26 +136,27 @@ data class EditorEventVariable(
     val type: ActionValueType,
 )
 
-/** Event fields a task can read when a share, SMS, notification or call trigger started it. */
-val DEFAULT_EDITOR_EVENT_VARIABLES: List<EditorEventVariable> = listOf(
-    EditorEventVariable("share_event", ActionValueType.BOOLEAN),
-    EditorEventVariable("share_text", ActionValueType.TEXT),
-    EditorEventVariable("share_uri", ActionValueType.TEXT),
-    EditorEventVariable("share_uris", ActionValueType.TEXT),
-    EditorEventVariable("share_mime", ActionValueType.TEXT),
-    EditorEventVariable("share_count", ActionValueType.NUMBER),
-    EditorEventVariable("share_multiple", ActionValueType.BOOLEAN),
-    EditorEventVariable("sms_sender", ActionValueType.TEXT),
-    EditorEventVariable("sms_body", ActionValueType.TEXT),
-    EditorEventVariable("sms_kind", ActionValueType.TEXT),
-    EditorEventVariable("sms_message_count", ActionValueType.NUMBER),
-    EditorEventVariable("sms_subscription_id", ActionValueType.TEXT),
-    EditorEventVariable("notification_package", ActionValueType.TEXT),
-    EditorEventVariable("notification_title", ActionValueType.TEXT),
-    EditorEventVariable("notification_body", ActionValueType.TEXT),
-    EditorEventVariable("incoming_number", ActionValueType.TEXT),
-    EditorEventVariable("incoming_known_contact", ActionValueType.TEXT),
-)
+/** Event fields a task can read when a share, SMS, notification, call or broadcast trigger started it. */
+val DEFAULT_EDITOR_EVENT_VARIABLES: List<EditorEventVariable> =
+    EventTaskVariables.all.map { EditorEventVariable(it.name, it.type) }
+
+/**
+ * The event chips for [taskId]'s editor. A task some profile starts gets exactly what those
+ * profiles' event contexts hand it, which is nothing for a task that only runs on exit. A task no
+ * profile uses yet keeps every event's chips, since it may still be attached to one.
+ */
+fun editorEventVariablesFor(taskId: Long, profiles: List<Profile>): List<EditorEventVariable> {
+    val usedBy = profiles.filter { it.enterTaskId == taskId || it.exitTaskId == taskId }
+    if (usedBy.isEmpty()) return DEFAULT_EDITOR_EVENT_VARIABLES
+    return usedBy.asSequence()
+        .filter { it.enterTaskId == taskId }
+        .flatMap { it.contexts }
+        .filter { it.type == ContextType.EVENT }
+        .flatMap { EventTaskVariables.declaredFor(it.config["event"]) }
+        .distinctBy { it.name }
+        .map { EditorEventVariable(it.name, it.type) }
+        .toList()
+}
 
 /**
  * Returns all references visible while editing an action. The current action is excluded when it
