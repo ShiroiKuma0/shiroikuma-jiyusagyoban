@@ -263,6 +263,14 @@ class ActiveAutomationViewModel(
     val newProfilesEnabled: StateFlow<Boolean> = ProfileDefaultsPreference.newProfilesEnabled(appContext)
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** Eager for the same reason, so a list opens in its chosen order instead of reshuffling. */
+    val librarySort: StateFlow<Map<LibraryList, LibrarySortOrder>> = LibrarySortPreference.orders(appContext)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    fun setLibrarySort(list: LibraryList, order: LibrarySortOrder) {
+        viewModelScope.launch { LibrarySortPreference.set(appContext, list, order) }
+    }
+
     val profiles: StateFlow<ImmutableList<Profile>> = profileDecodeResults
         .map { results ->
             results.mapNotNull { result -> result.value.takeIf { result.issue == null } }

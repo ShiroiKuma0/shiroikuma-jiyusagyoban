@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -149,6 +150,27 @@ class EditHistoryDaoInstrumentedTest {
             )
             assertEquals(branchedId, dao.getUndoCandidate(EditHistoryDao.TYPE_TASK, 10)?.id)
             assertEquals(null, dao.getRedoCandidate(EditHistoryDao.TYPE_TASK, 10))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun availabilityCarriesEachItemsNewestEditTime() = runBlocking {
+        val db = buildDb()
+        try {
+            val dao = db.editHistoryDao()
+            listOf(5L, 9L, 7L).forEach { time ->
+                dao.insert(EditHistoryEntity(entityType = EditHistoryDao.TYPE_TASK, entityId = 10, previousJson = "t$time", timestamp = time))
+            }
+            // An undone edit still happened, so it still counts as the last edit.
+            val undoneId = dao.insert(EditHistoryEntity(entityType = EditHistoryDao.TYPE_PROFILE, entityId = 10, previousJson = "p", timestamp = 12))
+            dao.markUndone(undoneId, "p2")
+
+            val rows = dao.availabilityAsFlow().first().associateBy { it.entityType to it.entityId }
+
+            assertEquals(9L, rows.getValue(EditHistoryDao.TYPE_TASK to 10L).lastEditedAtMs)
+            assertEquals(12L, rows.getValue(EditHistoryDao.TYPE_PROFILE to 10L).lastEditedAtMs)
         } finally {
             db.close()
         }

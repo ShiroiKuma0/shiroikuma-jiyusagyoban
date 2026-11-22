@@ -13,7 +13,11 @@ import kotlinx.coroutines.flow.stateIn
 @Immutable
 data class EditHistoryAvailabilityState(
     private val byKey: Map<String, Pair<Boolean, Boolean>> = emptyMap(),
+    private val lastEditedByKey: Map<String, Long> = emptyMap(),
 ) {
+    /** When the item was last created, edited, undone or redone in the app, or null if never. */
+    fun lastEditedAt(entityType: String, entityId: Long): Long? = lastEditedByKey[key(entityType, entityId)]
+
     fun canUndo(entityType: String, entityId: Long): Boolean = byKey[key(entityType, entityId)]?.first == true
 
     fun canRedo(entityType: String, entityId: Long): Boolean = byKey[key(entityType, entityId)]?.second == true
@@ -51,6 +55,7 @@ internal fun editHistoryAvailability(
             rows.associate { row ->
                 EditHistoryAvailabilityState.key(row.entityType, row.entityId) to (row.canUndo to row.canRedo)
             },
+            rows.associate { row -> EditHistoryAvailabilityState.key(row.entityType, row.entityId) to row.lastEditedAtMs },
         )
     }
     .stateIn(scope, SharingStarted.WhileSubscribed(5_000), EditHistoryAvailabilityState())

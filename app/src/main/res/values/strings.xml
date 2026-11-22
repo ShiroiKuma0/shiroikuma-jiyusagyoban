@@ -674,6 +674,10 @@
     <string name="variables_search_label">Search variables</string>
     <string name="variables_search_clear">Clear variable search</string>
     <string name="workspace_search_profiles_clear">Clear profile search</string>
+    <string name="library_sort_button">Sort order, %1$s</string>
+    <string name="library_sort_default">Default order</string>
+    <string name="library_sort_name">Name</string>
+    <string name="library_sort_last_edited">Last edited</string>
     <string name="workspace_search_tasks_clear">Clear task search</string>
     <string name="scenes_search_clear">Clear scene search</string>
     <string name="variables_deleted">Deleted %1$s</string>

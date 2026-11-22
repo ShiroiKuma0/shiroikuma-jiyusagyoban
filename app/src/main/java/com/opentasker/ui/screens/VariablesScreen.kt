@@ -60,6 +60,8 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.storage.AesGcmVariableSecretCodec
+import com.opentasker.core.storage.EditHistoryDao
+import com.opentasker.core.storage.VariableEditHistoryIdentity
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.utils.rememberSingleTap
 
@@ -83,6 +85,8 @@ fun VariablesScreen(
     onDelete: (name: String, successMessage: UiMessage, projectId: Long) -> Unit,
     onMessage: (String) -> Unit,
     contentLoaded: Boolean = true,
+    historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
 ) {
     // An unread database and an empty one look identical from here, so without this a cold start
     // with stored variables flashes "No global variables yet" before Room's first emission.
@@ -107,11 +111,14 @@ fun VariablesScreen(
         }
     }
 
-    val filtered = remember(variables, searchQuery) {
-        if (searchQuery.isBlank()) variables
+    val filtered = remember(variables, searchQuery, librarySort.order, historyAvailability) {
+        val matching = if (searchQuery.isBlank()) variables
         else variables.filter {
             it.name.contains(searchQuery, ignoreCase = true) ||
                 (!it.isSecret && it.value.contains(searchQuery, ignoreCase = true))
+        }
+        sortLibrary(matching, librarySort.order, Variable::name) {
+            historyAvailability.lastEditedAt(EditHistoryDao.TYPE_VARIABLE, VariableEditHistoryIdentity.entityId(it.projectId, it.name))
         }
     }
 
@@ -123,6 +130,7 @@ fun VariablesScreen(
         verticalArrangement = Arrangement.spacedBy(DesignSystem.Screen.cardGap),
     ) {
         item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -139,8 +147,10 @@ fun VariablesScreen(
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(DesignSystem.Radii.md),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
             )
+            LibrarySortButton(librarySort)
+            }
         }
         if (filtered.isEmpty()) {
             item {

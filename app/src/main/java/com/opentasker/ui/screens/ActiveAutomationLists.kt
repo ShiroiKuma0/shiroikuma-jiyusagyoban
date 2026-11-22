@@ -90,6 +90,7 @@ import com.opentasker.core.model.RunLogEntry
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.enterTaskIdOrNull
 import com.opentasker.core.plugins.locale.localePluginReceiverInstalled
+import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.core.storage.StorageDecodeIssue
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.utils.expandCollapseToggle
@@ -127,6 +128,7 @@ internal fun ProfilesScreen(
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
     /** Every task, whatever the project scope, so a card can name a task from another project. */
     allTasks: List<Task> = tasks,
     /** Tasks with a run in flight; a profile whose enter or exit task is one says Running. */
@@ -191,6 +193,7 @@ internal fun ProfilesScreen(
     val filteredProfiles = profiles
         .filter { selectedGroup == null || it.group == selectedGroup }
         .filter { profileSearchQuery.isBlank() || it.name.contains(profileSearchQuery, ignoreCase = true) }
+        .let { shown -> sortLibrary(shown, librarySort.order, Profile::name) { historyAvailability.lastEditedAt(EditHistoryDao.TYPE_PROFILE, it.id) } }
     // A context's delete runs on the tap, so one gate keeps a double tap from taking the next context too.
     val singleDelete = rememberSingleTap()
 
@@ -226,6 +229,7 @@ internal fun ProfilesScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
                 )
+                LibrarySortButton(librarySort)
                 WorkspaceActionsButton(
                     onBrowseTemplates = onBrowseTemplates,
                     onPreviewProfileShare = onPreviewProfileShare,
@@ -529,6 +533,7 @@ internal fun TasksScreen(
     runBusy: Boolean = false,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
     // What Setup still lists as missing; null until the first read comes back.
     pendingSetup: Set<SetupRequirement>? = null,
     onOpenSetup: (Set<SetupRequirement>) -> Unit = {},
@@ -550,8 +555,8 @@ internal fun TasksScreen(
         return
     }
     var taskSearchQuery by rememberSaveable { mutableStateOf("") }
-    val filteredTasks = if (taskSearchQuery.isBlank()) tasks
-        else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) }
+    val filteredTasks = (if (taskSearchQuery.isBlank()) tasks else tasks.filter { it.name.contains(taskSearchQuery, ignoreCase = true) })
+        .let { shown -> sortLibrary(shown, librarySort.order, Task::name) { historyAvailability.lastEditedAt(EditHistoryDao.TYPE_TASK, it.id) } }
 
     LazyColumn(
         modifier = Modifier
@@ -568,10 +573,11 @@ internal fun TasksScreen(
             }
         }
         item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
             OutlinedTextField(
                 value = taskSearchQuery,
                 onValueChange = { taskSearchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.workspace_search_tasks)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = if (taskSearchQuery.isNotEmpty()) {
@@ -580,6 +586,8 @@ internal fun TasksScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
             )
+            LibrarySortButton(librarySort)
+            }
         }
         if (filteredTasks.isEmpty()) {
             item {

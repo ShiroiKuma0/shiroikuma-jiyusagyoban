@@ -25,6 +25,8 @@ data class EditHistoryAvailability(
     val entityId: Long,
     val canUndo: Boolean,
     val canRedo: Boolean,
+    /** The newest history row's time, so a list can be sorted by when each item was last edited. */
+    val lastEditedAtMs: Long = 0,
 )
 
 @Dao
@@ -63,7 +65,8 @@ interface EditHistoryDao {
     @Query(
         "SELECT entityType, entityId, " +
             "MAX(CASE WHEN isUndone = 0 THEN 1 ELSE 0 END) AS canUndo, " +
-            "MAX(CASE WHEN isUndone = 1 THEN 1 ELSE 0 END) AS canRedo " +
+            "MAX(CASE WHEN isUndone = 1 THEN 1 ELSE 0 END) AS canRedo, " +
+            "MAX(timestamp) AS lastEditedAtMs " +
             "FROM edit_history GROUP BY entityType, entityId",
     )
     fun availabilityAsFlow(): kotlinx.coroutines.flow.Flow<List<EditHistoryAvailability>>

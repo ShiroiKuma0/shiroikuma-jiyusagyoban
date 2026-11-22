@@ -216,6 +216,8 @@ fun ActiveAutomationUi(
     val useNavigationRail = usesNavigationRail(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.fontScale)
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val newProfilesEnabled by viewModel.newProfilesEnabled.collectAsState()
+    val librarySort by viewModel.librarySort.collectAsState()
+    fun sortControl(list: LibraryList) = LibrarySortControl(librarySort[list] ?: LibrarySortOrder.Default) { viewModel.setLibrarySort(list, it) }
     val profiles by viewModel.profiles.collectAsState(); val contentLoaded by viewModel.contentLoaded.collectAsState(); val historyAvailability by viewModel.historyAvailability.collectAsState()
     val runBusy by viewModel.runActionBusy.collectAsState()
     val tasks by viewModel.tasks.collectAsState(); val invariants by viewModel.invariants.collectAsState()
@@ -782,7 +784,7 @@ fun ActiveAutomationUi(
                     if (profile.contexts.getOrNull(index) != null) viewModel.removeProfileContext(profile, index)
                 },
                 contentPadding = innerPadding, contentLoaded = contentLoaded, historyAvailability = historyAvailability,
-                runningTaskIds = runningTasks,
+                runningTaskIds = runningTasks, librarySort = sortControl(LibraryList.Profiles),
             )
 
             OpenTaskerScreen.Tasks -> TasksScreen(
@@ -825,7 +827,7 @@ fun ActiveAutomationUi(
                     screenOrdinal = OpenTaskerScreen.Setup.ordinal
                 },
                 contentPadding = innerPadding, contentLoaded = contentLoaded, historyAvailability = historyAvailability,
-                runningTaskIds = runningTasks,
+                runningTaskIds = runningTasks, librarySort = sortControl(LibraryList.Tasks),
             )
 
             OpenTaskerScreen.Flow -> AutomationFlowScreen(
@@ -868,7 +870,7 @@ fun ActiveAutomationUi(
                     viewModel.deleteVariable(name, successMessage, projectId)
                 },
                 onMessage = { message -> scope.launch { snackbarHostState.showSnackbarOverReason(message) } },
-                contentLoaded = contentLoaded,
+                contentLoaded = contentLoaded, historyAvailability = historyAvailability, librarySort = sortControl(LibraryList.Variables),
             )
 
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
@@ -885,6 +887,7 @@ fun ActiveAutomationUi(
                 onRedoSceneEdit = { viewModel.redoLastSceneEdit(it.id) },
                 onDeleteScene = { openDeleteScene(it) }, onDuplicateScene = viewModel::duplicateScene,
                 contentPadding = innerPadding, contentLoaded = contentLoaded, historyAvailability = historyAvailability,
+                librarySort = sortControl(LibraryList.Scenes),
             )
 
             OpenTaskerScreen.Setup -> permissionScreen(false)

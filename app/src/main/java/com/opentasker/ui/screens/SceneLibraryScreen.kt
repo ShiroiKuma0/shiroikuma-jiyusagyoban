@@ -3,6 +3,7 @@ package com.opentasker.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,7 @@ import com.opentasker.app.R
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.scenes.SceneOverlayService
+import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.utils.rememberSingleTap
 
@@ -53,15 +55,17 @@ fun SceneLibraryScreen(
     contentPadding: PaddingValues,
     contentLoaded: Boolean = true,
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
+    librarySort: LibrarySortControl = LibrarySortControl(),
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var elementEditorSceneId by rememberSaveable { mutableStateOf<Long?>(null) }
     var elementEditorIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val sortedScenes = remember(scenes) { scenes.sortedBy { it.name.lowercase() } }
-    val filteredScenes = remember(sortedScenes, searchQuery) {
-        if (searchQuery.isBlank()) sortedScenes
+    val filteredScenes = remember(sortedScenes, searchQuery, librarySort.order, historyAvailability) {
+        val matching = if (searchQuery.isBlank()) sortedScenes
         else sortedScenes.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        sortLibrary(matching, librarySort.order, Scene::name) { historyAvailability.lastEditedAt(EditHistoryDao.TYPE_SCENE, it.id) }
     }
     val listState = rememberLazyListState()
     val elementEditor = remember(scenes, elementEditorSceneId, elementEditorIndex) {
@@ -166,10 +170,11 @@ fun SceneLibraryScreen(
                 )
             }
             item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     placeholder = { Text(stringResource(R.string.scenes_search_hint)) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = if (searchQuery.isNotEmpty()) {
@@ -181,6 +186,9 @@ fun SceneLibraryScreen(
                     } else null,
                     singleLine = true,
                 )
+                // Scenes have always been listed by name, so that is this list's own order.
+                LibrarySortButton(librarySort, defaultIsName = true)
+                }
             }
             if (filteredScenes.isEmpty()) {
                 item {

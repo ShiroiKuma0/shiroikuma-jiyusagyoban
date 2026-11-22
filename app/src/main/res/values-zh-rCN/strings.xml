@@ -1093,6 +1093,10 @@
     <string name="workspace_search_profiles">搜索配置文件…</string>
     <string name="workspace_actions_content_description">工作区工具</string>
     <string name="workspace_search_tasks">搜索任务…</string>
+    <string name="library_sort_button">排序方式，%1$s</string>
+    <string name="library_sort_default">默认顺序</string>
+    <string name="library_sort_name">名称</string>
+    <string name="library_sort_last_edited">最近编辑</string>
 
     <string name="flow_empty_content_description">流程视图为空</string>
     <string name="flow_empty_profile_graph_title">尚无配置文件图</string>
