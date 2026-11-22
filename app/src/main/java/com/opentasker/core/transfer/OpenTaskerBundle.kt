@@ -170,6 +170,9 @@ data class BundleImportReport(
     val insertedProjects: Int = 0,
     /** Distinct projects the imported tasks/profiles/scenes landed in ("Unfiled" for items with none). */
     val projectNames: List<String> = emptyList(),
+    /** Row ids of every profile this import wrote, and of those among them that were not there before. */
+    val profileIds: List<Long> = emptyList(),
+    val newProfileIds: List<Long> = emptyList(),
     val warnings: List<String> = emptyList(),
     val lossyWarnings: List<String> = emptyList(),
 )
@@ -615,6 +618,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
 
         var insertedTasks = 0
         var insertedProfiles = 0
+        val writtenProfileIds = mutableListOf<Long>()
+        val newProfileIds = mutableListOf<Long>()
         var insertedVariables = 0
         var insertedScenes = 0
         var insertedTemplates = 0
@@ -822,6 +827,10 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
                 } else {
                     db.profileDao().insert(remappedProfile.toEntity())
                 }
+                profileIdMap[profile.id]?.let { written ->
+                    writtenProfileIds += written
+                    if (reuseId == null) newProfileIds += written
+                }
                 takenProfileNames += newName.lowercase()
                 targetProjectIds += pid
                 insertedProfiles++
@@ -986,6 +995,8 @@ class OpenTaskerBundleRepository(private val db: AppDatabase) {
             insertedTemplates = insertedTemplates,
             insertedProjects = insertedProjects,
             projectNames = projectNames,
+            profileIds = writtenProfileIds,
+            newProfileIds = newProfileIds,
             warnings = importWarnings,
             lossyWarnings = lossyWarnings.distinct(),
         )

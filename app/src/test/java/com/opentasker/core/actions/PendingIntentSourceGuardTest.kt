@@ -19,7 +19,13 @@ import kotlin.streams.toList
 class PendingIntentSourceGuardTest {
 
     /** Files permitted to build a mutable PendingIntent, with the reason each is allowed. */
-    private val mutableAllowlist = setOf("TermuxCommandBroker.kt", "PackageArchiveActions.kt")
+    private val mutableAllowlist = setOf(
+        "TermuxCommandBroker.kt",
+        "PackageArchiveActions.kt",
+        // package.install: the PackageInstaller session's status callback, mutable for the same
+        // reason as the archive one — the installer fills in the status extras.
+        "RemoteUpdateActions.kt",
+    )
 
     // Every production source root: pointing this at app/ alone stopped covering the files the
     // core modules own, and a guard that scans less still reports green.

@@ -99,6 +99,10 @@ object AutomationSensitivityRegistry {
         "dialog.form",
         "dialog.pickdir",
         "project.export",
+        // Read the names of this workspace's own projects, profiles and tasks; nothing leaves the app.
+        "workspace.list",
+        "workspace.find",
+        "package.info",
         "image.badge",
         "flow.fail",
         "system.get_locale",
@@ -383,6 +387,8 @@ object AutomationSensitivityRegistry {
         "package.install",
         // Overwrites tasks, profiles and scenes of the same name with whatever the file holds.
         "workspace.import",
+        // Profile Status for a typed name: it switches another profile, under the same checks.
+        "workspace.profile",
     )
 
     private val destructiveActionIds = setOf(
