@@ -1152,7 +1152,10 @@ object PreflightRunner {
                 // The run stops a Push or Pop whose position came out empty before it changes anything.
                 val position = spec.args["position"].orEmpty()
                 if (ArrayPositionArguments.emptyFailure(spec.type, "position", position, values["position"].orEmpty()) == null) {
-                    (ActionRegistry.get(spec.type) as? VariableOnlyAction)?.play(VariableWork(variables, secretKeys), values)
+                    // Like the run, every write of a step that read a secret is secret.
+                    variables.withSensitiveWritesNow(secretKeys.isNotEmpty()) {
+                        (ActionRegistry.get(spec.type) as? VariableOnlyAction)?.play(VariableWork(variables, secretKeys), values)
+                    }
                 }
             }
         }

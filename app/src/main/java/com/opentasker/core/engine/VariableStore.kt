@@ -530,7 +530,13 @@ class VariableStore {
         )
     }
 
-    suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T {
+    suspend fun <T> withSensitiveWrites(sensitive: Boolean, block: suspend () -> T): T =
+        markingWritesSensitive(sensitive) { block() }
+
+    /** [withSensitiveWrites] for code that doesn't suspend, like Preflight playing a variable action. */
+    fun <T> withSensitiveWritesNow(sensitive: Boolean, block: () -> T): T = markingWritesSensitive(sensitive, block)
+
+    private inline fun <T> markingWritesSensitive(sensitive: Boolean, block: () -> T): T {
         if (!sensitive) return block()
         sensitiveWriteDepth.incrementAndGet()
         return try {

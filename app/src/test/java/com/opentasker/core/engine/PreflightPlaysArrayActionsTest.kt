@@ -74,4 +74,16 @@ class PreflightPlaysArrayActionsTest {
 
         assertEquals(ActionArgumentSensitivity.REDACTED, seen.single())
     }
+
+    @Test
+    fun aValuePushedFromASecretStaysSecret() {
+        // Push marks nothing itself; the run marks every write of a step that read a secret.
+        val seen = reads(
+            step("array.push", "array" to "%Codes", "position" to "1", "value" to "%Csv"),
+            probe("%Codes(1)"),
+            secret = true,
+        )
+
+        assertEquals(ActionArgumentSensitivity.REDACTED, seen.single())
+    }
 }
