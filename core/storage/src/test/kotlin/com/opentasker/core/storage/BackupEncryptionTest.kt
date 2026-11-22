@@ -138,6 +138,25 @@ class BackupEncryptionTest {
     }
 
     @Test
+    fun legacyV1BackupAtTheCapRestoresAndOneByteOverIsRefused() {
+        val passphrase = "legacy-cap".toCharArray()
+        val cap = BackupEncryption.MAX_LEGACY_V1_PLAINTEXT_BYTES.toInt()
+
+        val atCap = CountingOutputStream()
+        BackupEncryption.decrypt(ByteArrayInputStream(legacyV1Backup(ByteArray(cap), passphrase)), atCap, passphrase)
+        assertEquals(cap.toLong(), atCap.count)
+
+        val overCap = CountingOutputStream()
+        try {
+            BackupEncryption.decrypt(ByteArrayInputStream(legacyV1Backup(ByteArray(cap + 1), passphrase)), overCap, passphrase)
+            fail("Expected an old-format backup over the cap to be refused")
+        } catch (error: IOException) {
+            assertTrue(error.message.orEmpty().contains("old format"))
+        }
+        assertEquals(0L, overCap.count)
+    }
+
+    @Test
     fun firstFrameTagFailurePublishesNoPlaintext() {
         val encrypted = encryptedBytes("authenticated data".toByteArray())
         encrypted[V2_HEADER_BYTES + Int.SIZE_BYTES + 3] =

@@ -34,6 +34,7 @@ object BackupEncryption {
     internal const val STREAM_CHUNK_BYTES = 64 * 1024
 
     private const val LEGACY_FORMAT_VERSION = 1
+    internal const val MAX_LEGACY_V1_PLAINTEXT_BYTES = 8L * 1024 * 1024
     private const val SALT_LENGTH = 32
     private const val NONCE_PREFIX_LENGTH = 8
     private const val LEGACY_IV_LENGTH = 12
@@ -199,7 +200,11 @@ object BackupEncryption {
         }
     }
 
-    /** Stream the legacy format without recreating its former explicit whole-file byte arrays. */
+    /**
+     * The legacy format is one AES-GCM message over the whole file. The cipher holds every
+     * ciphertext byte until the tag at the end checks out, so memory grows with the file and the
+     * format is capped at [MAX_LEGACY_V1_PLAINTEXT_BYTES], well under the v2 limit.
+     */
     private fun decryptLegacyV1(
         input: InputStream,
         output: OutputStream,
@@ -207,6 +212,8 @@ object BackupEncryption {
         maxPlaintextBytes: Long,
         cancellationCheck: () -> Unit,
     ) {
+        val limit = minOf(maxPlaintextBytes, MAX_LEGACY_V1_PLAINTEXT_BYTES)
+        val tooLarge = { if (limit < maxPlaintextBytes) legacyBackupTooLarge() else backupTooLarge(limit) }
         val salt = input.readExact(SALT_LENGTH, cancellationCheck)
         val iv = input.readExact(LEGACY_IV_LENGTH, cancellationCheck)
         val key = deriveKey(passphrase, salt)
@@ -223,16 +230,16 @@ object BackupEncryption {
                 if (count < 0) break
                 if (count == 0) continue
                 encryptedBytes += count
-                if (encryptedBytes > maxPlaintextBytes + GCM_TAG_BYTES) throw backupTooLarge(maxPlaintextBytes)
+                if (encryptedBytes > limit + GCM_TAG_BYTES) throw tooLarge()
                 cipher.update(buffer, 0, count)?.takeIf { it.isNotEmpty() }?.let { plain ->
                     plaintextBytes += plain.size
-                    if (plaintextBytes > maxPlaintextBytes) throw backupTooLarge(maxPlaintextBytes)
+                    if (plaintextBytes > limit) throw tooLarge()
                     output.write(plain)
                 }
             }
             cipher.doFinal().takeIf { it.isNotEmpty() }?.let { plain ->
                 plaintextBytes += plain.size
-                if (plaintextBytes > maxPlaintextBytes) throw backupTooLarge(maxPlaintextBytes)
+                if (plaintextBytes > limit) throw tooLarge()
                 output.write(plain)
             }
         } catch (error: GeneralSecurityException) {
@@ -349,6 +356,12 @@ object BackupEncryption {
 
     private fun backupTooLarge(maxBytes: Long): IOException =
         IOException("Backup file exceeds ${maxBytes / 1024 / 1024} MB limit")
+
+    private fun legacyBackupTooLarge(): IOException =
+        IOException(
+            "Backup file uses the old format, which restores only up to " +
+                "${MAX_LEGACY_V1_PLAINTEXT_BYTES / 1024 / 1024} MB",
+        )
 
     private fun decryptionFailure(cause: Exception): IOException = BackupDecryptionException(cause)
 
