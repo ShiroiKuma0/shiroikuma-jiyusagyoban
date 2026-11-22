@@ -34,6 +34,7 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.model.enterTaskIdOrNull
+import com.opentasker.core.text.countOf
 
 /** Synthetic inputs for a side-effect-free task/profile preflight. */
 data class PreflightInputs(
@@ -720,7 +721,7 @@ object PreflightRunner {
                 } else {
                     loops.addLast(PreflightLoopFrame(index, loop.items, itemVar, loop.sensitive, 0))
                     variables.set(itemVar, loop.items.first(), sensitive = loop.sensitive)
-                    step("foreach $source -> ${loop.items.size} items (1/${loop.items.size})", index + 1)
+                    step("foreach $source -> ${countOf(loop.items.size, "item")} (1/${loop.items.size})", index + 1)
                 }
             }
             FlowControl.ENDFOR -> {

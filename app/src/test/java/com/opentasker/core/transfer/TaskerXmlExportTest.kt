@@ -224,7 +224,7 @@ class TaskerXmlExportTest {
         assertEquals(1, report.exportedVariableCount)
         assertTrue(report.xml.contains("silent"))
         assertTrue(!report.xml.contains("must-not-export"))
-        assertTrue(report.warnings.any { it.contains("1 secret variable") })
+        assertTrue(report.warnings.any { it.contains("1 secret variable was omitted") })
     }
 
     @Test

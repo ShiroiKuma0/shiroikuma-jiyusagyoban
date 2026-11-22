@@ -426,7 +426,7 @@ class TaskRunner(
                 } else {
                     loopStack.addLast(LoopFrame(pc, loop.items, itemVar, loop.sensitive, 0))
                     ctx.variables.set(itemVar, loop.items[0], sensitive = loop.sensitive)
-                    outcome("foreach $source -> ${loop.items.size} items (1/${loop.items.size})", pc + 1)
+                    outcome("foreach $source -> ${countOf(loop.items.size, "item")} (1/${loop.items.size})", pc + 1)
                 }
             }
             FlowControl.ENDFOR -> {

@@ -77,7 +77,7 @@ class TaskerXmlImporterTest {
         assertEquals(1, report.sourceSceneCount)
         assertEquals(listOf("notify.show"), report.mappedActions.map { it.openTaskerActionId })
         assertEquals(listOf("9999"), report.unsupportedActions.map { it.taskerCode })
-        assertTrue(report.lossyWarnings.any { it.contains("scenes") })
+        assertTrue(report.lossyWarnings.contains("Tasker scenes are not imported yet; 1 scene was excluded."))
 
         val task = report.bundle.tasks.single()
         assertEquals("Alert task", task.name)

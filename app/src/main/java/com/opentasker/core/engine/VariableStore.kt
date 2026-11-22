@@ -8,6 +8,7 @@ import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -634,7 +635,7 @@ class VariableStore {
                 )
                 val child = list.getOrNull(head.index)
                 when {
-                    last && child == null -> throw JsonPathMissing("item [${head.index}] is out of range (the list has ${list.size} items)")
+                    last && child == null -> throw JsonPathMissing("item [${head.index}] is out of range (the list has ${countOf(list.size, "item")})")
                     last -> JsonArray(list.filterIndexed { index, _ -> index != head.index })
                     child == null || child is JsonNull -> throw JsonPathMissing("item [${head.index}] doesn't exist")
                     child !is JsonObject && child !is JsonArray -> throw JsonPathMissing("the item at [${head.index}] is ${describe(child)}, not a list or object")

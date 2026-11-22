@@ -476,7 +476,7 @@ class OpenTaskerBundleCodecTest {
         val encoded = OpenTaskerBundleCodec.encode(bundle)
         assertEquals(listOf("COUNT"), bundle.variables.map { it.name })
         assertFalse(encoded.contains("must-not-export"))
-        assertTrue(bundle.metadata.warnings.any { it.contains("must be re-entered") })
+        assertTrue(bundle.metadata.warnings.contains("1 secret variable was omitted and must be re-entered after import."))
     }
 
     @Test

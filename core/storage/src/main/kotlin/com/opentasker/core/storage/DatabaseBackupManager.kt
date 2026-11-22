@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import androidx.room.withTransaction
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.text.countOf
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -796,7 +797,7 @@ class DatabaseBackupManager(
                     val missing = requiredTables - found
                     if (missing.isNotEmpty()) {
                         throw IOException(
-                            "Backup copy ${file.name} is missing required table(s): ${missing.joinToString()}; " +
+                            "Backup copy ${file.name} is missing ${countOf(missing.size, "required table")}: ${missing.joinToString()}; " +
                                 "the configured database name/path may point at the wrong SQLite file",
                         )
                     }

@@ -31,6 +31,7 @@ import com.opentasker.core.engine.SUB_TASK_SETTING_KEYS
 import com.opentasker.core.engine.resetsReturnVariable
 import com.opentasker.core.engine.variables.VariableExpander
 import com.opentasker.core.text.countOf
+import com.opentasker.core.text.countWas
 import kotlin.math.roundToLong
 
 data class TaskerXmlExportReport(
@@ -176,7 +177,7 @@ object TaskerXmlExporter {
             warnings.add(0, ExportRedactionPolicy.SENSITIVE_ACTION_WARNING)
         }
         if (omittedSecretCount > 0) {
-            warnings.add(0, "${countOf(omittedSecretCount, "secret variable")} ${if (omittedSecretCount == 1) "was" else "were"} omitted and must be re-entered after import.")
+            warnings.add(0, "${countWas(omittedSecretCount, "secret variable")} omitted and must be re-entered after import.")
         }
         variables.filterNot { it.isSecret }.forEach { variable ->
             appendVariable(sb, variable)
@@ -702,7 +703,7 @@ object TaskerXmlExporter {
                 raw
             }
             number !in 1..layout.stepCount -> {
-                warnings += "A goto to step $number points outside its task, which has ${layout.stepCount} steps."
+                warnings += "A goto to step $number points outside its task, which has ${countOf(layout.stepCount, "step")}."
                 raw
             }
             else -> layout.taskerSteps[number - 1]?.toString() ?: run {

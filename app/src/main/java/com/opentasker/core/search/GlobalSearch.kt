@@ -4,6 +4,7 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Scene
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
+import com.opentasker.core.text.countOf
 import java.util.Locale
 
 enum class GlobalSearchResultKind {
@@ -84,7 +85,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.TASK,
                         entityId = task.id,
                         title = task.name,
-                        detail = "${task.actions.size} actions",
+                        detail = countOf(task.actions.size, "action"),
                         projectId = task.projectId,
                     )
                 )
@@ -173,7 +174,7 @@ fun searchGlobalEntities(
                         kind = GlobalSearchResultKind.SCENE,
                         entityId = scene.id,
                         title = scene.name,
-                        detail = "${scene.elements.size} elements",
+                        detail = countOf(scene.elements.size, "element"),
                         projectId = scene.projectId,
                     )
                 )

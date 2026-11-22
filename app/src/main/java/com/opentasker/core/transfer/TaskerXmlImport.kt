@@ -40,7 +40,7 @@ import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.plugins.locale.LocaleBundleValue
 import com.opentasker.core.plugins.locale.LocalePluginBundleCodec
 import com.opentasker.core.plugins.locale.LocalePluginContract
-import com.opentasker.core.text.countOf
+import com.opentasker.core.text.countWas
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -197,7 +197,7 @@ object TaskerXmlImporter {
         val profiles = parseProfiles(doc, tasks.map { it.id }.toSet(), lossyWarnings)
         val sceneCount = doc.elementsByTagName("Scene").size
         if (sceneCount > 0) {
-            lossyWarnings += "Tasker scenes are not imported yet; ${countOf(sceneCount, "scene")} ${if (sceneCount == 1) "was" else "were"} excluded."
+            lossyWarnings += "Tasker scenes are not imported yet; ${countWas(sceneCount, "scene")} excluded."
         }
 
         val bundle = OpenTaskerBundleCodec.build(

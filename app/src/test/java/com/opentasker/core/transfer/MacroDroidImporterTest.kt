@@ -114,6 +114,18 @@ class MacroDroidImporterTest {
     """.trimIndent()
 
     @Test
+    fun aMacrosLocalVariableIsCountedInTheWarning() {
+        val oneLocal = fillClipboardMacro("hello").replace(
+            "\"localVariables\": []",
+            "\"localVariables\": [{\"m_name\":\"count\",\"m_type\":1,\"m_intValue\":0}]",
+        )
+
+        val report = MacroDroidImporter.parse(oneLocal, "test", 0L)
+
+        assertTrue(report.lossyWarnings.contains("Macro 'Fill' has 1 local variable. Initial local values were not imported."))
+    }
+
+    @Test
     fun fillClipboardFromARealExportBecomesClipboardSet() {
         val report = MacroDroidImporter.parse(fillClipboardMacro("hello"), "test", 0L)
 
