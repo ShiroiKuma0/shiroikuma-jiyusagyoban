@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import android.net.Uri
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -9,6 +10,11 @@ import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.DEFAULT_RUN_LOG_PAGE_SIZE
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.toEntity
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -108,6 +114,26 @@ class ViewModelLanesInstrumentedTest {
         assertEquals(message.args.single(), state.latestBackupName)
     }
 
+    /** An old-format snapshot over its limit says why it won't open and names the limit, not a generic import error. */
+    @Test
+    fun anOldFormatSnapshotOverItsLimitSaysWhyItWontOpen() = runBlocking<Unit> {
+        val snapshot = context.cacheDir.resolve("lanes-legacy-snapshot.otbackup")
+        try {
+            snapshot.writeBytes(legacyV1Snapshot(ByteArray(8 * 1024 * 1024 + 1), "old-format".toCharArray()))
+            val backup = BackupController(context, scope, events, DatabaseBackupManager(context, db, TEST_DATABASE))
+
+            backup.importDatabaseBackup(Uri.fromFile(snapshot))
+            withTimeout(TIMEOUT_MS) { backup.encryptedRestorePrompt.first { it != null } }
+            backup.openEncryptedBackup("old-format")
+
+            val message = withTimeout(TIMEOUT_MS * 4) { events.receive() }
+            assertEquals(R.string.ui_error_backup_legacy_too_large, message.resId)
+            assertEquals(listOf(8L), message.args)
+        } finally {
+            snapshot.delete()
+        }
+    }
+
     @Test
     fun theDiagnosticsLaneMarksAFailedReadAndLetsRetryThrough() = runBlocking<Unit> {
         // Every query on a closed database throws, standing in for a health read that fails (A-360).
@@ -124,6 +150,18 @@ class ViewModelLanesInstrumentedTest {
 
     private fun entry(taskName: String) =
         RunLogEntry(taskId = 1, taskName = taskName, durationMs = 5, success = true, message = "Done").toEntity()
+
+    /** A snapshot in the old v1 format: header and version, salt, IV, then the whole file sealed in one AES-GCM pass. */
+    private fun legacyV1Snapshot(plaintext: ByteArray, passphrase: CharArray): ByteArray {
+        val salt = ByteArray(32) { it.toByte() }
+        val iv = ByteArray(12) { (it + 32).toByte() }
+        val spec = PBEKeySpec(passphrase, salt, 600_000, 256)
+        val key = SecretKeySpec(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded, "AES")
+        spec.clearPassword()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+        return "OTBK".toByteArray(Charsets.US_ASCII) + byteArrayOf(0, 0, 0, 1) + salt + iv + cipher.doFinal(plaintext)
+    }
 
     private fun cleanup() {
         context.deleteDatabase(TEST_DATABASE)
