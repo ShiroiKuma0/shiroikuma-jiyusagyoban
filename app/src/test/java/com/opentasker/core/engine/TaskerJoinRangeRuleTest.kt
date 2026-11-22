@@ -63,6 +63,20 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun aSearchRangeIsNotReadYetSoItJoinsWithAllOfIt() {
-        assertEquals(animals.joinToString(";+\$?a+b"), numbered().expand("%arr(+;+\$?a+b)"))
+        // Tasker splits at `+$?`, not the last `+`, so `2:3` is part of the search, not a range.
+        assertEquals(animals.joinToString(";+\$?a+2:3"), numbered().expand("%arr(+;+\$?a+2:3)"))
+    }
+
+    @Test
+    fun aCommaAndADigitMakeARangeOfTwoDigits() {
+        val twelve = VariableStore().apply { (1..12).forEach { set("arr$it", "v$it") } }
+        assertEquals("v12", twelve.expand("%arr(+,+12)"))
+    }
+
+    @Test
+    fun onlyTheDigitsZeroToNineCount() {
+        // Java's \d, which Tasker runs on, is 0 to 9; ICU's on a phone takes any script's digits.
+        val arabicIndicThree = Char(0x663).toString()
+        assertEquals(animals.joinToString("x+$arabicIndicThree"), numbered().expand("%arr(+x+$arabicIndicThree)"))
     }
 }

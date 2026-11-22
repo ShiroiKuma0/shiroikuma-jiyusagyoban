@@ -427,15 +427,26 @@ class VariableExpander {
             (
                 ((':' in rest || ',' in rest) && hasTaskerDigit(rest)) ||
                     "+\$?" in rest ||
-                    TASKER_SINGLE_DIGIT_RANGE.matches(rest)
+                    endsInPlusAndOneDigit(rest)
                 )
 
-    /**
-     * Tasker's `(.|\n)*\d(.|\n)*`, without the regex, which overflows Java's stack on long text: a
-     * digit, and no line break but `\n`, since `.` doesn't cross `\r`, U+0085, U+2028 or U+2029.
+    /*
+     * Tasker's `(.|\n)*\d(.|\n)*` and `.+\+\d$`, checked by hand as Java reads them. On a phone
+     * Kotlin's Regex runs on ICU, where `\d` takes any script's digits and `.` stops at more
+     * characters, and the first one overflows Java's stack on long text.
      */
+
+    /** A digit 0 to 9, and no line break but `\n`, which `(.|\n)` lets through. */
     private fun hasTaskerDigit(text: String): Boolean =
-        text.any { it in '0'..'9' } && text.none { it == '\r' || it.code == 0x85 || it.code == 0x2028 || it.code == 0x2029 }
+        text.any { it in '0'..'9' } && text.none { it != '\n' && isJavaLineBreak(it) }
+
+    /** Something with no line break, then `+` and one digit 0 to 9 at the end. */
+    private fun endsInPlusAndOneDigit(text: String): Boolean =
+        text.length >= 3 && text.last() in '0'..'9' && text[text.length - 2] == '+' && text.dropLast(2).none(::isJavaLineBreak)
+
+    /** What Java's `.` doesn't match by default. */
+    private fun isJavaLineBreak(c: Char): Boolean =
+        c == '\n' || c == '\r' || c.code == 0x85 || c.code == 0x2028 || c.code == 0x2029
 
     /**
      * Tasker's array forms over numbered variables (`%arr1`, `%arr2`, ...): `#` counts the elements,
@@ -1079,9 +1090,6 @@ class VariableExpander {
         private val TASKER_COUNT_FORMS = setOf("#", "#<", "#>")
         private val STORED_ARRAY_FORM = Regex("""#[<>]?|\d*(?::\d*)?""")
         private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
-
-        /** Java's `.+\+\d$` as Tasker writes it: `.` stops at a line break and `\d` is 0 to 9. */
-        private val TASKER_SINGLE_DIGIT_RANGE = Regex(""".+\+\d""")
 
         private fun isVariableNameChar(c: Char): Boolean = c.isLetterOrDigit() || c == '_' || c == '-'
 
