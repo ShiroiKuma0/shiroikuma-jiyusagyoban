@@ -36,7 +36,7 @@ class SecretGlobalNamesInCommitNotesTest {
         val shown = loggableGlobalNames(listOf("Count", built), store.globalSensitiveSnapshot())
 
         assertFalse(shown, "4831" in shown)
-        assertEquals("Count, 1 hidden name(s)", shown)
+        assertEquals("Count, 1 hidden name", shown)
     }
 
     @Test
@@ -44,7 +44,11 @@ class SecretGlobalNamesInCommitNotesTest {
         // Saved secret, so it can come back unreadable (a restore, a lost Keystore key). The Variables
         // screen marks each one, so the app log only needs the count.
         val note = unreadableSecretsNote(setOf("Cache_4831", "ApiKey"))
-        assertEquals("2 secret variable(s) can't be read and need to be entered again on the Variables screen", note)
+        assertEquals("2 secret variables can't be read and need to be entered again on the Variables screen", note)
+        assertEquals(
+            "1 secret variable can't be read and needs to be entered again on the Variables screen",
+            unreadableSecretsNote(setOf("ApiKey")),
+        )
         assertEquals(null, unreadableSecretsNote(emptySet()))
     }
 

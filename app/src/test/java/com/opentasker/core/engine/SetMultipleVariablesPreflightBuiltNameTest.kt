@@ -25,7 +25,7 @@ class SetMultipleVariablesPreflightBuiltNameTest {
     fun aLineWithASpaceStopsTheStepWhateverItsVariableHolds() {
         val step = step("Total %count")
         assertEquals(PreflightStepStatus.BLOCKED, step.status)
-        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name(s): Total %count" in it })
+        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name: Total %count" in it })
     }
 
     @Test

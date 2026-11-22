@@ -29,7 +29,7 @@ class SetMultipleVariablesFailureTest {
     @Test
     fun aSecretInALineThatIsNoNameStaysOutOfTheFailure() {
         val message = (run("names" to "%api_token,s3cr3t!") as ActionResult.Failure).message
-        assertEquals("invalid variable name(s): <redacted>", message)
+        assertEquals("invalid variable name: <redacted>", message)
         assertFalse(message, "s3cr3t" in message)
     }
 

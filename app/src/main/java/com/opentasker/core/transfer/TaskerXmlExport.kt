@@ -30,6 +30,7 @@ import com.opentasker.core.engine.SUB_TASK_RETURN_KEY
 import com.opentasker.core.engine.SUB_TASK_SETTING_KEYS
 import com.opentasker.core.engine.resetsReturnVariable
 import com.opentasker.core.engine.variables.VariableExpander
+import com.opentasker.core.text.countOf
 import kotlin.math.roundToLong
 
 data class TaskerXmlExportReport(
@@ -175,7 +176,7 @@ object TaskerXmlExporter {
             warnings.add(0, ExportRedactionPolicy.SENSITIVE_ACTION_WARNING)
         }
         if (omittedSecretCount > 0) {
-            warnings.add(0, "$omittedSecretCount secret variable(s) were omitted and must be re-entered after import.")
+            warnings.add(0, "${countOf(omittedSecretCount, "secret variable")} ${if (omittedSecretCount == 1) "was" else "were"} omitted and must be re-entered after import.")
         }
         variables.filterNot { it.isSecret }.forEach { variable ->
             appendVariable(sb, variable)

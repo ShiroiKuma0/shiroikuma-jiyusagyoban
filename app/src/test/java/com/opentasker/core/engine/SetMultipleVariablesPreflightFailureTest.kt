@@ -30,7 +30,7 @@ class SetMultipleVariablesPreflightFailureTest {
     fun aLineThatIsNoNameStopsTheStep() {
         val step = steps(setMultiple("names" to "%a\nnot a name", "values" to "1\n2")).single()
         assertEquals(PreflightStepStatus.BLOCKED, step.status)
-        assertTrue(step.warnings.toString(), step.warnings.any { "The run stops this step: invalid variable name(s): not a name." in it })
+        assertTrue(step.warnings.toString(), step.warnings.any { "The run stops this step: invalid variable name: not a name." in it })
     }
 
     @Test
@@ -49,7 +49,7 @@ class SetMultipleVariablesPreflightFailureTest {
     fun aSecretInALineThatIsNoNameIsNotShown() {
         val step = steps(setMultiple("names" to "%api_token,s3cr3t!")).single()
         assertEquals(PreflightStepStatus.BLOCKED, step.status)
-        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name(s): <redacted>" in it })
+        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name: <redacted>" in it })
         assertFalse(step.warnings.toString(), step.warnings.any { "s3cr3t" in it })
         assertFalse(step.expandedArguments.toString(), step.expandedArguments.values.any { "s3cr3t" in it })
     }

@@ -18,6 +18,7 @@ import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -1359,7 +1360,7 @@ internal fun countHiddenChanges(
     if (counted.isEmpty()) return changes
     return shown + ActionVariableChange(
         scope = counted.first().scope,
-        name = "${counted.size} hidden name(s)",
+        name = countOf(counted.size, "hidden name"),
         value = "",
         added = counted.all { it.added },
         sensitive = true,
@@ -1468,7 +1469,7 @@ fun List<ActionExecutionTrace>.toRunLogMessage(maxLines: Int = 8): String {
     if (isEmpty()) return "No actions executed"
     val visible = take(maxLines).flatMap { it.toRunLogLines() }.joinToString("\n")
     val remaining = size - maxLines
-    return if (remaining > 0) "$visible\n... $remaining more action(s)" else visible
+    return if (remaining > 0) "$visible\n... ${countOf(remaining, "more action")}" else visible
 }
 
 private data class ActionArgumentExpansionReport(

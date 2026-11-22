@@ -48,7 +48,7 @@ class SetMultipleVariablesPreflightOperatorNameTest {
     fun anOperatorDoesNotRescueALineWithASpace() {
         val step = step("Total %Title(lower)", mapOf("Title" to "My Song"))
         assertEquals(PreflightStepStatus.BLOCKED, step.status)
-        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name(s): Total %Title(lower)" in it })
+        assertTrue(step.warnings.toString(), step.warnings.any { "invalid variable name: Total %Title(lower)" in it })
     }
 
     @Test

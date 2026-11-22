@@ -240,7 +240,7 @@ object EngineHealthReader {
                 "Pending executions",
                 HealthSignalState.Ready,
                 nowMillis,
-                "$pendingExecutionCount external and $activeExecutionCount active execution(s) are tracked.",
+                "Tracked executions: $pendingExecutionCount external, $activeExecutionCount active.",
                 required = false,
             ),
         )

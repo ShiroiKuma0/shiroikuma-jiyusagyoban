@@ -29,7 +29,7 @@ class SetMultipleVariablesNameEdgesTest {
     @Test
     fun aValueWithNoNameBeforeItIsReportedAsABlankName() {
         val result = run("names" to "%a,1\n,2")
-        assertEquals("invalid variable name(s): (blank name)", (result as ActionResult.Failure).message)
+        assertEquals("invalid variable name: (blank name)", (result as ActionResult.Failure).message)
         assertEquals("1", variables.get("a"))
     }
 

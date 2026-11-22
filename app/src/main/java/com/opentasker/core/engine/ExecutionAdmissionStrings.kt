@@ -2,6 +2,7 @@ package com.opentasker.core.engine
 
 import android.content.res.Resources
 import com.opentasker.app.R
+import com.opentasker.core.text.countOf
 
 /** Localizable copy for admission decisions rendered in logs, diagnostics, and previews. */
 interface ExecutionAdmissionStrings {
@@ -97,7 +98,7 @@ private class ResourceExecutionAdmissionStrings(
 
 private object EnglishExecutionAdmissionStrings : ExecutionAdmissionStrings {
     override fun circuitOpen(remainingSeconds: Long): String =
-        "Execution circuit is open for $remainingSeconds more seconds."
+        "Execution circuit is open for ${countOf(remainingSeconds, "more second")}."
 
     override fun tripReason(reason: String): String = "Trip reason: $reason"
 

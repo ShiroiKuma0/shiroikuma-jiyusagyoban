@@ -47,9 +47,11 @@ internal fun multipleVariablesFailure(args: Map<String, String>, outcome: Multip
     outcome.isEmpty() -> "no variable names given"
     outcome.invalid.isEmpty() -> null
     ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", args) ->
-        "invalid variable name(s): ${ActionArgumentSensitivity.REDACTED}"
-    else -> "invalid variable name(s): ${outcome.invalid.joinToString()}"
+        "${invalidNamesLabel(outcome.invalid.size)}: ${ActionArgumentSensitivity.REDACTED}"
+    else -> "${invalidNamesLabel(outcome.invalid.size)}: ${outcome.invalid.joinToString()}"
 }
+
+private fun invalidNamesLabel(count: Int) = if (count == 1) "invalid variable name" else "invalid variable names"
 
 /**
  * What [setMultipleVariables] did with each name, by canonical name; [invalid] keeps the text as

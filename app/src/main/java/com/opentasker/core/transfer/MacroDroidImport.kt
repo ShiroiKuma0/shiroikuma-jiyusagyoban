@@ -12,6 +12,7 @@ import com.opentasker.core.model.Profile
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 import com.opentasker.core.validation.InputValidation
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -223,7 +224,7 @@ object MacroDroidImporter {
             }
             val localVariables = macro.objectArray("localVariables")
             if (localVariables.isNotEmpty()) {
-                lossyWarnings += "Macro '$name' has ${localVariables.size} local variable(s). Initial local values were not imported."
+                lossyWarnings += "Macro '$name' has ${countOf(localVariables.size, "local variable")}. Initial local values were not imported."
             }
             profiles += Profile(
                 id = profileId,

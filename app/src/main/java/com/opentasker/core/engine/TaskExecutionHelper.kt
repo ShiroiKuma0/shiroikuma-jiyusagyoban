@@ -15,6 +15,7 @@ import com.opentasker.core.storage.RuntimeVariableSeed
 import com.opentasker.core.storage.RuntimeVariableValue
 import com.opentasker.core.storage.VariableRepository
 import com.opentasker.core.storage.toEntity
+import com.opentasker.core.text.countOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -537,7 +538,7 @@ private suspend fun persistChangedGlobals(
  */
 internal fun loggableGlobalNames(names: Collection<String>, secretNames: Set<String>): String {
     val (hidden, shown) = names.partition { it in secretNames }
-    return (shown + listOfNotNull(hidden.size.takeIf { it > 0 }?.let { "$it hidden name(s)" })).joinToString()
+    return (shown + listOfNotNull(hidden.size.takeIf { it > 0 }?.let { countOf(it, "hidden name") })).joinToString()
 }
 
 /**
@@ -545,7 +546,9 @@ internal fun loggableGlobalNames(names: Collection<String>, secretNames: Set<Str
  * not named, for the reason [loggableGlobalNames] gives; the Variables screen marks each one.
  */
 internal fun unreadableSecretsNote(names: Set<String>): String? =
-    names.size.takeIf { it > 0 }?.let { "$it secret variable(s) can't be read and need to be entered again on the Variables screen" }
+    names.size.takeIf { it > 0 }?.let {
+        "${countOf(it, "secret variable")} can't be read and ${if (it == 1) "needs" else "need"} to be entered again on the Variables screen"
+    }
 
 suspend fun logSkippedRun(
     db: AppDatabase,

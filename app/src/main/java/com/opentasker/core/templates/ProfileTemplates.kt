@@ -116,7 +116,7 @@ data class AutomationBlueprint(
 
         val unknownKeys = slotValues.keys - inputs.mapTo(linkedSetOf()) { it.key }
         require(unknownKeys.isEmpty()) {
-            "Invalid blueprint values: unknown input(s) ${unknownKeys.sorted().joinToString()}"
+            "Invalid blueprint values: unknown ${if (unknownKeys.size == 1) "input" else "inputs"} ${unknownKeys.sorted().joinToString()}"
         }
         val values = defaults() + slotValues.mapValues { it.value.trim() }
         val missing = inputs.filter { it.required && values[it.key].isNullOrBlank() }

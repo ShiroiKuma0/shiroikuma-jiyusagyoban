@@ -14,7 +14,7 @@ object ExportRedactionPolicy {
     const val REDACTED = "[REDACTED]"
     private const val REDACTED_CARD = "[REDACTED-CARD]"
     const val SENSITIVE_ACTION_WARNING =
-        "Sensitive action value(s) were omitted and must be re-entered after import."
+        "Sensitive action values were omitted and must be re-entered after import."
 
     data class Context(
         val secretNames: Set<String> = emptySet(),

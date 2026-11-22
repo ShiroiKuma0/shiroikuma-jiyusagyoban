@@ -34,6 +34,7 @@ import com.opentasker.core.templates.BlueprintInstallationStore
 import com.opentasker.core.templates.BlueprintUpdatePlanner
 import com.opentasker.core.templates.BlueprintUpdateReview
 import com.opentasker.core.templates.validationError
+import com.opentasker.core.text.countOf
 import com.opentasker.core.validation.InputValidation
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
@@ -207,7 +208,7 @@ object OpenTaskerBundleCodec {
                 name = name,
                 description = description,
                 warnings = if (omittedSecretCount > 0) {
-                    listOf("$omittedSecretCount secret variable(s) were omitted and must be re-entered after import.")
+                    listOf("${countOf(omittedSecretCount, "secret variable")} ${if (omittedSecretCount == 1) "was" else "were"} omitted and must be re-entered after import.")
                 } else {
                     emptyList()
                 },
@@ -926,13 +927,13 @@ class OpenTaskerBundleRepository(
 
         if (bundle.blueprints.isNotEmpty()) {
             blueprintCatalogStore?.merge(bundle.blueprints)
-            importWarnings += "${bundle.blueprints.size} blueprint definition(s) were reviewed and saved; existing instantiated profiles were not overwritten."
+            importWarnings += "${countOf(bundle.blueprints.size, "blueprint definition")} ${if (bundle.blueprints.size == 1) "was" else "were"} reviewed and saved; existing instantiated profiles were not overwritten."
         }
 
         val importableInvariants = AutomationInvariantPolicy.normalize(bundle.invariants)
         if (importableInvariants.isNotEmpty() && invariantStore != null) {
             invariantStore.merge(importableInvariants)
-            importWarnings += "${importableInvariants.size} automation invariant(s) were imported and added to local diagnostics policy."
+            importWarnings += "${countOf(importableInvariants.size, "automation invariant")} ${if (importableInvariants.size == 1) "was" else "were"} imported and added to local diagnostics policy."
         }
 
         return BundleImportReport(

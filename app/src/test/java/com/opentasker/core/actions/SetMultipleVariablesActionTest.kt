@@ -119,9 +119,15 @@ class SetMultipleVariablesActionTest {
     @Test
     fun aNameThatIsntAVariableFailsTheStepAfterTheRestAreSet() {
         val result = run("names" to "%a\nnot a name\n%c", "values" to "1\n2\n3")
-        assertEquals("invalid variable name(s): not a name", (result as ActionResult.Failure).message)
+        assertEquals("invalid variable name: not a name", (result as ActionResult.Failure).message)
         assertEquals("1", variables.get("a"))
         assertEquals("3", variables.get("c"))
+    }
+
+    @Test
+    fun twoNamesThatArentVariablesAreBothListed() {
+        val result = run("names" to "%a\nnot a name\nnor this", "values" to "1\n2\n3")
+        assertEquals("invalid variable names: not a name, nor this", (result as ActionResult.Failure).message)
     }
 
     @Test
