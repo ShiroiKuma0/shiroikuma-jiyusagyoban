@@ -9,6 +9,7 @@ import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.configureConfigurationSnapshotDestination
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -18,6 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -44,11 +47,13 @@ internal class BackupController(
     // loaded off the main thread in init and refreshed after each backup operation.
     private val _backupSetupState = MutableStateFlow(BackupSetupState(busy = false))
     val backupSetupState: StateFlow<BackupSetupState> = _backupSetupState.asStateFlow()
+    private val operationLock = Mutex()
+    private val runningOperations = AtomicInteger()
 
     init {
         scope.launch {
             ConfigurationSnapshotSettings(appContext).changes().collect {
-                runCatching { refreshBackupSetupState(busy = false) }
+                runCatching { refreshBackupSetupState() }
             }
         }
     }
@@ -108,7 +113,7 @@ internal class BackupController(
     }
 
     fun dismissRestoreReview() {
-        // Closed first and held busy, so Stage or a new inspection can't reach the candidate mid-shred.
+        // Closed first, and the shred waits for any Stage already under way (see [launchBackupOperation]).
         _restoreReview.value = null
         launchBackupOperation {
             withContext(Dispatchers.IO) { databaseBackupManager.discardInspectedRestore() }
@@ -159,22 +164,26 @@ internal class BackupController(
      */
     private fun launchBackupOperation(block: suspend () -> Unit) {
         scope.launch {
+            runningOperations.incrementAndGet()
             _backupSetupState.value = _backupSetupState.value.copy(busy = true)
             try {
-                block()
+                // One at a time: a Cancel tapped while Stage is moving the candidate would shred the staged journal.
+                operationLock.withLock { block() }
             } finally {
-                withContext(NonCancellable) { refreshBackupSetupState(busy = false) }
+                runningOperations.decrementAndGet()
+                withContext(NonCancellable) { refreshBackupSetupState() }
             }
         }
     }
 
-    private suspend fun refreshBackupSetupState(busy: Boolean) {
+    /** Busy while any operation is queued or running, read when the state is written so a refresh mid-operation keeps it. */
+    private suspend fun refreshBackupSetupState() {
         // Backup enumeration and pending-restore checks hit the filesystem; keep them off
         // the main thread (debug StrictMode flags them otherwise).
         val loaded = withContext(Dispatchers.IO) {
             val settings = ConfigurationSnapshotSettings(appContext)
             BackupSetupState(
-                busy = busy,
+                busy = false,
                 latestBackupName = databaseBackupManager.latestBackup()?.name,
                 pendingRestore = databaseBackupManager.hasPendingRestore(),
                 pendingRestoreSummary = databaseBackupManager.pendingRestoreSummary(),
@@ -183,7 +192,7 @@ internal class BackupController(
                 snapshotStatus = settings.loadStatus(),
             )
         }
-        _backupSetupState.value = loaded
+        _backupSetupState.value = loaded.copy(busy = runningOperations.get() > 0)
     }
 
     /** Persists the snapshot schedule and brings the periodic worker in line with it. */

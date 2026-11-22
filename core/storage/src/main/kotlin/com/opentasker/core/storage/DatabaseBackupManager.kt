@@ -3,7 +3,6 @@ package com.opentasker.core.storage
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
-import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.opentasker.core.logging.AppLogger
 import java.io.File
@@ -542,7 +541,7 @@ class DatabaseBackupManager(
                 replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
                 val spent = retireRestoreJournal(pending)
-                context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit(commit = true) {
+                val rollbackRecorded = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit().run {
                     if (rollback != null) {
                         putString(restoreRollbackKey(databaseName), rollback.name)
                         putLong(restoredAtKey(databaseName), System.currentTimeMillis())
@@ -550,7 +549,12 @@ class DatabaseBackupManager(
                         remove(restoreRollbackKey(databaseName))
                         remove(restoredAtKey(databaseName))
                     }
+                    commit()
                 }
+                // A write that fails returns false instead of throwing. Unrecorded, the rollback
+                // can't be undone from Setup, so the restore goes back as failed. With no rollback
+                // there's nothing to lose, and the new database stays.
+                if (!rollbackRecorded && rollback != null) throw IOException("Could not record the restore's rollback")
                 // Only once the rollback is recorded, so a death while it shreds can't lose that.
                 shredFile(spent)
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
@@ -879,7 +883,7 @@ internal fun retireRestoreJournal(pending: File): File {
     return spent
 }
 
-/** Where [retireRestoreJournal] moves an applied journal while it shreds it. */
+/** Where [retireRestoreJournal] moves an applied journal until it's shredded. */
 internal fun spentRestoreJournal(pending: File): File = File(pending.parentFile, "${pending.name}.spent")
 
 /** Same-directory atomic publication or no publication; never delete the existing target first. */

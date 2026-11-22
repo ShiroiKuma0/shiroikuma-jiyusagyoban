@@ -5,6 +5,7 @@ import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -31,6 +32,18 @@ class RestoreJournalShredTest {
         assertFalse(pending.exists())
         shredFile(spent)
         assertEquals(emptyList<String>(), dir.list()!!.toList())
+    }
+
+    @Test
+    fun theShredOverwritesEveryByteBeforeTheFileGoes() = inTempDir { dir ->
+        val journal = File(dir, "opentasker_restore_pending.db.spent").apply { writeBytes(plaintext) }
+        // A second name for the same bytes still reads them once the first name is deleted.
+        val sameBytes = Files.createLink(File(dir, "same-bytes.db").toPath(), journal.toPath()).toFile()
+        shredFile(journal)
+        assertFalse(journal.exists())
+        val left = sameBytes.readBytes()
+        assertEquals(plaintext.size, left.size)
+        assertTrue("plaintext survived the shred", left.all { it == 0.toByte() })
     }
 
     @Test
