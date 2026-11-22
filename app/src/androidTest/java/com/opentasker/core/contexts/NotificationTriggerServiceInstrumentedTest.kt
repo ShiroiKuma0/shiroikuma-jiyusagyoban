@@ -6,29 +6,24 @@ import android.os.Process
 import android.service.notification.StatusBarNotification
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * What the notification listener hands the matcher, with real Notification extras (a Bundle can't
- * be built in a JVM test). The service is called directly, so nothing is posted and no listener
- * access is needed: it only reads, on any phone.
+ * be built in a JVM test). Nothing is posted and no listener access is needed, and the event is
+ * built rather than published: that bus is the one the engine listens on, so a published test
+ * event could fire a notification profile with no package filter on the phone running the test.
  */
 @RunWith(AndroidJUnit4::class)
 class NotificationTriggerServiceInstrumentedTest {
     private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
-    private fun posted(notification: Notification): Map<String, String> = runBlocking {
-        val received = async(start = CoroutineStart.UNDISPATCHED) { NotificationContextEvents.events.first() }
-        NotificationTriggerService().onNotificationPosted(statusBar(notification))
-        withTimeout(5_000) { received.await() }.metadata
+    private fun posted(notification: Notification): Map<String, String> {
+        val fields = postedNotification(statusBar(notification))
+        return NotificationContextEvents.buildEvent(fields.packageName, fields.title, fields.body).metadata
     }
 
     @Suppress("DEPRECATION")
