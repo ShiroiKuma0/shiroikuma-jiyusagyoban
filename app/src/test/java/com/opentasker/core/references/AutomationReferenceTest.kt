@@ -44,6 +44,34 @@ class AutomationReferenceTest {
         )
     }
 
+    /** Renaming or copying Foo used to pin its step that runs foo to Foo itself, or to the copy. */
+    @Test
+    fun renamingOrCopyingFooLeavesItsStepThatRunsFoo() {
+        val upper = Task(id = 3, name = "Foo", actions = listOf(ActionSpec(type = "task.stop", args = mapOf("task" to "foo"))))
+        val ids = setOf(3L, 4L)
+        val names = setOf("Foo", "foo")
+
+        val renamed = AutomationReferenceRewriter.stabilizeOwnNameReferences(upper, upper.copy(name = "Bar"), ids, names)
+        assertEquals("foo", renamed.actions.single().args["task"])
+
+        val copy = AutomationReferenceRewriter.remapDuplicateSelfReferences(
+            original = upper,
+            duplicate = upper.copy(id = 5, name = "Foo (copy)"),
+            taskIds = ids + 5L,
+            taskNames = names + "Foo (copy)",
+        )
+        assertEquals("foo", copy.actions.single().args["task"])
+
+        // The task's own exact name is still a self reference on both paths.
+        val self = upper.copy(actions = listOf(ActionSpec(type = "task.stop", args = mapOf("task" to "Foo"))))
+        assertEquals("3", AutomationReferenceRewriter.stabilizeOwnNameReferences(self, self.copy(name = "Bar"), ids, names).actions.single().args["task"])
+        assertEquals(
+            "5",
+            AutomationReferenceRewriter.remapDuplicateSelfReferences(self, self.copy(id = 5, name = "Foo (copy)"), ids + 5L, names)
+                .actions.single().args["task"],
+        )
+    }
+
     private fun scene(vararg elements: SceneElement) =
         Scene(id = 40, name = "Panel", widthDp = 200, heightDp = 200, elements = elements.toList())
 

@@ -1203,8 +1203,10 @@ object PreflightRunner {
         return null
     }
 
-    private fun resolveTask(reference: String, tasks: List<Task>): Task? =
+    /** As a run reads it: an id when a task has that number, then the exact name, then the name ignoring case. */
+    internal fun resolveTask(reference: String, tasks: List<Task>): Task? =
         reference.toLongOrNull()?.let { id -> tasks.firstOrNull { it.id == id } }
+            ?: tasks.firstOrNull { it.name == reference }
             ?: tasks.firstOrNull { it.name.equals(reference, ignoreCase = true) }
 
     private fun seedVariables(variables: VariableStore, input: PreflightInputs) {

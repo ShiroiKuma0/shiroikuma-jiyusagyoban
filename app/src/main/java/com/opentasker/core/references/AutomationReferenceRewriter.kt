@@ -65,11 +65,17 @@ object AutomationReferenceRewriter {
 
     /**
      * Rebinds references to [original] inside a copied task to that copy's stable id. [taskIds] is
-     * every task id, as in [AutomationReferenceIndex.build].
+     * every task id, as in [AutomationReferenceIndex.build], and [taskNames] every task name, so a
+     * step naming a task that differs from [original] only in case keeps naming that task.
      */
-    fun remapDuplicateSelfReferences(original: Task, duplicate: Task, taskIds: Set<Long>? = null): Task = duplicate.copy(
+    fun remapDuplicateSelfReferences(
+        original: Task,
+        duplicate: Task,
+        taskIds: Set<Long>? = null,
+        taskNames: Set<String>? = null,
+    ): Task = duplicate.copy(
         actions = duplicate.actions.map { action ->
-            action.retargetTaskArgs(original, duplicate.id, taskIds)
+            action.retargetTaskArgs(original, duplicate.id, taskIds, taskNames?.plus(original.name))
         },
     )
 
@@ -220,10 +226,19 @@ object AutomationReferenceRewriter {
     /**
      * Pins the references [renamed] makes to its own old name to its id. [stabilizeNameReferences]
      * leaves the renamed task out, but a Stop Task step naming the task it's in is a real self
-     * reference, and it would otherwise go on naming a task that no longer exists.
+     * reference, and it would otherwise go on naming a task that no longer exists. [taskNames] is
+     * every task name before the rename, so a step naming one that differs only in case stays.
      */
-    fun stabilizeOwnNameReferences(previous: Task, renamed: Task, taskIds: Set<Long>? = null): Task =
-        renamed.copy(actions = renamed.actions.map { action -> action.retargetTaskArgs(previous, previous.id, taskIds) })
+    fun stabilizeOwnNameReferences(
+        previous: Task,
+        renamed: Task,
+        taskIds: Set<Long>? = null,
+        taskNames: Set<String>? = null,
+    ): Task = renamed.copy(
+        actions = renamed.actions.map { action ->
+            action.retargetTaskArgs(previous, previous.id, taskIds, taskNames?.plus(previous.name))
+        },
+    )
 
     /**
      * Rewrites every task reference through [idMap], used when a bundle's tasks are inserted under

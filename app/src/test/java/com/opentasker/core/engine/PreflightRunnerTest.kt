@@ -280,4 +280,15 @@ class PreflightRunnerTest {
     fun everyRegisteredRuntimeActionHasAnExplicitNoSideEffectPreviewImplementation() {
         assertTrue(PreflightActionRegistry.missingRegisteredImplementations().isEmpty())
     }
+
+    /** Preflight previews the task a run would call: with Foo and foo, a step naming foo means foo. */
+    @Test
+    fun aCalledTaskIsFoundTheWayARunFindsIt() {
+        val tasks = listOf(Task(id = 3, name = "Foo"), Task(id = 4, name = "foo"))
+
+        assertEquals(4L, PreflightRunner.resolveTask("foo", tasks)?.id)
+        assertEquals(3L, PreflightRunner.resolveTask("Foo", tasks)?.id)
+        assertEquals(3L, PreflightRunner.resolveTask("FOO", tasks)?.id)
+        assertEquals(4L, PreflightRunner.resolveTask("4", tasks)?.id)
+    }
 }
