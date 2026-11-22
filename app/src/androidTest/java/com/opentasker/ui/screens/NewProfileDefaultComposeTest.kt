@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -63,6 +64,33 @@ class NewProfileDefaultComposeTest {
         composeTestRule.onNodeWithText("Save").performClick()
 
         assertEquals(true, saved)
+    }
+
+    @Test
+    fun aChoiceMadeInTheEditorSurvivesARotationWhileTheSettingLoads() {
+        var setting by mutableStateOf(true)
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            OpenTaskerTheme {
+                ProfileEditorDialog(
+                    profile = null,
+                    tasks = listOf(task),
+                    onDismiss = {},
+                    onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+                    newProfileEnabled = setting,
+                )
+            }
+        }
+        enableSwitch().assertIsOn().performClick()
+        enableSwitch().assertIsOff()
+
+        // A recreated screen reads the setting as off until the stored value loads (verifier 27).
+        setting = false
+        restorationTester.emulateSavedInstanceStateRestore()
+        setting = true
+        composeTestRule.waitForIdle()
+
+        enableSwitch().assertIsOff()
     }
 
     @Test

@@ -389,10 +389,10 @@ internal fun ProfileEditorDialog(
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     // New profiles start disabled, matching templates and imports and the "Leave off until
     // reviewed" helper, unless Settings says new profiles start on. Templates and imports stay
-    // review-first either way.
-    var enabled by rememberSaveable(profile?.id, newProfileEnabled.takeIf { profile == null }) {
-        mutableStateOf(profile?.enabled ?: newProfileEnabled)
-    }
+    // review-first either way. Keyed only on identity: keyed on the setting too, a rotation
+    // restored the user's choice under the setting's first value, then reset it when the real one
+    // loaded.
+    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: newProfileEnabled) }
     // Keyed only on profile identity: re-keying on `tasks` reset the user's selection to the
     // default whenever the tasks flow re-emitted (a parallel import, a rename re-sorting the
     // list) mid-edit. A vanished selection is caught by the canSave existence check below.

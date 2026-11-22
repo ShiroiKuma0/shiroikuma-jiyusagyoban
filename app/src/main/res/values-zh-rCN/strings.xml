@@ -175,9 +175,9 @@
     <string name="settings_run_onboarding_body">重新打开首次启动时提供的入门模板。</string>
     <string name="settings_run_onboarding_action">显示模板</string>
     <string name="settings_new_profiles_enabled_title">新配置文件默认开启</string>
-    <string name="settings_new_profiles_enabled_body">在编辑器中新建的配置文件保存后即开启。模板和导入的配置文件仍默认关闭，方便你先检查。</string>
-    <string name="settings_new_profiles_enabled_on">新配置文件默认开启</string>
-    <string name="settings_new_profiles_enabled_off">新配置文件默认关闭</string>
+    <string name="settings_new_profiles_enabled_body">开启后，在编辑器中新建的配置文件保存后即开启。模板、导入和复制的配置文件仍默认关闭，方便你先检查。</string>
+    <string name="settings_new_profiles_enabled_on">新配置文件保存后即开启</string>
+    <string name="settings_new_profiles_enabled_off">新配置文件保存后保持关闭</string>
     <string name="settings_engine_notification_title">引擎通知</string>
     <string name="settings_engine_notification_body">打开 Android 中自动化运行时常驻通知的设置，可更改其重要性、提示音或锁屏显示方式。</string>
     <string name="settings_engine_notification_action">打开</string>

@@ -180,7 +180,7 @@
     <string name="settings_run_onboarding_body">Reopen the starter templates you were offered on first launch.</string>
     <string name="settings_run_onboarding_action">Show templates</string>
     <string name="settings_new_profiles_enabled_title">New profiles start on</string>
-    <string name="settings_new_profiles_enabled_body">A profile you make in the editor is switched on when you save it. Templates and imports still start off, so you can look them over first.</string>
+    <string name="settings_new_profiles_enabled_body">When this is on, a profile you make in the editor is switched on when you save it. Templates, imports and copies still start off, so you can look them over first.</string>
     <string name="settings_new_profiles_enabled_on">New profiles start switched on</string>
     <string name="settings_new_profiles_enabled_off">New profiles start switched off</string>
     <string name="settings_engine_notification_title">Engine notification</string>

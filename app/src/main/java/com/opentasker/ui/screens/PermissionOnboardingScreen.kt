@@ -506,6 +506,7 @@ fun PermissionOnboardingScreen(
     val viewModelFactory = remember(context) {
         PermissionOnboardingViewModelFactory(context.applicationContext)
     }
+    val showEngineNotificationRow = remember(context, settingsOnly) { settingsOnly && canOpenEngineNotificationSettings(context) }
     val setupViewModel: PermissionOnboardingViewModel = viewModel(factory = viewModelFactory)
     val advancedProtectionEnabled by AdvancedProtectionReader.enabled.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -691,7 +692,9 @@ fun PermissionOnboardingScreen(
                     onEnabledChange = setupViewModel::setNewProfilesEnabled,
                 )
             }
-            item { EngineNotificationSetupCard(onOpen = { openEngineNotificationSettings(context, onMessage) }) }
+            if (showEngineNotificationRow) {
+                item { EngineNotificationSetupCard(onOpen = { openEngineNotificationSettings(context, onMessage) }) }
+            }
             onRunOnboardingAgain?.let { runAgain ->
                 item { RunOnboardingAgainCard(onRunAgain = runAgain) }
             }
@@ -1574,14 +1577,17 @@ internal fun openEngineNotificationSettings(context: Context, onMessage: (String
             PromotedOngoingNotificationSupport.ENGINE_CHANNEL_IMPORTANCE,
         ),
     )
-    openSettingsIntent(
-        context,
-        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            .putExtra(Settings.EXTRA_CHANNEL_ID, PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID),
-        onMessage,
-    )
+    openSettingsIntent(context, engineNotificationSettingsIntent(context), onMessage)
 }
+
+internal fun engineNotificationSettingsIntent(context: Context): Intent =
+    Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        .putExtra(Settings.EXTRA_CHANNEL_ID, PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID)
+
+/** A build with no page for one channel gets no row, rather than a button that only says so. */
+internal fun canOpenEngineNotificationSettings(context: Context): Boolean =
+    engineNotificationSettingsIntent(context).resolveActivity(context.packageManager) != null
 
 @Composable
 internal fun BackupSetupCard(

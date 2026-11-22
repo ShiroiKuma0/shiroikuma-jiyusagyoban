@@ -1,0 +1,74 @@
+package com.opentasker.ui.screens
+
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.room.Room
+import androidx.test.platform.app.InstrumentationRegistry
+import com.opentasker.core.model.ActionSpec
+import com.opentasker.core.model.Task
+import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.toEntity
+import com.opentasker.ui.theme.OpenTaskerTheme
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+
+/**
+ * A-365 through the whole screen: with "New profiles start on" set, the Profiles screen's New
+ * profile button opens an editor that starts on. NewProfileDefaultComposeTest covers the dialog
+ * on its own; this one covers the screen handing it the setting.
+ */
+class NewProfileDefaultScreenTest {
+    @get:Rule
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private lateinit var db: AppDatabase
+    private var settingBefore = false
+
+    @Before
+    fun setUp() {
+        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        runBlocking {
+            settingBefore = ProfileDefaultsPreference.newProfilesEnabled(context).first()
+            ProfileDefaultsPreference.setNewProfilesEnabled(context, true)
+            // The first-run flow would cover the screen.
+            OnboardingPreference.markCompleted(context)
+            db.taskDao().insert(Task(name = "Lights", actions = listOf(ActionSpec(type = "torch.set"))).toEntity())
+        }
+    }
+
+    @After
+    fun tearDown() {
+        db.close()
+        runBlocking { ProfileDefaultsPreference.setNewProfilesEnabled(context, settingBefore) }
+    }
+
+    @Test
+    fun theNewProfileButtonOpensAnEditorThatStartsOn() {
+        composeTestRule.setContent { OpenTaskerTheme { ActiveAutomationUi(db) } }
+        val newProfile = hasContentDescription("New profile") and hasClickAction()
+        composeTestRule.waitUntil(TIMEOUT_MS) { composeTestRule.onAllNodes(newProfile).fetchSemanticsNodes().isNotEmpty() }
+
+        composeTestRule.onAllNodes(newProfile).onFirst().performClick()
+
+        val enableSwitch = hasText("Enable after saving") and isToggleable()
+        composeTestRule.waitUntil(TIMEOUT_MS) { composeTestRule.onAllNodes(enableSwitch).fetchSemanticsNodes().isNotEmpty() }
+        composeTestRule.onNode(enableSwitch).performScrollTo().assertIsOn()
+    }
+
+    private companion object {
+        const val TIMEOUT_MS = 10_000L
+    }
+}
