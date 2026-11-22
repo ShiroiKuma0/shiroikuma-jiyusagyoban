@@ -97,10 +97,11 @@ class HomeAssistantWebhookProtocolTest {
 
     @Test
     fun secretPathIsNeverReturnedForDisplay() {
+        // Run details show a step's arguments through maskValue, and the webhook URL is declared sensitive.
+        registerActionMetadata()
         assertEquals(
-            "https://hooks.example.test/${ActionArgumentSensitivity.REDACTED}",
-            HomeAssistantWebhookProtocol.redactedUrl("https://hooks.example.test/api/webhook/secret"),
+            ActionArgumentSensitivity.REDACTED,
+            ActionArgumentSensitivity.maskValue(HomeAssistantWebhookAction.ID, "url", "https://hooks.example.test/api/webhook/secret"),
         )
-        assertEquals(ActionArgumentSensitivity.REDACTED, HomeAssistantWebhookProtocol.redactedUrl("not a URL"))
     }
 }

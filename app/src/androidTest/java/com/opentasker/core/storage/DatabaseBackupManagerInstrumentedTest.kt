@@ -467,13 +467,13 @@ class DatabaseBackupManagerInstrumentedTest {
             assertTrue("the rollback validates", manager.inspectManagedBackup(rollback).isSuccess)
             assertTrue("the rollback is listed", rollback.name in manager.listBackups().map { it.name })
             assertEquals(rollback.name, manager.lastRestoreRollback()?.file?.name)
-            // Counted from the directory itself, not from listBackups(), which is what the storage
-            // line reads: the rollback has to be in the Setup count and its bytes in the total.
+            // Counted from the directory itself, not from listBackups(), which retention and the
+            // backup card read: the rollback has to be in that listing, at its full size.
             val copyName = Regex("""_(backup|pre_restore|restore_failed)_[^/]*\.db$""")
             val onDisk = rollback.parentFile!!.listFiles { file -> copyName.containsMatchIn(file.name) }.orEmpty()
-            val (count, bytes) = manager.snapshotStorage()
-            assertEquals(onDisk.size, count)
-            assertEquals(onDisk.sumOf { it.length() }, bytes)
+            val listed = manager.listBackups()
+            assertEquals(onDisk.size, listed.size)
+            assertEquals(onDisk.sumOf { it.length() }, listed.sumOf { it.length() })
             assertTrue("a restore copy is never the latest backup", manager.latestBackup()?.name != rollback.name)
         } finally {
             db.close()
@@ -502,7 +502,8 @@ class DatabaseBackupManagerInstrumentedTest {
             }
             assertTrue(manager.listBackups().map { it.name }.containsAll(copies.map { it.name }))
 
-            assertEquals(2, manager.deleteOldBackups(olderThanDays = 3))
+            // The pass the snapshot worker runs; the fresh backup is the newest, so it stays.
+            assertEquals(2, manager.pruneSnapshots(ConfigurationSnapshotPolicy(maxAgeDays = 3)))
             assertTrue(copies.none { it.exists() })
             assertTrue("the fresh backup stays", source.exists())
         } finally {

@@ -28,8 +28,6 @@ class LocalePluginReceiverPillTest {
             LocalePluginContract.ACTION_QUERY_CONDITION -> conditions
             else -> emptyList()
         }
-        override fun activityPackages(action: String) = emptySet<String>()
-        override fun broadcastReceiverPermissions(action: String) = emptyMap<String, List<String>>()
     }
 
     @Test

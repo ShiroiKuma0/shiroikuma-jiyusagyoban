@@ -91,9 +91,5 @@ class LocalePluginSignerPinTest {
             lookups++
             return emptyList()
         }
-
-        override fun activityPackages(action: String): Set<String> = emptySet()
-
-        override fun broadcastReceiverPermissions(action: String): Map<String, List<String>> = emptyMap()
     }
 }

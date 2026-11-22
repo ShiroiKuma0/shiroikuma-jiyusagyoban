@@ -153,11 +153,6 @@ object HomeAssistantWebhookProtocol {
 
     fun retryDelayMilliseconds(config: HomeAssistantWebhookConfig, retryIndex: Int): Long =
         (config.backoffMilliseconds * (1L shl retryIndex.coerceIn(0, 4))).coerceAtMost(10_000L)
-
-    fun redactedUrl(url: String): String = runCatching {
-        val parsed = URI(url)
-        "${parsed.scheme}://${parsed.host}/${ActionArgumentSensitivity.REDACTED}"
-    }.getOrDefault(ActionArgumentSensitivity.REDACTED)
 }
 
 class HomeAssistantWebhookAction(

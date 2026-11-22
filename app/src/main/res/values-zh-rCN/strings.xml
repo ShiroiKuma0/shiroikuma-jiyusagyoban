@@ -18,8 +18,6 @@
     <string name="qs_tile_default_label">任务磁贴 %1$d</string>
     <string name="permission_automation_label">控制OpenTasker自动化</string>
     <string name="permission_automation_description">允许同签名集成方通过文档化的Intent运行OpenTasker任务、切换配置文件并查询自动化状态。</string>
-    <string name="error_prefix">错误：%1$s</string>
-    <string name="success_prefix">成功：%1$s</string>
     <string name="widget_task_description">一键运行一个OpenTasker任务</string>
     <string name="widget_task_already_running">该任务已在运行</string>
     <string name="widget_task_missing">任务已删除。点击选择另一个。</string>
@@ -182,8 +180,6 @@
     <string name="title_scene_library">场景库</string>
     <string name="title_context_inspector">上下文检查器</string>
     <string name="title_setup_checklist">设置清单</string>
-    <string name="settings_title">设置</string>
-    <string name="settings_body">管理外观、恢复、后台行为、集成以及其他应用级偏好。</string>
     <string name="settings_section_general">通用</string>
     <string name="setup_focus_title">完成自动化的设置</string>
     <string name="setup_focus_body">它在运行前需要下方列出的访问权限。</string>
@@ -949,8 +945,6 @@
     <string name="label_inverted">已反转</string>
     <string name="a11y_selected">已选择</string>
     <string name="a11y_not_selected">未选择</string>
-    <string name="a11y_option_selected">%1$s 已选择</string>
-    <string name="a11y_option_not_selected">%1$s 未选择</string>
     <string name="a11y_expanded">已展开</string>
     <string name="a11y_collapsed">已折叠</string>
     <string name="a11y_profile_status">%1$s 配置文件状态</string>

@@ -220,16 +220,6 @@ data class LocalePluginConditionResult(
         get() = state == LocalePluginConditionState.Satisfied
 }
 
-data class LocalePluginDescriptor(
-    val packageName: String,
-    val label: String,
-    val supportsSettings: Boolean,
-    val supportsConditions: Boolean,
-    val requestedPermissions: List<String>,
-    val settingReceiverPermissions: List<String> = emptyList(),
-    val conditionReceiverPermissions: List<String> = emptyList(),
-)
-
 /**
  * Whether a Locale `FIRE_SETTING` / `QUERY_CONDITION` broadcast can actually be delivered.
  *
@@ -246,7 +236,7 @@ internal object LocaleSettingDispatch {
         "Locale plugin setting requires $permission, which OpenTasker does not hold."
 }
 
-/** Package/component queries used by the host and discovery surfaces. */
+/** Package/component queries used by the host and the plugin step's setup pill. */
 interface LocalePluginComponentResolver {
     fun editActivities(packageName: String, action: String): List<ComponentName>
 
@@ -258,8 +248,6 @@ interface LocalePluginComponentResolver {
         editActivities(packageName, action).mapTo(linkedSetOf()) { it.className }
 
     fun broadcastReceivers(packageName: String, action: String): List<ComponentName>
-    fun activityPackages(action: String): Set<String>
-    fun broadcastReceiverPermissions(action: String): Map<String, List<String>>
 }
 
 /** Broadcast boundary used by the host; production uses Android and tests can supply a fixture. */
@@ -291,11 +279,6 @@ private class AndroidLocalePluginComponentResolver(
 
     override fun broadcastReceivers(packageName: String, action: String): List<ComponentName> =
         queryBroadcastReceivers(packageManager, packageName, action).map { it.component }
-
-    override fun activityPackages(action: String): Set<String> = queryPackages(packageManager, action)
-
-    override fun broadcastReceiverPermissions(action: String): Map<String, List<String>> =
-        queryBroadcastReceiversByPackage(packageManager, action)
 }
 
 private class AndroidLocalePluginTransport(
@@ -1161,59 +1144,6 @@ class LocalePluginHost private constructor(
     }
 }
 
-interface LocalePluginPackageMetadata {
-    fun label(packageName: String): String
-    fun requestedPermissions(packageName: String): List<String>
-}
-
-private class AndroidLocalePluginPackageMetadata(
-    private val packageManager: PackageManager,
-) : LocalePluginPackageMetadata {
-    override fun label(packageName: String): String =
-        runCatching { packageManager.getApplicationInfo(packageName, 0) }
-            .map { packageManager.getApplicationLabel(it).toString() }
-            .getOrDefault(packageName)
-
-    override fun requestedPermissions(packageName: String): List<String> = runCatching {
-        packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
-            .requestedPermissions
-            ?.toList()
-            .orEmpty()
-    }.getOrDefault(emptyList())
-}
-
-class LocalePluginDiscovery(
-    private val componentResolver: LocalePluginComponentResolver,
-    private val packageMetadata: LocalePluginPackageMetadata,
-) {
-    constructor(appContext: Context) : this(
-        componentResolver = AndroidLocalePluginComponentResolver(appContext.packageManager),
-        packageMetadata = AndroidLocalePluginPackageMetadata(appContext.packageManager),
-    )
-
-    fun discover(): List<LocalePluginDescriptor> {
-        val settings = componentResolver.activityPackages(LocalePluginContract.ACTION_EDIT_SETTING)
-        val conditions = componentResolver.activityPackages(LocalePluginContract.ACTION_EDIT_CONDITION)
-        val settingReceivers = componentResolver.broadcastReceiverPermissions(LocalePluginContract.ACTION_FIRE_SETTING)
-        val conditionReceivers = componentResolver.broadcastReceiverPermissions(LocalePluginContract.ACTION_QUERY_CONDITION)
-        return (settings + conditions)
-            .distinct()
-            .sorted()
-            .map { packageName ->
-                LocalePluginDescriptor(
-                    packageName = packageName,
-                    label = packageMetadata.label(packageName),
-                    supportsSettings = packageName in settings,
-                    supportsConditions = packageName in conditions,
-                    requestedPermissions = packageMetadata.requestedPermissions(packageName).sorted(),
-                    settingReceiverPermissions = settingReceivers[packageName].orEmpty(),
-                    conditionReceiverPermissions = conditionReceivers[packageName].orEmpty(),
-                )
-            }
-    }
-
-}
-
 /** A step with no wait still gets this long for the broadcast to leave. */
 private const val SETTING_DISPATCH_TIMEOUT_MS = 5_000L
 
@@ -1294,20 +1224,6 @@ private fun editActivityComponents(
             ComponentName(packageName, activityInfo.name.toClassName(packageName))
         }
         .sortedBy { it.className }
-
-private fun queryPackages(pm: PackageManager, action: String): Set<String> =
-    pm.queryIntentActivities(Intent(action), 0)
-        .mapNotNull { it.activityInfo?.packageName }
-        .toSet()
-
-private fun queryBroadcastReceiversByPackage(pm: PackageManager, action: String): Map<String, List<String>> =
-    pm.queryBroadcastReceivers(Intent(action), 0)
-        .mapNotNull { resolveInfo ->
-            val receiverInfo = resolveInfo.activityInfo ?: return@mapNotNull null
-            receiverInfo.packageName to receiverInfo.permission.orEmpty()
-        }
-        .groupBy({ it.first }, { it.second })
-        .mapValues { (_, permissions) -> permissions.filter { it.isNotBlank() }.distinct().sorted() }
 
 private fun String.toClassName(packageName: String): String = when {
     startsWith(".") -> packageName + this

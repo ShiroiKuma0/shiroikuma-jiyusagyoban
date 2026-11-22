@@ -33,13 +33,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -864,24 +861,6 @@ fun PermissionOnboardingScreen(
     }
 }
 
-@Composable
-private fun SettingsIntroCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.xxl),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
-            Text(
-                stringResource(R.string.settings_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
 /**
  * Version, licence, and the three links the project had nowhere in the app.
  *
@@ -1489,71 +1468,6 @@ private fun DirectBootSetupCard(
 }
 
 @Composable
-private fun ThemeChoice(
-    mode: ThemeMode,
-    selected: Boolean,
-    onSelect: (ThemeMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val label = when (mode) {
-        ThemeMode.System -> stringResource(R.string.theme_system)
-        ThemeMode.Dark -> stringResource(R.string.theme_dark)
-        ThemeMode.Light -> stringResource(R.string.theme_light)
-        ThemeMode.HighContrast -> stringResource(R.string.theme_high_contrast)
-        ThemeMode.Amoled -> stringResource(R.string.theme_amoled)
-        ThemeMode.Dynamic -> stringResource(R.string.theme_dynamic)
-    }
-    val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    val selectionDescription = stringResource(
-        if (selected) R.string.a11y_option_selected else R.string.a11y_option_not_selected,
-        label,
-    )
-    Surface(
-        modifier = modifier
-            .heightIn(min = 52.dp)
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = { if (!selected) onSelect(mode) },
-            )
-            .semantics {
-                this.selected = selected
-                stateDescription = selectionDescription
-            },
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
-        },
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, accent.copy(alpha = if (selected) 0.58f else 0.72f)),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (selected) {
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Filled.CheckCircle,
-                    contentDescription = selectionDescription,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun BackupSetupCard(
     state: BackupSetupState,
     onCreateBackup: () -> Unit,
@@ -1813,11 +1727,6 @@ private fun PermissionSetupCard(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
-}
-
-@Composable
-private fun PermissionMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    SummaryMetric(value = value, label = label, modifier = modifier)
 }
 
 @Composable

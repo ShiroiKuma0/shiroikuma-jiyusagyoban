@@ -222,8 +222,7 @@ class AccessibilitySourceTest {
             "screens/PermissionOnboardingScreen.kt" to listOf(
                 "role = Role.RadioButton",
                 "selected = mode == currentMode",
-                "stateDescription = selectionDescription",
-                "R.string.a11y_option_selected",
+                "contentDescription = stringResource(R.string.label_selected)",
                 "R.string.status_granted",
                 "R.string.status_optional",
                 "R.string.status_required",

@@ -142,15 +142,6 @@ interface ExpectedTriggerStateStore {
     fun save(state: ExpectedTriggerLedgerState)
 }
 
-/** In-memory store used by tests; mirrors the persistence contract without Android. */
-class InMemoryExpectedTriggerStateStore : ExpectedTriggerStateStore {
-    private var state = ExpectedTriggerLedgerState()
-
-    override fun load(): ExpectedTriggerLedgerState = synchronized(this) { state }
-
-    override fun save(state: ExpectedTriggerLedgerState) = synchronized(this) { this.state = state }
-}
-
 /**
  * Persistence wrapper around the pure trigger ledger.
  *

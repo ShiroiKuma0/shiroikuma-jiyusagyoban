@@ -18,8 +18,6 @@
     <string name="qs_tile_default_label">Task tile %1$d</string>
     <string name="permission_automation_label">Control OpenTasker automations</string>
     <string name="permission_automation_description">Allows same-signer integrations to run OpenTasker tasks, toggle profiles, and query automation status through documented intents.</string>
-    <string name="error_prefix">Error: %1$s</string>
-    <string name="success_prefix">Success: %1$s</string>
     <string name="widget_task_description">Run an OpenTasker task with one tap</string>
     <string name="widget_task_already_running">That task is already running</string>
     <string name="widget_task_missing">Task deleted. Tap to choose another.</string>
@@ -187,8 +185,6 @@
     <string name="title_scene_library">Scene library</string>
     <string name="title_context_inspector">Context inspector</string>
     <string name="title_setup_checklist">Setup checklist</string>
-    <string name="settings_title">Settings</string>
-    <string name="settings_body">Manage appearance, recovery, background behavior, integrations, and other app-wide preferences.</string>
     <string name="settings_section_general">General</string>
     <string name="setup_focus_title">Finish setting up your automation</string>
     <string name="setup_focus_body">It needs the access listed below before it can run.</string>
@@ -989,8 +985,6 @@
     <string name="label_inverted">Inverted</string>
     <string name="a11y_selected">Selected</string>
     <string name="a11y_not_selected">Not selected</string>
-    <string name="a11y_option_selected">%1$s selected</string>
-    <string name="a11y_option_not_selected">%1$s not selected</string>
     <string name="a11y_expanded">Expanded</string>
     <string name="a11y_collapsed">Collapsed</string>
     <string name="a11y_profile_status">%1$s profile status</string>

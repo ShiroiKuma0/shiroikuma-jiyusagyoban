@@ -48,26 +48,7 @@ class LocalePluginCompatibilityFixtureTest {
     }
 
     @Test
-    fun syntheticPluginCoversDiscoveryConfigurationFireQueryRequestAndRedaction() = runBlocking {
-        val discovery = LocalePluginDiscovery(
-            componentResolver = SyntheticLocalePluginResolver(
-                packageName = packageName,
-                settingActivity = settingActivity,
-                conditionActivity = conditionActivity,
-                settingReceiver = settingReceiver,
-                conditionReceiver = conditionReceiver,
-            ),
-            packageMetadata = object : LocalePluginPackageMetadata {
-                override fun label(packageName: String) = "Synthetic Locale Plugin"
-                override fun requestedPermissions(packageName: String) = listOf("com.example.PERMISSION")
-            },
-        ).discover()
-        assertEquals(1, discovery.size)
-        assertEquals(packageName, discovery.single().packageName)
-        assertTrue(discovery.single().supportsSettings)
-        assertTrue(discovery.single().supportsConditions)
-        assertEquals(listOf("com.example.PERMISSION"), discovery.single().requestedPermissions)
-
+    fun syntheticPluginCoversConfigurationFireQueryRequestAndRedaction() = runBlocking {
         val configResult = LocalePluginConfigurationResultParser.parse(
             Activity.RESULT_OK,
             Intent()
@@ -237,8 +218,6 @@ class LocalePluginCompatibilityFixtureTest {
             componentResolver = object : LocalePluginComponentResolver {
                 override fun editActivities(packageName: String, action: String) = emptyList<ComponentName>()
                 override fun broadcastReceivers(packageName: String, action: String) = emptyList<ComponentName>()
-                override fun activityPackages(action: String) = emptySet<String>()
-                override fun broadcastReceiverPermissions(action: String) = emptyMap<String, List<String>>()
             },
             transport = transport,
         )
@@ -266,18 +245,6 @@ class LocalePluginCompatibilityFixtureTest {
             LocalePluginContract.ACTION_FIRE_SETTING -> listOf(settingReceiver)
             LocalePluginContract.ACTION_QUERY_CONDITION -> listOf(conditionReceiver)
             else -> emptyList()
-        }
-
-        override fun activityPackages(action: String): Set<String> = when (action) {
-            LocalePluginContract.ACTION_EDIT_SETTING,
-            LocalePluginContract.ACTION_EDIT_CONDITION -> setOf(packageName)
-            else -> emptySet()
-        }
-
-        override fun broadcastReceiverPermissions(action: String): Map<String, List<String>> = when (action) {
-            LocalePluginContract.ACTION_FIRE_SETTING,
-            LocalePluginContract.ACTION_QUERY_CONDITION -> mapOf(packageName to listOf("com.example.PERMISSION"))
-            else -> emptyMap()
         }
     }
 

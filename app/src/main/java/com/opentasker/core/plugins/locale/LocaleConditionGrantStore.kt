@@ -51,9 +51,6 @@ class LocaleConditionGrantStore(context: Context) {
         prefs.edit().apply { toRemove.forEach { remove(it) } }.apply()
     }
 
-    /** Revoke every grant bound to a variable (kept as a named compatibility helper). */
-    fun revokeAllForVariable(variableKey: String) = revokeAllForBinding(variableKey)
-
     /** Revoke the context grants a change from [previous] to [next] ends; see [changedContextKeys]. */
     fun revokeChangedContexts(profileId: Long, previous: List<ContextSpec>, next: List<ContextSpec>) {
         changedContextKeys(profileId, previous, next).forEach(::revokeAllForBinding)

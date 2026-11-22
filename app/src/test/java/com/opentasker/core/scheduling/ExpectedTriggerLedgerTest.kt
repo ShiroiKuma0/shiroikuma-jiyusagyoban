@@ -144,3 +144,12 @@ class ExpectedTriggerLedgerPersistenceTest {
         assertNull("a missed tick is reported once, not every watchdog pass", ExpectedTriggerLedger(store).consumeMissed(240_000L))
     }
 }
+
+/** Mirrors the persistence contract without Android. */
+private class InMemoryExpectedTriggerStateStore : ExpectedTriggerStateStore {
+    private var state = ExpectedTriggerLedgerState()
+
+    override fun load(): ExpectedTriggerLedgerState = synchronized(this) { state }
+
+    override fun save(state: ExpectedTriggerLedgerState) = synchronized(this) { this.state = state }
+}

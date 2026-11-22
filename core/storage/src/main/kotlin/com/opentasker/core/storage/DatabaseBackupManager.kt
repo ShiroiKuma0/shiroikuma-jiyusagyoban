@@ -344,16 +344,6 @@ class DatabaseBackupManager(
     private fun countOrZero(sqlite: ReadOnlyDatabase, table: String): Int =
         runCatching { readLong(sqlite, "SELECT COUNT(*) FROM $table").toInt() }.getOrDefault(0)
 
-    suspend fun stageRestore(uri: Uri): Result<File> = withContext(Dispatchers.IO) {
-        runCatching {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("Could not open backup file")
-            stageRestoreFromInput(input)
-        }.onFailure { error ->
-            AppLogger.error(tag, "Restore import failed: ${error.message}", error)
-        }
-    }
-
     suspend fun restore(backupFile: File): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val managedBackup = requireManagedBackupFile(backupFile)
@@ -397,20 +387,6 @@ class DatabaseBackupManager(
         return deleted
     }
 
-    fun deleteBackup(backupFile: File): Boolean {
-        val managedBackup = runCatching { requireManagedBackupFile(backupFile) }.getOrElse { error ->
-            AppLogger.warn(tag, "Refusing to delete unmanaged backup: ${error.message}")
-            return false
-        }
-        return if (deleteBackupWithSidecars(managedBackup)) {
-            AppLogger.info(tag, "Backup deleted: ${managedBackup.absolutePath}")
-            true
-        } else {
-            AppLogger.warn(tag, "Failed to delete backup: ${managedBackup.absolutePath}")
-            false
-        }
-    }
-
     /**
      * Applies the snapshot retention window, returning how many files were removed.
      *
@@ -426,23 +402,6 @@ class DatabaseBackupManager(
                 if (deleted) AppLogger.info(tag, "Pruned expired snapshot: ${backup.name}")
             }
         }
-    }
-
-    /** Snapshot count and disk usage for the Setup status line. */
-    fun snapshotStorage(): Pair<Int, Long> {
-        val backups = listBackups()
-        return backups.size to backups.sumOf(File::length)
-    }
-
-    fun deleteOldBackups(olderThanDays: Int): Int {
-        val cutoffTime = System.currentTimeMillis() - (olderThanDays.coerceAtLeast(1).toLong() * 24 * 60 * 60 * 1000L)
-        return listBackups()
-            .filter { it.lastModified() < cutoffTime }
-            .count { backup ->
-                deleteBackupWithSidecars(backup).also { deleted ->
-                    if (deleted) AppLogger.info(tag, "Deleted old backup: ${backup.name}")
-                }
-            }
     }
 
     private fun stageRestoreFromInput(input: InputStream): File {
