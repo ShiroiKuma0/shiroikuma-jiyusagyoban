@@ -1490,7 +1490,7 @@
     <string name="diagnostics_stop_reason_user">stopped by you</string>
     <string name="diagnostics_stop_reason_system_processing">system processing</string>
     <string name="diagnostics_stop_reason_estimated_app_launch_time_changed">estimated app launch time changed</string>
-    <string name="diagnostics_stop_reason_foreground_service_timeout">Android\'s time limit for running services</string>
+    <string name="diagnostics_stop_reason_foreground_service_timeout">time limit for foreground work</string>
     <string name="diagnostics_stop_reason_unknown">reason not reported</string>
     <string name="diagnostics_pending_jobs">Scheduled jobs blocked by</string>
     <string name="diagnostics_pending_jobs_none">Nothing blocking</string>

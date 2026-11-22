@@ -584,7 +584,7 @@ class LocalizationSourceTest {
 
     /**
      * The microcopy pass (A-343) settled on " · " and "→" as separators, "…" for an ellipsis, and
-     * plain words for the engine's own terms. A lowercase term matches in any case.
+     * plain words for the engine's own terms, in American spelling.
      */
     @Test
     fun userVisibleStringsUseTheAppsSeparatorsAndPlainWords() {
