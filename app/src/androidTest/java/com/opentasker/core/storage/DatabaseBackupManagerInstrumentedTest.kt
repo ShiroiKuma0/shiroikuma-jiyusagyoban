@@ -638,10 +638,16 @@ class DatabaseBackupManagerInstrumentedTest {
     /**
      * A restore whose journal can't be retired, and whose old database can't be copied back
      * either, keeps the restored database live, so Undo has to point at the copy it replaced even
-     * though no write of that record was tried before the failure (verifier 24).
+     * though no write of that record was tried before the failure (verifier 24). A write that
+     * fails once is tried again there too (verifier 25).
      */
     @Test
-    fun aKeptRestoreWhoseJournalWontRetireStillRecordsItsUndo() = runBlocking {
+    fun aKeptRestoreWhoseJournalWontRetireStillRecordsItsUndo() = keptRestoreWithBlockedJournal(failingCommits = 0)
+
+    @Test
+    fun aKeptRestoreWhoseJournalWontRetireRecordsItsUndoAfterAFailedWrite() = keptRestoreWithBlockedJournal(failingCommits = 1)
+
+    private fun keptRestoreWithBlockedJournal(failingCommits: Int) = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         cleanup(context)
         val pending = DatabaseBackupManager.pendingRestoreFile(context, TEST_DATABASE)
@@ -662,7 +668,7 @@ class DatabaseBackupManagerInstrumentedTest {
                 assertTrue(block.mkdirs())
                 File(block, "keep").writeText("x")
             }
-            val prefs = FlakyRestorePrefs().also {
+            val prefs = FlakyRestorePrefs(failingCommits).also {
                 it.memory["rollback_name:$TEST_DATABASE"] = "opentasker-backup-test_pre_restore_older.db"
                 it.disk.putAll(it.memory)
             }

@@ -618,8 +618,8 @@ class DatabaseBackupManager(
                     // The restored database stays live, so its Undo is the right one, but it isn't
                     // recorded: the write failed, or the journal couldn't be retired before it was
                     // tried. A restart would read the record from before and never offer or clean
-                    // up this rollback, so write it now.
-                    runCatching { recordRollback() }
+                    // up this rollback, so write it now, with a second try as on the way in.
+                    runCatching { recordRollback() || recordRollback() }
                 } else if (!recordRead) {
                     // A record of another type fails this restore. Cleared, it can't fail the next.
                     clearRestoreRecord(restorePrefs, databaseName)
