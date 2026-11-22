@@ -60,7 +60,7 @@ internal fun isTaskerPickedElement(name: String): Boolean =
 internal fun VariableStore.pickedElement(name: String): Pair<String, Int>? {
     if (!isTaskerPickedElement(name)) return null
     val (base, pick) = TASKER_PICKED_ELEMENT.matchEntire(name)!!.destructured
-    val numbers = taskerElementNumbers(base)
+    val numbers = taskerElements(base).navigableKeySet()
     val position = when {
         pick.startsWith('>') -> if (numbers.isEmpty()) 0 else numbers.first()
         pick.startsWith('<') -> numbers.lastOrNull()?.coerceAtLeast(0) ?: 0

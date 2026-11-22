@@ -217,12 +217,13 @@ class VariableStore {
     fun numberedItems(base: String): java.util.NavigableMap<Int, String> = itemsNumbered(base, ::numberedIndex)
 
     /**
-     * The element numbers set under [base] the way Tasker's Variable Clear counts them (`dq.V`):
-     * whatever follows the base read as a whole number, so `arr0` is 0 and `arr07` is 7.
+     * The elements set under [base] the way Tasker's Variable Clear and array searches find them
+     * (`dq.V`, `dq.c0`): whatever follows the base read as a whole number, so `arr0` is 0 and
+     * `arr07` is 7.
      */
-    fun taskerElementNumbers(base: String): java.util.NavigableSet<Int> = itemsNumbered(base) { normalizedBase, name ->
+    fun taskerElements(base: String): java.util.NavigableMap<Int, String> = itemsNumbered(base) { normalizedBase, name ->
         name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
-    }.navigableKeySet()
+    }
 
     private fun itemsNumbered(base: String, index: (String, String) -> Int?): java.util.TreeMap<Int, String> {
         val items = java.util.TreeMap<Int, String>()

@@ -370,7 +370,7 @@ class VariableExpander {
             // A `1,3` list or a search isn't one of the stored array's forms yet, so it joins with all
             // of it, as before. Any other range that doesn't read, like one past what a number holds, gives empty.
             is TaskerJoinOrPick.Join -> return storedRange(name, pick.range.taskerTrim(), size, arrays)?.joinToString(pick.separator)
-                ?: if (isTaskerList(pick.range, pick.range) || taskerSearch(pick.range, pick.range) != null) {
+                ?: if (isTaskerList(pick.range, pick.range) || taskerSearch(pick.range) { it } != null) {
                     arrays.join(name, "${pick.separator}+${pick.range}")
                 } else {
                     ""
@@ -422,7 +422,7 @@ class VariableExpander {
         val range = rest.substring(split + 1)
         // Any other range Tasker reads isn't read here yet, so it still joins with all of it.
         // Tasker reads the range by calling itself on `%arr(range)`, which trims it.
-        val readable = TASKER_RANGE_FORM.matches(range.taskerTrim()) || isTaskerList(range, range) || taskerSearch(range, range) != null
+        val readable = TASKER_RANGE_FORM.matches(range.taskerTrim()) || isTaskerList(range, range) || taskerSearch(range) { it } != null
         return if (readable) TaskerJoinOrPick.Join(rest.substring(0, split), range) else TaskerJoinOrPick.Join(rest, "")
     }
 
@@ -493,22 +493,25 @@ class VariableExpander {
         val expanded = if ('%' in op) expandText(op, store, arrays) { it } else op
         val form = expanded.taskerTrim()
         val pick = taskerJoinOrPick(expanded)
-        val search = if (pick == null) taskerSearch(op, expanded) else null
+        val search = when (pick) {
+            null -> taskerSearch(op) { text -> if ('%' in text) expandText(text, store, arrays) { it } else text }
+            // A join's range is filled in already.
+            is TaskerJoinOrPick.Join -> taskerSearch(pick.range) { it }
+            TaskerJoinOrPick.AtRandom -> null
+        }
         if (pick == null && search == null && !TASKER_ARRAY_FORM.matches(form) && !isTaskerIndexList(op, expanded)) return null
-        val items = store.numberedItems(name)
+        // A search finds `%arr0` and `%arr07` too (`dq.c0`), where the other forms don't.
+        val items = if (search != null) store.taskerElements(name) else store.numberedItems(name)
         // The parts Split Text keeps don't search yet, so they read as before.
         if (search != null && items.isEmpty() && arrays.contains(name)) return null
         // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5. Tasker's
         // counts and searches aren't among them: they read the elements whatever the base holds
         // (`dq.V`, `dq.c0`), so 0.
         if (items.isEmpty() && baseValue != null && form !in TASKER_COUNT_FORMS && search == null) return null
-        search?.let { return readTaskerSearch(it, items, joiner = ",") }
+        search?.let { return readTaskerSearch(it, items, joiner = (pick as? TaskerJoinOrPick.Join)?.separator ?: ",") }
         when (pick) {
             TaskerJoinOrPick.AtRandom -> return items.values.randomOrNull().orEmpty()
-            is TaskerJoinOrPick.Join -> {
-                taskerSearch(pick.range, pick.range)?.let { return readTaskerSearch(it, items, joiner = pick.separator) }
-                return numberedRange(items, pick.range)?.joinToString(pick.separator).orEmpty()
-            }
+            is TaskerJoinOrPick.Join -> return numberedRange(items, pick.range)?.joinToString(pick.separator).orEmpty()
             null -> Unit
         }
         // An index variable that came out empty names no element, so it isn't the empty form
@@ -540,10 +543,6 @@ class VariableExpander {
         ',' in filledIn.taskerTrim() && !written.startsWith("#?") && !(written.startsWith('$') && '?' in written)
 
     /**
-     * [isTaskerList], unless the form as [written] starts with a letter: this app's own operators,
-     * like `%text(split:,)`, only count right there, so `%arr( a,1)` and `%arr(%i,1)` are still lists.
-     */
-    /**
      * One of Tasker's searches (decompiled 6.7.8, `dq.X`, `dq.c0`, `fr.m0`): `#?pattern` reads the
      * numbers of the elements that match, `$sep?pattern` their values, joined by `sep` when there is
      * one. A null [pattern] is a `$...?` text Tasker's split doesn't take, which finds nothing.
@@ -551,14 +550,15 @@ class VariableExpander {
     private class TaskerSearch(val values: Boolean, val pattern: String?, val joiner: String?)
 
     /**
-     * The search the text as [written] makes, spotted before trimming the way Tasker does, with
-     * [filledIn] the text once its variables are in. Null when it isn't one, or is a bare `#?` or
-     * `$?`, which Tasker doesn't read as a search.
+     * The search the text as [written] makes, spotted before trimming the way Tasker does. Null when
+     * it isn't one, or is a bare `#?` or `$?`, which Tasker doesn't read as a search. [fillIn] puts
+     * the variables in, after `#?` for a number search and, for a value search, into the trimmed
+     * text, which isn't trimmed again, so a pattern can end in a space a variable put there.
      */
-    private fun taskerSearch(written: String, filledIn: String): TaskerSearch? = when {
-        written.startsWith("#?") && written.length > 2 -> TaskerSearch(values = false, pattern = filledIn.removePrefix("#?"), joiner = null)
-        written.startsWith('$') && '?' in written -> filledIn.taskerTrim().takeIf { it.length != 2 }?.let { trimmed ->
-            val split = splitTaskerValueSearch(trimmed)
+    private fun taskerSearch(written: String, fillIn: (String) -> String): TaskerSearch? = when {
+        written.startsWith("#?") && written.length > 2 -> TaskerSearch(values = false, pattern = fillIn(written.substring(2)), joiner = null)
+        written.startsWith('$') && '?' in written -> fillIn(written.taskerTrim()).takeIf { it.length != 2 }?.let { text ->
+            val split = splitTaskerValueSearch(text)
             TaskerSearch(values = true, pattern = split?.second, joiner = split?.first?.ifEmpty { null })
         }
         else -> null
@@ -599,6 +599,10 @@ class VariableExpander {
         return parts.joinToString(search.joiner ?: joiner)
     }
 
+    /**
+     * [isTaskerList], unless the form as [written] starts with a letter: this app's own operators,
+     * like `%text(split:,)`, only count right there, so `%arr( a,1)` and `%arr(%i,1)` are still lists.
+     */
     private fun isTaskerIndexList(written: String, filledIn: String): Boolean =
         isTaskerList(written, filledIn) && !(written.isNotEmpty() && Character.isLetter(written.codePointAt(0)))
 

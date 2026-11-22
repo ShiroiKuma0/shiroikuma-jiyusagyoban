@@ -53,4 +53,63 @@ class TaskerArraySearchTest {
         assertEquals("0", VariableStore().apply { set("arr", "cat") }.expand("%arr(#?cat)"))
         assertEquals("0", VariableStore().expand("%arr(\$?cat)"))
     }
+
+    @Test
+    fun aJoinedSearchOnAVariableWithNoElementsFindsNothingToo() {
+        // Tasker reads the range by calling itself on %arr($?cat), so the base's own value never counts.
+        assertEquals("0", VariableStore().apply { set("arr", "cat") }.expand("%arr(+;+\$?cat)"))
+        assertEquals("0", VariableStore().apply { set("n", "5") }.expand("%n(+;+\$?5)"))
+    }
+
+    @Test
+    fun aSearchFindsElementZeroAndANumberWrittenWithALeadingZero() {
+        // `dq.c0` reads whatever follows the base as a number, where the other array forms skip these.
+        val variables = VariableStore().apply {
+            set("arr0", "cat")
+            set("arr2", "cat")
+            set("arr07", "dog")
+        }
+        assertEquals("0,2", variables.expand("%arr(#?cat)"))
+        assertEquals("7", variables.expand("%arr(#?dog)"))
+        assertEquals("cat,cat", variables.expand("%arr(\$?cat)"))
+    }
+
+    @Test
+    fun aValueSearchFillsInItsTrimmedTextSoAVariablesSpacesStay() {
+        // `dq.X` trims the text and then fills it in, so a space a variable ends with is part of the pattern.
+        val variables = VariableStore().apply {
+            set("arr1", "cat ")
+            set("arr2", "cat")
+            set("arr3", " ")
+            set("pat", "cat ")
+            set("space", " ")
+        }
+        assertEquals("cat ", variables.expand("%arr(\$?%pat)"))
+        assertEquals(" ", variables.expand("%arr(\$?%space)"))
+        assertEquals("cat", variables.expand("%arr(\$?cat )"))
+    }
+
+    @Test
+    fun aDoesntMatchRegexReadsTheElementsItDoesntFind() {
+        assertEquals("1,2", numbered().expand("%arr(#?!~Rt$)"))
+        assertEquals("alpha,beta", numbered().expand("%arr(\$?!~Rt$)"))
+    }
+
+    @Test
+    fun aLineBreakOtherThanNewlineEndsTheJoinerAndThePattern() {
+        val twice = { value: String -> VariableStore().apply { set("arr1", value); set("arr2", value) } }
+        // `.` stops at a carriage return, so the split is the ? before it and the pattern ends there.
+        assertEquals("bab", twice("b").expand("%arr(\$a?b\r?c)"))
+        // A newline is what `(.|\n)` lets through, so the joiner can hold one.
+        assertEquals("y?x\ny", twice("y").expand("%arr(\$?x\n?y)"))
+    }
+
+    @Test
+    fun theListsSplitTextKeepsDontSearchYet() {
+        // Not Tasker's answer: these read the way they did before searches came in (see the roadmap's
+        // array leftovers), joining the list with the form like any other form a kept list doesn't read.
+        val kept = VariableStore().apply { setArray("parts", listOf("cat", "bat")) }
+        assertEquals("cat#?catbat", kept.expand("%parts(#?cat)"))
+        assertEquals("cat;+\$?catbat", kept.expand("%parts(+;+\$?cat)"))
+    }
 }
