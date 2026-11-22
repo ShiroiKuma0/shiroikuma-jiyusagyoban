@@ -205,7 +205,10 @@ class TaskerNumberedArrayTest {
 
         assertEquals(ActionResult.Success, act(variables, "array.pop", "array" to "%arr", "position" to "2.9", "to_var" to "Got"))
         assertEquals("b", variables.get("Got"))
-        listOf("0.5", "2.", "1e3", "-1.5", "2.5f").forEach { position ->
+        val longFraction = store("arr1" to "a", "arr2" to "b", "arr3" to "c")
+        act(longFraction, "array.pop", "array" to "%arr", "position" to "2.99999999999999999", "to_var" to "Got")
+        assertEquals("the whole part as written, not a double rounded up to 3", "b", longFraction.get("Got"))
+        listOf("0.5", "0.99999999999999999", "2.", "1e3", "-1.5", "2.5f").forEach { position ->
             val result = act(store("arr1" to "a"), "array.pop", "array" to "%arr", "position" to position, "to_var" to "Got")
             assertTrue("$position: $result", result is ActionResult.Failure)
         }
@@ -214,7 +217,7 @@ class TaskerNumberedArrayTest {
     @Test
     fun aFractionAtTheLargestPositionIsTakenLikeItsWholePart() {
         // The whole-number path takes Int.MAX_VALUE, so the same whole part with a fraction must too.
-        listOf("2147483647", "2147483647.5").forEach { position ->
+        listOf("2147483647", "2147483647.5", "2147483647.9999999").forEach { position ->
             val variables = store("arr1" to "a")
             assertEquals(position, ActionResult.Success, act(variables, "array.push", "array" to "%arr", "position" to position, "value" to "z"))
             assertEquals(position, mapOf(1 to "a", 2 to "z"), variables.elements("arr"))

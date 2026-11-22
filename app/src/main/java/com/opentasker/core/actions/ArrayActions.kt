@@ -27,8 +27,10 @@ private fun arrayBase(args: Map<String, String>, key: String): String? =
 private fun position(args: Map<String, String>): Int? {
     val raw = args["position"]?.trim().orEmpty()
     if (raw.isEmpty()) return 1
-    raw.toIntOrNull()?.let { return it.takeIf { it >= 1 } }
-    return raw.takeIf(DECIMAL_POSITION::matches)?.toDouble()?.takeIf { it >= 1 && it < Int.MAX_VALUE + 1.0 }?.toInt()
+    // The whole part as written: through a double, 0.99999999999999999 rounds up to 1 and
+    // 2147483647.9999999 past an Int, so the two forms of one whole part would disagree.
+    val whole = if (DECIMAL_POSITION.matches(raw)) raw.substringBefore('.') else raw
+    return whole.toIntOrNull()?.takeIf { it >= 1 }
 }
 
 private val DECIMAL_POSITION = Regex("""\d+\.\d+""")
