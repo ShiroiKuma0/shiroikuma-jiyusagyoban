@@ -1323,8 +1323,11 @@ object TaskerXmlExporter {
 
     private val BARE_ARRAY = Regex("""%?([A-Za-z][A-Za-z0-9_]*)(?:\(\))?""")
 
-    /** A list position in this app's JSON path, `[0]`, spaces allowed as its parser allows them. */
-    private val PATH_INDEX = Regex("""\[\s*([0-9]+)\s*]""")
+    /**
+     * A list position in this app's JSON path, `[0]`, with the spaces and tabs its parser allows. Not
+     * `\s`, which on Android also takes other spaces the parser refuses.
+     */
+    private val PATH_INDEX = Regex("""\[[ \t]*([0-9]+)[ \t]*]""")
 
     private val VARIABLE_REFERENCE = Regex("""%[A-Za-z]""")
 

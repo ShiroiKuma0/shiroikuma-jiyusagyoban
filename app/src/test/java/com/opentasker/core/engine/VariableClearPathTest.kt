@@ -76,6 +76,19 @@ class VariableClearPathTest {
     }
 
     @Test
+    fun aPositionIsOnlyTheDigitsZeroToNine() {
+        // Anything else in [ ] would go out to Tasker as a field name, so it isn't a position here.
+        val store = VariableStore().apply { set("Json", json) }
+        listOf("%Json.list[+1]", "%Json.list[-0]", "%Json.list[${Char(0x661)}]").forEach { path ->
+            assertEquals("$path: isn't a variable path", failure(run(store, path)))
+        }
+        assertEquals(json, store.get("Json"))
+        // Spaces around the digits are fine.
+        assertTrue(run(store, "%Json.list[ 1 ]").success)
+        assertEquals("""{"a":1,"b":{"c":2,"d":null},"list":[10,30]}""", store.get("Json"))
+    }
+
+    @Test
     fun anUnsetVariableOrOneThatIsntJsonFailsTheStep() {
         val store = VariableStore().apply { set("Text", "hello") }
         assertEquals("%Nope.a: %Nope has no value to change", failure(run(store, "%Nope.a")))

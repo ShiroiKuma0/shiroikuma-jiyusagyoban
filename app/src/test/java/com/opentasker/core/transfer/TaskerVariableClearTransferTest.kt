@@ -85,6 +85,8 @@ class TaskerVariableClearTransferTest {
         assertTrue("""<Str sr="arg0" ve="3">%json.list(2).name</Str>""" in exported(mapOf("name" to "%json.list[1].name")))
         // %json(1) would be an array element to Tasker.
         assertTrue("""<Str sr="arg0" ve="3">%json.(1)</Str>""" in exported(mapOf("name" to "json[0]")))
+        // The spaces and tabs a position here may have around it go too.
+        assertTrue("""<Str sr="arg0" ve="3">%json.list(2)</Str>""" in exported(mapOf("name" to "%json.list[ ${'\t'}1 ]")))
     }
 
     @Test

@@ -687,7 +687,9 @@ class VariableStore {
                 '[' -> {
                     val close = fullPath.indexOf(']', startIndex = cursor + 1)
                     if (close == -1) return null
-                    val body = fullPath.substring(cursor + 1, close).trim()
+                    // Digits 0 to 9 only, so the export writes the same position out as Tasker's (n+1).
+                    val body = fullPath.substring(cursor + 1, close).trim(' ', '\t')
+                    if (body.isEmpty() || body.any { it !in '0'..'9' }) return null
                     val index = body.toIntOrNull() ?: return null
                     if (index < 0 || index > MAX_ARRAY_INDEX) return null
                     selectors += PathSelector.Index(index)
