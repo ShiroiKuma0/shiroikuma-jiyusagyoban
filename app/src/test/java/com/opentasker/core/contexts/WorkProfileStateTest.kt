@@ -38,6 +38,16 @@ class WorkProfileStateTest {
     }
 
     @Test
+    fun aPausedProfileWinsOverAnotherThatRuns() {
+        // Before Android 15 a clone or a maker's dual-app profile is of unknown kind and never paused,
+        // so a paused work profile beside it still reads paused.
+        assertEquals(
+            "paused",
+            WorkProfileState.stateOf(listOf(OtherProfile(managed = null, quietMode = false), OtherProfile(managed = null, quietMode = true))),
+        )
+    }
+
+    @Test
     fun aStateContextMatchesTheThreeValuesInAnyCase() {
         val paused = mapOf("work_profile" to "paused")
 

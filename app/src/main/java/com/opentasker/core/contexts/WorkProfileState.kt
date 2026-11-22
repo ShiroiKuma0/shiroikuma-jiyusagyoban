@@ -6,7 +6,9 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
+import android.os.UserHandle
 import android.os.UserManager
+import androidx.annotation.RequiresApi
 
 /**
  * The `work_profile` state key: whether this user's work profile is running, paused, or not there.
@@ -34,13 +36,16 @@ internal object WorkProfileState {
      */
     data class OtherProfile(val managed: Boolean?, val quietMode: Boolean)
 
-    /** A profile known not to be a work profile (a clone, say) doesn't count; one of unknown kind does. */
+    /**
+     * A profile known not to be a work profile (a clone, say) doesn't count, and one of unknown kind
+     * does. Only a work profile can be paused, so a paused one wins over another that runs.
+     */
     fun stateOf(profiles: List<OtherProfile>): String {
         val work = profiles.filter { it.managed != false }
         return when {
             work.isEmpty() -> NONE
-            work.any { !it.quietMode } -> AVAILABLE
-            else -> PAUSED
+            work.any { it.quietMode } -> PAUSED
+            else -> AVAILABLE
         }
     }
 
@@ -59,13 +64,18 @@ internal object WorkProfileState {
             .filter { it != me }
             .map { handle ->
                 OtherProfile(
-                    managed = launcherApps?.let { apps ->
-                        runCatching { apps.getLauncherUserInfo(handle)?.userType }.getOrNull()
-                            ?.let { it == UserManager.USER_TYPE_PROFILE_MANAGED }
-                    },
+                    managed = if (Build.VERSION.SDK_INT >= 35 && launcherApps != null) isWorkProfile(launcherApps, handle) else null,
                     quietMode = runCatching { users.isQuietModeEnabled(handle) }.getOrDefault(false),
                 )
             }
         return stateOf(profiles)
     }
+
+    /**
+     * Android 15 describes every profile it lets this app see. One it won't describe is hidden from
+     * this app, which is Private Space, never the work profile.
+     */
+    @RequiresApi(35)
+    private fun isWorkProfile(apps: LauncherApps, handle: UserHandle): Boolean =
+        runCatching { apps.getLauncherUserInfo(handle)?.userType == UserManager.USER_TYPE_PROFILE_MANAGED }.getOrDefault(false)
 }
