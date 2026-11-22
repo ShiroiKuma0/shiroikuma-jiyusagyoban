@@ -43,6 +43,12 @@ import java.util.concurrent.ConcurrentHashMap
  * `Install Package` — install or update an APK from a file, without a hand on the phone where
  * Android allows it.
  *
+ * On a rooted phone another app is installed through root (`pm install`, with this app named as
+ * the installer): no confirmation at all, and from then on the ordinary route is silent for that app
+ * too. Only where there is no root — or root does not answer — the ordinary route below is taken.
+ * This app's own update always takes the ordinary route: it is silent there, and it is the one
+ * install whose failure nobody could repair from afar.
+ *
  * Android 12+ installs silently when the installer asks for it and either updates itself or is the
  * installer of record of the app it updates (so 自由作業盤 updating itself is always silent; another
  * app is silent from the second time on — the first install by this app asks once). Where a
@@ -60,11 +66,16 @@ import java.util.concurrent.ConcurrentHashMap
  *   - "keep_dir":    where a copy of the APK is kept (default `/sdcard/tmp`; `-` keeps none) — a build
  *                    is never thrown away, and an existing file of that name is left alone
  *   - "reinstall":   `true` installs a build that is already the installed one (default: refused)
+ *   - "route":       `session` never uses root (default `auto`: root first, for another app)
+ *   - "launch":      `true` starts the installed app again afterwards — an update stops the app it
+ *                    replaces, and Android starts nothing by itself. Not for this app: its own
+ *                    restart is [PackageReplacedReceiver]'s
  *   - "report_task": the task run after a SELF-update restarted the app
  *   - "param:<n>":   handed to that task as the local variable `%<n>`
  *   - "prefix":      result prefix (default `pi`): `%pi_ok` (true/false), `%pi_message`,
  *                    `%pi_package`, `%pi_label`, `%pi_version`, `%pi_old_version`, `%pi_self`,
- *                    `%pi_kept`
+ *                    `%pi_kept`, `%pi_route` (root / session), and with "launch": `%pi_started`
+ *                    (true/false), `%pi_start_message`
  *   - "timeout":     seconds to wait for the installer (default 180, max 280)
  */
 class PackageInstallAction : Action {
@@ -74,7 +85,7 @@ class PackageInstallAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: "pi"
         fun put(key: String, value: String) = ctx.variables.set("${prefix}_$key", value)
-        listOf("message", "package", "label", "version", "old_version", "kept").forEach { put(it, "") }
+        listOf("message", "package", "label", "version", "old_version", "kept", "started", "start_message", "route").forEach { put(it, "") }
         put("ok", "false")
         put("self", "false")
         fun fail(message: String): ActionResult {
@@ -136,6 +147,30 @@ class PackageInstallAction : Action {
         if (installed != null && installed.longVersionCodeCompat() == newCode && !reinstall) {
             return fail("already on this build ($newName)")
         }
+        val launch = args["launch"]?.trim()?.lowercase() in setOf("true", "1", "yes")
+        suspend fun startAgain() {
+            if (self || !launch) return
+            val problem = startInstalled(ctx, pkg)
+            put("started", (problem == null).toString())
+            put("start_message", problem.orEmpty())
+        }
+
+        // Root first, for any app but this one.
+        if (!self && args["route"]?.trim()?.lowercase() != "session") {
+            val rooted = withContext(Dispatchers.IO) { RootInstall.available() }
+            if (rooted) {
+                put("route", "root")
+                ctx.logger("Install $pkg $newName: through root")
+                val (ok, detail) = withContext(Dispatchers.IO) { RootInstall.install(file, app.packageName, timeoutSec) }
+                if (!ok) return fail("root install refused: $detail")
+                put("ok", "true")
+                put("message", "installed (root)")
+                startAgain()
+                return ActionResult.Success
+            }
+        }
+        put("route", "session")
+
         if (!pm.canRequestPackageInstalls()) {
             return fail("白い熊 自由作業盤 is not allowed to install apps — allow “Install unknown apps” for it on that phone")
         }
@@ -207,7 +242,11 @@ class PackageInstallAction : Action {
                     if (self) PendingSelfUpdate.clear(app)
                     fail(
                         if (PackageInstallResultReceiver.askedUser.remove(sessionId) == true)
-                            "the phone is asking for a tap to confirm, and nothing pressed it within ${timeoutSec}s"
+                            "the phone is asking for a tap to confirm, and nothing pressed it within ${timeoutSec}s. " +
+                                "Unlock that phone, send the command again and tap Update (or Install) once — " +
+                                "after that, updates of this app need no tap. The accessibility service that presses it is " +
+                                (if (ShiroiKumaAccessibilityService.isConnected) "on, but cannot reach a prompt behind the lock screen"
+                                else "OFF on that phone")
                         else "the installer did not answer within ${timeoutSec}s",
                     )
                 }
@@ -215,6 +254,7 @@ class PackageInstallAction : Action {
                     // A self-update normally never reaches this line: the process is gone by now.
                     put("ok", "true")
                     put("message", result.second)
+                    startAgain()
                     ActionResult.Success
                 }
                 else -> {
@@ -230,6 +270,131 @@ class PackageInstallAction : Action {
             PackageInstallResultReceiver.waiting.remove(sessionId)
         }
     }
+}
+
+/** Installing through root: `pm install` fed from this process, with this app named as the installer. */
+private object RootInstall {
+    /** Whether `su` answers as root. A root manager may show its own prompt the first time. */
+    fun available(): Boolean = runCatching {
+        val process = ProcessBuilder("su", "-c", "id -u").redirectErrorStream(true).start()
+        process.outputStream.close()
+        if (!process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroy()
+            return false
+        }
+        process.exitValue() == 0 && process.inputStream.bufferedReader().use { it.readText() }.trim() == "0"
+    }.getOrDefault(false)
+
+    /** The APK goes in on standard input, so it may lie where only this app can read it. */
+    fun install(file: File, installer: String, timeoutSec: Int): Pair<Boolean, String> = runCatching {
+        val process = ProcessBuilder("su", "-c", "pm install -r -i $installer -S ${file.length()}")
+            .redirectErrorStream(true).start()
+        val output = StringBuilder()
+        val reader = Thread { runCatching { process.inputStream.bufferedReader().use { output.append(it.readText()) } } }
+        reader.start()
+        runCatching { process.outputStream.use { out -> file.inputStream().use { it.copyTo(out, 1 shl 16) } } }
+        if (!process.waitFor(timeoutSec.toLong(), java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroy()
+            return false to "pm did not answer within ${timeoutSec}s"
+        }
+        reader.join(5_000)
+        val text = output.toString().trim()
+        (process.exitValue() == 0 && text.contains("Success")) to text.lines().lastOrNull { it.isNotBlank() }.orEmpty().take(300)
+            .ifEmpty { "exit ${process.exitValue()}" }
+    }.getOrElse { false to "su failed: ${it.message}" }
+}
+
+/** Which installed app a typed name means — the part of [PackageInfoAction] with no Android in it. */
+internal object AppPick {
+    sealed interface Found {
+        data class One(val packageName: String) : Found
+        data class Refused(val message: String) : Found
+    }
+
+    /** [apps] are package name to label. A package name wins, then an exact label, then one that differs only in case, then the only label containing it. */
+    fun find(query: String, apps: List<Pair<String, String>>): Found {
+        val wanted = query.trim()
+        if (wanted.isEmpty()) return Found.Refused("no app name given")
+        apps.firstOrNull { it.first == wanted }?.let { return Found.One(it.first) }
+        val exact = apps.filter { it.second.trim() == wanted }
+        val same = exact.ifEmpty { apps.filter { it.second.trim().equals(wanted, ignoreCase = true) } }
+        val matches = same.ifEmpty { apps.filter { it.second.contains(wanted, ignoreCase = true) || it.first.contains(wanted, ignoreCase = true) } }
+        return when (matches.size) {
+            1 -> Found.One(matches.single().first)
+            0 -> Found.Refused("no installed app is named '$wanted'")
+            else -> Found.Refused(
+                "${matches.size} apps match '$wanted'" +
+                    if (matches.size <= 8) ": " + matches.joinToString(" · ") { "${it.second} (${it.first})" } else " — be more exact",
+            )
+        }
+    }
+}
+
+/**
+ * `App Version` — which build of an app is installed.
+ *
+ * Args:
+ *   - "query":  a package name, or the app's name (or a part of it that only one app carries)
+ *   - "prefix": result prefix (default `pk`): `%pk_ok`, `%pk_message`, `%pk_package`, `%pk_label`,
+ *               `%pk_version`, `%pk_code`, `%pk_updated` (yyyy-MM-dd HH:mm), `%pk_installer`
+ */
+class PackageInfoAction : Action {
+    override val id = "package.info"
+    override val category = ActionCategory.APP
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: "pk"
+        fun put(key: String, value: String) = ctx.variables.set("${prefix}_$key", value)
+        listOf("message", "package", "label", "version", "code", "updated", "installer").forEach { put(it, "") }
+        put("ok", "false")
+        fun fail(message: String): ActionResult {
+            put("message", message)
+            return ActionResult.Failure(message)
+        }
+        val pm = ctx.app.packageManager
+        val query = args["query"]?.trim().orEmpty()
+        return withContext(Dispatchers.IO) {
+            val direct = runCatching { pm.getPackageInfo(query, 0) }.getOrNull()
+            val info = direct ?: run {
+                val apps = runCatching {
+                    pm.getInstalledApplications(0).map { it.packageName to pm.getApplicationLabel(it).toString() }
+                }.getOrElse { return@withContext fail("could not list the installed apps: ${it.message}") }
+                when (val found = AppPick.find(query, apps)) {
+                    is AppPick.Found.Refused -> return@withContext fail(found.message)
+                    is AppPick.Found.One -> runCatching { pm.getPackageInfo(found.packageName, 0) }.getOrNull()
+                        ?: return@withContext fail("app not found: ${found.packageName}")
+                }
+            }
+            val pkg = info.packageName
+            put("package", pkg)
+            put("label", runCatching { info.applicationInfo?.let { pm.getApplicationLabel(it).toString() } }.getOrNull() ?: pkg)
+            put("version", info.versionName.orEmpty())
+            put("code", info.longVersionCodeCompat().toString())
+            put("updated", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date(info.lastUpdateTime)))
+            @Suppress("DEPRECATION")
+            put(
+                "installer",
+                runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) pm.getInstallSourceInfo(pkg).installingPackageName
+                    else pm.getInstallerPackageName(pkg)
+                }.getOrNull().orEmpty(),
+            )
+            put("ok", "true")
+            ActionResult.Success
+        }
+    }
+}
+
+/** Starts [pkg]'s own screen; why it could not be started, or null. The install stands either way. */
+private suspend fun startInstalled(ctx: ActionContext, pkg: String): String? {
+    // The package manager needs a moment before the new build's activities resolve.
+    delay(1_500)
+    return runCatching {
+        val intent = ctx.app.packageManager.getLaunchIntentForPackage(pkg)
+            ?: return "it has no screen to start"
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        (startActivityFromAction(ctx, intent, pkg) as? ActionResult.Failure)?.message
+    }.getOrElse { "start failed: ${it.message}" }
 }
 
 @Suppress("DEPRECATION")
@@ -403,9 +568,13 @@ class PackageReplacedReceiver : BroadcastReceiver() {
  *
  * Args:
  *   - "path":   the bundle JSON
+ *   - "enable": `true` switches on every profile the bundle carries, each under the checks its own
+ *               switch in the app runs; without it a new profile stays off
  *   - "prefix": result prefix (default `wi`): `%wi_ok`, `%wi_message`, `%wi_tasks`, `%wi_profiles`,
  *               `%wi_scenes`, `%wi_variables`, `%wi_projects` (names, comma-separated),
- *               `%wi_warnings` (one per line)
+ *               `%wi_warnings` (one per line), `%wi_new_profiles` (the profiles that were not there
+ *               before, one `project / name` per line), `%wi_profile_report` (one line per profile
+ *               the bundle carries: ● on, ○ off, ✗ refused and why), `%wi_refused` (how many)
  */
 class WorkspaceImportAction : Action {
     override val id = "workspace.import"
@@ -414,8 +583,10 @@ class WorkspaceImportAction : Action {
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
         val prefix = args["prefix"]?.trim()?.ifBlank { null } ?: "wi"
         fun put(key: String, value: String) = ctx.variables.set("${prefix}_$key", value)
-        listOf("message", "tasks", "profiles", "scenes", "variables", "projects", "warnings").forEach { put(it, "") }
+        listOf("message", "tasks", "profiles", "scenes", "variables", "projects", "warnings", "new_profiles", "profile_report")
+            .forEach { put(it, "") }
         put("ok", "false")
+        put("refused", "0")
         fun fail(message: String): ActionResult {
             put("message", message)
             return ActionResult.Failure(message)
@@ -424,6 +595,8 @@ class WorkspaceImportAction : Action {
         if (path.isEmpty()) return fail("missing path")
         val file = File(path)
         if (!file.isFile) return fail("no such file: $path")
+        val enable = args["enable"]?.trim()?.lowercase() in setOf("true", "1", "yes", "on")
+        val canWriteSettings = android.provider.Settings.System.canWrite(ctx.app)
         return withContext(Dispatchers.IO) {
             val bundle = runCatching { OpenTaskerBundleCodec.decode(file.readText(Charsets.UTF_8)) }
                 .getOrElse { return@withContext fail("not an OpenTasker bundle: ${it.message}") }
@@ -436,6 +609,34 @@ class WorkspaceImportAction : Action {
             put("variables", report.insertedVariables.toString())
             put("projects", report.projectNames.joinToString(", "))
             put("warnings", (report.warnings + report.lossyWarnings).joinToString("\n"))
+            // The profiles the bundle carried, as they stand now. Switching one on goes through the
+            // same checks as its switch in the app, so a refusal is reported, never overridden.
+            val db = OpenTaskerApp_NoHilt.db
+            val projectNames = db.projectDao().getAll().associate { it.id to it.name }
+            var refused = 0
+            val lines = report.profileIds.mapNotNull { id ->
+                val profile = db.profileDao().getById(id) ?: return@mapNotNull null
+                val title = (projectNames[profile.projectId] ?: WorkspaceQuery.UNFILED) + " / " + profile.name
+                val isNew = id in report.newProfileIds
+                val problem = if (enable && !profile.enabled) {
+                    com.opentasker.core.capabilities.ProfileTurnOnChecks.switchSaved(db, id, true, canWriteSettings)
+                } else {
+                    null
+                }
+                val on = db.profileDao().getById(id)?.enabled == true
+                if (problem != null) refused++
+                Triple(
+                    isNew,
+                    title,
+                    when {
+                        problem != null -> "✗ $title — $problem"
+                        else -> (if (on) "● " else "○ ") + title + if (isNew) " (new)" else ""
+                    },
+                )
+            }
+            put("new_profiles", lines.filter { it.first }.joinToString("\n") { it.second })
+            put("profile_report", lines.joinToString("\n") { it.third })
+            put("refused", refused.toString())
             put(
                 "message",
                 "tasks ${report.insertedTasks} · profiles ${report.insertedProfiles} · scenes ${report.insertedScenes} · variables ${report.insertedVariables}",
