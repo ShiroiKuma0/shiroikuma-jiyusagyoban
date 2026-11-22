@@ -92,9 +92,11 @@ class TaskerJoinRangeRuleTest {
     }
 
     @Test
-    fun aSearchRangeIsNotReadYetSoItJoinsWithAllOfIt() {
-        // Tasker splits at `+$?`, not the last `+`, so `2:3` is part of the search, not a range.
-        assertEquals(animals.joinToString(";+\$?a+2:3"), numbered().expand("%arr(+;+\$?a+2:3)"))
+    fun aSearchRangeSplitsAtItsPlusDollarSoTheRestIsItsPattern() {
+        // Tasker splits at `+$?`, not the last `+`, so `2:3` is part of the search, not a range
+        // (which would read beta;cat). Nothing matches `a+2:3`, and a search that finds nothing reads 0.
+        assertEquals("0", numbered().expand("%arr(+;+\$?a+2:3)"))
+        assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+\$?*a*)"))
     }
 
     @Test

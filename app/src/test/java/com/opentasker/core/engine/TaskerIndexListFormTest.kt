@@ -65,7 +65,7 @@ class TaskerIndexListFormTest {
         assertEquals("beta", numbered().expand("%arr(#1,2)"))
         assertEquals("alpha", numbered().expand("%arr(\$a,1)"))
         assertEquals("alpha", numbered().expand("%arr( #?x,1)"))
-        // Typed right at the start they're searches, which aren't read here yet, so not the list 1.
+        // Typed right at the start they're searches (TaskerArraySearchTest), so not the list 1.
         assertNotEquals("alpha", numbered().expand("%arr(#?x,1)"))
         assertNotEquals("alpha", numbered().expand("%arr(\$a?,1)"))
         // A letter keeps this app's operator only where it's typed: not one a variable fills in, nor a range after +sep+.
