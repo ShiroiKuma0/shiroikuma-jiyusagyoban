@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- After deleting a project, undoing an earlier edit to one of its tasks, profiles or scenes put the item back in the deleted project, where no list showed it, and undoing the project deletion then failed. Undo and redo now leave items in the project they're in, and a deleted item whose project is gone comes back in Default.
 - In the scene editor, dragging an element you'd already touched could undo the move you'd just made to another one, and dragging a selected element could unselect it. Each drag now works from the scene as it is.
 - Picking a shorter run log retention could delete held runs, the ones you can still replay, without showing the review first, because the review only counted ordinary entries. It counts held runs now and says how many would go.
 - In Diagnostics, a scheduled job's "Earlier run stopped by Android" line no longer starts with a stray space.

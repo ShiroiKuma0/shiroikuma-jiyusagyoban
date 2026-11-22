@@ -6,6 +6,7 @@ import com.opentasker.core.diff.AutomationSemanticDiff
 import com.opentasker.core.diff.SemanticDiffDocument
 import com.opentasker.core.diff.SemanticDiffEntry
 import com.opentasker.core.location.LocationDwellStateStore
+import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
 import com.opentasker.core.plugins.locale.LocaleGrantStore
 import com.opentasker.core.references.AutomationReferenceRewriter
@@ -115,6 +116,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_TASK -> {
                         if (db.taskDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.task(snapshot.previousJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         db.taskDao().insert(restored.toEntity())
                         history.markUndone(snapshot.id, "")
                         return@withTransaction AutomationSemanticDiff.compareTask(null, restored)
@@ -124,6 +126,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_PROFILE -> {
                         if (db.profileDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.profile(snapshot.previousJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         writeSettingsGuard.requireWriteSettingsIfEnabled(restored)
                         db.profileDao().insert(restored.toEntity())
                         history.markUndone(snapshot.id, "")
@@ -134,6 +137,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_SCENE -> {
                         if (db.sceneDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.scene(snapshot.previousJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         db.sceneDao().insert(restored.toEntity())
                         history.markUndone(snapshot.id, "")
                         return@withTransaction AutomationSemanticDiff.compareScene(null, restored)
@@ -151,6 +155,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_TASK -> {
                         if (db.taskDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.task(snapshot.nextJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         db.taskDao().insert(restored.toEntity())
                         history.markRedone(snapshot.id)
                         return@withTransaction AutomationSemanticDiff.compareTask(null, restored)
@@ -160,6 +165,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_PROFILE -> {
                         if (db.profileDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.profile(snapshot.nextJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         writeSettingsGuard.requireWriteSettingsIfEnabled(restored)
                         db.profileDao().insert(restored.toEntity())
                         history.markRedone(snapshot.id)
@@ -170,6 +176,7 @@ internal class EditHistoryTransitions(
                     EditHistoryDao.TYPE_SCENE -> {
                         if (db.sceneDao().getById(entityId) != null) return@withTransaction null
                         val restored = EditHistorySnapshotDecoder.scene(snapshot.nextJson, entityId)
+                            .let { it.copy(projectId = existingProjectOrDefault(it.projectId)) }
                         db.sceneDao().insert(restored.toEntity())
                         history.markRedone(snapshot.id)
                         return@withTransaction AutomationSemanticDiff.compareScene(null, restored)
@@ -227,6 +234,9 @@ internal class EditHistoryTransitions(
             }
         }
 
+        // An edit never moves an item between projects, but deleting a project moves its members
+        // without a history row of their own. Writing back the snapshot's project would put the
+        // item in one it has left, or in a deleted one no project view shows.
         val targetJson = if (redo) snapshot.nextJson else snapshot.previousJson
         if (targetJson.isBlank()) return@withTransaction null
 
@@ -239,7 +249,7 @@ internal class EditHistoryTransitions(
                 } else {
                     current.actionsJson
                 }
-                val target = EditHistorySnapshotDecoder.task(targetJson, entityId)
+                val target = EditHistorySnapshotDecoder.task(targetJson, entityId).copy(projectId = current.projectId)
                 val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
                     ?: AutomationSemanticDiff.compareTask(currentDecoded.value, target)?.let(::documentOf)
                     ?: SemanticDiffDocument()
@@ -256,7 +266,7 @@ internal class EditHistoryTransitions(
                 } else {
                     current.contextsJson
                 }
-                val target = EditHistorySnapshotDecoder.profile(targetJson, entityId)
+                val target = EditHistorySnapshotDecoder.profile(targetJson, entityId).copy(projectId = current.projectId)
                 writeSettingsGuard.requireWriteSettingsIfEnabled(target)
                 val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
                     ?: AutomationSemanticDiff.compareProfile(currentDecoded.value, target)?.let(::documentOf)
@@ -284,7 +294,7 @@ internal class EditHistoryTransitions(
                 } else {
                     current.elementsJson
                 }
-                val target = EditHistorySnapshotDecoder.scene(targetJson, entityId)
+                val target = EditHistorySnapshotDecoder.scene(targetJson, entityId).copy(projectId = current.projectId)
                 val diff = currentDecoded.issue?.let { SemanticDiffDocument() }
                     ?: AutomationSemanticDiff.compareScene(currentDecoded.value, target)?.let(::documentOf)
                     ?: SemanticDiffDocument()
@@ -296,6 +306,10 @@ internal class EditHistoryTransitions(
             else -> return@withTransaction null
         }
     }
+
+    /** A re-inserted item whose project was deleted meanwhile goes to Default, where it shows. */
+    private suspend fun existingProjectOrDefault(projectId: Long): Long =
+        if (db.projectDao().getById(projectId) != null) projectId else DEFAULT_PROJECT_ID
 
     private suspend fun transitionStorageDeletion(
         entityType: String,
