@@ -566,6 +566,7 @@ class DatabaseBackupManager(
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
                 temp?.let(::shredFile)
+                var databaseWentBack = !replacementPublished
                 rollback?.takeIf { replacementPublished && it.exists() }?.let { previous ->
                     // A database-sized staging copy, in the databases directory, written on the
                     // path where something has already gone wrong. If the rename below fails the
@@ -573,7 +574,7 @@ class DatabaseBackupManager(
                     // and nothing ever looks for it.
                     val rollbackTemp = File(requireNotNull(dbFile.parentFile), "$databaseName.rollback.tmp")
                     try {
-                        runCatching {
+                        databaseWentBack = runCatching {
                             previous.inputStream().use { source ->
                                 FileOutputStream(rollbackTemp).use { output ->
                                     source.copyBoundedTo(output, MAX_BACKUP_IMPORT_BYTES)
@@ -581,15 +582,16 @@ class DatabaseBackupManager(
                                 }
                             }
                             replaceFileAtomically(rollbackTemp, dbFile, "restore rollback")
-                        }
+                        }.isSuccess
                     } finally {
                         rollbackTemp.delete()
                         deleteDatabaseSidecars(rollbackTemp)
                     }
                 }
-                if (undoWritten) {
+                if (undoWritten && databaseWentBack) {
                     // commit() changes the prefs in memory before the write that failed, so Setup
-                    // would offer Undo for a restore that has just gone back.
+                    // would offer Undo for a restore that has just gone back. When copying the old
+                    // database back failed, the restored one is live and its Undo is still right.
                     restorePrefs.edit().run {
                         rollbackBefore?.let { putString(restoreRollbackKey(databaseName), it) } ?: remove(restoreRollbackKey(databaseName))
                         if (restoredAtBefore >= 0) putLong(restoredAtKey(databaseName), restoredAtBefore) else remove(restoredAtKey(databaseName))
