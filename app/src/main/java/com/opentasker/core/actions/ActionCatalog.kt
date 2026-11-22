@@ -96,6 +96,7 @@ object ActionCatalog {
         define("screen.timeout", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ScreenTimeoutAction),
         // IDEMPOTENT: the same name and value written twice leaves the same setting.
         define("settings.write", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsWriteAction),
+        define("settings.read", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::SettingsReadAction),
         define("dnd.set", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::DoNotDisturbAction),
         define("zen.rule.set", ActionCategory.SETTINGS, ActionRetrySafety.NEVER, ::ZenRuleSetAction),
         define("zen.rule.clear", ActionCategory.SETTINGS, ActionRetrySafety.IDEMPOTENT, ::ZenRuleClearAction),

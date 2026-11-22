@@ -51,6 +51,8 @@ object ActionCapabilityRegistry {
         "clipboard.get",
         "clipboard.set",
         "data.read",
+        // Reading a setting needs no access; Android refuses the names it hides, and the step says so.
+        "settings.read",
         "datetime.format",
         "datetime.parse",
         "datetime.add",

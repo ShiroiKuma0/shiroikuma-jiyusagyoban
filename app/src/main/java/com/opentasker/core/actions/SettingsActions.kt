@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.opentasker.core.assistant.AssistantAirplane
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.contexts.QuickSettingsTileStore
 import com.opentasker.core.contexts.requestRefresh
 import com.opentasker.core.platform.AndroidAudioHardening
@@ -747,19 +748,23 @@ internal fun hasWriteSecureSettings(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_SECURE_SETTINGS) ==
         PackageManager.PERMISSION_GRANTED
 
+private fun settingsTableArg(args: Map<String, String>): SettingsTable? {
+    val requested = args["table"]?.trim()?.lowercase().orEmpty()
+    return SettingsTable.entries.firstOrNull { it.wireValue == requested }
+}
+
+private fun settingsKeyArg(args: Map<String, String>): String? =
+    args["key"]?.trim().orEmpty().takeIf(SETTINGS_KEY_PATTERN::matches)
+
+private const val SETTINGS_KEY_RULE = "A setting name is up to 64 characters of a-z, 0-9, underscore or dot."
+
 /** Validates the arguments before anything touches a Settings table. */
 internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest {
-    val requestedTable = args["table"]?.trim()?.lowercase().orEmpty()
-    val table = SettingsTable.entries.firstOrNull { it.wireValue == requestedTable }
+    val table = settingsTableArg(args)
         ?: return SettingsWriteRequest.Rejected(
             "Choose the table to write: global, secure, or system.",
         )
-    val key = args["key"]?.trim().orEmpty()
-    if (!SETTINGS_KEY_PATTERN.matches(key)) {
-        return SettingsWriteRequest.Rejected(
-            "A setting name is up to 64 characters of a-z, 0-9, underscore or dot.",
-        )
-    }
+    val key = settingsKeyArg(args) ?: return SettingsWriteRequest.Rejected(SETTINGS_KEY_RULE)
     PROTECTED_SETTING_FRAGMENTS.firstOrNull { it in key }?.let { fragment ->
         return SettingsWriteRequest.Rejected(
             "\"$key\" controls what other apps are allowed to do, so this action will not write " +
@@ -845,6 +850,30 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
         }
 
         ctx.logger("Setting $target = $value")
+        return ActionResult.Success
+    }
+}
+
+/**
+ * Reads one Android setting into a variable: Tasker's Custom Setting with Read Setting To and no
+ * value. Like Tasker (decompiled 6.7.8, `uu.h2.f`), a setting that isn't there is stored as empty.
+ * Reading needs no access, but Android 12 and newer refuse names they hide from apps; Tasker
+ * stores those as empty too, and here the step fails and says so.
+ */
+class SettingsReadAction : DeclaredAction(ActionCatalog.require("settings.read")) {
+
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+        val table = settingsTableArg(args)
+            ?: return ActionResult.Failure("Choose the table to read: global, secure, or system.")
+        val key = settingsKeyArg(args) ?: return ActionResult.Failure(SETTINGS_KEY_RULE)
+        val output = VariableNamePolicy.normalize(args["var"].orEmpty())
+            ?: return ActionResult.Failure("Choose a variable to store the setting in.")
+        val target = "${table.wireValue}/$key"
+        val value = runCatching { readSetting(ctx.app.contentResolver, table, key) }.getOrElse { error ->
+            return ActionResult.Failure("Android won't let this app read $target: ${error.message ?: "it refused"}")
+        }
+        ctx.variables.set(output, value.orEmpty())
+        ctx.logger("Read setting $target")
         return ActionResult.Success
     }
 }

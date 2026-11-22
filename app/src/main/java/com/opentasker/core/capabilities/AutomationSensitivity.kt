@@ -82,6 +82,8 @@ object AutomationSensitivityRegistry {
 
     private val dataAccessActionIds = setOf(
         "clipboard.get",
+        // Settings can name the phone, its accounts or the apps it trusts.
+        "settings.read",
         "contacts.lookup",
         // Reads the phone's location when a coordinate is blank.
         "sun.times",

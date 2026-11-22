@@ -428,12 +428,27 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
-    fun customSettingThatReadsASettingIsNeverImportedAsAWrite() {
-        // Importing this one as a write would wipe the user's quick settings tiles.
-        val xml = """<code>235</code><Int sr="arg0" val="1"/><Str sr="arg1" ve="3">sysui_qs_tiles</Str><Str sr="arg2" ve="3"/><Int sr="arg3" val="0"/><Str sr="arg4" ve="3">%tiles</Str>"""
+    fun customSettingThatReadsASettingImportsAsAReadNeverAsAWrite() {
+        // Both corpus reads. Importing either as a write would wipe the setting, the user's quick
+        // settings tiles in the first.
+        val tiles = action("""<code>235</code><Int sr="arg0" val="1"/><Str sr="arg1" ve="3">sysui_qs_tiles</Str><Str sr="arg2" ve="3"/><Int sr="arg3" val="0"/><Str sr="arg4" ve="3">%tiles</Str>""")
+        val light = action("""<code>235</code><Int sr="arg0" val="0"/><Str sr="arg1" ve="3">is_camping_light_on</Str><Str sr="arg2" ve="3"/><Int sr="arg3" val="0"/><Str sr="arg4" ve="3">%rbl</Str>""")
 
-        assertEquals(TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, action(xml).type)
-        assertWarns(xml, "%tiles")
+        assertEquals("settings.read", tiles.type)
+        assertEquals(mapOf("table" to "secure", "key" to "sysui_qs_tiles", "var" to "%tiles"), tiles.args)
+        assertEquals(mapOf("table" to "global", "key" to "is_camping_light_on", "var" to "%rbl"), light.args)
+    }
+
+    @Test
+    fun customSettingThatWritesAndReadsOrReadsIntoANameBuiltFromPartsStaysAPlaceholder() {
+        // Tasker writes and then reads the setting back, which takes two steps here.
+        val both = """<code>235</code><Int sr="arg0" val="1"/><Str sr="arg1" ve="3">doze_always_on</Str><Str sr="arg2" ve="3">1</Str><Int sr="arg3" val="0"/><Str sr="arg4" ve="3">%aod</Str>"""
+        val builtName = """<code>235</code><Int sr="arg0" val="1"/><Str sr="arg1" ve="3">doze_always_on</Str><Str sr="arg2" ve="3"/><Int sr="arg3" val="0"/><Str sr="arg4" ve="3">%aod%n</Str>"""
+
+        assertEquals(TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, action(both).type)
+        assertWarns(both, "two steps")
+        assertEquals(TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, action(builtName).type)
+        assertWarns(builtName, "%aod%n")
     }
 
     @Test

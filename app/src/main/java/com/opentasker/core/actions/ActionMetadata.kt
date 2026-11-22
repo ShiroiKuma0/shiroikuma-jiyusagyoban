@@ -157,6 +157,7 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "vpn.tunnel",
     "screen.timeout",
     "settings.write",
+    "settings.read",
     "dnd.set",
     "ringer.set",
     "torch.set",
@@ -1147,6 +1148,41 @@ fun registerActionMetadata() {
                     FieldType.TEXT,
                     required = true,
                     hintRes = R.string.catalog_action_settings_write_field_value_hint,
+                ),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "settings.read",
+            nameRes = R.string.catalog_action_settings_read_name,
+            descriptionRes = R.string.catalog_action_settings_read_description,
+            categoryRes = R.string.catalog_category_settings,
+            fields = listOf(
+                ActionField(
+                    "table",
+                    R.string.catalog_action_settings_write_field_table_label,
+                    FieldType.DROPDOWN,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_write_field_table_hint,
+                    options = settingsTableOptions,
+                ),
+                ActionField(
+                    "key",
+                    R.string.catalog_action_settings_write_field_key_label,
+                    FieldType.TEXT,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_write_field_key_hint,
+                    sensitive = false,
+                ),
+                ActionField(
+                    "var",
+                    R.string.catalog_action_settings_read_field_var_label,
+                    FieldType.TEXT,
+                    required = true,
+                    hintRes = R.string.catalog_action_settings_read_field_var_hint,
+                    sensitive = false,
                 ),
             )
         )

@@ -209,6 +209,20 @@ class TaskerExportLayoutTest {
     }
 
     @Test
+    fun readSettingGoesOutAsCustomSettingWithReadSettingTo() {
+        assertHas(
+            xml("settings.read", "table" to "secure", "key" to "sysui_qs_tiles", "var" to "%tiles"),
+            "<code>235</code>",
+            """<Int sr="arg0" val="1"/>""",
+            """<Str sr="arg1" ve="3">sysui_qs_tiles</Str>""",
+            """<Str sr="arg4" ve="3">%tiles</Str>""",
+        )
+        val back = roundTrip("settings.read", "table" to "global", "key" to "a", "var" to "Got")
+        assertEquals("settings.read", back.type)
+        assertEquals(mapOf("table" to "global", "key" to "a", "var" to "%Got"), back.args)
+    }
+
+    @Test
     fun sendSmsAndFilesAndClipboardReadBack() {
         assertEquals("%n", roundTrip("sms.send", "number" to "%n", "message" to "%m").args["number"])
 

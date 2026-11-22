@@ -457,6 +457,10 @@
     <string name="catalog_action_settings_write_field_key_hint" formatted="false">location_mode、screen_off_timeout 等</string>
     <string name="catalog_action_settings_write_field_value_label" formatted="false">值</string>
     <string name="catalog_action_settings_write_field_value_hint" formatted="false">写入后回读，以便Android忽略的值会报告失败。</string>
+    <string name="catalog_action_settings_read_name" formatted="false">读取设置</string>
+    <string name="catalog_action_settings_read_description" formatted="false">按名称将一个Android设置读入变量。读取无需授权，但Android会对应用隐藏部分名称。</string>
+    <string name="catalog_action_settings_read_field_var_label" formatted="false">存入</string>
+    <string name="catalog_action_settings_read_field_var_hint" formatted="false">不存在的设置存为空值，与Tasker相同。</string>
     <string name="catalog_action_dnd_set_name" formatted="false">设置勿扰模式</string>
     <string name="catalog_action_dnd_set_description" formatted="false">设置DND打扰过滤模式</string>
     <string name="catalog_action_dnd_set_field_mode_label" formatted="false">模式</string>

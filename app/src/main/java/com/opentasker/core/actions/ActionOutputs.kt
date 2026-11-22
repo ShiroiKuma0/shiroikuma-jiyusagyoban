@@ -352,6 +352,9 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
         output("enabled", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = "IME", suffix = "_ENABLED"),
         output("count", ActionValueType.NUMBER, nameArgumentKeys = listOf("var"), defaultName = "IME", suffix = "_COUNT"),
     )
+    "settings.read" -> listOf(
+        output("value", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = "Setting"),
+    )
     "clipboard.get" -> listOf(
         output("text", ActionValueType.TEXT, nameArgumentKeys = listOf("var", "result"), defaultName = "Clipboard"),
         output("has_text", ActionValueType.BOOLEAN, nameArgumentKeys = listOf("var", "result"), defaultName = "Clipboard", suffix = "_has_text"),

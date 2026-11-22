@@ -105,6 +105,7 @@ object TaskerXmlExporter {
         "url.open" to "104",
         "screenshot.take" to "176",
         "settings.write" to "235",
+        "settings.read" to "235",
         "sms.send" to "41",
         "file.read" to "417",
         "file.write" to "410",
@@ -361,6 +362,18 @@ object TaskerXmlExporter {
                 appendStr(sb, 2, args["value"] ?: "")
                 appendInt(sb, 3, "0")
                 appendStr(sb, 4, "")
+            }
+            "settings.read" -> {
+                val table = args["table"].orEmpty().trim()
+                val tableIndex = TASKER_SETTING_TABLE_INDEXES[table.lowercase()]
+                if (tableIndex == null) {
+                    warnings += "Tasker's Custom Setting only knows global, secure and system, not '$table'."
+                }
+                appendInt(sb, 0, tableIndex ?: table)
+                appendStr(sb, 1, args["key"] ?: "")
+                appendStr(sb, 2, "")
+                appendInt(sb, 3, "0")
+                appendStr(sb, 4, taskerVariableName(args["var"], "setting"))
             }
             "sms.send" -> {
                 appendStr(sb, 0, args["number"] ?: "")

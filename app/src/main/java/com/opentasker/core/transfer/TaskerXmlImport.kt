@@ -1415,30 +1415,32 @@ object TaskerXmlImporter {
     }
 
     /**
-     * Custom Setting's read form leaves Value blank and names a variable, so importing it as a write
-     * would wipe the setting. Anything but a complete write stays a placeholder that refuses to run.
+     * Custom Setting writes its value and then, when Read Setting To names a variable, reads the
+     * setting into it (decompiled 6.7.8, `HelperExecuteService.H1`). The read form leaves Value
+     * blank and imports as Read Setting, never as a write, which would wipe the setting. A write
+     * that also reads takes two steps here, so it stays a placeholder, as does a write with no value.
      */
     private fun taskerCustomSetting(code: String, byIndex: Map<Int, String>, ints: Map<Int, Int>): ActionWithLoss {
         val table = ints[0]?.let(TASKER_SETTING_TABLES::get)
         val name = byIndex[1].orEmpty().trim()
         val value = byIndex[2].orEmptyIfBlank()
-        val readsInto = byIndex[4].orEmptyIfBlank()
+        val readsInto = byIndex[4].orEmptyIfBlank()?.trim()
         val refusal = when {
-            readsInto != null -> "Tasker Custom Setting reads $name into $readsInto, and this app only writes settings"
             table == null -> "Tasker Custom Setting $name uses a settings type this app doesn't know"
             name.isEmpty() -> "Tasker Custom Setting has no setting name"
-            value == null -> "Tasker Custom Setting $name has no value to write"
+            readsInto != null && value != null -> "Tasker Custom Setting writes $name and then reads it into $readsInto, which takes two steps here"
+            readsInto != null && !TASKER_PLAIN_VARIABLE.matches(readsInto) -> "Tasker Custom Setting reads $name into $readsInto, which isn't one plain variable"
+            readsInto == null && value == null -> "Tasker Custom Setting $name has no value to write"
             else -> null
         }
-        if (refusal != null || table == null || value == null) return taskerPlaceholder(code, refusal.orEmpty())
-        return ActionWithLoss(
-            ActionSpec(
-                type = "settings.write",
-                label = "Tasker custom setting",
-                args = mapOf("table" to table, "key" to name, "value" to value),
-            ),
-            lossyWarning = "Tasker Custom Setting's Use Root option was not imported".takeIf { (ints[3] ?: 0) != 0 },
-        )
+        if (refusal != null || table == null) return taskerPlaceholder(code, refusal.orEmpty())
+        val rootWarning = "Tasker Custom Setting's Use Root option was not imported".takeIf { (ints[3] ?: 0) != 0 }
+        val spec = if (readsInto != null) {
+            ActionSpec(type = "settings.read", label = "Tasker read setting", args = mapOf("table" to table, "key" to name, "var" to readsInto))
+        } else {
+            ActionSpec(type = "settings.write", label = "Tasker custom setting", args = mapOf("table" to table, "key" to name, "value" to value.orEmpty()))
+        }
+        return ActionWithLoss(spec, lossyWarning = rootWarning)
     }
 
     /**
