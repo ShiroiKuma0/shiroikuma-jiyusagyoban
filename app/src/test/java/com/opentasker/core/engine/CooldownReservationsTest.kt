@@ -8,6 +8,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class CooldownReservationsTest {
 
@@ -90,5 +92,66 @@ class CooldownReservationsTest {
             pool.shutdownNow()
         }
         assertEquals(1, accepted.get())
+    }
+
+    @Test
+    fun aReleasedReservationPutsTheEarlierDeadlineBack() {
+        val clock = FakeClock()
+        val persisted = mutableMapOf<Long, Long>()
+        val cooldowns = CooldownReservations(now = clock, persist = { id, deadline -> persisted[id] = deadline })
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+        clock.millis += 60_000
+        val second = cooldowns.reserve(profileId = 1, cooldownSec = 60)
+        assertTrue(second.accepted)
+
+        cooldowns.release(profileId = 1, reservation = second)
+
+        assertEquals(1_060_000L, persisted[1L])
+        assertEquals(mapOf(1L to 1_060_000L), cooldowns.snapshot())
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+    }
+
+    @Test
+    fun aReleaseAfterALaterReservationLeavesTheLaterWindow() {
+        val clock = FakeClock()
+        val cooldowns = CooldownReservations(now = clock)
+        val first = cooldowns.reserve(profileId = 1, cooldownSec = 60)
+        clock.millis += 60_000
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+
+        cooldowns.release(profileId = 1, reservation = first)
+
+        clock.millis += 1_000
+        assertFalse(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+    }
+
+    @Test
+    fun aClaimGivesTheCooldownBackOnlyWhenTheRunWasNotAdmitted() {
+        val cooldowns = CooldownReservations(now = FakeClock())
+        val refused = CooldownClaim(cooldowns, profileId = 1, reservation = cooldowns.reserve(profileId = 1, cooldownSec = 60))
+        val admitted = CooldownClaim(cooldowns, profileId = 2, reservation = cooldowns.reserve(profileId = 2, cooldownSec = 60))
+
+        refused.releaseUnlessAdmitted()
+        admitted.admitted()
+        admitted.releaseUnlessAdmitted()
+
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+        assertFalse(cooldowns.reserve(profileId = 2, cooldownSec = 60).accepted)
+    }
+
+    /** A job canceled before it starts never runs its body, where admission would have happened. */
+    @Test
+    fun aJobCanceledBeforeItStartsGivesTheCooldownBack() = runBlocking {
+        val cooldowns = CooldownReservations(now = FakeClock())
+        val canceled = CooldownClaim(cooldowns, profileId = 1, reservation = cooldowns.reserve(profileId = 1, cooldownSec = 60))
+        val finished = CooldownClaim(cooldowns, profileId = 2, reservation = cooldowns.reserve(profileId = 2, cooldownSec = 60))
+
+        val neverStarted = launch { canceled.admitted() }.givingBack(canceled)
+        neverStarted.cancel()
+        neverStarted.join()
+        launch { finished.admitted() }.givingBack(finished).join()
+
+        assertTrue(cooldowns.reserve(profileId = 1, cooldownSec = 60).accepted)
+        assertFalse(cooldowns.reserve(profileId = 2, cooldownSec = 60).accepted)
     }
 }

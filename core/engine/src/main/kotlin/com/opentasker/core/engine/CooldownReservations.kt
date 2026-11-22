@@ -1,8 +1,15 @@
 package com.opentasker.core.engine
 
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Job
+
 data class CooldownReservation(
     val accepted: Boolean,
     val remainingMs: Long = 0,
+    /** The deadline this reservation armed, or 0 when it armed none. */
+    val deadlineMs: Long = 0,
+    /** The deadline it replaced, which [CooldownReservations.release] puts back. */
+    val previousDeadlineMs: Long = 0,
 )
 
 /**
@@ -44,7 +51,51 @@ class CooldownReservations(
             val next = current + cooldownSec * 1000L
             deadlines[profileId] = next
             persist(profileId, next)
+            return CooldownReservation(accepted = true, deadlineMs = next, previousDeadlineMs = deadline)
         }
         return CooldownReservation(accepted = true)
     }
+
+    /**
+     * Puts back the deadline [reservation] replaced, for a run that never started. Does nothing
+     * once a later reservation or a [clear] has replaced it, so it can't undo someone else's window.
+     */
+    fun release(profileId: Long, reservation: CooldownReservation) = synchronized(deadlines) {
+        if (reservation.deadlineMs == 0L || deadlines[profileId] != reservation.deadlineMs) return@synchronized
+        if (reservation.previousDeadlineMs > 0L) {
+            deadlines[profileId] = reservation.previousDeadlineMs
+        } else {
+            deadlines.remove(profileId)
+        }
+        persist(profileId, reservation.previousDeadlineMs)
+    }
+}
+
+/**
+ * The cooldown one dispatch armed. The dispatch reserves it before admission runs, so a run that
+ * admission refuses (open circuit, burst or active limit) or that is canceled before it gets that
+ * far gives it back: nothing ran, and the next trigger shouldn't read "on cooldown".
+ */
+class CooldownClaim(
+    private val reservations: CooldownReservations,
+    private val profileId: Long,
+    private val reservation: CooldownReservation,
+) {
+    private val settled = AtomicBoolean(false)
+
+    /** The run got past admission, so the cooldown stands. */
+    fun admitted() = settled.set(true)
+
+    /** Gives the cooldown back unless [admitted] came first. Later calls do nothing. */
+    fun releaseUnlessAdmitted() {
+        if (settled.compareAndSet(false, true)) reservations.release(profileId, reservation)
+    }
+}
+
+/**
+ * Gives [claim]'s cooldown back when this job ends without an admitted run. A job canceled before
+ * it starts never runs its body, so only its completion can do that.
+ */
+fun Job.givingBack(claim: CooldownClaim?): Job = apply {
+    if (claim != null) invokeOnCompletion { claim.releaseUnlessAdmitted() }
 }

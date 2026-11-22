@@ -58,6 +58,8 @@ suspend fun executeAndLogTask(
     profileFallbackTaskId: Long? = null,
     allowFallback: Boolean = true,
     execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
+    /** Called once admission accepts the run, before any of the task starts. */
+    onAdmitted: () -> Unit = {},
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     if (execution.mode == ExecutionMode.SIMULATION) {
         val reason = "Simulation mode is diagnostic only; no task or side effect was run."
@@ -118,6 +120,7 @@ suspend fun executeAndLogTask(
         )
     }
     val admissionLease = requireNotNull(admission.lease)
+    onAdmitted()
     // Only admitted work becomes a causal parent. A capacity or collision skip must not make a
     // later unrelated profile appear to be a child of work that never ran.
     ExecutionCausality.remember(execution)

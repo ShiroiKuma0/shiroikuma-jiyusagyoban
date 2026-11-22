@@ -771,6 +771,7 @@ class AutomationService : Service() {
         // Logging and run-log writes deliberately happen after the lock is released.
         var cooldownSkipRemainingMs: Long? = null
         val plan = profileTaskSlots.exclusively { slots ->
+            var claim: CooldownClaim? = null
             val decision = if (profile.automationMode == AutomationMode.QUEUED) {
                 synchronized(queuedProfileTasks) {
                     val queuedDecision = TaskDispatchPolicy.plan(
@@ -804,20 +805,22 @@ class AutomationService : Service() {
                     cooldownSkipRemainingMs = reservation.remainingMs
                     return@exclusively decision
                 }
+                if (reservation.deadlineMs > 0L) claim = CooldownClaim(cooldowns, profile.id, reservation)
             }
 
             when (decision.step) {
                 DispatchStep.START ->
-                    slots.store(slot, launchTrackedTask(profile, slot, task, initialVariables, causal))
+                    slots.store(slot, launchTrackedTask(profile, slot, task, initialVariables, causal, claim))
                 DispatchStep.RESTART -> {
                     slots.cancel(slot)
-                    slots.store(slot, launchTrackedTask(profile, slot, task, initialVariables, causal))
+                    slots.store(slot, launchTrackedTask(profile, slot, task, initialVariables, causal, claim))
                 }
                 DispatchStep.START_QUEUE -> slots.store(
                     slot,
-                    launchQueuedTasks(profile, slot, QueuedProfileTask(task, initialVariables, causal)),
+                    launchQueuedTasks(profile, slot, QueuedProfileTask(task, initialVariables, causal, claim)),
                 )
-                DispatchStep.LAUNCH_PARALLEL -> scope.launch { runTask(task, profile, initialVariables, causal) }
+                DispatchStep.LAUNCH_PARALLEL ->
+                    scope.launch { runTask(task, profile, initialVariables, causal, claim) }.givingBack(claim)
                 else -> Unit
             }
             decision
@@ -851,15 +854,16 @@ class AutomationService : Service() {
         task: Task,
         initialVariables: Map<String, String>,
         causal: CausalExecutionDecision,
+        claim: CooldownClaim?,
     ): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
             val thisJob = currentCoroutineContext()[Job]
             try {
-                runTask(task, profile, initialVariables, causal)
+                runTask(task, profile, initialVariables, causal, claim)
             } finally {
                 profileTaskSlots.releaseIfCurrent(slot, thisJob)
             }
-        }
+        }.givingBack(claim)
 
     private fun launchQueuedTasks(profile: Profile, slot: Long, firstTask: QueuedProfileTask): Job =
         scope.launch(start = CoroutineStart.DEFAULT) {
@@ -868,7 +872,7 @@ class AutomationService : Service() {
             try {
                 while (isActive && nextTask != null) {
                     val queuedTask = requireNotNull(nextTask)
-                    runTask(queuedTask.task, profile, queuedTask.initialVariables, queuedTask.causal)
+                    runTask(queuedTask.task, profile, queuedTask.initialVariables, queuedTask.causal, queuedTask.claim)
                     // Slots outside, queue inside — the same order the producer uses. Taking them
                     // the other way round here would be a lock-order inversion against dispatch.
                     nextTask = profileTaskSlots.exclusively { slots ->
@@ -895,13 +899,14 @@ class AutomationService : Service() {
                     }
                 }
             }
-        }
+        }.givingBack(firstTask.claim)
 
     private suspend fun runTask(
         task: Task,
         profile: Profile,
         initialVariables: Map<String, String> = emptyMap(),
         causal: CausalExecutionDecision,
+        claim: CooldownClaim? = null,
     ) {
         val source = "Profile: ${profile.name}"
         val result = withTaskPresence(task) {
@@ -927,8 +932,11 @@ class AutomationService : Service() {
                     causalDepth = causal.depth,
                     causalProfileChain = causal.profileChain,
                 ),
+                onAdmitted = { claim?.admitted() },
             )
         }
+        // A refused run gives its cooldown back now, not when a queue it started finishes.
+        claim?.releaseUnlessAdmitted()
         if (result.logInserted) {
             pruneRunLogs(force = false)
         }
@@ -938,6 +946,7 @@ class AutomationService : Service() {
         val task: Task,
         val initialVariables: Map<String, String>,
         val causal: CausalExecutionDecision,
+        val claim: CooldownClaim? = null,
     )
 
     /** Variable extras a validated external request forwarded, already name-checked and capped. */
