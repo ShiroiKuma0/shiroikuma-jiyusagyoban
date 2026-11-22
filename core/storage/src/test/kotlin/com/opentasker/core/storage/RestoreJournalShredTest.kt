@@ -93,4 +93,28 @@ class RestoreJournalShredTest {
         assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; true })
         assertEquals(3, drops)
     }
+
+    /**
+     * A review lives only as long as the process. A candidate still there at start is one nobody
+     * staged or dismissed, and one decrypted from a snapshot is that snapshot in plaintext.
+     */
+    @Test
+    fun aCandidateLeftByAStoppedReviewGoesAtTheNextStart() = inTempDir { dir ->
+        val context = object : ContextWrapper(null) {
+            override fun getFilesDir(): File = dir
+        }
+        val candidate = DatabaseBackupManager.candidateRestoreFile(context).apply { writeBytes(plaintext) }
+        val decryptTemp = File(candidate.parentFile, "${candidate.name}.decrypt.tmp").apply { writeBytes(plaintext) }
+        val decryptSidecar = File(candidate.parentFile, "${decryptTemp.name}-shm").apply { writeBytes(plaintext) }
+        val pending = DatabaseBackupManager.pendingRestoreFile(context).apply { writeBytes(plaintext) }
+        val backup = File(candidate.parentFile, "opentasker_backup_2026-11-22_01-38-22.db").apply { writeBytes(plaintext) }
+
+        DatabaseBackupManager.discardLeftoverRestoreCandidate(context)
+
+        assertFalse("the candidate stayed", candidate.exists())
+        assertFalse("the decrypt staging file stayed", decryptTemp.exists())
+        assertFalse("the staging file's sidecar stayed", decryptSidecar.exists())
+        assertTrue("a staged restore is the user's decision, not a leftover", pending.exists())
+        assertTrue("backups aren't leftovers", backup.exists())
+    }
 }

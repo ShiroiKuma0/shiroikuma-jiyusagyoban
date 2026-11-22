@@ -635,18 +635,40 @@ class DatabaseBackupManager(
                 }
                 val replacementKept = replacementPublished && !databaseWentBack
                 // The restored database stays live, so the replaced one's state goes before the
-                // journal does. The journal is kept as the failed copy either way.
-                if (replacementKept) runCatching(dropStateOfReplacedDatabase)
+                // journal does.
+                val stateDropped = !replacementKept || runCatching(dropStateOfReplacedDatabase).getOrDefault(false)
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")
                 // The journal may already be off its name if recording the rollback is what failed.
                 val journal = pending.takeIf { it.exists() } ?: spentRestoreJournal(pending)
-                val failedBackup = if (runCatching { journal.renameTo(failed) }.getOrDefault(false)) {
-                    failed
+                val failedBackup = if (stateDropped) {
+                    if (runCatching { journal.renameTo(failed) }.getOrDefault(false)) {
+                        failed
+                    } else {
+                        shredFile(journal)
+                        null
+                    }
                 } else {
-                    shredFile(journal)
-                    null
+                    // The drop isn't on disk, so a spent journal stays for the next start to finish
+                    // it, and the failed copy is a copy.
+                    val spent = spentRestoreJournal(pending)
+                    if (journal != spent) runCatching { journal.renameTo(spent) }
+                    runCatching { spent.copyTo(failed) }.onFailure { failed.delete() }.getOrNull()
                 }
                 PendingRestoreApplyResult.Failed(error, failedBackup, replacementKept = replacementKept)
+            }
+        }
+
+        /**
+         * Shreds a restore candidate a review left behind, and the staging file an interrupted
+         * snapshot decrypt left. A review lives only as long as the process, so at start any
+         * candidate is one the user never staged or dismissed, and one from an encrypted snapshot
+         * is that snapshot in plaintext.
+         */
+        fun discardLeftoverRestoreCandidate(context: Context, databaseName: String = DATABASE_NAME) {
+            val candidate = candidateRestoreFile(context, databaseName)
+            listOf(candidate, File(candidate.parentFile, "${candidate.name}.decrypt.tmp")).forEach { file ->
+                shredFile(file)
+                deleteDatabaseSidecars(file)
             }
         }
 

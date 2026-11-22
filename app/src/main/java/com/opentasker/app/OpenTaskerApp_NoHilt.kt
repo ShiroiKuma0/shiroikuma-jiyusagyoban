@@ -190,10 +190,13 @@ class OpenTaskerApp_NoHilt : Application() {
     /** Applies any staged restore, migrates a legacy plaintext file, then publishes the database. */
     private fun prepareDatabase() {
         if (DatabaseBackupManager.pendingRestoreFile(this).exists()) _startupStage.value = StartupStage.Restoring
+        DatabaseBackupManager.discardLeftoverRestoreCandidate(this)
         // Plugin condition grants name profile positions in the database they were given in, so a
         // restore that replaces it drops them, on disk before the restore's journal goes.
         val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this) {
-            LocaleConditionGrantStore(this).revokeAllContextGrants()
+            LocaleConditionGrantStore(this).revokeAllContextGrants().also { cleared ->
+                if (!cleared) AppLogger.warn("OpenTasker", "Could not clear the plugin condition grants a restore left; the next start tries again")
+            }
         }
         when (restoreResult) {
             is PendingRestoreApplyResult.Applied -> {
@@ -207,7 +210,7 @@ class OpenTaskerApp_NoHilt : Application() {
                 AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
             }
             PendingRestoreApplyResult.StoppedAfterSwap -> {
-                AppLogger.warn("OpenTasker", "A database restore stopped after its database went in; plugin condition grants were cleared")
+                AppLogger.warn("OpenTasker", "A database restore stopped after its database went in; its plugin condition grants were due to be cleared this start")
             }
             PendingRestoreApplyResult.NoPending -> Unit
         }
