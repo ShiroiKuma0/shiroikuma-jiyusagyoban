@@ -200,7 +200,7 @@
     <string name="capability_termux_setup" formatted="false">需要Termux 0.109或更高版本、RUN_COMMAND权限以及已批准的脚本哈希。</string>
     <string name="capability_tasker_import_unsupported" formatted="false">导入的Tasker操作无法映射到受支持的OpenTasker操作。</string>
     <string name="capability_macrodroid_import_unsupported" formatted="false">导入的MacroDroid操作无法映射到受支持的OpenTasker操作。</string>
-    <string name="capability_sms_permission" formatted="false">需要短信权限；Play版为符合政策要求而省略了短信操作。</string>
+    <string name="capability_sms_permission" formatted="false">需要短信权限。</string>
     <string name="capability_contacts_permission" formatted="false">无人值守查找需要显式的联系人权限；Android 17及以上还支持按字段划分的系统选择器模式。</string>
     <string name="capability_audio_output_restricted" formatted="false">除非OpenTasker具有使用中合格的前台服务路径，否则Android 17会限制音频输出。</string>
     <string name="capability_audio_output_ready" formatted="false">音频输出可用。</string>

@@ -165,8 +165,8 @@ val selectedDistribution = providers.gradleProperty("openTaskerDistribution")
     .get()
     .lowercase()
 require(selectedDistribution in allowedDistributions) {
-    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}. " +
-        "The Play profile was retired on 2026-08-31, when Play distribution was dropped."
+    "Unsupported OpenTasker distribution '$selectedDistribution'. Expected one of: ${allowedDistributions.joinToString()}." +
+        if (selectedDistribution == "play") " The Play profile was retired on 2026-08-31, when Play distribution was dropped." else ""
 }
 /**
  * F-Droid's build server has no signing material, so the F-Droid distribution packages unsigned by

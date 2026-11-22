@@ -46,7 +46,7 @@ class ActionCapabilitiesTest {
     }
 
     @Test
-    fun smsCapabilityFollowsDistributionPolicy() {
+    fun smsActionsCanBeAddedAndNeedTheSmsPermission() {
         val capability = ActionCapabilityRegistry.get("sms.send")
 
         assertTrue(capability.canAdd)

@@ -160,9 +160,9 @@ class LocalReleaseGateContractTest {
             "The unsigned opt-out must not come back",
             build.contains("openTaskerAllowUnsignedRelease"),
         )
-        assertFalse(
-            "Staging must not honour the unsigned opt-out",
-            build.contains("requireSignature.set(!releaseBuildIsUnsigned || allowUnsignedRelease)"),
+        assertTrue(
+            "Only the unsigned F-Droid build may skip the signing check",
+            build.contains("val signingRequired = !releaseBuildIsUnsigned"),
         )
     }
 }
