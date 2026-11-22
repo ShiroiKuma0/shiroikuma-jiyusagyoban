@@ -383,12 +383,16 @@ internal fun ProfileEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Long?, Int, Int, Int, AutomationMode, String?, ProfileLifetime, Long?, Int?, Int?, ProfileOverflowPolicy, Long?) -> Unit,
     onSimulate: ((Profile) -> Unit)? = null,
+    newProfileEnabled: Boolean = false,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     // New profiles start disabled, matching templates and imports and the "Leave off until
-    // reviewed" helper; every other creation path is review-first.
-    var enabled by rememberSaveable(profile?.id) { mutableStateOf(profile?.enabled ?: false) }
+    // reviewed" helper, unless Settings says new profiles start on. Templates and imports stay
+    // review-first either way.
+    var enabled by rememberSaveable(profile?.id, newProfileEnabled.takeIf { profile == null }) {
+        mutableStateOf(profile?.enabled ?: newProfileEnabled)
+    }
     // Keyed only on profile identity: re-keying on `tasks` reset the user's selection to the
     // default whenever the tasks flow re-emitted (a parallel import, a rename re-sorting the
     // list) mid-edit. A vanished selection is caught by the canSave existence check below.

@@ -2,6 +2,7 @@ package com.opentasker.ui.screens
 
 import android.Manifest
 import android.app.Activity
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
@@ -288,6 +289,10 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val newProfilesEnabled: StateFlow<Boolean> = ProfileDefaultsPreference.newProfilesEnabled(context)
+        .flowOn(Dispatchers.IO)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val themeMode: StateFlow<ThemeMode> = ThemePreference.observe(context)
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.System)
@@ -324,6 +329,12 @@ private class PermissionOnboardingViewModel(appContext: Context) : ViewModel() {
         refreshTick.update { it + 1L }
         refreshExternalState()
         refreshUpdateCheckState()
+    }
+
+    fun setNewProfilesEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            ProfileDefaultsPreference.setNewProfilesEnabled(context, enabled)
+        }
     }
 
     fun setDirectBootEnabled(enabled: Boolean) {
@@ -502,6 +513,7 @@ fun PermissionOnboardingScreen(
     val loadedItems by setupViewModel.permissionItems.collectAsState()
     val items = loadedItems.orEmpty()
     val directBootEnabled by setupViewModel.directBootEnabled.collectAsState()
+    val newProfilesEnabled by setupViewModel.newProfilesEnabled.collectAsState()
     val themeMode by setupViewModel.themeMode.collectAsState()
     val updateCheckState by setupViewModel.updateCheckState.collectAsState()
     val associations by setupViewModel.associations.collectAsState()
@@ -673,6 +685,13 @@ fun PermissionOnboardingScreen(
                     onEnabledChange = setupViewModel::setDirectBootEnabled,
                 )
             }
+            item {
+                NewProfilesEnabledSetupCard(
+                    enabled = newProfilesEnabled,
+                    onEnabledChange = setupViewModel::setNewProfilesEnabled,
+                )
+            }
+            item { EngineNotificationSetupCard(onOpen = { openEngineNotificationSettings(context, onMessage) }) }
             onRunOnboardingAgain?.let { runAgain ->
                 item { RunOnboardingAgainCard(onRunAgain = runAgain) }
             }
@@ -1480,6 +1499,88 @@ private fun DirectBootSetupCard(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     }
+}
+
+@Composable
+internal fun NewProfilesEnabledSetupCard(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    val stateDescription = stringResource(
+        if (enabled) R.string.settings_new_profiles_enabled_on else R.string.settings_new_profiles_enabled_off,
+    )
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = enabled, onValueChange = onEnabledChange, role = Role.Switch)
+                .semantics(mergeDescendants = true) { this.stateDescription = stateDescription }
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.settings_new_profiles_enabled_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_new_profiles_enabled_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(stateDescription, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+            }
+            Switch(checked = enabled, onCheckedChange = null)
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    }
+}
+
+@Composable
+internal fun EngineNotificationSetupCard(onOpen: () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.settings_engine_notification_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(R.string.settings_engine_notification_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = onOpen) {
+                Text(stringResource(R.string.settings_engine_notification_action))
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    }
+}
+
+/**
+ * Opens Android's page for the engine's notification channel. The service makes the channel when
+ * it first starts, so it's made here too, or Android would have no page to open. Making it again
+ * leaves whatever the user already chose for it alone.
+ */
+internal fun openEngineNotificationSettings(context: Context, onMessage: (String) -> Unit) {
+    context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+        NotificationChannel(
+            PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID,
+            context.getString(R.string.service_notification_channel_name),
+            PromotedOngoingNotificationSupport.ENGINE_CHANNEL_IMPORTANCE,
+        ),
+    )
+    openSettingsIntent(
+        context,
+        Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, PromotedOngoingNotificationSupport.ENGINE_CHANNEL_ID),
+        onMessage,
+    )
 }
 
 @Composable
