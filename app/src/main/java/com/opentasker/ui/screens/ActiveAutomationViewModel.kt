@@ -48,6 +48,7 @@ import com.opentasker.core.model.Task
 import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.logging.AppLogger
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.SerializationException
 import com.opentasker.core.plugins.locale.LocaleConditionGrantStore
@@ -247,7 +248,14 @@ class ActiveAutomationViewModel(
         editHistoryAvailability(db, viewModelScope, LibraryEditTimes.times(appContext))
 
     /** Dates a create, a variable save or an undo, which add no edit history row of their own. */
-    private fun edited(entityType: String, entityId: Long) = viewModelScope.launch { LibraryEditTimes.touch(appContext, entityType, entityId) }
+    private fun edited(entityType: String, entityId: Long) = viewModelScope.launch {
+        // Only the Last edited order reads it, so a write that fails is logged and the edit stands.
+        try {
+            LibraryEditTimes.touch(appContext, entityType, entityId)
+        } catch (error: IOException) {
+            AppLogger.warn("OpenTasker.UI", "Couldn't date an edit for the Last edited order", error)
+        }
+    }
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -1077,6 +1085,8 @@ class ActiveAutomationViewModel(
                     applied.profile.copy(enabled = false, enterTaskId = taskId, exitTaskId = exitTaskId).toEntity(),
                 )
             }
+            edited(EditHistoryDao.TYPE_PROFILE, profileId)
+            (listOf(taskId) + listOfNotNull(exitTaskId)).forEach { edited(EditHistoryDao.TYPE_TASK, it) }
             blueprintCatalogStore.merge(listOf(template))
             blueprintInstallationStore.record(
                 BlueprintInstallation(

@@ -20,6 +20,7 @@ import com.opentasker.core.storage.DatabaseMigrations
 import com.opentasker.core.storage.DatabaseSecurity
 import com.opentasker.core.storage.PendingRestoreApplyResult
 import com.opentasker.core.storage.VariableRepository
+import com.opentasker.ui.screens.LibraryEditTimes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -201,6 +202,11 @@ class OpenTaskerApp_NoHilt : Application() {
         }
         when (restoreResult) {
             is PendingRestoreApplyResult.Applied -> {
+                // The restored items' ids may match times kept for other items before it.
+                applicationScope.launch {
+                    runCatching { LibraryEditTimes.clear(this@OpenTaskerApp_NoHilt) }
+                        .onFailure { AppLogger.warn("OpenTasker", "Could not clear the Last edited times after a restore", it) }
+                }
                 AppLogger.info(
                     "OpenTasker",
                     "Applied pending database restore to ${restoreResult.databaseFile.name}; " +

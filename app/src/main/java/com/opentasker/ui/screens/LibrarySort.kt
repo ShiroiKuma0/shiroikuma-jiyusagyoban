@@ -101,6 +101,11 @@ object LibraryEditTimes {
         }
     }
 
+    /** A restored database brings back items under ids these times may belong to something else. */
+    suspend fun clear(context: Context) {
+        context.libraryEditTimesDataStore.edit { it.clear() }
+    }
+
     internal suspend fun forget(context: Context, entityType: String, entityId: Long) {
         context.libraryEditTimesDataStore.edit { it.remove(longPreferencesKey(EditHistoryAvailabilityState.key(entityType, entityId))) }
     }

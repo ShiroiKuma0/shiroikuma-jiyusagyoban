@@ -116,7 +116,8 @@ class LibrarySortComposeTest {
                 assertEquals(chosen, after[LibraryList.Tasks])
                 // Read back from the file itself, which is what a restarted app reads.
                 val onDisk = File(context.filesDir, "datastore/library_sort_prefs.preferences_pb").readBytes().toString(Charsets.ISO_8859_1)
-                assertTrue(onDisk, "sort_tasks" in onDisk && chosen.name in onDisk)
+                // The Tasks entry itself, not just any list kept under that name.
+                assertTrue(onDisk, Regex("sort_tasks[\\s\\S]{1,8}${chosen.name}").containsMatchIn(onDisk))
                 // Each list keeps its own order.
                 assertEquals(stored[LibraryList.Scenes], after[LibraryList.Scenes])
             } finally {
