@@ -350,7 +350,9 @@ object PreflightRunner {
             }
 
             val expansion = expandArguments(spec, variables, input)
-            val condition = spec.condition?.trim()?.takeIf(String::isNotBlank)
+            // A placeholder keeps the imported Run only if, which can name %LOC too. It never runs,
+            // so its condition isn't read either, and the step shows as blocked, not skipped.
+            val condition = spec.condition?.trim()?.takeIf(String::isNotBlank)?.takeUnless { spec.type in IMPORT_PLACEHOLDER_TYPES }
             val conditionResult = condition?.let { evaluate(it, variables, input) }
             if (conditionResult != null && !conditionResult.value) {
                 recordStep(
