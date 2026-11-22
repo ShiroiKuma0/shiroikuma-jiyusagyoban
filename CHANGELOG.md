@@ -8,6 +8,84 @@ Keeping our block strictly above upstream's own heading is not cosmetic: upstrea
 release directly under that heading, so their insertions and ours never touch and this file merges
 cleanly on a rebase instead of conflicting on every sync.
 
+## 0.2.96+2026-11-22.18-16.gcb3b4c60+036 — 2026-11-22
+
+Built on upstream `cb3b4c60` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-22,
+190 commits past the base of `+034`. Build `+035` was the sync alone and is contained in this one.
+The database moves to version 41; an installed `+034` or older updates in place.
+
+### New from upstream
+
+- **Add Calendar Event** puts an event on a calendar you name, timed or all day, and leaves its id
+  in `%event_id`. **Find Calendar Events** reads the events of a time window into `%event_count`,
+  `%event_titles`, `%event_starts` and their companions.
+- **Read Setting** reads one Android setting by name into a variable; a setting that is not there
+  reads as empty, as in Tasker.
+- **Write Setting** understands Tasker's toggle value and flips a 0/1 setting instead of writing
+  the marker into it.
+- **`work_profile`** is a new state — `available`, `paused` or `none` — that follows Android's work
+  profile broadcasts.
+- **Companion device profiles can fire**: Android is now asked to watch the paired device.
+- **Bluetooth nearby** pages paired devices that do not advertise, which most phones do not with
+  the screen off.
+- **A media state that names an app matches**: media sessions are read through the notification
+  listener.
+- **Send Intent** may name a class that sits outside the target's package name.
+- **The run log is indexed** by task and by execution, so its task filter and the start-up check
+  for cut-off runs no longer read the whole table.
+- **Backup and restore**: an encrypted snapshot can be restored from the picker; a restore that
+  stops half-way is finished or undone at the next start; the plaintext copy a restore is staged
+  from is overwritten before it is deleted; an old v1 encrypted backup is limited to 8 MB.
+- **Home screen shortcuts made with Pin** take a task's new name and go dark when it is deleted.
+- **Steps that run a task** are read exact name first, so renaming or deleting `Foo` no longer
+  repoints a step that runs `foo`, and a task whose name is a number is protected.
+- **Secret values no longer reach the logs through a name built from them** — a global named
+  `%Cache_%Pin` is counted, not named, in the app log and the run's notes.
+- **Every calendar preset** sets the all-day filter, so a context no longer stays "all-day only".
+- **Counts read right for one**: "1 context", "1 action", "1 issue".
+
+### Lists
+
+- **Sort.** Profiles and Tasks have a sort pill beside the search field, Scenes one above the
+  list. "Manual" is the list as arranged; "Name" and "Last edited" show a flat list. A sort is a
+  view: no position, group or bundle order is written, and a line above the list says so. Each
+  list remembers its choice.
+- **Running.** A task's card says Running while it runs, also as a sub-task; so does every profile
+  that runs it on enter, on exit or as its fallback — by name where the profile links by name.
+
+### Actions
+
+- **Get Location** has two new fields. *Accuracy wanted (m)*: a cached fix worse than this is not
+  used and the wait goes on until one this good arrives; on timeout the best fix seen is still
+  written, and `<prefix>Acc` says how good it was. *Hide the coordinates*: latitude and longitude
+  are stored as sensitive and never shown in the run log. It is off unless switched on.
+- Upstream's own Get Location is **not** included: it uses the id `location.get`, which is this
+  app's action with its own arguments and variables.
+
+### Engine
+
+- **A clock set back, or a cooldown shortened, no longer holds a profile** for longer than one
+  cooldown: a deadline further away than that is brought in and saved.
+- **`%k(+1)` on a number stays arithmetic** when an array of the same name exists. Tasker's
+  `%arr(+sep)` join, `%arr(1,3)`, `%arr(*)` and the `#?` / `$?` searches from upstream are otherwise
+  available in variable expansion.
+- **The Wi-Fi network name is read from the start of the service**, as before; upstream now reads
+  it only while a profile asks, through a hook this app's service does not use.
+
+### Settings
+
+- **New profiles start on** — a switch in the Editor section of the UI settings page. Off by
+  default; imports, templates and copies start off either way.
+
+### Not taken from upstream
+
+- Its Tasker array rework of Array Push, Pop and Process, Variable Clear by position and by JSON
+  path, and Replace Text in place: this app's own versions of those actions stay.
+- Giving a cooldown back when a run never starts.
+- Airplane mode through the digital-assistant role. The three services for it are not in the
+  manifest, so the app is not offered as an assistant; airplane mode goes through Shizuku.
+- The "Variables this trigger provides" section of the event editor, and the reworded Inspector.
+
 ## 0.2.96+2026-11-13.00-28.g70b0571a+034 — 2026-11-22
 
 Built on upstream `70b0571a` — OpenTasker **0.2.96** plus its unreleased work up to 2026-11-12,
