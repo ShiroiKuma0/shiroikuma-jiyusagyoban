@@ -200,6 +200,18 @@ class TaskerNumberedArrayTest {
     }
 
     @Test
+    fun aPositionWithAFractionCountsByItsWholePartAsInTasker() {
+        val variables = store("arr1" to "a", "arr2" to "b", "arr3" to "c")
+
+        assertEquals(ActionResult.Success, act(variables, "array.pop", "array" to "%arr", "position" to "2.9", "to_var" to "Got"))
+        assertEquals("b", variables.get("Got"))
+        listOf("0.5", "2.", "1e3", "-1.5", "2.5f").forEach { position ->
+            val result = act(store("arr1" to "a"), "array.pop", "array" to "%arr", "position" to position, "to_var" to "Got")
+            assertTrue("$position: $result", result is ActionResult.Failure)
+        }
+    }
+
+    @Test
     fun aPositionVariableThatIsUnsetStopsTheStepInsteadOfUsingTheFirstElement() {
         fun pop(position: String) = Task(
             name = "T",

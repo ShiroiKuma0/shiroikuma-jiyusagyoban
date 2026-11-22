@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- Array Push and Pop failed on a Position holding a number with a fraction, like 2.5. They count it by its whole part now, as Tasker does.
 - A backup restore that failed after the restored database was already in place, with no way to put the old one back, kept the plugin condition grants made for the old database. They're cleared now, as after a restore that works.
 - A Tasker Custom Setting that flips a setting (its value is `=:=toggle=:=`) used to write that text into the setting itself. Write Setting now does what Tasker does: it reads the setting and writes 1 over 0 or 0 over 1, and fails without writing when the setting holds anything else. A Tasker Auto Brightness or Display AutoRotate set to Toggle imports now too, the same way.
 - Every event profile used to open its own receiver for Locale plugin query requests, one that other apps can send to. Now the whole app shares one, and it only listens while a profile that can react to those requests is running.

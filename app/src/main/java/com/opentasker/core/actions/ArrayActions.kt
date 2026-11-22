@@ -20,11 +20,18 @@ internal const val MAX_ELEMENTS = 10_000
 private fun arrayBase(args: Map<String, String>, key: String): String? =
     args[key]?.let(VariableNamePolicy::normalize)
 
-/** The 1-based `position` argument, 1 when it is left blank, or null when it isn't a whole number from 1. */
+/**
+ * The 1-based `position` argument, 1 when it is left blank, or null when it isn't a number from 1.
+ * A fraction counts by its whole part, as in Tasker's whole-number fields (decompiled 6.7.8, `i.F`).
+ */
 private fun position(args: Map<String, String>): Int? {
     val raw = args["position"]?.trim().orEmpty()
-    return if (raw.isEmpty()) 1 else raw.toIntOrNull()?.takeIf { it >= 1 }
+    if (raw.isEmpty()) return 1
+    raw.toIntOrNull()?.let { return it.takeIf { it >= 1 } }
+    return raw.takeIf(DECIMAL_POSITION::matches)?.toDouble()?.takeIf { it >= 1 && it < Int.MAX_VALUE }?.toInt()
 }
+
+private val DECIMAL_POSITION = Regex("""\d+\.\d+""")
 
 internal fun elementName(base: String, index: Int): String? =
     "$base$index".takeIf { it.length <= VariableNamePolicy.MAX_LENGTH }
@@ -128,7 +135,7 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")), Var
 
     override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
-        val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
+        val requested = position(args) ?: return ActionResult.Failure("position must be a number from 1")
         val items = ctx.variables.elementsWithFlags(base)
         if (items.size >= MAX_ELEMENTS) return ActionResult.Failure("%$base already has $MAX_ELEMENTS elements")
         val at = requested.coerceAtMost((items.lastEntry()?.key ?: 0) + 1)
@@ -160,7 +167,7 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")), Varia
 
     override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
-        val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
+        val requested = position(args) ?: return ActionResult.Failure("position must be a number from 1")
         val toVar = args["to_var"]?.trim()?.ifEmpty { null }
             ?.let { VariableNamePolicy.normalize(it) ?: return ActionResult.Failure("invalid To Var name") }
         val items = ctx.variables.elementsWithFlags(base)
