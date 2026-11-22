@@ -1,9 +1,11 @@
 package com.opentasker.ui.screens
 
 import com.opentasker.core.storage.BackupEncryption
+import com.opentasker.core.storage.DatabaseKeyUnavailableException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import javax.crypto.AEADBadTagException
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,6 +40,9 @@ class EncryptedRestorePromptTest {
         assertFalse(readsAsWrongPassphrase(notASnapshot))
         assertFalse(readsAsWrongPassphrase(IOException("Backup file exceeds 100 MB limit")))
         assertFalse(readsAsWrongPassphrase(IllegalStateException("not a database")))
+        // The snapshot decrypted fine and the device key failed while the candidate was checked:
+        // a crypto error, but not the passphrase's, so asking again would loop forever.
+        assertFalse(readsAsWrongPassphrase(DatabaseKeyUnavailableException("key unwrap failed", AEADBadTagException("keystore"))))
     }
 
     @Test

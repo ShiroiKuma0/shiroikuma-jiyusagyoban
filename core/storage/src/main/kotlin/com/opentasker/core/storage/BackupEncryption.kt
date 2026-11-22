@@ -12,6 +12,14 @@ import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
+ * An `.otbackup` failed its authentication: the passphrase is wrong or the file is damaged, which
+ * AES-GCM can't tell apart. Its own type, so a restore asks for the passphrase again on this and
+ * not on another crypto failure further down, like the device key being unavailable.
+ */
+class BackupDecryptionException(cause: Exception) :
+    IOException("Decryption failed. The passphrase is wrong or the file is damaged.", cause)
+
+/**
  * Encrypts and decrypts `.otbackup` files using AES-256-GCM with PBKDF2-derived keys.
  *
  * Format v2 is a bounded-memory sequence of independently authenticated 64 KiB frames. The frame
@@ -342,8 +350,7 @@ object BackupEncryption {
     private fun backupTooLarge(maxBytes: Long): IOException =
         IOException("Backup file exceeds ${maxBytes / 1024 / 1024} MB limit")
 
-    private fun decryptionFailure(cause: Exception): IOException =
-        IOException("Decryption failed. The passphrase is wrong or the file is damaged.", cause)
+    private fun decryptionFailure(cause: Exception): IOException = BackupDecryptionException(cause)
 
     private val EMPTY_BYTES = ByteArray(0)
 }

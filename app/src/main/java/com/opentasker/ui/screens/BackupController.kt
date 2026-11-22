@@ -3,13 +3,13 @@ package com.opentasker.ui.screens
 import android.content.Context
 import android.net.Uri
 import com.opentasker.app.R
+import com.opentasker.core.storage.BackupDecryptionException
 import com.opentasker.core.storage.ConfigurationSnapshotPolicy
 import com.opentasker.core.storage.ConfigurationSnapshotSettings
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.RestoreCandidate
 import com.opentasker.core.storage.configureConfigurationSnapshotDestination
-import java.security.GeneralSecurityException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,16 +38,17 @@ data class EncryptedRestorePrompt(val uri: Uri, val wrongPassphrase: Boolean = f
 
 /**
  * AES-GCM can't tell a wrong passphrase from a damaged file: both fail the authentication tag,
- * which [com.opentasker.core.storage.BackupEncryption] reports with the crypto error as its cause.
- * Either way, asking again is the useful answer, and the prompt says the file may be damaged.
+ * which [com.opentasker.core.storage.BackupEncryption] reports as a [BackupDecryptionException].
+ * Either way, asking again is the useful answer, and the prompt says the file may be damaged. Any
+ * other crypto failure (the device key, say) closes the prompt, since another passphrase won't help.
  */
 internal fun readsAsWrongPassphrase(error: Throwable): Boolean =
     generateSequence(error) { it.cause.takeIf { cause -> cause !== it } }
         .take(8)
-        .any { it is GeneralSecurityException }
+        .any { it is BackupDecryptionException }
 
 /**
- * The Setup card's backup lane of [ActiveAutomationViewModel]: backup, export, restore review and
+ * The Settings backup card's lane of [ActiveAutomationViewModel]: backup, export, restore review and
  * staging, rollback, and configuration snapshots. It runs on the view model's scope and reports
  * through the view model's message channel, so it lives and dies with the screen (A-353).
  */
