@@ -1,5 +1,6 @@
 package com.opentasker.core.contexts
 
+import android.content.ComponentName
 import android.content.Context
 import android.media.AudioManager
 import android.media.session.MediaSessionManager
@@ -29,9 +30,11 @@ object MediaPlaybackStateEvents {
             @Suppress("DEPRECATION")
             it.isMusicActive
         } == true
+        // Without MEDIA_CONTENT_CONTROL, only an enabled notification listener may list sessions, so
+        // pass ours. With notification access off this throws, and media_active falls back to audio.
         val sessionPackages = runCatching {
             app.getSystemService(MediaSessionManager::class.java)
-                ?.getActiveSessions(null)
+                ?.getActiveSessions(ComponentName(app, NotificationTriggerService::class.java))
                 .orEmpty()
                 .filter { controller -> controller.playbackState?.state in ACTIVE_PLAYBACK_STATES }
                 .map { it.packageName }
