@@ -1760,13 +1760,16 @@
     <string name="inspector_causal_loop_body">引擎停止了此配置文件链：%1$s。请参阅运行日志和诊断了解父级执行。</string>
     <string name="inspector_no_profiles_body">在审阅匹配说明前请先创建配置文件。</string>
     <string name="inspector_ready">就绪</string>
-    <string name="inspector_attention">%1$d 项需关注</string>
+    <plurals name="inspector_attention">
+        <item quantity="other">%1$d 项需关注</item>
+    </plurals>
     <string name="inspector_last_update_value">%1$s %2$s</string>
     <string name="inspector_context_number">#%1$d</string>
     <string name="inspector_context_source">%1$s 通过 %2$s</string>
     <string name="inspector_observed">观察于 %1$s</string>
-    <string name="inspector_matched">matched=%1$b</string>
-    <string name="inspector_metadata">%1$s=%2$s</string>
+    <string name="inspector_matched">匹配：是</string>
+    <string name="inspector_not_matched">匹配：否</string>
+    <string name="inspector_metadata">%1$s：%2$s</string>
     <string name="inspector_observed_component">观察到的组件：%1$s</string>
     <string name="inspector_component_unavailable">观察到的组件：不可用</string>
     <string name="inspector_oem_risk">%1$s 后台风险：%2$s</string>
@@ -1792,8 +1795,8 @@
     <string name="inspector_status_needs_setup">需要设置</string>
     <string name="inspector_status_missing">缺失</string>
     <string name="inspector_status_error">错误</string>
-    <string name="inspector_observation_loading">加载中</string>
-    <string name="inspector_observation_ready">就绪</string>
+    <string name="inspector_observation_loading">暂无读数</string>
+    <string name="inspector_observation_ready">最新</string>
     <string name="inspector_observation_stale">过期</string>
     <string name="inspector_observation_error">错误</string>
     <string name="context_source_application">应用</string>

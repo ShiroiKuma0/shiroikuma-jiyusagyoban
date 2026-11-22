@@ -1858,13 +1858,17 @@
     <string name="inspector_causal_loop_body">The engine stopped this profile chain: %1$s. See Run Log and Diagnostics for the parent execution.</string>
     <string name="inspector_no_profiles_body">Create a profile before reviewing match explanations.</string>
     <string name="inspector_ready">Ready</string>
-    <string name="inspector_attention">%1$d attention</string>
+    <plurals name="inspector_attention">
+        <item quantity="one">%1$d needs attention</item>
+        <item quantity="other">%1$d need attention</item>
+    </plurals>
     <string name="inspector_last_update_value">%1$s %2$s</string>
     <string name="inspector_context_number">#%1$d</string>
     <string name="inspector_context_source">%1$s via %2$s</string>
     <string name="inspector_observed">Observed %1$s</string>
-    <string name="inspector_matched">matched=%1$b</string>
-    <string name="inspector_metadata">%1$s=%2$s</string>
+    <string name="inspector_matched">Matched: Yes</string>
+    <string name="inspector_not_matched">Matched: No</string>
+    <string name="inspector_metadata">%1$s: %2$s</string>
     <string name="inspector_observed_component">Observed component: %1$s</string>
     <string name="inspector_component_unavailable">Observed component: unavailable</string>
     <string name="inspector_oem_risk">%1$s background risk: %2$s</string>
@@ -1890,8 +1894,8 @@
     <string name="inspector_status_needs_setup">Needs setup</string>
     <string name="inspector_status_missing">Missing</string>
     <string name="inspector_status_error">Error</string>
-    <string name="inspector_observation_loading">Loading</string>
-    <string name="inspector_observation_ready">Ready</string>
+    <string name="inspector_observation_loading">No reading yet</string>
+    <string name="inspector_observation_ready">Fresh</string>
     <string name="inspector_observation_stale">Stale</string>
     <string name="inspector_observation_error">Error</string>
     <string name="context_source_application">Application</string>

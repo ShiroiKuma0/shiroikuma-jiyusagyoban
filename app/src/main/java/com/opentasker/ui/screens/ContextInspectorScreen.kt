@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -498,8 +499,9 @@ private fun InspectorProfileSelector(
     }
 }
 
+@VisibleForTesting
 @Composable
-private fun ContextInspectorSummaryCard(
+internal fun ContextInspectorSummaryCard(
     snapshot: ContextInspectionSnapshot,
     onRefresh: () -> Unit,
 ) {
@@ -531,7 +533,7 @@ private fun ContextInspectorSummaryCard(
                 if (attentionSources == 0) {
                     stringResource(R.string.inspector_ready)
                 } else {
-                    stringResource(R.string.inspector_attention, attentionSources)
+                    pluralStringResource(R.plurals.inspector_attention, attentionSources, attentionSources)
                 },
                 style = MaterialTheme.typography.titleSmall,
                 color = healthColor,
@@ -544,8 +546,9 @@ private fun ContextInspectorSummaryCard(
     }
 }
 
+@VisibleForTesting
 @Composable
-private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
+internal fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     val color = sourceStatusColor(source.status)
     val observationStatus = source.observationStatus(nowMs)
     val observation = source.lastObservation
@@ -582,10 +585,14 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
                     )
                 }
                 InspectorStatusPill(stringResource(source.status.resourceId), color)
-                InspectorStatusPill(
-                    stringResource(observationStatus.resourceId),
-                    observationStatusColor(observationStatus),
-                )
+                // The freshness pill only means something while the source runs. Beside "Needs
+                // setup" it read as a second, contradicting status.
+                if (source.status == ContextSourceStatus.Active || source.status == ContextSourceStatus.Waiting) {
+                    InspectorStatusPill(
+                        stringResource(observationStatus.resourceId),
+                        observationStatusColor(observationStatus),
+                    )
+                }
             }
             source.setupDetail?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -600,8 +607,9 @@ private fun ContextSourceCard(source: ContextSourceSnapshot, nowMs: Long) {
     }
 }
 
+@VisibleForTesting
 @Composable
-private fun ProfileInspectorCard(
+internal fun ProfileInspectorCard(
     profile: ProfileInspection,
     nowMs: Long,
     lintFindings: List<AutomationLintFinding>,
@@ -609,6 +617,9 @@ private fun ProfileInspectorCard(
 ) {
     var lintExpanded by remember(profile.profileId) { mutableStateOf(false) }
     var detailsExpanded by remember(profile.profileId) { mutableStateOf(false) }
+    val platformBlocked = remember(profile.profile) {
+        profile.profile?.let { PlatformSupport.blockedTriggers(listOf(it), Build.VERSION.SDK_INT) }.orEmpty()
+    }
     val color = when {
         !profile.enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         profile.matching -> MaterialTheme.colorScheme.tertiary
@@ -642,16 +653,16 @@ private fun ProfileInspectorCard(
                     label = when {
                         !profile.enabled -> stringResource(R.string.status_disabled)
                         profile.matching -> stringResource(R.string.status_matching)
-                        else -> stringResource(R.string.status_blocked)
+                        // "Blocked" is kept for a profile something refuses to run. One whose
+                        // contexts simply don't hold right now is only not matching.
+                        platformBlocked.isNotEmpty() || profile.suppressionReason != null -> stringResource(R.string.status_blocked)
+                        else -> stringResource(R.string.inspector_not_matching)
                     },
                     color = color,
                 )
             }
             // Outside the details: "Blocked" with no reason is the whole symptom of a trigger this
             // release can't deliver, so the reason has to be visible without digging.
-            val platformBlocked = remember(profile.profile) {
-                profile.profile?.let { PlatformSupport.blockedTriggers(listOf(it), Build.VERSION.SDK_INT) }.orEmpty()
-            }
             platformBlocked.forEach { blocked ->
                 InspectorNotice(
                     title = stringResource(R.string.inspector_platform_blocked_title),
@@ -869,7 +880,7 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.inspector_latest_value), style = MaterialTheme.typography.labelLarge)
             Text(
-                stringResource(R.string.inspector_matched, event.event.matched),
+                stringResource(if (event.event.matched) R.string.inspector_matched else R.string.inspector_not_matched),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -889,12 +900,14 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
             event.event.metadata.entries
                 .filterNot {
                     it.key == "component" || it.key == "component_status" ||
-                        it.key.startsWith("_setup_") || it.key.startsWith(STAND_IN_MARKER_PREFIX)
+                        it.key.startsWith("_setup_") || it.key.startsWith(STAND_IN_MARKER_PREFIX) ||
+                        // An empty value read as a broken "foreground=" line.
+                        it.value.isBlank()
                 }
                 .sortedBy { it.key }
                 .forEach { (key, value) ->
                     Text(
-                        stringResource(R.string.inspector_metadata, key, value),
+                        stringResource(R.string.inspector_metadata, metadataLabel(key), value),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1215,6 +1228,10 @@ private val ContextObservationStatus.resourceId: Int
         ContextObservationStatus.Stale -> R.string.inspector_observation_stale
         ContextObservationStatus.Error -> R.string.inspector_observation_error
     }
+
+/** "battery_level" reads as "Battery level", so a source's raw keys don't show as code. */
+private fun metadataLabel(key: String): String =
+    key.replace('_', ' ').trim().replaceFirstChar { it.uppercaseChar() }
 
 private fun formatRelativeTime(context: Context, observedAtMs: Long, nowMs: Long): String {
     val seconds = ((nowMs - observedAtMs) / 1000L).coerceAtLeast(0)
