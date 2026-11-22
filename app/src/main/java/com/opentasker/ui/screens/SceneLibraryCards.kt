@@ -459,11 +459,6 @@ private fun SceneIssueText(issue: SceneIssue) {
 }
 
 @Composable
-private fun SceneMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    SummaryMetric(value = value, label = label, modifier = modifier)
-}
-
-@Composable
 internal fun sceneElementTypeLabel(type: SceneElementType): String = stringResource(sceneElementTypeLabelRes(type))
 
 @Composable

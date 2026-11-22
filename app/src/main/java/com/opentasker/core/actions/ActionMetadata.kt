@@ -91,9 +91,6 @@ object ActionMetadataRegistry {
     fun get(id: String): ActionMetadata? = ActionCatalog.get(id)?.metadataOrNull()
 
     fun all(): Collection<ActionMetadata> = ActionCatalog.allDefinitions.mapNotNull { it.metadataOrNull() }
-
-    fun byCategory(@StringRes categoryRes: Int): List<ActionMetadata> =
-        all().filter { it.categoryRes == categoryRes }
 }
 
 /**

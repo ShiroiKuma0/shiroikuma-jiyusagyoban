@@ -162,20 +162,6 @@ fun inspectProfile(
     )
 }
 
-fun inspectContext(
-    index: Int,
-    spec: ContextSpec,
-    sourcesByKey: Map<String, ContextSourceSnapshot>,
-): ContextCheck {
-    return inspectContextForProfile(
-        profile = Profile(id = 0, name = "Inspector", enterTaskId = 0),
-        index = index,
-        spec = spec,
-        sourcesByKey = sourcesByKey,
-        observationTransformer = { _, _, _, observation -> observation },
-    )
-}
-
 /**
  * Mirrors the engine's evaluateWithOrGroups semantics: contexts sharing an orGroup
  * need only one member to match; ungrouped contexts are AND terms. The Inspector

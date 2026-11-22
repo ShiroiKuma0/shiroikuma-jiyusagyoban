@@ -493,13 +493,6 @@ class VariableRepository(
         return RuntimeVariableSeed(values, secretNames, unavailable)
     }
 
-    suspend fun persistRuntime(values: List<RuntimeVariableValue>) {
-        val entities = values.map(::runtimeValueToEntity)
-        storageMutationMutex.withLock {
-            dao.upsertAll(entities)
-        }
-    }
-
     /**
      * Applies a run's changed globals as one Room insert batch only when each row still matches the
      * snapshot that run hydrated. The first commit wins a same-name race; disjoint names merge.

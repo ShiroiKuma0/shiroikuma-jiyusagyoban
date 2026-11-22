@@ -69,10 +69,6 @@ object CrashLogHandler {
         }
     }
 
-    fun getLatestCrashLog(context: Context): String? {
-        return listCrashLogs(context).firstOrNull()?.redactedContent
-    }
-
     fun listCrashLogs(context: Context): List<CrashLogRecord> =
         listCrashLogFiles(File(context.filesDir, CRASH_DIR))
 

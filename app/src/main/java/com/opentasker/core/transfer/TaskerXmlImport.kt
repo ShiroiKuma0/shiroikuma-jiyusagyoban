@@ -2444,11 +2444,6 @@ object TaskerXmlImporter {
             .sortedBy { it.argIndex() }
             .map { it.getAttribute("val").ifBlank { it.textContent.orEmpty() }.trim() }
 
-    private fun Element.actionInts(): List<Int> =
-        directChildren("Int")
-            .sortedBy { it.argIndex() }
-            .mapNotNull { it.getAttribute("val").ifBlank { it.textContent.orEmpty() }.trim().toIntOrNull() }
-
     /**
      * Str args keyed by their Tasker `sr` argument index. Tasker writes children in lexicographic
      * `sr` order (arg1, arg10, arg11, arg12, arg2, ...) and omits fields it considers unset, so a

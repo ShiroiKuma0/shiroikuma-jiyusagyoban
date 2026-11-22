@@ -908,11 +908,6 @@ private fun ContextMetadataBlock(event: ContextEventObservation, nowMs: Long) {
 }
 
 @Composable
-private fun InspectorMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    SummaryMetric(value = value, label = label, modifier = modifier)
-}
-
-@Composable
 private fun InspectorStatusPill(label: String, color: Color) {
     StatusPill(label = label, color = color)
 }

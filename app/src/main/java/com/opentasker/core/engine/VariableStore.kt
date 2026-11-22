@@ -465,17 +465,6 @@ class VariableStore {
         return name
     }
 
-    /**
-     * Expand with operator support. Examples:
-     * - "%VAR(+5)" → parse VAR as number, add 5
-     * - "%VAR(upper)" → uppercase VAR
-     * - "%VAR(regex:(\d+):1)" → extract first digit group
-     * - "(x > 5) ? yes : no" → conditional
-     */
-    fun expandWithOperators(expr: String): String {
-        return expand(expr)
-    }
-
     fun evaluateCondition(expr: String): Boolean {
         return expander.evaluateCondition(expr, this, arrayStore)
     }

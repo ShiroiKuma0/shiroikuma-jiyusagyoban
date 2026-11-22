@@ -1056,7 +1056,6 @@
 
     <string name="workspace_review_readiness_templates">启用配置文件前请先审阅就绪状态。模板在你批准之前保持禁用。</string>
     <string name="workspace_task_library_ready_body">构建可复用的操作序列，然后在顺序和权限就绪时将它们附加到配置文件。</string>
-    <string name="workspace_templates_body">从现成的配置文件开始。你填写它要求的部分，阅读它将被允许做什么，且在你打开之前它保持关闭。</string>
     <string name="workspace_recent_failure">最近失败</string>
     <string name="workspace_review_run_log_details">查看运行日志以了解详情。</string>
     <string name="workspace_stored_data_review">存储的数据需要审阅</string>
@@ -1089,16 +1088,11 @@
     <string name="flow_context_action_summary">%1$d 个上下文 · %2$d 个操作</string>
     <string name="flow_all_context_rules">所有上下文规则</string>
     <string name="flow_add_content_description">添加</string>
-    <string name="flow_lane_contexts">上下文</string>
-    <string name="flow_lane_profile">配置文件</string>
-    <string name="flow_lane_enter">进入</string>
-    <string name="flow_lane_exit">退出</string>
     <string name="flow_enter">进入</string>
     <string name="flow_exit">退出</string>
     <string name="flow_missing_reference">缺失引用</string>
     <string name="flow_step_label">步骤 %1$d</string>
     <string name="flow_then">然后</string>
-    <string name="flow_if">如果</string>
     <string name="flow_if_condition">如果 %1$s</string>
     <string name="flow_changed_node">已更改</string>
     <string name="flow_sub_task_reference">子任务引用</string>

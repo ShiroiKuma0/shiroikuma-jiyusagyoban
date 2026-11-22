@@ -2,12 +2,7 @@ package com.opentasker.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,12 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,18 +34,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -62,7 +48,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.opentasker.app.R
 import com.opentasker.core.capabilities.AutomationLintSeverity
-import com.opentasker.core.capabilities.AutomationLint
 import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.flow.AutomationFlowGraph
 import com.opentasker.core.flow.AutomationFlowGraphBuilder
@@ -337,179 +322,6 @@ private fun FlowInlineCommand(
 }
 
 @Composable
-private fun FlowCanvasOverview(
-    graph: AutomationFlowGraph,
-    profileNode: AutomationFlowNode,
-    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
-) {
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-
-    @Suppress("DEPRECATION")
-    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        scale = (scale * zoomChange).coerceIn(0.5f, 2.5f)
-        offsetX += panChange.x
-        offsetY += panChange.y
-    }
-
-    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.60f)
-    val lanes = buildList {
-        if (graph.contextNodes.isNotEmpty()) add(FlowLaneData(stringResource(R.string.flow_lane_contexts), graph.contextNodes))
-        add(FlowLaneData(stringResource(R.string.flow_lane_profile), listOf(profileNode)))
-        graph.enterTaskNode?.let { add(FlowLaneData(stringResource(R.string.flow_lane_enter), listOf(it) + graph.actionNodesFor(it.id))) }
-        graph.exitTaskNode?.let { add(FlowLaneData(stringResource(R.string.flow_lane_exit), listOf(it) + graph.actionNodesFor(it.id))) }
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .clipToBounds()
-            .transformable(transformState),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
-        shape = RoundedCornerShape(com.opentasker.ui.theme.DesignSystem.Radii.lg),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
-                ),
-        ) {
-            Canvas(Modifier.fillMaxSize()) {
-                // Convert dp to px against the real density so connectors line up with the
-                // dp-laid-out lane label column (68.dp) at any density instead of only at 1x.
-                val laneHeight = size.height / lanes.size.coerceAtLeast(1)
-                val labelWidth = 72.dp.toPx()
-                val trailingPadding = 16.dp.toPx()
-                for (laneIdx in 0 until lanes.size - 1) {
-                    val fromY = laneHeight * laneIdx + laneHeight / 2
-                    val toY = laneHeight * (laneIdx + 1) + laneHeight / 2
-                    val midX = labelWidth + 40.dp.toPx()
-                    drawLine(edgeColor, Offset(midX, fromY), Offset(midX, toY), strokeWidth = 2.dp.toPx())
-                    drawCircle(edgeColor, 3.dp.toPx(), Offset(midX, toY))
-                }
-                lanes.forEachIndexed { laneIdx, lane ->
-                    val y = laneHeight * laneIdx + laneHeight / 2
-                    val nodeWidth = (size.width - labelWidth - trailingPadding) / lane.nodes.size.coerceAtLeast(1)
-                    for (nodeIdx in 0 until lane.nodes.size - 1) {
-                        val fromX = labelWidth + nodeWidth * nodeIdx + nodeWidth / 2
-                        val toX = labelWidth + nodeWidth * (nodeIdx + 1) + nodeWidth / 2
-                        drawLine(edgeColor, Offset(fromX, y), Offset(toX, y), strokeWidth = 1.5.dp.toPx())
-                        drawCircle(edgeColor, 2.5.dp.toPx(), Offset(toX, y))
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier.fillMaxSize().padding(4.dp),
-                verticalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                lanes.forEach { lane ->
-                    FlowCanvasLane(
-                        label = lane.label,
-                        nodes = lane.nodes,
-                        onNodeTargetSelected = onNodeTargetSelected,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private data class FlowLaneData(
-    val label: String,
-    val nodes: List<AutomationFlowNode>,
-)
-
-@Composable
-private fun FlowCanvasLane(
-    label: String,
-    nodes: List<AutomationFlowNode>,
-    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
-) {
-    if (nodes.isEmpty()) return
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            modifier = Modifier.width(68.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        nodes.forEach { node ->
-            FlowCanvasNode(node = node, onNodeTargetSelected = onNodeTargetSelected)
-        }
-    }
-}
-
-@Composable
-private fun FlowCanvasNode(
-    node: AutomationFlowNode,
-    onNodeTargetSelected: (AutomationFlowTarget) -> Unit,
-) {
-    val color = nodeColor(node.kind, node.muted)
-    val target = node.target
-    Surface(
-        modifier = Modifier
-            .widthIn(min = 128.dp, max = 184.dp)
-            .semantics { contentDescription = node.accessibilityLabel() }
-            .then(
-                if (target != null) {
-                    Modifier.clickable(role = Role.Button) { onNodeTargetSelected(target) }
-                } else {
-                    Modifier
-                }
-            ),
-        color = color.copy(alpha = if (node.muted) 0.07f else 0.10f),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(
-            if (node.changed) 2.dp else 1.dp,
-            if (node.changed) MaterialTheme.colorScheme.tertiary else color.copy(alpha = if (node.muted) 0.20f else 0.30f),
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                node.title,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (node.muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // The list variant already carries this pill. On the canvas the only marker used to be
-            // a 2dp tertiary border, which in the dark theme sits a few percent away from the sage
-            // node outline and is invisible to anyone who cannot compare two similar colours.
-            if (node.changed) {
-                FlowStatusPill(
-                    label = stringResource(R.string.flow_changed_node),
-                    color = MaterialTheme.colorScheme.tertiary,
-                )
-            }
-            node.condition?.let {
-                Text(
-                    stringResource(R.string.flow_if),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    maxLines = 1,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun FlowTaskLane(
     graph: AutomationFlowGraph,
     taskNode: AutomationFlowNode?,
@@ -657,11 +469,6 @@ private fun FlowEdgeLabel(label: String) {
         )
         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
     }
-}
-
-@Composable
-private fun FlowMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    SummaryMetric(value = value, label = label, modifier = modifier)
 }
 
 @Composable

@@ -77,18 +77,6 @@ object AppLogger {
         }
     }
 
-    fun logExecution(tag: String, operation: String, durationMs: Long, success: Boolean = true) {
-        val status = if (success) "OK" else "FAILED"
-        info(tag, "$operation completed in ${durationMs}ms [$status]")
-    }
-
-    fun logStructured(tag: String, level: Level, message: String, data: Map<String, Any> = emptyMap()) {
-        val dataText = if (data.isEmpty()) "" else {
-            " | " + data.entries.joinToString(", ") { "${it.key}=${it.value}" }
-        }
-        emit(level, tag, message + dataText, null)
-    }
-
     internal fun clearForTest() {
         synchronized(ring) { ring.clear() }
         minimumLevel = Level.DEBUG

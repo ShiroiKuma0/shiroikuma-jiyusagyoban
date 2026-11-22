@@ -32,9 +32,6 @@ interface EditHistoryDao {
     @Insert
     suspend fun insert(entry: EditHistoryEntity): Long
 
-    @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC LIMIT 1")
-    suspend fun getLatest(type: String, entityId: Long): EditHistoryEntity?
-
     @Query("SELECT * FROM edit_history WHERE entityType = :type AND entityId = :entityId AND isUndone = 0 ORDER BY timestamp DESC, id DESC LIMIT 1")
     suspend fun getUndoCandidate(type: String, entityId: Long): EditHistoryEntity?
 
@@ -47,9 +44,6 @@ interface EditHistoryDao {
     @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId AND id NOT IN (SELECT id FROM edit_history WHERE entityType = :type AND entityId = :entityId ORDER BY timestamp DESC, id DESC LIMIT :keep)")
     suspend fun pruneOld(type: String, entityId: Long, keep: Int = MAX_HISTORY_PER_ENTITY)
 
-    @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId")
-    suspend fun deleteFor(type: String, entityId: Long)
-
     @Query("DELETE FROM edit_history WHERE entityType = :type AND entityId = :entityId AND isUndone = 1")
     suspend fun deleteRedoBranch(type: String, entityId: Long)
 
@@ -58,9 +52,6 @@ interface EditHistoryDao {
 
     @Query("UPDATE edit_history SET isUndone = 0 WHERE id = :id")
     suspend fun markRedone(id: Long)
-
-    @Query("DELETE FROM edit_history WHERE timestamp < :before")
-    suspend fun deleteOlderThan(before: Long)
 
     /**
      * One row per entity that has any history, saying whether undo and redo are actually available.

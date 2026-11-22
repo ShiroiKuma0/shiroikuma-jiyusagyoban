@@ -231,7 +231,6 @@ class RunLogPagingTest {
         override suspend fun insert(e: RunLogEntity) = unused()
         override suspend fun getRecent(): List<RunLogEntity> = unused()
         override fun getRecentFlow(): Flow<List<RunLogEntity>> = unused()
-        override suspend fun getByTask(taskId: Long): List<RunLogEntity> = unused()
         override suspend fun getById(id: Long): RunLogEntity? = unused()
         override suspend fun getByExecutionId(executionId: String): RunLogEntity? = unused()
         override suspend fun setStarred(id: Long, starred: Boolean) = unused()

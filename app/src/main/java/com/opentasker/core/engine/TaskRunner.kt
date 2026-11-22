@@ -1513,9 +1513,6 @@ private data class ActionArgumentExpansionReport(
         return ExportRedactionPolicy.redactText(message, sensitiveValues, REDACTED_VALUE)
     }
 
-    /** Compatibility name retained for source-level callers; the policy now covers all fields. */
-    fun redactSecretDerivedValues(message: String): String = redactSensitiveValues(message)
-
     fun hasSensitiveValues(): Boolean = args.keys.any { name ->
         ActionArgumentSensitivity.isSensitive(actionType, name, args) ||
             expansions.any { it.argName == name && it.isSecretDerived }

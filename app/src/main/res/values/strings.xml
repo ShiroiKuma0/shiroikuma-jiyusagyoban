@@ -1103,7 +1103,6 @@
 
     <string name="workspace_review_readiness_templates">Review readiness before enabling profiles. Templates stay disabled until you approve them.</string>
     <string name="workspace_task_library_ready_body">Build reusable action sequences, then attach them to profiles when the order and permissions are ready.</string>
-    <string name="workspace_templates_body">Start from a ready-made profile. You fill in the parts it asks for, read what it will be allowed to do, and it stays off until you turn it on.</string>
     <string name="workspace_recent_failure">Recent failure</string>
     <string name="workspace_review_run_log_details">Review the run log for details.</string>
     <string name="workspace_stored_data_review">Stored data needs review</string>
@@ -1136,16 +1135,11 @@
     <string name="flow_context_action_summary">%1$d context(s) · %2$d action(s)</string>
     <string name="flow_all_context_rules">all context rules</string>
     <string name="flow_add_content_description">Add</string>
-    <string name="flow_lane_contexts">Contexts</string>
-    <string name="flow_lane_profile">Profile</string>
-    <string name="flow_lane_enter">Enter</string>
-    <string name="flow_lane_exit">Exit</string>
     <string name="flow_enter">enter</string>
     <string name="flow_exit">exit</string>
     <string name="flow_missing_reference">missing reference</string>
     <string name="flow_step_label">step %1$d</string>
     <string name="flow_then">then</string>
-    <string name="flow_if">if</string>
     <string name="flow_if_condition">if %1$s</string>
     <string name="flow_changed_node">Changed</string>
     <string name="flow_sub_task_reference">Sub-task reference</string>

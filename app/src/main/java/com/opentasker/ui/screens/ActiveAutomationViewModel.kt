@@ -1686,8 +1686,6 @@ class ActiveAutomationViewModel(
     fun redoLastProfileEdit(profileId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROFILE, profileId, redo = true)
     fun undoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = false)
     fun redoLastSceneEdit(sceneId: Long) = transitionEditAsync(EditHistoryDao.TYPE_SCENE, sceneId, redo = true)
-    fun redoLastVariableDelete(historyId: Long) = transitionEditAsync(EditHistoryDao.TYPE_VARIABLE, historyId, redo = true)
-    fun redoLastProjectDelete(projectId: Long) = transitionEditAsync(EditHistoryDao.TYPE_PROJECT, projectId, redo = true)
 
     fun updateVariable(
         previousName: String?,

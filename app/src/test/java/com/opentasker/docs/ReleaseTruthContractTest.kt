@@ -243,7 +243,7 @@ class ReleaseTruthContractTest {
         )
         requireSourceEvidence(
             "app/src/main/java/com/opentasker/ui/screens/AutomationFlowScreen.kt",
-            "rememberTransformableState",
+            "graph.incomingEdgeLabel(",
             "flow_subflow",
             "flow_branch",
             "onAddContext",
@@ -307,7 +307,7 @@ class ReleaseTruthContractTest {
             "README.md",
             required = listOf(
                 "Scene element editor with drag-to-move, resize handles, multi-select, alignment guides",
-                "Flow graphs with zoom/pan canvas previews, edge routing, branch/subflow markers",
+                "Flow graphs with labeled edges, branch/subflow markers",
                 "persisted default-on kill switch",
                 "eight elevated actions run through a separately bound AIDL user service",
                 "Termux 0.109+ `RUN_COMMAND` integration",
@@ -319,12 +319,14 @@ class ReleaseTruthContractTest {
                 "Read-only flow graphs",
                 "Scene multi-select layout edits, alignment guides, and overlay launch",
                 "Visual flow editor authoring",
+                // The Flow tab's zoom/pan canvas left the screen in the v0.2.87 redesign.
+                "zoom/pan",
             ),
         ),
         DocumentTruthRule(
             "docs/ARCHITECTURE.md",
             required = listOf(
-                "zoom/pan",
+                "labeled edges",
                 "picker-backed Add Context/Add Step commands",
                 "SceneOverlayService",
                 "multi-select",
@@ -346,6 +348,7 @@ class ReleaseTruthContractTest {
                 "does not link the Shizuku API",
                 "first-class condition-context picker row",
                 "Tasker XML export remains roadmap work",
+                "zoom/pan",
             ),
         ),
         DocumentTruthRule(
@@ -355,8 +358,8 @@ class ReleaseTruthContractTest {
         ),
         DocumentTruthRule(
             "docs/VISUAL_FLOW.md",
-            required = listOf("zoom/pan", "edge routing", "branch/subflow markers", "picker-backed add commands"),
-            forbidden = listOf("keeps the graph layout read-only", "No branching editor.", "Add zoom gestures only if"),
+            required = listOf("labeled edges", "branch/subflow markers", "picker-backed add commands"),
+            forbidden = listOf("keeps the graph layout read-only", "No branching editor.", "Add zoom gestures only if", "zoom/pan"),
         ),
         DocumentTruthRule(
             "docs/SHIZUKU.md",

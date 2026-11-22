@@ -100,8 +100,6 @@ interface RunLogDao {
     suspend fun getRecent(): List<RunLogEntity>
     @Query("SELECT * FROM run_logs ORDER BY timestamp DESC, id DESC LIMIT 100")
     fun getRecentFlow(): Flow<List<RunLogEntity>>
-    @Query("SELECT * FROM run_logs WHERE taskId = :taskId ORDER BY timestamp DESC, id DESC LIMIT 50")
-    suspend fun getByTask(taskId: Long): List<RunLogEntity>
     @Query("SELECT * FROM run_logs WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): RunLogEntity?
     @Query("SELECT * FROM run_logs WHERE executionId = :executionId ORDER BY id DESC LIMIT 1")

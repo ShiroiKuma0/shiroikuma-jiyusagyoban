@@ -63,19 +63,3 @@ internal fun timeContextEventAt(
 
 internal fun millisUntilNextMinute(nowMillis: Long): Long =
     60_000L - Math.floorMod(nowMillis, 60_000L)
-
-fun timeMatches(from: String, to: String): Boolean {
-    val cal = Calendar.getInstance()
-    val now = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
-    val fromMin = parseClockMinutes(from) ?: return false
-    val toMin = parseClockMinutes(to) ?: return false
-    return if (fromMin <= toMin) now in fromMin..toMin else (now >= fromMin || now <= toMin)
-}
-
-private fun parseClockMinutes(value: String): Int? {
-    val parts = value.trim().split(":")
-    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return null
-    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
-    if (hour !in 0..23 || minute !in 0..59) return null
-    return hour * 60 + minute
-}

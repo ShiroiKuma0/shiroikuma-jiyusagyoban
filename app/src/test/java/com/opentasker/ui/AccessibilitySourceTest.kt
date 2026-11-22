@@ -130,7 +130,7 @@ class AccessibilitySourceTest {
         val flowSource = uiSourceRoot.resolve("screens/AutomationFlowScreen.kt").readText()
         assertTrue(flowSource.contains("graph.accessibilitySummary()"))
         assertTrue(flowSource.contains("node.accessibilityLabel()"))
-        assertTrue("Flow canvas must keep bounded zoom/pan interaction", flowSource.contains("rememberTransformableState"))
+        assertTrue("Flow graph edges must keep their condition and step labels", flowSource.contains("graph.incomingEdgeLabel("))
         assertTrue("Flow graph must expose missing-reference repair nodes", flowSource.contains("AutomationFlowNodeKind.MISSING"))
         assertTrue("Flow graph must keep picker-backed context add", flowSource.contains("onAddContext"))
         assertTrue("Flow graph must keep picker-backed action add", flowSource.contains("onAddAction"))

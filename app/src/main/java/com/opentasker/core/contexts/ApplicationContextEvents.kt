@@ -14,7 +14,6 @@ object ApplicationContextEvents {
         extraBufferCapacity = 16,
     )
     @Volatile private var latestForegroundPackage: String? = null
-    @Volatile private var latestForegroundComponent: String? = null
 
     val events: Flow<ContextEvent> = flow {
         emit(
@@ -36,7 +35,6 @@ object ApplicationContextEvents {
         if (normalized.isBlank()) return false
         val normalizedComponent = className?.trim().orEmpty()
         latestForegroundPackage = normalized
-        latestForegroundComponent = normalizedComponent.ifBlank { null }
         return foregroundEvents.tryEmit(
             ContextEvent(
                 type = TYPE,
@@ -52,7 +50,4 @@ object ApplicationContextEvents {
 
     /** Latest package shown by the Context Inspector, offered as an explicit editor shortcut. */
     fun latestObservedPackage(): String? = latestForegroundPackage
-
-    /** Latest Activity class shown by the Context Inspector, when the OEM reported one. */
-    fun latestObservedComponent(): String? = latestForegroundComponent
 }
