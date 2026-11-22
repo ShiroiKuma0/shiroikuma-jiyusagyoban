@@ -52,6 +52,13 @@ class TaskerIndexListFormTest {
     }
 
     @Test
+    fun aLetterAfterASpaceIsStillTaskersList() {
+        // This app's own operators only count right after the parenthesis, and Tasker trims, then reads a list.
+        assertEquals("alpha", numbered().expand("%arr( a,1)"))
+        assertEquals("alpha", numbered().expand("%arr(+;+ a,1)"))
+    }
+
+    @Test
     fun aCommaListIsARangeAfterTheSecondPlus() {
         assertEquals("alpha;cat", numbered().expand("%arr(+;+1,3)"))
         // The stored array Split Text keeps has no list form, so that still joins with all of it.

@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
@@ -52,6 +53,17 @@ class TaskerJoinRangeRuleTest {
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+ 1:3)"))
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+1:3 )"))
         assertEquals("beta;alpha", stored().expand("%arr(+;+ 1:0 )"))
+    }
+
+    @Test
+    fun theFormIsTrimmedTheWayJavaTrimsIt() {
+        // Tasker's String.trim drops control characters and keeps a no-break space, where Kotlin's trim() does the reverse.
+        val control = Char(1)
+        val noBreak = Char(0xA0)
+        assertEquals("beta", numbered().expand("%arr(${control}2)"))
+        assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+${control}1:3)"))
+        assertNotEquals("beta", numbered().expand("%arr(${noBreak}2)"))
+        assertNotEquals("alpha;beta;cat", numbered().expand("%arr(+;+${noBreak}1:3)"))
     }
 
     @Test
