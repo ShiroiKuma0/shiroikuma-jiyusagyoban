@@ -88,4 +88,13 @@ class VariableClearPathTest {
         assertTrue(run(store, "%Json.a").success)
         assertTrue(store.isSensitive("Json"))
     }
+
+    @Test
+    fun brokenJsonNestedDeepFailsTheStepWithoutParsingIt() {
+        // kotlinx reads down an unclosed `[[[` before it refuses it, deep enough to overflow the stack.
+        val deep = "[".repeat(100_000)
+        val store = VariableStore().apply { set("Deep", deep) }
+        assertEquals("%Deep[0]: %Deep isn't valid JSON", failure(run(store, "%Deep[0]")))
+        assertEquals(deep, store.get("Deep"))
+    }
 }

@@ -576,11 +576,12 @@ class VariableStore {
         val parsed = parsePathSelectors(fullPath) ?: return "isn't a variable path"
         if (parsed.selectors.isEmpty()) return "can't clear the whole variable this way"
         val current = get(parsed.base) ?: return "%${parsed.base} has no value to change"
-        val depth = JsonNesting.depth(current)
-        if (depth != JsonNesting.NOT_JSON && depth > JsonNesting.MAX_DATA_DEPTH) return "%${parsed.base} is nested too deep to change"
-        // Tasker only reads it as JSON when, trimmed, it starts with { or [.
         val trimmed = current.trim()
-        val root = if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        val depth = JsonNesting.depth(trimmed)
+        if (depth != JsonNesting.NOT_JSON && depth > JsonNesting.MAX_DATA_DEPTH) return "%${parsed.base} is nested too deep to change"
+        // Tasker only reads it as JSON when, trimmed, it starts with { or [. Text kotlinx refuses
+        // isn't parsed at all, since kotlinx can overflow the stack reading into it first.
+        val root = if (depth != JsonNesting.NOT_JSON && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
             try { jsonCodec.parseToJsonElement(trimmed) } catch (_: SerializationException) { null }
         } else {
             null
