@@ -517,7 +517,8 @@ class ActiveAutomationViewModel(
                     throw CorruptRecordOverwriteException(issue)
                 }
                 val previousTask = previous.toDomain()
-                val renamed = !previousTask.name.equals(task.name, ignoreCase = true)
+                // Exact: a button's legacy name is matched exactly, so "foo" to "Foo" is a rename too.
+                val renamed = previousTask.name != task.name
                 val allTasks = if (renamed) db.taskDao().getAll() else emptyList()
                 if (renamed) {
                     saved = AutomationReferenceRewriter.stabilizeOwnNameReferences(

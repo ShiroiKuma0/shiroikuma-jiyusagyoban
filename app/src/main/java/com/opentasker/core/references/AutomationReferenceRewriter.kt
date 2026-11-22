@@ -301,8 +301,9 @@ object AutomationReferenceRewriter {
             ).takeIf { it != profile }
         }
 
+        val exactNames = tasks.mapTo(hashSetOf(target.name)) { it.name }
         val changedTasks = tasks.mapNotNull { task ->
-            val actions = task.actions.map { action -> action.retargetTaskArgs(target, replacement, taskIds) }
+            val actions = task.actions.map { action -> action.retargetTaskArgs(target, replacement, taskIds, exactNames) }
             task.copy(actions = actions).takeIf { it != task }
         }
 
@@ -366,14 +367,19 @@ object AutomationReferenceRewriter {
      * `task.run` or `task.stop` target leaves the action present but unbound, where the runner
      * already fails closed with "task.run requires a 'task'" (or task.stop's same message).
      */
-    private fun ActionSpec.retargetTaskArgs(target: Task, replacement: Long?, taskIds: Set<Long>?): ActionSpec {
+    private fun ActionSpec.retargetTaskArgs(
+        target: Task,
+        replacement: Long?,
+        taskIds: Set<Long>?,
+        exactNames: Set<String>? = null,
+    ): ActionSpec {
         val updated = args.toMutableMap()
         var changed = false
 
         if (type == SUB_TASK_ACTION_ID || type == STOP_TASK_ACTION_ID) {
             SUB_TASK_REF_KEYS.forEach { key ->
                 val raw = updated[key]?.trim().orEmpty()
-                if (raw.isBlank() || !raw.refersTo(target, taskIds)) return@forEach
+                if (raw.isBlank() || !raw.refersTo(target, taskIds, exactNames)) return@forEach
                 if (replacement == null) updated.remove(key) else updated[key] = replacement.toString()
                 changed = true
             }
@@ -404,10 +410,14 @@ object AutomationReferenceRewriter {
         return if (changed) copy(args = updated) else this
     }
 
-    /** As the engine reads a target: a number is an id when a task has that id, and a name otherwise. */
-    private fun String.refersTo(target: Task, taskIds: Set<Long>?): Boolean {
+    /**
+     * As the engine reads a target: a number is an id when a task has that id, and a name otherwise,
+     * matched exactly first and ignoring case only when no task in [exactNames] has it exactly.
+     */
+    private fun String.refersTo(target: Task, taskIds: Set<Long>?, exactNames: Set<String>?): Boolean {
         val id = toLongOrNull()?.takeIf { taskIds == null || it in taskIds }
-        return if (id != null) id == target.id else equals(target.name, ignoreCase = true)
+        if (id != null) return id == target.id
+        return this == target.name || (equals(target.name, ignoreCase = true) && (exactNames == null || this !in exactNames))
     }
 }
 

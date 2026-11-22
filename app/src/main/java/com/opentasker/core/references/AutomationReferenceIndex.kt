@@ -224,9 +224,10 @@ object AutomationReferenceIndex {
             add(TaskReference(TaskReferenceSite.GlobalFallbackTask, TaskRef.ById(fallbackId)))
         }
 
+        val exactNames = tasks.mapTo(hashSetOf()) { it.name }
         tasks.sortedBy { it.id }.forEach { task ->
             task.actions.forEachIndexed { actionIndex, action ->
-                actionTaskRefs(task, actionIndex, action.type, action.args, taskIds).forEach(::add)
+                actionTaskRefs(task, actionIndex, action.type, action.args, taskIds, exactNames).forEach(::add)
             }
         }
 
@@ -401,6 +402,8 @@ object AutomationReferenceIndex {
         actionType: String,
         args: Map<String, String>,
         taskIds: Set<Long>? = null,
+        /** Every task name, when known. The engine falls back to ignoring case only when none matches exactly. */
+        exactNames: Set<String>? = null,
     ): List<TaskReference> = buildList {
         if (actionType == SUB_TASK_ACTION_ID || actionType == STOP_TASK_ACTION_ID) {
             val key = SUB_TASK_REF_KEYS.firstOrNull { args[it]?.isNotBlank() == true }
@@ -417,7 +420,7 @@ object AutomationReferenceIndex {
                         raw.toLongOrNull()
                             ?.takeIf { it > 0 && (taskIds == null || it in taskIds) }
                             ?.let(TaskRef::ById)
-                            ?: TaskRef.ByName(raw),
+                            ?: TaskRef.ByName(raw, ignoreCase = exactNames == null || raw !in exactNames),
                     ),
                 )
             }

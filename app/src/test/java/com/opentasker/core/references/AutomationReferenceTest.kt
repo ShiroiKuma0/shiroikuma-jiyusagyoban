@@ -22,6 +22,28 @@ class AutomationReferenceTest {
 
     private fun caller(vararg actions: ActionSpec) = Task(id = 30, name = "Caller", actions = actions.toList())
 
+    /** The engine runs the task named exactly "foo", and falls back to "Foo" only when there's none. */
+    @Test
+    fun aStepsNameMeansTheExactTaskBeforeOneThatDiffersInCase() {
+        val upper = Task(id = 3, name = "Foo")
+        val lower = Task(id = 4, name = "foo")
+        val stepCaller = caller(ActionSpec(type = "task.run", args = mapOf("task" to "foo")))
+        val all = listOf(upper, lower, stepCaller)
+
+        assertTrue(AutomationReferenceIndex.referencesTo(task = upper, tasks = all).isEmpty())
+        assertEquals(1, AutomationReferenceIndex.referencesTo(task = lower, tasks = all).size)
+        // A rewrite lists only the tasks it changed.
+        assertTrue(AutomationReferenceRewriter.retarget(upper, ReferenceResolution.Clear, tasks = all).tasks.isEmpty())
+        assertTrue(AutomationReferenceRewriter.stabilizeNameReferences(target = upper, tasks = all).tasks.isEmpty())
+
+        val onlyUpper = listOf(upper, stepCaller)
+        assertEquals(1, AutomationReferenceIndex.referencesTo(task = upper, tasks = onlyUpper).size)
+        assertEquals(
+            "3",
+            AutomationReferenceRewriter.stabilizeNameReferences(target = upper, tasks = onlyUpper).tasks.single().actions.single().args["task"],
+        )
+    }
+
     private fun scene(vararg elements: SceneElement) =
         Scene(id = 40, name = "Panel", widthDp = 200, heightDp = 200, elements = elements.toList())
 
