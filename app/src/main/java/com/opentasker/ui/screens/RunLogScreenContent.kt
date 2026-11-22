@@ -177,6 +177,7 @@ internal fun RunLogScreenContent(
                     onQueryChange = { onFiltersChange(filters.copy(query = it)) },
                     dateFilter = filters.date,
                     onDateFilterChange = { onFiltersChange(filters.copy(date = it)) },
+                    onClearFilters = { onFiltersChange(RunLogFilterState()) },
                 )
             }
         }
@@ -369,6 +370,7 @@ private fun RunLogFilterCard(
     onQueryChange: (String) -> Unit,
     dateFilter: RunLogDateFilter,
     onDateFilterChange: (RunLogDateFilter) -> Unit,
+    onClearFilters: () -> Unit,
 ) {
     val hasActiveFilters = statusFilter != RunLogStatusFilter.All || selectedTaskId != null || dateFilter != RunLogDateFilter.All
     var expanded by rememberSaveable { mutableStateOf(hasActiveFilters) }
@@ -409,14 +411,9 @@ private fun RunLogFilterCard(
                         modifier = Modifier.weight(1f),
                     )
                     if (hasActiveFilters || query.isNotBlank()) {
-                        TextButton(
-                            onClick = {
-                                onStatusFilterChange(RunLogStatusFilter.All)
-                                onTaskFilterChange(null)
-                                onQueryChange("")
-                                onDateFilterChange(RunLogDateFilter.All)
-                            },
-                        ) {
+                        // One update. Each single-filter callback copies the filters this card was
+                        // drawn with, so four in a row left only the last one's reset standing.
+                        TextButton(onClick = onClearFilters) {
                             Text(stringResource(R.string.action_clear))
                         }
                     }

@@ -1,6 +1,9 @@
 package com.opentasker.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -104,6 +107,42 @@ class RunLogScreenContentTest {
         composeTestRule.onAllNodesWithText("Backup Task", substring = true).onFirst().assertIsDisplayed()
         // "Failed" shows on both the status pill and the per-task health summary.
         composeTestRule.onAllNodesWithText("Failed", substring = true).onFirst().assertIsDisplayed()
+    }
+
+    /** Clear made four updates, each from the same old filters, so only the date came back to Any. */
+    @Test
+    fun clearResetsEveryFilterInOneUpdate() {
+        var filters by mutableStateOf(
+            RunLogFilterState(RunLogStatusFilter.Failed, taskId = 10, query = "door", date = RunLogDateFilter.Day),
+        )
+        val updates = mutableListOf<RunLogFilterState>()
+        val entries = listOf(
+            RunLogEntry(id = 1, taskId = 10, taskName = "Door Check", durationMs = 10, success = false, message = "door"),
+        )
+        composeTestRule.setContent {
+            OpenTaskerTheme {
+                RunLogScreenContent(
+                    logs = entries,
+                    tasks = listOf(Task(id = 10, name = "Door Check")),
+                    retentionPolicy = RunLogRetentionPolicy(),
+                    onRetentionPolicyChange = {},
+                    onShareDiagnostic = {},
+                    contentPadding = PaddingValues(0.dp),
+                    filters = filters,
+                    onFiltersChange = {
+                        updates += it
+                        filters = it
+                    },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag(RUN_LOG_LIST_TAG).performScrollToNode(hasText("Clear"))
+        composeTestRule.onNodeWithText("Clear").performClick()
+        composeTestRule.waitForIdle()
+
+        assertEquals(listOf(RunLogFilterState()), updates)
+        assertEquals(RunLogFilterState(), filters)
     }
 
     @Test
