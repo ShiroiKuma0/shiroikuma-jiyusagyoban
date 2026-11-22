@@ -116,4 +116,14 @@ class VariableClearPathTest {
         assertEquals("%Deep[0]: %Deep isn't valid JSON", failure(run(store, "%Deep[0]")))
         assertEquals(deep, store.get("Deep"))
     }
+
+    @Test
+    fun aListOfOneSaysOneItem() {
+        val store = VariableStore().apply { set("One", """{"list":[5]}""") }
+
+        val report = run(store, "%One.list[1]")
+
+        assertFalse(report.success)
+        assertEquals("%One.list[1]: item [1] is out of range (the list has 1 item)", failure(report))
+    }
 }

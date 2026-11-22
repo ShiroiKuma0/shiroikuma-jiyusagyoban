@@ -520,7 +520,7 @@ private suspend fun persistChangedGlobals(
     }.getOrElse { error ->
         AppLogger.error(
             logTag,
-            "Failed to persist ${changed.size + removed.size} global variable change(s) atomically",
+            "Failed to persist ${countOf(changed.size + removed.size, "global variable change")} atomically",
             error,
         )
         val secretNames = beforeSensitive + afterSensitive
@@ -528,7 +528,7 @@ private suspend fun persistChangedGlobals(
     }
     if (commit.conflictedNames.isEmpty()) return emptyList()
     val names = loggableGlobalNames(commit.conflictedNames, beforeSensitive + afterSensitive)
-    AppLogger.warn(logTag, "Global commit preserved newer concurrent value(s): $names")
+    AppLogger.warn(logTag, "Global commit kept ${countOf(commit.conflictedNames.size, "newer concurrent value")}: $names")
     return listOf("Global write conflict (newer value kept): $names")
 }
 

@@ -13,6 +13,7 @@ import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.AppDatabaseProvider
 import com.opentasker.core.storage.ConfigurationSnapshotWorker
+import com.opentasker.core.text.countOf
 import com.opentasker.core.updates.UpdateCheckWorker
 import com.opentasker.core.storage.DatabaseBackupManager
 import com.opentasker.core.storage.DatabaseMigrations
@@ -157,8 +158,8 @@ class OpenTaskerApp_NoHilt : Application() {
                     if (recovery.interrupted > 0 || recovery.logsWritten > 0) {
                         AppLogger.warn(
                             "OpenTasker",
-                            "Recovered ${recovery.interrupted} interrupted execution(s); " +
-                                "wrote ${recovery.logsWritten} durable run-log record(s)",
+                            "Recovered ${countOf(recovery.interrupted, "interrupted execution")}; " +
+                                "wrote ${countOf(recovery.logsWritten, "durable run-log record")}",
                         )
                     }
                 }.onFailure { error ->

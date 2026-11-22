@@ -14,6 +14,7 @@ import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.platform.AppVisibilityTracker
 import com.opentasker.core.platform.BackgroundActivityStart
+import com.opentasker.core.text.countOf
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val MAX_CLIPBOARD_CHARS = 64 * 1024
@@ -53,7 +54,7 @@ class ClipboardGetAction : DeclaredAction(ActionCatalog.require("clipboard.get")
 
         ctx.variables.set(output, text, sensitive = true)
         ctx.variables.set("${output}_has_text", text.isNotEmpty().toString())
-        ctx.logger("Clipboard read: ${text.length} characters")
+        ctx.logger("Clipboard read: ${countOf(text.length, "character")}")
         return ActionResult.Success
     }
 }
@@ -69,7 +70,7 @@ class ClipboardSetAction : DeclaredAction(ActionCatalog.require("clipboard.set")
             ?: return ActionResult.Failure("clipboard service unavailable")
         return runCatching {
             clipboard.setPrimaryClip(ClipData.newPlainText("OpenTasker", text))
-            ctx.logger("Clipboard write: ${text.length} characters")
+            ctx.logger("Clipboard write: ${countOf(text.length, "character")}")
             ActionResult.Success
         }.getOrElse { ActionResult.Failure("clipboard write failed: ${it.message}") }
     }
@@ -117,7 +118,7 @@ class ContactsLookupAction : DeclaredAction(ActionCatalog.require("contacts.look
         ctx.variables.setArray("${output}_names", names, sensitive = true)
         ctx.variables.setArray("${output}_phones", phones, sensitive = true)
         ctx.variables.setArray("${output}_emails", emails, sensitive = true)
-        ctx.logger("Contacts lookup matched ${contacts.size} contact(s)")
+        ctx.logger("Contacts lookup matched ${countOf(contacts.size, "contact")}")
         return ActionResult.Success
     }
 

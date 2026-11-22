@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.platform.ForeignParcels
+import com.opentasker.core.text.countOf
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -91,7 +92,7 @@ object BroadcastContextEvents {
             }.isSuccess
             if (registered) {
                 registeredActions = wanted
-                AppLogger.info(TAG, "Broadcast trigger listening for ${wanted.size} action(s)")
+                AppLogger.info(TAG, "Broadcast trigger listening for ${countOf(wanted.size, "action")}")
             } else {
                 AppLogger.warn(TAG, "Broadcast trigger receiver could not be registered")
             }

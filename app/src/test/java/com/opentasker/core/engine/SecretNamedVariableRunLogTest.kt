@@ -77,7 +77,7 @@ class SecretNamedVariableRunLogTest {
         assertFalse(serialized, "cache_1234" in serialized)
         assertEquals("1", changes["b"])
         assertEquals(2, changes.size)
-        assertEquals(listOf("var.set_multiple -> set 2 variable(s)"), logs)
+        assertEquals(listOf("var.set_multiple -> set 2 variables"), logs)
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.isArgumentSensitive
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 
 private fun outputVar(args: Map<String, String>, default: String): String =
     (args["var"] ?: args["variable"])?.trim()?.ifBlank { null } ?: default
@@ -24,7 +25,7 @@ class TextMatchAction : DeclaredAction(ActionCatalog.require("text.match")) {
         ctx.variables.set(varName, groups.firstOrNull() ?: "")
         ctx.variables.setArray(varName, groups)
         ctx.variables.set("${varName}_count", (groups.size - 1).coerceAtLeast(0).toString())
-        ctx.logger("text.match -> \$$varName (${groups.size} value(s))")
+        ctx.logger("text.match -> \$$varName (${countOf(groups.size, "value")})")
         return ActionResult.Success
     }
 }
@@ -127,7 +128,7 @@ class TextSplitAction : DeclaredAction(ActionCatalog.require("text.split")) {
         ctx.variables.set(varName, parts.firstOrNull() ?: "")
         ctx.variables.setArray(varName, parts)
         ctx.variables.set("${varName}_count", parts.size.toString())
-        ctx.logger("text.split -> \$$varName (${parts.size} part(s))")
+        ctx.logger("text.split -> \$$varName (${countOf(parts.size, "part")})")
         return ActionResult.Success
     }
 }
@@ -145,7 +146,7 @@ class TextJoinAction : DeclaredAction(ActionCatalog.require("text.join")) {
             TextOps.join(items, delimiter),
             sensitive = ctx.variables.isArraySensitive(arrayName),
         )
-        ctx.logger("text.join -> \$$varName (${items.size} item(s))")
+        ctx.logger("text.join -> \$$varName (${countOf(items.size, "item")})")
         return ActionResult.Success
     }
 }

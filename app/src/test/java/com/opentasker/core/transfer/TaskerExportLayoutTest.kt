@@ -439,4 +439,11 @@ class TaskerExportLayoutTest {
             assertEquals(type, args, back.args)
         }
     }
+
+    @Test
+    fun aGotoOutsideAOneStepTaskSaysOneStep() {
+        val result = export(ActionSpec(type = "flow.goto", args = mapOf("step" to "4")))
+
+        assertTrue(result.warnings.toString(), result.warnings.any { "step 4 points outside its task, which has 1 step." in it })
+    }
 }

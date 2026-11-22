@@ -8,6 +8,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.opentasker.core.logging.AppLogger
+import com.opentasker.core.text.countOf
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
@@ -73,8 +74,8 @@ class ConfigurationSnapshotWorker(
             settings.recordSuccess(now, inventory.snapshotCount, inventory.storageBytes)
             AppLogger.info(
                 TAG,
-                "Encrypted configuration snapshot created; pruned ${inventory.removedCount} archive(s) " +
-                    "and $internalRemoved internal backup(s)",
+                "Encrypted configuration snapshot created; pruned ${countOf(inventory.removedCount, "archive")} " +
+                    "and ${countOf(internalRemoved, "internal backup")}",
             )
             Result.success()
         } catch (error: CancellationException) {

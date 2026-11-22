@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import com.opentasker.core.data.StructuredDataReader
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.text.countOf
 
 /**
  * Parse a JSON / CSV / XML / HTML string into variables, fully on-device.
@@ -38,7 +39,7 @@ class DataReadAction : DeclaredAction(ActionCatalog.require("data.read")) {
         ctx.variables.set(varName, result.values.firstOrNull() ?: "")
         ctx.variables.setArray(varName, result.values)
         ctx.variables.set("${varName}_count", result.values.size.toString())
-        ctx.logger("data.read: $format -> \$$varName (${result.values.size} value(s))")
+        ctx.logger("data.read: $format -> \$$varName (${countOf(result.values.size, "value")})")
         return ActionResult.Success
     }
 }

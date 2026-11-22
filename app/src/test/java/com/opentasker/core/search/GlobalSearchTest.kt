@@ -71,4 +71,12 @@ class GlobalSearchTest {
 
         assertTrue(results.isEmpty())
     }
+
+    @Test
+    fun oneActionAndOneElementReadInTheSingular() {
+        val results = searchGlobalEntities("build report", listOf(profile), listOf(task), emptyList(), listOf(scene))
+
+        assertEquals("1 action", results.single { it.kind == GlobalSearchResultKind.TASK }.detail)
+        assertEquals("1 element", results.single { it.kind == GlobalSearchResultKind.SCENE }.detail)
+    }
 }

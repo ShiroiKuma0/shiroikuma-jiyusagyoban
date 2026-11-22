@@ -230,4 +230,16 @@ class TaskRunnerForValuesTest {
         assertTrue(report.canPreflight)
         assertEquals(2, report.tasks.single().steps[1].executionCount)
     }
+
+    @Test
+    fun aLoopOverOneValueSaysOneItemInTheRunAndThePreview() {
+        val ran = run(forEach("values" to "1:1"), record(), endFor)
+        assertEquals("foreach 1:1 -> 1 item (1/1)", ran.traces.first().message)
+
+        val preview = PreflightRunner.preflightTask(
+            Task(id = 6, name = "For", actions = listOf(forEach("values" to "1:1"), record(), endFor)),
+            inputs = PreflightInputs(),
+        )
+        assertEquals("foreach 1:1 -> 1 item (1/1)", preview.tasks.single().steps[0].branchDecision)
+    }
 }

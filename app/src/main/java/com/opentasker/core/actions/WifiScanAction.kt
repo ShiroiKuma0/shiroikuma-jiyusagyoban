@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
+import com.opentasker.core.text.countOf
 
 /**
  * Report the access points the platform can currently see.
@@ -71,7 +72,7 @@ class WifiScanAction : DeclaredAction(ActionCatalog.require("wifi.scan")) {
 
         // Count only: the SSIDs a device can see are a location fingerprint and do not belong in a
         // run log.
-        ctx.logger("wifi.scan: ${visible.size} access point(s), new scan requested = $scanRequested")
+        ctx.logger("wifi.scan: ${countOf(visible.size, "access point")}, new scan requested = $scanRequested")
         return ActionResult.Success
     }
 

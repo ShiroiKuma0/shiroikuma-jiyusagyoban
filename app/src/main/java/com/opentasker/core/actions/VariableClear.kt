@@ -4,6 +4,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 
 /**
  * Tasker's Variable Clear. Args: `name`, `pattern`, `local_only`, `clear_all`. The name is read as
@@ -31,7 +32,7 @@ class VarClearAction : DeclaredAction(ActionCatalog.require("var.clear")) {
         val cleared = ctx.variables.clearVariables(args) ?: return ActionResult.Failure(
             if (isTaskerPickedElement(name)) "'$name' doesn't pick a variable name" else "invalid variable name '$name'",
         )
-        ctx.logger("var.clear -> $cleared variable(s)")
+        ctx.logger("var.clear -> ${countOf(cleared, "variable")}")
         return ActionResult.Success
     }
 }

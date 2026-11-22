@@ -39,6 +39,6 @@ class SetMultipleVariablesNameEdgesTest {
         assertEquals(ActionResult.Success, run("names" to "%cache_%Pin", "values" to "warm"))
         assertEquals("warm", variables.get("cache_1234"))
         assertTrue(variables.isSensitive("cache_1234"))
-        assertEquals(listOf("var.set_multiple -> set 1 variable(s)"), logs)
+        assertEquals(listOf("var.set_multiple -> set 1 variable"), logs)
     }
 }

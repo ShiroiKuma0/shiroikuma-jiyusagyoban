@@ -70,6 +70,7 @@ import com.opentasker.core.platform.ServiceAudioEligibility
 import com.opentasker.core.storage.RunLogRetentionSettings
 import com.opentasker.core.storage.applyRetention
 import com.opentasker.core.storage.minimumTimestamp
+import com.opentasker.core.text.countOf
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -576,7 +577,7 @@ class AutomationService : Service() {
     private fun logContextMonitorTransition(transition: ContextMonitorTransition) {
         val counts = contextMonitorLifecycle.currentReferenceCounts()
         transition.started.forEach { monitor ->
-            AppLogger.info(TAG, "Context monitor $monitor started for ${counts.getOrDefault(monitor, 0)} enabled profile(s)")
+            AppLogger.info(TAG, "Context monitor $monitor started for ${countOf(counts.getOrDefault(monitor, 0), "enabled profile")}")
         }
         transition.stopped.forEach { monitor ->
             AppLogger.info(TAG, "Context monitor $monitor stopped after its final enabled profile was removed")

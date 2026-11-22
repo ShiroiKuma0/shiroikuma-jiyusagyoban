@@ -43,7 +43,7 @@ class WifiScanActionTest {
         )
         assertTrue(
             "The run log must not carry the list of networks a device can see",
-            "access point(s), new scan requested" in source,
+            "countOf(visible.size, \"access point\")}, new scan requested" in source,
         )
         listOf("ssids", "bssids").forEach { field ->
             assertTrue(

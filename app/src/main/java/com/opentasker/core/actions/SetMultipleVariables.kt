@@ -8,6 +8,7 @@ import com.opentasker.core.engine.countHiddenChanges
 import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 
 /**
  * Tasker's Multiple Variables Set. Args: `names` and `values`, each split on its own splitter
@@ -27,7 +28,7 @@ class SetMultipleVariablesAction : DeclaredAction(ActionCatalog.require("var.set
         // Names only: a value could be a secret that only its name gives away. A names list that may
         // hold a secret, like a typed value read as a bare name or a name built from one, is only counted.
         val hidden = outcome.builtFromSecret || ActionArgumentSensitivity.isSensitive("var.set_multiple", "names", args)
-        fun shown(names: List<String>) = if (hidden) "${names.size} variable(s)" else names.joinToString { "%$it" }
+        fun shown(names: List<String>) = if (hidden) countOf(names.size, "variable") else names.joinToString { "%$it" }
         ctx.logger(
             buildList {
                 if (outcome.set.isNotEmpty()) add("set " + shown(outcome.set))

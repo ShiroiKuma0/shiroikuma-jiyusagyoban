@@ -37,7 +37,7 @@ class SetMultipleVariablesFailureTest {
     fun aSecretReadAsABareNameStaysOutOfTheLog() {
         // One line splits on its comma, so abc is a second name and is unset, as in Tasker.
         assertEquals(ActionResult.Success, run("names" to "%api_token,abc"))
-        assertEquals(listOf("var.set_multiple -> unset 2 variable(s)"), logs)
+        assertEquals(listOf("var.set_multiple -> unset 2 variables"), logs)
     }
 
     @Test

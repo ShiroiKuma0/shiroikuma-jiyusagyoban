@@ -8,6 +8,7 @@ import com.opentasker.core.engine.VariableOnlyAction
 import com.opentasker.core.engine.VariableWork
 import com.opentasker.core.engine.variableWork
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 
 // Tasker's arrays are numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
 // actions work on those elements. Variable Split, Array Clear, Push, Pop and Process drop a list
@@ -94,7 +95,7 @@ class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")), Varia
         ctx.variables.removeArray(base)
         ctx.variables.replaceNumberedItems(base, parts.withIndex().associate { (index, part) -> index + 1 to (part to sensitive) })
         if (args["delete_base"]?.toBooleanStrictOrNull() == true) ctx.variables.remove(base)
-        ctx.logger("var.split -> %$base (${parts.size} element(s))")
+        ctx.logger("var.split -> %$base (${countOf(parts.size, "element")})")
         return ActionResult.Success
     }
 }
@@ -121,7 +122,7 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), Variabl
         }
         ctx.variables.set(base, joined, sensitive = ctx.variables.anyNumberedItemSensitive(base))
         if (args["delete_parts"]?.toBooleanStrictOrNull() == true) ctx.variables.replaceNumberedItems(base, emptyMap())
-        ctx.logger("var.join -> %$base (${items.size} element(s))")
+        ctx.logger("var.join -> %$base (${countOf(items.size, "element")})")
         return ActionResult.Success
     }
 }
@@ -200,7 +201,7 @@ class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")), V
         val count = ctx.variables.numberedItems(base).size
         ctx.variables.removeArray(base)
         ctx.variables.replaceNumberedItems(base, emptyMap())
-        ctx.logger("array.clear -> %$base ($count element(s))")
+        ctx.logger("array.clear -> %$base (${countOf(count, "element")})")
         return ActionResult.Success
     }
 }
@@ -229,7 +230,7 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
             else -> items.keys.zip(reorder(type, values)).toMap()
         }
         ctx.variables.replaceElements(base, processed)?.let { return ActionResult.Failure(it) }
-        ctx.logger("array.process -> %$base ($type, ${processed.size} element(s))")
+        ctx.logger("array.process -> %$base ($type, ${countOf(processed.size, "element")})")
         return ActionResult.Success
     }
 

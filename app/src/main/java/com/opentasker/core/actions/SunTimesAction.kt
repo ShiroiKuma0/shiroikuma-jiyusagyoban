@@ -14,6 +14,7 @@ import com.opentasker.core.contexts.TaskerSunTimes
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
+import com.opentasker.core.text.countOf
 import java.util.TimeZone
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -90,7 +91,7 @@ class SunTimesAction(
         ctx.variables.setArray(prefix + "_custom_evening", times.customEvening.map(Long::toString))
 
         // Never the coordinates: they say where the phone is.
-        ctx.logger("sun.times -> %${prefix}_sunrise and the rest, ${elevations.size} custom elevation(s)")
+        ctx.logger("sun.times -> %${prefix}_sunrise and the rest, ${countOf(elevations.size, "custom elevation")}")
         return ActionResult.Success
     }
 
