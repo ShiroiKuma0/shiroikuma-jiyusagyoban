@@ -4,7 +4,9 @@ import com.opentasker.core.data.TextOps
 import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.engine.VariableStore
-import com.opentasker.core.engine.isArgumentSensitive
+import com.opentasker.core.engine.VariableOnlyAction
+import com.opentasker.core.engine.VariableWork
+import com.opentasker.core.engine.variableWork
 import com.opentasker.core.model.VariableNamePolicy
 
 // Tasker's arrays are numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
@@ -62,9 +64,11 @@ private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<Str
  * trailing empty parts are dropped the way Tasker drops them. With `values` it splits that text
  * instead of %name's own value, which is Tasker's Array Set.
  */
-class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")) {
+class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "name") ?: return ActionResult.Failure("invalid variable name")
         val values = args["values"]
         val source = values ?: ctx.variables.get(base) ?: return ActionResult.Failure("%$base is not set")
@@ -90,9 +94,11 @@ class VarSplitAction : DeclaredAction(ActionCatalog.require("var.split")) {
  * Tasker's Variable Join. Args: `name`, `joiner`, `delete_parts`. Joins %name1, %name2, ... in
  * index order into %name, and unsets the elements when asked. Unset elements are skipped.
  */
-class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")) {
+class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "name") ?: return ActionResult.Failure("invalid variable name")
         val items = ctx.variables.numberedItems(base)
         val joiner = args["joiner"].orEmpty()
@@ -116,9 +122,11 @@ class VarJoinAction : DeclaredAction(ActionCatalog.require("var.join")) {
  * value and moves the elements from that position up one. A position past the end appends. With
  * `fill_spaces`, only the elements up to the first unset one move, and the value fills that gap.
  */
-class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
+class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
         val items = ctx.variables.elementsWithFlags(base)
@@ -146,9 +154,11 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
  * moves the later ones down one, storing it in `to_var` when one is named. A position past the end
  * pops the last element, and an empty array is left as it is.
  */
-class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
+class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val requested = position(args) ?: return ActionResult.Failure("position must be a whole number from 1")
         val toVar = args["to_var"]?.trim()?.ifEmpty { null }
@@ -172,9 +182,11 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
 }
 
 /** Tasker's Array Clear. Args: `array`. Unsets every element of the array. */
-class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")) {
+class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val count = ctx.variables.numberedItems(base).size
         ctx.variables.removeArray(base)
@@ -189,9 +201,11 @@ class ArrayClearAction : DeclaredAction(ActionCatalog.require("array.clear")) {
  * already have, so gaps stay where they are. Remove Duplicates unsets every later copy of a value,
  * and Squash renumbers the elements from 1, dropping empty ones. Equal values keep index order.
  */
-class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")) {
+class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")), VariableOnlyAction {
 
-    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
+    override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult = play(ctx.variableWork(), args)
+
+    override fun play(ctx: VariableWork, args: Map<String, String>): ActionResult {
         val base = arrayBase(args, "array") ?: return ActionResult.Failure("invalid array name")
         val type = args["type"]?.trim().orEmpty()
         if (type !in TYPES) return ActionResult.Failure("unknown array process type '$type'")

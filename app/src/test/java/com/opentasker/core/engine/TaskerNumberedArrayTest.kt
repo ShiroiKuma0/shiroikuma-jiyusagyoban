@@ -302,7 +302,20 @@ class TaskerNumberedArrayTest {
                 pop("%Pos1"),
             ),
         )
-        val fromOutput = stepFor(PreflightRunner.preflightTask(earlierOutput), "Split")
+        val fromSplit = stepFor(PreflightRunner.preflightTask(earlierOutput), "Split")
+        val earlierMatches = Task(
+            id = 5,
+            name = "Matches",
+            actions = listOf(
+                ActionSpec(type = "var.set", args = mapOf("name" to "%Text", "value" to "x2y1")),
+                ActionSpec(
+                    type = "text.replace",
+                    args = mapOf("source" to "%Text", "pattern" to "\\d", "replacement" to "#", "var" to "%Text", "matches" to "%Pos"),
+                ),
+                pop("%Pos1"),
+            ),
+        )
+        val fromOutput = stepFor(PreflightRunner.preflightTask(earlierMatches), "Matches")
         val noWriter = stepFor(PreflightRunner.preflightTask(Task(id = 4, name = "Alone", actions = listOf(pop("%Pos")))), "Alone")
 
         // Previewed through its caller, the child gets the caller's %par1.
@@ -311,7 +324,10 @@ class TaskerNumberedArrayTest {
         // Previewed alone, %par1 is unset but a caller could pass it, so it warns and goes on.
         assertEquals(PreflightStepStatus.SIMULATED, childAlone.status)
         assertTrue(childAlone.warnings.toString(), childAlone.warnings.any { "%par1 is empty here" in it })
-        // A global written by an earlier step's output isn't one Preflight plays either.
+        // Preflight plays a Variable Split before it, so %Pos1 is known there.
+        assertEquals(PreflightStepStatus.SIMULATED, fromSplit.status)
+        assertTrue(fromSplit.warnings.toString(), fromSplit.warnings.none { "is empty here" in it })
+        // A global written by an earlier step's output that Preflight doesn't play only warns.
         assertEquals(PreflightStepStatus.SIMULATED, fromOutput.status)
         assertTrue(fromOutput.warnings.toString(), fromOutput.warnings.any { "%Pos1 is empty here" in it })
         // A global nothing writes really does stop the run's step.

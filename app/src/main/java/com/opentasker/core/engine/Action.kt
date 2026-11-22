@@ -44,6 +44,26 @@ fun ActionContext.forAction(
 
 fun ActionContext.isArgumentSensitive(name: String): Boolean = name in sensitiveArgumentNames
 
+/**
+ * An action whose whole effect is on variables. Preflight plays it on its own snapshot, so a later
+ * step there reads what the run would leave, like a `%arr(2)` after an Array Push. [play] is the
+ * action's run without the run around it, and it touches nothing but [VariableWork.variables].
+ */
+interface VariableOnlyAction {
+    fun play(ctx: VariableWork, args: Map<String, String>): ActionResult
+}
+
+/** What a [VariableOnlyAction] gets from a run, or from Preflight. */
+class VariableWork(
+    val variables: VariableStore,
+    val sensitiveArgumentNames: Set<String> = emptySet(),
+    val logger: (String) -> Unit = {},
+) {
+    fun isArgumentSensitive(name: String): Boolean = name in sensitiveArgumentNames
+}
+
+fun ActionContext.variableWork(): VariableWork = VariableWork(variables, sensitiveArgumentNames, logger)
+
 internal const val SECRET_DERIVED_ACTION_LOG = "<redacted: action output depends on a secret>"
 
 /** Result of executing a single Action. */

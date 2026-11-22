@@ -103,7 +103,7 @@ data class PreflightReport(
 
 /**
  * Static action descriptions used by the preflight runner. No Action.run implementation is ever
- * called here. Registered actions receive an explicit category-based simulation contract; an
+ * called here, though a [VariableOnlyAction]'s work is played on the preflight variables. Registered actions receive an explicit category-based simulation contract; an
  * unknown action has no preview implementation and is blocked instead of being guessed.
  */
 object PreflightActionRegistry {
@@ -121,6 +121,9 @@ object PreflightActionRegistry {
         "var.persist" -> "Would promote a variable to global scope; persistence is suppressed."
         "var.clear" -> "Unsets variables in the preflight snapshot only; durable variable removals are suppressed."
         else -> {
+            if (ActionRegistry.get(actionId) is VariableOnlyAction) {
+                return "Plays its change on the preflight variable snapshot only; durable variable writes are suppressed."
+            }
             val category = ActionRegistry.get(actionId)?.category?.name?.lowercase() ?: "unknown"
             "Would simulate $category action $actionId; the runtime action is not invoked."
         }
@@ -431,7 +434,7 @@ object PreflightRunner {
                 failsHere = true
             }
             if (effectiveStatus != PreflightStepStatus.BLOCKED) {
-                simulateVariableWrite(spec, expansion.rawValues, variables, input.eventVariables, expansion.secretKeys.isNotEmpty())?.let { (failure, builtFromOthers) ->
+                simulateVariableWrite(spec, expansion.rawValues, variables, input.eventVariables, expansion.secretKeys)?.let { (failure, builtFromOthers) ->
                     if (builtFromOthers) {
                         // Something Preflight doesn't play may set those variables first, so this only warns.
                         val note = "A name built from other variables isn't a variable name here. If nothing changes those variables before this step, the run stops the step."
@@ -1102,15 +1105,18 @@ object PreflightRunner {
     /**
      * Plays [spec]'s variable write on [variables]. For Multiple Variables Set, returns why the run
      * fails the step, if it does, and whether only names built from other variables caused it.
-     * [readsASecret] marks what Set Variable writes as secret, as the run does for a step that reads one.
+     * [secretKeys] are the arguments that read a secret: what Set Variable writes from one is secret,
+     * as the run makes it. A [VariableOnlyAction] plays its run's own work here; when that fails,
+     * the run changes nothing either.
      */
     private fun simulateVariableWrite(
         spec: ActionSpec,
         values: Map<String, String>,
         variables: VariableStore,
         eventVariables: Map<String, String>,
-        readsASecret: Boolean,
+        secretKeys: Set<String>,
     ): Pair<String, Boolean>? {
+        val readsASecret = secretKeys.isNotEmpty()
         when (spec.type) {
             "var.set" -> {
                 val name = values["name"]?.trim().orEmpty()
@@ -1141,6 +1147,13 @@ object PreflightRunner {
                     referencesAsLetters(entry)?.let(VariableNamePolicy::normalize) != null
                 }
                 return failure to builtFromOthers
+            }
+            else -> {
+                // The run stops a Push or Pop whose position came out empty before it changes anything.
+                val position = spec.args["position"].orEmpty()
+                if (ArrayPositionArguments.emptyFailure(spec.type, "position", position, values["position"].orEmpty()) == null) {
+                    (ActionRegistry.get(spec.type) as? VariableOnlyAction)?.play(VariableWork(variables, secretKeys), values)
+                }
             }
         }
         return null

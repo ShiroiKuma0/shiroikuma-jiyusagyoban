@@ -17,6 +17,7 @@
 
 ### Changed
 
+- Preflight plays Variable Split and Join and the array actions (Push, Pop, Clear, Process) on its own copy of the variables, so a later step's `%arr(2)` or `%arr(#)` shows what the run would leave there. A Push or Pop whose position came out empty changes nothing, since the run stops it.
 - The Play build profile is gone, since this app isn't heading to Google Play. Building with `-PopenTaskerDistribution=play` now stops and says so, and the standard and F-Droid builds keep their SMS and phone-state permissions as before.
 - Report a problem now asks for both diagnostic exports: the Diagnostics report (engine health, permissions and any crash log) and, for a problem with a run, the Run Log's JSON export. Each screen also says in one line what its export holds and that secrets are hidden. The Run Log's Share button sends the Diagnostics report, which wasn't obvious before.
 - Bluetooth nearby can now find a paired phone that isn't advertising, which most phones don't do with the screen off. Every other scan cycle (every third while Bluetooth audio is playing) it asks up to three paired devices from the profile's list to answer, which brings up a short link the scan already counts as a sighting. A paired device that only speaks Bluetooth Low Energy, or one that's already connected, is left alone, and no cycle that runs a full discovery scan asks.
