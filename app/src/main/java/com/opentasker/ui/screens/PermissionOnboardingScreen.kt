@@ -2089,7 +2089,7 @@ private fun SnapshotRecoveryPassphraseDialog(
 private val SNAPSHOT_RETENTION_CHOICES = listOf(3 to 7, 5 to 14, 10 to 30)
 private const val SNAPSHOT_MIN_PASSPHRASE_CHARS = 12
 
-private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotStatus): String {
+internal fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotStatus): String {
     val storage = android.text.format.Formatter.formatShortFileSize(context, status.storageBytes)
     val failure = status.lastFailureAtMs
     if (failure != null) {
@@ -2101,11 +2101,17 @@ private fun snapshotStatusLabel(context: Context, status: ConfigurationSnapshotS
     }
     val success = status.lastSuccessAtMs
         ?: return context.getString(R.string.setup_snapshots_status_pending)
-    return context.getString(
+    val ok = context.getString(
         R.string.setup_snapshots_status_ok,
         formatSnapshotTimestamp(context, success),
         status.snapshotCount,
         storage,
+    )
+    if (status.refusedDeletes <= 0) return ok
+    return ok + "\n" + context.resources.getQuantityString(
+        R.plurals.setup_snapshots_status_refused_deletes,
+        status.refusedDeletes,
+        status.refusedDeletes,
     )
 }
 

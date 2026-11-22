@@ -389,6 +389,10 @@
     <string name="setup_snapshots_status_failed">Last snapshot failed %1$s: %2$s</string>
     <string name="setup_snapshots_status_pending">No snapshot taken yet; the first one runs on the next scheduled check.</string>
     <string name="setup_snapshots_status_unknown_error">the reason was not recorded</string>
+    <plurals name="setup_snapshots_status_refused_deletes">
+        <item quantity="one">The folder wouldn\'t delete %1$d old snapshot. Delete it there yourself.</item>
+        <item quantity="other">The folder wouldn\'t delete %1$d old snapshots. Delete them there yourself.</item>
+    </plurals>
     <string name="setup_snapshots_destination_missing">A destination folder is required before snapshots can run.</string>
     <string name="setup_snapshots_destination_ready">Off-device destination ready. OpenTasker can access only the folder you selected.</string>
     <string name="setup_snapshots_destination_choose">Choose snapshot folder</string>

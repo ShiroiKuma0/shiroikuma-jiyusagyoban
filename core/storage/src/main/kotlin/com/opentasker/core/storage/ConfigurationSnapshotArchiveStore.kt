@@ -3,6 +3,7 @@ package com.opentasker.core.storage
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import com.opentasker.core.logging.AppLogger
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -41,7 +42,47 @@ data class ConfigurationSnapshotArchiveInventory(
     val snapshotCount: Int,
     val storageBytes: Long,
     val removedCount: Int,
+    /** Expired archives the folder wouldn't delete. They're still there, so they count above. */
+    val refusedCount: Int = 0,
 )
+
+/**
+ * Deletes the [archives] that [policy] lets go, one at a time. A delete that returns false or
+ * throws is counted as refused and that archive stays in the totals, so the run that just wrote a
+ * good snapshot still succeeds. Failing it made WorkManager retry, and every retry wrote another
+ * full archive. Losing access to the folder still stops the run.
+ */
+internal fun <T> applySnapshotRetention(
+    archives: List<T>,
+    fileOf: (T) -> SnapshotFile,
+    policy: ConfigurationSnapshotPolicy,
+    nowMs: Long,
+    onDeleteError: (T, Exception) -> Unit = { _, _ -> },
+    delete: (T) -> Boolean,
+): ConfigurationSnapshotArchiveInventory {
+    val expired = selectExpiredSnapshots(archives.map(fileOf), policy, nowMs).mapTo(hashSetOf(), SnapshotFile::name)
+    var removed = 0
+    var refused = 0
+    val kept = archives.filter { archive ->
+        if (fileOf(archive).name !in expired) return@filter true
+        val deleted = try {
+            delete(archive)
+        } catch (error: SnapshotDestinationUnavailableException) {
+            throw error
+        } catch (error: Exception) {
+            onDeleteError(archive, error)
+            false
+        }
+        if (deleted) removed += 1 else refused += 1
+        !deleted
+    }
+    return ConfigurationSnapshotArchiveInventory(
+        snapshotCount = kept.size,
+        storageBytes = kept.sumOf { fileOf(it).sizeBytes },
+        removedCount = removed,
+        refusedCount = refused,
+    )
+}
 
 /** Storage Access Framework boundary for scheduled encrypted snapshot archives. */
 // Public because the device lane exercises the SAF archive path; core:storage is a module now.
@@ -122,24 +163,15 @@ class ConfigurationSnapshotArchiveStore(context: Context) {
         treeUri: Uri,
         policy: ConfigurationSnapshotPolicy,
         nowMs: Long,
-    ): ConfigurationSnapshotArchiveInventory {
-        val archives = listArchives(treeUri)
-        val expiredNames = selectExpiredSnapshots(archives.map(ConfigurationSnapshotArchive::file), policy, nowMs)
-            .mapTo(hashSetOf(), SnapshotFile::name)
-        var removed = 0
-        archives.filter { it.file.name in expiredNames }.forEach { archive ->
-            if (!deleteArchive(treeUri, archive.uri)) {
-                throw IOException("The snapshot folder refused to delete ${archive.file.name}")
-            }
-            removed += 1
-        }
-        val retained = archives.filterNot { it.file.name in expiredNames }
-        return ConfigurationSnapshotArchiveInventory(
-            snapshotCount = retained.size,
-            storageBytes = retained.sumOf { it.file.sizeBytes },
-            removedCount = removed,
-        )
-    }
+    ): ConfigurationSnapshotArchiveInventory = applySnapshotRetention(
+        archives = listArchives(treeUri),
+        fileOf = ConfigurationSnapshotArchive::file,
+        policy = policy,
+        nowMs = nowMs,
+        onDeleteError = { archive, error ->
+            AppLogger.warn("ConfigurationSnapshotArchiveStore", "Deleting old snapshot ${archive.file.name} failed", error)
+        },
+    ) { archive -> deleteArchive(treeUri, archive.uri) }
 
     private fun rootDocumentUri(treeUri: Uri): Uri =
         DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))

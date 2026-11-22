@@ -387,6 +387,9 @@
     <string name="setup_snapshots_status_failed">上次快照失败于 %1$s：%2$s</string>
     <string name="setup_snapshots_status_pending">尚未拍摄快照；第一个将在下一次计划检查时运行。</string>
     <string name="setup_snapshots_status_unknown_error">原因未被记录</string>
+    <plurals name="setup_snapshots_status_refused_deletes">
+        <item quantity="other">该文件夹未能删除 %1$d 个旧快照，请在文件夹中手动删除。</item>
+    </plurals>
     <string name="setup_snapshots_destination_missing">快照运行前需要一个目标文件夹。</string>
     <string name="setup_snapshots_destination_ready">设备外目标就绪。OpenTasker只能访问你选择的文件夹。</string>
     <string name="setup_snapshots_destination_choose">选择快照文件夹</string>

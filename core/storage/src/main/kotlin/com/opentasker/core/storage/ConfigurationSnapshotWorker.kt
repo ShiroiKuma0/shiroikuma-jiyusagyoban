@@ -71,7 +71,14 @@ class ConfigurationSnapshotWorker(
                 internalRemoved = manager.pruneSnapshots(policy, now)
             }
 
-            settings.recordSuccess(now, inventory.snapshotCount, inventory.storageBytes)
+            settings.recordSuccess(now, inventory.snapshotCount, inventory.storageBytes, inventory.refusedCount)
+            if (inventory.refusedCount > 0) {
+                AppLogger.warn(
+                    TAG,
+                    "The snapshot folder refused to delete ${countOf(inventory.refusedCount, "old archive")}; " +
+                        "they stay until removed by hand",
+                )
+            }
             AppLogger.info(
                 TAG,
                 "Encrypted configuration snapshot created; pruned ${countOf(inventory.removedCount, "archive")} " +

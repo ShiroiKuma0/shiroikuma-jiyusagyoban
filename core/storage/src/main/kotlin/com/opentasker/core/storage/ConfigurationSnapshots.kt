@@ -52,6 +52,8 @@ data class ConfigurationSnapshotStatus(
     val lastFailureMessage: String? = null,
     val snapshotCount: Int = 0,
     val storageBytes: Long = 0L,
+    /** Old snapshots the folder wouldn't delete on the last run, left for the user to remove. */
+    val refusedDeletes: Int = 0,
 )
 
 class ConfigurationSnapshotSettings(context: Context) {
@@ -119,13 +121,15 @@ class ConfigurationSnapshotSettings(context: Context) {
         lastFailureMessage = prefs.getString(KEY_LAST_FAILURE_MESSAGE, null),
         snapshotCount = prefs.getInt(KEY_SNAPSHOT_COUNT, 0).coerceAtLeast(0),
         storageBytes = prefs.getLong(KEY_STORAGE_BYTES, 0L).coerceAtLeast(0L),
+        refusedDeletes = prefs.getInt(KEY_REFUSED_DELETES, 0).coerceAtLeast(0),
     )
 
-    fun recordSuccess(atMs: Long, snapshotCount: Int, storageBytes: Long) {
+    fun recordSuccess(atMs: Long, snapshotCount: Int, storageBytes: Long, refusedDeletes: Int = 0) {
         prefs.edit(commit = true) {
             putLong(KEY_LAST_SUCCESS, atMs)
             putInt(KEY_SNAPSHOT_COUNT, snapshotCount.coerceAtLeast(0))
             putLong(KEY_STORAGE_BYTES, storageBytes.coerceAtLeast(0L))
+            putInt(KEY_REFUSED_DELETES, refusedDeletes.coerceAtLeast(0))
             remove(KEY_LAST_FAILURE)
             remove(KEY_LAST_FAILURE_MESSAGE)
         }
@@ -145,6 +149,7 @@ class ConfigurationSnapshotSettings(context: Context) {
             remove(KEY_LAST_FAILURE_MESSAGE)
             remove(KEY_SNAPSHOT_COUNT)
             remove(KEY_STORAGE_BYTES)
+            remove(KEY_REFUSED_DELETES)
         }
     }
 
@@ -170,6 +175,7 @@ class ConfigurationSnapshotSettings(context: Context) {
         const val KEY_LAST_FAILURE_MESSAGE = "last_failure_message"
         const val KEY_SNAPSHOT_COUNT = "snapshot_count"
         const val KEY_STORAGE_BYTES = "storage_bytes"
+        const val KEY_REFUSED_DELETES = "refused_deletes"
         const val SNAPSHOT_SECRET_PROJECT_ID = Long.MIN_VALUE
         const val SNAPSHOT_SECRET_NAME = "__configuration_snapshot_recovery_passphrase"
         const val MAX_FAILURE_MESSAGE_CHARS = 200

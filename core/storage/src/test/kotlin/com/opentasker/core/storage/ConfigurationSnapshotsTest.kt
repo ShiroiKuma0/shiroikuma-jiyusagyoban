@@ -5,6 +5,67 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConfigurationSnapshotsTest {
+    /**
+     * A folder that won't delete an old archive used to fail the whole run after a good export, and
+     * WorkManager's retries each wrote another full archive into it.
+     */
+    @Test
+    fun aDeleteTheFolderRefusesIsCountedAndTheRestStillGo() {
+        // Two snapshots is the least the policy keeps, so the last three expire.
+        val snapshots = listOf(
+            SnapshotFile(name = "newest", lastModifiedMs = NOW, sizeBytes = 1),
+            SnapshotFile(name = "kept", lastModifiedMs = NOW - HOUR, sizeBytes = 2),
+            SnapshotFile(name = "refused", lastModifiedMs = NOW - 2 * HOUR, sizeBytes = 10),
+            SnapshotFile(name = "throws", lastModifiedMs = NOW - 3 * HOUR, sizeBytes = 100),
+            SnapshotFile(name = "deleted", lastModifiedMs = NOW - 4 * HOUR, sizeBytes = 1_000),
+        )
+        val attempted = mutableListOf<String>()
+        val errors = mutableListOf<String>()
+
+        val inventory = applySnapshotRetention(
+            snapshots,
+            fileOf = { it },
+            policy = ConfigurationSnapshotPolicy(enabled = true, maxSnapshots = 2, maxAgeDays = 365),
+            nowMs = NOW,
+            onDeleteError = { file, _ -> errors += file.name },
+        ) { file ->
+            attempted += file.name
+            when (file.name) {
+                "refused" -> false
+                "throws" -> throw UnsupportedOperationException("Delete not supported")
+                else -> true
+            }
+        }
+
+        assertEquals(listOf("refused", "throws", "deleted"), attempted)
+        assertEquals(listOf("throws"), errors)
+        assertEquals(
+            ConfigurationSnapshotArchiveInventory(snapshotCount = 4, storageBytes = 113, removedCount = 1, refusedCount = 2),
+            inventory,
+        )
+    }
+
+    /** Lost access to the folder is not a refused delete: the run stops and says to pick it again. */
+    @Test
+    fun losingTheFolderDuringRetentionStillStopsTheRun() {
+        val snapshots = listOf(
+            SnapshotFile(name = "newest", lastModifiedMs = NOW),
+            SnapshotFile(name = "kept", lastModifiedMs = NOW - HOUR),
+            SnapshotFile(name = "old", lastModifiedMs = NOW - 2 * HOUR),
+        )
+
+        val error = runCatching {
+            applySnapshotRetention(
+                snapshots,
+                fileOf = { it },
+                policy = ConfigurationSnapshotPolicy(enabled = true, maxSnapshots = 2, maxAgeDays = 365),
+                nowMs = NOW,
+            ) { throw SnapshotDestinationUnavailableException("gone") }
+        }.exceptionOrNull()
+
+        assertTrue(error is SnapshotDestinationUnavailableException)
+    }
+
     @Test
     fun retentionKeepsTheNewestSnapshotsUpToTheCountLimit() {
         val snapshots = (0 until 8).map { index ->

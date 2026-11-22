@@ -3,10 +3,13 @@ package com.opentasker.core.storage
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.opentasker.app.R
+import com.opentasker.ui.screens.snapshotStatusLabel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
@@ -49,6 +52,23 @@ class ConfigurationSnapshotSettingsInstrumentedTest {
             ConfigurationSnapshotStatus(lastSuccessAtMs = 123_456L, snapshotCount = 4, storageBytes = 9_876L),
             settings.loadStatus(),
         )
+    }
+
+    /** A good snapshot whose old archives the folder kept is a success that says what's left to do. */
+    @Test
+    fun oldSnapshotsTheFolderKeptAreRecordedAndShown() {
+        val settings = ConfigurationSnapshotSettings(context)
+        settings.recordSuccess(atMs = 123_456L, snapshotCount = 6, storageBytes = 9_876L, refusedDeletes = 2)
+
+        val status = settings.loadStatus()
+        assertEquals(2, status.refusedDeletes)
+        assertNull(status.lastFailureAtMs)
+        val refusedLine = context.resources.getQuantityString(R.plurals.setup_snapshots_status_refused_deletes, 2, 2)
+        assertTrue(snapshotStatusLabel(context, status).endsWith("\n" + refusedLine))
+
+        settings.recordSuccess(atMs = 223_456L, snapshotCount = 4, storageBytes = 9_000L)
+        assertEquals(0, settings.loadStatus().refusedDeletes)
+        assertFalse(refusedLine in snapshotStatusLabel(context, settings.loadStatus()))
     }
 
     @Test
