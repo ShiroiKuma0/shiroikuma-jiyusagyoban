@@ -53,6 +53,15 @@ class ImportResourceBudgetTest {
             handEdited,
             budget().copy(maxNestingDepth = 1, maxJsonTokens = 6),
         )
+
+        // The inverse: the same document is refused one under, so the six tokens and the depth of
+        // one were really counted, not let through by a check that counts nothing.
+        assertBudget("JSON tokens") {
+            ImportResourceGuard.requireJsonPreflight(handEdited, budget().copy(maxNestingDepth = 1, maxJsonTokens = 5))
+        }
+        assertBudget("nesting depth") {
+            ImportResourceGuard.requireJsonPreflight(handEdited, budget().copy(maxNestingDepth = 0, maxJsonTokens = 6))
+        }
     }
 
     @Test

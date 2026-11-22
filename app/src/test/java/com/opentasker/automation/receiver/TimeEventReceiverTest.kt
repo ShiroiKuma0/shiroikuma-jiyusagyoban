@@ -1,6 +1,10 @@
 package com.opentasker.automation.receiver
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.content.SharedPreferences
 import com.opentasker.automation.scheduler.TimeEventScheduler
 import com.opentasker.core.scheduling.ExactAlarmSupport
 import org.junit.Assert.assertEquals
@@ -27,9 +31,134 @@ class TimeEventReceiverTest {
     @Test
     fun receiverIgnoresIncompleteBroadcasts() {
         val receiver = TimeEventReceiver()
+        val app = RecordingContext()
 
         receiver.onReceive(null, null)
         receiver.onReceive(null, Intent(TimeEventScheduler.ACTION_TIME_TICK))
+        receiver.onReceive(app, null)
+        receiver.onReceive(app, broadcast(null))
+        receiver.onReceive(app, broadcast("test.unknown"))
+
+        assertEquals(
+            "a broadcast with nothing to act on must not mark a tick delivered, arm an alarm or start the engine",
+            emptyList<String>(),
+            app.touched,
+        )
+        assertTrue(app.prefs.values.isEmpty())
+    }
+
+    /**
+     * The control for the test above: a real tick does write the ledger, so the recorder sees it.
+     * Past the ledger the tick needs AlarmManager, which this JVM classpath can't provide, so what
+     * happens after that isn't asserted here.
+     */
+    @Test
+    fun aTickMarksTheLedgerDeliveredWhereTheRecorderCanSeeIt() {
+        val app = RecordingContext()
+
+        runCatching { TimeEventReceiver().onReceive(app, broadcast(TimeEventScheduler.ACTION_TIME_TICK)) }
+
+        assertTrue(app.touched.toString(), app.touched.any { it.startsWith("prefs:") })
+        assertTrue("the delivery reached storage", app.prefs.values.isNotEmpty())
+    }
+
+    private fun broadcast(actionName: String?): Intent = object : Intent() {
+        override fun getAction(): String? = actionName
+    }
+
+    /** Records everything the receiver could reach through its context. */
+    private class RecordingContext : ContextWrapper(null) {
+        val touched = mutableListOf<String>()
+        val prefs = InMemoryPreferences()
+
+        override fun getApplicationContext(): Context {
+            touched += "applicationContext"
+            return this
+        }
+
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            touched += "prefs:$name"
+            return prefs
+        }
+
+        override fun getSystemService(name: String): Any? {
+            touched += "service:$name"
+            return null
+        }
+
+        override fun startService(service: Intent?): ComponentName? {
+            touched += "startService"
+            return null
+        }
+
+        override fun startForegroundService(service: Intent?): ComponentName? {
+            touched += "startForegroundService"
+            return null
+        }
+
+        override fun sendBroadcast(intent: Intent?) {
+            touched += "sendBroadcast"
+        }
+    }
+
+    /** Just enough SharedPreferences for the trigger ledger. */
+    private class InMemoryPreferences : SharedPreferences {
+        val values = linkedMapOf<String, Any?>()
+
+        override fun getAll(): MutableMap<String, *> = LinkedHashMap(values)
+        override fun getString(key: String?, defValue: String?): String? = values[key] as? String ?: defValue
+
+        @Suppress("UNCHECKED_CAST")
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+            (values[key] as? Set<String>)?.toMutableSet() ?: defValues
+
+        override fun getInt(key: String?, defValue: Int): Int = values[key] as? Int ?: defValue
+        override fun getLong(key: String?, defValue: Long): Long = values[key] as? Long ?: defValue
+        override fun getFloat(key: String?, defValue: Float): Float = values[key] as? Float ?: defValue
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = values[key] as? Boolean ?: defValue
+        override fun contains(key: String?): Boolean = key in values
+        override fun edit(): SharedPreferences.Editor = Editor()
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+
+        private inner class Editor : SharedPreferences.Editor {
+            private val staged = linkedMapOf<String, Any?>()
+            private val removed = mutableSetOf<String>()
+            private var clearFirst = false
+
+            private fun put(key: String?, value: Any?): SharedPreferences.Editor {
+                staged[requireNotNull(key)] = value
+                return this
+            }
+
+            override fun putString(key: String?, value: String?) = put(key, value)
+            override fun putStringSet(key: String?, values: MutableSet<String>?) = put(key, values?.toSet())
+            override fun putInt(key: String?, value: Int) = put(key, value)
+            override fun putLong(key: String?, value: Long) = put(key, value)
+            override fun putFloat(key: String?, value: Float) = put(key, value)
+            override fun putBoolean(key: String?, value: Boolean) = put(key, value)
+
+            override fun remove(key: String?): SharedPreferences.Editor {
+                removed += requireNotNull(key)
+                return this
+            }
+
+            override fun clear(): SharedPreferences.Editor {
+                clearFirst = true
+                return this
+            }
+
+            override fun commit(): Boolean {
+                apply()
+                return true
+            }
+
+            override fun apply() {
+                if (clearFirst) values.clear()
+                removed.forEach { values.remove(it) }
+                staged.forEach { (key, value) -> if (value == null) values.remove(key) else values[key] = value }
+            }
+        }
     }
 
     /**

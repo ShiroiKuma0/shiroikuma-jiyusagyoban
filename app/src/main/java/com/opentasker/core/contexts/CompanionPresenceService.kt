@@ -33,24 +33,33 @@ class CompanionPresenceService : CompanionDeviceService() {
 
     @RequiresApi(36)
     override fun onDevicePresenceEvent(event: DevicePresenceEvent) {
-        val state = when (event.event) {
-            DevicePresenceEvent.EVENT_BLE_APPEARED,
-            DevicePresenceEvent.EVENT_BT_CONNECTED,
-            DevicePresenceEvent.EVENT_SELF_MANAGED_APPEARED,
-            -> CompanionContextEvents.STATE_PRESENT
+        publishCompanionPresenceEvent(event.event, event.associationId)
+    }
+}
 
-            DevicePresenceEvent.EVENT_BLE_DISAPPEARED,
-            DevicePresenceEvent.EVENT_BT_DISCONNECTED,
-            DevicePresenceEvent.EVENT_SELF_MANAGED_DISAPPEARED,
-            -> CompanionContextEvents.STATE_ABSENT
+/**
+ * Android 16's presence callback as present or absent; events that are neither are ignored. Split
+ * from the service because DevicePresenceEvent can't be built in a JVM test.
+ */
+@RequiresApi(36)
+internal fun publishCompanionPresenceEvent(eventCode: Int, associationId: Int) {
+    val state = when (eventCode) {
+        DevicePresenceEvent.EVENT_BLE_APPEARED,
+        DevicePresenceEvent.EVENT_BT_CONNECTED,
+        DevicePresenceEvent.EVENT_SELF_MANAGED_APPEARED,
+        -> CompanionContextEvents.STATE_PRESENT
 
-            else -> return
-        }
-        val associationId = event.associationId.takeIf { it >= 0 }?.toString().orEmpty()
-        if (state == CompanionContextEvents.STATE_PRESENT) {
-            CompanionContextEvents.publishPresent(associationId)
-        } else {
-            CompanionContextEvents.publishAbsent(associationId)
-        }
+        DevicePresenceEvent.EVENT_BLE_DISAPPEARED,
+        DevicePresenceEvent.EVENT_BT_DISCONNECTED,
+        DevicePresenceEvent.EVENT_SELF_MANAGED_DISAPPEARED,
+        -> CompanionContextEvents.STATE_ABSENT
+
+        else -> return
+    }
+    val id = associationId.takeIf { it >= 0 }?.toString().orEmpty()
+    if (state == CompanionContextEvents.STATE_PRESENT) {
+        CompanionContextEvents.publishPresent(id)
+    } else {
+        CompanionContextEvents.publishAbsent(id)
     }
 }

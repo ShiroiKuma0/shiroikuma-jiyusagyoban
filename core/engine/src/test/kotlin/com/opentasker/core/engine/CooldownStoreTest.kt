@@ -1,5 +1,8 @@
 package com.opentasker.core.engine
 
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,5 +70,148 @@ class CooldownStoreTest {
         assertEquals(null, profileIdForCooldownKey("cooldown_7"))
         assertEquals(null, profileIdForCooldownKey("cd_"))
         assertEquals(null, profileIdForCooldownKey("cd_seven"))
+    }
+
+    // The store itself, over an in-memory SharedPreferences, so a slip in the key it writes, a
+    // prune that writes when it shouldn't, or a read that prunes would show up here.
+
+    @Test
+    fun aDeadlineSetByOneStoreIsReadByTheNextAndCountsDownToZero() {
+        val app = PrefsContext()
+        CooldownStore(app).set(5L, now + 60_000L)
+
+        val afterRestart = CooldownStore(app)
+        assertEquals("a new process must see the same deadline", now + 60_000L, afterRestart.get(5L))
+        assertEquals(60_000L, afterRestart.remaining(5L, nowMs = now))
+        assertEquals("time left never goes negative", 0L, afterRestart.remaining(5L, nowMs = now + 70_000L))
+        assertEquals("a profile without a cooldown has none", 0L, afterRestart.get(6L))
+        assertEquals(setOf("cd_5"), app.prefs.values.keys)
+
+        afterRestart.remove(5L)
+        assertEquals(0L, CooldownStore(app).get(5L))
+        assertTrue(app.prefs.values.isEmpty())
+    }
+
+    @Test
+    fun askingHowLongIsLeftNeverWritesEvenForAPassedDeadline() {
+        val app = PrefsContext()
+        CooldownStore(app).set(1L, now - 1_000L)
+        val writesBefore = app.prefs.writes
+
+        assertEquals(0L, CooldownStore(app).remaining(1L, nowMs = now))
+        assertEquals(writesBefore, app.prefs.writes)
+        assertTrue("only loadAll prunes", "cd_1" in app.prefs.values)
+    }
+
+    @Test
+    fun loadingDropsPassedDeadlinesFromStorageAndLeavesEverythingElse() {
+        val wallClock = System.currentTimeMillis()
+        val app = PrefsContext()
+        val store = CooldownStore(app)
+        store.set(1L, wallClock - 60_000L)
+        store.set(2L, wallClock + 3_600_000L)
+        app.prefs.values["unrelated"] = wallClock - 60_000L
+
+        assertEquals(mapOf(2L to wallClock + 3_600_000L), store.loadAll())
+        assertEquals(setOf("cd_2", "unrelated"), app.prefs.values.keys)
+    }
+
+    @Test
+    fun loadingWithNothingExpiredWritesNothing() {
+        val app = PrefsContext()
+        CooldownStore(app).set(2L, System.currentTimeMillis() + 3_600_000L)
+        val writesBefore = app.prefs.writes
+
+        CooldownStore(app).loadAll()
+
+        assertEquals(writesBefore, app.prefs.writes)
+    }
+
+    @Test
+    fun pruningDropsOnlyDeletedProfilesAndWritesNothingWhenNoneAre() {
+        val app = PrefsContext()
+        val store = CooldownStore(app)
+        store.set(1L, now + 1L)
+        store.set(2L, now + 1L)
+        app.prefs.values["unrelated"] = 7L
+
+        val writesBefore = app.prefs.writes
+        store.pruneDeleted(setOf(1L, 2L))
+        assertEquals("nothing stale, nothing written", writesBefore, app.prefs.writes)
+
+        store.pruneDeleted(setOf(1L))
+        assertEquals(setOf("cd_1", "unrelated"), app.prefs.values.keys)
+    }
+
+    private class PrefsContext : ContextWrapper(null) {
+        val prefs = InMemoryPreferences()
+
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            assertEquals("opentasker_cooldowns", name)
+            assertEquals(Context.MODE_PRIVATE, mode)
+            return prefs
+        }
+    }
+
+    /** Just enough SharedPreferences for the store: values, and a count of applied edits. */
+    private class InMemoryPreferences : SharedPreferences {
+        val values = linkedMapOf<String, Any?>()
+        var writes = 0
+
+        override fun getAll(): MutableMap<String, *> = LinkedHashMap(values)
+        override fun getString(key: String?, defValue: String?): String? = values[key] as? String ?: defValue
+
+        @Suppress("UNCHECKED_CAST")
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
+            (values[key] as? Set<String>)?.toMutableSet() ?: defValues
+
+        override fun getInt(key: String?, defValue: Int): Int = values[key] as? Int ?: defValue
+        override fun getLong(key: String?, defValue: Long): Long = values[key] as? Long ?: defValue
+        override fun getFloat(key: String?, defValue: Float): Float = values[key] as? Float ?: defValue
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = values[key] as? Boolean ?: defValue
+        override fun contains(key: String?): Boolean = key in values
+        override fun edit(): SharedPreferences.Editor = Editor()
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+
+        private inner class Editor : SharedPreferences.Editor {
+            private val staged = linkedMapOf<String, Any?>()
+            private val removed = mutableSetOf<String>()
+            private var clearFirst = false
+
+            private fun put(key: String?, value: Any?): SharedPreferences.Editor {
+                staged[requireNotNull(key)] = value
+                return this
+            }
+
+            override fun putString(key: String?, value: String?) = put(key, value)
+            override fun putStringSet(key: String?, values: MutableSet<String>?) = put(key, values?.toSet())
+            override fun putInt(key: String?, value: Int) = put(key, value)
+            override fun putLong(key: String?, value: Long) = put(key, value)
+            override fun putFloat(key: String?, value: Float) = put(key, value)
+            override fun putBoolean(key: String?, value: Boolean) = put(key, value)
+
+            override fun remove(key: String?): SharedPreferences.Editor {
+                removed += requireNotNull(key)
+                return this
+            }
+
+            override fun clear(): SharedPreferences.Editor {
+                clearFirst = true
+                return this
+            }
+
+            override fun commit(): Boolean {
+                apply()
+                return true
+            }
+
+            override fun apply() {
+                if (clearFirst) values.clear()
+                removed.forEach { values.remove(it) }
+                staged.forEach { (key, value) -> if (value == null) values.remove(key) else values[key] = value }
+                writes++
+            }
+        }
     }
 }

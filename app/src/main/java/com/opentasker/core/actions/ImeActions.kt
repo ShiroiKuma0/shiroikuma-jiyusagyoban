@@ -41,25 +41,48 @@ class ImeSetAction : DeclaredAction(ActionCatalog.require("ime.set")) {
         if (requested.isBlank()) return ActionResult.Failure("missing ime_id")
         val manager = ctx.app.getSystemService(InputMethodManager::class.java)
             ?: return ActionResult.Failure("input-method service not available")
-        val target = resolveImeTarget(requested, manager.enabledInputMethodList.map(InputMethodInfo::getId))
-            ?: return ActionResult.Failure("IME is not enabled or is ambiguous: $requested")
-        val current = Settings.Secure.getString(
-            ctx.app.contentResolver,
-            Settings.Secure.DEFAULT_INPUT_METHOD,
-        ).orEmpty()
-        if (current == target) {
-            ctx.logger("IME already selected: $target")
-            return ActionResult.Success
-        }
+        return switchKeyboard(
+            requested = requested,
+            enabledIds = manager.enabledInputMethodList.map(InputMethodInfo::getId),
+            currentIme = {
+                Settings.Secure.getString(
+                    ctx.app.contentResolver,
+                    Settings.Secure.DEFAULT_INPUT_METHOD,
+                ).orEmpty()
+            },
+            openPicker = manager::showInputMethodPicker,
+            log = ctx.logger,
+        )
+    }
+}
 
-        return try {
-            manager.showInputMethodPicker()
-            ActionResult.Failure(
-                "Android requires user selection to switch keyboards; opened the IME picker for $target",
-            )
-        } catch (error: RuntimeException) {
-            ActionResult.Failure("could not open the IME picker: ${error.message}", error)
-        }
+/**
+ * What `ime.set` decides once Android has been asked. An ordinary app can open the keyboard
+ * picker but can't choose for the user, so every real switch ends as a Failure that names the
+ * picker: reporting Success there would claim a change that never happened. Split from the action
+ * so a test can drive it without an InputMethodManager.
+ */
+internal fun switchKeyboard(
+    requested: String,
+    enabledIds: List<String>,
+    currentIme: () -> String,
+    openPicker: () -> Unit,
+    log: (String) -> Unit,
+): ActionResult {
+    val target = resolveImeTarget(requested, enabledIds)
+        ?: return ActionResult.Failure("IME is not enabled or is ambiguous: $requested")
+    if (currentIme() == target) {
+        log("IME already selected: $target")
+        return ActionResult.Success
+    }
+
+    return try {
+        openPicker()
+        ActionResult.Failure(
+            "Android requires user selection to switch keyboards; opened the IME picker for $target",
+        )
+    } catch (error: RuntimeException) {
+        ActionResult.Failure("could not open the IME picker: ${error.message}", error)
     }
 }
 
