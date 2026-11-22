@@ -28,6 +28,12 @@
     <string name="catalog_action_notify_show_field_button3_label_hint" formatted="false">第三个按钮标签</string>
     <string name="catalog_action_notify_show_field_button3_task_id_label" formatted="false">按钮3任务</string>
     <string name="catalog_action_notify_show_field_button3_task_id_hint" formatted="false">点击时运行的任务</string>
+    <string name="catalog_action_notify_show_field_button1_url_label" formatted="false">按钮 1 链接</string>
+    <string name="catalog_action_notify_show_field_button1_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
+    <string name="catalog_action_notify_show_field_button2_url_label" formatted="false">按钮 2 链接</string>
+    <string name="catalog_action_notify_show_field_button2_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
+    <string name="catalog_action_notify_show_field_button3_url_label" formatted="false">按钮 3 链接</string>
+    <string name="catalog_action_notify_show_field_button3_url_hint" formatted="false">点击时打开的网址，未设置任务时使用</string>
     <string name="catalog_action_notify_cancel_name" formatted="false">取消通知</string>
     <string name="catalog_action_notify_cancel_description" formatted="false">按标签和/或ID取消通知</string>
     <string name="catalog_action_notify_cancel_field_tag_label" formatted="false">标签</string>
@@ -83,9 +89,39 @@
     <string name="catalog_action_contacts_lookup_field_mode_label" formatted="false">查找模式</string>
     <string name="catalog_action_contacts_lookup_field_mode_hint" formatted="false">Android 17及以上默认为选择器；权限用于无人值守运行</string>
     <string name="catalog_action_contacts_lookup_field_var_label" formatted="false">输出变量</string>
+    <string name="catalog_action_calendar_event_add_name" formatted="false">添加日历活动</string>
+    <string name="catalog_action_calendar_event_add_description" formatted="false">向日历添加活动，并把新活动的ID存入%event_id</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_label" formatted="false">日历</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_hint" formatted="false">日历应用中显示的名称，或其ID</string>
+    <string name="catalog_action_calendar_event_add_field_title_label" formatted="false">标题</string>
+    <string name="catalog_action_calendar_event_add_field_start_label" formatted="false">开始</string>
+    <string name="catalog_action_calendar_event_add_field_start_hint" formatted="false">now、纪元毫秒数、2026-11-22或2026-11-22 09:30</string>
+    <string name="catalog_action_calendar_event_add_field_end_label" formatted="false">结束</string>
+    <string name="catalog_action_calendar_event_add_field_end_hint" formatted="false">写法与“开始”相同。全天活动填写最后一天。留空则使用“时长”</string>
+    <string name="catalog_action_calendar_event_add_field_duration_label" formatted="false">时长（分钟）</string>
+    <string name="catalog_action_calendar_event_add_field_duration_hint" formatted="false">默认为60。全天活动改为填写结束日期</string>
+    <string name="catalog_action_calendar_event_add_field_all_day_label" formatted="false">全天</string>
+    <string name="catalog_action_calendar_event_add_field_description_label" formatted="false">描述</string>
+    <string name="catalog_action_calendar_event_add_field_location_label" formatted="false">地点</string>
+    <string name="catalog_action_calendar_event_add_field_var_label" formatted="false">变量前缀</string>
+    <string name="catalog_action_calendar_event_add_field_var_hint" formatted="false">默认为event，因此新活动的ID会存入%event_id</string>
+    <string name="catalog_action_calendar_event_query_name" formatted="false">查找日历活动</string>
+    <string name="catalog_action_calendar_event_query_description" formatted="false">把某个时间段内的活动读入%event_count、%event_titles、%event_starts等变量</string>
+    <string name="catalog_action_calendar_event_query_field_from_label" formatted="false">从</string>
+    <string name="catalog_action_calendar_event_query_field_from_hint" formatted="false">默认为now。也可以是纪元毫秒数、2026-11-22或2026-11-22 09:30</string>
+    <string name="catalog_action_calendar_event_query_field_to_label" formatted="false">到</string>
+    <string name="catalog_action_calendar_event_query_field_to_hint" formatted="false">默认为“从”之后一天，最多为其后一年</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_label" formatted="false">日历</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_hint" formatted="false">要查找的日历名称或ID。留空则查找所有日历</string>
+    <string name="catalog_action_calendar_event_query_field_max_label" formatted="false">最多活动数</string>
+    <string name="catalog_action_calendar_event_query_field_max_hint" formatted="false">默认为10，最多50</string>
+    <string name="catalog_action_calendar_event_query_field_var_label" formatted="false">变量前缀</string>
+    <string name="catalog_action_calendar_event_query_field_var_hint" formatted="false">默认为event。标题和地点在运行日志中保持隐藏</string>
     <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">默认：Contact；同时设置姓名、电话、邮箱、数组和数量</string>
     <string name="action_option_contacts_permission" formatted="false">权限（无人值守）</string>
     <string name="action_option_contacts_picker" formatted="false">系统选择器（Android 17及以上）</string>
+    <string name="action_option_location_fix" formatted="false">重新定位</string>
+    <string name="action_option_location_last_known" formatted="false">仅用上次已知位置</string>
     <string name="catalog_action_data_read_name" formatted="false">读取数据</string>
     <string name="catalog_action_data_read_description" formatted="false">将JSON、CSV、XML或HTML解析为变量。适用于HTTP响应和文件。</string>
     <string name="catalog_action_data_read_field_source_label" formatted="false">源数据</string>
@@ -242,9 +278,21 @@
     <string name="catalog_action_sun_times_field_elevations_hint" formatted="false">地平线以上为正、以下为负的度数，每行一个或以逗号分隔。对应时间存入 %ss_custom_morning 和 %ss_custom_evening</string>
     <string name="catalog_action_sun_times_field_var_label" formatted="false">变量前缀</string>
     <string name="catalog_action_sun_times_field_var_hint" formatted="false">默认为 ss，生成 %ss_sunrise、%ss_sunset 等变量。时间均为 1970 年起的秒数</string>
+    <string name="catalog_action_location_get_name" formatted="false">获取位置</string>
+    <string name="catalog_action_location_get_description" formatted="false">把手机所在位置读入%location_lat、%location_lon、%location_accuracy和%location_age</string>
+    <string name="catalog_action_location_get_field_mode_label" formatted="false">模式</string>
+    <string name="catalog_action_location_get_field_mode_hint" formatted="false">“重新定位”会使用GPS和网络定位。“仅用上次已知位置”读取手机已有的位置，不耗电</string>
+    <string name="catalog_action_location_get_field_accuracy_label" formatted="false">精度（米）</string>
+    <string name="catalog_action_location_get_field_accuracy_hint" formatted="false">等待至少达到此精度的定位。留空则采用第一次定位</string>
+    <string name="catalog_action_location_get_field_timeout_label" formatted="false">超时（秒）</string>
+    <string name="catalog_action_location_get_field_timeout_hint" formatted="false">等待新定位的时长，1到120。默认为30</string>
+    <string name="catalog_action_location_get_field_var_label" formatted="false">变量前缀</string>
+    <string name="catalog_action_location_get_field_var_hint" formatted="false">默认为location。纬度和经度在运行日志中保持隐藏</string>
     <string name="catalog_action_tts_speak_name" formatted="false">朗读（文本转语音）</string>
     <string name="catalog_action_tts_speak_description" formatted="false">使用设备扬声器朗读文本</string>
     <string name="catalog_action_tts_speak_field_text_label" formatted="false">要朗读的文本</string>
+    <string name="catalog_action_tts_speak_field_stream_label" formatted="false">音频流</string>
+    <string name="catalog_action_tts_speak_field_stream_hint" formatted="false">默认为音乐。铃声和通知使用铃声或通知音量，在振动或静音模式下不发声，勿扰模式也可能让它们静音。在Android 17上，后台启动的任务只能通过闹钟发声，这需要精确闹钟权限，并跟随闹钟音量。</string>
     <string name="catalog_action_flow_wait_name" formatted="false">等待</string>
     <string name="catalog_action_flow_wait_description" formatted="false">暂停任务执行指定时长</string>
     <string name="catalog_category_flow" formatted="false">流程</string>
@@ -365,6 +413,16 @@
     <string name="catalog_action_plugin_locale_query_field_resultvariable_label" formatted="false">结果变量</string>
     <string name="catalog_action_plugin_locale_query_field_resultvariable_hint" formatted="false">%plugin_state</string>
     <string name="catalog_action_plugin_locale_query_field_requiresatisfied_label" formatted="false">不满足则失败</string>
+    <string name="catalog_action_script_shizuku_run_name" formatted="false">运行Shizuku脚本</string>
+    <string name="catalog_action_script_shizuku_run_description" formatted="false">通过Shizuku运行已批准的shell脚本，并可选择捕获有限的输出</string>
+    <string name="catalog_action_script_shizuku_run_field_path_label" formatted="false">脚本路径</string>
+    <string name="catalog_action_script_shizuku_run_field_path_hint" formatted="false">/data/local/tmp/my_script.sh</string>
+    <string name="catalog_action_script_shizuku_run_field_arguments_label" formatted="false">参数</string>
+    <string name="catalog_action_script_shizuku_run_field_arguments_hint" formatted="false">可选的shell风格参数</string>
+    <string name="catalog_action_script_shizuku_run_field_captureprefix_label" formatted="false">输出变量前缀</string>
+    <string name="catalog_action_script_shizuku_run_field_captureprefix_hint" formatted="false">%script</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_label" formatted="false">超时（毫秒）</string>
+    <string name="catalog_action_script_shizuku_run_field_timeoutms_hint" formatted="false">30000（1000到120000）</string>
     <string name="catalog_action_script_termux_run_name" formatted="false">运行Termux脚本</string>
     <string name="catalog_action_script_termux_run_description" formatted="false">运行一个已批准的Termux脚本并可选择捕获受限输出</string>
     <string name="catalog_category_script" formatted="false">脚本</string>
@@ -424,6 +482,18 @@
     <string name="catalog_action_volume_set_field_stream_label" formatted="false">音频流</string>
     <string name="catalog_action_volume_set_field_stream_hint" formatted="false">音乐、通话、闹钟</string>
     <string name="catalog_action_volume_set_field_level_label" formatted="false">音量级别（0-100）</string>
+    <string name="catalog_action_vpn_tunnel_name" formatted="false">连接或断开VPN</string>
+    <string name="catalog_action_vpn_tunnel_description" formatted="false">开启或关闭WireGuard或Tailscale隧道，然后检查VPN是否真的已改变。</string>
+    <string name="catalog_action_vpn_tunnel_field_client_label" formatted="false">VPN应用</string>
+    <string name="catalog_action_vpn_tunnel_field_client_hint" formatted="false">拥有该隧道的应用</string>
+    <string name="catalog_action_vpn_tunnel_field_state_label" formatted="false">连接</string>
+    <string name="catalog_action_vpn_tunnel_field_state_hint" formatted="false">开启即连接，关闭即断开</string>
+    <string name="catalog_action_vpn_tunnel_field_tunnel_label" formatted="false">隧道名称</string>
+    <string name="catalog_action_vpn_tunnel_field_tunnel_hint" formatted="false">仅限WireGuard，须与应用中显示的完全一致</string>
+    <string name="action_option_vpn_wireguard" formatted="false">WireGuard</string>
+    <string name="action_option_vpn_tailscale" formatted="false">Tailscale</string>
+    <string name="action_option_vpn_up" formatted="false">开启</string>
+    <string name="action_option_vpn_down" formatted="false">关闭</string>
     <string name="catalog_action_wifi_scan_name" formatted="false">扫描Wi-Fi网络</string>
     <string name="catalog_action_wifi_scan_description" formatted="false">将附近接入点列表写入变量。Android限制真实扫描的频率，因此结果可能来自最近一次缓存的扫描。</string>
     <string name="catalog_action_wifi_scan_field_var_label" formatted="false">变量前缀</string>
@@ -438,6 +508,10 @@
     <string name="catalog_action_airplane_toggle_description" formatted="false">打开或关闭飞行模式</string>
     <string name="catalog_action_airplane_toggle_field_state_label" formatted="false">状态</string>
     <string name="catalog_action_airplane_toggle_field_state_hint" formatted="false">开/关/切换</string>
+    <string name="catalog_action_hotspot_toggle_name" formatted="false">切换Wi-Fi热点</string>
+    <string name="catalog_action_hotspot_toggle_description" formatted="false">开启或关闭Wi-Fi热点</string>
+    <string name="catalog_action_hotspot_toggle_field_state_label" formatted="false">状态</string>
+    <string name="catalog_action_hotspot_toggle_field_state_hint" formatted="false">开/关/切换</string>
     <string name="catalog_action_mobile_toggle_name" formatted="false">切换移动数据</string>
     <string name="catalog_action_mobile_toggle_description" formatted="false">打开或关闭移动数据</string>
     <string name="catalog_action_mobile_toggle_field_state_label" formatted="false">状态</string>
@@ -689,6 +763,8 @@
     <string name="catalog_action_sound_play_field_path_label" formatted="false">声音文件路径</string>
     <string name="catalog_action_sound_play_field_volume_label" formatted="false">音量（0-100）</string>
     <string name="catalog_action_sound_play_field_volume_hint" formatted="false">可选；为空时使用当前音量</string>
+    <string name="catalog_action_sound_play_field_stream_label" formatted="false">音频流</string>
+    <string name="catalog_action_sound_play_field_stream_hint" formatted="false">默认为音乐。铃声和通知使用铃声或通知音量，在振动或静音模式下不发声，勿扰模式也可能让它们静音。在Android 17上，后台启动的任务只能通过闹钟发声，这需要精确闹钟权限，并跟随闹钟音量。</string>
     <string name="catalog_action_sound_beep_name" formatted="false">蜂鸣</string>
     <string name="catalog_action_sound_beep_description" formatted="false">以设定的音高播放一个音</string>
     <string name="catalog_action_sound_beep_field_frequency_label" formatted="false">频率（Hz）</string>
