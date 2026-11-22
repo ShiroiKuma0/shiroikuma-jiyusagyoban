@@ -232,6 +232,17 @@ class TaskerExportLayoutTest {
     }
 
     @Test
+    fun aReadSettingWithNoVariableSaysWhereTaskerWillPutIt() {
+        // Here the step fails without a variable; in Tasker it reads into %setting. Say so.
+        val report = export(ActionSpec(type = "settings.read", args = mapOf("table" to "system", "key" to "a")))
+
+        assertHas(report.xml, """<Str sr="arg4" ve="3">%setting</Str>""")
+        assertTrue(report.warnings.toString(), report.warnings.any { "no variable to read into" in it && "%setting" in it })
+        val named = export(ActionSpec(type = "settings.read", args = mapOf("table" to "system", "key" to "a", "var" to "v")))
+        assertFalse(named.warnings.toString(), named.warnings.any { "no variable to read into" in it })
+    }
+
+    @Test
     fun sendSmsAndFilesAndClipboardReadBack() {
         assertEquals("%n", roundTrip("sms.send", "number" to "%n", "message" to "%m").args["number"])
 
@@ -297,6 +308,16 @@ class TaskerExportLayoutTest {
 
         val report = export(ActionSpec(type = "sound.beep", args = mapOf("frequency" to "%pitch", "duration" to "100")))
         assertTrue(report.warnings.toString(), report.warnings.any { "multiplying by 4" in it })
+    }
+
+    @Test
+    fun aBeepTemplateGoesBackAsWrittenRatherThanAsASum() {
+        // The import divides Tasker's pitch by 4. Written back as Tasker's `%f+100`, the template
+        // would come in again with a second division: a quarter of the frequency it was.
+        val frequency = "{{ f | add:100 }}"
+
+        assertHas(xml("sound.beep", "frequency" to frequency, "duration" to "100"), """<Int sr="arg0"><var>$frequency</var></Int>""")
+        assertEquals(frequency, roundTrip("sound.beep", "frequency" to frequency, "duration" to "100").args["frequency"])
     }
 
     @Test

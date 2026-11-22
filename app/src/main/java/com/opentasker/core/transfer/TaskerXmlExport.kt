@@ -330,7 +330,9 @@ object TaskerXmlExporter {
                 }
             }
             "sound.beep" -> {
-                appendInt(sb, 0, taskerBeepFrequency(args["frequency"].orEmpty(), warnings))
+                // Tasker's pitch is 4 times the Hz and the import divides by 4, so a template goes
+                // back as written: as a sum it would come home divided a second time.
+                appendInt(sb, 0, taskerBeepFrequency(args["frequency"].orEmpty(), warnings), sum = false)
                 appendInt(sb, 1, args["duration"] ?: "")
                 appendInt(sb, 2, args["amplitude"].orEmpty().ifBlank { "50" })
                 appendInt(sb, 3, (taskerOutputStream(args["stream"]) ?: TASKER_MUSIC_STREAM).toString())
@@ -373,6 +375,9 @@ object TaskerXmlExporter {
                 appendStr(sb, 1, args["key"] ?: "")
                 appendStr(sb, 2, "")
                 appendInt(sb, 3, "0")
+                if (args["var"].isNullOrBlank()) {
+                    warnings += "The 'settings.read' step has no variable to read into, so in Tasker it reads into %setting."
+                }
                 appendStr(sb, 4, taskerVariableName(args["var"], "setting"))
             }
             "sms.send" -> {
