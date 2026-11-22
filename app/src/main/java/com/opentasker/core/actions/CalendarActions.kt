@@ -10,6 +10,7 @@ import com.opentasker.core.engine.ActionContext
 import com.opentasker.core.engine.ActionResult
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.text.countOf
+import java.text.BreakIterator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -260,8 +261,13 @@ internal fun selectCalendarEvents(
     .toList()
 
 /** At most [max] characters, one fewer when the cut would split an emoji or another surrogate pair. */
-private fun String.cutAt(max: Int): String =
-    if (length <= max) this else take(if (this[max - 1].isHighSurrogate()) max - 1 else max)
+private fun String.cutAt(max: Int): String {
+    if (length <= max) return this
+    // The last break between characters as a person sees them, so an emoji, a flag or a letter
+    // with an accent isn't cut in half.
+    val breakBefore = BreakIterator.getCharacterInstance().apply { setText(this@cutAt) }.preceding(max + 1)
+    return take(breakBefore.coerceAtLeast(0))
+}
 
 /**
  * The end to report for [row] once [selectCalendarEvents] has it in local time: an all-day event

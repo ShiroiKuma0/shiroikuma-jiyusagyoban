@@ -301,6 +301,28 @@ class CalendarActionsTest {
     }
 
     @Test
+    fun aCutTitleKeepsAnAccentWithItsLetter() {
+        // An e followed by a combining acute accent is one letter on screen, and the accent would be the 1025th char.
+        val title = "x".repeat(1023) + "e\u0301" + "tail"
+        val rows = listOf(CalendarEventRow(1, 2, title, now + 60_000L, now + 120_000L, allDay = false, location = ""))
+
+        assertEquals(ActionResult.Success, query(FakeStore(calendars, rows)))
+
+        assertEquals("x".repeat(1023), variables.get("event_title"))
+    }
+
+    @Test
+    fun aCutTitleKeepsAFlagWhole() {
+        // A flag is two regional indicator letters, four chars, and this one runs from the 1023rd to the 1026th.
+        val title = "x".repeat(1022) + "\ud83c\uddfa\ud83c\uddf8" + "tail"
+        val rows = listOf(CalendarEventRow(1, 2, title, now + 60_000L, now + 120_000L, allDay = false, location = ""))
+
+        assertEquals(ActionResult.Success, query(FakeStore(calendars, rows)))
+
+        assertEquals("x".repeat(1022), variables.get("event_title"))
+    }
+
+    @Test
     fun aQueryLooksOnlyInTheNamedCalendar() {
         val rows = listOf(
             CalendarEventRow(1, 2, "Standup", now + 60_000L, now + 120_000L, allDay = false, location = ""),
