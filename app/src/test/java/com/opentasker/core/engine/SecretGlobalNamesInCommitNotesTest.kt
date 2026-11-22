@@ -40,6 +40,15 @@ class SecretGlobalNamesInCommitNotesTest {
     }
 
     @Test
+    fun aSecretThatCantBeReadBackIsCountedNotNamed() {
+        // Saved secret, so it can come back unreadable (a restore, a lost Keystore key). The Variables
+        // screen marks each one, so the app log only needs the count.
+        val note = unreadableSecretsNote(setOf("Cache_4831", "ApiKey"))
+        assertEquals("2 secret variable(s) can't be read and need to be entered again on the Variables screen", note)
+        assertEquals(null, unreadableSecretsNote(emptySet()))
+    }
+
+    @Test
     fun plainNamesStillShow() {
         assertEquals("Count, Log", loggableGlobalNames(listOf("Count", "Log"), setOf("Pin")))
         assertEquals("", loggableGlobalNames(emptyList(), setOf("Pin")))

@@ -165,12 +165,7 @@ suspend fun executeAndLogTask(
         secretNames = persistedBaselineSecretNames,
         unavailableSecretNames = persistedBaselineSecretNames - persistedBaselineValues.keys,
     )
-    if (persistedGlobals.unavailableSecretNames.isNotEmpty()) {
-        AppLogger.warn(
-            logTag,
-            "Secret variables require re-entry: ${persistedGlobals.unavailableSecretNames.sorted().joinToString()}",
-        )
-    }
+    unreadableSecretsNote(persistedGlobals.unavailableSecretNames)?.let { AppLogger.warn(logTag, it) }
     initialVariables.forEach { (name, value) -> variables.set(name, value, EventTaskVariables.isSensitive(name)) }
     // Baseline after seeding + event vars, so only globals actually changed during the run persist.
     val baselineGlobals = variables.globalSnapshot()
@@ -542,6 +537,13 @@ internal fun loggableGlobalNames(names: Collection<String>, secretNames: Set<Str
     val (hidden, shown) = names.partition { it in secretNames }
     return (shown + listOfNotNull(hidden.size.takeIf { it > 0 }?.let { "$it hidden name(s)" })).joinToString()
 }
+
+/**
+ * The app log line for saved secrets that can't be read back, or null when there are none. Counted,
+ * not named, for the reason [loggableGlobalNames] gives; the Variables screen marks each one.
+ */
+internal fun unreadableSecretsNote(names: Set<String>): String? =
+    names.size.takeIf { it > 0 }?.let { "$it secret variable(s) can't be read and need to be entered again on the Variables screen" }
 
 suspend fun logSkippedRun(
     db: AppDatabase,

@@ -22,6 +22,7 @@
 
 ### Fixed
 
+- When a saved secret can't be read back (after a restore, or a lost Keystore key), the app log now says how many need entering again instead of naming them. A name built from a secret, like `%Cache_%Pin`, held the PIN. The Variables screen still marks each one.
 - A list position in a variable path, like `%items[1]`, is only the digits 0 to 9 now, with spaces around them if you like. Set Variable and Variable Clear used to read `%items[+1]` as item 1 too, and a Tasker export then wrote it out as a field named `+1`.
 - When a run's global variables can't be saved, or another run saved them first, the run log and app log count a secret global instead of naming it. A name built from a secret, like `%Cache_%Pin`, put the PIN in both logs.
 - `%arr(+sep+range)` reads a range only when Tasker would. `%arr(+;+2)` is still element 2, but `%arr(+;+12)` and `%arr(+x+:)` now join with `;+12` and `x+:`, as they do in Tasker, instead of reading element 12 or every element. The digits it looks for are any script's, as on a phone, and a vertical tab or form feed in the separator stops it the same way a carriage return does.
