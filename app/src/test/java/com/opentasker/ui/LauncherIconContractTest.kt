@@ -19,7 +19,7 @@ class LauncherIconContractTest {
     @Test
     fun `adaptive icons keep density color and themed layers separate`() {
         listOf("ic_launcher.xml", "ic_launcher_round.xml").forEach { name ->
-            val adaptive = read("app/src/main/res/mipmap-anydpi-v26/$name")
+            val adaptive = read("app/src/main/res/mipmap-anydpi/$name")
             assertTrue("@color/ic_launcher_background" in adaptive)
             assertTrue("@mipmap/ic_launcher_foreground" in adaptive)
             assertTrue("@mipmap/ic_launcher_monochrome" in adaptive)

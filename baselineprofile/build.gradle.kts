@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.test")
+    alias(libs.plugins.android.test)
     alias(libs.plugins.androidx.baselineprofile)
 }
 

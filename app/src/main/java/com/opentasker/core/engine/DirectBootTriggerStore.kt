@@ -1,7 +1,6 @@
 package com.opentasker.core.engine
 
 import android.content.Context
-import android.os.Build
 import android.os.UserManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.deviceProtectedDataStoreFile
@@ -72,11 +71,7 @@ object DirectBootTriggerStore {
     }
 
     fun isUserUnlocked(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            true
-        } else {
-            context.getSystemService(UserManager::class.java)?.isUserUnlocked == true
-        }
+        context.getSystemService(UserManager::class.java)?.isUserUnlocked == true
 
     private fun dataStore(context: Context): DataStore<Preferences> {
         instance?.let { return it }

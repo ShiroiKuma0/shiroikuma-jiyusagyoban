@@ -99,15 +99,6 @@ object MqttNetworkPolicy {
         host: String,
         resolver: (String) -> Array<InetAddress> = InetAddress::getAllByName,
     ): Boolean = resolvePrivateOnly(host, resolver) != null
-
-    private fun isPrivateOrLocalAddress(address: InetAddress): Boolean {
-        if (address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress) return true
-        if (address is java.net.Inet6Address) {
-            val firstByte = address.address.firstOrNull()?.toInt()?.and(0xff) ?: return false
-            return firstByte and 0xfe == 0xfc
-        }
-        return false
-    }
 }
 
 fun interface MqttPublishTransport {

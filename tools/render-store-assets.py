@@ -224,7 +224,7 @@ def save_assets() -> None:
         )
 
     adaptive = adaptive_xml()
-    anydpi = RES / "mipmap-anydpi-v26"
+    anydpi = RES / "mipmap-anydpi"
     anydpi.mkdir(parents=True, exist_ok=True)
     (anydpi / "ic_launcher.xml").write_text(adaptive, encoding="utf-8", newline="\n")
     (anydpi / "ic_launcher_round.xml").write_text(adaptive, encoding="utf-8", newline="\n")

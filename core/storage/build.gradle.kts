@@ -49,7 +49,6 @@ dependencies {
     testCompileOnly(platform(libs.androidx.compose.bom))
     testCompileOnly(libs.androidx.compose.runtime)
     implementation(libs.work.runtime)
-    implementation(libs.androidx.profileinstaller)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
