@@ -338,8 +338,9 @@ class VariableExpander {
     }
 
     /**
-     * The 0-based arrays text.split and text.match store: `#` counts the elements, a number is one
-     * element and `a:b` joins a range with commas, backwards when a is past b. A variable inside
+     * The 0-based arrays text.split and text.match store: `#` counts the elements, `#>` and `#<` are
+     * 1 and the count (0 when empty), the indexes Array Push, Pop and Process give this list, a
+     * number is one element and `a:b` joins a range with commas, backwards when a is past b. A variable inside
      * the parentheses is filled in first and trimmed, so `%parts(%i)` reads the element at `%i` and
      * gives empty while `%i` is, as does a range with an empty variable on either side. Any other
      * form joins the elements with it. Both actions also set [name] to the first element, so while
@@ -371,6 +372,9 @@ class VariableExpander {
         }
         return when {
             form == "#" -> size.toString()
+            // The first and last index as the array actions number this list, from 1.
+            form == "#>" -> if (size == 0) "0" else "1"
+            form == "#<" -> size.toString()
             form.isEmpty() || !arrayForm -> arrays.join(name, expanded)
             ':' !in form -> form.toIntOrNull()?.let { arrays.get(name, it) }.orEmpty()
             else -> storedRange(name, form, size, arrays)?.joinToString(",").orEmpty()
@@ -1073,7 +1077,7 @@ class VariableExpander {
         private val PATTERN_WILDCARD = Regex("[*+]")
         private val TASKER_ARRAY_FORM = Regex("""#[<>]?|[<>]|\d*(?::\d*)?""")
         private val TASKER_COUNT_FORMS = setOf("#", "#<", "#>")
-        private val STORED_ARRAY_FORM = Regex("""#|\d*(?::\d*)?""")
+        private val STORED_ARRAY_FORM = Regex("""#[<>]?|\d*(?::\d*)?""")
         private val TASKER_RANGE_FORM = Regex("""\d*(?::\d*)?""")
 
         /** Java's `.+\+\d$` as Tasker writes it: `.` stops at a line break and `\d` is 0 to 9. */

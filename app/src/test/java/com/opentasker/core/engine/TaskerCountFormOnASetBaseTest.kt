@@ -51,6 +51,20 @@ class TaskerCountFormOnASetBaseTest {
     }
 
     @Test
+    fun aKeptListCountsFromOneAsTheArrayActionsDo() {
+        val store = VariableStore().apply {
+            set("parts", "a")
+            setArray("parts", listOf("a", "b", "c"))
+            setArray("none", emptyList())
+        }
+        assertEquals("3", store.expand("%parts(#)"))
+        assertEquals("1", store.expand("%parts(#>)"))
+        assertEquals("3", store.expand("%parts(#<)"))
+        assertEquals("0", store.expand("%none(#>)"))
+        assertEquals("0", store.expand("%none(#<)"))
+    }
+
+    @Test
     fun theCountsStillReadElementsAndMathsStillWorks() {
         val store = VariableStore().apply {
             set("found", "a")
