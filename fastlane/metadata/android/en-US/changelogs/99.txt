@@ -1,0 +1,8 @@
+Calendar actions add events and read what's coming up.
+New Get Location and Read Setting actions.
+Profiles, Tasks, Variables and Scenes can sort by last edit.
+Airplane mode can switch without Shizuku.
+Profiles can react to a paused work profile.
+More Tasker array forms and MacroDroid If blocks import.
+Home screen shortcuts follow their task's name.
+Simplified Chinese covers 152 more strings.
