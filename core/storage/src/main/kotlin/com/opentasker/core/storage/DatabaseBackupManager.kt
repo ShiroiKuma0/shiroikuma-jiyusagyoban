@@ -485,9 +485,10 @@ class DatabaseBackupManager(
          *
          * [dropStateOfReplacedDatabase] clears what belonged to the database a restore replaces
          * (the app's plugin condition grants name profile positions in it) and returns whether
-         * that is on disk. It runs once the restored database is in place and before the journal
-         * that records the swap is shredded, so a stop in between leaves the journal and the next
-         * start runs it again. It must be safe to run twice.
+         * what must not outlive it is gone from disk. It runs once the restored database is in
+         * place and before the journal that records the swap is shredded, so a stop in between or
+         * a false return leaves the journal and the next start runs it again. It must be safe to
+         * run twice.
          */
         fun applyPendingRestoreIfPresent(
             context: Context,

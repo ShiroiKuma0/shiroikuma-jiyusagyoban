@@ -20,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -75,7 +77,12 @@ object LibrarySortPreference {
     }
 }
 
-internal val Context.libraryEditTimesDataStore by preferencesDataStore(name = "library_edit_times")
+// A file that can't be read starts empty, as if no time was stamped yet, so clearing it after a
+// restore and stamping new times keep working.
+internal val Context.libraryEditTimesDataStore by preferencesDataStore(
+    name = "library_edit_times",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * When an item was last created, saved, undone or redone in the app, keyed like

@@ -196,15 +196,15 @@ class OpenTaskerApp_NoHilt : Application() {
         DatabaseBackupManager.discardLeftoverRestoreCandidate(this)
         // Plugin condition grants name profile positions in the database they were given in, and the
         // Last edited times name item ids, which the restored items may reuse. A restore that
-        // replaces the database drops both, on disk before the restore's journal goes.
+        // replaces the database drops both. Only the grants keep the restore's journal until they're
+        // gone from disk: a stale time just dates an item wrongly, and holding the journal for it
+        // would clear grants the user gave again after the restore on every later start.
         val restoreResult = DatabaseBackupManager.applyPendingRestoreIfPresent(this) {
-            val grantsCleared = LocaleConditionGrantStore(this).revokeAllContextGrants().also { cleared ->
+            runCatching { runBlocking { LibraryEditTimes.clear(this@OpenTaskerApp_NoHilt) } }
+                .onFailure { AppLogger.warn("OpenTasker", "Could not clear the Last edited times a restore left; some items may show an old time", it) }
+            LocaleConditionGrantStore(this).revokeAllContextGrants().also { cleared ->
                 if (!cleared) AppLogger.warn("OpenTasker", "Could not clear the plugin condition grants a restore left; the next start tries again")
             }
-            val timesCleared = runCatching { runBlocking { LibraryEditTimes.clear(this@OpenTaskerApp_NoHilt) } }
-                .onFailure { AppLogger.warn("OpenTasker", "Could not clear the Last edited times a restore left; the next start tries again", it) }
-                .isSuccess
-            grantsCleared && timesCleared
         }
         when (restoreResult) {
             is PendingRestoreApplyResult.Applied -> {
@@ -218,7 +218,7 @@ class OpenTaskerApp_NoHilt : Application() {
                 AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
             }
             PendingRestoreApplyResult.StoppedAfterSwap -> {
-                AppLogger.warn("OpenTasker", "A database restore stopped after its database went in; its plugin condition grants were due to be cleared this start")
+                AppLogger.warn("OpenTasker", "A database restore stopped after its database went in; the plugin condition grants and Last edited times it left were due to be cleared this start")
             }
             PendingRestoreApplyResult.NoPending -> Unit
         }

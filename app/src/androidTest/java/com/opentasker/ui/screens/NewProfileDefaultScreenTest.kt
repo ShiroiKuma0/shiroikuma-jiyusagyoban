@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.FallbackTaskSettings
 import com.opentasker.core.storage.toEntity
 import com.opentasker.ui.theme.OpenTaskerTheme
 import kotlinx.coroutines.flow.first
@@ -40,10 +41,14 @@ class NewProfileDefaultScreenTest {
     private lateinit var db: AppDatabase
     private var settingBefore = false
     private var onboardingDoneBefore = false
+    // The view model clears a stored fallback task that isn't in its database, so the app's own is put back.
+    private val fallbackTask = FallbackTaskSettings(context)
+    private var fallbackTaskIdBefore: Long? = null
 
     @Before
     fun setUp() {
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        fallbackTaskIdBefore = fallbackTask.loadTaskId()
         runBlocking {
             settingBefore = ProfileDefaultsPreference.newProfilesEnabled(context).first()
             onboardingDoneBefore = OnboardingPreference.hasCompleted(context).first()
@@ -57,6 +62,7 @@ class NewProfileDefaultScreenTest {
     @After
     fun tearDown() {
         db.close()
+        fallbackTask.saveTaskId(fallbackTaskIdBefore)
         runBlocking {
             ProfileDefaultsPreference.setNewProfilesEnabled(context, settingBefore)
             // Leave the device as it was found, so a fresh install still gets the first-run flow.

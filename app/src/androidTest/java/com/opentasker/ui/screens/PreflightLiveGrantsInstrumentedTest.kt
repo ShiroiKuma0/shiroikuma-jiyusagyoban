@@ -10,6 +10,7 @@ import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
+import com.opentasker.core.storage.FallbackTaskSettings
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -31,6 +32,9 @@ class PreflightLiveGrantsInstrumentedTest {
     private val store = ViewModelStore()
     private lateinit var db: AppDatabase
     private var writeSettingsMode = "default"
+    // The view model clears a stored fallback task that isn't in its database, so the app's own is put back.
+    private val fallbackTask = FallbackTaskSettings(context)
+    private var fallbackTaskIdBefore: Long? = null
 
     @Before
     fun setUp() {
@@ -40,12 +44,14 @@ class PreflightLiveGrantsInstrumentedTest {
             .filterNot { it.trimStart().startsWith("Uid mode:") }
             .firstNotNullOfOrNull { Regex("WRITE_SETTINGS: (\\w+)").find(it)?.groupValues?.get(1) } ?: "default"
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        fallbackTaskIdBefore = fallbackTask.loadTaskId()
     }
 
     @After
     fun tearDown() {
         store.clear()
         db.close()
+        fallbackTask.saveTaskId(fallbackTaskIdBefore)
         shell("appops set ${context.packageName} WRITE_SETTINGS $writeSettingsMode")
     }
 
