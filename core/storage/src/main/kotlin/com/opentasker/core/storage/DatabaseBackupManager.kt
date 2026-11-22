@@ -607,7 +607,7 @@ class DatabaseBackupManager(
                     shredFile(journal)
                     null
                 }
-                PendingRestoreApplyResult.Failed(error, failedBackup)
+                PendingRestoreApplyResult.Failed(error, failedBackup, replacementKept = replacementPublished && !databaseWentBack)
             }
         }
 
@@ -946,7 +946,8 @@ data class RestoreRollback(val file: File, val restoredAtMs: Long)
 sealed interface PendingRestoreApplyResult {
     data object NoPending : PendingRestoreApplyResult
     data class Applied(val databaseFile: File, val previousBackup: File?) : PendingRestoreApplyResult
-    data class Failed(val exception: Exception, val failedBackup: File?) : PendingRestoreApplyResult
+    /** [replacementKept]: the restored database is live, because there was none before it or the old one couldn't be put back. */
+    data class Failed(val exception: Exception, val failedBackup: File?, val replacementKept: Boolean = false) : PendingRestoreApplyResult
 }
 
 internal fun InputStream.copyBoundedTo(output: OutputStream, maxBytes: Long): Long {

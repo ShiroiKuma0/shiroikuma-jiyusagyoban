@@ -200,6 +200,8 @@ class OpenTaskerApp_NoHilt : Application() {
                 )
             }
             is PendingRestoreApplyResult.Failed -> {
+                // The grants belong to the database they were given in, as on a restore that applies.
+                if (restoreResult.replacementKept) LocaleConditionGrantStore(this).revokeAllContextGrants()
                 AppLogger.error("OpenTasker", "Pending database restore failed", restoreResult.exception)
             }
             PendingRestoreApplyResult.NoPending -> Unit
