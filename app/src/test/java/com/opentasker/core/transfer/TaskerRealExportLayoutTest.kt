@@ -906,13 +906,55 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
-    fun anArrayNamedThroughAnotherVariableStaysAPlaceholder() {
+    fun aPositionSumOrAPopTargetBuiltFromPartsStaysAPlaceholder() {
         listOf(
-            """<code>357</code><Str sr="arg0" ve="3">%%array</Str>""",
-            """<code>590</code><Str sr="arg0" ve="3">%%name</Str><Str sr="arg1" ve="3">,</Str><Int sr="arg2" val="0"/>""",
             """<code>355</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>%i+1</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>""",
             """<code>356</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">%out%n</Str>""",
         ).forEach { assertEquals(it, placeholder, action(it).type) }
+    }
+
+    @Test
+    fun anArrayNamedThroughAnotherVariableWorksOnTheArrayItNames() {
+        // Tasker reads each of these names through `%%name` one level (decompiled 6.7.8, ExecuteService.b5 and dq.t1).
+        val steps = listOf(
+            """<code>590</code><Str sr="arg0" ve="3">%%List</Str><Str sr="arg1" ve="3">,</Str><Int sr="arg2" val="0"/><Int sr="arg3" val="0"/>""",
+            """<code>355</code><Str sr="arg0" ve="3">%%List</Str><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">z</Str><Int sr="arg3" val="0"/>""",
+            """<code>356</code><Str sr="arg0" ve="3">%%List</Str><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">%First</Str>""",
+            """<code>369</code><Str sr="arg0" ve="3">%%List</Str><Int sr="arg1" val="5"/>""",
+            """<code>592</code><Str sr="arg0" ve="3">%%List</Str><Str sr="arg1" ve="3">-</Str><Int sr="arg2" val="0"/>""",
+        )
+        val task = parse(*steps.toTypedArray()).bundle.tasks.single()
+        assertEquals(listOf("var.split", "array.push", "array.pop", "array.process", "var.join"), task.actions.map { it.type })
+        val variables = VariableStore().apply {
+            set("List", "Fruits")
+            set("Fruits", "cherry,apple,banana")
+        }
+
+        val report = runBlocking { TaskRunner(ActionContext(ContextWrapper(null), variables)).run(task) }
+
+        assertTrue(report.toString(), report.success)
+        assertEquals("z", variables.get("First"))
+        // Split, push z first, pop it into %First, sort (5 is alphabetical), join.
+        assertEquals("apple-banana-cherry", variables.get("Fruits"))
+        assertEquals("Fruits", variables.get("List"))
+        assertTrue(variables.numberedItems("List").isEmpty())
+
+        val set = action("""<code>354</code><Str sr="arg0" ve="3">%%List</Str><Str sr="arg1" ve="3">1,2</Str><Str sr="arg2" ve="3">,</Str>""")
+        val clear = action("""<code>357</code><Str sr="arg0" ve="3">%%List</Str>""")
+        assertEquals(listOf("var.split", "array.clear"), listOf(set.type, clear.type))
+    }
+
+    @Test
+    fun anArrayNamedThroughAnUnsetVariableStopsTheStep() {
+        val task = parse("""<code>355</code><Str sr="arg0" ve="3">%%List</Str><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">z</Str><Int sr="arg3" val="0"/>""")
+            .bundle.tasks.single()
+        val variables = VariableStore()
+
+        val report = runBlocking { TaskRunner(ActionContext(ContextWrapper(null), variables)).run(task) }
+
+        assertFalse(report.toString(), report.success)
+        // Capitalized, so a write to any array it could have named would outlive the task.
+        assertEquals(emptyList<String>(), variables.globalSnapshot().keys.filterNot { it.startsWith("FLOW_ERROR") })
     }
 
     @Test
@@ -956,9 +998,9 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
-    fun arrayProcessWithAnUnknownOperationOrIndirectArrayStaysAPlaceholder() {
+    fun arrayProcessWithAnUnknownOperationOrAnArrayNameBuiltFromPartsStaysAPlaceholder() {
         listOf(
-            """<code>369</code><Str sr="arg0" ve="3">%%array</Str><Int sr="arg1" val="11"/>""",
+            """<code>369</code><Str sr="arg0" ve="3">%list%n</Str><Int sr="arg1" val="11"/>""",
             """<code>369</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1" val="14"/>""",
             """<code>369</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>%op</var></Int>""",
             """<code>369</code><Str sr="arg0" ve="3">%list</Str>""",

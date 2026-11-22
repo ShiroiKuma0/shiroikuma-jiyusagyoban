@@ -1820,7 +1820,9 @@ object TaskerXmlImporter {
         val regexSplitter = element.rawActionString(1).takeIf { code == "590" && (ints[3] ?: 0) != 0 && it.isNotEmpty() }
         val processType = ints[1]?.let(ArrayProcessAction.TYPES::getOrNull).takeIf { code == "369" && variables[1] == null }
         val refusal = when {
-            !TASKER_PLAIN_VARIABLE.matches(name) -> "Tasker ${tasker.first}'s ${if (code.startsWith("59")) "name" else "array"} $name isn't one plain variable"
+            // `%%list` names the array %list holds the name of, one level, which is how it runs here too.
+            !TASKER_PLAIN_VARIABLE.matches(if (name.startsWith("%%")) name.substring(1) else name) ->
+                "Tasker ${tasker.first}'s ${if (code.startsWith("59")) "name" else "array"} $name isn't one plain variable"
             code == "369" && processType == null ->
                 "Tasker Array Process's type ${variables[1] ?: ints[1]} isn't one of its 14 operations"
             (code == "355" || code == "356") && !(TASKER_PLAIN_VARIABLE.matches(position) || position.toIntOrNull()?.let { it >= 1 } == true) ->
