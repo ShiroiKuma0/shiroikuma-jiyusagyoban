@@ -2992,7 +2992,7 @@ object TaskerXmlImporter {
                     "%location_lat and %location_lon. Location also works as a profile condition here",
                 "380" to "Tasker's HTTP Response answers a request made to Tasker's own web server, and OpenTasker doesn't run one",
                 "421" to "Tasker's Get Screen Info reads what's on screen as the assistant app. OpenTasker can be the assistant " +
-                    "app, but it has no step that reads the screen",
+                    "app, but it has no step that reads the text on screen",
                 "450" to "Tasker's APN Droid drives the APNDroid app, which OpenTasker doesn't talk to",
                 "342" to "Tasker's Test File reads a file's details into a variable, and OpenTasker has no step that does",
                 "400" to "Tasker's Move moves or renames a file, and OpenTasker has no step that does",

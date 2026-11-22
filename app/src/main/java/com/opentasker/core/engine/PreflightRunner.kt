@@ -138,6 +138,7 @@ object PreflightRunner {
     private const val MAX_STEPS = 512
     private const val MAX_SUBTASK_DEPTH = 8
     private const val MAX_DISPLAY_VALUE_LENGTH = 256
+    private val IMPORT_PLACEHOLDER_TYPES = setOf("tasker.unsupported", "macrodroid.unsupported")
     private val SINGLE_VARIABLE = Regex("%[A-Za-z][A-Za-z0-9_]*")
 
     // The actions that write Tasker's numbered elements (%arr1, %arr2, ...), text.replace through
@@ -963,10 +964,13 @@ object PreflightRunner {
         val outputNames = OutputNameArguments(spec.type)
         var failure: String? = null
         var unsetPosition: Pair<String, String>? = null
+        // An import placeholder never runs, and its note names variables like %LOC to explain the step,
+        // so filling them in would only read the location for nothing.
+        val placeholder = spec.type in IMPORT_PLACEHOLDER_TYPES
         val rawValues = spec.args.mapValues { (key, raw) ->
             val pathBase = outputNames.pathBase(key, raw)
             when {
-                outputNames.keepsAsWritten(key, raw) -> TemplateExpansionResult(raw, emptyList(), emptyList())
+                placeholder || outputNames.keepsAsWritten(key, raw) -> TemplateExpansionResult(raw, emptyList(), emptyList())
                 pathBase != null -> expand(raw.substring(pathBase.length), variables, input).let { it.copy(value = pathBase + it.value) }
                 LineListArguments.applies(spec.type, key) -> {
                     val lines = raw.lines().map { line -> expand(line, variables, input) }
