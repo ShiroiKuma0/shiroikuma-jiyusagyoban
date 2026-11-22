@@ -932,6 +932,7 @@
     <string name="capability_grant_from_setup">Grant this from the Setup tab; elevated device actions need Shizuku, which Setup can guide you through.</string>
     <string name="label_enabled">Enabled</string>
     <string name="label_paused">Paused</string>
+    <string name="label_running">Running</string>
     <string name="label_unsupported">Unsupported</string>
     <string name="label_inverted">Inverted</string>
     <string name="a11y_selected">Selected</string>

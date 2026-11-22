@@ -4,6 +4,7 @@
 
 ### Added
 
+- Task and profile cards say Running while a task runs. The task's own card shows it, and so does every profile that runs it on enter or exit, and it goes away when the run finishes or you cancel it. TalkBack reads it with the card's status line.
 - Read Setting reads one Android setting by name into a variable. A setting that isn't there reads as empty, as in Tasker, and a name Android hides from apps fails the step with a message. A Tasker Custom Setting that only reads (Read Setting To with no value) imports as Read Setting and exports back the same way. One that writes and then reads still imports as a placeholder.
 - A Tasker Array Push or Pop whose Position is a sum like `%i+1` or `%i - 1` imports now. The sum is worked out when the step runs and only its whole part counts, as in Tasker, and the step stops when `%i` isn't set. A sum that divides by 0 still imports as a placeholder, since Tasker fails that step. Exported back to Tasker, the Position is the same sum again.
 - A Tasker array step that names its array through another variable imports now and runs on that array. With `%list` holding `fruits`, an Array Push to `%%list` pushes onto `%fruits`, the way Tasker reads it. Array Set, Push, Pop, Clear and Process and Variable Split and Join all take it. When `%list` isn't set, the step fails instead of guessing.

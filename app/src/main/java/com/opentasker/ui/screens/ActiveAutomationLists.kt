@@ -80,6 +80,7 @@ import com.opentasker.core.capabilities.CapabilityLevel
 import com.opentasker.core.capabilities.SetupRequirement
 import com.opentasker.core.capabilities.SetupRequirementResolver
 import com.opentasker.core.contexts.contextConfigSummary
+import com.opentasker.core.engine.ActiveExecution
 import com.opentasker.core.engine.SingleActionRun
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
@@ -127,6 +128,8 @@ internal fun ProfilesScreen(
     historyAvailability: EditHistoryAvailabilityState = EditHistoryAvailabilityState(),
     /** Every task, whatever the project scope, so a card can name a task from another project. */
     allTasks: List<Task> = tasks,
+    /** Tasks with a run in flight; a profile whose enter or exit task is one says Running. */
+    runningTaskIds: Set<Long> = emptySet(),
 ) {
     // An unread database and an empty one look identical from here; without this gate a cold
     // start with existing data flashes the first-run screen before Room's first emission.
@@ -291,6 +294,7 @@ internal fun ProfilesScreen(
                 onEditContext = { index, context -> onEditContext(profile, index, context) },
                 onDeleteContext = { index -> singleDelete { onDeleteContext(profile, index) } },
                 onPreflight = { onPreflightProfile(profile) },
+                running = listOfNotNull(enterTaskId, exitTaskId).any { it in runningTaskIds },
             )
         }
     }
@@ -360,6 +364,7 @@ private fun ProfileCard(
     onEditContextLogic: () -> Unit,
     onEditContext: (Int, ContextSpec) -> Unit,
     onDeleteContext: (Int) -> Unit,
+    running: Boolean,
 ) {
     var expanded by rememberSaveable(profile.id) { mutableStateOf(false) }
     val profileState = when {
@@ -433,17 +438,26 @@ private fun ProfileCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                text = listOf(
-                    profileState,
-                    stringResource(R.string.label_context_count, profile.contexts.size),
-                    stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
-                ).joinToString(" • "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // One node, so TalkBack reads Running together with the profile's state.
+            Row(
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                if (running) StatusPill(stringResource(R.string.label_running), MaterialTheme.colorScheme.primary)
+                Text(
+                    text = listOf(
+                        profileState,
+                        stringResource(R.string.label_context_count, profile.contexts.size),
+                        stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
+                    ).joinToString(" • "),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (expanded && profile.contexts.isEmpty()) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_profile_cannot_match),
@@ -517,6 +531,8 @@ internal fun TasksScreen(
     // What Setup still lists as missing; null until the first read comes back.
     pendingSetup: Set<SetupRequirement>? = null,
     onOpenSetup: (Set<SetupRequirement>) -> Unit = {},
+    /** Tasks with a run in flight; their cards say Running. */
+    runningTaskIds: Set<Long> = emptySet(),
 ) {
     if (!contentLoaded) {
         ContentLoadingState(contentPadding)
@@ -596,10 +612,14 @@ internal fun TasksScreen(
                 runBusy = runBusy,
                 pendingSetup = pendingSetup,
                 onOpenSetup = onOpenSetup,
+                running = task.id in runningTaskIds,
             )
         }
     }
 }
+
+/** The tasks with a run in flight, for the Running pill on task and profile cards. */
+internal fun runningTaskIds(executions: List<ActiveExecution>): Set<Long> = executions.mapTo(HashSet()) { it.taskId }
 
 @Composable
 private fun TaskCard(
@@ -624,6 +644,7 @@ private fun TaskCard(
     runBusy: Boolean,
     pendingSetup: Set<SetupRequirement>?,
     onOpenSetup: (Set<SetupRequirement>) -> Unit,
+    running: Boolean,
 ) {
     var expanded by rememberSaveable(task.id) { mutableStateOf(initiallyExpanded) }
     val runDescription = stringResource(R.string.a11y_run_task, task.name)
@@ -696,14 +717,23 @@ private fun TaskCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                text = listOf(
-                    stringResource(R.string.label_priority_short, task.priority),
-                    collisionModeTitle(task.collisionMode),
-                ).joinToString(" • "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // One node, so TalkBack reads Running together with the task's settings.
+            Row(
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm),
+            ) {
+                if (running) StatusPill(stringResource(R.string.label_running), MaterialTheme.colorScheme.primary)
+                Text(
+                    text = listOf(
+                        stringResource(R.string.label_priority_short, task.priority),
+                        collisionModeTitle(task.collisionMode),
+                    ).joinToString(" • "),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (expanded && task.actions.isEmpty()) {
                 InlineNotice(
                     title = stringResource(R.string.workspace_task_has_no_actions),

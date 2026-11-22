@@ -892,6 +892,7 @@
     <string name="capability_grant_from_setup">从“设置”标签页授予此项；提权的设备操作需要Shizuku，设置可指导你完成。</string>
     <string name="label_enabled">已启用</string>
     <string name="label_paused">已暂停</string>
+    <string name="label_running">运行中</string>
     <string name="label_unsupported">不支持</string>
     <string name="label_inverted">已反转</string>
     <string name="a11y_selected">已选择</string>
