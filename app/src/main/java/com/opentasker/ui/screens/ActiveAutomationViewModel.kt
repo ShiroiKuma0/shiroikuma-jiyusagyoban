@@ -639,8 +639,26 @@ class ActiveAutomationViewModel(
         }
     }
 
+    /**
+     * When each profile, task and scene was last edited in the app, keyed by [lastEditedKey] — the
+     * newer of its last edit-history row and its last stamp. Feeds the lists' "Last edited" view and
+     * nothing else.
+     */
+    val lastEdited: StateFlow<Map<String, Long>> = combine(
+        db.editHistoryDao().availabilityAsFlow(),
+        LibraryEditTimes.times(appContext),
+    ) { rows, stamps ->
+        newestEdits(rows.associate { lastEditedKey(it.entityType, it.entityId) to it.lastEditedAtMs }, stamps)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Dates a creation, which adds no edit-history row of its own. A failed write only costs the date. */
+    private suspend fun edited(entityType: String, entityId: Long) {
+        runCatching { LibraryEditTimes.touch(appContext, entityType, entityId) }
+            .onFailure { AppLogger.warn("OpenTasker.UI", "Couldn't date an edit for the Last edited order", it) }
+    }
+
     fun createTask(name: String, priority: Int, projectId: Long? = null, iconPath: String? = null, freezeBubble: Boolean = false) = launchWithMessage("Task created") {
-        db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, iconPath = iconPath, freezeBubble = freezeBubble).toEntity())
+        edited(EditHistoryDao.TYPE_TASK, db.taskDao().insert(Task(name = name.trim(), priority = priority.coerceIn(0, 10), projectId = projectId, iconPath = iconPath, freezeBubble = freezeBubble).toEntity()))
     }
 
     fun renameTask(task: Task, name: String) = launchWithMessage("Renamed") {
@@ -771,7 +789,7 @@ class ActiveAutomationViewModel(
         borderColor: String? = null, borderWidth: Int = 0,
         defaultPosition: String = "center", defaultModal: Boolean = true, defaultDismissOnOutside: Boolean = true,
     ) = launchWithMessage("Scene created") {
-        db.sceneDao().insert(
+        val sceneId = db.sceneDao().insert(
             Scene(
                 name = name.trim(),
                 widthDp = widthDp.coerceIn(120, 1440),
@@ -787,10 +805,13 @@ class ActiveAutomationViewModel(
                 defaultDismissOnOutside = defaultDismissOnOutside,
             ).toEntity()
         )
+        edited(EditHistoryDao.TYPE_SCENE, sceneId)
     }
 
     fun updateScene(scene: Scene, message: String = "Scene updated") = launchWithMessage(message) {
         db.sceneDao().update(scene.toEntity())
+        // A scene save writes no edit-history row here, so the stamp is its only date.
+        edited(EditHistoryDao.TYPE_SCENE, scene.id)
     }
 
     fun deleteScene(scene: Scene) = launchWithMessage("Scene deleted") { offer ->
@@ -820,7 +841,7 @@ class ActiveAutomationViewModel(
                 projectId = projectId,
             ).withPolicy(policy)
             requireValidProfileFieldLimits(profile)
-            db.profileDao().insert(profile.toEntity())
+            edited(EditHistoryDao.TYPE_PROFILE, db.profileDao().insert(profile.toEntity()))
         }
 
     fun updateProfile(profile: Profile, message: String = "Profile updated") =

@@ -1,5 +1,6 @@
 package com.opentasker.ui.screens
 
+import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.ui.theme.ThemedSwitch
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -309,7 +310,10 @@ internal fun ProfilesScreen(
     // the red ❗ on their rows; project ids (null = Unfiled) with such profiles get it on their chips.
     brokenProfileIds: Set<Long> = emptySet(),
     alertProjectIds: Set<Long?> = emptySet(),
+    /** Last-edited times by [lastEditedKey], for the "Last edited" view. */
+    lastEdited: Map<String, Long> = emptyMap(),
 ) {
+    val sort = rememberLibrarySort(LibraryList.Profiles)
     // Item + group multi-selection live here (re-mounting the screen on a tab switch resets them). Set<Long>
     // has no Saver, so plain remember — not rememberSaveable — is correct.
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -425,10 +429,11 @@ internal fun ProfilesScreen(
                         item { StorageDecodeWarningCard(storageDecodeIssues) }
                     }
                     item {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = profileSearchQuery,
                             onValueChange = { profileSearchQuery = it },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
                             placeholder = { Text(stringResource(R.string.workspace_search_profiles)) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.variables_search_label)) },
                             trailingIcon = if (profileSearchQuery.isNotEmpty()) {
@@ -437,7 +442,10 @@ internal fun ProfilesScreen(
                             singleLine = true,
                             shape = RoundedCornerShape(DesignSystem.Radii.lg),
                         )
+                        LibrarySortButton(sort)
+                        }
                     }
+                    if (sort.order != LibrarySortOrder.Default) item { LibrarySortNotice(sort.order) }
                     if (stringGroups.isNotEmpty()) {
                         item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(DesignSystem.Spacing.sm)) {
@@ -467,7 +475,11 @@ internal fun ProfilesScreen(
                             )
                         }
                     }
-                    if (groupOps.groups.isEmpty()) {
+                    if (sort.order != LibrarySortOrder.Default) {
+                        // A VIEW: flat, no groups, no drag handles — so nothing here can write an order.
+                        val sorted = sortLibrary(filteredProfiles, sort.order, { it.name }) { lastEdited[lastEditedKey(EditHistoryDao.TYPE_PROFILE, it.id)] }
+                        items(sorted, key = { it.id }) { profile -> profileCard(profile) }
+                    } else if (groupOps.groups.isEmpty()) {
                         items(filteredProfiles, key = { it.id }) { profile -> profileCard(profile) }
                     } else {
                         groupedItems(
@@ -745,6 +757,7 @@ private fun ProfileCard(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (broken) HealthAlertIcon()
+                        if (rememberRunningTasks().runs(profile)) RunningPill()
                         Text(profile.name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     // Collapsed: name + a one-line status summary (state + context count). Expanded: just the task.
@@ -861,8 +874,11 @@ internal fun TasksScreen(
     // subset shown here): blocked task ids → red ❗ on their rows; project ids → ❗ on their chips.
     brokenTaskIds: Set<Long> = emptySet(),
     alertProjectIds: Set<Long?> = emptySet(),
+    /** Last-edited times by [lastEditedKey], for the "Last edited" view. */
+    lastEdited: Map<String, Long> = emptyMap(),
 ) {
     val themePrefs by ThemeStore.state.collectAsState()
+    val sort = rememberLibrarySort(LibraryList.Tasks)
     val focusManager = LocalFocusManager.current
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var selectedGroupIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
@@ -968,10 +984,11 @@ internal fun TasksScreen(
                     item { StorageDecodeWarningCard(storageDecodeIssues) }
                 }
                 item {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = taskSearchQuery,
                         onValueChange = { taskSearchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                         placeholder = { Text(stringResource(R.string.workspace_search_tasks)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.run_log_search_label)) },
                         trailingIcon = if (taskSearchQuery.isNotEmpty()) {
@@ -980,7 +997,10 @@ internal fun TasksScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(DesignSystem.Radii.lg),
                     )
+                    LibrarySortButton(sort)
+                    }
                 }
+                if (sort.order != LibrarySortOrder.Default) item { LibrarySortNotice(sort.order) }
                 if (filteredTasks.isEmpty()) {
                     item {
                         InlineNotice(
@@ -990,7 +1010,11 @@ internal fun TasksScreen(
                         )
                     }
                 }
-                if (groupOps.groups.isEmpty()) {
+                if (sort.order != LibrarySortOrder.Default) {
+                    // A VIEW: flat, no groups, no drag handles — so nothing here can write an order.
+                    val sorted = sortLibrary(filteredTasks, sort.order, { it.name }) { lastEdited[lastEditedKey(EditHistoryDao.TYPE_TASK, it.id)] }
+                    items(sorted, key = { it.id }) { task -> taskCard(task) }
+                } else if (groupOps.groups.isEmpty()) {
                     items(filteredTasks, key = { it.id }) { task -> taskCard(task) }
                 } else {
                     groupedItems(
@@ -1209,6 +1233,7 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (broken) HealthAlertIcon()
+                        if (rememberRunningTasks().runs(task.id)) RunningPill()
                         Text(
                             task.name,
                             style = MaterialTheme.typography.titleLarge,
@@ -1773,3 +1798,9 @@ private fun ContextRow(
 }
 
 private fun plural(count: Int): String = if (count == 1) "" else "s"
+
+/** Shown before the name while the task runs — on the folded card too, which is where it is looked for. */
+@Composable
+private fun RunningPill() {
+    StatusPill(stringResource(R.string.label_running), MaterialTheme.colorScheme.primary)
+}

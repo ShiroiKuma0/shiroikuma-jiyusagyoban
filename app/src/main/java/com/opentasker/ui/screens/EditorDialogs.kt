@@ -487,7 +487,7 @@ internal fun ProfileEditorDialog(
     siblingNames: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onSave: (String, Boolean, Long, Int, AutomationMode, String?, ProfilePolicyDraft) -> Unit,
-    // Upstream's "New profiles start on" setting (18d9c420); the fork's Settings has no row for it yet.
+    // Upstream's "New profiles start on" setting (18d9c420): the Editor section of the UI settings page.
     newProfileEnabled: Boolean = false,
 ) {
     val initialTaskId = profile?.enterTaskId ?: tasks.firstOrNull()?.id ?: 0L

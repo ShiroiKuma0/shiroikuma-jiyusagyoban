@@ -314,6 +314,7 @@ fun ActiveAutomationUi(
     val viewModel: ActiveAutomationViewModel = viewModel(factory = ActiveAutomationViewModelFactory(db, context))
     val profiles by viewModel.profiles.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val lastEdited by viewModel.lastEdited.collectAsState()
     val scenes by viewModel.scenes.collectAsState()
     val dataLoaded by viewModel.dataLoaded.collectAsState()
     val projects by viewModel.projects.collectAsState()
@@ -1188,6 +1189,7 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Profiles -> ProfilesScreen(
                 profiles = visibleProfiles,
+                lastEdited = lastEdited,
                 brokenProfileIds = brokenProfileIds,
                 alertProjectIds = alertProfileProjectIds,
                 tasks = tasks,
@@ -1231,6 +1233,7 @@ fun ActiveAutomationUi(
 
             OpenTaskerScreen.Tasks -> TasksScreen(
                 tasks = visibleTasks,
+                lastEdited = lastEdited,
                 brokenTaskIds = brokenTaskIds,
                 alertProjectIds = alertProjectIds,
                 expandedTasks = expandedTasks,
@@ -1342,6 +1345,7 @@ fun ActiveAutomationUi(
             // element editor below the list — that part is unchanged.
             OpenTaskerScreen.Scenes -> SceneLibraryScreen(
                 scenes = visibleScenes,
+                lastEdited = lastEdited,
                 expandedScenes = expandedScenes,
                 tasks = tasks,
                 projects = projects,
@@ -1538,6 +1542,7 @@ fun ActiveAutomationUi(
     if (showCreateProfileDialog) {
         ProfileEditorDialog(
             profile = null,
+            newProfileEnabled = prefs.newProfilesEnabled,
             tasks = tasks,
             siblingNames = profiles.filter { (it.projectId ?: 0L) == (currentProjectId ?: 0L) }
                 .map { it.name.trim().lowercase() }.toSet(),

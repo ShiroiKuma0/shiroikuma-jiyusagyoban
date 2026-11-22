@@ -34,6 +34,7 @@ data class ThemePrefs(
     val fontWeight: Int = 0,        // 0 = leave each text style's own weight; else 100..900
     val fontScalePct: Int = 100,    // 100 = 1.0x; clamped to [SCALE_MIN, SCALE_MAX]
     val advancedActionPicker: Boolean = true,   // full-screen, category-foldable action picker (fork default)
+    val newProfilesEnabled: Boolean = false,    // a profile made in the editor is switched on when saved (upstream 18d9c420)
     // ---- The role table (UiRoles.kt): the roles 白い熊 has set apart from their defaults, by role key.
     val roleOverrides: Map<String, Int> = emptyMap(),
     // ---- The UI page itself: its sections in 白い熊's order, and the ones that are unfolded. Section
@@ -326,6 +327,7 @@ object ThemeStore {
     private const val K_FONT_WEIGHT = "font_weight"
     private const val K_FONT_SCALE = "font_scale"
     private const val K_ADVANCED_ACTION_PICKER = "advanced_action_picker"
+    private const val K_NEW_PROFILES_ENABLED = "new_profiles_enabled"
     private const val K_ROLE_OVERRIDES = "role_overrides"
     private const val K_UI_SECTION_ORDER = "ui_section_order"
     private const val K_UI_SECTIONS_OPEN = "ui_sections_open"
@@ -554,6 +556,7 @@ object ThemeStore {
             fontWeight = prefs.getInt(K_FONT_WEIGHT, d.fontWeight),
             fontScalePct = prefs.getInt(K_FONT_SCALE, d.fontScalePct),
             advancedActionPicker = prefs.getBoolean(K_ADVANCED_ACTION_PICKER, d.advancedActionPicker),
+            newProfilesEnabled = prefs.getBoolean(K_NEW_PROFILES_ENABLED, d.newProfilesEnabled),
             roleOverrides = UiRoles.decode(prefs.getString(K_ROLE_OVERRIDES, "").orEmpty()),
             uiSectionOrder = prefs.getString(K_UI_SECTION_ORDER, "").orEmpty(),
             uiSectionsOpen = prefs.getString(K_UI_SECTIONS_OPEN, "").orEmpty(),
@@ -673,6 +676,7 @@ object ThemeStore {
             putInt(K_FONT_WEIGHT, p.fontWeight)
             putInt(K_FONT_SCALE, p.fontScalePct)
             putBoolean(K_ADVANCED_ACTION_PICKER, p.advancedActionPicker)
+            putBoolean(K_NEW_PROFILES_ENABLED, p.newProfilesEnabled)
             putString(K_ROLE_OVERRIDES, UiRoles.encode(p.roleOverrides))
             putString(K_UI_SECTION_ORDER, p.uiSectionOrder)
             putString(K_UI_SECTIONS_OPEN, p.uiSectionsOpen)

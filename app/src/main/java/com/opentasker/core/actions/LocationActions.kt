@@ -28,6 +28,16 @@ import kotlin.coroutines.resume
  * just reported its position has nothing new to say and waiting on GPS would only cost time and
  * battery. Otherwise one update is requested and awaited up to `timeout_ms`.
  *
+ * Two things taken from upstream's own Get Location (6f3a541c), which is not shipped because it
+ * claims this action's id with other arguments:
+ * - `accuracy` (metres): a cached fix worse than this is not accepted, and the wait goes on past
+ *   the first fix until one this good arrives. On timeout the best fix seen is still published —
+ *   this action's rule is "something rather than nothing" — and `<prefix>Acc` says how good it was.
+ * - `hide`: the coordinates are stored as sensitive, so the run log and previews never show them,
+ *   and the log line leaves them out. OFF by default, deliberately: a sensitive variable taints
+ *   whatever is built from it and is left out of exports, which would break tasks that write the
+ *   position into a file name or a URI.
+ *
  * Publishes `<prefix>Lat`, `<prefix>Lon`, `<prefix>Acc` (metres), `<prefix>AgeMs`,
  * `<prefix>Provider` and `<prefix>Ok`. `Ok` is written in every outcome — including failure —
  * so a task can branch on it without having to treat "action failed" as flow control.
@@ -40,11 +50,16 @@ class GetLocationAction : Action {
         val prefix = args["prefix"]?.trim().orEmpty().ifEmpty { "LOC_" }
         val timeoutMs = args["timeout_ms"]?.trim()?.toLongOrNull()?.coerceIn(1_000L, 120_000L) ?: 20_000L
         val maxAgeMs = args["max_age_ms"]?.trim()?.toLongOrNull()?.coerceAtLeast(0L) ?: 120_000L
+        val wanted = args["accuracy"]?.trim()?.takeIf(String::isNotEmpty)?.let { text ->
+            text.toFloatOrNull()?.takeIf { it.isFinite() && it >= 1f }
+                ?: return ActionResult.Failure("accuracy must be a number of metres, 1 or more")
+        }
+        val hide = isTruthy(args["hide"])
 
         fun publish(location: Location?, provider: String) {
             ctx.variables.set("${prefix}Ok", (location != null).toString())
-            ctx.variables.set("${prefix}Lat", location?.latitude?.let { fmt6(it) } ?: "")
-            ctx.variables.set("${prefix}Lon", location?.longitude?.let { fmt6(it) } ?: "")
+            ctx.variables.set("${prefix}Lat", location?.latitude?.let { fmt6(it) } ?: "", sensitive = hide && location != null)
+            ctx.variables.set("${prefix}Lon", location?.longitude?.let { fmt6(it) } ?: "", sensitive = hide && location != null)
             ctx.variables.set("${prefix}Acc", location?.accuracy?.let { fmt1(it.toDouble()) } ?: "")
             ctx.variables.set("${prefix}AgeMs", location?.let { ageMs(it).toString() } ?: "")
             ctx.variables.set("${prefix}Provider", location?.provider ?: provider)
@@ -63,13 +78,21 @@ class GetLocationAction : Action {
             return ActionResult.Failure("Android location service unavailable")
         }
 
-        bestLastKnown(manager)?.takeIf { ageMs(it) <= maxAgeMs }?.let { cached ->
+        bestLastKnown(manager)?.takeIf { ageMs(it) <= maxAgeMs && meets(it, wanted) }?.let { cached ->
             publish(cached, cached.provider.orEmpty())
             ctx.logger("Location: cached fix from ${cached.provider}, ${ageMs(cached)} ms old")
             return ActionResult.Success
         }
 
-        val fresh = withTimeoutOrNull(timeoutMs) { awaitFix(manager) }
+        // The best fix the wait saw, kept outside it so a timeout does not throw it away.
+        val seen = java.util.concurrent.atomic.AtomicReference<Location?>(null)
+        val fresh = withTimeoutOrNull(timeoutMs) { awaitFix(manager, wanted, seen) }
+        if (fresh == null && seen.get() != null) {
+            val best = seen.get()!!
+            publish(best, best.provider.orEmpty())
+            ctx.logger("Location: no fix within ${fmt1(wanted?.toDouble() ?: 0.0)} m in ${timeoutMs} ms, using the best seen (±${fmt1(best.accuracy.toDouble())} m)")
+            return ActionResult.Success
+        }
         if (fresh == null) {
             // Fall back to a stale fix rather than nothing: a coordinate from ten minutes ago still
             // says which town this run happened in, which is the whole point of recording it.
@@ -83,7 +106,10 @@ class GetLocationAction : Action {
             }
         }
         publish(fresh, fresh.provider.orEmpty())
-        ctx.logger("Location: ${fmt6(fresh.latitude)}, ${fmt6(fresh.longitude)} (±${fmt1(fresh.accuracy.toDouble())} m)")
+        ctx.logger(
+            if (hide) "Location: a fix from ${fresh.provider} (±${fmt1(fresh.accuracy.toDouble())} m), coordinates hidden"
+            else "Location: ${fmt6(fresh.latitude)}, ${fmt6(fresh.longitude)} (±${fmt1(fresh.accuracy.toDouble())} m)",
+        )
         return ActionResult.Success
     }
 
@@ -93,9 +119,23 @@ class GetLocationAction : Action {
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
             .minByOrNull { ageMs(it) }
 
-    /** One update from whichever enabled provider answers first. */
+    /** Whether [location] is as good as [wanted] metres; any fix is when nothing was asked for. */
+    private fun meets(location: Location, wanted: Float?): Boolean =
+        wanted == null || (location.hasAccuracy() && location.accuracy <= wanted)
+
+    private fun isTruthy(value: String?): Boolean =
+        value?.trim()?.lowercase() in setOf("true", "1", "on", "yes")
+
+    /**
+     * The first update good enough for [wanted] from whichever enabled provider gives one; with no
+     * accuracy asked for, simply the first. Every fix that is better than the last goes into [seen].
+     */
     @SuppressLint("MissingPermission")
-    private suspend fun awaitFix(manager: LocationManager): Location? =
+    private suspend fun awaitFix(
+        manager: LocationManager,
+        wanted: Float?,
+        seen: java.util.concurrent.atomic.AtomicReference<Location?>,
+    ): Location? =
         suspendCancellableCoroutine { continuation ->
             val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
                 .filter { runCatching { manager.isProviderEnabled(it) }.getOrDefault(false) }
@@ -105,6 +145,10 @@ class GetLocationAction : Action {
             }
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
+                    seen.updateAndGet { best ->
+                        if (best == null || !best.hasAccuracy() || (location.hasAccuracy() && location.accuracy <= best.accuracy)) location else best
+                    }
+                    if (!meets(location, wanted)) return
                     runCatching { manager.removeUpdates(this) }
                     if (continuation.isActive) continuation.resume(location)
                 }

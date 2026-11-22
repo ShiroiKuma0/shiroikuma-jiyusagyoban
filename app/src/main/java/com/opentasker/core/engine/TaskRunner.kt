@@ -805,9 +805,12 @@ class TaskRunner(
     /** Tasker's %TRUN lists a task run by another one too, for as long as it actually runs. */
     private suspend fun runListed(child: TaskRunner, target: Task): TaskRunReport {
         val running = TaskerBuiltIns.subTaskStarted(target.name)
+        // Its card says Running for the same span (upstream abcd0e47).
+        ActiveExecutionRegistry.nestedStarted(target.id)
         try {
             return child.run(target)
         } finally {
+            ActiveExecutionRegistry.nestedEnded(target.id)
             TaskerBuiltIns.subTaskEnded(running)
         }
     }
