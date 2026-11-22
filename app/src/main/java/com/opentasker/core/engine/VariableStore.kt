@@ -8,9 +8,11 @@ import com.opentasker.core.expressions.InertTemplateText
 import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.expressions.TemplateScope
 import com.opentasker.core.model.VariableNamePolicy
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -562,6 +564,74 @@ class VariableStore {
         if (sensitiveWriteDepth.get() > 0) sensitiveArrayNames += name
         return true
     }
+
+    /**
+     * Removes the field or list item [fullPath] names (`base.key`, `base.list[0]`) from the JSON its
+     * base holds and stores the rest, as Tasker's Variable Clear does with a path (decompiled 6.7.8,
+     * `TaskerJsonWriter.d`), so a removed list item moves the later ones down. Returns null when it
+     * did, else why not, for the step to fail with: the base is unset or isn't a JSON object or list,
+     * or a field or item on the way isn't there. The base keeps its secret flag.
+     */
+    fun clearAtPath(fullPath: String): String? {
+        val parsed = parsePathSelectors(fullPath) ?: return "isn't a variable path"
+        if (parsed.selectors.isEmpty()) return "can't clear the whole variable this way"
+        val current = get(parsed.base) ?: return "%${parsed.base} has no value to change"
+        val depth = JsonNesting.depth(current)
+        if (depth != JsonNesting.NOT_JSON && depth > JsonNesting.MAX_DATA_DEPTH) return "%${parsed.base} is nested too deep to change"
+        // Tasker only reads it as JSON when, trimmed, it starts with { or [.
+        val trimmed = current.trim()
+        val root = if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try { jsonCodec.parseToJsonElement(trimmed) } catch (_: SerializationException) { null }
+        } else {
+            null
+        }
+        if (root !is JsonObject && root !is JsonArray) return "%${parsed.base} isn't valid JSON"
+        val updated = try { removeInJson(root, parsed.selectors) } catch (missing: JsonPathMissing) { return missing.message }
+        set(parsed.base, updated.toString(), sensitive = isSensitive(parsed.base))
+        return null
+    }
+
+    /** [element] without what the last of [selectors] names; [JsonPathMissing] says where it stopped. */
+    private fun removeInJson(element: JsonElement, selectors: List<PathSelector>): JsonElement {
+        val last = selectors.size == 1
+        return when (val head = selectors.first()) {
+            is PathSelector.Property -> {
+                val obj = element as? JsonObject ?: throw JsonPathMissing(
+                    if (last) "can't remove field '${head.name}' from ${describe(element)}" else "expected an object at '${head.name}', but found ${describe(element)}",
+                )
+                val child = obj[head.name]
+                when {
+                    last && child == null -> throw JsonPathMissing("field '${head.name}' doesn't exist")
+                    last -> JsonObject(obj - head.name)
+                    child == null || child is JsonNull -> throw JsonPathMissing("field '${head.name}' doesn't exist")
+                    child !is JsonObject && child !is JsonArray -> throw JsonPathMissing("'${head.name}' is ${describe(child)}, not a list or object")
+                    else -> JsonObject(obj + (head.name to removeInJson(child, selectors.drop(1))))
+                }
+            }
+            is PathSelector.Index -> {
+                val list = element as? JsonArray ?: throw JsonPathMissing(
+                    if (last) "can't remove item [${head.index}] from ${describe(element)}" else "expected a list at [${head.index}], but found ${describe(element)}",
+                )
+                val child = list.getOrNull(head.index)
+                when {
+                    last && child == null -> throw JsonPathMissing("item [${head.index}] is out of range (the list has ${list.size} items)")
+                    last -> JsonArray(list.filterIndexed { index, _ -> index != head.index })
+                    child == null || child is JsonNull -> throw JsonPathMissing("item [${head.index}] doesn't exist")
+                    child !is JsonObject && child !is JsonArray -> throw JsonPathMissing("the item at [${head.index}] is ${describe(child)}, not a list or object")
+                    else -> JsonArray(list.toMutableList().also { it[head.index] = removeInJson(child, selectors.drop(1)) })
+                }
+            }
+        }
+    }
+
+    private fun describe(element: JsonElement): String = when (element) {
+        is JsonObject -> "an object"
+        is JsonArray -> "a list"
+        is JsonNull -> "null"
+        is JsonPrimitive -> if (element.isString) "text" else "a value"
+    }
+
+    private class JsonPathMissing(override val message: String) : Exception(message)
 
     private fun setInJson(
         element: JsonElement,

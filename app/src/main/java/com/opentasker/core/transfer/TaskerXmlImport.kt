@@ -1514,7 +1514,9 @@ object TaskerXmlImporter {
      * Variable Clear (decompiled 6.7.8, `dq.I`) reads its name as written, never filled in. Pattern
      * Matching clears every name that matches, globals too unless Local Variables Only. No name
      * clears every local, and every global as well with Clear All Variables. Each switch only
-     * counts where Tasker reads it, so only those come over.
+     * counts where Tasker reads it, so only those come over. Without Pattern Matching, a name with a
+     * `.` or a `[...]` in it is a JSON path (`fr.M`), which Tasker clears by removing that field or
+     * item (`HelperExecuteService.y2`), so it comes over in this app's path syntax.
      */
     private fun taskerVariableClear(
         code: String,
@@ -1526,11 +1528,15 @@ object TaskerXmlImporter {
         val pattern = name.isNotEmpty() && (ints[1] ?: 0) != 0
         val localOnly = pattern && (ints[2] ?: 0) != 0
         val clearAll = name.isEmpty() && (ints[3] ?: 0) != 0
+        val isPath = !pattern && ('.' in name || ('[' in name && ']' in name))
+        val path = if (isPath) taskerJsonPath(name) else null
         val refusal = when {
             (1..3).any { it in variables } -> "Tasker Variable Clear takes a switch from a variable, which has no match here"
             name.startsWith("%%") -> "Tasker Variable Clear takes the name to clear from ${name.drop(1)}, which has no match here"
-            name.isNotEmpty() && !pattern && !TASKER_PLAIN_VARIABLE.matches(name) ->
-                "Tasker Variable Clear clears $name, and this app clears one whole variable or a pattern"
+            isPath && path == null ->
+                "Tasker Variable Clear removes $name from a JSON variable, a path this app can't write (a variable in it, a key with other than letters, digits, _ or -, or a position that isn't a whole number from 1)"
+            name.isNotEmpty() && !pattern && !isPath && !TASKER_PLAIN_VARIABLE.matches(name) ->
+                "Tasker Variable Clear clears $name, and this app clears one whole variable, one field or item of a JSON variable, or a pattern"
             else -> null
         }
         if (refusal != null) return taskerPlaceholder(code, refusal)
@@ -1539,13 +1545,74 @@ object TaskerXmlImporter {
                 type = "var.clear",
                 label = "Tasker variable clear",
                 args = buildMap {
-                    put("name", name)
+                    put("name", path ?: name)
                     if (pattern) put("pattern", "true")
                     if (localOnly) put("local_only", "true")
                     if (clearAll) put("clear_all", "true")
                 },
             ),
         )
+    }
+
+    /**
+     * A Tasker JSON path (decompiled 6.7.8, `fr.R`, `lt.g.f`, `kt.c0`) the way this app writes one.
+     * The variable runs to the first `.` or `[`, then `.key` and `[key]` (with `\` escapes) name
+     * fields and `(n)` is the nth list item, `[n-1]` here. Null when a path here can't say it: a
+     * variable in the path (Tasker fills it in), a key with other than letters, digits, `_` or `-`,
+     * a position that isn't a whole number from 1, or nothing after the variable.
+     */
+    private fun taskerJsonPath(name: String): String? {
+        val baseEnd = name.indexOfFirst { it == '.' || it == '[' }.takeIf { it > 0 } ?: return null
+        val base = name.substring(0, baseEnd)
+        if (!TASKER_PLAIN_VARIABLE.matches(base)) return null
+        val path = name.substring(baseEnd).removePrefix(".")
+        if ('%' in path) return null
+        val out = StringBuilder(base)
+        var steps = 0
+        fun field(key: String): Boolean {
+            if (key.isEmpty() || !key.all { it.isLetterOrDigit() || it == '_' || it == '-' }) return false
+            out.append('.').append(key)
+            steps++
+            return true
+        }
+        fun keyEnd(from: Int) = (from until path.length).firstOrNull { path[it] == '.' || path[it] == '[' || path[it] == '(' } ?: path.length
+        var at = 0
+        while (at < path.length) {
+            when (path[at]) {
+                '(' -> {
+                    val close = path.indexOf(')', at + 1).let { if (it < 0) path.length else it }
+                    val position = path.substring(at + 1, close).toIntOrNull()?.takeIf { it > 0 } ?: return null
+                    out.append('[').append(position - 1).append(']')
+                    steps++
+                    at = close + 1
+                }
+                '[' -> {
+                    val key = StringBuilder()
+                    at++
+                    while (at < path.length && path[at] != ']') {
+                        if (path[at] == '\\' && at + 1 < path.length) at++
+                        key.append(path[at])
+                        at++
+                    }
+                    at++
+                    if (!field(key.toString())) return null
+                }
+                '.' -> {
+                    at++
+                    if (at < path.length && path[at] != '[' && path[at] != '(') {
+                        val end = keyEnd(at)
+                        if (!field(path.substring(at, end))) return null
+                        at = end
+                    }
+                }
+                else -> {
+                    val end = keyEnd(at)
+                    if (!field(path.substring(at, end))) return null
+                    at = end
+                }
+            }
+        }
+        return if (steps > 0) out.toString() else null
     }
 
     /**

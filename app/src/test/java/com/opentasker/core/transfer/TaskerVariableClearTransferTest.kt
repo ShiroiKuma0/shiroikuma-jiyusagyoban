@@ -48,15 +48,40 @@ class TaskerVariableClearTransferTest {
     @Test
     fun whatTaskerWontClearStaysAPlaceholder() {
         listOf(
-            // One key of a JSON variable, or an array element.
-            clear("%json.key"),
+            // An array element.
             clear("%arr(1)"),
+            // A JSON path this app can't write: a variable in it, a key with a space, a position from 0, no field at all.
+            clear("%json.list(%i)"),
+            clear("%json[my key]"),
+            clear("%json.list(0)"),
+            clear("%json."),
             // The name to clear is held in %which.
             clear("%%which"),
             clear("%%which", pattern = 1),
             // A switch taken from a variable.
             """<code>549</code><Str sr="arg0" ve="3">%a</Str><Int sr="arg1"><var>%usePattern</var></Int>""",
         ).forEach { assertEquals(it, placeholder, action(it).type) }
+    }
+
+    @Test
+    fun aJsonPathComesOverInThisAppsPathSyntax() {
+        // Tasker counts list positions from 1 with (n) and also names a field as [key] (kt.c0).
+        mapOf(
+            "%json.key" to "%json.key",
+            "%json.list(2)" to "%json.list[1]",
+            "%json.list(2).name" to "%json.list[1].name",
+            "%json[key].sub" to "%json.key.sub",
+            "%json.(1)" to "%json[0]",
+        ).forEach { (tasker, here) -> assertEquals(tasker, "var.clear" to mapOf("name" to here), action(clear(tasker)).let { it.type to it.args }) }
+        // With Pattern Matching on, Tasker matches names instead.
+        assertEquals(mapOf("name" to "%json.key", "pattern" to "true"), action(clear("%json.key", pattern = 1)).args)
+    }
+
+    @Test
+    fun aJsonPathGoesOutInTaskersPathSyntax() {
+        assertTrue("""<Str sr="arg0" ve="3">%json.list(2).name</Str>""" in exported(mapOf("name" to "%json.list[1].name")))
+        // %json(1) would be an array element to Tasker.
+        assertTrue("""<Str sr="arg0" ve="3">%json.(1)</Str>""" in exported(mapOf("name" to "json[0]")))
     }
 
     @Test
@@ -83,6 +108,9 @@ class TaskerVariableClearTransferTest {
             mapOf("name" to "%a/%b", "pattern" to "true", "local_only" to "true"),
             mapOf("name" to ""),
             mapOf("name" to "", "clear_all" to "true"),
+            mapOf("name" to "%Json.key"),
+            mapOf("name" to "%json.list[1].name"),
+            mapOf("name" to "%json[0]"),
         ).forEach { args ->
             val back = TaskerXmlImporter.parse(rawXml = exported(args), appVersion = "test", importedAtEpochMs = 0L)
                 .bundle.tasks.single().actions.single()

@@ -480,10 +480,19 @@ object TaskerXmlExporter {
                 appendInt(sb, 2, taskerFlag(args["delete_parts"]))
             }
             "var.clear" -> {
-                // A pattern or an empty name (every local) goes as written, a plain name with its %.
+                // A pattern or an empty name (every local) goes as written, a plain name with its %,
+                // and a JSON path in Tasker's path syntax.
                 val name = args["name"]?.trim().orEmpty()
                 val pattern = taskerFlag(args["pattern"])
-                appendStr(sb, 0, if (name.isEmpty() || pattern == "1") name else taskerVariableName(name, "VAR"))
+                appendStr(
+                    sb,
+                    0,
+                    when {
+                        name.isEmpty() || pattern == "1" -> name
+                        '.' in name || '[' in name -> taskerJsonPathName(taskerVariableName(name, "VAR"))
+                        else -> taskerVariableName(name, "VAR")
+                    },
+                )
                 appendInt(sb, 1, pattern)
                 appendInt(sb, 2, taskerFlag(args["local_only"]))
                 appendInt(sb, 3, taskerFlag(args["clear_all"]))
@@ -1212,6 +1221,18 @@ object TaskerXmlExporter {
         return if (trimmed.startsWith("%")) trimmed else "%$trimmed"
     }
 
+    /**
+     * This app's JSON path (`%json.list[0]`) as Tasker writes it (`%json.list(1)`): list positions
+     * count from 1, and one right after the variable gets a dot (`%json.(1)`), since Tasker reads
+     * `%json(1)` as an array element.
+     */
+    private fun taskerJsonPathName(name: String): String {
+        val baseEnd = name.indexOfFirst { it == '.' || it == '[' }
+        if (baseEnd < 0) return name
+        val path = name.substring(baseEnd).replace(PATH_INDEX) { "(${it.groupValues[1].toBigInteger().inc()})" }
+        return name.substring(0, baseEnd) + (if (path.startsWith('(')) ".$path" else path)
+    }
+
     /** A checkbox the way Tasker stores one, as 1 or 0. */
     private fun taskerFlag(value: String?): String = if (value?.trim()?.toBooleanStrictOrNull() == true) "1" else "0"
 
@@ -1301,6 +1322,9 @@ object TaskerXmlExporter {
     private val TEMPLATE_VARIABLE = Regex("""\{\{\s*(?:global\.)?([A-Za-z][A-Za-z0-9_]*)\s*\}\}""")
 
     private val BARE_ARRAY = Regex("""%?([A-Za-z][A-Za-z0-9_]*)(?:\(\))?""")
+
+    /** A list position in this app's JSON path, `[0]`, spaces allowed as its parser allows them. */
+    private val PATH_INDEX = Regex("""\[\s*([0-9]+)\s*]""")
 
     private val VARIABLE_REFERENCE = Regex("""%[A-Za-z]""")
 

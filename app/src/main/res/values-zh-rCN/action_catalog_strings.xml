@@ -61,7 +61,7 @@
     <string name="catalog_action_var_clear_name" formatted="false">变量清除</string>
     <string name="catalog_action_var_clear_description" formatted="false">取消设置一个变量、名称匹配模式的所有变量，或所有局部变量</string>
     <string name="catalog_action_var_clear_field_name_label" formatted="false">名称或模式</string>
-    <string name="catalog_action_var_clear_field_name_hint" formatted="false">%name，开启模式匹配时可写 %item*。留空则清除所有局部变量</string>
+    <string name="catalog_action_var_clear_field_name_hint" formatted="false">%name，写 %json.key 可删除 JSON 变量中的一个字段，开启模式匹配时可写 %item*。留空则清除所有局部变量</string>
     <string name="catalog_action_var_clear_field_pattern_label" formatted="false">模式匹配</string>
     <string name="catalog_action_var_clear_field_pattern_hint" formatted="false">清除名称匹配的所有变量，如 %item* 或 %a/%b</string>
     <string name="catalog_action_var_clear_field_local_only_label" formatted="false">仅局部变量</string>
