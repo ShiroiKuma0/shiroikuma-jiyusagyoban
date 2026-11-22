@@ -54,7 +54,8 @@ class BackupRestoreAtomicityTest {
         val transactionStart = source.indexOf("The pending file is the durable restore journal")
         val atomicPublish = source.indexOf("replaceFileAtomically(temp, dbFile", transactionStart)
         val sidecarCleanup = source.indexOf("deleteDatabaseSidecars(dbFile)", atomicPublish)
-        val journalDelete = source.indexOf("pending.delete()", sidecarCleanup)
+        // Retired (renamed off, then shredded) only once the new database is in place.
+        val journalDelete = source.indexOf("retireRestoreJournal(pending)", sidecarCleanup)
 
         assertTrue(transactionStart >= 0)
         assertTrue(atomicPublish > transactionStart)

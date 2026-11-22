@@ -168,10 +168,12 @@ object StateSensorEvents {
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             }
+            // Published first, so a stop() that runs from here on takes it off.
+            listener = candidate
             if (runCatching { manager.registerListener(candidate, sensor, SensorManager.SENSOR_DELAY_UI) }.getOrDefault(false)) {
-                listener = candidate
                 emitReady(emit, "orientation")
             } else {
+                listener = null
                 emitSetup(emit, "orientation", "Open Setup to review orientation sensor support; Android could not register the available sensor.")
             }
         }
@@ -218,10 +220,12 @@ object StateSensorEvents {
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             }
+            // Published first, so a stop() that runs from here on takes it off.
+            listener = candidate
             if (runCatching { manager.registerListener(candidate, sensor, SensorManager.SENSOR_DELAY_UI) }.getOrDefault(false)) {
-                listener = candidate
                 emitReady(emit, "proximity")
             } else {
+                listener = null
                 emitSetup(emit, "proximity", "Open Setup to review proximity sensor support; Android could not register the available sensor.")
             }
         }
@@ -239,7 +243,9 @@ object StateSensorEvents {
         val readings = ActivityReadings(STEP_RATE_BUCKET)
         val stepTimes = ArrayDeque<Long>()
 
-        fun emitActivity(activity: String, stepsPerMinute: Int? = null, measured: Boolean = true) {
+        // The sensor's thread and the recheck both get here, so the readings' lock guards them,
+        // the step times and the last motion.
+        fun emitActivity(activity: String, stepsPerMinute: Int? = null, measured: Boolean = true) = synchronized(readings) {
             if (activity == "walking" || activity == "running") lastMotionAt = System.currentTimeMillis()
             readings.next(activity, stepsPerMinute, measured)?.let { emitValues(emit, "activity", it, measured) }
         }
@@ -247,7 +253,7 @@ object StateSensorEvents {
         fun stop() {
             listener?.let { manager?.unregisterListener(it) }
             listener = null
-            stepTimes.clear()
+            synchronized(readings) { stepTimes.clear() }
         }
 
         fun ensure() {
@@ -263,8 +269,10 @@ object StateSensorEvents {
             if (listener != null) {
                 // No motion for that long while listening is a measured "stationary", which also
                 // replaces the stand-in below when a step detector never saw a step.
-                if (lastMotionAt > 0L && System.currentTimeMillis() - lastMotionAt > ACTIVITY_IDLE_MS) {
-                    emitActivity("stationary", 0)
+                synchronized(readings) {
+                    if (lastMotionAt > 0L && System.currentTimeMillis() - lastMotionAt > ACTIVITY_IDLE_MS) {
+                        emitActivity("stationary", 0)
+                    }
                 }
                 return
             }
@@ -275,17 +283,19 @@ object StateSensorEvents {
                 emitSetup(emit, "activity", "Open Setup to review activity sensor support; this device has no step detector or accelerometer.")
                 return
             }
-            lastMotionAt = System.currentTimeMillis()
+            synchronized(readings) { lastMotionAt = System.currentTimeMillis() }
             // Nothing has been sensed yet, so this is a stand-in until the sensor or the idle check reports.
             emitActivity("stationary", 0, measured = false)
             val candidate = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
                     val now = System.currentTimeMillis()
                     if (sensor.type == Sensor.TYPE_STEP_DETECTOR) {
-                        stepTimes.addLast(now)
-                        while (stepTimes.firstOrNull()?.let { now - it > 60_000L } == true) stepTimes.removeFirst()
-                        val stepsPerMinute = stepTimes.size
-                        emitActivity(MotionActivityClassifier.fromStepRate(stepsPerMinute), stepsPerMinute)
+                        synchronized(readings) {
+                            stepTimes.addLast(now)
+                            while (stepTimes.firstOrNull()?.let { now - it > 60_000L } == true) stepTimes.removeFirst()
+                            val stepsPerMinute = stepTimes.size
+                            emitActivity(MotionActivityClassifier.fromStepRate(stepsPerMinute), stepsPerMinute)
+                        }
                     } else if (event.values.size >= 3) {
                         emitActivity(MotionActivityClassifier.fromAcceleration(event.values[0], event.values[1], event.values[2]))
                     }
@@ -293,11 +303,13 @@ object StateSensorEvents {
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             }
+            // Published first, so a stop() that runs from here on takes it off.
+            listener = candidate
             if (!runCatching { manager.registerListener(candidate, sensor, SensorManager.SENSOR_DELAY_UI) }.getOrDefault(false)) {
+                listener = null
                 emitSetup(emit, "activity", "Open Setup to review activity sensor support; Android could not register the available sensor.")
                 return
             }
-            listener = candidate
             emitReady(emit, "activity")
         }
 
@@ -716,26 +728,37 @@ object StateSensorEvents {
 private fun Double.trimForState(): String =
     if (isFinite()) "%.3f".format(java.util.Locale.US, this).trimEnd('0').trimEnd('.') else "0"
 
-private class RecheckingRegistration(
+/**
+ * Runs [ensure] now and every [intervalMs], and [stop] on [close]. One lock covers both, so a
+ * [close] waits for an [ensure] that's registering a listener and then takes it off, and no
+ * [ensure] runs after it. Cancelling the job alone doesn't stop an [ensure] already running.
+ */
+internal class RecheckingRegistration(
     private val ensure: () -> Unit,
     private val stop: () -> Unit,
     private val intervalMs: Long,
 ) {
+    private val lock = Any()
     private var job: Job? = null
+    private var closed = false
 
     fun start(scope: CoroutineScope) {
-        job = scope.launch {
+        val started = scope.launch {
             while (isActive) {
-                runCatching(ensure)
+                synchronized(lock) { if (!closed) runCatching(ensure) }
                 delay(intervalMs)
             }
         }
+        synchronized(lock) { job = started }
     }
 
     fun close() {
-        job?.cancel()
-        job = null
-        runCatching(stop)
+        synchronized(lock) {
+            closed = true
+            job?.cancel()
+            job = null
+            runCatching(stop)
+        }
     }
 }
 

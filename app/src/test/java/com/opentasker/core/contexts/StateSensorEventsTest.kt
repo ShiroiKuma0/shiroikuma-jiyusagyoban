@@ -1,6 +1,15 @@
 package com.opentasker.core.contexts
 
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.thread
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -39,5 +48,39 @@ class StateSensorEventsTest {
 
         assertTrue(speed != null)
         assertTrue(speed!! in 9.0..11.5)
+    }
+
+    @Test
+    fun closeWaitsForARegistrationUnderWayThenRemovesIt() {
+        val registered = AtomicBoolean(false)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val ensures = AtomicInteger()
+        val registration = RecheckingRegistration(
+            ensure = {
+                ensures.incrementAndGet()
+                entered.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                registered.set(true)
+            },
+            stop = { registered.set(false) },
+            intervalMs = 10,
+        )
+        val scope = CoroutineScope(Dispatchers.Default)
+        try {
+            registration.start(scope)
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            // The profile closes while the sensor is still being registered.
+            val closer = thread { registration.close() }
+            Thread.sleep(100)
+            release.countDown()
+            closer.join(5_000)
+            assertFalse("a sensor registered as the source closed was left on", registered.get())
+            val count = ensures.get()
+            Thread.sleep(100)
+            assertEquals("no recheck runs after close", count, ensures.get())
+        } finally {
+            scope.cancel()
+        }
     }
 }

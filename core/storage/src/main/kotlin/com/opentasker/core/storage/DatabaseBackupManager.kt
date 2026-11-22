@@ -223,7 +223,7 @@ class DatabaseBackupManager(
                 writeValidatedCopy(input, candidate, "restore candidate")
                 summarize(candidate, sourceLabel ?: uri.lastPathSegment ?: candidate.name)
             }.onFailure { error ->
-                candidateRestoreFile(context, databaseName).delete()
+                shredFile(candidateRestoreFile(context, databaseName))
                 AppLogger.error(tag, "Restore inspection failed: ${error.message}", error)
             }
         }
@@ -237,7 +237,7 @@ class DatabaseBackupManager(
                 writeValidatedCopy(managedBackup.inputStream(), candidate, "restore candidate")
                 summarize(candidate, managedBackup.name)
             }.onFailure { error ->
-                candidateRestoreFile(context, databaseName).delete()
+                shredFile(candidateRestoreFile(context, databaseName))
                 AppLogger.error(tag, "Restore inspection failed: ${error.message}", error)
             }
         }
@@ -256,8 +256,13 @@ class DatabaseBackupManager(
         }
     }
 
-    /** Drops an inspected candidate the user decided not to stage. */
-    fun discardInspectedRestore(): Boolean = candidateRestoreFile(context, databaseName).delete()
+    /** Drops an inspected candidate the user decided not to stage, shredded like the journal. */
+    fun discardInspectedRestore(): Boolean {
+        val candidate = candidateRestoreFile(context, databaseName)
+        if (!candidate.exists()) return false
+        shredFile(candidate)
+        return !candidate.exists()
+    }
 
     /**
      * Cancels a staged restore. Only the validated pending journal is removed — backups, the live
@@ -266,7 +271,8 @@ class DatabaseBackupManager(
     fun cancelPendingRestore(): Boolean {
         val pending = pendingRestoreFile(context, databaseName)
         if (!pending.exists()) return false
-        return pending.delete().also { deleted ->
+        shredFile(pending)
+        return (!pending.exists()).also { deleted ->
             if (deleted) AppLogger.info(tag, "Pending restore cancelled")
             else AppLogger.warn(tag, "Could not cancel the pending restore journal")
         }
@@ -495,6 +501,7 @@ class DatabaseBackupManager(
             databaseName: String = DATABASE_NAME,
         ): PendingRestoreApplyResult {
             val pending = pendingRestoreFile(context, databaseName)
+            shredFile(spentRestoreJournal(pending))
             if (!pending.exists()) return PendingRestoreApplyResult.NoPending
 
             val dbFile = context.getDatabasePath(databaseName)
@@ -532,7 +539,7 @@ class DatabaseBackupManager(
                 replaceFileAtomically(temp, dbFile, "live database restore")
                 replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
-                if (!pending.delete()) throw IOException("Could not finalize the pending restore journal")
+                retireRestoreJournal(pending)
                 context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit(commit = true) {
                     if (rollback != null) {
                         putString(restoreRollbackKey(databaseName), rollback.name)
@@ -544,7 +551,7 @@ class DatabaseBackupManager(
                 }
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
-                temp?.delete()
+                temp?.let(::shredFile)
                 rollback?.takeIf { replacementPublished && it.exists() }?.let { previous ->
                     // A database-sized staging copy, in the databases directory, written on the
                     // path where something has already gone wrong. If the rename below fails the
@@ -570,7 +577,7 @@ class DatabaseBackupManager(
                 val failedBackup = if (runCatching { pending.renameTo(failed) }.getOrDefault(false)) {
                     failed
                 } else {
-                    pending.delete()
+                    shredFile(pending)
                     null
                 }
                 PendingRestoreApplyResult.Failed(error, failedBackup)
@@ -852,6 +859,20 @@ internal fun shredFile(file: File) {
     }
     file.delete()
 }
+
+/**
+ * Takes an applied restore journal off its name, then shreds it, so the plaintext a portable
+ * backup was staged as doesn't stay in `files/backups`. Renamed first, so a death mid-shred
+ * leaves a [spentRestoreJournal] the next start shreds, never a zeroed journal it would apply.
+ */
+internal fun retireRestoreJournal(pending: File) {
+    val spent = spentRestoreJournal(pending)
+    if (!pending.renameTo(spent)) throw IOException("Could not finalize the pending restore journal")
+    shredFile(spent)
+}
+
+/** Where [retireRestoreJournal] moves an applied journal while it shreds it. */
+internal fun spentRestoreJournal(pending: File): File = File(pending.parentFile, "${pending.name}.spent")
 
 /** Same-directory atomic publication or no publication; never delete the existing target first. */
 internal fun replaceFileAtomically(source: File, target: File, purpose: String) {

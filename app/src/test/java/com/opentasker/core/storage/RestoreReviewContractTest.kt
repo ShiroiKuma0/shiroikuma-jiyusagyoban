@@ -28,7 +28,7 @@ class RestoreReviewContractTest {
         )
         assertTrue("inspection must write the separate candidate file", "candidateRestoreFile(" in inspect)
         assertFalse("inspection must not touch the pending journal", "pendingRestoreFile(" in inspect)
-        assertTrue("a rejected candidate must not be left behind", ".delete()" in inspect)
+        assertTrue("a rejected candidate must not be left behind", "shredFile(candidateRestoreFile(" in inspect)
     }
 
     @Test
@@ -48,7 +48,7 @@ class RestoreReviewContractTest {
             source.indexOf("fun cancelPendingRestore("),
             source.indexOf("suspend fun pendingRestoreSummary("),
         )
-        assertTrue("cancel deletes the pending journal", "pending.delete()" in cancel)
+        assertTrue("cancel shreds the pending journal", "shredFile(pending)" in cancel)
         assertFalse("cancel must not touch the live database", "dbFile" in cancel)
         assertFalse("cancel must not delete backups", "listBackups" in cancel)
         assertFalse("cancel must not remove the pre-restore snapshot", "rollback" in cancel)

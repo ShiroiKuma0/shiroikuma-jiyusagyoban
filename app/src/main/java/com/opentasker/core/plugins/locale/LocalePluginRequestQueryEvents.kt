@@ -6,17 +6,44 @@ import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import com.opentasker.core.contexts.ContextEvent
+import com.opentasker.core.logging.AppLogger
 import com.opentasker.core.platform.ForeignParcels
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.shareIn
 
 object LocalePluginRequestQueryEvents {
+    private const val TAG = "PluginRequestQuery"
     private const val EVENT_NAME = "locale_request_query"
     private const val MAX_ACTIVITY_CLASS_CHARS = 240
     private val classNamePattern = Regex("^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$")
 
-    fun events(app: Context): Flow<ContextEvent> = callbackFlow {
+    /** Whether an event matcher for [requestedEvent] can fire on a `REQUEST_QUERY`: one for this event, or for any event (blank). */
+    fun isRequested(requestedEvent: String?): Boolean =
+        requestedEvent.isNullOrBlank() || requestedEvent.trim().equals(EVENT_NAME, ignoreCase = true)
+
+    private val sharedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val sharedLock = Any()
+    private var shared: Flow<ContextEvent>? = null
+
+    /** `REQUEST_QUERY` events through one exported receiver for the whole process, however many matchers listen. */
+    fun events(app: Context): Flow<ContextEvent> = synchronized(sharedLock) {
+        shared ?: receiverEvents(app)
+            .shareIn(
+                scope = sharedScope,
+                // Unregisters once the last matcher stops, and rides out a profile reload's brief gap.
+                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+                replay = 0,
+            )
+            .also { shared = it }
+    }
+
+    private fun receiverEvents(app: Context): Flow<ContextEvent> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val event = intent?.let(::buildEventFromIntent) ?: return
@@ -25,7 +52,14 @@ object LocalePluginRequestQueryEvents {
         }
         val filter = IntentFilter(LocalePluginContract.ACTION_REQUEST_QUERY)
 
-        ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        try {
+            ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        } catch (ex: RuntimeException) {
+            // Shared, so a refusal here would reach no matcher and take the process down instead.
+            AppLogger.warn(TAG, "Plugin query requests aren't heard: ${ex.message}")
+            close()
+            return@callbackFlow
+        }
 
         awaitClose {
             runCatching { app.unregisterReceiver(receiver) }

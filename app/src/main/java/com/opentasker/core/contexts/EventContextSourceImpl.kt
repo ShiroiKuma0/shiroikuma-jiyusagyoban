@@ -52,7 +52,7 @@ class EventContextSourceImpl : EventDemandContextSource {
         awaitClose { collectors.forEach { it.cancel() } }
     }
 
-    private fun eventFlows(app: Context, requestedEvent: String?): List<Flow<ContextEvent>> = listOf(
+    private fun eventFlows(app: Context, requestedEvent: String?): List<Flow<ContextEvent>> = listOfNotNull(
         // Keep service-owned pulse bridges first so onSubscribed is a strict producer barrier.
         ShakeContextEvents.events,
         CameraMicContextEvents.flow,
@@ -68,7 +68,8 @@ class EventContextSourceImpl : EventDemandContextSource {
         NfcContextEvents.events,
         BootContextEvents.events,
         CalendarSunContextEvents.events(app, requestedEvent = requestedEvent),
-        LocalePluginRequestQueryEvents.events(app),
+        // Exported, so only a matcher that can fire on it holds it open.
+        LocalePluginRequestQueryEvents.events(app).takeIf { LocalePluginRequestQueryEvents.isRequested(requestedEvent) },
         QuickSettingsTileContextEvents.events,
         PushContextEvents.events,
         ShareContextEvents.events,
