@@ -42,4 +42,9 @@ dependencies {
     implementation(composeBom)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    constraints {
+        // Compose asks for an older androidx.activity than the app ships, and only the app's
+        // version is in gradle/verification-metadata.xml, so this module resolves that one too.
+        implementation(libs.androidx.activity.compose)
+    }
 }

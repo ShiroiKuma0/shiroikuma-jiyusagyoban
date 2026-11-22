@@ -205,6 +205,11 @@
             <sha256 value="f34b5f8747deb0a2a5bdb1359666d914cf32708596249659ee168e8ca6102f13" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
+      <component group="androidx.activity" name="activity-ktx" version="1.7.0">
+         <artifact name="activity-ktx-1.7.0.module">
+            <sha256 value="f4001a709b6f7132b22a5e17c24f8b8a9b3c462a598de3b0f16cc57a4344bab6" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
       <component group="androidx.annotation" name="annotation" version="1.10.0">
          <artifact name="annotation-1.10.0.module">
             <sha256 value="5b2d4387f384e5913a4aec979a20ece13bb5ce992bc90a962dea1feea7fa89e9" origin="OpenTasker: Google Maven published .sha256" />
@@ -2902,6 +2907,11 @@
             <sha256 value="d1b165dd2bee90500733e4ad79024f5f590bfb3825682a894dfbd3274cefb0f8" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
+      <component group="androidx.startup" name="startup-runtime" version="1.0.0">
+         <artifact name="startup-runtime-1.0.0.module">
+            <sha256 value="40effca0d6ee1fde32bc296897e54ebbcc4cf4aa29b0c531036cbd2a824a3c24" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
       <component group="androidx.startup" name="startup-runtime" version="1.1.1">
          <artifact name="startup-runtime-1.1.1.aar">
             <sha256 value="e0a6329a371262fe4c450372b70fdaf33b769ef6917094723787cfce896b1dd3" origin="OpenTasker: Google Maven published .sha256" reason="Artifact is not signed" />
@@ -3028,6 +3038,11 @@
          </artifact>
          <artifact name="uiautomator-shell.aar">
             <sha256 value="1d6a721fa7a654fe8d060bb6eff538cfdd0d3827de40ebbcee7069c12a6267f5" origin="OpenTasker: Google Maven published .sha256" />
+         </artifact>
+      </component>
+      <component group="androidx.tracing" name="tracing" version="1.0.0">
+         <artifact name="tracing-1.0.0.module">
+            <sha256 value="fc8b21ebe5fa3a7c96ee098bcdcd00f077ebce73f243fa858e2b0671615f75d8" origin="OpenTasker: Google Maven published .sha256" />
          </artifact>
       </component>
       <component group="androidx.tracing" name="tracing" version="1.1.0">
