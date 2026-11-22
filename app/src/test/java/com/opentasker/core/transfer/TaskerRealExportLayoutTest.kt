@@ -2,6 +2,7 @@ package com.opentasker.core.transfer
 
 import android.content.ContextWrapper
 import com.opentasker.core.actions.SetVariableAction
+import com.opentasker.core.actions.TASKER_TOGGLE_VALUE
 import com.opentasker.core.actions.TextReplaceAction
 import com.opentasker.core.actions.TextSubstringAction
 import com.opentasker.core.engine.ActionContext
@@ -405,6 +406,18 @@ class TaskerRealExportLayoutTest {
             assertEquals("doze_always_on", action.args["key"])
             assertEquals("1", action.args["value"])
         }
+    }
+
+    @Test
+    fun customSettingsToggleKeepsTaskersToggleValueForTheWriteToFlip() {
+        // Two corpus exports flip the screen buttons this way. The write step reads the marker and
+        // writes 1 for 0 and 0 for 1, so the marker itself never lands in the setting.
+        val action = action(
+            """<code>235</code><Int sr="arg0" val="1"/><Str sr="arg1" ve="3">screen_buttons_turn_on</Str><Str sr="arg2" ve="3">=:=toggle=:=</Str><Int sr="arg3" val="0"/><Str sr="arg4" ve="3"/>""",
+        )
+
+        assertEquals("settings.write", action.type)
+        assertEquals(mapOf("table" to "secure", "key" to "screen_buttons_turn_on", "value" to TASKER_TOGGLE_VALUE), action.args)
     }
 
     @Test

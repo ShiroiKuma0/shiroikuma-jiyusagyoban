@@ -3,6 +3,7 @@ package com.opentasker.core.actions
 import android.Manifest
 import android.app.NotificationManager
 import android.bluetooth.BluetoothManager
+import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
@@ -659,6 +660,26 @@ internal sealed interface SettingsWriteRequest {
 
 internal const val MAX_SETTINGS_VALUE_CHARS = 256
 
+/**
+ * The value Tasker's Custom Setting writes to flip a setting (decompiled 6.7.8, `uu.g2.a`): it reads
+ * the setting and writes 1 for 0 and 0 for 1 (`uu.m1.k`), and fails on anything else.
+ */
+internal const val TASKER_TOGGLE_VALUE = "=:=toggle=:="
+
+/** What a toggle writes over [current], or null when [current] isn't 0 or 1 and so can't be toggled. */
+internal fun toggledSettingValue(current: String?): String? = when (current) {
+    "0" -> "1"
+    "1" -> "0"
+    else -> null
+}
+
+/** One setting's value as Android stores it, or null when the table has no such name. */
+internal fun readSetting(resolver: ContentResolver, table: SettingsTable, key: String): String? = when (table) {
+    SettingsTable.GLOBAL -> Settings.Global.getString(resolver, key)
+    SettingsTable.SECURE -> Settings.Secure.getString(resolver, key)
+    SettingsTable.SYSTEM -> Settings.System.getString(resolver, key)
+}
+
 private val SETTINGS_KEY_PATTERN = Regex("[a-z0-9_.]{1,64}")
 
 /**
@@ -765,6 +786,8 @@ internal fun parseSettingsWrite(args: Map<String, String>): SettingsWriteRequest
  * The value is read back afterwards. Android accepts a write to a name it does not know, and
  * silently normalises or discards values it does not like, so without the read-back the action
  * would report success for a setting that never changed.
+ *
+ * Tasker's toggle value, [TASKER_TOGGLE_VALUE], flips a setting at 0 or 1 instead of being written.
  */
 class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write")) {
 
@@ -789,11 +812,20 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
             )
         }
 
+        val value = if (request.value == TASKER_TOGGLE_VALUE) {
+            val current = runCatching { readSetting(resolver, request.table, request.key) }.getOrNull()
+            toggledSettingValue(current) ?: return ActionResult.Failure(
+                "$target holds ${current ?: "nothing"}, and only a setting at 0 or 1 can be toggled.",
+            )
+        } else {
+            request.value
+        }
+
         val accepted = runCatching {
             when (request.table) {
-                SettingsTable.GLOBAL -> Settings.Global.putString(resolver, request.key, request.value)
-                SettingsTable.SECURE -> Settings.Secure.putString(resolver, request.key, request.value)
-                SettingsTable.SYSTEM -> Settings.System.putString(resolver, request.key, request.value)
+                SettingsTable.GLOBAL -> Settings.Global.putString(resolver, request.key, value)
+                SettingsTable.SECURE -> Settings.Secure.putString(resolver, request.key, value)
+                SettingsTable.SYSTEM -> Settings.System.putString(resolver, request.key, value)
             }
         }.getOrElse { error ->
             return ActionResult.Failure(
@@ -802,23 +834,17 @@ class SettingsWriteAction : DeclaredAction(ActionCatalog.require("settings.write
         }
         if (!accepted) return ActionResult.Failure("Android refused to write $target.")
 
-        val readBack = runCatching {
-            when (request.table) {
-                SettingsTable.GLOBAL -> Settings.Global.getString(resolver, request.key)
-                SettingsTable.SECURE -> Settings.Secure.getString(resolver, request.key)
-                SettingsTable.SYSTEM -> Settings.System.getString(resolver, request.key)
-            }
-        }.getOrNull()
-        if (readBack != request.value) {
+        val readBack = runCatching { readSetting(resolver, request.table, request.key) }.getOrNull()
+        if (readBack != value) {
             // Deliberately not "Android ignored it": the value may also have been accepted and then
             // normalised or clamped by whatever owns that setting. What is certain is that the
             // setting does not hold what was asked for, so report that and nothing more.
             return ActionResult.Failure(
-                "$target reads ${readBack ?: "nothing"} after the write, not ${request.value}.",
+                "$target reads ${readBack ?: "nothing"} after the write, not $value.",
             )
         }
 
-        ctx.logger("Setting $target = ${request.value}")
+        ctx.logger("Setting $target = $value")
         return ActionResult.Success
     }
 }

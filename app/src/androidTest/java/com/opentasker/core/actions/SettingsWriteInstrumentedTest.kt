@@ -94,6 +94,24 @@ class SettingsWriteInstrumentedTest {
         assertEquals("1", Settings.Global.getString(context.contentResolver, PROBE_KEY))
     }
 
+    @Test
+    fun taskersToggleFlipsASettingAtZeroOrOneAndLeavesAnyOtherAlone() = runBlocking {
+        grantSecureSettings()
+        val resolver = context.contentResolver
+        val toggle = mapOf("table" to "global", "key" to PROBE_KEY, "value" to TASKER_TOGGLE_VALUE)
+        Settings.Global.putString(resolver, PROBE_KEY, "0")
+
+        assertEquals(ActionResult.Success, action.run(actionContext(), toggle))
+        assertEquals("1", Settings.Global.getString(resolver, PROBE_KEY))
+        assertEquals(ActionResult.Success, action.run(actionContext(), toggle))
+        assertEquals("0", Settings.Global.getString(resolver, PROBE_KEY))
+
+        Settings.Global.putString(resolver, PROBE_KEY, "2")
+        val refused = action.run(actionContext(), toggle)
+        assertTrue("expected a refusal, got $refused", refused is ActionResult.Failure)
+        assertEquals("a refused toggle leaves the setting as it was", "2", Settings.Global.getString(resolver, PROBE_KEY))
+    }
+
     private fun args(value: String) =
         mapOf("table" to "secure", "key" to LOCATION_MODE, "value" to value)
 
