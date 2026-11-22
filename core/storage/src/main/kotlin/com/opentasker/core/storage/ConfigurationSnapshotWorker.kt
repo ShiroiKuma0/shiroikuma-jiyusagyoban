@@ -80,7 +80,7 @@ class ConfigurationSnapshotWorker(
             if (inventory.refusedCount > 0) {
                 AppLogger.warn(
                     TAG,
-                    "The snapshot folder refused to delete ${countOf(inventory.refusedCount, "old archive")}; " +
+                    "The snapshot folder holds ${countOf(inventory.refusedCount, "old archive")} it refused to delete; " +
                         "they stay until removed by hand",
                 )
             }

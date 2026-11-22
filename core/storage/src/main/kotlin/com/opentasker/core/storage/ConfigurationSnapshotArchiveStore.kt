@@ -118,8 +118,9 @@ internal inline fun retainAfterExport(
 
 /**
  * What a run that saved its snapshot but couldn't list the folder records: the last run's counts
- * plus the archive it just wrote, and the old ones the folder still holds after refusing to
- * delete them. The next run that can list the folder corrects them.
+ * with one more for the archive it just wrote (its size isn't known without the listing), and the
+ * old ones the folder still holds after refusing to delete them. The next run that can list the
+ * folder corrects them.
  */
 internal fun inventoryWithoutListing(lastRun: ConfigurationSnapshotStatus) = ConfigurationSnapshotArchiveInventory(
     snapshotCount = lastRun.snapshotCount + 1,
