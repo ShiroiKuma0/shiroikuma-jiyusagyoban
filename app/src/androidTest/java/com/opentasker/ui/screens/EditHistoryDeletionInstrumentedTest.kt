@@ -221,6 +221,35 @@ class EditHistoryDeletionInstrumentedTest {
         }
     }
 
+    /** Redoing a creation puts it back in its project, or in Default once that project is gone. */
+    @Test
+    fun redoingACreationKeepsItsProjectOrFallsBackToDefault() = runBlocking {
+        val db = buildDb()
+        try {
+            db.projectDao().insert(ProjectEntity(id = 1L, name = "Default", position = 0))
+            db.projectDao().insert(ProjectEntity(id = 2L, name = "Work", position = 1))
+            val kept = Scene(id = 12L, name = "Kept", widthDp = 240, heightDp = 160, projectId = 2L)
+            val orphaned = Scene(id = 13L, name = "Orphaned", widthDp = 240, heightDp = 160, projectId = 2L)
+            listOf(kept, orphaned).forEach { scene ->
+                db.sceneDao().insert(scene.toEntity())
+                db.editHistoryDao().recordCreation(EditHistoryDao.TYPE_SCENE, scene.id, StorageJson.encodeToString(scene))
+            }
+            val repository = variableRepository(db)
+            val transitions = transitions(db, repository)
+
+            assertNotNull(transitions.transition(EditHistoryDao.TYPE_SCENE, kept.id, redo = false))
+            assertNotNull(transitions.transition(EditHistoryDao.TYPE_SCENE, kept.id, redo = true))
+            assertEquals(2L, db.sceneDao().getById(kept.id)?.projectId)
+
+            assertNotNull(transitions.transition(EditHistoryDao.TYPE_SCENE, orphaned.id, redo = false))
+            deleteProjectIntoDefault(db, repository, taskIds = emptyList(), profileIds = emptyList(), sceneIds = listOf(kept.id))
+            assertNotNull(transitions.transition(EditHistoryDao.TYPE_SCENE, orphaned.id, redo = true))
+            assertEquals(1L, db.sceneDao().getById(orphaned.id)?.projectId)
+        } finally {
+            db.close()
+        }
+    }
+
     /** What `deleteProject` does to project 2 with Default as the destination. */
     private suspend fun deleteProjectIntoDefault(
         db: AppDatabase,
