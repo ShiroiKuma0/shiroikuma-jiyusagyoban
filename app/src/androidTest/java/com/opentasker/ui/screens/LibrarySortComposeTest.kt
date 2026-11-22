@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -15,9 +16,11 @@ import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.EditHistoryDao
 import com.opentasker.ui.theme.OpenTaskerTheme
+import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -91,7 +94,9 @@ class LibrarySortComposeTest {
         var picked: LibrarySortOrder? = null
         showTasks({ LibrarySortControl(LibrarySortOrder.Default) { picked = it } })
 
-        composeTestRule.onNodeWithContentDescription("Sort order, Default order").performClick()
+        // Tasks are already in name order, so the menu offers Name and Last edited, not Name twice.
+        composeTestRule.onNodeWithContentDescription("Sort order, Name").performClick()
+        composeTestRule.onAllNodesWithText("Default order").assertCountEquals(0)
         composeTestRule.onNodeWithText("Last edited").performClick()
 
         assertEquals(LibrarySortOrder.LastEdited, picked)
@@ -106,13 +111,35 @@ class LibrarySortComposeTest {
             try {
                 LibrarySortPreference.set(context, LibraryList.Tasks, if (before == LibrarySortOrder.Name) LibrarySortOrder.LastEdited else LibrarySortOrder.Name)
                 val after = LibrarySortPreference.orders(context).first()
+                val chosen = if (before == LibrarySortOrder.Name) LibrarySortOrder.LastEdited else LibrarySortOrder.Name
 
-                assertEquals(if (before == LibrarySortOrder.Name) LibrarySortOrder.LastEdited else LibrarySortOrder.Name, after[LibraryList.Tasks])
+                assertEquals(chosen, after[LibraryList.Tasks])
+                // Read back from the file itself, which is what a restarted app reads.
+                val onDisk = File(context.filesDir, "datastore/library_sort_prefs.preferences_pb").readBytes().toString(Charsets.ISO_8859_1)
+                assertTrue(onDisk, "sort_tasks" in onDisk && chosen.name in onDisk)
                 // Each list keeps its own order.
                 assertEquals(stored[LibraryList.Scenes], after[LibraryList.Scenes])
             } finally {
                 LibrarySortPreference.set(context, LibraryList.Tasks, before)
             }
+        }
+    }
+
+    @Test
+    fun anEditTimeIsKeptOnDiskUntilForgotten() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val id = Long.MAX_VALUE - 7
+        val key = EditHistoryAvailabilityState.key(EditHistoryDao.TYPE_TASK, id)
+        runBlocking {
+            try {
+                LibraryEditTimes.touch(context, EditHistoryDao.TYPE_TASK, id, atMs = 1_234L)
+                assertEquals(1_234L, LibraryEditTimes.times(context).first()[key])
+                val onDisk = File(context.filesDir, "datastore/library_edit_times.preferences_pb").readBytes().toString(Charsets.ISO_8859_1)
+                assertTrue(key in onDisk)
+            } finally {
+                LibraryEditTimes.forget(context, EditHistoryDao.TYPE_TASK, id)
+            }
+            assertEquals(null, LibraryEditTimes.times(context).first()[key])
         }
     }
 }

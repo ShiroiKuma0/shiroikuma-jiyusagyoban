@@ -229,7 +229,7 @@ internal fun ProfilesScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(DesignSystem.Radii.lg),
                 )
-                LibrarySortButton(librarySort)
+                LibrarySortButton(librarySort, defaultIsName = true)
                 WorkspaceActionsButton(
                     onBrowseTemplates = onBrowseTemplates,
                     onPreviewProfileShare = onPreviewProfileShare,
@@ -586,7 +586,7 @@ internal fun TasksScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(DesignSystem.Radii.lg),
             )
-            LibrarySortButton(librarySort)
+            LibrarySortButton(librarySort, defaultIsName = true)
             }
         }
         if (filteredTasks.isEmpty()) {

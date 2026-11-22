@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.opentasker.app.R
@@ -73,6 +74,41 @@ object LibrarySortPreference {
         context.librarySortDataStore.edit { prefs -> prefs[key(list)] = order.name }
     }
 }
+
+private val Context.libraryEditTimesDataStore by preferencesDataStore(name = "library_edit_times")
+
+/**
+ * When an item was last created, saved, undone or redone in the app, keyed like
+ * [EditHistoryAvailabilityState.key]. Edit history already dates an edit to a profile, task or
+ * scene, but creating one, saving a variable and undo or redo add no history row of their own.
+ */
+object LibraryEditTimes {
+    // Deleted items leave their time behind, so only the newest are kept.
+    private const val MAX_TIMES = 2_000
+
+    fun times(context: Context): Flow<Map<String, Long>> =
+        context.libraryEditTimesDataStore.data
+            .map { prefs -> prefs.asMap().entries.mapNotNull { (key, value) -> (value as? Long)?.let { key.name to it } }.toMap() }
+            .catch { emit(emptyMap()) }
+
+    suspend fun touch(context: Context, entityType: String, entityId: Long, atMs: Long = System.currentTimeMillis()) {
+        context.libraryEditTimesDataStore.edit { prefs ->
+            prefs[longPreferencesKey(EditHistoryAvailabilityState.key(entityType, entityId))] = atMs
+            val stamps = prefs.asMap().entries.mapNotNull { (key, value) -> (value as? Long)?.let { key.name to it } }
+            if (stamps.size > MAX_TIMES) {
+                stamps.sortedBy { it.second }.take(stamps.size - MAX_TIMES).forEach { prefs.remove(longPreferencesKey(it.first)) }
+            }
+        }
+    }
+
+    internal suspend fun forget(context: Context, entityType: String, entityId: Long) {
+        context.libraryEditTimesDataStore.edit { it.remove(longPreferencesKey(EditHistoryAvailabilityState.key(entityType, entityId))) }
+    }
+}
+
+/** The newer of each item's last history row and its last stamp from [LibraryEditTimes]. */
+internal fun newestEdits(history: Map<String, Long>, stamps: Map<String, Long>): Map<String, Long> =
+    (history.keys + stamps.keys).associateWith { key -> maxOf(history[key] ?: Long.MIN_VALUE, stamps[key] ?: Long.MIN_VALUE) }
 
 /** A list's current order and what to call when the user picks another. */
 @Immutable

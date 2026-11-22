@@ -60,8 +60,6 @@ import com.opentasker.core.model.Variable
 import com.opentasker.core.model.VariableNamePolicy
 import com.opentasker.core.model.DEFAULT_PROJECT_ID
 import com.opentasker.core.storage.AesGcmVariableSecretCodec
-import com.opentasker.core.storage.EditHistoryDao
-import com.opentasker.core.storage.VariableEditHistoryIdentity
 import com.opentasker.ui.theme.DesignSystem
 import com.opentasker.ui.utils.rememberSingleTap
 
@@ -118,7 +116,7 @@ fun VariablesScreen(
                 (!it.isSecret && it.value.contains(searchQuery, ignoreCase = true))
         }
         sortLibrary(matching, librarySort.order, Variable::name) {
-            historyAvailability.lastEditedAt(EditHistoryDao.TYPE_VARIABLE, VariableEditHistoryIdentity.entityId(it.projectId, it.name))
+            historyAvailability.lastEditedVariableAt(it.projectId, it.name)
         }
     }
 

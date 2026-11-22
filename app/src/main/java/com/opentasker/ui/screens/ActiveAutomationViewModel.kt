@@ -243,7 +243,11 @@ class ActiveAutomationViewModel(
     val contentLoaded: StateFlow<Boolean> = contentLoadedSignal(db, viewModelScope)
 
     /** See [editHistoryAvailability]: Undo/Redo are enabled only where there is history. */
-    val historyAvailability: StateFlow<EditHistoryAvailabilityState> = editHistoryAvailability(db, viewModelScope)
+    val historyAvailability: StateFlow<EditHistoryAvailabilityState> =
+        editHistoryAvailability(db, viewModelScope, LibraryEditTimes.times(appContext))
+
+    /** Dates a create, a variable save or an undo, which add no edit history row of their own. */
+    private fun edited(entityType: String, entityId: Long) = viewModelScope.launch { LibraryEditTimes.touch(appContext, entityType, entityId) }
 
     private val profileDecodeResults = db.profileDao()
         .getAllAsFlow()
@@ -263,11 +267,16 @@ class ActiveAutomationViewModel(
     val newProfilesEnabled: StateFlow<Boolean> = ProfileDefaultsPreference.newProfilesEnabled(appContext)
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // Choices made here, kept even if reading the saved ones failed and that flow ended.
+    private val chosenSorts = MutableStateFlow(emptyMap<LibraryList, LibrarySortOrder>())
+
     /** Eager for the same reason, so a list opens in its chosen order instead of reshuffling. */
     val librarySort: StateFlow<Map<LibraryList, LibrarySortOrder>> = LibrarySortPreference.orders(appContext)
+        .combine(chosenSorts) { saved, chosen -> saved + chosen }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     fun setLibrarySort(list: LibraryList, order: LibrarySortOrder) {
+        chosenSorts.value = chosenSorts.value + (list to order)
         viewModelScope.launch { LibrarySortPreference.set(appContext, list, order) }
     }
 
@@ -448,7 +457,7 @@ class ActiveAutomationViewModel(
                 collisionMode = collisionMode,
                 projectId = projectId,
             ).toEntity(),
-        )
+        ).also { edited(EditHistoryDao.TYPE_TASK, it) }
     }
 
     fun duplicateTask(task: Task) {
@@ -658,7 +667,7 @@ class ActiveAutomationViewModel(
                 heightDp = heightDp.coerceIn(SCENE_HEIGHT_RANGE_DP),
                 projectId = projectId,
             ).toEntity()
-        )
+        ).also { edited(EditHistoryDao.TYPE_SCENE, it) }
     }
 
     fun duplicateScene(scene: Scene) {
@@ -785,7 +794,7 @@ class ActiveAutomationViewModel(
             val lint = requireAutomationLint(profile)
             val reviewed = reviewFeedbackRisk(profile)
             writeSettingsGuard.requireWriteSettingsIfEnabled(reviewed)
-            db.profileDao().upsert(reviewed.toEntity())
+            db.profileDao().insert(reviewed.toEntity()).also { edited(EditHistoryDao.TYPE_PROFILE, it) }
             emitLintWarnings(profile, lint)
             UiMessage(profileSavedMessageRes(profile.enabled, reviewed.enabled, R.string.ui_message_profile_created))
         }
@@ -1636,6 +1645,7 @@ class ActiveAutomationViewModel(
             runCatching { editHistoryTransitions.transition(entityType, entityId, redo) }
                 .onSuccess { diff ->
                     val changed = diff != null
+                    if (changed) edited(entityType, entityId)
                     if (changed && entityType == EditHistoryDao.TYPE_TASK) TaskWidgetProvider.requestRefresh(appContext)
                     if (review && diff != null && !diff.isEmpty) {
                         _semanticDiffReview.value = SemanticDiffReviewState(diff)
@@ -1738,6 +1748,7 @@ class ActiveAutomationViewModel(
                         }
                     }
                 }
+                runCatching { VariableEditHistoryIdentity.entityId(projectId, globalName) }.onSuccess { edited(EditHistoryDao.TYPE_VARIABLE, it) }
                 onSaved()
                 events.send(successMessage)
             }.onFailure { error ->
