@@ -10,8 +10,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Argument checks for Read Setting. They all come before the Settings provider is touched, so a
- * context with nothing behind it is enough; the read itself runs in SettingsReadInstrumentedTest.
+ * Read Setting's argument checks, which come before the Settings provider is touched, and what a
+ * refused read does. On the JVM every Settings call throws, so a context with nothing behind it
+ * covers both; a read that succeeds runs in SettingsReadInstrumentedTest.
  */
 class SettingsReadTest {
 

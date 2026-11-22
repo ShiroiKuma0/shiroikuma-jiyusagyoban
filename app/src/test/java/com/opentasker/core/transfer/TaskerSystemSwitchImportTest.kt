@@ -97,10 +97,10 @@ class TaskerSystemSwitchImportTest {
 
     @Test
     fun aSetValueOutsideOffOnAndToggleStaysAPlaceholder() {
-        listOf("3", "-1").forEach { set ->
-            val step = step("808", """<Int sr="arg0" val="$set"/>""")
+        listOf("808" to "3", "808" to "-1", "822" to "3", "822" to "-1").forEach { (code, set) ->
+            val step = step(code, """<Int sr="arg0" val="$set"/>""")
 
-            assertEquals(set, TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, step.type)
+            assertEquals("$code set $set", TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, step.type)
             assertTrue(step.args.getValue("summary"), "isn't off, on or toggle" in step.args.getValue("summary"))
         }
     }

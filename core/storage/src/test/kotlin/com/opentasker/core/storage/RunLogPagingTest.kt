@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -66,6 +67,34 @@ class RunLogPagingTest {
 
         assertEquals(3, snapshot.totalCount)
         assertEquals(listOf(9L, 6L, 3L), rows.map { it.id })
+        assertTrue(rows.all { it.taskId == 2L })
+    }
+
+    @Test
+    fun everyPageKeepsTheStatusTheSearchAndTheTimeWindow() = runBlocking {
+        val dao = FakeRunLogDao()
+        (1L..20L).forEach { id ->
+            dao.add(
+                id = id,
+                timestamp = id * 10,
+                success = id % 3 != 0L,
+                message = if (id % 4 == 0L || id == 2L) "Alarm went off" else "ok",
+            )
+        }
+        // In the window 40..170, succeeded, and mentioning an alarm: 4, 8 and 16. Row 12 failed,
+        // row 2 is before the window and row 20 after it.
+        val query = RunLogQuery(
+            status = RunLogStatusQuery.SUCCEEDED,
+            minimumTimestamp = 40,
+            maximumTimestamp = 170,
+            escapedSearch = "alarm",
+        )
+
+        val snapshot = dao.openSnapshot(query)
+        val rows = walk(dao, snapshot, pageSize = 1).flatMap { it.entries }
+
+        assertEquals(3, snapshot.totalCount)
+        assertEquals(listOf(16L, 8L, 4L), rows.map { it.id })
     }
 
     @Test
@@ -102,15 +131,15 @@ class RunLogPagingTest {
         var pageQueries = 0
         var lastLimit = -1
 
-        fun add(id: Long, timestamp: Long, taskId: Long = 1L) {
+        fun add(id: Long, timestamp: Long, taskId: Long = 1L, success: Boolean = true, message: String = "ok") {
             rows += RunLogEntity(
                 id = id,
                 taskId = taskId,
                 taskName = "Task $taskId",
                 timestamp = timestamp,
                 durationMs = 0,
-                success = true,
-                message = "ok",
+                success = success,
+                message = message,
             )
         }
 
@@ -123,13 +152,25 @@ class RunLogPagingTest {
             escapedSearch: String,
             snapshotMaxId: Long,
         ): List<RunLogEntity> {
-            require(status == "ALL" && escapedSearch.isEmpty()) { "this fake models the snapshot and key range, not status or search" }
+            // Rows here are never held and carry no "decision:" text, so these three statuses are
+            // the SQL's for them; the rest aren't modelled.
+            val statusMatches: (RunLogEntity) -> Boolean = when (status) {
+                "ALL" -> { _ -> true }
+                "SUCCEEDED" -> { row -> row.success }
+                "FAILED" -> { row -> !row.success }
+                else -> error("this fake doesn't model status $status")
+            }
             return rows
                 .filter { row ->
                     row.id <= snapshotMaxId &&
                         (taskId == null || row.taskId == taskId) &&
                         (minimumTimestamp == null || row.timestamp >= minimumTimestamp) &&
-                        (maximumTimestamp == null || row.timestamp <= maximumTimestamp)
+                        (maximumTimestamp == null || row.timestamp <= maximumTimestamp) &&
+                        // LIKE '%search%' with no wildcards in the search, case-blind for ASCII.
+                        (escapedSearch.isEmpty() ||
+                            row.taskName.contains(escapedSearch, ignoreCase = true) ||
+                            row.message.contains(escapedSearch, ignoreCase = true)) &&
+                        statusMatches(row)
                 }
                 .sortedWith(compareByDescending<RunLogEntity> { it.timestamp }.thenByDescending { it.id })
         }
