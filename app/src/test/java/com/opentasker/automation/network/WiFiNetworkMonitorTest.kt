@@ -109,6 +109,11 @@ class WiFiNetworkMonitorTest {
             "API 31+ callbacks must ask for location info or every SSID arrives redacted",
             "WifiCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO)" in source,
         )
+        // ...but only while a profile compares a name, since each name handed over is a location
+        // access, and nothing reads one (WifiManager included) otherwise.
+        assertTrue("if (nameWanted && Build.VERSION.SDK_INT >= 31) {" in source)
+        assertTrue("if (!nameWanted) return null" in source)
+        assertTrue("val withheld = nameWanted && synchronized(stateLock) {" in source)
         assertTrue("synchronized(stateLock) { publish(tracker.onLost(network)) }" in source)
         assertTrue("synchronized(stateLock) { publish(tracker.onCapabilities(network, ssid)) }" in source)
         assertFalse(
@@ -126,6 +131,8 @@ class WiFiNetworkMonitorTest {
         // retried by the next trigger, and stop() must not unregister a callback that is gone.
         assertTrue("if (!withheld && !callbackLost) return" in source)
         assertTrue("if (!callbackLost) cm.unregisterNetworkCallback(callback)" in source)
+        // Every registration, the first one included, takes a callback with the flag as it is now.
+        assertEquals(3, Regex("callback = newCallback\\(\\)").findAll(source).count())
         assertTrue("if (!callbackLost) connectivityManager?.unregisterNetworkCallback(callback)" in source)
     }
 

@@ -130,6 +130,13 @@ class AutomationService : Service() {
     private val contextMonitorLifecycle by lazy {
         ContextMonitorLifecycle(
             mapOf(
+                ContextMonitor.WIFI_NAME to ContextMonitorHandle(
+                    start = {
+                        wifiNetworkMonitor.setNameWanted(true)
+                        true
+                    },
+                    stop = { wifiNetworkMonitor.setNameWanted(false) },
+                ),
                 ContextMonitor.WIFI to ContextMonitorHandle(
                     start = { wifiNetworkMonitor.start() },
                     stop = { wifiNetworkMonitor.stop() },

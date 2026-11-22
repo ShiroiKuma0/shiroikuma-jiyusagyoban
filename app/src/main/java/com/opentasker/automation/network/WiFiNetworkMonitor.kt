@@ -36,10 +36,19 @@ class WiFiNetworkMonitor(
     private val tracker = WifiConnectionTracker<Network>()
     private var lastState: WiFiState? = null
 
+    // Whether an enabled profile compares the network's name. Android notes a location access each
+    // time it hands a name over, and capability updates (signal strength, validation) come often,
+    // so a phone whose profiles only check connected or disconnected never asks for one (A-369).
+    @Volatile
+    private var nameWanted = false
+
+    @Volatile
+    private var callback = newCallback()
+
     // Android 12 strips the SSID from every WifiInfo a callback receives unless the callback asks
     // for location info, and the placeholder it leaves is not blank, so without the flag the first
     // capability update after connecting replaced the real name with Unknown for good (issue #17).
-    private val callback = if (Build.VERSION.SDK_INT >= 31) {
+    private fun newCallback(): WifiCallback = if (nameWanted && Build.VERSION.SDK_INT >= 31) {
         WifiCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO)
     } else {
         WifiCallback()
@@ -53,16 +62,20 @@ class WiFiNetworkMonitor(
 
         // Android always follows onAvailable with onCapabilitiesChanged, which carries the SSID,
         // so publishing here would only announce a nameless connection a moment early.
+        // A callback replaced by a re-registration may still have an update in flight.
         override fun onAvailable(network: Network) {
+            if (this !== callback) return
             synchronized(stateLock) { tracker.onAvailable(network) }
         }
 
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+            if (this !== callback) return
             val ssid = readSsid(networkCapabilities)
             synchronized(stateLock) { publish(tracker.onCapabilities(network, ssid)) }
         }
 
         override fun onLost(network: Network) {
+            if (this !== callback) return
             synchronized(stateLock) { publish(tracker.onLost(network)) }
         }
     }
@@ -99,6 +112,7 @@ class WiFiNetworkMonitor(
             }
 
             try {
+                callback = newCallback()
                 registerAndSeed(cm)
                 AppLogger.debug(TAG, "WiFi NetworkCallback registered")
             } catch (ex: RuntimeException) {
@@ -142,22 +156,42 @@ class WiFiNetworkMonitor(
         }
     }
 
+    /**
+     * Says whether an enabled profile compares the network's name. A running callback is registered
+     * again with or without location info when that changes, and Android replays the networks.
+     */
+    fun setNameWanted(wanted: Boolean) {
+        if (nameWanted == wanted) return
+        nameWanted = wanted
+        lifecycle.whileActive {
+            val cm = connectivityManager ?: return@whileActive
+            reregister(cm, if (wanted) "to read the network name" else "without location info")
+        }
+    }
+
     private fun refreshIfNameWithheld() {
-        val withheld = synchronized(stateLock) {
+        // A name nobody compares isn't withheld, just not asked for.
+        val withheld = nameWanted && synchronized(stateLock) {
             lastState?.let { it.connected && it.ssidUnavailableReason.isNotEmpty() } == true
         }
         if (!withheld && !callbackLost) return
         lifecycle.whileActive {
             val cm = connectivityManager ?: return@whileActive
-            if (!callbackLost) cm.unregisterNetworkCallback(callback)
-            callbackLost = true
-            try {
-                registerAndSeed(cm)
-                callbackLost = false
-                AppLogger.debug(TAG, "WiFi NetworkCallback re-registered to re-read a withheld name")
-            } catch (ex: RuntimeException) {
-                AppLogger.error(TAG, "Re-registering the WiFi NetworkCallback failed; the next refresh retries it", ex)
-            }
+            reregister(cm, "to re-read a withheld name")
+        }
+    }
+
+    /** Call inside [lifecycle]'s active block. */
+    private fun reregister(cm: ConnectivityManager, why: String) {
+        if (!callbackLost) cm.unregisterNetworkCallback(callback)
+        callbackLost = true
+        callback = newCallback()
+        try {
+            registerAndSeed(cm)
+            callbackLost = false
+            AppLogger.debug(TAG, "WiFi NetworkCallback re-registered $why")
+        } catch (ex: RuntimeException) {
+            AppLogger.error(TAG, "Re-registering the WiFi NetworkCallback failed; the next refresh retries it", ex)
         }
     }
 
@@ -199,6 +233,8 @@ class WiFiNetworkMonitor(
     }.getOrDefault(true)
 
     private fun readSsid(capabilities: NetworkCapabilities): String? {
+        // Below Android 12 the name comes from WifiManager, which notes the location access too.
+        if (!nameWanted) return null
         if (Build.VERSION.SDK_INT >= 31) {
             val wifiInfo = capabilities.transportInfo as? WifiInfo
             // A redacted WifiInfo means Android withheld the name, and WifiManager applies the same
@@ -217,6 +253,7 @@ class WiFiNetworkMonitor(
     }
 
     private fun ssidUnavailableReason(): String = when {
+        !nameWanted -> NAME_NOT_READ
         !hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) ->
             "Android only shows the Wi-Fi name to apps with precise location access. Open Setup and allow precise location."
         !isLocationEnabled() ->
@@ -242,6 +279,10 @@ class WiFiNetworkMonitor(
     companion object {
         private const val TAG = "WiFiNetworkMonitor"
         const val UNKNOWN_SSID = "Unknown"
+
+        /** Why a connected network has no name while no enabled profile compares one. */
+        internal const val NAME_NOT_READ =
+            "OpenTasker asks Android for the Wi-Fi name only while an enabled profile compares it."
 
         /** What Android puts in place of an SSID it withholds. */
         private const val WITHHELD_SSID = "<unknown ssid>"

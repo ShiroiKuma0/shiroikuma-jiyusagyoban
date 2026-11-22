@@ -1,5 +1,7 @@
 package com.opentasker.core.engine
 
+import com.opentasker.core.contexts.stateContextKey
+import com.opentasker.core.contexts.stateSpecReadsWifiSsid
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
@@ -11,6 +13,9 @@ import java.util.Locale
  * absent: cancelling the matcher already releases those resources.
  */
 internal enum class ContextMonitor {
+    // Reading a Wi-Fi name is a location access, so only a profile that compares one asks for it.
+    // It comes before WIFI so the callback asks for location info from its first registration.
+    WIFI_NAME,
     WIFI,
     CONNECTIVITY,
     APP_USAGE,
@@ -131,8 +136,13 @@ internal fun requiredContextMonitors(profile: Profile): Set<ContextMonitor> = bu
 }
 
 private fun MutableSet<ContextMonitor>.addStateMonitor(spec: ContextSpec) {
-    when (spec.stateKey()) {
-        "wifi", "ssid", "wifi_ssid", "wifi_connected" -> add(ContextMonitor.WIFI)
+    // The matcher's own reading of the key. Splitting the predicate here only at =, < and > left a
+    // "wifi~Home*" pattern with no key, so its profile never started the Wi-Fi monitor it reads.
+    when (stateContextKey(spec)) {
+        "wifi", "wifi_connected" -> {
+            add(ContextMonitor.WIFI)
+            if (stateSpecReadsWifiSsid(spec)) add(ContextMonitor.WIFI_NAME)
+        }
         "internet", "network_type", "vpn" -> add(ContextMonitor.CONNECTIVITY)
     }
 }
@@ -151,15 +161,6 @@ private fun MutableSet<ContextMonitor>.addEventMonitor(spec: ContextSpec) {
         "" -> addAll(EVENT_MONITORS)
         else -> Unit
     }
-}
-
-private fun ContextSpec.stateKey(): String {
-    val predicate = config["predicate"].orEmpty().trim()
-    if (predicate.isNotEmpty()) {
-        val operatorIndex = predicate.indexOfAny(charArrayOf('=', '<', '>'))
-        if (operatorIndex > 0) return predicate.substring(0, operatorIndex).trim().lowercase(Locale.US)
-    }
-    return config["key"].orEmpty().trim().lowercase(Locale.US)
 }
 
 private val EVENT_MONITORS = setOf(

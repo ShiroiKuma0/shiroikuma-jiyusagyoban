@@ -37,16 +37,17 @@ class ContextMonitorLifecycleTest {
         )
         val second = profile(2, ContextSpec(ContextType.STATE, mapOf("predicate" to "ssid=Office")))
 
+        // Both profiles compare a name, so each also owns the name demand.
         harness.lifecycle.reconcile(listOf(first, second))
         assertEquals(2, harness.lifecycle.currentReferenceCounts()[ContextMonitor.WIFI])
-        assertEquals(listOf("start:WIFI"), harness.events)
+        assertEquals(listOf("start:WIFI_NAME", "start:WIFI"), harness.events)
 
         harness.lifecycle.reconcile(listOf(second))
         assertEquals(1, harness.lifecycle.currentReferenceCounts()[ContextMonitor.WIFI])
-        assertEquals(listOf("start:WIFI"), harness.events)
+        assertEquals(listOf("start:WIFI_NAME", "start:WIFI"), harness.events)
 
         harness.lifecycle.reconcile(emptyList())
-        assertEquals(listOf("start:WIFI", "stop:WIFI"), harness.events)
+        assertEquals(listOf("start:WIFI_NAME", "start:WIFI", "stop:WIFI_NAME", "stop:WIFI"), harness.events)
         assertEquals(emptySet<ContextMonitor>(), harness.lifecycle.currentlyStarted())
     }
 
@@ -102,6 +103,40 @@ class ContextMonitorLifecycleTest {
             ),
             requiredContextMonitors(profile),
         )
+    }
+
+    @Test
+    fun onlyAContextThatComparesAWifiNameAsksForTheName() {
+        fun monitors(vararg config: Pair<String, String>) =
+            requiredContextMonitors(profile(1, ContextSpec(ContextType.STATE, mapOf(*config))))
+        val both = setOf(ContextMonitor.WIFI_NAME, ContextMonitor.WIFI)
+        val connectionOnly = setOf(ContextMonitor.WIFI)
+
+        assertEquals(both, monitors("key" to "wifi", "value" to "Home"))
+        assertEquals(both, monitors("predicate" to "ssid=Home"))
+        assertEquals(both, monitors("key" to "wifi_ssid", "operator" to "~", "value" to "Office*"))
+        // A pattern written as a predicate used to start no monitor at all.
+        assertEquals(both, monitors("predicate" to "wifi~Home*"))
+        assertEquals(connectionOnly, monitors("key" to "wifi", "value" to "connected"))
+        assertEquals(connectionOnly, monitors("key" to "wifi", "value" to "disconnected"))
+        assertEquals(connectionOnly, monitors("key" to "wifi_connected", "value" to "true"))
+    }
+
+    @Test
+    fun theNameDemandComesAndGoesWithTheProfilesThatCompareANameWhileWifiKeepsRunning() {
+        val harness = MonitorHarness()
+        val connected = profile(1, ContextSpec(ContextType.STATE, mapOf("key" to "wifi_connected", "value" to "true")))
+        val atHome = profile(2, ContextSpec(ContextType.STATE, mapOf("key" to "wifi", "value" to "Home")))
+
+        harness.lifecycle.reconcile(listOf(connected))
+        assertEquals(listOf("start:WIFI"), harness.events)
+
+        harness.lifecycle.reconcile(listOf(connected, atHome))
+        assertEquals(listOf("start:WIFI", "start:WIFI_NAME"), harness.events)
+
+        harness.lifecycle.reconcile(listOf(connected, atHome.copy(enabled = false)))
+        assertEquals(listOf("start:WIFI", "start:WIFI_NAME", "stop:WIFI_NAME"), harness.events)
+        assertEquals(setOf(ContextMonitor.WIFI), harness.lifecycle.currentlyStarted())
     }
 
     @Test
