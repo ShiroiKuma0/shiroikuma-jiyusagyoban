@@ -24,9 +24,20 @@ import com.opentasker.core.scheduling.AlarmSchedulePrecision
 import com.opentasker.core.storage.ScheduledWorkOutcome
 import com.opentasker.core.storage.ScheduledWorkOutcomeStore
 import com.opentasker.core.scheduling.ExactAlarmSupport
-import java.time.Duration
 import kotlinx.coroutines.flow.first
 
+/**
+ * One `JobScheduler.PENDING_JOB_REASON_*` code for a job, kept as numbers so Diagnostics can word it
+ * in the app's language. [ageMillis] is set for a history entry, [durationMillis] for a stats one.
+ */
+data class PendingJobEntry(
+    val jobId: Int,
+    val reason: Int,
+    val ageMillis: Long? = null,
+    val durationMillis: Long? = null,
+)
+
+/** The text fields feed the shared report, which stays English; the entries feed the screen. */
 data class ScheduledJobDiagnostics(
     val currentAvailable: Boolean,
     val currentReasons: String? = null,
@@ -34,6 +45,9 @@ data class ScheduledJobDiagnostics(
     val history: String? = null,
     val aggregateStatsAvailable: Boolean,
     val aggregateStats: String? = null,
+    val currentEntries: List<PendingJobEntry> = emptyList(),
+    val historyEntries: List<PendingJobEntry> = emptyList(),
+    val statsEntries: List<PendingJobEntry> = emptyList(),
 ) {
     companion object {
         fun unavailable(): ScheduledJobDiagnostics = ScheduledJobDiagnostics(
@@ -69,6 +83,16 @@ data class EngineHealthStatus(
     val activeExecutionCount: Int = 0,
     val pendingExecutionCount: Int = 0,
     val signals: List<HealthSignal> = emptyList(),
+    // What the text fields above were made from, so Diagnostics can say it in the app's language
+    // while the shared report keeps the English (A-438).
+    /** When this was read, for how long ago the last heartbeat was. */
+    val readAtMillis: Long = 0L,
+    val exactAlarmPrecision: AlarmSchedulePrecision? = null,
+    /** A `UsageStatsManager.STANDBY_BUCKET_*` value, or null where Android doesn't report one. */
+    val standbyBucketCode: Int? = null,
+    val foregroundServiceTypeBits: Int = 0,
+    /** A `WorkInfo.STOP_REASON_*` value, or null when the watchdog worker has no WorkInfo yet. */
+    val lastWorkerStopReasonCode: Int? = null,
 )
 
 data class HistoricalProcessExitRead(
@@ -265,6 +289,11 @@ object EngineHealthReader {
             activeExecutionCount = activeExecutionCount,
             pendingExecutionCount = pendingExecutionCount,
             signals = signals,
+            readAtMillis = nowMillis,
+            exactAlarmPrecision = exactAlarm,
+            standbyBucketCode = standbyBucketValue(context),
+            foregroundServiceTypeBits = persisted.heartbeat.foregroundServiceTypes,
+            lastWorkerStopReasonCode = workerStopReason,
         )
     }
 
@@ -365,13 +394,21 @@ object EngineHealthReader {
             history = history.value,
             aggregateStatsAvailable = aggregateStats.available,
             aggregateStats = aggregateStats.value,
+            currentEntries = current.entries,
+            historyEntries = history.entries,
+            statsEntries = aggregateStats.entries,
         )
     }
 
     private data class PlatformScheduledJobSignal(
         val available: Boolean,
         val value: String?,
+        val entries: List<PendingJobEntry> = emptyList(),
     )
+
+    /** Pairs each entry with its report line, dropping entries whose line repeats an earlier one. */
+    private fun List<PendingJobEntry>.withReportLines(line: (PendingJobEntry) -> String): List<Pair<PendingJobEntry, String>> =
+        map { it to line(it) }.distinctBy { it.second }
 
     @RequiresApi(34)
     private fun readCurrentPendingJobReasons(
@@ -389,12 +426,15 @@ object EngineHealthReader {
                 successfulReads += 1
                 pendingReasons
                     .filter(::isReportablePendingJobReason)
-                    .map { reason -> "job ${job.id}: ${pendingJobReasonLabel(reason)}" }
+                    .map { reason -> PendingJobEntry(job.id, reason) }
             }.getOrElse { emptyList() }
-        }.distinct().sorted().take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        }.withReportLines { "job ${it.jobId}: ${pendingJobReasonLabel(it.reason)}" }
+            .sortedBy { it.second }
+            .take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
         return PlatformScheduledJobSignal(
             available = jobs.isEmpty() || successfulReads > 0,
-            value = reasons.takeIf { it.isNotEmpty() }?.joinToString("; "),
+            value = reasons.takeIf { it.isNotEmpty() }?.joinToString("; ") { it.second },
+            entries = reasons.map { it.first },
         )
     }
 
@@ -419,16 +459,18 @@ object EngineHealthReader {
                 val snapshots: List<PendingJobReasonsInfo> = scheduler.getPendingJobReasonsHistory(job.id)
                 successfulReads += 1
                 snapshots.flatMap { snapshot ->
-                    val age = ageLabel((nowMillis - snapshot.timestampMillis).coerceAtLeast(0L))
+                    val ageMillis = (nowMillis - snapshot.timestampMillis).coerceAtLeast(0L)
                     snapshot.getPendingJobReasons()
                         .filter(::isReportablePendingJobReason)
-                        .map { reason -> "job ${job.id}, $age ago: ${pendingJobReasonLabel(reason)}" }
+                        .map { reason -> PendingJobEntry(job.id, reason, ageMillis = ageMillis) }
                 }
             }.getOrElse { emptyList() }
-        }.distinct().takeLast(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        }.withReportLines { "job ${it.jobId}, ${ageLabel(it.ageMillis ?: 0L)} ago: ${pendingJobReasonLabel(it.reason)}" }
+            .takeLast(MAX_PENDING_DIAGNOSTIC_ENTRIES)
         return PlatformScheduledJobSignal(
             available = successfulReads > 0,
-            value = history.takeIf { it.isNotEmpty() }?.joinToString("; "),
+            value = history.takeIf { it.isNotEmpty() }?.joinToString("; ") { it.second },
+            entries = history.map { it.first },
         )
     }
 
@@ -446,14 +488,14 @@ object EngineHealthReader {
                 durations.entries
                     .filter { (reason, _) -> isReportablePendingJobReason(reason) }
                     .sortedByDescending { (_, duration) -> duration.toMillis() }
-                    .map { (reason, duration) ->
-                        "job ${job.id}: ${pendingJobReasonLabel(reason)} for ${durationLabel(duration)}"
-                    }
+                    .map { (reason, duration) -> PendingJobEntry(job.id, reason, durationMillis = duration.toMillis()) }
             }.getOrElse { emptyList() }
-        }.distinct().take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
+        }.withReportLines { "job ${it.jobId}: ${pendingJobReasonLabel(it.reason)} for ${durationLabel(it.durationMillis ?: 0L)}" }
+            .take(MAX_PENDING_DIAGNOSTIC_ENTRIES)
         return PlatformScheduledJobSignal(
             available = successfulReads > 0,
-            value = stats.takeIf { it.isNotEmpty() }?.joinToString("; "),
+            value = stats.takeIf { it.isNotEmpty() }?.joinToString("; ") { it.second },
+            entries = stats.map { it.first },
         )
     }
 
@@ -536,7 +578,7 @@ object EngineHealthReader {
         WorkInfo.STOP_REASON_USER -> "Stopped by user"
         WorkInfo.STOP_REASON_SYSTEM_PROCESSING -> "System processing"
         WorkInfo.STOP_REASON_ESTIMATED_APP_LAUNCH_TIME_CHANGED -> "Estimated app launch time changed"
-        WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT -> "Foreground-service time limit"
+        WorkInfo.STOP_REASON_FOREGROUND_SERVICE_TIMEOUT -> "Time limit for foreground work"
         WorkInfo.STOP_REASON_UNKNOWN -> "Unknown"
         else -> "Reason $reason"
     }
@@ -586,8 +628,6 @@ object EngineHealthReader {
     internal fun isThrottledStandbyBucket(bucket: Int): Boolean =
         bucket == UsageStatsManager.STANDBY_BUCKET_RARE ||
             bucket == UsageStatsManager.STANDBY_BUCKET_RESTRICTED
-
-    internal fun durationLabel(duration: Duration): String = durationLabel(duration.toMillis())
 
     internal fun durationLabel(durationMillis: Long): String {
         val seconds = durationMillis.coerceAtLeast(0L) / 1_000L

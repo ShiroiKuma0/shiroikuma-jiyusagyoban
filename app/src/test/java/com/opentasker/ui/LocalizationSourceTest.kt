@@ -618,6 +618,22 @@ class LocalizationSourceTest {
     }
 
     /**
+     * The health reader's text is English on purpose, for the shared report. Diagnostics words the
+     * same readings from resources instead (A-438), so it must not show the reader's text fields.
+     */
+    @Test
+    fun diagnosticsScreenDoesNotShowTheReportsEnglish() {
+        val screen = sourceRoot.resolve("com/opentasker/ui/screens/DiagnosticsScreen.kt").readText()
+        val reportFields = listOf(
+            """\.exactAlarmStatus\b""", """\.standbyConsequence\b""", """\.activeForegroundServiceTypes\b""",
+            """\.lastWorkerStopReason\b""", """\.currentReasons\b""", """pendingScheduledJobs\.history\b""",
+            """\.aggregateStats\b""", """signal\.label\b""", """signal\.reason\b""", """\.assessment\b""",
+            """::ageLabel\b""", """correlation\.reason\b""",
+        ).filter { Regex(it).containsMatchIn(screen) }
+        assertTrue("Diagnostics shows the report's English: $reportFields", reportFields.isEmpty())
+    }
+
+    /**
      * Every default string is used by the app's own code or resources (A-342), so copy nothing shows
      * can't pile up again. A lookup by name would hide a use from this check, so there is none.
      */

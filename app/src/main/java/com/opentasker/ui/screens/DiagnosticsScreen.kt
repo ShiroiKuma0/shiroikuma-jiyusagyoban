@@ -50,10 +50,7 @@ import com.opentasker.core.diagnostics.HealthSignalState
 import com.opentasker.core.storage.ScheduledWorkOutcome
 import com.opentasker.core.storage.ScheduledWorkOutcomeKind
 import com.opentasker.core.storage.ScheduledWorkerId
-import com.opentasker.core.diagnostics.assessment
 import com.opentasker.core.diagnostics.healthy
-import com.opentasker.core.engine.EngineExitCorrelation
-import com.opentasker.core.engine.EngineExitCorrelationState
 import com.opentasker.core.engine.ExecutionAdmissionSnapshot
 import com.opentasker.core.engine.ExecutionCircuitState
 import com.opentasker.core.logging.AppLogEntry
@@ -91,7 +88,7 @@ fun DiagnosticsScreen(
             DiagnosticSummaryCard(
                 healthy = healthy,
                 checkFailed = state.loadFailed && health == null,
-                reason = health?.assessment?.reason,
+                reason = health?.let { healthAssessmentText(it, formatter) },
                 onRefresh = onRefresh,
                 onShare = onShare,
                 onCopy = onCopy,
@@ -257,7 +254,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             if (!expanded) {
                 HealthRow(
                     stringResource(R.string.diagnostics_exact_alarm),
-                    health?.exactAlarmStatus ?: stringResource(R.string.diagnostics_loading),
+                    stringResource(health?.let { exactAlarmRes(it.exactAlarmPrecision) } ?: R.string.diagnostics_loading),
                 )
                 HealthRow(
                     stringResource(R.string.diagnostics_active_executions),
@@ -272,11 +269,11 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             )
             HealthRow(
                 stringResource(R.string.diagnostics_fgs_types),
-                health?.activeForegroundServiceTypes ?: stringResource(R.string.diagnostics_loading),
+                health?.let { foregroundServiceTypesText(it.foregroundServiceTypeBits) } ?: stringResource(R.string.diagnostics_loading),
             )
             HealthRow(
                 stringResource(R.string.diagnostics_standby_consequence),
-                health?.standbyConsequence ?: stringResource(R.string.diagnostics_loading),
+                stringResource(health?.let { standbyConsequenceRes(it.standbyBucketCode) } ?: R.string.diagnostics_loading),
             )
             if (health?.standbyThrottled == true) {
                 Text(
@@ -287,7 +284,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             }
             HealthRow(
                 stringResource(R.string.diagnostics_exact_alarm),
-                health?.exactAlarmStatus ?: stringResource(R.string.diagnostics_loading),
+                stringResource(health?.let { exactAlarmRes(it.exactAlarmPrecision) } ?: R.string.diagnostics_loading),
             )
             HealthRow(
                 stringResource(R.string.diagnostics_advanced_protection),
@@ -311,7 +308,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
             )
             HealthRow(
                 stringResource(R.string.diagnostics_worker_stop),
-                health?.lastWorkerStopReason ?: stringResource(R.string.diagnostics_none),
+                health?.lastWorkerStopReasonCode?.let { stopReasonSentence(it) } ?: stringResource(R.string.diagnostics_none),
             )
             SectionTitle(stringResource(R.string.diagnostics_scheduled_work_header))
             val outcomes = health?.scheduledWorkOutcomes.orEmpty().associateBy { it.worker }
@@ -346,8 +343,9 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 when {
                     health == null -> stringResource(R.string.diagnostics_loading)
                     !health.pendingScheduledJobs.currentAvailable -> stringResource(R.string.diagnostics_pending_jobs_unavailable)
-                    else -> health.pendingScheduledJobs.currentReasons
-                        ?: stringResource(R.string.diagnostics_pending_jobs_none)
+                    health.pendingScheduledJobs.currentEntries.isNotEmpty() ->
+                        pendingJobEntriesText(health.pendingScheduledJobs.currentEntries)
+                    else -> stringResource(R.string.diagnostics_pending_jobs_none)
                 },
             )
             HealthRow(
@@ -355,8 +353,9 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 when {
                     health == null -> stringResource(R.string.diagnostics_loading)
                     !health.pendingScheduledJobs.historyAvailable -> stringResource(R.string.diagnostics_pending_job_history_unavailable)
-                    else -> health.pendingScheduledJobs.history
-                        ?: stringResource(R.string.diagnostics_pending_job_history_none)
+                    health.pendingScheduledJobs.historyEntries.isNotEmpty() ->
+                        pendingJobEntriesText(health.pendingScheduledJobs.historyEntries)
+                    else -> stringResource(R.string.diagnostics_pending_job_history_none)
                 },
             )
             HealthRow(
@@ -364,8 +363,9 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                 when {
                     health == null -> stringResource(R.string.diagnostics_loading)
                     !health.pendingScheduledJobs.aggregateStatsAvailable -> stringResource(R.string.diagnostics_pending_job_stats_unavailable)
-                    else -> health.pendingScheduledJobs.aggregateStats
-                        ?: stringResource(R.string.diagnostics_pending_job_stats_none)
+                    health.pendingScheduledJobs.statsEntries.isNotEmpty() ->
+                        pendingJobEntriesText(health.pendingScheduledJobs.statsEntries)
+                    else -> stringResource(R.string.diagnostics_pending_job_stats_none)
                 },
             )
             HealthRow(
@@ -391,12 +391,7 @@ private fun EngineHealthCard(health: EngineHealthStatus?, formatter: SimpleDateF
                         -> MaterialTheme.colorScheme.error
                     }
                     Text(
-                        stringResource(
-                            R.string.diagnostics_health_signal,
-                            signal.label,
-                            stringResource(signal.state.resourceId),
-                            signal.reason,
-                        ),
+                        healthSignalText(signal, health, formatter),
                         style = MaterialTheme.typography.bodySmall,
                         color = color,
                     )
@@ -514,23 +509,6 @@ private fun AdmissionCircuitRow(
     }
 }
 
-@Composable
-private fun processExitSummary(correlation: EngineExitCorrelation, formatter: SimpleDateFormat): String = when (correlation.state) {
-    EngineExitCorrelationState.UNAVAILABLE -> stringResource(R.string.diagnostics_process_exit_unavailable)
-    EngineExitCorrelationState.NO_GAP -> stringResource(R.string.diagnostics_process_exit_no_gap)
-    EngineExitCorrelationState.NO_MATCH -> stringResource(
-        R.string.diagnostics_process_exit_no_match,
-        correlation.gapMillis?.let(EngineHealthReader::ageLabel) ?: stringResource(R.string.diagnostics_none),
-    )
-    EngineExitCorrelationState.MATCHED -> stringResource(
-        R.string.diagnostics_process_exit_matched,
-        correlation.reason ?: stringResource(R.string.diagnostics_none),
-        correlation.description ?: stringResource(R.string.diagnostics_none),
-        correlation.timestampMillis?.let { formatter.format(Date(it)) } ?: stringResource(R.string.diagnostics_never),
-        correlation.gapMillis?.let(EngineHealthReader::ageLabel) ?: stringResource(R.string.diagnostics_none),
-    )
-}
-
 @StringRes
 private fun scheduledWorkerLabel(worker: ScheduledWorkerId): Int = when (worker) {
     ScheduledWorkerId.ENGINE_WATCHDOG -> R.string.diagnostics_worker_engine_watchdog
@@ -542,7 +520,7 @@ private fun scheduledWorkerLabel(worker: ScheduledWorkerId): Int = when (worker)
 }
 
 @StringRes
-private fun stopReasonLabel(reason: Int): Int = when (reason) {
+internal fun stopReasonLabel(reason: Int): Int = when (reason) {
     WorkInfo.STOP_REASON_NOT_STOPPED -> R.string.diagnostics_stop_reason_not_stopped
     WorkInfo.STOP_REASON_CANCELLED_BY_APP -> R.string.diagnostics_stop_reason_cancelled_by_app
     WorkInfo.STOP_REASON_PREEMPT -> R.string.diagnostics_stop_reason_preempt
@@ -644,7 +622,7 @@ private fun AppLogCard(entry: AppLogEntry, formatter: SimpleDateFormat) {
 
 private const val CRASH_PREVIEW_LINES = 6
 
-private val HealthSignalState.resourceId: Int
+internal val HealthSignalState.resourceId: Int
     get() = when (this) {
         HealthSignalState.Ready -> R.string.diagnostics_health_state_ready
         HealthSignalState.Loading -> R.string.diagnostics_health_state_loading

@@ -25,13 +25,16 @@ data class HealthAssessment(
         get() = state == HealthSignalState.Ready
 }
 
-fun assessHealth(signals: List<HealthSignal>): HealthAssessment {
+/** The required signal the overall state comes from: the first Error, else Stale, else Loading. */
+fun decidingSignal(signals: List<HealthSignal>): HealthSignal? {
     val required = signals.filter { it.required }
-    val failed = required.firstOrNull { it.state == HealthSignalState.Error }
-    if (failed != null) return HealthAssessment(HealthSignalState.Error, "${failed.label}: ${failed.reason}")
-    val stale = required.firstOrNull { it.state == HealthSignalState.Stale }
-    if (stale != null) return HealthAssessment(HealthSignalState.Stale, "${stale.label}: ${stale.reason}")
-    val loading = required.firstOrNull { it.state == HealthSignalState.Loading }
-    if (loading != null) return HealthAssessment(HealthSignalState.Loading, "${loading.label}: ${loading.reason}")
-    return HealthAssessment(HealthSignalState.Ready, "All required health evidence is current.")
+    return required.firstOrNull { it.state == HealthSignalState.Error }
+        ?: required.firstOrNull { it.state == HealthSignalState.Stale }
+        ?: required.firstOrNull { it.state == HealthSignalState.Loading }
+}
+
+fun assessHealth(signals: List<HealthSignal>): HealthAssessment {
+    val deciding = decidingSignal(signals)
+        ?: return HealthAssessment(HealthSignalState.Ready, "All required health evidence is current.")
+    return HealthAssessment(deciding.state, "${deciding.label}: ${deciding.reason}")
 }
