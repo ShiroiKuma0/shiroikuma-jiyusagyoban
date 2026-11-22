@@ -389,7 +389,7 @@ class VariableStore {
         // or from another variable, and whatever the read gives, `(upper)` or an array item included.
         if (secretReads.any { opensATemplateBefore(s, it.range.first) }) return true
         // A `{{` from another variable: the secret's own text inside a block gives it away.
-        val values = secretReads.mapNotNull { get(nameRead(s, it)) }.filter(String::isNotEmpty)
+        val values = secretReads.flatMap { secretNamesRead(it) }.mapNotNull(::get).filter(String::isNotEmpty)
         return values.isNotEmpty() && templateBlock.findAll(expanded).any { block -> values.any(block.value::contains) }
     }
 
@@ -401,29 +401,21 @@ class VariableStore {
         return close < 0 || close + 2 > at
     }
 
-    private fun readsASecret(s: String, match: MatchResult): Boolean {
-        val name = nameRead(s, match)
-        return isSensitive(name) || name in sensitiveArrayNames ||
-            (isOperatorForm(s, match) && anyNumberedItemSensitive(match.groupValues[1]))
-    }
+    /**
+     * Whether the `(` after a name opens an operator, so `%my-arr(1)` reads the array my-arr, or is
+     * text after a plain read of `%my`, depends on where it closes in the text [VariableExpander]
+     * picks, and a `(cond) ? a : b` can cut that text short. So a read counts as secret when either
+     * way of reading it is, and when a `(` follows a name with a secret numbered item.
+     */
+    private fun readsASecret(s: String, match: MatchResult): Boolean =
+        secretNamesRead(match).isNotEmpty() ||
+            (s.startsWith("(", match.range.last + 1) && anyNumberedItemSensitive(match.groupValues[1]))
 
-    /** A `(` right after the name that closes, as [VariableExpander] reads one; an unclosed `(` is a plain read. */
-    private fun isOperatorForm(s: String, match: MatchResult): Boolean {
-        val open = match.range.last + 1
-        if (!s.startsWith("(", open)) return false
-        var depth = 0
-        for (index in open until s.length) {
-            when (s[index]) {
-                '(' -> depth++
-                ')' -> if (--depth == 0) return true
-            }
-        }
-        return false
+    /** The secret names among those [match] can read: its whole name, and the name it falls back to. */
+    private fun secretNamesRead(match: MatchResult): List<String> {
+        val whole = match.groupValues[1]
+        return listOf(whole, readName(whole)).distinct().filter { isSensitive(it) || it in sensitiveArrayNames }
     }
-
-    /** An operator form like `%my-arr(1)` reads its whole name, as [VariableExpander] does; only a plain read falls back. */
-    private fun nameRead(s: String, match: MatchResult): String =
-        if (isOperatorForm(s, match)) match.groupValues[1] else readName(match.groupValues[1])
 
     /**
      * The variable `%name` reads: itself, or for an unset name with a hyphen the longest set prefix,

@@ -16,18 +16,29 @@ class ActionContext(
     val eventVariables: Map<String, String> = emptyMap(),
     val audioEligibility: AudioRuntimeEligibility = AudioRuntimeEligibility(),
     val sensitiveArgumentNames: Set<String> = emptySet(),
+    /**
+     * Names a step adds as it writes them when the name itself gives a secret away, like
+     * `cache_1234` built from `%cache_%Pin`, so the run log only counts their changes. A task run
+     * hands each step its own set; null elsewhere. Ahead of [logger], which callers pass as a
+     * trailing lambda.
+     */
+    val hiddenChangeNames: MutableSet<String>? = null,
     val logger: (String) -> Unit = {},
 )
 
-fun ActionContext.forAction(sensitiveArgumentNames: Set<String>): ActionContext {
-    if (sensitiveArgumentNames.isEmpty()) return this
+fun ActionContext.forAction(
+    sensitiveArgumentNames: Set<String>,
+    hiddenChangeNames: MutableSet<String>? = null,
+): ActionContext {
+    if (sensitiveArgumentNames.isEmpty() && hiddenChangeNames == null) return this
     return ActionContext(
         app = app,
         variables = variables,
         eventVariables = eventVariables,
         audioEligibility = audioEligibility,
-        logger = { logger(SECRET_DERIVED_ACTION_LOG) },
+        logger = if (sensitiveArgumentNames.isEmpty()) logger else { _ -> logger(SECRET_DERIVED_ACTION_LOG) },
         sensitiveArgumentNames = sensitiveArgumentNames,
+        hiddenChangeNames = hiddenChangeNames ?: this.hiddenChangeNames,
     )
 }
 

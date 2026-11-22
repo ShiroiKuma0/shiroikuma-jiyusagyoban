@@ -97,6 +97,35 @@ class SecretNamedVariableRunLogTest {
     }
 
     @Test
+    fun aNameBuiltFromASecretCopiedEarlierInTheStepStaysHidden() {
+        // %x takes the token's value on the first line, so it's a secret by the second.
+        val variables = VariableStore()
+        variables.set("Token", "abc123", sensitive = true)
+        val (serialized, _) = run(variables, setMultiple("names" to "%x\n%cache_%x", "values" to "%Token\nwarm"))
+        assertFalse(serialized, "cache_abc123" in serialized)
+    }
+
+    @Test
+    fun aNameBuiltFromADeclaredSecretWithNoValueYetStaysHidden() {
+        val variables = VariableStore().apply { seedGlobals(emptyMap(), secretNames = setOf("Pin")) }
+        val (serialized, _) = run(variables, setMultiple("names" to "%Pin\n%cache_%Pin", "values" to "0000\nwarm"))
+        assertFalse(serialized, "cache_0000" in serialized)
+    }
+
+    @Test
+    fun aNameThatComesOutDifferentlyEachTimeStaysHidden() {
+        // %slot(*) picks a slot at random, so working the name out a second time can give another one.
+        repeat(12) {
+            val variables = VariableStore().apply {
+                set("Pin", "1234", sensitive = true)
+                listOf("a", "b", "c").forEachIndexed { index, slot -> set("slot${index + 1}", slot) }
+            }
+            val (serialized, _) = run(variables, setMultiple("names" to "%cache_%slot(*)%Pin", "values" to "warm"))
+            assertFalse(serialized, "1234" in serialized)
+        }
+    }
+
+    @Test
     fun setVariableOnANameBuiltFromASecretKeepsTheNameOut() {
         val variables = VariableStore()
         variables.set("Pin", "1234", sensitive = true)

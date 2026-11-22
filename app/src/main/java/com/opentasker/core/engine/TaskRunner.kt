@@ -18,6 +18,7 @@ import com.opentasker.core.expressions.TemplateExpressionEngine
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
@@ -791,10 +792,11 @@ class TaskRunner(
         }
         val timeoutMs = actionTimeoutMs(spec.type)
         val before = ctx.variables.toTemplateScope()
+        val hiddenChangeNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
         val rawResult = try {
             runStepWithinLimit(timeoutMs) {
                 ctx.variables.withSensitiveWrites(expansionReport.hasSecretDerivedValues()) {
-                    action.run(ctx.forAction(expansionReport.sensitiveArgumentNames()), expansionReport.args)
+                    action.run(ctx.forAction(expansionReport.sensitiveArgumentNames(), hiddenChangeNames), expansionReport.args)
                 }
             }
         } catch (e: CancellationException) {
@@ -825,7 +827,7 @@ class TaskRunner(
         }.let { changes ->
             when {
                 spec.type == "var.set_multiple" ->
-                    multipleVariablesShownChanges(spec.args, expansionReport.args, changes, before, ctx.eventVariables)
+                    multipleVariablesShownChanges(spec.args, expansionReport.args, changes, hiddenChangeNames)
                 // A name filled in from a secret, like %cache_%Pin, holds that secret.
                 spec.type == "var.set" && expansionReport.expansions.any { it.argName == "name" && it.isSecretDerived } ->
                     countHiddenChanges(changes) { true }

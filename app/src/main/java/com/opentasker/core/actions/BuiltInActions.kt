@@ -509,7 +509,7 @@ class LaunchIntentAction : DeclaredAction(ActionCatalog.require("intent.launch")
         if (plan.mode != IntentDispatchMode.ACTIVITY && component == null) return null
         if (component != null) {
             if (component.packageName != plan.packageName) return null
-            // A class a step names in this app must be the app's own code. A library's component
+            // A class a step names in this app must sit under its package name. A library's component
             // merged in (WorkManager's receivers, a BIND_* service) isn't for steps, and this app's
             // own uid passes whatever permission guards it, so exported or not it's refused.
             if (explicitComponent != null && component.packageName == ctx.app.packageName &&

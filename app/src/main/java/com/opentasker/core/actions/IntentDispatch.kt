@@ -156,8 +156,9 @@ internal object IntentDispatchPolicy {
     }
 
     /**
-     * Whether [className] in [componentPackage] is this app's own code, under its own package name,
-     * the only classes a step may name inside this app. Another app's classes can sit anywhere.
+     * Whether [className] in [componentPackage] sits under this app's package name, the only classes
+     * a step may name inside this app (most of its code, under com.opentasker.core, isn't). Another
+     * app's classes can sit anywhere.
      */
     fun isOwnClass(componentPackage: String, className: String, appPackage: String): Boolean =
         componentPackage == appPackage && (className == appPackage || className.startsWith("$appPackage."))

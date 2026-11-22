@@ -343,7 +343,7 @@ class VariableExpander {
      * the parentheses is filled in first and trimmed, so `%parts(%i)` reads the element at `%i` and
      * gives empty while `%i` is, as does a range with an empty variable on either side. Any other
      * form joins the elements with it. Both actions also set [name] to the first element, so while
-     * it holds a value the stored array answers only those array forms. It never answers once
+     * it holds a value the stored array answers only those array forms and Tasker's `+sep` and `*` (see [taskerJoinOrPick]). It never answers once
      * [name] has numbered elements (`%parts1`, ...) of its own, whether [name] is set or not. Null
      * leaves [op] to them.
      */
@@ -356,13 +356,15 @@ class VariableExpander {
     ): String? {
         val expanded = if ('%' in op) expandText(op, store, arrays) { it } else op
         val form = expanded.trim()
-        val arrayForm = STORED_ARRAY_FORM.matches(form)
+        val pick = taskerJoinOrPick(expanded)
+        // Tasker's `+sep` and `*` are array forms too, so they read the array while [name] holds its first element.
+        val arrayForm = pick != null || STORED_ARRAY_FORM.matches(form)
         if (store.numberedItems(name).isNotEmpty() || (baseValue != null && !arrayForm)) return null
         if (form.isEmpty() && '%' in op) return ""
         if (':' in op && op.split(':', limit = 2).any { side -> '%' in side && expandText(side, store, arrays) { it }.isBlank() }) return ""
         val size = arrays.length(name)
         // Ahead of the joiner fallback below, which would read `+=` or `*` as the text to join with.
-        when (val pick = taskerJoinOrPick(expanded)) {
+        when (pick) {
             TaskerJoinOrPick.AtRandom -> return if (size == 0) "" else arrays.get(name, Random.nextInt(size))
             is TaskerJoinOrPick.Join -> return storedRange(name, pick.range, size, arrays)?.joinToString(pick.separator).orEmpty()
             null -> Unit
@@ -383,8 +385,9 @@ class VariableExpander {
         }
         val from = form.substringBefore(':').ifEmpty { "0" }.toIntOrNull() ?: return null
         val to = form.substringAfter(':', "").ifEmpty { null }?.let { it.toIntOrNull() ?: return null } ?: (size - 1)
-        val range = if (from <= to) from..to else from downTo to
-        return range.filter { it in 0 until size }.map { arrays.get(name, it) }
+        // Cut to the array before walking it, so `0:2000000000` doesn't count to two billion.
+        val range = if (from <= to) from.coerceAtLeast(0)..to.coerceAtMost(size - 1) else from.coerceAtMost(size - 1) downTo to.coerceAtLeast(0)
+        return range.map { arrays.get(name, it) }
     }
 
     /**
