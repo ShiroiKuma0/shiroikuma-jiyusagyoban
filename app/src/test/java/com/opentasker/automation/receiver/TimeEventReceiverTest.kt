@@ -39,10 +39,11 @@ class TimeEventReceiverTest {
         receiver.onReceive(app, broadcast("test.unknown"))
 
         // The ledger and the scheduler both start from the application context, so either shows
-        // up here. A service start can't: building its Intent throws on the JVM before it gets
-        // as far as the context.
+        // up here, as does a system service lookup or a broadcast. A service start can't:
+        // building its Intent throws on the JVM before it gets as far as the context.
         assertEquals(
-            "a broadcast with nothing to act on must not mark a tick delivered or reach the scheduler",
+            "a broadcast with nothing to act on must not mark a tick delivered, reach the scheduler, " +
+                "look up a system service or send a broadcast",
             emptyList<String>(),
             app.touched,
         )
@@ -68,7 +69,10 @@ class TimeEventReceiverTest {
         override fun getAction(): String? = actionName
     }
 
-    /** Records the two ways the ledger and the scheduler reach the context. */
+    /**
+     * Records the two ways the ledger and the scheduler reach the context, plus the two other
+     * calls a receiver could make on it that the JVM lets through.
+     */
     private class RecordingContext : ContextWrapper(null) {
         val touched = mutableListOf<String>()
         val prefs = InMemoryPreferences()
@@ -81,6 +85,15 @@ class TimeEventReceiverTest {
         override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
             touched += "prefs:$name"
             return prefs
+        }
+
+        override fun getSystemService(name: String): Any? {
+            touched += "service:$name"
+            return null
+        }
+
+        override fun sendBroadcast(intent: Intent?) {
+            touched += "broadcast"
         }
     }
 

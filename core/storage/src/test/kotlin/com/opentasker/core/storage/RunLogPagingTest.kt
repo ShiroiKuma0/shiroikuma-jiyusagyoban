@@ -78,11 +78,11 @@ class RunLogPagingTest {
                 id = id,
                 timestamp = id * 10,
                 success = id % 3 != 0L,
-                message = if (id % 4 == 0L || id == 2L) "Alarm went off" else "ok",
+                message = if (id % 4 == 0L || id == 2L || id == 17L) "Alarm went off" else "ok",
             )
         }
-        // In the window 40..170, succeeded, and mentioning an alarm: 4, 8 and 16. Row 12 failed,
-        // row 2 is before the window and row 20 after it.
+        // In the window 40..170, succeeded, and mentioning an alarm: 4, 8, 16 and 17, with 4 and 17
+        // on its two edges. Row 12 failed, row 2 is before the window and row 20 after it.
         val query = RunLogQuery(
             status = RunLogStatusQuery.SUCCEEDED,
             minimumTimestamp = 40,
@@ -93,8 +93,8 @@ class RunLogPagingTest {
         val snapshot = dao.openSnapshot(query)
         val rows = walk(dao, snapshot, pageSize = 1).flatMap { it.entries }
 
-        assertEquals(3, snapshot.totalCount)
-        assertEquals(listOf(16L, 8L, 4L), rows.map { it.id })
+        assertEquals(4, snapshot.totalCount)
+        assertEquals(listOf(17L, 16L, 8L, 4L), rows.map { it.id })
     }
 
     @Test
@@ -160,6 +160,8 @@ class RunLogPagingTest {
                 "FAILED" -> { row -> !row.success }
                 else -> error("this fake doesn't model status $status")
             }
+            // The SQL unescapes `\%`, `\_` and `\\` (ESCAPE '\'); this fake doesn't, so it refuses them.
+            require('\\' !in escapedSearch) { "this fake doesn't model LIKE escapes" }
             return rows
                 .filter { row ->
                     row.id <= snapshotMaxId &&
