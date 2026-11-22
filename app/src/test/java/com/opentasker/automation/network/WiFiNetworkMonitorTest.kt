@@ -114,8 +114,13 @@ class WiFiNetworkMonitorTest {
         assertTrue("if (nameWanted && Build.VERSION.SDK_INT >= 31) {" in source)
         assertTrue("if (!nameWanted) return null" in source)
         assertTrue("val withheld = nameWanted && synchronized(stateLock) {" in source)
-        assertTrue("synchronized(stateLock) { publish(tracker.onLost(network)) }" in source)
-        assertTrue("synchronized(stateLock) { publish(tracker.onCapabilities(network, ssid)) }" in source)
+        // A replaced callback is turned away under the lock that swaps it and empties the tracker,
+        // or a late update from it lands in the new registration's tracker.
+        assertTrue("synchronized(stateLock) { if (this === callback) publish(tracker.onLost(network)) }" in source)
+        assertTrue("synchronized(stateLock) { if (this === callback) publish(tracker.onCapabilities(network, ssid)) }" in source)
+        assertTrue("synchronized(stateLock) { if (this === callback) tracker.onAvailable(network) }" in source)
+        assertTrue("synchronized(stateLock) {\n            callback = fresh\n            tracker.reset()\n        }" in source)
+        assertEquals("the callback is only replaced together with the tracker", 1, Regex("""^\s+callback = """, RegexOption.MULTILINE).findAll(source).count())
         assertFalse(
             "state must come from the networks the callback named, never the default network",
             // A property access, so the KDoc that explains why may still name it.
@@ -131,8 +136,12 @@ class WiFiNetworkMonitorTest {
         // retried by the next trigger, and stop() must not unregister a callback that is gone.
         assertTrue("if (!withheld && !callbackLost) return" in source)
         assertTrue("if (!callbackLost) cm.unregisterNetworkCallback(callback)" in source)
-        // Every registration, the first one included, takes a callback with the flag as it is now.
-        assertEquals(3, Regex("callback = newCallback\\(\\)").findAll(source).count())
+        // Every registration, the first one included, takes a callback with the flag as it is now:
+        // the one place that registers makes a fresh one, and start and re-register both go there.
+        assertEquals(1, Regex("""\bregisterNetworkCallback\(""").findAll(source).count())
+        assertTrue("val fresh = newCallback()" in source)
+        assertTrue("cm.registerNetworkCallback(request, fresh)" in source)
+        assertEquals(2, Regex("""registerAndSeed\(cm\)""").findAll(source).count())
         assertTrue("if (!callbackLost) connectivityManager?.unregisterNetworkCallback(callback)" in source)
     }
 

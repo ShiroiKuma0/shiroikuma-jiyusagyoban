@@ -62,21 +62,21 @@ class WiFiNetworkMonitor(
 
         // Android always follows onAvailable with onCapabilitiesChanged, which carries the SSID,
         // so publishing here would only announce a nameless connection a moment early.
-        // A callback replaced by a re-registration may still have an update in flight.
+        // A callback replaced by a re-registration may still have an update in flight. The check
+        // is made under the lock that swaps the callback and empties the tracker, so a late update
+        // from the old one can't land in the new tracker after the swap.
         override fun onAvailable(network: Network) {
-            if (this !== callback) return
-            synchronized(stateLock) { tracker.onAvailable(network) }
+            synchronized(stateLock) { if (this === callback) tracker.onAvailable(network) }
         }
 
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             if (this !== callback) return
             val ssid = readSsid(networkCapabilities)
-            synchronized(stateLock) { publish(tracker.onCapabilities(network, ssid)) }
+            synchronized(stateLock) { if (this === callback) publish(tracker.onCapabilities(network, ssid)) }
         }
 
         override fun onLost(network: Network) {
-            if (this !== callback) return
-            synchronized(stateLock) { publish(tracker.onLost(network)) }
+            synchronized(stateLock) { if (this === callback) publish(tracker.onLost(network)) }
         }
     }
 
@@ -112,7 +112,6 @@ class WiFiNetworkMonitor(
             }
 
             try {
-                callback = newCallback()
                 registerAndSeed(cm)
                 AppLogger.debug(TAG, "WiFi NetworkCallback registered")
             } catch (ex: RuntimeException) {
@@ -146,8 +145,12 @@ class WiFiNetworkMonitor(
     }
 
     private fun registerAndSeed(cm: ConnectivityManager) {
-        synchronized(stateLock) { tracker.reset() }
-        cm.registerNetworkCallback(request, callback)
+        val fresh = newCallback()
+        synchronized(stateLock) {
+            callback = fresh
+            tracker.reset()
+        }
+        cm.registerNetworkCallback(request, fresh)
         // Android replays onAvailable for every Wi-Fi network already up, so the one answer the
         // callback can never give is "nothing is connected". Seeding more than that here would race
         // the replay with a staler reading.
@@ -185,7 +188,6 @@ class WiFiNetworkMonitor(
     private fun reregister(cm: ConnectivityManager, why: String) {
         if (!callbackLost) cm.unregisterNetworkCallback(callback)
         callbackLost = true
-        callback = newCallback()
         try {
             registerAndSeed(cm)
             callbackLost = false
