@@ -1,6 +1,7 @@
 package com.opentasker.core.engine
 
 import android.content.ContextWrapper
+import com.opentasker.core.actions.clearVariables
 import com.opentasker.core.actions.registerActionMetadata
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.Task
@@ -84,5 +85,32 @@ class VariableClearPickedElementTest {
     @Test
     fun withPatternMatchingTheElementIsPickedFirst() {
         elements().also { assertTrue(run(it, "%Arr(<)", pattern = true).success) }.also { assertEquals(listOf(2, 3), left(it)) }
+    }
+
+    @Test
+    fun elementZeroAndANumberWrittenWithZerosInFrontCountTheWayTaskerReadsThem() {
+        // Tasker's dq.V reads what follows the base with new Integer, so %Arr0 is element 0.
+        elements().apply { set("Arr0", "z") }.also { assertTrue(run(it, "%Arr(>)").success) }.also { assertEquals(listOf(2, 3, 5), left(it)) }
+        // %Arr07 counts as 7, so the pick is %Arr7, which isn't set, and both stay.
+        VariableStore().apply { set("Arr07", "g"); set("Arr4", "d") }.also { assertTrue(run(it, "%Arr(<)").success) }
+            .also { assertEquals("g", it.get("Arr07")); assertEquals("d", it.get("Arr4")) }
+    }
+
+    @Test
+    fun aNameTaskerReadsAsAPathIsntPicked() {
+        // Tasker's fr.M: a dot, or both brackets. With Pattern Matching on, that's a pattern clear of the text as written.
+        elements().also { assertTrue(run(it, "%Arr(<.x)", pattern = true).success) }.also { assertEquals(listOf(2, 3, 5), left(it)) }
+        // With it off the step fails as a path, and the preview agrees.
+        elements().also { assertFalse(run(it, "%Arr(<.x)").success) }.also { assertEquals(listOf(2, 3, 5), left(it)) }
+        elements().also { assertEquals(0, it.clearVariables(mapOf("name" to "%Arr(<.x)"))) }.also { assertEquals(listOf(2, 3, 5), left(it)) }
+        // One bracket alone isn't a path to Tasker, so it picks.
+        elements().also { assertTrue(run(it, "%Arr(<[)").success) }.also { assertEquals(listOf(2, 3), left(it)) }
+    }
+
+    @Test
+    fun theFailureDoesntSayTheNumberTheVariableHeld() {
+        val report = run(elements().apply { set("Idx", "-1234") }, "%Arr(%Idx)")
+        assertFalse(report.success)
+        assertFalse(report.results.toString(), "1234" in report.results.toString())
     }
 }

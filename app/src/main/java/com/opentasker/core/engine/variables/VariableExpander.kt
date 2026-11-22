@@ -356,7 +356,7 @@ class VariableExpander {
         arrays: ArrayStore,
     ): String? {
         val expanded = if ('%' in op) expandText(op, store, arrays) { it } else op
-        val form = expanded.trim()
+        val form = expanded.taskerTrim()
         val pick = taskerJoinOrPick(expanded)
         // Tasker's `+sep` and `*` are array forms too, so they read the array while [name] holds its first element.
         val arrayForm = pick != null || STORED_ARRAY_FORM.matches(form)

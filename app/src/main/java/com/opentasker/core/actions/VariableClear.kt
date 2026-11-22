@@ -20,16 +20,16 @@ import com.opentasker.core.model.VariableNamePolicy
 class VarClearAction : DeclaredAction(ActionCatalog.require("var.clear")) {
 
     override suspend fun run(ctx: ActionContext, args: Map<String, String>): ActionResult {
-        if (clearsAPath(args)) {
-            val path = args["name"].orEmpty().trim()
-            ctx.variables.clearAtPath(path)?.let { why -> return ActionResult.Failure("$path: $why") }
-            ctx.logger("var.clear -> removed $path")
+        val name = args["name"].orEmpty().trim()
+        // Tasker picks the element before it looks for a path, the same order clearVariables keeps.
+        if (!isTaskerPickedElement(name) && clearsAPath(args)) {
+            ctx.variables.clearAtPath(name)?.let { why -> return ActionResult.Failure("$name: $why") }
+            ctx.logger("var.clear -> removed $name")
             return ActionResult.Success
         }
-        val name = args["name"].orEmpty().trim()
+        // The picked number isn't named, since a secret %idx could hold it.
         val cleared = ctx.variables.clearVariables(args) ?: return ActionResult.Failure(
-            ctx.variables.pickedElement(name)?.let { (base, position) -> "'$name' picks $base$position, which isn't a variable name" }
-                ?: "invalid variable name '$name'",
+            if (isTaskerPickedElement(name)) "'$name' doesn't pick a variable name" else "invalid variable name '$name'",
         )
         ctx.logger("var.clear -> $cleared variable(s)")
         return ActionResult.Success
@@ -43,21 +43,27 @@ class VarClearAction : DeclaredAction(ActionCatalog.require("var.clear")) {
 private val TASKER_PICKED_ELEMENT =
     Regex("""(%[A-Za-z][A-Za-z0-9_]+[A-Za-z0-9])\(([<>][^()]*|%[A-Za-z][A-Za-z0-9_]+[A-Za-z0-9])\)""")
 
-/** Whether [name] is an element Variable Clear picks as it runs, like `%arr(>)` or `%arr(%idx)`. */
-internal fun isTaskerPickedElement(name: String): Boolean = TASKER_PICKED_ELEMENT.matches(name)
+/**
+ * Whether [name] is an element Variable Clear picks as it runs, like `%arr(>)` or `%arr(%idx)`.
+ * Tasker never picks in a name it reads as a path (`fr.M`): one with a `.`, or with both `[` and `]`.
+ */
+internal fun isTaskerPickedElement(name: String): Boolean =
+    TASKER_PICKED_ELEMENT.matches(name) && '.' !in name && !('[' in name && ']' in name)
 
 /**
  * The base and element number [name] picks as the step runs, the way Tasker's Variable Clear picks
- * it (decompiled 6.7.8, `dq.i`): `>` the lowest number set and `<` the highest, 0 when none is,
- * and `%idx` the whole number `%idx` holds, read like Tasker's `new Integer(text)`, 0 when it holds
- * none or isn't set. Tasker fails the step on a number below 0. Null when [name] isn't a pick.
+ * it (decompiled 6.7.8, `dq.i` and `dq.V`): `>` the lowest number set and `<` the highest, 0 when
+ * none is, counting `%arr0` and reading `%arr07` as 7, and `%idx` the whole number `%idx` holds,
+ * read like Tasker's `new Integer(text)`, 0 when it holds none or isn't set. Tasker fails the step
+ * on a number below 0. Null when [name] isn't a pick.
  */
 internal fun VariableStore.pickedElement(name: String): Pair<String, Int>? {
-    val (base, pick) = TASKER_PICKED_ELEMENT.matchEntire(name)?.destructured ?: return null
-    val items = numberedItems(base)
+    if (!isTaskerPickedElement(name)) return null
+    val (base, pick) = TASKER_PICKED_ELEMENT.matchEntire(name)!!.destructured
+    val numbers = taskerElementNumbers(base)
     val position = when {
-        pick.startsWith('>') -> if (items.isEmpty()) 0 else items.firstKey()
-        pick.startsWith('<') -> if (items.isEmpty()) 0 else items.lastKey()
+        pick.startsWith('>') -> if (numbers.isEmpty()) 0 else numbers.first()
+        pick.startsWith('<') -> numbers.lastOrNull()?.coerceAtLeast(0) ?: 0
         else -> get(pick)?.toIntOrNull() ?: 0
     }
     return base to position

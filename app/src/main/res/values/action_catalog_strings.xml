@@ -67,7 +67,7 @@
     <string name="catalog_action_var_clear_name" formatted="false">Variable Clear</string>
     <string name="catalog_action_var_clear_description" formatted="false">Unset a variable, every variable matching a pattern, or every local variable</string>
     <string name="catalog_action_var_clear_field_name_label" formatted="false">Name or pattern</string>
-    <string name="catalog_action_var_clear_field_name_hint" formatted="false">%name, %json.key to remove one field of a JSON variable, or %item* with pattern matching. Leave it empty to clear every local variable</string>
+    <string name="catalog_action_var_clear_field_name_hint" formatted="false">%name, %arr(&lt;) for the last element of an array, %json.key to remove one field of a JSON variable, or %item* with pattern matching. Leave it empty to clear every local variable</string>
     <string name="catalog_action_var_clear_field_pattern_label" formatted="false">Pattern matching</string>
     <string name="catalog_action_var_clear_field_pattern_hint" formatted="false">Clear every variable whose name matches, like %item* or %a/%b</string>
     <string name="catalog_action_var_clear_field_local_only_label" formatted="false">Local variables only</string>

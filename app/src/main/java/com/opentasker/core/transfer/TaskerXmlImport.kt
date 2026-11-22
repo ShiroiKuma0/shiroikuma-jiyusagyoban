@@ -1518,8 +1518,8 @@ object TaskerXmlImporter {
      * are. One Tasker picks as the step runs, `%arr(>)`, `%arr(<)` or `%arr(%idx)`, comes over as
      * written, since Variable Clear here picks it the same way. Pattern Matching clears every name
      * that matches, globals too unless Local Variables Only. No name clears every local, and every
-     * global as well with Clear All Variables. Each
-     * switch only counts where Tasker reads it, so only those come over. Without Pattern Matching, a
+     * global as well with Clear All Variables. Each switch only counts where Tasker reads it, so
+     * only those come over. Without Pattern Matching, a
      * name with a `.` or a `[...]` in it is a JSON path (`fr.M`), which Tasker clears by removing
      * that field or item (`HelperExecuteService.y2`), so it comes over in this app's path syntax.
      */

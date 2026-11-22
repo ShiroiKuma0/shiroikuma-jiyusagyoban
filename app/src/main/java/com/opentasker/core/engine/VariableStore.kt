@@ -214,7 +214,17 @@ class VariableStore {
      * Tasker's array elements: the variables named [base] plus a whole number from 1 (`arr1`,
      * `arr2`, ...), in the scope [base] belongs to, by index. Each one reads the way [get] reads it.
      */
-    fun numberedItems(base: String): java.util.NavigableMap<Int, String> {
+    fun numberedItems(base: String): java.util.NavigableMap<Int, String> = itemsNumbered(base, ::numberedIndex)
+
+    /**
+     * The element numbers set under [base] the way Tasker's Variable Clear counts them (`dq.V`):
+     * whatever follows the base read as a whole number, so `arr0` is 0 and `arr07` is 7.
+     */
+    fun taskerElementNumbers(base: String): java.util.NavigableSet<Int> = itemsNumbered(base) { normalizedBase, name ->
+        name.takeIf { it.length > normalizedBase.length && it.startsWith(normalizedBase) }?.substring(normalizedBase.length)?.toIntOrNull()
+    }.navigableKeySet()
+
+    private fun itemsNumbered(base: String, index: (String, String) -> Int?): java.util.TreeMap<Int, String> {
         val items = java.util.TreeMap<Int, String>()
         val normalizedBase = VariableNamePolicy.normalize(base) ?: return items
         val names = if (VariableNamePolicy.isGlobal(normalizedBase)) {
@@ -223,8 +233,8 @@ class VariableStore {
             synchronized(localStack) { arrayScopes(normalizedBase).flatMapTo(mutableSetOf()) { (values, _) -> values.keys } }
         }
         names.forEach { name ->
-            val index = numberedIndex(normalizedBase, name) ?: return@forEach
-            get(name)?.let { items[index] = it }
+            val number = index(normalizedBase, name) ?: return@forEach
+            get(name)?.let { items[number] = it }
         }
         return items
     }

@@ -64,6 +64,9 @@ class TaskerJoinRangeRuleTest {
         assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+${control}1:3)"))
         assertNotEquals("beta", numbered().expand("%arr(${noBreak}2)"))
         assertNotEquals("alpha;beta;cat", numbered().expand("%arr(+;+${noBreak}1:3)"))
+        // The parts Split Text keeps read the same forms (from 0 for now), so they trim the same way.
+        assertEquals("cat", stored().expand("%arr(${control}2)"))
+        assertNotEquals("cat", stored().expand("%arr(${noBreak}2)"))
     }
 
     @Test
