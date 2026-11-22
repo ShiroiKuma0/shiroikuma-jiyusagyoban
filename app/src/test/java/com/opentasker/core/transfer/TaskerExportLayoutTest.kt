@@ -171,6 +171,15 @@ class TaskerExportLayoutTest {
     }
 
     @Test
+    fun aSumInAFieldOfTheSameUnitGoesBackAsTaskersSum() {
+        // A Wait in seconds held in %x imports as milliseconds, and Wait's first field is milliseconds.
+        val millis = "{{ x | mul:1000 }}"
+
+        assertHas(xml("flow.wait", "millis" to millis), """<Int sr="arg0"><var>%x*1000</var></Int>""")
+        assertEquals(millis, roundTrip("flow.wait", "millis" to millis).args["millis"])
+    }
+
+    @Test
     fun autoBrightnessIsCalledOutBecauseTaskerStoresThatElsewhere() {
         val report = export(ActionSpec(type = "brightness.set", args = mapOf("brightness" to "auto")))
 

@@ -512,13 +512,13 @@ object TaskerXmlExporter {
             }
             "array.push" -> {
                 appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
-                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1", sum = true)
+                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1")
                 appendStr(sb, 2, args["value"].orEmpty())
                 appendInt(sb, 3, taskerFlag(args["fill_spaces"]))
             }
             "array.pop" -> {
                 appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
-                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1", sum = true)
+                appendInt(sb, 1, args["position"]?.ifBlank { null } ?: "1")
                 appendStr(sb, 2, args["to_var"]?.ifBlank { null }?.let { taskerVariableName(it, it) }.orEmpty())
             }
             "array.clear" -> appendStr(sb, 0, taskerVariableName(args["array"], "arr"))
@@ -1111,12 +1111,11 @@ object TaskerXmlExporter {
     }
 
     /**
-     * A number field holding a variable is written the way Tasker writes it, in a `<var>`. With
-     * [sum], a sum the import made a template of goes back as Tasker's sum. Only Push and Pop's
-     * Position ask for that: other fields scale their template by the field's unit, which a
-     * sum written back would then get applied twice.
+     * A number field holding a variable or a sum is written the way Tasker writes it, in a `<var>`.
+     * Pass [sum] false where the template is in another unit than the field, as Display Timeout's
+     * milliseconds are in its seconds field: written back as a sum, the import would scale it twice.
      */
-    private fun appendInt(sb: StringBuilder, index: Int, value: String, sum: Boolean = false) {
+    private fun appendInt(sb: StringBuilder, index: Int, value: String, sum: Boolean = true) {
         val trimmed = value.trim()
         if (trimmed.toIntOrNull() != null) {
             sb.appendLine("""      <Int sr="arg$index" val="$trimmed"/>""")
@@ -1164,7 +1163,7 @@ object TaskerXmlExporter {
         val seconds = text.toLongOrNull()?.div(1000)
         if (seconds == null) {
             warnings += "'screen.timeout' holds milliseconds in $text, and Tasker's Display Timeout reads that field as seconds."
-            appendInt(sb, 0, text)
+            appendInt(sb, 0, text, sum = false)
             appendInt(sb, 1, "0")
             appendInt(sb, 2, "0")
             return
