@@ -102,6 +102,17 @@ class ConfigurationSnapshotsTest {
         assertEquals(1, errors.size)
     }
 
+    /** The stand-in used to drop the refused count, so Setup's note went away while those files stayed. */
+    @Test
+    fun aRunThatCantListTheFolderKeepsTheRefusedCountAndCountsItsOwnSnapshot() {
+        val lastRun = ConfigurationSnapshotStatus(snapshotCount = 5, storageBytes = 50, refusedDeletes = 3)
+
+        assertEquals(
+            ConfigurationSnapshotArchiveInventory(snapshotCount = 6, storageBytes = 50, removedCount = 0, refusedCount = 3),
+            inventoryWithoutListing(lastRun),
+        )
+    }
+
     @Test
     fun retentionKeepsTheNewestSnapshotsUpToTheCountLimit() {
         val snapshots = (0 until 8).map { index ->
