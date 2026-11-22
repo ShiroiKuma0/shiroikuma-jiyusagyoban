@@ -147,4 +147,21 @@ class ActionFamilyExecutionTest {
 
         assertFailed(run("text.split", mapOf("source" to "a,b,c", "var" to "parts")), "delimiter")
     }
+
+    @Test
+    fun replaceTextCountsOneMatchInTheSingular() {
+        val logs = mutableListOf<String>()
+        val action = requireNotNull(ActionRegistry.get("text.replace"))
+        fun replace(source: String) = runBlocking {
+            action.run(
+                ActionContext(ContextWrapper(null), variables, logger = { logs += it }),
+                mapOf("source" to source, "pattern" to "b", "replacement" to "B", "var" to "out", "matches" to "found"),
+            )
+        }
+
+        assertEquals(ActionResult.Success, replace("abc"))
+        assertEquals(ActionResult.Success, replace("abcb"))
+
+        assertEquals(listOf("text.replace -> %found (1 match)", "text.replace -> %found (2 matches)"), logs.filter { "%found" in it })
+    }
 }

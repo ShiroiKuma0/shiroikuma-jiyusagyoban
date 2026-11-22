@@ -77,7 +77,7 @@ class TextReplaceAction : DeclaredAction(ActionCatalog.require("text.replace")) 
                 }
                 val sensitive = ctx.isArgumentSensitive("source")
                 ctx.variables.replaceNumberedItems(array, found.withIndex().associate { (index, match) -> index + 1 to (match to sensitive) })
-                ctx.logger("text.replace -> %$array (${found.size} match(es))")
+                ctx.logger("text.replace -> %$array (${countOf(found.size, "match", "matches")})")
             }
             if (searchOnly || (inPlace && found.isEmpty())) return ActionResult.Success
         }
