@@ -47,6 +47,20 @@ class TaskerJoinRangeRuleTest {
     }
 
     @Test
+    fun spacesAroundTheRangeGoTheWayTaskersSecondReadTrimsThem() {
+        // Tasker reads the range by calling itself on %arr(range), and that call trims the form.
+        assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+ 1:3)"))
+        assertEquals("alpha;beta;cat", numbered().expand("%arr(+;+1:3 )"))
+        assertEquals("beta;alpha", stored().expand("%arr(+;+ 1:0 )"))
+    }
+
+    @Test
+    fun aStoredRangePastWhatANumberHoldsGivesEmpty() {
+        assertEquals("", stored().expand("%arr(+;+0:99999999999)"))
+        assertEquals("", numbered().expand("%arr(+;+1:99999999999)"))
+    }
+
+    @Test
     fun aDigitEarlierMakesAnEmptyRangeThatJoinsEverything() {
         // `a:1+` passes Tasker's test, so the separator is `a:1` and the empty range is every element.
         assertEquals("alphaa:1betaa:1cata:1dog", numbered().expand("%arr(+a:1+)"))
@@ -76,8 +90,8 @@ class TaskerJoinRangeRuleTest {
 
     @Test
     fun aDigitInAnyScriptCounts() {
-        // Tasker runs its test on Android's regex, where \d is any script's decimal digit, and reads
-        // the range with Integer.parseInt, which takes them too.
+        // Tasker runs its test on Android's regex, where \d is any script's decimal digit, and reads a
+        // list's numbers with Kotlin's toIntOrNull and a range's with Integer.parseInt, which take them too.
         val three = Char(0x663).toString()
         val four = Char(0x664).toString()
         assertEquals("cat;dog", numbered().expand("%arr(+;+$three,$four)"))

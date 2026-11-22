@@ -29,6 +29,29 @@ class TaskerIndexListFormTest {
     }
 
     @Test
+    fun aListIsReadAsWrittenSoASpaceAtEitherEndStaysOnItsPart() {
+        // Tasker trims the form only to spot the comma, then hands fr.h0 the text as written.
+        assertEquals("cat", numbered().expand("%arr( 1,3)"))
+        assertEquals("alpha", numbered().expand("%arr(1,3 )"))
+        assertEquals("cat", numbered().expand("%arr(+;+ 1,3)"))
+    }
+
+    @Test
+    fun anEmptyVariableBesideAColonInAListIsJustAPartThatNamesNothing() {
+        // A list part isn't a range, so a range's empty-side rule doesn't empty the whole list.
+        val withEmpty = numbered().apply { set("a", "") }
+        assertEquals("beta", withEmpty.expand("%arr(%a:1,2)"))
+        assertEquals("alpha", withEmpty.expand("%arr(1,2:%a)"))
+    }
+
+    @Test
+    fun aLetterOutsideTheBasicPlaneStillMakesItThisAppsOwnOperator() {
+        val boldA = String(Character.toChars(0x1D400))
+        assertEquals("", numbered().expand("%arr(A,1)"))
+        assertEquals("", numbered().expand("%arr($boldA,1)"))
+    }
+
+    @Test
     fun aCommaListIsARangeAfterTheSecondPlus() {
         assertEquals("alpha;cat", numbered().expand("%arr(+;+1,3)"))
         // The stored array Split Text keeps has no list form, so that still joins with all of it.
@@ -49,5 +72,8 @@ class TaskerIndexListFormTest {
     fun aPlainVariableKeepsItsOwnOperators() {
         val plain = VariableStore().apply { set("n", "10") }
         assertEquals("15", plain.expand("%n(+5)"))
+        // With a comma too: `-` takes away what follows when it's a number, and `1,5` isn't one, so 0.
+        // Read as a list of element numbers instead, it would name nothing and give empty.
+        assertEquals("10", plain.expand("%n(-1,5)"))
     }
 }

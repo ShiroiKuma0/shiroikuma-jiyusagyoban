@@ -368,8 +368,9 @@ class VariableExpander {
         when (pick) {
             TaskerJoinOrPick.AtRandom -> return if (size == 0) "" else arrays.get(name, Random.nextInt(size))
             // A `1,3` list isn't one of the stored array's forms, so it joins with all of it, as before.
-            is TaskerJoinOrPick.Join -> return storedRange(name, pick.range, size, arrays)?.joinToString(pick.separator)
-                ?: arrays.join(name, "${pick.separator}+${pick.range}")
+            // Any other range that doesn't read, like one past what a number holds, gives empty.
+            is TaskerJoinOrPick.Join -> return storedRange(name, pick.range.trim(), size, arrays)?.joinToString(pick.separator)
+                ?: if (isTaskerIndexList(pick.range)) arrays.join(name, "${pick.separator}+${pick.range}") else ""
             null -> Unit
         }
         return when {
@@ -416,7 +417,8 @@ class VariableExpander {
         val split = if ("+\$?" in rest) rest.indexOf("+\$?") else rest.lastIndexOf('+')
         val range = rest.substring(split + 1)
         // A range Tasker reads that isn't read here yet, like `$?pattern`, still joins with all of it.
-        val readable = TASKER_RANGE_FORM.matches(range) || isTaskerIndexList(range)
+        // Tasker reads the range by calling itself on `%arr(range)`, which trims it.
+        val readable = TASKER_RANGE_FORM.matches(range.trim()) || isTaskerIndexList(range)
         return if (readable) TaskerJoinOrPick.Join(rest.substring(0, split), range) else TaskerJoinOrPick.Join(rest, "")
     }
 
@@ -500,7 +502,12 @@ class VariableExpander {
         // An index variable that came out empty names no element, so it isn't the empty form
         // that joins them all, nor the open side of a range (%arr(%a:%b) isn't %arr(:)).
         if (form.isEmpty() && '%' in op) return ""
-        if (':' in op && op.split(':', limit = 2).any { side -> '%' in side && expandText(side, store, arrays) { it }.isBlank() }) return ""
+        // A list's parts aren't ranges, so `%arr(%a:1,2)` still reads element 2.
+        if (':' in op && !isTaskerIndexList(form) &&
+            op.split(':', limit = 2).any { side -> '%' in side && expandText(side, store, arrays) { it }.isBlank() }
+        ) {
+            return ""
+        }
         val lastIndex = if (items.isEmpty()) 0 else items.lastKey()
         return when (form) {
             "#" -> items.size.toString()
@@ -508,25 +515,30 @@ class VariableExpander {
             "#<" -> lastIndex.toString()
             ">" -> items.firstEntry()?.value.orEmpty()
             "<" -> items.lastEntry()?.value.orEmpty()
-            else -> numberedRange(items, form)?.joinToString(",").orEmpty()
+            else -> numberedRange(items, expanded)?.joinToString(",").orEmpty()
         }
     }
 
     /**
      * Tasker's list of positions, `%arr(1,3)` (decompiled 6.7.8, `fr.h0`), which any other form with
-     * a comma is there. One that starts with a letter stays this app's own operator, like
-     * `%text(split:,)`, and Tasker's `#?` and `$?` searches aren't read yet.
+     * a comma is there, spaces trimmed. One that starts with a letter stays this app's own operator,
+     * like `%text(split:,)`, and Tasker's `#?` and `$?` searches aren't read yet.
      */
-    private fun isTaskerIndexList(form: String): Boolean =
-        ',' in form && form.first().let { !it.isLetter() && it != '#' && it != '$' }
+    private fun isTaskerIndexList(form: String): Boolean {
+        val start = form.trim()
+        if (',' !in start) return false
+        val first = start.codePointAt(0)
+        return !Character.isLetter(first) && first != '#'.code && first != '$'.code
+    }
 
     /**
-     * The numbered elements a `a:b`, `:b`, `a:`, `:`, empty or single-index [form] names, or a
-     * `1,3` list in its order, where a part that isn't a whole number, spaces and all, names
-     * nothing, as in Tasker; null when it isn't one.
+     * The numbered elements a `a:b`, `:b`, `a:`, `:`, empty or single-index form names, spaces
+     * trimmed, or a `1,3` list in its order, read from [text] as written the way Tasker reads it, so
+     * a part that isn't a whole number, spaces and all, names nothing; null when it isn't one.
      */
-    private fun numberedRange(items: java.util.NavigableMap<Int, String>, form: String): List<String>? {
-        if (isTaskerIndexList(form)) return form.split(',').mapNotNull { part -> part.toIntOrNull()?.let { items[it] } }
+    private fun numberedRange(items: java.util.NavigableMap<Int, String>, text: String): List<String>? {
+        if (isTaskerIndexList(text)) return text.split(',').mapNotNull { part -> part.toIntOrNull()?.let { items[it] } }
+        val form = text.trim()
         if (form.isNotEmpty() && ':' !in form) return listOfNotNull(items[form.toIntOrNull() ?: return null])
         val lastIndex = if (items.isEmpty()) 0 else items.lastKey()
         val from = form.substringBefore(':').ifEmpty { "1" }.toIntOrNull() ?: return null
