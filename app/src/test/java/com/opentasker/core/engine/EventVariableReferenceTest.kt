@@ -10,9 +10,11 @@ import com.opentasker.core.contexts.NotificationContextEvents
 import com.opentasker.core.contexts.ShareContextEvents
 import com.opentasker.core.contexts.ShareInput
 import com.opentasker.core.contexts.SmsContextEvents
+import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,10 +77,22 @@ class EventVariableReferenceTest {
 
         val sms = SmsContextEvents.buildSmsEvent(listOf(SmsContextEvents.SmsPart("+15550100", "hi")), subscriptionId = 1, sdkInt = 36)
         assertEquals(listed("sms_received"), EventTaskVariables.from(sms).keys)
-        assertTrue(EventTaskVariables.from(sms).values.none(String::isEmpty))
+        assertEquals(
+            mapOf(
+                "sms_sender" to "+15550100",
+                "sms_body" to "hi",
+                "sms_kind" to SmsContextEvents.KIND_SMS,
+                "sms_message_count" to "1",
+                "sms_subscription_id" to "1",
+            ),
+            EventTaskVariables.from(sms),
+        )
 
         val notification = NotificationContextEvents.buildEvent("com.example", "Title", "Body")
-        assertEquals(listed("notification"), EventTaskVariables.from(notification).keys)
+        assertEquals(
+            mapOf("notification_package" to "com.example", "notification_title" to "Title", "notification_body" to "Body"),
+            EventTaskVariables.from(notification),
+        )
 
         val call = CallContextEvents.buildEvent("+15550100", true)
         assertEquals(mapOf("incoming_number" to "+15550100", "incoming_known_contact" to "true"), EventTaskVariables.from(call))
@@ -137,5 +151,31 @@ class EventVariableReferenceTest {
         val profiles = listOf(Profile(id = 1, name = "Shared", contexts = listOf(eventSpec("share")), enterTaskId = 10))
 
         assertEquals(DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(99, profiles))
+    }
+
+    @Test
+    fun aTaskAnotherTaskRunsKeepsEveryEventsChips() {
+        val profiles = listOf(Profile(id = 1, name = "Shared", contexts = listOf(eventSpec("share")), enterTaskId = 10))
+        fun caller(ref: String, enabled: Boolean = true) = Task(
+            id = 20,
+            name = "Caller",
+            actions = listOf(ActionSpec(type = SUB_TASK_ACTION_ID, args = mapOf("task" to ref), enabled = enabled)),
+        )
+        val shared = Task(id = 10, name = "Save share")
+
+        assertEquals(DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(10, profiles, listOf(shared, caller("10"))))
+        assertEquals(DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(10, profiles, listOf(shared, caller("save SHARE"))))
+        assertEquals("a name built at run time may be this task", DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(10, profiles, listOf(shared, caller("%target"))))
+        assertEquals(listed("share"), editorEventVariablesFor(10, profiles, listOf(shared, caller("Other"))).map { it.name }.toSet())
+        assertEquals("a step turned off runs nothing", listed("share"), editorEventVariablesFor(10, profiles, listOf(shared, caller("10", enabled = false))).map { it.name }.toSet())
+    }
+
+    @Test
+    fun anEventContextWithNoEventNamedFiresOnAnyEventSoKeepsEveryChip() {
+        val profiles = listOf(Profile(id = 1, name = "Any", contexts = listOf(ContextSpec(ContextType.EVENT, mapOf("event" to " "))), enterTaskId = 10))
+        val unnamed = listOf(Profile(id = 1, name = "Any", contexts = listOf(ContextSpec(ContextType.EVENT, emptyMap())), enterTaskId = 10))
+
+        assertEquals(DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(10, profiles))
+        assertEquals(DEFAULT_EDITOR_EVENT_VARIABLES, editorEventVariablesFor(10, unnamed))
     }
 }

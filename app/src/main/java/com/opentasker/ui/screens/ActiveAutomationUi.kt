@@ -1237,7 +1237,7 @@ fun ActiveAutomationUi(
             tasks = tasks,
             enclosingActions = state.task.actions,
             globalVariables = projectVariables,
-            eventVariables = remember(state.task.id, profiles) { editorEventVariablesFor(state.task.id, profiles) },
+            eventVariables = remember(state.task.id, profiles, tasks) { editorEventVariablesFor(state.task.id, profiles, tasks) },
             onDismiss = { clearActionEdit() },
             onSave = { action ->
                 val updatedActions = state.index?.let { index ->

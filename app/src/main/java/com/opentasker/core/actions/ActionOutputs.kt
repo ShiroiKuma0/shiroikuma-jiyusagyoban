@@ -1,10 +1,13 @@
 package com.opentasker.core.actions
 
 import com.opentasker.core.engine.EventTaskVariables
+import com.opentasker.core.engine.SUB_TASK_ACTION_ID
+import com.opentasker.core.engine.SUB_TASK_REF_KEYS
 import com.opentasker.core.engine.SUB_TASK_RETURN_KEY
 import com.opentasker.core.model.ActionSpec
 import com.opentasker.core.model.ContextType
 import com.opentasker.core.model.Profile
+import com.opentasker.core.model.Task
 import com.opentasker.core.model.VariableNamePolicy
 
 /** Value kinds exposed by an action for downstream template inputs. */
@@ -143,19 +146,40 @@ val DEFAULT_EDITOR_EVENT_VARIABLES: List<EditorEventVariable> =
 /**
  * The event chips for [taskId]'s editor. A task some profile starts gets exactly what those
  * profiles' event contexts hand it, which is nothing for a task that only runs on exit. A task no
- * profile uses yet keeps every event's chips, since it may still be attached to one.
+ * profile uses yet keeps every event's chips, since it may still be attached to one. So does a
+ * task another task runs (a sub-task reads its caller's event fields), and one started by an event
+ * context with no event named, since that context fires on every event.
  */
-fun editorEventVariablesFor(taskId: Long, profiles: List<Profile>): List<EditorEventVariable> {
+fun editorEventVariablesFor(taskId: Long, profiles: List<Profile>, tasks: List<Task> = emptyList()): List<EditorEventVariable> {
     val usedBy = profiles.filter { it.enterTaskId == taskId || it.exitTaskId == taskId }
-    if (usedBy.isEmpty()) return DEFAULT_EDITOR_EVENT_VARIABLES
-    return usedBy.asSequence()
+    if (usedBy.isEmpty() || calledAsSubTask(taskId, tasks)) return DEFAULT_EDITOR_EVENT_VARIABLES
+    val events = usedBy.asSequence()
         .filter { it.enterTaskId == taskId }
         .flatMap { it.contexts }
         .filter { it.type == ContextType.EVENT }
-        .flatMap { EventTaskVariables.declaredFor(it.config["event"]) }
+        .map { it.config["event"]?.trim().orEmpty() }
+        .toList()
+    if (events.any(String::isEmpty)) return DEFAULT_EDITOR_EVENT_VARIABLES
+    return events.asSequence()
+        .flatMap(EventTaskVariables::declaredFor)
         .distinctBy { it.name }
         .map { EditorEventVariable(it.name, it.type) }
         .toList()
+}
+
+/**
+ * Whether another task has a step that runs [taskId], or runs a task named only at run time, which
+ * might be this one.
+ */
+private fun calledAsSubTask(taskId: Long, tasks: List<Task>): Boolean {
+    val name = tasks.firstOrNull { it.id == taskId }?.name
+    return tasks.any { caller ->
+        caller.id != taskId && caller.actions.any { spec ->
+            val ref = SUB_TASK_REF_KEYS.firstNotNullOfOrNull { spec.args[it]?.trim()?.takeIf(String::isNotBlank) }
+            spec.enabled && spec.type == SUB_TASK_ACTION_ID && ref != null &&
+                ('%' in ref || "{{" in ref || ref.toLongOrNull() == taskId || ref.equals(name, ignoreCase = true))
+        }
+    }
 }
 
 /**
