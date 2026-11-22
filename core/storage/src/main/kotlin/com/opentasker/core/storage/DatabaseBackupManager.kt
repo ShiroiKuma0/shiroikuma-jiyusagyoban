@@ -508,6 +508,11 @@ class DatabaseBackupManager(
             var rollback: File? = null
             var replacementPublished = false
             var temp: File? = null
+            val restorePrefs = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
+            // What Undo pointed at before this restore, put back if the restore goes back.
+            val rollbackBefore = restorePrefs.getString(restoreRollbackKey(databaseName), null)
+            val restoredAtBefore = restorePrefs.getLong(restoredAtKey(databaseName), -1L)
+            var undoWritten = false
             return try {
                 validateDatabaseFile(context, pending)
                 dbFile.parentFile?.mkdirs()
@@ -541,7 +546,8 @@ class DatabaseBackupManager(
                 replacementPublished = true
                 deleteDatabaseSidecars(dbFile)
                 val spent = retireRestoreJournal(pending)
-                val rollbackRecorded = context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit().run {
+                undoWritten = true
+                val rollbackRecorded = restorePrefs.edit().run {
                     if (rollback != null) {
                         putString(restoreRollbackKey(databaseName), rollback.name)
                         putLong(restoredAtKey(databaseName), System.currentTimeMillis())
@@ -552,8 +558,8 @@ class DatabaseBackupManager(
                     commit()
                 }
                 // A write that fails returns false instead of throwing. Unrecorded, the rollback
-                // can't be undone from Setup, so the restore goes back as failed. With no rollback
-                // there's nothing to lose, and the new database stays.
+                // can't be undone from Setup, so the restore goes back as failed. With no database
+                // before it there's nothing for Undo to go back to, so the new database stays.
                 if (!rollbackRecorded && rollback != null) throw IOException("Could not record the restore's rollback")
                 // Only once the rollback is recorded, so a death while it shreds can't lose that.
                 shredFile(spent)
@@ -579,6 +585,15 @@ class DatabaseBackupManager(
                     } finally {
                         rollbackTemp.delete()
                         deleteDatabaseSidecars(rollbackTemp)
+                    }
+                }
+                if (undoWritten) {
+                    // commit() changes the prefs in memory before the write that failed, so Setup
+                    // would offer Undo for a restore that has just gone back.
+                    restorePrefs.edit().run {
+                        rollbackBefore?.let { putString(restoreRollbackKey(databaseName), it) } ?: remove(restoreRollbackKey(databaseName))
+                        if (restoredAtBefore >= 0) putLong(restoredAtKey(databaseName), restoredAtBefore) else remove(restoredAtKey(databaseName))
+                        commit()
                     }
                 }
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")
