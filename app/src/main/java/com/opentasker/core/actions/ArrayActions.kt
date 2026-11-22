@@ -28,7 +28,7 @@ private fun position(args: Map<String, String>): Int? {
     val raw = args["position"]?.trim().orEmpty()
     if (raw.isEmpty()) return 1
     raw.toIntOrNull()?.let { return it.takeIf { it >= 1 } }
-    return raw.takeIf(DECIMAL_POSITION::matches)?.toDouble()?.takeIf { it >= 1 && it < Int.MAX_VALUE }?.toInt()
+    return raw.takeIf(DECIMAL_POSITION::matches)?.toDouble()?.takeIf { it >= 1 && it < Int.MAX_VALUE + 1.0 }?.toInt()
 }
 
 private val DECIMAL_POSITION = Regex("""\d+\.\d+""")
