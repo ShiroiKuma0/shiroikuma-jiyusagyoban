@@ -85,6 +85,7 @@ object AutomationSensitivityRegistry {
         // Settings can name the phone, its accounts or the apps it trusts.
         "settings.read",
         "contacts.lookup",
+        "calendar.event.query",
         // Reads the phone's location when a coordinate is blank.
         "sun.times",
         "location.get",
@@ -97,6 +98,8 @@ object AutomationSensitivityRegistry {
     )
 
     private val externalTransmissionActionIds = setOf(
+        // A synced calendar uploads the new event to its account.
+        "calendar.event.add",
         "intent.launch",
         "plugin.locale.fire",
         "plugin.locale.query",
@@ -117,6 +120,7 @@ object AutomationSensitivityRegistry {
 
     private val deviceControlActionIds = setOf(
         "clipboard.set",
+        "calendar.event.add",
         "notify.show",
         "notify.cancel",
         "notify.progress",

@@ -463,8 +463,11 @@
     <string name="setup_notification_access_body">Needed for notification-text triggers and rich notification matching.</string>
     <string name="setup_notification_access_required_for">Notification triggers</string>
     <string name="setup_calendar_access_title">Calendar access</string>
-    <string name="setup_calendar_access_body">Needed for local calendar-window triggers. OpenTasker only emits redacted calendar metadata to matching.</string>
-    <string name="setup_calendar_access_required_for">Calendar triggers</string>
+    <string name="setup_calendar_access_body">Needed for calendar triggers and finding calendar events. Triggers only match on redacted calendar details, and the titles of events a task finds are kept hidden in the run log.</string>
+    <string name="setup_calendar_access_required_for">Calendar triggers and finding events</string>
+    <string name="setup_calendar_write_title">Calendar editing</string>
+    <string name="setup_calendar_write_body">Needed to add calendar events. Android grants it apart from reading the calendar, so this asks for both.</string>
+    <string name="setup_calendar_write_required_for">Adding calendar events</string>
     <string name="setup_contacts_access_title">Contacts access</string>
     <string name="setup_contacts_access_body">Needed for unattended contact lookup actions. Contact values are written as sensitive variables and never copied into run-log messages. On Android 17+, picker mode can grant only the selected fields instead.</string>
     <string name="setup_contacts_access_required_for">Unattended contact lookup and telling a stranger\'s call from a contact\'s</string>

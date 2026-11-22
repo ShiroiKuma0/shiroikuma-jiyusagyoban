@@ -89,6 +89,34 @@
     <string name="catalog_action_contacts_lookup_field_mode_label" formatted="false">Lookup mode</string>
     <string name="catalog_action_contacts_lookup_field_mode_hint" formatted="false">Picker is the default on Android 17+; permission is for unattended runs</string>
     <string name="catalog_action_contacts_lookup_field_var_label" formatted="false">Output variable</string>
+    <string name="catalog_action_calendar_event_add_name" formatted="false">Add Calendar Event</string>
+    <string name="catalog_action_calendar_event_add_description" formatted="false">Add an event to a calendar and put the new event id in %event_id</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_label" formatted="false">Calendar</string>
+    <string name="catalog_action_calendar_event_add_field_calendar_hint" formatted="false">Its name as your calendar app shows it, or its id</string>
+    <string name="catalog_action_calendar_event_add_field_title_label" formatted="false">Title</string>
+    <string name="catalog_action_calendar_event_add_field_start_label" formatted="false">Start</string>
+    <string name="catalog_action_calendar_event_add_field_start_hint" formatted="false">now, epoch milliseconds, 2026-11-22 or 2026-11-22 09:30</string>
+    <string name="catalog_action_calendar_event_add_field_end_label" formatted="false">End</string>
+    <string name="catalog_action_calendar_event_add_field_end_hint" formatted="false">Written like Start. For an all-day event, the last day. Blank uses Duration</string>
+    <string name="catalog_action_calendar_event_add_field_duration_label" formatted="false">Duration (minutes)</string>
+    <string name="catalog_action_calendar_event_add_field_duration_hint" formatted="false">60 by default. All-day events take an End day instead</string>
+    <string name="catalog_action_calendar_event_add_field_all_day_label" formatted="false">All day</string>
+    <string name="catalog_action_calendar_event_add_field_description_label" formatted="false">Description</string>
+    <string name="catalog_action_calendar_event_add_field_location_label" formatted="false">Location</string>
+    <string name="catalog_action_calendar_event_add_field_var_label" formatted="false">Variable prefix</string>
+    <string name="catalog_action_calendar_event_add_field_var_hint" formatted="false">event by default, so the new event id lands in %event_id</string>
+    <string name="catalog_action_calendar_event_query_name" formatted="false">Find Calendar Events</string>
+    <string name="catalog_action_calendar_event_query_description" formatted="false">Read the events in a time window into %event_count, %event_titles, %event_starts and more</string>
+    <string name="catalog_action_calendar_event_query_field_from_label" formatted="false">From</string>
+    <string name="catalog_action_calendar_event_query_field_from_hint" formatted="false">now by default. Also epoch milliseconds, 2026-11-22 or 2026-11-22 09:30</string>
+    <string name="catalog_action_calendar_event_query_field_to_label" formatted="false">To</string>
+    <string name="catalog_action_calendar_event_query_field_to_hint" formatted="false">A day after From by default, and at most a year after it</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_label" formatted="false">Calendar</string>
+    <string name="catalog_action_calendar_event_query_field_calendar_hint" formatted="false">A name or id to look in. Blank looks in every calendar</string>
+    <string name="catalog_action_calendar_event_query_field_max_label" formatted="false">Most events</string>
+    <string name="catalog_action_calendar_event_query_field_max_hint" formatted="false">10 by default, 50 at most</string>
+    <string name="catalog_action_calendar_event_query_field_var_label" formatted="false">Variable prefix</string>
+    <string name="catalog_action_calendar_event_query_field_var_hint" formatted="false">event by default. Titles and locations are kept hidden in the run log</string>
     <string name="catalog_action_contacts_lookup_field_var_hint" formatted="false">default: Contact; also sets name, phone, email, arrays, and count</string>
     <string name="action_option_contacts_permission" formatted="false">Permission (unattended)</string>
     <string name="action_option_contacts_picker" formatted="false">System picker (Android 17+)</string>

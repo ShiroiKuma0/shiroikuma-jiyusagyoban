@@ -39,7 +39,7 @@
 - **Profiles, contexts, tasks, actions**. A complete Room-backed automation pipeline with a Compose UI
 - **Companion presence triggers**. User-confirmed CompanionDeviceManager associations emit low-power present/absent events without a scanning loop, with setup-time revocation
 - **7 context families**. Application, Time, Day, Location, State, Event, and Plugin (Locale/Tasker condition)
-- **101 built-in actions** plus engine-handled flow control (`task.run` with named inputs, `task.stop`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`, `go to` and `anchor`)
+- **103 built-in actions** plus engine-handled flow control (`task.run` with named inputs, `task.stop`, `if`/`else`/`end if`, `for each`/`end for`, `try`/`catch`/`end try`, `stop`, `go to` and `anchor`)
 - **USB device contexts**. Attach/detach event pulses expose bounded device, vendor, product, and class fields for local input-device automations
 - **Template expressions**. Bounded `{{ ... }}` expansion with scoped variables, arrays, JSON paths, string/math/date functions, traces, and strict regex policy
 - **Side-effect-free preflight reviews**. Preview a task or profile with synthetic event variables, expanded inputs, branch decisions, setup gaps, intended effects, and explicit blockers before any action runs
@@ -83,18 +83,18 @@
 - Locale/Tasker condition plugins, polled as first-class context predicates with last-known-state caching, and asked again early when a plugin says its answer changed
 - Home Assistant bridge proof of concept, with bounded outbound JSON webhooks, HTTPS by default, redacted webhook secrets and retries with backoff
 
-### Actions (101 registered + 13 engine-handled)
+### Actions (103 registered + 13 engine-handled)
 
 | Category | Count | Examples |
 |----------|------:|---------|
 | Settings | 22 | Wi-Fi, Wi-Fi scan, Bluetooth, brightness, volume, airplane, mobile data, Wi-Fi hotspot, always-on display, screen timeout, write and read setting, DND, Zen rule set/clear, ringer mode, torch, tile state, wallpaper, temporary state, keyboard info, keyboard picker |
-| App | 10 | launch intent, launch app, publish shortcut, kill, archive, unarchive, go home, open URL, SMS, screenshot |
+| App | 11 | launch intent, launch app, publish shortcut, kill, archive, unarchive, go home, open URL, SMS, screenshot, add calendar event |
 | File | 5 | read, write, append, delete, list |
 | Network | 9 | HTTP Request, Home Assistant webhook, MQTT publish, legacy GET/POST aliases, ping, download, Wake-on-LAN, WireGuard and Tailscale tunnels |
 | Media | 11 | play, beep, stop, pause, resume, play/pause, next, previous, rewind, fast forward, mute |
 | System | 7 | vibrate, clipboard set, reboot, lock, screen off, wake, log |
 | Notification | 4 | notify/toast, progress, cancel, TTS speak |
-| Variable | 25 | set variable, set several variables at once, variable clear (one, a pattern or all), clipboard get, contacts lookup, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match, replace or collect regex matches into an array, split, join, substring, length), Tasker's numbered arrays (variable split/join, array push/pop/clear/process), variable convert (sizes, units, dates, Base64, hashes and more), sunrise and sunset times, the phone's current location |
+| Variable | 26 | set variable, set several variables at once, variable clear (one, a pattern or all), clipboard get, contacts lookup, find calendar events, read data (JSON/CSV/XML/HTML), date-time (format/parse/add), text (match, replace or collect regex matches into an array, split, join, substring, length), Tasker's numbered arrays (variable split/join, array push/pop/clear/process), variable convert (sizes, units, dates, Base64, hashes and more), sunrise and sunset times, the phone's current location |
 | Flow | 2+13 | wait, profile status; engine: task.run, task.stop, if/else/end if, for each/end for, try/catch/end try, stop, go to, anchor |
 | Plugin | 2 | Locale setting dispatch, Locale condition query |
 | Script | 2 | SHA-256-pinned Termux `RUN_COMMAND` and Shizuku shell scripts, both with bounded result capture |

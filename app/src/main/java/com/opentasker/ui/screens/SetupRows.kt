@@ -232,6 +232,20 @@ internal fun buildPermissionItems(
             requirements = setOf(SetupRequirement.CALENDAR),
         ),
         PermissionSetupItem(
+            title = context.getString(R.string.setup_calendar_write_title),
+            body = context.getString(R.string.setup_calendar_write_body),
+            granted = hasPermission(context, Manifest.permission.WRITE_CALENDAR) && hasPermission(context, Manifest.permission.READ_CALENDAR),
+            actionLabel = request,
+            // Adding an event reads the calendar list first, to find the one the step names.
+            action = PermissionAction.RuntimePermission(
+                Manifest.permission.WRITE_CALENDAR,
+                requestedWith = listOf(Manifest.permission.READ_CALENDAR),
+            ),
+            requiredFor = context.getString(R.string.setup_calendar_write_required_for),
+            section = SetupSection.NEEDED,
+            requirements = setOf(SetupRequirement.CALENDAR_WRITE),
+        ),
+        PermissionSetupItem(
             title = context.getString(R.string.setup_contacts_access_title),
             body = context.getString(R.string.setup_contacts_access_body),
             granted = hasPermission(context, Manifest.permission.READ_CONTACTS),

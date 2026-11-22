@@ -398,5 +398,25 @@ internal fun declaredActionOutputs(actionId: String): List<ActionOutputDefinitio
         output("phones", ActionValueType.ARRAY, nameArgumentKeys = listOf("var", "result"), defaultName = "Contact", suffix = "_phones"),
         output("emails", ActionValueType.ARRAY, nameArgumentKeys = listOf("var", "result"), defaultName = "Contact", suffix = "_emails"),
     )
+    "calendar.event.add" -> listOf(
+        output("id", ActionValueType.TEXT, nameArgumentKeys = listOf("var"), defaultName = DEFAULT_CALENDAR_PREFIX, suffix = "_id"),
+    )
+    "calendar.event.query" -> listOf(
+        "count" to ActionValueType.NUMBER,
+        "id" to ActionValueType.TEXT,
+        "calendar_id" to ActionValueType.TEXT,
+        "title" to ActionValueType.TEXT,
+        "start" to ActionValueType.NUMBER,
+        "end" to ActionValueType.NUMBER,
+        "all_day" to ActionValueType.BOOLEAN,
+        "location" to ActionValueType.TEXT,
+        "ids" to ActionValueType.ARRAY,
+        "titles" to ActionValueType.ARRAY,
+        "starts" to ActionValueType.ARRAY,
+        "ends" to ActionValueType.ARRAY,
+        "locations" to ActionValueType.ARRAY,
+    ).map { (key, type) ->
+        output(key, type, nameArgumentKeys = listOf("var"), defaultName = DEFAULT_CALENDAR_PREFIX, suffix = "_$key")
+    }
     else -> emptyList()
 }

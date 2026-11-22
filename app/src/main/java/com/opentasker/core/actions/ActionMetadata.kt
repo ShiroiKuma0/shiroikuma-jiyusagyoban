@@ -188,6 +188,8 @@ private fun declaredActionSummaryRes(actionId: String): Int = when (actionId) {
     "clipboard.get",
     "clipboard.set",
     "contacts.lookup",
+    "calendar.event.add",
+    "calendar.event.query",
     "integration.home_assistant.webhook",
     "mqtt.publish",
     "http.get",
@@ -1658,6 +1660,42 @@ fun registerActionMetadata() {
                 ActionField("query", R.string.catalog_action_contacts_lookup_field_query_label, required = true, hintRes = R.string.catalog_action_contacts_lookup_field_query_hint, sensitive = true),
                 ActionField("mode", R.string.catalog_action_contacts_lookup_field_mode_label, FieldType.DROPDOWN, hintRes = R.string.catalog_action_contacts_lookup_field_mode_hint, options = listOf(option("picker", R.string.action_option_contacts_picker), option("permission", R.string.action_option_contacts_permission))),
                 ActionField("var", R.string.catalog_action_contacts_lookup_field_var_label, hintRes = R.string.catalog_action_contacts_lookup_field_var_hint),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "calendar.event.add",
+            nameRes = R.string.catalog_action_calendar_event_add_name,
+            descriptionRes = R.string.catalog_action_calendar_event_add_description,
+            categoryRes = R.string.catalog_category_app,
+            fields = listOf(
+                ActionField("calendar", R.string.catalog_action_calendar_event_add_field_calendar_label, required = true, hintRes = R.string.catalog_action_calendar_event_add_field_calendar_hint),
+                ActionField("title", R.string.catalog_action_calendar_event_add_field_title_label, required = true, sensitive = true),
+                ActionField("start", R.string.catalog_action_calendar_event_add_field_start_label, required = true, hintRes = R.string.catalog_action_calendar_event_add_field_start_hint),
+                ActionField("end", R.string.catalog_action_calendar_event_add_field_end_label, hintRes = R.string.catalog_action_calendar_event_add_field_end_hint),
+                ActionField("duration", R.string.catalog_action_calendar_event_add_field_duration_label, FieldType.NUMBER, hintRes = R.string.catalog_action_calendar_event_add_field_duration_hint, numberRule = integerRule(1, CalendarEventAddAction.MAX_DURATION_MINUTES)),
+                ActionField("all_day", R.string.catalog_action_calendar_event_add_field_all_day_label, FieldType.CHECKBOX),
+                ActionField("description", R.string.catalog_action_calendar_event_add_field_description_label, FieldType.MULTILINE, sensitive = true),
+                ActionField("location", R.string.catalog_action_calendar_event_add_field_location_label, sensitive = true),
+                ActionField("var", R.string.catalog_action_calendar_event_add_field_var_label, hintRes = R.string.catalog_action_calendar_event_add_field_var_hint),
+            ),
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "calendar.event.query",
+            nameRes = R.string.catalog_action_calendar_event_query_name,
+            descriptionRes = R.string.catalog_action_calendar_event_query_description,
+            categoryRes = R.string.catalog_category_variable,
+            fields = listOf(
+                ActionField("from", R.string.catalog_action_calendar_event_query_field_from_label, hintRes = R.string.catalog_action_calendar_event_query_field_from_hint),
+                ActionField("to", R.string.catalog_action_calendar_event_query_field_to_label, hintRes = R.string.catalog_action_calendar_event_query_field_to_hint),
+                ActionField("calendar", R.string.catalog_action_calendar_event_query_field_calendar_label, hintRes = R.string.catalog_action_calendar_event_query_field_calendar_hint),
+                ActionField("max", R.string.catalog_action_calendar_event_query_field_max_label, FieldType.NUMBER, hintRes = R.string.catalog_action_calendar_event_query_field_max_hint, numberRule = integerRule(1, CalendarEventQueryAction.MAX_RESULTS.toLong())),
+                ActionField("var", R.string.catalog_action_calendar_event_query_field_var_label, hintRes = R.string.catalog_action_calendar_event_query_field_var_hint),
             ),
         )
     )

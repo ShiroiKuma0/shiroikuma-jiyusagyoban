@@ -450,8 +450,11 @@
     <string name="setup_notification_access_body">通知文本触发和丰富通知匹配所需。</string>
     <string name="setup_notification_access_required_for">通知触发</string>
     <string name="setup_calendar_access_title">日历访问</string>
-    <string name="setup_calendar_access_body">本地日历窗口触发所需。OpenTasker只向匹配过程发出脱敏的日历元数据。</string>
-    <string name="setup_calendar_access_required_for">日历触发</string>
+    <string name="setup_calendar_access_body">日历触发和查找日历事件所需。触发只匹配脱敏的日历信息，任务找到的事件标题在运行日志中保持隐藏。</string>
+    <string name="setup_calendar_access_required_for">日历触发和查找事件</string>
+    <string name="setup_calendar_write_title">日历编辑</string>
+    <string name="setup_calendar_write_body">添加日历事件所需。Android 将它与读取日历分开授予，所以这里会同时请求两者。</string>
+    <string name="setup_calendar_write_required_for">添加日历事件</string>
     <string name="setup_contacts_access_title">联系人访问</string>
     <string name="setup_contacts_access_body">无人值守的联系人查找操作所需。联系人值会写入敏感变量，且绝不会复制到运行日志消息中。在Android 17及以上，选择器模式可以只授予所选字段。</string>
     <string name="setup_contacts_access_required_for">无人值守联系人查找</string>

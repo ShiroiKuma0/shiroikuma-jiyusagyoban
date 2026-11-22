@@ -22,6 +22,7 @@ enum class SetupRequirement {
     USAGE_ACCESS,
     NOTIFICATION_ACCESS,
     CALENDAR,
+    CALENDAR_WRITE,
     OVERLAY,
     WRITE_SETTINGS,
     DEVICE_ADMIN,
@@ -216,6 +217,8 @@ object SetupRequirementResolver {
             "url.open", "app.launch", "home.go", "intent.launch" -> add(SetupRequirement.OVERLAY)
             "sms.send" -> add(SetupRequirement.SMS)
             "contacts.lookup" -> add(SetupRequirement.CONTACTS)
+            "calendar.event.add" -> add(SetupRequirement.CALENDAR_WRITE)
+            "calendar.event.query" -> add(SetupRequirement.CALENDAR)
             "dnd.set", "zen.rule.set", "zen.rule.clear", "ringer.set", "volume.set", "media.mute" -> add(SetupRequirement.DND)
             "http.request", "http.get", "http.post", "integration.home_assistant.webhook", "mqtt.publish", "ping", "download", "wol" -> add(SetupRequirement.LOCAL_NETWORK)
             // Termux and Shizuku are optional integrations, not permission blockers.

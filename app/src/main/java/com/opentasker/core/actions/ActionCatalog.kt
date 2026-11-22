@@ -52,6 +52,10 @@ object ActionCatalog {
         define("clipboard.get", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::ClipboardGetAction),
         define("clipboard.set", ActionCategory.SYSTEM, ActionRetrySafety.IDEMPOTENT, ::ClipboardSetAction),
         define("contacts.lookup", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::ContactsLookupAction),
+        // NEVER: a retry would add the same event twice.
+        define("calendar.event.add", ActionCategory.APP, ActionRetrySafety.NEVER, ::CalendarEventAddAction),
+        // IDEMPOTENT: it only reads the calendar, and a retry reads it again.
+        define("calendar.event.query", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::CalendarEventQueryAction),
         define("data.read", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::DataReadAction),
         define("datetime.format", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::DateTimeFormatAction),
         define("datetime.parse", ActionCategory.VARIABLE, ActionRetrySafety.IDEMPOTENT, ::DateTimeParseAction),
