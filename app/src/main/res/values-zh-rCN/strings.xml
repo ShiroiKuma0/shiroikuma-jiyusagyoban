@@ -665,6 +665,7 @@
     <string name="run_log_show_fewer_actions">显示更少（共 %1$d 个）</string>
     <string name="run_log_retention_preview_title">审阅保留缩减</string>
     <string name="run_log_retention_preview_body">存储了 %1$s。最旧的一个来自 %2$s。此更改将永久移除 %3$s。</string>
+    <string name="run_log_retention_preview_body_with_held">%1$s%2$s</string>
     <string name="run_log_retention_confirm">裁剪条目</string>
     <string name="run_log_export_before_pruning">先导出</string>
 

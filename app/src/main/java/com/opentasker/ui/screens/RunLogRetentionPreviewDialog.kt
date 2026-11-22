@@ -33,17 +33,22 @@ internal fun RunLogRetentionPreviewDialog(
         oldest,
         pluralStringResource(R.plurals.count_run_log_entries, removed, removed),
     )
-    // Held runs can still be replayed, so losing them is called out on its own.
-    val held = if (preview.heldPrunableCount > 0) {
-        " " + pluralStringResource(R.plurals.run_log_retention_preview_held, preview.heldPrunableCount, preview.heldPrunableCount)
+    // Held runs can still be replayed, so losing them is called out on its own. Chinese joins the two
+    // sentences without a space, so the join is a resource too.
+    val text = if (preview.heldPrunableCount > 0) {
+        stringResource(
+            R.string.run_log_retention_preview_body_with_held,
+            body,
+            pluralStringResource(R.plurals.run_log_retention_preview_held, preview.heldPrunableCount, preview.heldPrunableCount),
+        )
     } else {
-        ""
+        body
     }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.run_log_retention_preview_title)) },
         text = {
-            Text(body + held, modifier = Modifier.verticalScroll(rememberScrollState()))
+            Text(text, modifier = Modifier.verticalScroll(rememberScrollState()))
         },
         confirmButton = {
             Button(onClick = onConfirm) { Text(stringResource(R.string.run_log_retention_confirm)) }

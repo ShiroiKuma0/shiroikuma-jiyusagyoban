@@ -670,6 +670,7 @@
     <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>
     <string name="run_log_retention_preview_title">Review retention reduction</string>
     <string name="run_log_retention_preview_body">%1$s stored. The oldest is from %2$s. This change will permanently remove %3$s.</string>
+    <string name="run_log_retention_preview_body_with_held">%1$s %2$s</string>
     <string name="run_log_retention_confirm">Prune entries</string>
     <string name="run_log_export_before_pruning">Export first</string>
 
