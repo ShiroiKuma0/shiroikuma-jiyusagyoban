@@ -1511,12 +1511,14 @@ object TaskerXmlImporter {
     }
 
     /**
-     * Variable Clear (decompiled 6.7.8, `dq.I`) reads its name as written, never filled in. Pattern
-     * Matching clears every name that matches, globals too unless Local Variables Only. No name
-     * clears every local, and every global as well with Clear All Variables. Each switch only
-     * counts where Tasker reads it, so only those come over. Without Pattern Matching, a name with a
-     * `.` or a `[...]` in it is a JSON path (`fr.M`), which Tasker clears by removing that field or
-     * item (`HelperExecuteService.y2`), so it comes over in this app's path syntax.
+     * Variable Clear (decompiled 6.7.8, `dq.I`) reads its name as written, never filled in, except
+     * that an array element `%arr(2)` in a name that isn't a path becomes `%arr2` first, Pattern
+     * Matching or not (`ExecuteService.b5`, `dq.u1`, `dq.i`), so the other elements stay where they
+     * are. Pattern Matching clears every name that matches, globals too unless Local Variables
+     * Only. No name clears every local, and every global as well with Clear All Variables. Each
+     * switch only counts where Tasker reads it, so only those come over. Without Pattern Matching, a
+     * name with a `.` or a `[...]` in it is a JSON path (`fr.M`), which Tasker clears by removing
+     * that field or item (`HelperExecuteService.y2`), so it comes over in this app's path syntax.
      */
     private fun taskerVariableClear(
         code: String,
@@ -1528,14 +1530,30 @@ object TaskerXmlImporter {
         val pattern = name.isNotEmpty() && (ints[1] ?: 0) != 0
         val localOnly = pattern && (ints[2] ?: 0) != 0
         val clearAll = name.isEmpty() && (ints[3] ?: 0) != 0
-        val isPath = !pattern && ('.' in name || ('[' in name && ']' in name))
+        val pathName = '.' in name || ('[' in name && ']' in name)
+        val isPath = !pattern && pathName
         val path = if (isPath) taskerJsonPath(name) else null
+        val element = if (pathName) null else TASKER_ELEMENT_FORM.matchEntire(name)?.destructured
+        val elementName = element?.let { (base, position) ->
+            position.takeIf { it.isNotEmpty() && it.all { c -> c in '0'..'9' } }?.toIntOrNull()
+                ?.let { "$base$it" }?.takeIf(TASKER_PLAIN_VARIABLE::matches)
+        }
         val refusal = when {
             (1..3).any { it in variables } -> "Tasker Variable Clear takes a switch from a variable, which has no match here"
             name.startsWith("%%") -> "Tasker Variable Clear takes the name to clear from ${name.drop(1)}, which has no match here"
+            element != null && elementName == null -> {
+                val (base, position) = element
+                when {
+                    position.isNotEmpty() && position.all { it in '0'..'9' } ->
+                        "Tasker Variable Clear clears element $position of $base, which this app can't name"
+                    position.startsWith('>') || position.startsWith('<') || TASKER_ELEMENT_VARIABLE.matches(position) ->
+                        "Tasker Variable Clear clears the element of $base that ($position) picks when the task runs, which has no match here"
+                    else -> "Tasker Variable Clear fails the step on $name, since that doesn't name one element"
+                }
+            }
             isPath && path == null ->
                 "Tasker Variable Clear removes $name from a JSON variable, a path this app can't write (a variable in it, a key with other than letters, digits, _ or -, or a position that isn't a whole number from 1)"
-            name.isNotEmpty() && !pattern && !isPath && !TASKER_PLAIN_VARIABLE.matches(name) ->
+            name.isNotEmpty() && !pattern && !isPath && elementName == null && !TASKER_PLAIN_VARIABLE.matches(name) ->
                 "Tasker Variable Clear clears $name, and this app clears one whole variable, one field or item of a JSON variable, or a pattern"
             else -> null
         }
@@ -1545,7 +1563,7 @@ object TaskerXmlImporter {
                 type = "var.clear",
                 label = "Tasker variable clear",
                 args = buildMap {
-                    put("name", path ?: name)
+                    put("name", path ?: elementName ?: name)
                     if (pattern) put("pattern", "true")
                     if (localOnly) put("local_only", "true")
                     if (clearAll) put("clear_all", "true")
@@ -2869,6 +2887,12 @@ object TaskerXmlImporter {
 
     /** One variable whose name fits [VariableNamePolicy.MAX_LENGTH], so a step can store into it. */
     private val TASKER_PLAIN_VARIABLE = Regex("""%[A-Za-z][A-Za-z0-9_]{0,${VariableNamePolicy.MAX_LENGTH - 1}}""")
+
+    /** A name Tasker reads as one array element before a Variable Clear (decompiled 6.7.8, `dq.Q0`), in ASCII. */
+    private val TASKER_ELEMENT_FORM = Regex("""(%[A-Za-z0-9][A-Za-z0-9_]+[A-Za-z0-9])\(([^()]*)\)""")
+
+    /** A variable as the position of that element (`dq.c1`), in ASCII; a shorter one, like `%i`, fails there. */
+    private val TASKER_ELEMENT_VARIABLE = Regex("""%+[A-Za-z0-9][A-Za-z0-9_.]+[A-Za-z0-9]""")
 
     /** Tasker's array actions: their Tasker name and the action each one maps to. */
     private val TASKER_ARRAY_ACTIONS = mapOf(

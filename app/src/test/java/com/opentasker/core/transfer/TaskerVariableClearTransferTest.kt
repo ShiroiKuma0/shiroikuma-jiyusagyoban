@@ -48,8 +48,14 @@ class TaskerVariableClearTransferTest {
     @Test
     fun whatTaskerWontClearStaysAPlaceholder() {
         listOf(
-            // An array element.
-            clear("%arr(1)"),
+            // An array element Tasker picks when the task runs, and forms it fails on.
+            clear("%arr(>)"),
+            clear("%arr(&lt;)"),
+            clear("%arr(%index)"),
+            clear("%arr(1:2)"),
+            clear("%arr(#)"),
+            clear("%arr()"),
+            clear("%arr(99999999999)"),
             // A JSON path this app can't write: a variable in it, a key with a space, a position from 0, no field at all.
             clear("%json.list(%i)"),
             clear("%json[my key]"),
@@ -64,6 +70,18 @@ class TaskerVariableClearTransferTest {
             // A switch taken from a variable.
             """<code>549</code><Str sr="arg0" ve="3">%a</Str><Int sr="arg1"><var>%usePattern</var></Int>""",
         ).forEach { assertEquals(it, placeholder, action(it).type) }
+    }
+
+    @Test
+    fun anArrayElementComesOverAsTheVariableTaskerClears() {
+        // Tasker turns %arr(2) into %arr2 before it clears (dq.u1, dq.i), so the other elements stay where they are.
+        mapOf(
+            clear("%arr(2)") to mapOf("name" to "%arr2"),
+            clear("%Arr(007)") to mapOf("name" to "%Arr7"),
+            clear("%arr(0)") to mapOf("name" to "%arr0"),
+            // With Pattern Matching on too.
+            clear("%arr(3)", pattern = 1, localOnly = 1) to mapOf("name" to "%arr3", "pattern" to "true", "local_only" to "true"),
+        ).forEach { (xml, args) -> assertEquals(xml, "var.clear" to args, action(xml).let { it.type to it.args }) }
     }
 
     @Test
