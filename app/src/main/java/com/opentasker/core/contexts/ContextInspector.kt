@@ -147,7 +147,7 @@ fun inspectProfile(
         contextsMatch && checks.all { it.effectiveMatched } -> "All contexts currently match."
         // An "any of" rule or an OR group holds while some of its contexts don't.
         contextsMatch -> "Enough contexts match for the profile's rule."
-        else -> checks.firstOrNull { !it.effectiveMatched }?.reason ?: "The profile's context rule doesn't hold."
+        else -> blockingReason(checks, profile.contextExpression) ?: "The profile's context rule doesn't hold."
     }
 
     return ProfileInspection(
@@ -193,6 +193,29 @@ internal fun evaluateChecks(
     false
 } else {
     expression.evaluate(checks.map { if (it.valueUnknown) null else it.effectiveMatched }) == true
+}
+
+/**
+ * Why a profile's contexts don't hold, from the context that fails its rule. Without a rule that's
+ * the first context that doesn't match. With one, the rule is walked down to a context whose state
+ * keeps it from holding, so a context a NOT is happy to see off isn't blamed. Null when nothing
+ * can be named, such as a rule that can't be evaluated.
+ */
+internal fun blockingReason(checks: List<ContextCheck>, expression: ContextExpressionNode?): String? {
+    if (expression == null) return checks.firstOrNull { !it.effectiveMatched }?.reason
+    val values = checks.map { if (it.valueUnknown) null else it.effectiveMatched }
+    // The leaf keeping [node] from being [wanted], and whether that leaf needs to match.
+    fun culprit(node: ContextExpressionNode, wanted: Boolean): Pair<ContextCheck, Boolean>? {
+        if (node.evaluate(values) == wanted) return null
+        val inner = if (node.invert) !wanted else wanted
+        if (node.isLeaf()) return node.contextIndex?.let(checks::getOrNull)?.let { it to inner }
+        return node.children.firstNotNullOfOrNull { culprit(it, inner) }
+    }
+    val (check, needsMatch) = culprit(expression, true) ?: return null
+    return when {
+        needsMatch || check.valueUnknown -> check.reason
+        else -> "Context ${check.index + 1} matches, and the rule needs it not to."
+    }
 }
 
 internal fun explainContextExpression(

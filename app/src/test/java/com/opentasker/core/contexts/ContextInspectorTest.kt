@@ -562,7 +562,7 @@ class ContextInspectorTest {
     }
 
     @Test
-    fun aRuleThatFailsWhileEveryContextMatchesSaysTheRuleDoesntHold() {
+    fun aRuleThatFailsWhileEveryContextMatchesNamesTheOneItNeedsOff() {
         val profile = Profile(
             id = 12,
             name = "Not charging",
@@ -582,7 +582,7 @@ class ContextInspectorTest {
 
         assertFalse(result.matching)
         assertEquals("Not (Context 1 matches)", result.logicExplanation)
-        assertEquals("The profile's context rule doesn't hold.", result.summary)
+        assertEquals("Context 1 matches, and the rule needs it not to.", result.summary)
     }
 
     @Test
@@ -594,5 +594,57 @@ class ContextInspectorTest {
         assertEquals("SSID", readableFieldName("SSID"))
         assertEquals("Screen on", readableFieldName("SCREEN_ON"))
         assertEquals("", readableFieldName(""))
+    }
+
+    private fun stateProfile(expression: ContextExpressionNode) = Profile(
+        id = 13,
+        name = "Rule",
+        enabled = true,
+        enterTaskId = 10,
+        contexts = listOf(
+            ContextSpec(ContextType.STATE, mapOf("key" to "screen", "value" to "on")),
+            ContextSpec(ContextType.STATE, mapOf("key" to "charging", "value" to "true")),
+        ),
+        contextExpression = expression,
+    )
+
+    private val screenOffCharging = ContextSourceSnapshot(
+        key = "state",
+        label = "Device state",
+        registered = true,
+        lastObservation = ContextEventObservation(ContextEvent("state", true, mapOf("screen" to "off", "charging" to "true")), observedAtMs = 1000),
+    )
+
+    @Test
+    fun aFailingRuleBlamesTheContextThatFailsItNotOneANotIsHappyToSeeOff() {
+        // Neither the screen on nor charging. The screen is off, which suits the rule, so charging is to blame.
+        val profile = stateProfile(
+            ContextExpressionNode.group(
+                ContextBooleanOperator.AND,
+                listOf(ContextExpressionNode(contextIndex = 0, invert = true), ContextExpressionNode(contextIndex = 1, invert = true)),
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(screenOffCharging)).single()
+
+        assertFalse(result.matching)
+        assertEquals("Context 2 matches, and the rule needs it not to.", result.summary)
+    }
+
+    @Test
+    fun aFailingRuleBlamesAContextThatShouldMatchWithItsOwnReason() {
+        // The screen on or not charging: the screen is off and charging is on, so the screen is to blame.
+        val profile = stateProfile(
+            ContextExpressionNode.group(
+                ContextBooleanOperator.OR,
+                listOf(ContextExpressionNode.leaf(0), ContextExpressionNode(contextIndex = 1, invert = true)),
+            ),
+        )
+
+        val result = inspectProfiles(listOf(profile), listOf(screenOffCharging)).single()
+
+        assertFalse(result.matching)
+        assertEquals(result.contexts[0].reason, result.summary)
+        assertFalse(result.contexts[0].effectiveMatched)
     }
 }
