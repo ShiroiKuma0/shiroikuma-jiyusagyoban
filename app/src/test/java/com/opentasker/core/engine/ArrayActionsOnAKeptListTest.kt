@@ -124,4 +124,19 @@ class ArrayActionsOnAKeptListTest {
         assertTrue(outcome.results.toString(), outcome.success)
         assertEquals("2:b;c", store.get("Out"))
     }
+
+    @Test
+    fun aSubTaskChangingAListWithNoBaseLeavesTheResultWithTheCaller() {
+        // Wi-Fi Scan keeps %wifi_ssid with no %wifi_ssid of its own.
+        val inner = Task(id = 2, name = "Inner", actions = listOf(ActionSpec(type = "array.pop", args = mapOf("array" to "%wifi_ssid", "position" to "1"))))
+        val store = VariableStore().apply { setArray("wifi_ssid", listOf("a", "b", "c")) }
+        val outcome = report(
+            store,
+            ActionSpec(type = "task.run", args = mapOf("task" to "Inner")),
+            ActionSpec(type = "var.set", args = mapOf("name" to "%Out", "value" to "%wifi_ssid(#):%wifi_ssid(+;)")),
+            tasks = mapOf("Inner" to inner),
+        )
+        assertTrue(outcome.results.toString(), outcome.success)
+        assertEquals("2:b;c", store.get("Out"))
+    }
 }
