@@ -47,7 +47,7 @@ class ContextMonitorLifecycleTest {
         assertEquals(listOf("start:WIFI_NAME", "start:WIFI"), harness.events)
 
         harness.lifecycle.reconcile(emptyList())
-        assertEquals(listOf("start:WIFI_NAME", "start:WIFI", "stop:WIFI_NAME", "stop:WIFI"), harness.events)
+        assertEquals(listOf("start:WIFI_NAME", "start:WIFI", "stop:WIFI", "stop:WIFI_NAME"), harness.events)
         assertEquals(emptySet<ContextMonitor>(), harness.lifecycle.currentlyStarted())
     }
 
@@ -71,8 +71,8 @@ class ContextMonitorLifecycleTest {
                 "start:CONNECTIVITY",
                 "start:APP_USAGE",
                 "start:SHAKE",
-                "stop:CONNECTIVITY",
                 "stop:APP_USAGE",
+                "stop:CONNECTIVITY",
                 "stop:SHAKE",
             ),
             harness.events,

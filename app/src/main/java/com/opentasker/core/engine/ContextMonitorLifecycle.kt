@@ -91,7 +91,9 @@ internal class ContextMonitorLifecycle(
             }
         }
 
-        ContextMonitor.entries.forEach { monitor ->
+        // Stopped in the reverse of starting order, so a monitor that tunes another goes after it:
+        // WIFI_NAME stopping first would re-register the Wi-Fi callback just before WIFI removes it.
+        ContextMonitor.entries.asReversed().forEach { monitor ->
             if (normalizedCounts.getOrDefault(monitor, 0) == 0 && monitor in startedMonitors) {
                 val didStop = runCatching { handles.getValue(monitor).stop() }.isSuccess
                 if (didStop) {
