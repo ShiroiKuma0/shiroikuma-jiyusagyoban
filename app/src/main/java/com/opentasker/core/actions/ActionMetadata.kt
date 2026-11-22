@@ -1914,6 +1914,8 @@ fun registerActionMetadata() {
                 ActionField("name", "File name for the kept copy", hint = "default: the file's own name"),
                 ActionField("keep_dir", "Keep a copy in", hint = "default /sdcard/tmp; - keeps none. An existing file is never overwritten"),
                 ActionField("reinstall", "Reinstall the same build", FieldType.CHECKBOX, hint = "off: a build that is already installed is refused"),
+                ActionField("route", "Route", FieldType.DROPDOWN, options = listOf("auto", "session"), hint = "auto: on a rooted phone another app is installed through root, with no confirmation; session: never use root. Writes %pi_route"),
+                ActionField("launch", "Start the app afterwards", FieldType.CHECKBOX, hint = "an update stops the app it replaces; writes %pi_started (true/false) and %pi_start_message. Not for this app, which restarts by itself"),
                 ActionField("report_task", "Task to run after a self-update", hint = "runs once this app has restarted; gets every param:<name> argument and the result variables as locals"),
                 ActionField("prefix", "Variable prefix", hint = "default pi — writes %pi_ok (true/false), %pi_message, %pi_package, %pi_label, %pi_version, %pi_old_version, %pi_self, %pi_kept"),
                 ActionField("timeout", "Timeout (s)", FieldType.NUMBER, hint = "default 180, max 280"),
@@ -1929,7 +1931,65 @@ fun registerActionMetadata() {
             category = "Tasks",
             fields = listOf(
                 ActionField("path", "Bundle file (JSON)", required = true, pathPicker = true),
-                ActionField("prefix", "Variable prefix", hint = "default wi — writes %wi_ok, %wi_message, %wi_tasks, %wi_profiles, %wi_scenes, %wi_variables, %wi_projects, %wi_warnings"),
+                ActionField("enable", "Switch the bundle's profiles on", FieldType.CHECKBOX, hint = "every profile the bundle carries, each under the checks its own switch runs; off: a new profile stays off"),
+                ActionField("prefix", "Variable prefix", hint = "default wi — writes %wi_ok, %wi_message, %wi_tasks, %wi_profiles, %wi_scenes, %wi_variables, %wi_projects, %wi_warnings, %wi_new_profiles, %wi_profile_report (● on, ○ off, ✗ refused), %wi_refused"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "package.info",
+            name = "App Version",
+            description = "Which build of an app is installed: version, when it was last updated, and which app installed it",
+            category = "App",
+            fields = listOf(
+                ActionField("query", "App", required = true, hint = "package name, or the app's name"),
+                ActionField("prefix", "Variable prefix", hint = "default pk — writes %pk_ok, %pk_message, %pk_package, %pk_label, %pk_version, %pk_code, %pk_updated, %pk_installer"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "workspace.list",
+            name = "List Workspace",
+            description = "This workspace's projects, profiles or tasks as text, split into pages short enough to send as messages",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("kind", "What to list", FieldType.DROPDOWN, required = true, options = listOf("projects", "profiles", "tasks")),
+                ActionField("query", "Narrow to", hint = "project · word · project word · word @ project · @ project"),
+                ActionField("header", "First line", hint = "put at the top of the first page"),
+                ActionField("max_chars", "Page size (characters)", FieldType.NUMBER, hint = "default 1500"),
+                ActionField("prefix", "Variable prefix", hint = "default wl — writes %wl_ok, %wl_message, %wl_count, %wl_pages and the array %wl_page"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "workspace.find",
+            name = "Find in Workspace",
+            description = "The one task or profile a typed name means. A name that occurs twice is refused with the projects it occurs in",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("kind", "What to find", FieldType.DROPDOWN, required = true, options = listOf("task", "profile")),
+                ActionField("query", "Name", required = true, hint = "name, or name @ project"),
+                ActionField("prefix", "Variable prefix", hint = "default wf — writes %wf_ok, %wf_message, %wf_id, %wf_name, %wf_project, %wf_enabled"),
+            )
+        )
+    )
+
+    ActionMetadataRegistry.register(
+        ActionMetadata(
+            id = "workspace.profile",
+            name = "Switch Profile",
+            description = "Profile Status for a typed name: the profile may be given as name @ project, and the outcome comes back in variables",
+            category = "Tasks",
+            fields = listOf(
+                ActionField("query", "Profile", required = true, hint = "name, or name @ project"),
+                ActionField("state", "State", FieldType.DROPDOWN, required = true, options = listOf("on", "off", "toggle", "show")),
+                ActionField("prefix", "Variable prefix", hint = "default wp — writes %wp_ok, %wp_message, %wp_name, %wp_project, %wp_was, %wp_now"),
             )
         )
     )
