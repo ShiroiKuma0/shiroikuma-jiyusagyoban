@@ -67,7 +67,10 @@ class ViewModelLanesInstrumentedTest {
 
         runLog.updateRunLogFilters(RunLogFilterState())
         runLog.clearRunLog()
-        assertEquals(R.string.run_log_cleared, withTimeout(TIMEOUT_MS) { events.receive() }.resId)
+        // The message counts what it cleared, so it is a plural (A-341).
+        val cleared = withTimeout(TIMEOUT_MS) { events.receive() }
+        assertEquals(R.plurals.run_log_cleared, cleared.resId)
+        assertEquals(2, cleared.quantity)
         withTimeout(TIMEOUT_MS) { runLog.runLogPage.first { !it.loading && it.totalCount == 0 } }
     }
 

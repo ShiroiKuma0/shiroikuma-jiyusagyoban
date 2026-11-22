@@ -654,7 +654,7 @@ class ActiveAutomationViewModel(
             }
                 .onSuccess { blocked ->
                     if (blocked > 0) {
-                        events.send(message(R.string.ui_task_still_used, blocked))
+                        events.send(pluralMessage(R.plurals.ui_task_still_used, blocked, blocked))
                     } else {
                         LocaleGrantStore(appContext).revokeAllForTask(task.id)
                         // Otherwise a widget bound to this task keeps looking runnable and only
@@ -1211,8 +1211,8 @@ class ActiveAutomationViewModel(
                     events.send(
                         message(
                             R.string.ui_message_tasker_imported,
-                            importReport.insertedTasks,
-                            importReport.insertedProfiles,
+                            pluralMessage(R.plurals.count_tasks, importReport.insertedTasks, importReport.insertedTasks),
+                            pluralMessage(R.plurals.count_disabled_profiles, importReport.insertedProfiles, importReport.insertedProfiles),
                         ),
                     )
                 }
@@ -1241,9 +1241,9 @@ class ActiveAutomationViewModel(
                     events.send(
                         message(
                             R.string.ui_message_bundle_exported,
-                            bundle.tasks.size,
-                            bundle.profiles.size,
-                            bundle.scenes.size,
+                            pluralMessage(R.plurals.count_tasks, bundle.tasks.size, bundle.tasks.size),
+                            pluralMessage(R.plurals.count_profiles, bundle.profiles.size, bundle.profiles.size),
+                            pluralMessage(R.plurals.count_scenes, bundle.scenes.size, bundle.scenes.size),
                         ),
                     )
                 }
@@ -1278,9 +1278,9 @@ class ActiveAutomationViewModel(
                     events.send(
                         message(
                             R.string.ui_message_tasker_xml_exported,
-                            report.exportedProfileCount,
-                            report.exportedTaskCount,
-                            report.skippedActions.size,
+                            pluralMessage(R.plurals.count_profiles, report.exportedProfileCount, report.exportedProfileCount),
+                            pluralMessage(R.plurals.count_tasks, report.exportedTaskCount, report.exportedTaskCount),
+                            pluralMessage(R.plurals.count_skipped_actions, report.skippedActions.size, report.skippedActions.size),
                         ),
                     )
                     if (report.warnings.isNotEmpty()) {
@@ -1459,9 +1459,9 @@ class ActiveAutomationViewModel(
                     events.send(
                         message(
                             R.string.ui_message_bundle_imported,
-                            importReport.insertedTasks,
-                            importReport.insertedProfiles,
-                            importReport.insertedScenes,
+                            pluralMessage(R.plurals.count_tasks, importReport.insertedTasks, importReport.insertedTasks),
+                            pluralMessage(R.plurals.count_disabled_profiles, importReport.insertedProfiles, importReport.insertedProfiles),
+                            pluralMessage(R.plurals.count_scenes, importReport.insertedScenes, importReport.insertedScenes),
                         ),
                     )
                 }

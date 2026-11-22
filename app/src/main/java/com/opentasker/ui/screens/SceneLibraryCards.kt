@@ -141,7 +141,13 @@ internal fun SceneOverviewCard(
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                stringResource(R.string.scenes_overview_summary, scenes.sumOf { it.elements.size }, scenes.size),
+                scenes.sumOf { it.elements.size }.let { elements ->
+                    stringResource(
+                        R.string.scenes_overview_summary,
+                        pluralStringResource(R.plurals.count_elements, elements, elements),
+                        pluralStringResource(R.plurals.count_scenes, scenes.size, scenes.size),
+                    )
+                },
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -193,7 +199,7 @@ internal fun SceneCard(
                 Column(Modifier.weight(1f)) {
                     Text(scene.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        stringResource(R.string.scenes_card_summary, scene.widthDp, scene.heightDp, scene.elements.size),
+                        pluralStringResource(R.plurals.scenes_card_summary, scene.elements.size, scene.widthDp, scene.heightDp, scene.elements.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

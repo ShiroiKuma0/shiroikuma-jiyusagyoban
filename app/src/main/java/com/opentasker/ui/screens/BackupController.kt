@@ -277,7 +277,7 @@ internal class BackupController(
             }
             events.send(
                 if (saved.enabled) {
-                    uiMessage(R.string.ui_message_snapshots_enabled, saved.maxSnapshots, saved.maxAgeDays)
+                    uiPluralMessage(R.plurals.ui_message_snapshots_enabled, saved.maxAgeDays, saved.maxSnapshots, saved.maxAgeDays)
                 } else {
                     uiMessage(R.string.ui_message_snapshots_disabled)
                 },
@@ -296,7 +296,7 @@ internal class BackupController(
                 }.onSuccess { policy ->
                     events.send(
                         if (policy.enabled) {
-                            uiMessage(R.string.ui_message_snapshots_enabled, policy.maxSnapshots, policy.maxAgeDays)
+                            uiPluralMessage(R.plurals.ui_message_snapshots_enabled, policy.maxAgeDays, policy.maxSnapshots, policy.maxAgeDays)
                         } else {
                             uiMessage(R.string.ui_message_snapshot_destination_saved)
                         },

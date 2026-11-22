@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -199,13 +200,17 @@ private fun FlowOverviewCard(
                     .testTag(if (warningCount == 0) FLOW_OVERVIEW_READY_ICON_TAG else FLOW_OVERVIEW_ISSUES_ICON_TAG),
             )
             Text(
-                if (warningCount == 0) stringResource(R.string.status_ready) else stringResource(R.string.label_issue_count, warningCount),
+                if (warningCount == 0) stringResource(R.string.status_ready) else pluralStringResource(R.plurals.label_issue_count, warningCount, warningCount),
                 style = MaterialTheme.typography.titleSmall,
                 color = if (warningCount == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.weight(1f),
             )
             Text(
-                stringResource(R.string.header_flow_detail, profiles.size, tasks.size),
+                stringResource(
+                    R.string.header_flow_detail,
+                    pluralStringResource(R.plurals.count_profiles, profiles.size, profiles.size),
+                    pluralStringResource(R.plurals.count_tasks, tasks.size, tasks.size),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -238,8 +243,10 @@ private fun FlowGraphCard(
                     Text(
                         stringResource(
                             R.string.flow_context_action_summary,
-                            graph.contextNodes.size,
-                            graph.nodes.count { it.kind == AutomationFlowNodeKind.ACTION },
+                            pluralStringResource(R.plurals.label_context_count, graph.contextNodes.size, graph.contextNodes.size),
+                            graph.nodes.count { it.kind == AutomationFlowNodeKind.ACTION }.let { actions ->
+                                pluralStringResource(R.plurals.label_action_count, actions, actions)
+                            },
                         ),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

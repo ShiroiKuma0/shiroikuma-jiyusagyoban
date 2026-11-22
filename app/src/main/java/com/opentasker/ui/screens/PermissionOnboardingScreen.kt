@@ -82,6 +82,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -1724,9 +1725,9 @@ private fun BackupStateBanner(state: BackupSetupState) {
                     R.string.setup_backup_restore_summary,
                     summary.sourceLabel,
                     summary.schemaVersion,
-                    summary.profileCount,
-                    summary.taskCount,
-                    summary.sceneCount,
+                    pluralStringResource(R.plurals.count_profiles, summary.profileCount, summary.profileCount),
+                    pluralStringResource(R.plurals.count_tasks, summary.taskCount, summary.taskCount),
+                    pluralStringResource(R.plurals.count_scenes, summary.sceneCount, summary.sceneCount),
                 )
         } ?: stringResource(R.string.setup_backup_restore_body)
         state.latestBackupName != null -> stringResource(R.string.setup_backup_latest, state.latestBackupName)
@@ -1964,8 +1965,8 @@ private fun SnapshotScheduleControls(
             Text(
                 stringResource(
                     R.string.setup_snapshots_retention,
-                    policy.maxSnapshots,
-                    policy.maxAgeDays,
+                    pluralStringResource(R.plurals.count_snapshots, policy.maxSnapshots, policy.maxSnapshots),
+                    pluralStringResource(R.plurals.count_days, policy.maxAgeDays, policy.maxAgeDays),
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2057,7 +2058,7 @@ private fun SnapshotRecoveryPassphraseDialog(
                 )
                 if ((passphrase.isNotEmpty() && !longEnough) || (confirmation.isNotEmpty() && !matches)) {
                     Text(
-                        stringResource(R.string.setup_snapshots_passphrase_error, SNAPSHOT_MIN_PASSPHRASE_CHARS),
+                        pluralStringResource(R.plurals.setup_snapshots_passphrase_error, SNAPSHOT_MIN_PASSPHRASE_CHARS, SNAPSHOT_MIN_PASSPHRASE_CHARS),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

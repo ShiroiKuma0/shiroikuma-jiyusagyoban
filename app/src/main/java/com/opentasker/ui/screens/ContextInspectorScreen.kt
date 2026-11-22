@@ -52,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -755,7 +756,7 @@ private fun ProfileInspectorCard(
                             Column(Modifier.weight(1f)) {
                                 Text(stringResource(R.string.inspector_lint_title), style = MaterialTheme.typography.labelLarge)
                                 Text(
-                                    stringResource(R.string.inspector_lint_count, lintFindings.size),
+                                    pluralStringResource(R.plurals.inspector_lint_count, lintFindings.size, lintFindings.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1139,8 +1140,9 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val broadcastDetail = if (listening.isEmpty()) {
             context.getString(R.string.inspector_broadcast_idle)
         } else {
-            context.getString(
-                R.string.inspector_broadcast_listening,
+            context.resources.getQuantityString(
+                R.plurals.inspector_broadcast_listening,
+                listening.size,
                 listening.size,
                 listening.sorted().joinToString(", "),
             )

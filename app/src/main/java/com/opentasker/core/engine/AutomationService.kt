@@ -1274,7 +1274,7 @@ class AutomationService : Service() {
         }
         val text = when {
             activeTasks.size <= 1 -> getString(R.string.service_notification_open_status)
-            else -> getString(R.string.service_notification_multiple_tasks, activeTasks.size - 1)
+            else -> resources.getQuantityString(R.plurals.service_notification_multiple_tasks, activeTasks.size - 1, activeTasks.size - 1)
         }
         val builder = NotificationCompat.Builder(this, channel.id)
             .setContentTitle(title)

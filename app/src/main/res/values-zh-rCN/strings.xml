@@ -100,7 +100,9 @@
     <string name="run_log_clear_action">立即清空运行日志</string>
     <string name="run_log_clear_body">只有保留设置会缩减此日志。在开始新的测试前请自行清空。</string>
     <string name="run_log_clear_confirm_body">此操作会删除运行历史。固定的运行以及等待重放的已保留运行会保留，且此操作无法撤销。</string>
-    <string name="run_log_cleared">已清空 %1$d 条运行日志记录</string>
+    <plurals name="run_log_cleared">
+        <item quantity="other">已清空 %1$d 条运行日志记录</item>
+    </plurals>
     <string name="startup_stage_opening">正在打开你的自动化…</string>
     <string name="startup_stage_restoring">正在恢复你的备份…</string>
     <string name="startup_stage_encrypting">正在加密你的自动化。此操作只会发生一次。</string>
@@ -364,14 +366,14 @@
     <string name="setup_backup_helper_full">创建本地数据库备份、导出副本，或在你可控制的文件夹中保留加密快照。机密变量值仍绑定设备，迁移后必须重新输入。</string>
     <string name="setup_backup_working">处理中…</string>
     <string name="setup_backup_restore_body">重启OpenTasker以在数据库打开前应用暂存恢复。</string>
-    <string name="setup_backup_restore_summary">%1$s · 架构 v%2$d · %3$d 个配置文件、%4$d 个任务、%5$d 个场景。重启OpenTasker以应用。</string>
+    <string name="setup_backup_restore_summary">%1$s · 架构 v%2$d · %3$s、%4$s、%5$s。重启OpenTasker以应用。</string>
     <string name="setup_backup_restore_unreadable">暂存恢复已无法读取（%1$s）。取消它以免下一次启动被阻塞。</string>
     <string name="setup_backup_restore_cancel">取消暂存恢复</string>
     <string name="setup_backup_rollback_kept">你于 %1$s 恢复前的数据库仍在这里，如果需要可回退到它。</string>
     <string name="setup_backup_rollback_action">回退</string>
     <string name="setup_snapshots_label">自动设备外快照</string>
     <string name="setup_snapshots_helper">将加密恢复存档写入你选择的文件夹。OpenTasker从不上传它们，且恢复仅在审阅后应用。</string>
-    <string name="setup_snapshots_retention">最多保留 %1$d 个快照，为期 %2$d 天。</string>
+    <string name="setup_snapshots_retention">最多保留 %1$s，为期 %2$s。</string>
     <string name="setup_snapshots_choice">%1$d / %2$d天</string>
     <string name="setup_snapshots_status_ok">上次快照 %1$s · 已存储 %2$d 个 · %3$s</string>
     <string name="setup_snapshots_status_failed">上次快照失败于 %1$s：%2$s</string>
@@ -385,7 +387,9 @@
     <string name="setup_snapshots_passphrase_body">选择一个恢复口令并保存在你的密码管理器中。卸载后或换设备时会需要它；OpenTasker无法替你找回。</string>
     <string name="setup_snapshots_passphrase_label">恢复口令</string>
     <string name="setup_snapshots_passphrase_confirm">确认口令</string>
-    <string name="setup_snapshots_passphrase_error">至少使用 %1$d 个字符并两次输入相同的口令。</string>
+    <plurals name="setup_snapshots_passphrase_error">
+        <item quantity="other">至少使用 %1$d 个字符并两次输入相同的口令。</item>
+    </plurals>
     <string name="setup_snapshots_passphrase_save">保存并使用文件夹</string>
     <string name="setup_snapshots_destination_save_failed">无法保存快照文件夹授权或恢复口令。</string>
     <string name="setup_global_fallback_title">全局失败回退</string>
@@ -393,7 +397,7 @@
     <string name="setup_global_fallback_label">全局回退任务</string>
     <string name="restore_review_title">审阅恢复</string>
     <string name="restore_review_summary">%1$s · %2$s · 架构 v%3$d</string>
-    <string name="restore_review_counts">%1$d 个配置文件 · %2$d 个任务 · %3$d 个场景 · %4$d 个变量 · %5$d 条运行日志记录</string>
+    <string name="restore_review_counts">%1$s · %2$s · %3$s · %4$s · %5$s</string>
     <string name="restore_review_incompatible">此数据库的架构版本超出此构建可打开的范围。</string>
     <string name="restore_review_replaces">此操作会替换已暂存的恢复：%1$s（架构 v%2$d）。暂存会将其丢弃。</string>
     <string name="restore_review_body">尚未暂存任何内容。暂存会将此数据库排队，在下次启动时替换实时数据库；当前数据库会先被快照。</string>
@@ -424,7 +428,9 @@
     <string name="service_notification_idle_title">OpenTasker正在运行</string>
     <string name="service_notification_active_title">任务运行中：%1$s</string>
     <string name="service_notification_open_status">点击打开自动化状态</string>
-    <string name="service_notification_multiple_tasks">另有 %1$d 个任务在运行</string>
+    <plurals name="service_notification_multiple_tasks">
+        <item quantity="other">另有 %1$d 个任务在运行</item>
+    </plurals>
     <string name="setup_exact_alarm_card_title">精确闹钟</string>
     <string name="setup_exact_alarm_card_body">允许精确的计划自动化。如果被拒绝，OpenTasker会回退到不精确的投递窗口。</string>
     <string name="setup_exact_alarm_required_for">时间触发、计划任务</string>
@@ -620,10 +626,12 @@
     <string name="run_log_held_policy">保留原因：%1$s</string>
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
-    <string name="run_log_show_all_actions">显示全部 %1$d 个操作</string>
+    <plurals name="run_log_show_all_actions">
+        <item quantity="other">显示全部 %1$d 个操作</item>
+    </plurals>
     <string name="run_log_show_fewer_actions">显示更少（共 %1$d 个）</string>
     <string name="run_log_retention_preview_title">审阅保留缩减</string>
-    <string name="run_log_retention_preview_body">存储了 %1$d 个条目；最旧的一个来自 %2$s。此更改将永久移除 %3$d 个条目。</string>
+    <string name="run_log_retention_preview_body">存储了 %1$s。最旧的一个来自 %2$s。此更改将永久移除 %3$s。</string>
     <string name="run_log_retention_confirm">裁剪条目</string>
     <string name="run_log_export_before_pruning">先导出</string>
 
@@ -758,7 +766,9 @@
     <string name="inspector_platform_blocked_body">监测%1$s需要Android %2$s，而此手机运行Android %3$s。</string>
     <string name="inspector_simulate_trigger">模拟触发</string>
     <string name="inspector_lint_title">自动化检查结果</string>
-    <string name="inspector_lint_count">%1$d 条结果</string>
+    <plurals name="inspector_lint_count">
+        <item quantity="other">%1$d 条结果</item>
+    </plurals>
     <string name="inspector_profile_selector">配置文件</string>
     <string name="inspector_profile_selector_content_description">选择配置文件</string>
     <string name="inspector_profile_policy">优先级 %1$d · 宽限 %2$d 秒 · 有效期：%3$s</string>
@@ -942,9 +952,45 @@
     <string name="scene_overlay_move_up_action">向上移动叠加层</string>
     <string name="scene_overlay_move_down_action">向下移动叠加层</string>
     <string name="scene_overlay_move_right_action">向右移动叠加层</string>
-    <string name="label_issue_count">%1$d 个问题</string>
-    <string name="label_context_count">%1$d 个上下文</string>
-    <string name="label_action_count">%1$d 个操作</string>
+    <plurals name="label_issue_count">
+        <item quantity="other">%1$d 个问题</item>
+    </plurals>
+    <plurals name="label_context_count">
+        <item quantity="other">%1$d 个上下文</item>
+    </plurals>
+    <plurals name="label_action_count">
+        <item quantity="other">%1$d 个操作</item>
+    </plurals>
+    <plurals name="count_tasks">
+        <item quantity="other">%1$d 个任务</item>
+    </plurals>
+    <plurals name="count_profiles">
+        <item quantity="other">%1$d 个配置文件</item>
+    </plurals>
+    <plurals name="count_disabled_profiles">
+        <item quantity="other">%1$d 个禁用配置文件</item>
+    </plurals>
+    <plurals name="count_scenes">
+        <item quantity="other">%1$d 个场景</item>
+    </plurals>
+    <plurals name="count_elements">
+        <item quantity="other">%1$d 个元素</item>
+    </plurals>
+    <plurals name="count_variables">
+        <item quantity="other">%1$d 个变量</item>
+    </plurals>
+    <plurals name="count_run_log_entries">
+        <item quantity="other">%1$d 条运行日志记录</item>
+    </plurals>
+    <plurals name="count_days">
+        <item quantity="other">%1$d 天</item>
+    </plurals>
+    <plurals name="count_snapshots">
+        <item quantity="other">%1$d 个快照</item>
+    </plurals>
+    <plurals name="count_skipped_actions">
+        <item quantity="other">跳过了 %1$d 个操作</item>
+    </plurals>
     <string name="label_cooldown_seconds">%1$d 秒冷却</string>
     <string name="label_priority_short">优先级 %1$d</string>
     <string name="label_more_count">另外 %1$d 个</string>
@@ -990,7 +1036,9 @@
     <string name="event_variable_broadcast_sender">发送应用，通常为空，因为很少有应用公开身份</string>
     <string name="event_variable_broadcast_extra_count">收到的附加项数量。每一项也是单独的变量，名称为 broadcast_extra_ 加上其键名</string>
     <string name="event_variable_broadcast_extras_lossy">有附加项过大或不是纯文本而被丢弃时为 true</string>
-    <string name="inspector_broadcast_listening">正在监听 %1$d 个广播动作：%2$s</string>
+    <plurals name="inspector_broadcast_listening">
+        <item quantity="other">正在监听 %1$d 个广播动作：%2$s</item>
+    </plurals>
     <string name="inspector_broadcast_idle">没有已启用的配置文件在等待广播。</string>
     <string name="context_sms_received_android_17_note">在Android 17及以上，包含OTP的标准短信可能被非默认短信应用扣留最多三小时。已连接设备和其他豁免应用可以更早收到；当OTP时间很关键时，请使用短信检索或用户同意。</string>
 
@@ -1050,7 +1098,7 @@
     <string name="flow_empty_profile_graph_title">尚无配置文件图</string>
     <string name="flow_empty_profile_graph_body">创建或导入一个配置文件，以生成包含上下文、任务、操作和缺失引用的可读自动化图。</string>
     <string name="flow_waiting_for_profile">正在等待配置文件</string>
-    <string name="flow_context_action_summary">%1$d 个上下文 · %2$d 个操作</string>
+    <string name="flow_context_action_summary">%1$s · %2$s</string>
     <string name="flow_all_context_rules">所有上下文规则</string>
     <string name="flow_add_content_description">添加</string>
     <string name="flow_enter">进入</string>
@@ -1064,7 +1112,7 @@
     <string name="flow_subflow">子流程</string>
     <string name="flow_branch_condition">分支条件</string>
     <string name="flow_branch">分支</string>
-    <string name="flow_accessibility_summary">%1$s：%2$d 个上下文、%3$d 个操作、进入任务 %4$s、退出任务 %5$s、%6$s。</string>
+    <string name="flow_accessibility_summary">%1$s：%2$s、%3$s、进入任务 %4$s、退出任务 %5$s、%6$s。</string>
     <string name="flow_no_exit_task">无退出任务</string>
     <string name="flow_no_enter_task">无进入任务</string>
 
@@ -1178,7 +1226,9 @@
     <string name="flow_missing_task_title">缺失 %1$s 任务</string>
     <string name="flow_missing_task_warning">%1$s 任务 %2$d 缺失。</string>
     <string name="flow_missing_task_detail">任务ID %1$d 被 %2$s 引用</string>
-    <string name="flow_task_detail">%1$d 个操作 · 优先级 %2$d</string>
+    <plurals name="flow_task_detail">
+        <item quantity="other">%1$d 个操作 · 优先级 %2$d</item>
+    </plurals>
     <string name="flow_warning_no_actions">%1$s 没有操作。</string>
     <string name="flow_context_title">上下文 %1$d：%2$s</string>
     <string name="flow_action_subtask_title">步骤 %1$d：运行子任务 "%2$s"</string>
@@ -1222,7 +1272,9 @@
     <string name="automation_mode_parallel_body">在已在运行的任务之外，再同时启动一次运行。</string>
 
     <string name="delete_task_references_title">任务仍在使用中</string>
-    <string name="delete_task_references_body">&quot;%1$s&quot; 被另外 %2$d 个自动化引用。请在删除前决定这些引用如何处理。</string>
+    <plurals name="delete_task_references_body">
+        <item quantity="other">\"%1$s\" 被另外 %2$d 个自动化引用。请在删除前决定这些引用如何处理。</item>
+    </plurals>
     <string name="delete_task_references_required">一个配置文件在激活时会运行此任务，且不能没有任务，因此必须重新分配这些引用。</string>
     <string name="delete_task_references_option_reassign">将它们重新分配给另一个任务</string>
     <string name="delete_task_references_option_clear">清除这些引用</string>
@@ -1244,8 +1296,10 @@
     <string name="label_value">值</string>
     <string name="label_x_dp">X dp</string>
     <string name="label_y_dp">Y dp</string>
-    <string name="scenes_overview_summary">%1$d 个元素，分布 %2$d 个场景</string>
-    <string name="scenes_card_summary">%1$d x %2$d dp · %3$d 个元素</string>
+    <string name="scenes_overview_summary">%1$s，分布 %2$s</string>
+    <plurals name="scenes_card_summary">
+        <item quantity="other">%1$d x %2$d dp · %3$d 个元素</item>
+    </plurals>
     <string name="scenes_element_bounds">边界 %1$d,%2$d %3$dx%4$d dp</string>
     <string name="scenes_binding_tap">点击：%1$s</string>
     <string name="scenes_binding_long_press">长按：%1$s</string>
@@ -1287,7 +1341,9 @@
     </plurals>
     <string name="diagnostics_admission_closed">已关闭；记录了 %1$s</string>
     <string name="diagnostics_admission_trip_reason">触发原因：%1$s</string>
-    <string name="admission_reason_circuit_open">执行熔断器再打开 %1$d 秒。</string>
+    <plurals name="admission_reason_circuit_open">
+        <item quantity="other">执行熔断器再打开 %1$d 秒。</item>
+    </plurals>
     <string name="admission_reason_trip_reason">触发原因：%1$s</string>
     <string name="admission_reason_global_active">应用级的同时运行上限已满（当前运行 %1$s）。</string>
     <string name="admission_reason_profile_active">此配置文件已按其上限运行了同样多的次数（%1$s）。</string>
@@ -1483,13 +1539,17 @@
     <!-- Secondary-surface localization -->
     <string name="nav_more">更多</string>
     <string name="header_profiles_detail">%1$d 个已启用 • 共 %2$d 个</string>
-    <string name="header_tasks_detail">%1$d 个操作 • %2$d 个任务</string>
-    <string name="header_variables_detail">%1$d 个全局变量</string>
-    <string name="header_flow_detail">%1$d 个配置文件 • %2$d 个任务</string>
-    <string name="header_scenes_detail">%1$d 个元素 • %2$d 个场景</string>
+    <string name="header_tasks_detail">%1$s • %2$s</string>
+    <plurals name="header_variables_detail">
+        <item quantity="other">%1$d 个全局变量</item>
+    </plurals>
+    <string name="header_flow_detail">%1$s • %2$s</string>
+    <string name="header_scenes_detail">%1$s • %2$s</string>
     <string name="header_inspector_detail">实时上下文健康</string>
     <string name="header_setup_detail">权限与可靠性检查</string>
-    <string name="header_run_log_detail">%1$d 个匹配条目</string>
+    <plurals name="header_run_log_detail">
+        <item quantity="other">%1$d 个匹配条目</item>
+    </plurals>
     <string name="header_diagnostics_detail">引擎、崩溃和应用日志</string>
     <string name="header_settings_detail">应用级行为与恢复</string>
     <string name="setup_update_title">发布更新检查</string>
@@ -1613,7 +1673,9 @@
     <string name="ui_message_profile_deleted">配置文件已删除</string>
     <string name="ui_message_profile_reviewed">导入的配置文件已审阅并启用</string>
     <string name="ui_message_template_installed">模板已作为禁用配置文件安装</string>
-    <string name="ui_task_still_used">任务仍被 %1$d 个自动化使用。请先重新分配或清除这些引用。</string>
+    <plurals name="ui_task_still_used">
+        <item quantity="other">任务仍被 %1$d 个自动化使用。请先重新分配或清除这些引用。</item>
+    </plurals>
     <string name="ui_message_tasker_xml_ready">Tasker XML已就绪，可供审阅</string>
     <string name="ui_message_automation_import_ready">自动化导入已就绪，可供审阅</string>
     <string name="ui_message_bundle_ready">OpenTasker包已就绪，可供审阅</string>
@@ -1627,10 +1689,12 @@
     <string name="ui_message_diagnostics_copied">已复制脱敏的诊断报告</string>
     <string name="ui_message_backup_created">备份已创建：%1$s</string>
     <string name="ui_message_backup_exported">备份已导出：%1$s</string>
-    <string name="ui_message_snapshots_enabled">自动快照已开启：最多保留 %2$d 天的 %1$d 个</string>
+    <plurals name="ui_message_snapshots_enabled">
+        <item quantity="other">自动快照已开启：最多保留 %2$d 天的 %1$d 个</item>
+    </plurals>
     <string name="ui_message_snapshots_disabled">自动快照已关闭</string>
     <string name="ui_message_snapshot_destination_saved">快照目标已保存</string>
-    <string name="ui_message_tasker_xml_exported">Tasker XML已导出：%1$d 个配置文件、%2$d 个任务、跳过了 %3$d 个操作</string>
+    <string name="ui_message_tasker_xml_exported">Tasker XML已导出：%1$s、%2$s、%3$s</string>
     <string name="ui_message_restore_staged">恢复已暂存。请重启OpenTasker以应用。</string>
     <string name="ui_message_restore_cancelled">暂存恢复已取消</string>
     <string name="ui_message_no_staged_restore">没有可取消的暂存恢复</string>
@@ -1642,9 +1706,9 @@
     <string name="ui_run_status_skipped">已跳过</string>
     <string name="ui_run_status_succeeded">成功</string>
     <string name="ui_run_status_failed">失败</string>
-    <string name="ui_message_tasker_imported">导入了 %1$d 个任务、%2$d 个禁用配置文件</string>
-    <string name="ui_message_bundle_exported">导出了 %1$d 个任务、%2$d 个配置文件、%3$d 个场景</string>
-    <string name="ui_message_bundle_imported">导入了 %1$d 个任务、%2$d 个禁用配置文件、%3$d 个场景</string>
+    <string name="ui_message_tasker_imported">导入了 %1$s、%2$s</string>
+    <string name="ui_message_bundle_exported">导出了 %1$s、%2$s、%3$s</string>
+    <string name="ui_message_bundle_imported">导入了 %1$s、%2$s、%3$s</string>
     <!--
         Plural forms, not a stem plus a suffix passed from code. "Exported %1$d run log entr%2$s"
         with "y"/"ies" supplied by Kotlin cannot be translated into any language, and the retention
@@ -1676,10 +1740,14 @@
     <string name="run_log_summary_skipped">%1$d 个跳过</string>
     <string name="run_log_trace_detail">%1$s · %2$d 毫秒 · %3$s</string>
     <string name="run_log_trace_expanded">已展开：%1$s</string>
-    <string name="run_log_template_warnings">%1$d 条模板警告</string>
+    <plurals name="run_log_template_warnings">
+        <item quantity="other">%1$d 条模板警告</item>
+    </plurals>
     <string name="run_log_expression_value">%1$s → %2$s</string>
     <string name="run_log_expression_more">另外 %1$d 个</string>
-    <string name="run_log_expression_count">%1$d 个表达式</string>
+    <plurals name="run_log_expression_count">
+        <item quantity="other">%1$d 个表达式</item>
+    </plurals>
     <string name="run_log_duration">%1$d 毫秒</string>
     <string name="run_log_trace_indexed">%1$d. %2$s</string>
 
@@ -1826,7 +1894,9 @@
     <string name="preflight_setup_missing">缺少设置：%1$s</string>
     <string name="preflight_warnings">警告</string>
     <string name="preflight_context_detail">%1$d. %2$s · %3$s</string>
-    <string name="preflight_task_detail">%1$s（%2$d 个步骤）</string>
+    <plurals name="preflight_task_detail">
+        <item quantity="other">%1$s（%2$d 个步骤）</item>
+    </plurals>
     <string name="preflight_step_detail">%1$d. %2$s · %3$s（%4$s）</string>
     <string name="preflight_status_simulated">已模拟</string>
     <string name="preflight_status_skipped">已跳过</string>

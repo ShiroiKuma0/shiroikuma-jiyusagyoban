@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -141,7 +142,7 @@ internal fun PreflightReviewDialog(
                 Text(stringResource(R.string.preflight_tasks, report.tasks.size), style = MaterialTheme.typography.titleSmall)
                 report.tasks.forEach { task ->
                     Text(
-                        stringResource(R.string.preflight_task_detail, task.taskPath, task.steps.size),
+                        pluralStringResource(R.plurals.preflight_task_detail, task.steps.size, task.taskPath, task.steps.size),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     task.steps.forEach { step -> PreflightStepCard(step) }

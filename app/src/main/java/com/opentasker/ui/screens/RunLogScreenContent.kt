@@ -527,7 +527,7 @@ private fun RunLogSummaryCard(
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    stringResource(R.string.header_run_log_detail, totalCount),
+                    pluralStringResource(R.plurals.header_run_log_detail, totalCount, totalCount),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -734,11 +734,11 @@ private fun RunLogCard(
                                 modifier = Modifier.semantics { stateDescription = stateLabel },
                             ) {
                                 Text(
-                                    stringResource(
-                                        if (tracesExpanded) R.string.run_log_show_fewer_actions
-                                        else R.string.run_log_show_all_actions,
-                                        diagnostics.traces.size,
-                                    ),
+                                    if (tracesExpanded) {
+                                        stringResource(R.string.run_log_show_fewer_actions, diagnostics.traces.size)
+                                    } else {
+                                        pluralStringResource(R.plurals.run_log_show_all_actions, diagnostics.traces.size, diagnostics.traces.size)
+                                    },
                                 )
                             }
                         }
@@ -807,7 +807,7 @@ private fun RunLogTraceRow(trace: RunLogActionDiagnostic) {
             if (trace.templateWarningCount > 0) {
                 Spacer(Modifier.height(4.dp))
                 StatusPill(
-                    stringResource(R.string.run_log_template_warnings, trace.templateWarningCount),
+                    pluralStringResource(R.plurals.run_log_template_warnings, trace.templateWarningCount, trace.templateWarningCount),
                     MaterialTheme.colorScheme.error,
                 )
             }
@@ -885,7 +885,7 @@ private fun ExpressionDebugger(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    stringResource(R.string.run_log_expression_count, expressions.size),
+                    pluralStringResource(R.plurals.run_log_expression_count, expressions.size, expressions.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

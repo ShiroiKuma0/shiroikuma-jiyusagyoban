@@ -39,10 +39,14 @@ data class UiMessage(
     val stayUntilDismissed: Boolean = false,
 ) {
     @SuppressLint("ResourceType")
-    fun resolve(context: Context): String = if (quantity == null) {
-        context.getString(resId, *args.toTypedArray())
-    } else {
-        context.resources.getQuantityString(resId, quantity, *args.toTypedArray())
+    fun resolve(context: Context): String {
+        // A count inside a message is a message of its own, so each count gets its own plural.
+        val resolved = args.map { if (it is UiMessage) it.resolve(context) else it }.toTypedArray()
+        return if (quantity == null) {
+            context.getString(resId, *resolved)
+        } else {
+            context.resources.getQuantityString(resId, quantity, *resolved)
+        }
     }
 }
 

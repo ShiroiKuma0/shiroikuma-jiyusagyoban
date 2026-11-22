@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -448,7 +449,7 @@ private fun ProfileCard(
                 Text(
                     text = listOf(
                         profileState,
-                        stringResource(R.string.label_context_count, profile.contexts.size),
+                        pluralStringResource(R.plurals.label_context_count, profile.contexts.size, profile.contexts.size),
                         stringResource(R.string.label_cooldown_seconds, profile.cooldownSec),
                     ).joinToString(" • "),
                     modifier = Modifier.weight(1f),
@@ -683,7 +684,7 @@ private fun TaskCard(
                 Column(Modifier.weight(1f)) {
                     Text(task.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(
-                        stringResource(R.string.label_action_count, task.actions.size),
+                        pluralStringResource(R.plurals.label_action_count, task.actions.size, task.actions.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

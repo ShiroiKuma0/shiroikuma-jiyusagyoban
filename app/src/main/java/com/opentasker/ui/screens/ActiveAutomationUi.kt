@@ -94,6 +94,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -534,13 +535,29 @@ fun ActiveAutomationUi(
         // Counted over the same project-scoped lists the screens render, or the header disagreed
         // with the list under it whenever a project was selected.
         OpenTaskerScreen.Profiles -> stringResource(R.string.header_profiles_detail, projectProfiles.count { it.enabled }, projectProfiles.size)
-        OpenTaskerScreen.Tasks -> stringResource(R.string.header_tasks_detail, projectTasks.sumOf { it.actions.size }, projectTasks.size)
-        OpenTaskerScreen.Vars -> stringResource(R.string.header_variables_detail, projectVariables.size)
-        OpenTaskerScreen.Flow -> stringResource(R.string.header_flow_detail, projectProfiles.size, projectTasks.size)
-        OpenTaskerScreen.Scenes -> stringResource(R.string.header_scenes_detail, projectScenes.sumOf { it.elements.size }, projectScenes.size)
+        OpenTaskerScreen.Tasks -> projectTasks.sumOf { it.actions.size }.let { actions ->
+            stringResource(
+                R.string.header_tasks_detail,
+                pluralStringResource(R.plurals.label_action_count, actions, actions),
+                pluralStringResource(R.plurals.count_tasks, projectTasks.size, projectTasks.size),
+            )
+        }
+        OpenTaskerScreen.Vars -> pluralStringResource(R.plurals.header_variables_detail, projectVariables.size, projectVariables.size)
+        OpenTaskerScreen.Flow -> stringResource(
+            R.string.header_flow_detail,
+            pluralStringResource(R.plurals.count_profiles, projectProfiles.size, projectProfiles.size),
+            pluralStringResource(R.plurals.count_tasks, projectTasks.size, projectTasks.size),
+        )
+        OpenTaskerScreen.Scenes -> projectScenes.sumOf { it.elements.size }.let { elements ->
+            stringResource(
+                R.string.header_scenes_detail,
+                pluralStringResource(R.plurals.count_elements, elements, elements),
+                pluralStringResource(R.plurals.count_scenes, projectScenes.size, projectScenes.size),
+            )
+        }
         OpenTaskerScreen.Inspector -> stringResource(R.string.header_inspector_detail)
         OpenTaskerScreen.Setup -> stringResource(R.string.header_setup_detail)
-        OpenTaskerScreen.RunLog -> stringResource(R.string.header_run_log_detail, runLogPage.totalCount)
+        OpenTaskerScreen.RunLog -> pluralStringResource(R.plurals.header_run_log_detail, runLogPage.totalCount, runLogPage.totalCount)
         OpenTaskerScreen.Diagnostics -> stringResource(R.string.header_diagnostics_detail)
         OpenTaskerScreen.Settings -> stringResource(R.string.header_settings_detail)
     }

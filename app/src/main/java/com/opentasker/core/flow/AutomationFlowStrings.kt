@@ -56,7 +56,15 @@ private class ResourceAutomationFlowStrings(
     private val resources: Resources,
 ) : AutomationFlowStrings {
     override fun accessibilitySummary(title: String, contextCount: Int, actionCount: Int, enterTask: String, exitTask: String, warningText: String): String =
-        resources.getString(R.string.flow_accessibility_summary, title, contextCount, actionCount, enterTask, exitTask, warningText)
+        resources.getString(
+            R.string.flow_accessibility_summary,
+            title,
+            resources.getQuantityString(R.plurals.label_context_count, contextCount, contextCount),
+            resources.getQuantityString(R.plurals.label_action_count, actionCount, actionCount),
+            enterTask,
+            exitTask,
+            warningText,
+        )
     override fun noExitTask(): String = resources.getString(R.string.flow_no_exit_task)
     override fun noEnterTask(): String = resources.getString(R.string.flow_no_enter_task)
 
@@ -97,7 +105,7 @@ private class ResourceAutomationFlowStrings(
     override fun missingTaskTitle(label: String): String = resources.getString(R.string.flow_missing_task_title, label)
     override fun missingTaskWarning(label: String, taskId: Long): String = resources.getString(R.string.flow_missing_task_warning, label, taskId)
     override fun missingTaskDetail(taskId: Long, profileName: String): String = resources.getString(R.string.flow_missing_task_detail, taskId, profileName)
-    override fun taskDetail(actionCount: Int, priority: Int): String = resources.getString(R.string.flow_task_detail, actionCount, priority)
+    override fun taskDetail(actionCount: Int, priority: Int): String = resources.getQuantityString(R.plurals.flow_task_detail, actionCount, actionCount, priority)
     override fun noActionsWarning(taskName: String): String = resources.getString(R.string.flow_warning_no_actions, taskName)
     override fun contextTitle(index: Int, type: String): String = resources.getString(R.string.flow_context_title, index, type)
     override fun contextDetail(inverted: Boolean, summary: String?): String =

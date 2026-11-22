@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -538,7 +539,7 @@ internal fun ProfileEditorDialog(
                 tasks.forEach { task ->
                     SelectableOption(
                         title = task.name,
-                        body = stringResource(R.string.label_action_count, task.actions.size),
+                        body = pluralStringResource(R.plurals.label_action_count, task.actions.size, task.actions.size),
                         selected = task.id == enterTaskId,
                         onClick = { enterTaskId = task.id },
                     )
@@ -1147,8 +1148,9 @@ internal fun TaskDeleteReferencesDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    stringResource(
-                        R.string.delete_task_references_body,
+                    pluralStringResource(
+                        R.plurals.delete_task_references_body,
+                        preview.references.size,
                         preview.task.name,
                         preview.references.size,
                     ),
@@ -1348,11 +1350,11 @@ internal fun RestoreReviewDialog(
                 Text(
                     stringResource(
                         R.string.restore_review_counts,
-                        candidate.profileCount,
-                        candidate.taskCount,
-                        candidate.sceneCount,
-                        candidate.variableCount,
-                        candidate.runLogCount,
+                        pluralStringResource(R.plurals.count_profiles, candidate.profileCount, candidate.profileCount),
+                        pluralStringResource(R.plurals.count_tasks, candidate.taskCount, candidate.taskCount),
+                        pluralStringResource(R.plurals.count_scenes, candidate.sceneCount, candidate.sceneCount),
+                        pluralStringResource(R.plurals.count_variables, candidate.variableCount, candidate.variableCount),
+                        pluralStringResource(R.plurals.count_run_log_entries, candidate.runLogCount, candidate.runLogCount),
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

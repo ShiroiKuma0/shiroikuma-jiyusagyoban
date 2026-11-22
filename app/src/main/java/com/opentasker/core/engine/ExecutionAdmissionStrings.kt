@@ -42,8 +42,9 @@ interface ExecutionAdmissionStrings {
 private class ResourceExecutionAdmissionStrings(
     private val resources: Resources,
 ) : ExecutionAdmissionStrings {
-    override fun circuitOpen(remainingSeconds: Long): String = resources.getString(
-        R.string.admission_reason_circuit_open,
+    override fun circuitOpen(remainingSeconds: Long): String = resources.getQuantityString(
+        R.plurals.admission_reason_circuit_open,
+        remainingSeconds.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(),
         remainingSeconds,
     )
 

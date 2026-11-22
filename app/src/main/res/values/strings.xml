@@ -103,7 +103,10 @@
     <string name="run_log_clear_action">Clear the run log now</string>
     <string name="run_log_clear_body">Retention is the only thing that shrinks this log. Clear it yourself before starting a fresh test.</string>
     <string name="run_log_clear_confirm_body">This deletes the run history. Pinned runs and held runs waiting to be replayed are kept, and this cannot be undone.</string>
-    <string name="run_log_cleared">Cleared %1$d run log entries</string>
+    <plurals name="run_log_cleared">
+        <item quantity="one">Cleared %1$d run log entry</item>
+        <item quantity="other">Cleared %1$d run log entries</item>
+    </plurals>
     <string name="startup_stage_opening">Opening your automations…</string>
     <string name="startup_stage_restoring">Restoring your backup…</string>
     <string name="startup_stage_encrypting">Encrypting your automations. This only happens once.</string>
@@ -372,14 +375,14 @@
     <string name="setup_backup_helper_full">Create a local database backup, export a copy, or keep encrypted snapshots in a folder you control. Secret variable values remain device-bound and must be re-entered after a transfer.</string>
     <string name="setup_backup_working">Working…</string>
     <string name="setup_backup_restore_body">Restart OpenTasker to apply the staged restore before the database opens.</string>
-    <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$d profiles, %4$d tasks, %5$d scenes. Restart OpenTasker to apply it.</string>
+    <string name="setup_backup_restore_summary">%1$s · schema v%2$d · %3$s, %4$s, %5$s. Restart OpenTasker to apply it.</string>
     <string name="setup_backup_restore_unreadable">The staged restore can no longer be read (%1$s). Cancel it so the next start is not blocked.</string>
     <string name="setup_backup_restore_cancel">Cancel staged restore</string>
     <string name="setup_backup_rollback_kept">The database from before your restore on %1$s is still here if you need to go back to it.</string>
     <string name="setup_backup_rollback_action">Roll back</string>
     <string name="setup_snapshots_label">Automatic off-device snapshots</string>
     <string name="setup_snapshots_helper">Write encrypted recovery archives to a folder you choose. OpenTasker never uploads them, and a restore is applied only after review.</string>
-    <string name="setup_snapshots_retention">Keeping up to %1$d snapshots for %2$d days.</string>
+    <string name="setup_snapshots_retention">Keeping up to %1$s for %2$s.</string>
     <string name="setup_snapshots_choice">%1$d / %2$dd</string>
     <string name="setup_snapshots_status_ok">Last snapshot %1$s · %2$d stored · %3$s</string>
     <string name="setup_snapshots_status_failed">Last snapshot failed %1$s: %2$s</string>
@@ -393,7 +396,10 @@
     <string name="setup_snapshots_passphrase_body">Choose a recovery passphrase and save it in your password manager. You will need it after uninstall or on another device; OpenTasker cannot recover it for you.</string>
     <string name="setup_snapshots_passphrase_label">Recovery passphrase</string>
     <string name="setup_snapshots_passphrase_confirm">Confirm passphrase</string>
-    <string name="setup_snapshots_passphrase_error">Use at least %1$d characters and enter the same passphrase twice.</string>
+    <plurals name="setup_snapshots_passphrase_error">
+        <item quantity="one">Use at least %1$d character and enter the same passphrase twice.</item>
+        <item quantity="other">Use at least %1$d characters and enter the same passphrase twice.</item>
+    </plurals>
     <string name="setup_snapshots_passphrase_save">Save and use folder</string>
     <string name="setup_snapshots_destination_save_failed">The snapshot folder grant or recovery passphrase could not be saved.</string>
     <string name="setup_global_fallback_title">Global failure fallback</string>
@@ -401,7 +407,7 @@
     <string name="setup_global_fallback_label">Global fallback task</string>
     <string name="restore_review_title">Review restore</string>
     <string name="restore_review_summary">%1$s · %2$s · schema v%3$d</string>
-    <string name="restore_review_counts">%1$d profiles · %2$d tasks · %3$d scenes · %4$d variables · %5$d run log entries</string>
+    <string name="restore_review_counts">%1$s · %2$s · %3$s · %4$s · %5$s</string>
     <string name="restore_review_incompatible">The schema version of this database is outside the range this build can open.</string>
     <string name="restore_review_replaces">This replaces a restore already staged: %1$s (schema v%2$d). Staging discards it.</string>
     <string name="restore_review_body">Nothing has been staged yet. Staging queues this database to replace the live one at the next start; the current database is snapshotted first.</string>
@@ -434,7 +440,10 @@
     <string name="service_notification_idle_title">OpenTasker is running</string>
     <string name="service_notification_active_title">Task running: %1$s</string>
     <string name="service_notification_open_status">Tap to open automation status</string>
-    <string name="service_notification_multiple_tasks">%1$d other task(s) running</string>
+    <plurals name="service_notification_multiple_tasks">
+        <item quantity="one">%1$d other task running</item>
+        <item quantity="other">%1$d other tasks running</item>
+    </plurals>
     <string name="setup_exact_alarm_card_title">Exact alarms</string>
     <string name="setup_exact_alarm_card_body">Allows precise scheduled automations. If denied, OpenTasker falls back to inexact delivery windows.</string>
     <string name="setup_exact_alarm_required_for">Time triggers, schedules</string>
@@ -651,10 +660,13 @@
     <string name="run_log_export_json_short">JSON</string>
     <string name="run_log_export_csv_short">CSV</string>
     <string name="run_log_export_note">Share sends the Diagnostics report. JSON and CSV save this run history with secrets hidden, which helps with a bug about a run.</string>
-    <string name="run_log_show_all_actions">Show all %1$d actions</string>
+    <plurals name="run_log_show_all_actions">
+        <item quantity="one">Show %1$d action</item>
+        <item quantity="other">Show all %1$d actions</item>
+    </plurals>
     <string name="run_log_show_fewer_actions">Show fewer (%1$d total)</string>
     <string name="run_log_retention_preview_title">Review retention reduction</string>
-    <string name="run_log_retention_preview_body">%1$d entries are stored; the oldest is from %2$s. This change will permanently remove %3$d entries.</string>
+    <string name="run_log_retention_preview_body">%1$s stored. The oldest is from %2$s. This change will permanently remove %3$s.</string>
     <string name="run_log_retention_confirm">Prune entries</string>
     <string name="run_log_export_before_pruning">Export first</string>
 
@@ -794,7 +806,10 @@
     <string name="inspector_platform_blocked_body">Watching for %1$s needs Android %2$s, and this phone runs Android %3$s.</string>
     <string name="inspector_simulate_trigger">Simulate trigger</string>
     <string name="inspector_lint_title">Automation lint findings</string>
-    <string name="inspector_lint_count">%1$d finding(s)</string>
+    <plurals name="inspector_lint_count">
+        <item quantity="one">%1$d finding</item>
+        <item quantity="other">%1$d findings</item>
+    </plurals>
     <string name="inspector_profile_selector">Profile</string>
     <string name="inspector_profile_selector_content_description">Choose profile</string>
     <string name="inspector_profile_policy">Priority %1$d · Grace %2$ds · Lifetime: %3$s</string>
@@ -982,9 +997,58 @@
     <string name="scene_overlay_move_up_action">Move overlay up</string>
     <string name="scene_overlay_move_down_action">Move overlay down</string>
     <string name="scene_overlay_move_right_action">Move overlay right</string>
-    <string name="label_issue_count">%1$d issue(s)</string>
-    <string name="label_context_count">%1$d context(s)</string>
-    <string name="label_action_count">%1$d action(s)</string>
+    <plurals name="label_issue_count">
+        <item quantity="one">%1$d issue</item>
+        <item quantity="other">%1$d issues</item>
+    </plurals>
+    <plurals name="label_context_count">
+        <item quantity="one">%1$d context</item>
+        <item quantity="other">%1$d contexts</item>
+    </plurals>
+    <plurals name="label_action_count">
+        <item quantity="one">%1$d action</item>
+        <item quantity="other">%1$d actions</item>
+    </plurals>
+    <plurals name="count_tasks">
+        <item quantity="one">%1$d task</item>
+        <item quantity="other">%1$d tasks</item>
+    </plurals>
+    <plurals name="count_profiles">
+        <item quantity="one">%1$d profile</item>
+        <item quantity="other">%1$d profiles</item>
+    </plurals>
+    <plurals name="count_disabled_profiles">
+        <item quantity="one">%1$d disabled profile</item>
+        <item quantity="other">%1$d disabled profiles</item>
+    </plurals>
+    <plurals name="count_scenes">
+        <item quantity="one">%1$d scene</item>
+        <item quantity="other">%1$d scenes</item>
+    </plurals>
+    <plurals name="count_elements">
+        <item quantity="one">%1$d element</item>
+        <item quantity="other">%1$d elements</item>
+    </plurals>
+    <plurals name="count_variables">
+        <item quantity="one">%1$d variable</item>
+        <item quantity="other">%1$d variables</item>
+    </plurals>
+    <plurals name="count_run_log_entries">
+        <item quantity="one">%1$d run log entry</item>
+        <item quantity="other">%1$d run log entries</item>
+    </plurals>
+    <plurals name="count_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="count_snapshots">
+        <item quantity="one">%1$d snapshot</item>
+        <item quantity="other">%1$d snapshots</item>
+    </plurals>
+    <plurals name="count_skipped_actions">
+        <item quantity="one">%1$d action skipped</item>
+        <item quantity="other">%1$d actions skipped</item>
+    </plurals>
     <string name="label_cooldown_seconds">%1$ds cooldown</string>
     <string name="label_priority_short">Priority %1$d</string>
     <string name="label_more_count">%1$d more</string>
@@ -1037,7 +1101,10 @@
     <string name="event_variable_broadcast_sender">The sending app, usually empty since few apps share who they are</string>
     <string name="event_variable_broadcast_extra_count">How many extras came. Each is also its own variable, broadcast_extra_ and its key</string>
     <string name="event_variable_broadcast_extras_lossy">true when an extra was too big or not plain text and got dropped</string>
-    <string name="inspector_broadcast_listening">Listening for %1$d broadcast action(s): %2$s</string>
+    <plurals name="inspector_broadcast_listening">
+        <item quantity="one">Listening for %1$d broadcast action: %2$s</item>
+        <item quantity="other">Listening for %1$d broadcast actions: %2$s</item>
+    </plurals>
     <string name="inspector_broadcast_idle">No enabled profile is waiting for a broadcast.</string>
     <string name="context_sms_received_android_17_note">On Android 17+, standard SMS messages containing OTPs may be withheld for up to three hours for non-default-SMS apps. Connected-device and other exempt apps can receive them sooner; use SMS Retriever or User Consent when OTP timing matters.</string>
 
@@ -1097,7 +1164,7 @@
     <string name="flow_empty_profile_graph_title">No profile graph yet</string>
     <string name="flow_empty_profile_graph_body">Create or import a profile to generate a readable automation graph with contexts, tasks, actions, and missing references.</string>
     <string name="flow_waiting_for_profile">Waiting for profile</string>
-    <string name="flow_context_action_summary">%1$d context(s) · %2$d action(s)</string>
+    <string name="flow_context_action_summary">%1$s · %2$s</string>
     <string name="flow_all_context_rules">all context rules</string>
     <string name="flow_add_content_description">Add</string>
     <string name="flow_enter">enter</string>
@@ -1111,7 +1178,7 @@
     <string name="flow_subflow">Subflow</string>
     <string name="flow_branch_condition">Branch condition</string>
     <string name="flow_branch">Branch</string>
-    <string name="flow_accessibility_summary">%1$s: %2$d context(s), %3$d action(s), enter task %4$s, exit task %5$s, %6$s.</string>
+    <string name="flow_accessibility_summary">%1$s: %2$s, %3$s, enter task %4$s, exit task %5$s, %6$s.</string>
     <string name="flow_no_exit_task">no exit task</string>
     <string name="flow_no_enter_task">no enter task</string>
 
@@ -1225,7 +1292,10 @@
     <string name="flow_missing_task_title">Missing %1$s task</string>
     <string name="flow_missing_task_warning">%1$s task %2$d is missing.</string>
     <string name="flow_missing_task_detail">Task id %1$d is referenced by %2$s</string>
-    <string name="flow_task_detail">%1$d action(s) · priority %2$d</string>
+    <plurals name="flow_task_detail">
+        <item quantity="one">%1$d action · priority %2$d</item>
+        <item quantity="other">%1$d actions · priority %2$d</item>
+    </plurals>
     <string name="flow_warning_no_actions">%1$s has no actions.</string>
     <string name="flow_context_title">Context %1$d: %2$s</string>
     <string name="flow_action_subtask_title">Step %1$d: run sub-task "%2$s"</string>
@@ -1270,7 +1340,10 @@
     <string name="automation_mode_parallel_body">Start another run alongside the one already going.</string>
 
     <string name="delete_task_references_title">Task is still in use</string>
-    <string name="delete_task_references_body">&quot;%1$s&quot; is referenced by %2$d other automation(s). Choose what happens to those references before it is deleted.</string>
+    <plurals name="delete_task_references_body">
+        <item quantity="one">\"%1$s\" is referenced by %2$d other automation. Choose what happens to that reference before it is deleted.</item>
+        <item quantity="other">\"%1$s\" is referenced by %2$d other automations. Choose what happens to those references before it is deleted.</item>
+    </plurals>
     <string name="delete_task_references_required">A profile runs this task on activation and cannot be left without one, so these references must be reassigned.</string>
     <string name="delete_task_references_option_reassign">Reassign them to another task</string>
     <string name="delete_task_references_option_clear">Clear the references</string>
@@ -1292,13 +1365,16 @@
     <string name="label_value">Value</string>
     <string name="label_x_dp">X dp</string>
     <string name="label_y_dp">Y dp</string>
-    <string name="scenes_overview_summary">%1$d element(s) across %2$d scene(s)</string>
+    <string name="scenes_overview_summary">%1$s across %2$s</string>
     <plurals name="scenes_overview_errors">
         <item quantity="one">%1$d scene error</item>
         <item quantity="other">%1$d scene errors</item>
     </plurals>
     <string name="scenes_size_range_helper">From %1$d to %2$d</string>
-    <string name="scenes_card_summary">%1$d x %2$d dp · %3$d element(s)</string>
+    <plurals name="scenes_card_summary">
+        <item quantity="one">%1$d x %2$d dp · %3$d element</item>
+        <item quantity="other">%1$d x %2$d dp · %3$d elements</item>
+    </plurals>
     <string name="scenes_element_bounds">Bounds %1$d,%2$d %3$dx%4$d dp</string>
     <string name="scenes_binding_tap">Tap: %1$s</string>
     <string name="scenes_binding_long_press">Long press: %1$s</string>
@@ -1341,7 +1417,10 @@
     </plurals>
     <string name="diagnostics_admission_closed">Closed; %1$s recorded</string>
     <string name="diagnostics_admission_trip_reason">Trip reason: %1$s</string>
-    <string name="admission_reason_circuit_open">Execution circuit is open for %1$d more seconds.</string>
+    <plurals name="admission_reason_circuit_open">
+        <item quantity="one">Execution circuit is open for %1$d more second.</item>
+        <item quantity="other">Execution circuit is open for %1$d more seconds.</item>
+    </plurals>
     <string name="admission_reason_trip_reason">Trip reason: %1$s</string>
     <string name="admission_reason_global_active">The app-wide limit on runs at once is full (%1$s running).</string>
     <string name="admission_reason_profile_active">This profile is already running as many times as it may (%1$s).</string>
@@ -1537,13 +1616,19 @@
     <!-- Secondary-surface localization -->
     <string name="nav_more">More</string>
     <string name="header_profiles_detail">%1$d enabled • %2$d total</string>
-    <string name="header_tasks_detail">%1$d actions • %2$d tasks</string>
-    <string name="header_variables_detail">%1$d global variables</string>
-    <string name="header_flow_detail">%1$d profiles • %2$d tasks</string>
-    <string name="header_scenes_detail">%1$d elements • %2$d scenes</string>
+    <string name="header_tasks_detail">%1$s • %2$s</string>
+    <plurals name="header_variables_detail">
+        <item quantity="one">%1$d global variable</item>
+        <item quantity="other">%1$d global variables</item>
+    </plurals>
+    <string name="header_flow_detail">%1$s • %2$s</string>
+    <string name="header_scenes_detail">%1$s • %2$s</string>
     <string name="header_inspector_detail">Live context health</string>
     <string name="header_setup_detail">Permission and reliability checks</string>
-    <string name="header_run_log_detail">%1$d matching entries</string>
+    <plurals name="header_run_log_detail">
+        <item quantity="one">%1$d matching entry</item>
+        <item quantity="other">%1$d matching entries</item>
+    </plurals>
     <string name="header_diagnostics_detail">Engine, crashes, and app logs</string>
     <string name="header_settings_detail">App-wide behavior and recovery</string>
     <string name="setup_update_title">Release update checks</string>
@@ -1681,7 +1766,10 @@
     <string name="ui_message_profile_deleted">Profile deleted</string>
     <string name="ui_message_profile_reviewed">Imported profile reviewed and enabled</string>
     <string name="ui_message_template_installed">Template installed as a disabled profile</string>
-    <string name="ui_task_still_used">Task is still used by %1$d automation(s). Reassign or clear those references first.</string>
+    <plurals name="ui_task_still_used">
+        <item quantity="one">Task is still used by %1$d automation. Reassign or clear that reference first.</item>
+        <item quantity="other">Task is still used by %1$d automations. Reassign or clear those references first.</item>
+    </plurals>
     <string name="ui_message_tasker_xml_ready">Tasker XML ready for review</string>
     <string name="ui_message_automation_import_ready">Automation import ready for review</string>
     <string name="ui_message_bundle_ready">OpenTasker bundle ready for review</string>
@@ -1695,10 +1783,13 @@
     <string name="ui_message_diagnostics_copied">Redacted diagnostic report copied</string>
     <string name="ui_message_backup_created">Backup created: %1$s</string>
     <string name="ui_message_backup_exported">Backup exported: %1$s</string>
-    <string name="ui_message_snapshots_enabled">Automatic snapshots on: up to %1$d kept for %2$d days</string>
+    <plurals name="ui_message_snapshots_enabled">
+        <item quantity="one">Automatic snapshots on: up to %1$d kept for %2$d day</item>
+        <item quantity="other">Automatic snapshots on: up to %1$d kept for %2$d days</item>
+    </plurals>
     <string name="ui_message_snapshots_disabled">Automatic snapshots off</string>
     <string name="ui_message_snapshot_destination_saved">Snapshot destination saved</string>
-    <string name="ui_message_tasker_xml_exported">Tasker XML exported: %1$d profiles, %2$d tasks, %3$d actions skipped</string>
+    <string name="ui_message_tasker_xml_exported">Tasker XML exported: %1$s, %2$s, %3$s</string>
     <string name="ui_message_tasker_xml_export_warnings">Check before using this file (%1$d): %2$s</string>
     <string name="ui_message_restore_staged">Restore staged. Restart OpenTasker to apply it.</string>
     <string name="ui_message_restore_cancelled">Staged restore cancelled</string>
@@ -1711,9 +1802,9 @@
     <string name="ui_run_status_skipped">skipped</string>
     <string name="ui_run_status_succeeded">succeeded</string>
     <string name="ui_run_status_failed">failed</string>
-    <string name="ui_message_tasker_imported">Imported %1$d task(s), %2$d disabled profile(s)</string>
-    <string name="ui_message_bundle_exported">Exported %1$d task(s), %2$d profile(s), %3$d scene(s)</string>
-    <string name="ui_message_bundle_imported">Imported %1$d task(s), %2$d disabled profile(s), %3$d scene(s)</string>
+    <string name="ui_message_tasker_imported">Imported %1$s, %2$s</string>
+    <string name="ui_message_bundle_exported">Exported %1$s, %2$s, %3$s</string>
+    <string name="ui_message_bundle_imported">Imported %1$s, %2$s, %3$s</string>
     <!--
         Plural forms, not a stem plus a suffix passed from code. "Exported %1$d run log entr%2$s"
         with "y"/"ies" supplied by Kotlin cannot be translated into any language, and the retention
@@ -1745,10 +1836,16 @@
     <string name="run_log_summary_skipped">%1$d skipped</string>
     <string name="run_log_trace_detail">%1$s · %2$d ms · %3$s</string>
     <string name="run_log_trace_expanded">Expanded: %1$s</string>
-    <string name="run_log_template_warnings">%1$d template warning(s)</string>
+    <plurals name="run_log_template_warnings">
+        <item quantity="one">%1$d template warning</item>
+        <item quantity="other">%1$d template warnings</item>
+    </plurals>
     <string name="run_log_expression_value">%1$s → %2$s</string>
     <string name="run_log_expression_more">%1$d more</string>
-    <string name="run_log_expression_count">%1$d expression(s)</string>
+    <plurals name="run_log_expression_count">
+        <item quantity="one">%1$d expression</item>
+        <item quantity="other">%1$d expressions</item>
+    </plurals>
     <string name="run_log_duration">%1$d ms</string>
     <string name="run_log_trace_indexed">%1$d. %2$s</string>
 
@@ -1895,7 +1992,10 @@
     <string name="preflight_setup_missing">Missing setup: %1$s</string>
     <string name="preflight_warnings">Warnings</string>
     <string name="preflight_context_detail">%1$d. %2$s · %3$s</string>
-    <string name="preflight_task_detail">%1$s (%2$d steps)</string>
+    <plurals name="preflight_task_detail">
+        <item quantity="one">%1$s (%2$d step)</item>
+        <item quantity="other">%1$s (%2$d steps)</item>
+    </plurals>
     <string name="preflight_step_detail">%1$d. %2$s · %3$s (%4$s)</string>
     <string name="preflight_status_simulated">simulated</string>
     <string name="preflight_status_skipped">skipped</string>

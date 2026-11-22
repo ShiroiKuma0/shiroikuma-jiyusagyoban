@@ -257,7 +257,7 @@ internal class RunLogController(
             }
                 .onSuccess { deleted ->
                     refreshRunLogPage()
-                    events.send(uiMessage(R.string.run_log_cleared, deleted))
+                    events.send(uiPluralMessage(R.plurals.run_log_cleared, deleted, deleted))
                 }
                 .onFailure { events.send(loggedUiErrorMessage(it, R.string.ui_error_retention_update)) }
         }

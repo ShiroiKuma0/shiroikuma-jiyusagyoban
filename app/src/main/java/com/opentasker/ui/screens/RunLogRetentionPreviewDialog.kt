@@ -10,6 +10,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.opentasker.app.R
 import java.util.Date
@@ -32,9 +33,9 @@ internal fun RunLogRetentionPreviewDialog(
             Text(
                 stringResource(
                     R.string.run_log_retention_preview_body,
-                    preview.storedCount,
+                    pluralStringResource(R.plurals.count_run_log_entries, preview.storedCount, preview.storedCount),
                     oldest,
-                    preview.prunableCount,
+                    pluralStringResource(R.plurals.count_run_log_entries, preview.prunableCount, preview.prunableCount),
                 ),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             )
