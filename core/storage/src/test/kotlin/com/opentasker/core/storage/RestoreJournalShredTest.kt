@@ -63,6 +63,34 @@ class RestoreJournalShredTest {
         val context = object : ContextWrapper(null) {
             override fun getFilesDir(): File = dir
         }
-        assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context))
+        var drops = 0
+        assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; true })
+        assertEquals("nothing was replaced, so nothing is dropped", 0, drops)
+    }
+
+    /**
+     * The spent journal is the only record that a restored database went in, so it goes only once
+     * the replaced database's state is dropped on disk. Until then every start drops it again.
+     */
+    @Test
+    fun aStoppedRestoreKeepsItsJournalUntilTheDropIsOnDisk() = inTempDir { dir ->
+        val context = object : ContextWrapper(null) {
+            override fun getFilesDir(): File = dir
+        }
+        val spent = spentRestoreJournal(DatabaseBackupManager.pendingRestoreFile(context)).apply { writeBytes(plaintext) }
+        var drops = 0
+
+        assertEquals(PendingRestoreApplyResult.StoppedAfterSwap, DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; false })
+        assertTrue("a drop that isn't on disk keeps the journal", spent.exists())
+        assertEquals(
+            PendingRestoreApplyResult.StoppedAfterSwap,
+            DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; throw IllegalStateException("prefs") },
+        )
+        assertTrue("so does one that throws", spent.exists())
+        assertEquals(PendingRestoreApplyResult.StoppedAfterSwap, DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; true })
+        assertFalse(spent.exists())
+        assertEquals(3, drops)
+        assertEquals(PendingRestoreApplyResult.NoPending, DatabaseBackupManager.applyPendingRestoreIfPresent(context) { drops++; true })
+        assertEquals(3, drops)
     }
 }

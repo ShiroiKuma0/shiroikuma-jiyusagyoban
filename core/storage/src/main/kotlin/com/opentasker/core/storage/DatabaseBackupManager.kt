@@ -496,17 +496,27 @@ class DatabaseBackupManager(
     companion object {
         const val DATABASE_NAME = "opentasker.db"
 
+        /**
+         * Applies a staged restore, if there is one.
+         *
+         * [dropStateOfReplacedDatabase] clears what belonged to the database a restore replaces
+         * (the app's plugin condition grants name profile positions in it) and returns whether
+         * that is on disk. It runs once the restored database is in place and before the journal
+         * that records the swap is shredded, so a stop in between leaves the journal and the next
+         * start runs it again. It must be safe to run twice.
+         */
         fun applyPendingRestoreIfPresent(
             context: Context,
             databaseName: String = DATABASE_NAME,
+            dropStateOfReplacedDatabase: () -> Boolean = { true },
         ): PendingRestoreApplyResult {
             val pending = pendingRestoreFile(context, databaseName)
             val spent = spentRestoreJournal(pending)
             // A journal only goes off its name after the restored database is in place, and the run
-            // that moved it shreds it before returning. One still here means that run stopped after
-            // the swap, before the app could drop the grants made for the database it replaced.
+            // that moved it shreds it only once the replaced database's state is dropped. One still
+            // here means that run stopped after the swap, before that drop was on disk.
             val stoppedAfterSwap = spent.exists()
-            shredFile(spent)
+            if (stoppedAfterSwap && runCatching(dropStateOfReplacedDatabase).getOrDefault(false)) shredFile(spent)
             if (!pending.exists()) {
                 return if (stoppedAfterSwap) PendingRestoreApplyResult.StoppedAfterSwap else PendingRestoreApplyResult.NoPending
             }
@@ -568,8 +578,10 @@ class DatabaseBackupManager(
                 // can't be undone from Setup, so the restore goes back as failed. With no database
                 // before it there's nothing for Undo to go back to, so the new database stays.
                 if (!rollbackRecorded && rollback != null) throw IOException("Could not record the restore's rollback")
-                // Only once the rollback is recorded, so a death while it shreds can't lose that.
-                shredFile(spent)
+                // Only once the rollback is recorded, so a death while it shreds can't lose that,
+                // and the replaced database's state is dropped on disk, so a death before that
+                // drops it at the next start. A drop that fails mustn't undo the restore.
+                if (runCatching(dropStateOfReplacedDatabase).getOrDefault(false)) shredFile(spent)
                 PendingRestoreApplyResult.Applied(dbFile, rollback)
             } catch (error: Exception) {
                 temp?.let(::shredFile)
@@ -605,6 +617,10 @@ class DatabaseBackupManager(
                         commit()
                     }
                 }
+                val replacementKept = replacementPublished && !databaseWentBack
+                // The restored database stays live, so the replaced one's state goes before the
+                // journal does. The journal is kept as the failed copy either way.
+                if (replacementKept) runCatching(dropStateOfReplacedDatabase)
                 val failed = File(backupDir(context), "${databaseName.removeSuffix(".db")}_restore_failed_${timestamp()}.db")
                 // The journal may already be off its name if recording the rollback is what failed.
                 val journal = pending.takeIf { it.exists() } ?: spentRestoreJournal(pending)
@@ -614,7 +630,7 @@ class DatabaseBackupManager(
                     shredFile(journal)
                     null
                 }
-                PendingRestoreApplyResult.Failed(error, failedBackup, replacementKept = replacementPublished && !databaseWentBack)
+                PendingRestoreApplyResult.Failed(error, failedBackup, replacementKept = replacementKept)
             }
         }
 

@@ -61,14 +61,15 @@ class LocaleConditionGrantStore(context: Context) {
 
     /**
      * Revoke every context grant. A restore replaces the profiles wholesale, so the positions the
-     * grants name may hold other contexts now.
+     * grants name may hold other contexts now. Written with commit(), so true means it is on disk:
+     * the restore keeps its journal until then.
      */
-    fun revokeAllContextGrants() {
+    fun revokeAllContextGrants(): Boolean {
         val toRemove = prefs.all
             .filter { (key, value) -> key.startsWith(KEY_PREFIX) && (value as? String)?.startsWith(CONTEXT_PREFIX) == true }
             .keys
-        if (toRemove.isEmpty()) return
-        prefs.edit().apply { toRemove.forEach { remove(it) } }.apply()
+        if (toRemove.isEmpty()) return true
+        return prefs.edit().apply { toRemove.forEach { remove(it) } }.commit()
     }
 
     /** All currently issued grants, for inspection/revocation UIs. */
