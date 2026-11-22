@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 data class DiagnosticsUiState(
@@ -51,6 +52,8 @@ internal class DiagnosticsController(
     private val appContext: Context,
     private val scope: CoroutineScope,
     private val events: SendChannel<UiMessage>,
+    /** The redacted report Copy and Share send. It reads health, prefs and crash-log files. */
+    private val buildReport: suspend () -> String = { DiagnosticExport.buildReport(appContext, db) },
 ) {
     private val _diagnosticsState = MutableStateFlow(DiagnosticsUiState())
     val diagnosticsState: StateFlow<DiagnosticsUiState> = _diagnosticsState.asStateFlow()
@@ -109,7 +112,7 @@ internal class DiagnosticsController(
     fun copyDiagnosticReport() {
         scope.launch {
             try {
-                val report = DiagnosticExport.buildReport(appContext, db)
+                val report = report()
                 val clipboard = appContext.getSystemService(ClipboardManager::class.java)
                     ?: throw IllegalStateException("Clipboard service is unavailable")
                 clipboard.setPrimaryClip(
@@ -125,7 +128,7 @@ internal class DiagnosticsController(
     fun shareDiagnosticReport() {
         scope.launch {
             try {
-                val report = DiagnosticExport.buildReport(appContext, db)
+                val report = report()
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_SUBJECT, appContext.getString(R.string.diagnostics_share_subject))
@@ -138,6 +141,10 @@ internal class DiagnosticsController(
             }
         }
     }
+
+    // The scope is the view model's, on the main thread, and the report's reads can block; Refresh
+    // already moves the same reads to IO.
+    private suspend fun report(): String = withContext(Dispatchers.IO) { buildReport() }
 }
 
 private const val DIAGNOSTICS_READ_TIMEOUT_MS = 15_000L

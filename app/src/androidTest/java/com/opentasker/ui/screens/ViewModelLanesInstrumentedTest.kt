@@ -15,9 +15,12 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -26,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -149,6 +153,32 @@ class ViewModelLanesInstrumentedTest {
         // Retry after a failure starts a new read instead of being dropped by the in-flight guard.
         diagnostics.refreshDiagnostics()
         assertEquals(R.string.ui_error_diagnostics_refresh, withTimeout(TIMEOUT_MS) { events.receive() }.resId)
+    }
+
+    /**
+     * Copy built the report on the lane's own scope, which is the view model's main thread in the
+     * app, so its file and prefs reads could freeze the screen. Share goes through the same call.
+     */
+    @Test
+    fun copyBuildsTheReportOffTheLanesThread() = runBlocking<Unit> {
+        val laneThread = Executors.newSingleThreadExecutor { Thread(it, "diagnostics-lane") }
+        val laneScope = CoroutineScope(SupervisorJob() + laneThread.asCoroutineDispatcher())
+        val builtOn = CompletableDeferred<String>()
+        try {
+            val diagnostics = DiagnosticsController(db, context, laneScope, events, buildReport = {
+                builtOn.complete(Thread.currentThread().name)
+                "report"
+            })
+            withTimeout(TIMEOUT_MS) { diagnostics.diagnosticsState.first { it.loadedAtMillis > 0L } }
+
+            diagnostics.copyDiagnosticReport()
+
+            assertEquals(R.string.ui_message_diagnostics_copied, withTimeout(TIMEOUT_MS) { events.receive() }.resId)
+            assertNotEquals("diagnostics-lane", builtOn.await())
+        } finally {
+            laneScope.cancel()
+            laneThread.shutdown()
+        }
     }
 
     private fun entry(taskName: String) =

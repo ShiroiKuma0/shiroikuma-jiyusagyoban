@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- Copy and Share on the Diagnostics screen built the report on the main thread. Its reads of engine health, settings and crash logs can stall, and the screen froze while they did. The report is built in the background now, as Refresh already does.
 - Clear in the run log filters only reset the date. The status, task and search stayed as they were. Clear now resets all four.
 - A task whose name is a number, like "2025", wasn't protected when you deleted it, and renaming it left every Perform Task or Stop Task step that named it pointing at nothing. Those steps run a task by its id when one has that number, and by its name otherwise. Delete and rename now read them the same way.
 - A media state context that names an app never matched. The playing app's package always came back empty, because OpenTasker asked Android for media sessions the way only system apps may. It now asks through its notification listener, so with notification access on, the app that's playing shows up.
