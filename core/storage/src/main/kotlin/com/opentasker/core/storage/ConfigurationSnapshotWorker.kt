@@ -66,7 +66,15 @@ class ConfigurationSnapshotWorker(
                     }
                     throw error
                 }
-                archiveStore.enforceRetention(treeUri, policy, now)
+                retainAfterExport(
+                    fallback = {
+                        // The counts from the last run; the next run that can list the folder corrects them.
+                        settings.loadStatus().let { ConfigurationSnapshotArchiveInventory(it.snapshotCount, it.storageBytes, removedCount = 0) }
+                    },
+                    onError = { error ->
+                        AppLogger.warn(TAG, "The snapshot was saved, but old ones couldn't be checked; the next run tries again", error)
+                    },
+                ) { archiveStore.enforceRetention(treeUri, policy, now) }
             } finally {
                 internalRemoved = manager.pruneSnapshots(policy, now)
             }

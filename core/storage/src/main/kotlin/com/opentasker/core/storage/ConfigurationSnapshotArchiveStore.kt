@@ -84,6 +84,38 @@ internal fun <T> applySnapshotRetention(
     )
 }
 
+/**
+ * What one old archive's lost-access error means, with the folder listed a moment before. While
+ * the grant is still held, a file not found was already gone (true, as deleted) and anything else
+ * is that one file refused (false). Without the grant the folder itself is lost, and that stops
+ * the run as before.
+ */
+internal fun singleArchiveDeleteOutcome(error: SnapshotDestinationUnavailableException, stillGranted: Boolean): Boolean {
+    if (!stillGranted) throw error
+    return error.cause is FileNotFoundException
+}
+
+/**
+ * Runs [retain] after a good export. Retention that can't finish, say because the folder couldn't
+ * be listed, is reported through [onError] and [fallback] stands in for its counts, so the run
+ * still succeeds: failing it made WorkManager retry, and every retry wrote another full archive.
+ * Losing access to the folder still stops the run.
+ */
+internal inline fun retainAfterExport(
+    fallback: () -> ConfigurationSnapshotArchiveInventory,
+    onError: (Exception) -> Unit,
+    retain: () -> ConfigurationSnapshotArchiveInventory,
+): ConfigurationSnapshotArchiveInventory = try {
+    retain()
+} catch (error: SnapshotDestinationUnavailableException) {
+    throw error
+} catch (error: kotlinx.coroutines.CancellationException) {
+    throw error
+} catch (error: Exception) {
+    onError(error)
+    fallback()
+}
+
 /** Storage Access Framework boundary for scheduled encrypted snapshot archives. */
 // Public because the device lane exercises the SAF archive path; core:storage is a module now.
 class ConfigurationSnapshotArchiveStore(context: Context) {
@@ -171,7 +203,18 @@ class ConfigurationSnapshotArchiveStore(context: Context) {
         onDeleteError = { archive, error ->
             AppLogger.warn("ConfigurationSnapshotArchiveStore", "Deleting old snapshot ${archive.file.name} failed", error)
         },
-    ) { archive -> deleteArchive(treeUri, archive.uri) }
+    ) { archive ->
+        try {
+            deleteArchive(treeUri, archive.uri)
+        } catch (error: SnapshotDestinationUnavailableException) {
+            val stillGranted = runCatching { requirePersistedAccess(treeUri) }.isSuccess
+            singleArchiveDeleteOutcome(error, stillGranted).also { gone ->
+                if (!gone) {
+                    AppLogger.warn("ConfigurationSnapshotArchiveStore", "The folder refused to delete old snapshot ${archive.file.name}", error)
+                }
+            }
+        }
+    }
 
     private fun rootDocumentUri(treeUri: Uri): Uri =
         DocumentsContract.buildDocumentUriUsingTree(treeUri, DocumentsContract.getTreeDocumentId(treeUri))

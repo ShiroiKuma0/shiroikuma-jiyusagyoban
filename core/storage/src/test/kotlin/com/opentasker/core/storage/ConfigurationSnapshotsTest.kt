@@ -66,6 +66,42 @@ class ConfigurationSnapshotsTest {
         assertTrue(error is SnapshotDestinationUnavailableException)
     }
 
+    /**
+     * One file's delete used to read as the whole folder lost: Setup said to pick it again right
+     * after a good snapshot, and the success went unrecorded.
+     */
+    @Test
+    fun oneFileGoneOrRefusedIsNotTheFolderLost() {
+        val gone = SnapshotDestinationUnavailableException("lost", java.io.FileNotFoundException("gone"))
+        val refused = SnapshotDestinationUnavailableException("lost", SecurityException("no"))
+
+        assertTrue(singleArchiveDeleteOutcome(gone, stillGranted = true))
+        assertTrue(!singleArchiveDeleteOutcome(refused, stillGranted = true))
+        val lost = runCatching { singleArchiveDeleteOutcome(refused, stillGranted = false) }.exceptionOrNull()
+        assertTrue(lost === refused)
+    }
+
+    /** A folder that couldn't be listed after a good export used to fail the run, and each retry wrote another archive. */
+    @Test
+    fun retentionThatCantListTheFolderStillLetsTheRunSucceed() {
+        val lastRun = ConfigurationSnapshotArchiveInventory(snapshotCount = 3, storageBytes = 30, removedCount = 0)
+        val errors = mutableListOf<Exception>()
+
+        val inventory = retainAfterExport(fallback = { lastRun }, onError = { errors += it }) {
+            throw java.io.IOException("The snapshot folder could not be read")
+        }
+
+        assertEquals(lastRun, inventory)
+        assertEquals(1, errors.size)
+        val lost = runCatching {
+            retainAfterExport(fallback = { lastRun }, onError = { errors += it }) {
+                throw SnapshotDestinationUnavailableException("gone")
+            }
+        }.exceptionOrNull()
+        assertTrue(lost is SnapshotDestinationUnavailableException)
+        assertEquals(1, errors.size)
+    }
+
     @Test
     fun retentionKeepsTheNewestSnapshotsUpToTheCountLimit() {
         val snapshots = (0 until 8).map { index ->
