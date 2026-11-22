@@ -1725,6 +1725,8 @@
     <string name="inspector_setup_clock_inexact">时钟来源已注册；精确闹钟被拒绝，因此计划引擎滴答使用不精确的回退方案。</string>
     <string name="inspector_setup_state_ready">当设备传感器和权限存在时，电池、充电、媒体、屏幕、耳机和基于传感器的状态检查可用。</string>
     <string name="inspector_setup_state_partial">基础状态检查可用。Wi-Fi、速度、活动、漫游和通话值可能需要设置权限或设备提供商访问。</string>
+    <string name="inspector_setup_work_profile_unsupported">此设备不支持工作资料，因此 work_profile 始终为 none。</string>
+    <string name="inspector_setup_private_space_hidden">无法读取私密空间：Android 只向主屏幕应用显示它。work_profile 只反映工作资料。</string>
     <string name="inspector_setup_calendar_ready">可以使用脱敏元数据匹配日历事件。</string>
     <string name="inspector_setup_calendar_missing">日历触发需要设置中的日历访问；日出/日落匹配使用配置的坐标。</string>
     <string name="inspector_setup_event_ready">开机、系统、通知、NFC、日历和太阳事件已注册。通知文本仅保存在内存中用于匹配，不会写入运行日志。%1$s</string>

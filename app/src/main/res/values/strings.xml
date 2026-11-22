@@ -1794,6 +1794,8 @@
     <string name="inspector_setup_clock_inexact">Clock source is registered; exact alarms are denied so scheduled engine ticks use the inexact fallback.</string>
     <string name="inspector_setup_state_ready">Battery, charging, media, screen, headset, and sensor-backed state checks are available when their device sensors and permissions are present.</string>
     <string name="inspector_setup_state_partial">Basic state checks are available. Wi-Fi, speed, activity, roaming, and phone-call values may need Setup permission or device-provider access.</string>
+    <string name="inspector_setup_work_profile_unsupported">This device doesn\'t support work profiles, so work_profile always reads none.</string>
+    <string name="inspector_setup_private_space_hidden">Private Space can\'t be read, since Android shows it only to the home screen app. work_profile covers the work profile alone.</string>
     <string name="inspector_setup_calendar_ready">Calendar events can be matched with redacted metadata.</string>
     <string name="inspector_setup_calendar_missing">Calendar triggers need Calendar access in Setup; sunrise/sunset matching uses configured coordinates.</string>
     <string name="inspector_setup_event_ready">Boot, system, notification, NFC, calendar, and sun events are registered. Notification text is kept in-memory for matching and is not written to run logs. %1$s</string>

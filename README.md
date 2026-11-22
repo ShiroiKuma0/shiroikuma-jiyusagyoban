@@ -63,7 +63,7 @@
 - **MacroDroid migration**. Import full `.mdr` backups, password-protected `.emdr` exports or single `.macro` shares into disabled profiles, with bounded decoding and an exact mapped, unsupported, and lossy review
 
 - Time/day schedules with presets, aliases, and ranges
-- Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, phone-call state, Bluetooth devices nearby, and Health Connect steps, heart rate, sleep and exercise). Sensor/GPS/phone callbacks are demand-gated per profile
+- Device state (battery, charging, headphones, screen, media playback, airplane, power save, Wi-Fi SSID, orientation, proximity, physical activity, speed, roaming, tethering, phone-call state, Bluetooth devices nearby, work profile, and Health Connect steps, heart rate, sleep and exercise). Sensor/GPS/phone callbacks are demand-gated per profile. `work_profile` reads `available`, `paused` or `none` and changes when you pause or resume work apps, with no permission needed. Before Android 15, Android doesn't say what kind a profile is, so any other profile of yours counts. Private Space can't be read at all, since Android shows it only to the home screen app
 - App foreground detection via UsageStats, with optional exact/glob Activity component matching and explicit unavailable-component reporting
 - Wi-Fi and data/internet connectivity via NetworkCallback
 - Notification listener with package/title/body filters. A matching notification hands the task `{{ event.notification_package }}`, `{{ event.notification_title }}` and `{{ event.notification_body }}`

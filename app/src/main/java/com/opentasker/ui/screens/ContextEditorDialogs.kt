@@ -75,6 +75,7 @@ import com.opentasker.core.contexts.NfcTagWriteSession
 import com.opentasker.core.contexts.ScreenRecordingEventPresets
 import com.opentasker.core.contexts.SunEventCalculator
 import com.opentasker.core.contexts.TimeContextBounds
+import com.opentasker.core.contexts.WorkProfileState
 import com.opentasker.core.contexts.BT_NEAR_STATE_KEY
 import com.opentasker.core.engine.EventTaskVariables
 import com.opentasker.core.engine.EventVariable
@@ -834,6 +835,7 @@ internal object StateContextPresets {
             add(StateContextPreset("roaming", R.string.context_state_preset_roaming, mapOf("key" to "roaming", "operator" to "=", "value" to "true")))
             add(StateContextPreset("bt_near", R.string.context_state_preset_bt_near, mapOf("key" to BT_NEAR_STATE_KEY, "operator" to "=", "value" to "")))
             add(StateContextPreset("tethering", R.string.context_state_preset_tethering, mapOf("key" to "tethering", "operator" to "=", "value" to "true")))
+            add(StateContextPreset("work_profile", R.string.context_state_preset_work_profile, mapOf("key" to WorkProfileState.KEY, "operator" to "=", "value" to WorkProfileState.PAUSED)))
             add(StateContextPreset("call", R.string.context_state_preset_call, mapOf("key" to "call_state", "operator" to "=", "value" to "ringing")))
             add(StateContextPreset("health_steps", R.string.context_state_preset_health_steps, mapOf("key" to HealthMetric.STEPS.stateKey, "operator" to ">=", "value" to "10000")))
             add(StateContextPreset("health_heart_rate", R.string.context_state_preset_health_heart_rate, mapOf("key" to HealthMetric.HEART_RATE.stateKey, "operator" to ">", "value" to "100")))

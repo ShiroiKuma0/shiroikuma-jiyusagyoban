@@ -104,6 +104,9 @@ class StateContextSourceImpl : StateDemandContextSource {
                     Intent.ACTION_AIRPLANE_MODE_CHANGED -> {
                         statePatch["airplane"] = isAirplaneModeOn(app).toString()
                     }
+                    // Read the profile again rather than trust which broadcast came last: a pause
+                    // and a removal can arrive close together.
+                    in WorkProfileState.ACTIONS -> statePatch[WorkProfileState.KEY] = WorkProfileState.read(app)
                 }
 
                 publishPatch(statePatch)
@@ -118,6 +121,7 @@ class StateContextSourceImpl : StateDemandContextSource {
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+            WorkProfileState.ACTIONS.forEach(::addAction)
         }
 
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -234,6 +238,7 @@ internal fun seedInitialState(app: Context): Map<String, String> {
     }
 
     seed["airplane"] = isAirplaneModeOn(app).toString()
+    seed[WorkProfileState.KEY] = WorkProfileState.read(app)
 
     seed += MediaPlaybackStateEvents.snapshot(app)
 
@@ -352,6 +357,9 @@ internal fun normalizeStateExpectedValue(key: String, value: String): String? {
             "ringing", "ring" -> "ringing"
             "offhook", "off_hook", "active", "in_call" -> "offhook"
             else -> null
+        }
+        WorkProfileState.KEY -> normalized.takeIf {
+            it in setOf(WorkProfileState.AVAILABLE, WorkProfileState.PAUSED, WorkProfileState.NONE)
         }
         else -> value.trim()
     }

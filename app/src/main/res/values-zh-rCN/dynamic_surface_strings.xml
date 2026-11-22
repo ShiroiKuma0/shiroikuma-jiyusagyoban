@@ -50,6 +50,7 @@
     <string name="context_state_preset_speed" formatted="false">速度 ≥ 10 米/秒</string>
     <string name="context_state_preset_roaming" formatted="false">漫游</string>
     <string name="context_state_preset_tethering" formatted="false">网络共享</string>
+    <string name="context_state_preset_work_profile" formatted="false">工作资料已暂停</string>
     <string name="context_state_preset_call" formatted="false">来电</string>
     <string name="context_state_preset_health_steps" formatted="false">今天走满 10,000 步</string>
     <string name="context_state_preset_health_heart_rate" formatted="false">心率超过 100</string>

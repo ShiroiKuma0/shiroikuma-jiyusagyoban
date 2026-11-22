@@ -82,6 +82,7 @@ import com.opentasker.core.capabilities.AutomationLintStrings
 import com.opentasker.core.capabilities.AutomationInvariantStore
 import com.opentasker.core.capabilities.PlatformSupport
 import com.opentasker.core.contexts.BroadcastContextEvents
+import com.opentasker.core.contexts.WorkProfileState
 import com.opentasker.core.engine.CausalLoopDiagnostics
 import com.opentasker.core.location.LocationDwellStateStore
 import com.opentasker.core.location.LocationPolicyDisclosures
@@ -1111,11 +1112,16 @@ private fun contextSourceSetup(context: Context, key: String): ContextSourceSetu
         val locationReady = hasPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
         ContextSourceSetup(
             ready = true,
-            detail = if (wifiReady && locationReady) {
-                context.getString(R.string.inspector_setup_state_ready)
-            } else {
-                context.getString(R.string.inspector_setup_state_partial)
-            },
+            detail = listOfNotNull(
+                if (wifiReady && locationReady) {
+                    context.getString(R.string.inspector_setup_state_ready)
+                } else {
+                    context.getString(R.string.inspector_setup_state_partial)
+                },
+                if (WorkProfileState.supported(context)) null else context.getString(R.string.inspector_setup_work_profile_unsupported),
+                // Private Space arrived in Android 15, and only the home screen app may see it.
+                if (Build.VERSION.SDK_INT >= 35) context.getString(R.string.inspector_setup_private_space_hidden) else null,
+            ).joinToString(" "),
         )
     }
     "event" -> {
