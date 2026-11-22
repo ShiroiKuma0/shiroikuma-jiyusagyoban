@@ -38,6 +38,7 @@
 
 ### Fixed
 
+- In the scene editor, dragging an element you'd already touched could undo the move you'd just made to another one, and dragging a selected element could unselect it. Each drag now works from the scene as it is.
 - Picking a shorter run log retention could delete held runs, the ones you can still replay, without showing the review first, because the review only counted ordinary entries. It counts held runs now and says how many would go.
 - In Diagnostics, a scheduled job's "Earlier run stopped by Android" line no longer starts with a stray space.
 - Diagnostics reads in Simplified Chinese all the way down now. Time alarms, app standby, the service types, blocked scheduled jobs, why the app last closed and the health evidence lines were still in English and in the engine's own terms, so they're plain words in both languages. The shared report stays in English, so a bug report reads the same from any phone.

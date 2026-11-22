@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -256,6 +257,20 @@ private fun SceneCanvasElement(
         CustomAccessibilityAction(moveRightActionLabel) { moveBy(1, 0) },
     ) + resizeAccessibilityActions
 
+    // A gesture handler starts on its element's first touch and lives until one of its pointerInput
+    // keys changes, so it reads these rather than the values it started with. Holding the scene it
+    // started with, a touched B dragged after A moved saved over the old scene and put A back, and
+    // a stale `selected` toggled the element off.
+    val currentScene by rememberUpdatedState(scene)
+    val currentElement by rememberUpdatedState(element)
+    val currentIndex by rememberUpdatedState(index)
+    val currentProjection by rememberUpdatedState(projection)
+    val currentSelected by rememberUpdatedState(selected)
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    val currentOnMoveElement by rememberUpdatedState(onMoveElement)
+    val currentOnResizeElement by rememberUpdatedState(onResizeElement)
+    val currentOnAlignmentGuidesChanged by rememberUpdatedState(onAlignmentGuidesChanged)
+
     val currentWidth = (projection.width + resizeDx).coerceAtLeast(MIN_ELEMENT_SIZE.toFloat())
     val currentHeight = (projection.height + resizeDy).coerceAtLeast(MIN_ELEMENT_SIZE.toFloat())
     Box(
@@ -284,55 +299,55 @@ private fun SceneCanvasElement(
                         // Only add to the selection if this member isn't already selected; toggling
                         // here would deselect a selected element the moment the user starts to drag
                         // it, silently dropping it from a multi-selection group move.
-                        onDragStart = { if (!selected) onSelect() },
+                        onDragStart = { if (!currentSelected) currentOnSelect() },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             dragX += dragAmount.x / density.density
                             dragY += dragAmount.y / density.density
                             val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
-                                scene = scene,
-                                element = element,
-                                canvasX = projection.x + dragX,
-                                canvasY = projection.y + dragY,
+                                scene = currentScene,
+                                element = currentElement,
+                                canvasX = currentProjection.x + dragX,
+                                canvasY = currentProjection.y + dragY,
                                 canvasWidth = canvasWidth,
                                 canvasHeight = canvasHeight,
                             )
                             val alignment = SceneAlignmentGuides.findGuides(
-                                scene = scene,
-                                movingIndex = index,
+                                scene = currentScene,
+                                movingIndex = currentIndex,
                                 candidateX = candidateX,
                                 candidateY = candidateY,
-                                candidateW = element.widthDp,
-                                candidateH = element.heightDp,
+                                candidateW = currentElement.widthDp,
+                                candidateH = currentElement.heightDp,
                             )
-                            onAlignmentGuidesChanged(alignment.guides)
+                            currentOnAlignmentGuidesChanged(alignment.guides)
                         },
                         onDragEnd = {
                             val (candidateX, candidateY) = SceneCanvasProjector.scenePositionForCanvasOffset(
-                                scene = scene,
-                                element = element,
-                                canvasX = projection.x + dragX,
-                                canvasY = projection.y + dragY,
+                                scene = currentScene,
+                                element = currentElement,
+                                canvasX = currentProjection.x + dragX,
+                                canvasY = currentProjection.y + dragY,
                                 canvasWidth = canvasWidth,
                                 canvasHeight = canvasHeight,
                             )
                             val alignment = SceneAlignmentGuides.findGuides(
-                                scene = scene,
-                                movingIndex = index,
+                                scene = currentScene,
+                                movingIndex = currentIndex,
                                 candidateX = candidateX,
                                 candidateY = candidateY,
-                                candidateW = element.widthDp,
-                                candidateH = element.heightDp,
+                                candidateW = currentElement.widthDp,
+                                candidateH = currentElement.heightDp,
                             )
                             dragX = 0f
                             dragY = 0f
-                            onAlignmentGuidesChanged(emptyList())
-                            onMoveElement(index, alignment.snappedX, alignment.snappedY)
+                            currentOnAlignmentGuidesChanged(emptyList())
+                            currentOnMoveElement(currentIndex, alignment.snappedX, alignment.snappedY)
                         },
                         onDragCancel = {
                             dragX = 0f
                             dragY = 0f
-                            onAlignmentGuidesChanged(emptyList())
+                            currentOnAlignmentGuidesChanged(emptyList())
                         },
                     )
                 },
@@ -370,8 +385,8 @@ private fun SceneCanvasElement(
                         },
                         onDragEnd = {
                             val resized = SceneEditorMutations.resizeElementFromCanvasDelta(
-                                scene = scene,
-                                element = element,
+                                scene = currentScene,
+                                element = currentElement,
                                 deltaCanvasX = resizeDx,
                                 deltaCanvasY = resizeDy,
                                 canvasWidth = canvasWidth,
@@ -380,7 +395,7 @@ private fun SceneCanvasElement(
                             )
                             resizeDx = 0f
                             resizeDy = 0f
-                            onResizeElement(index, resized.widthDp, resized.heightDp)
+                            currentOnResizeElement(currentIndex, resized.widthDp, resized.heightDp)
                         },
                         onDragCancel = {
                             resizeDx = 0f
