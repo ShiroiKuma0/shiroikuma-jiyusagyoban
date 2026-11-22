@@ -404,7 +404,8 @@ class AutomationService : Service() {
             dispatchedProfiles.clear()
             dispatchedWithoutEnterTask.clear()
         }
-        cooldowns.clear()
+        // Cooldowns stay: a run this stop cancels before it started gives its cooldown back when
+        // its job completes, which can be after this returns. The next service seeds from the store.
         ExecutionAdmissionRegistry.detach(executionAdmission)
         profileTaskSlots.clear()
         queuedProfileTasks.clear()

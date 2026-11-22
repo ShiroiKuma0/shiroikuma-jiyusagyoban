@@ -33,8 +33,6 @@ class CooldownReservations(
         deadlines.putAll(persisted)
     }
 
-    fun clear() = synchronized(deadlines) { deadlines.clear() }
-
     fun snapshot(): Map<Long, Long> = synchronized(deadlines) { deadlines.toMap() }
 
     /**
@@ -58,7 +56,7 @@ class CooldownReservations(
 
     /**
      * Puts back the deadline [reservation] replaced, for a run that never started. Does nothing
-     * once a later reservation or a [clear] has replaced it, so it can't undo someone else's window.
+     * once a later reservation has replaced it, so it can't undo someone else's window.
      */
     fun release(profileId: Long, reservation: CooldownReservation) = synchronized(deadlines) {
         if (reservation.deadlineMs == 0L || deadlines[profileId] != reservation.deadlineMs) return@synchronized
@@ -73,8 +71,9 @@ class CooldownReservations(
 
 /**
  * The cooldown one dispatch armed. The dispatch reserves it before admission runs, so a run that
- * admission refuses (open circuit, burst or active limit) or that is canceled before it gets that
- * far gives it back: nothing ran, and the next trigger shouldn't read "on cooldown".
+ * admission refuses (open circuit, burst or active limit), the collision policy skips, or that is
+ * canceled before it starts gives it back: nothing ran, and the next trigger shouldn't read
+ * "on cooldown".
  */
 class CooldownClaim(
     private val reservations: CooldownReservations,
@@ -83,7 +82,7 @@ class CooldownClaim(
 ) {
     private val settled = AtomicBoolean(false)
 
-    /** The run got past admission, so the cooldown stands. */
+    /** The task started, so the cooldown stands. */
     fun admitted() = settled.set(true)
 
     /** Gives the cooldown back unless [admitted] came first. Later calls do nothing. */

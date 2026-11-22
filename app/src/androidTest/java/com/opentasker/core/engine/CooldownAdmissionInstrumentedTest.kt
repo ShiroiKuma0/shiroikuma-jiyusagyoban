@@ -3,9 +3,13 @@ package com.opentasker.core.engine
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.opentasker.core.model.CollisionMode
 import com.opentasker.core.model.Task
 import com.opentasker.core.storage.AppDatabase
 import com.opentasker.core.storage.toEntity
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -52,6 +56,22 @@ class CooldownAdmissionInstrumentedTest {
         refusals.forEach { (kind, admission) ->
             assertEquals(kind, admission.preview(profileId = PROFILE).rejection?.kind)
             assertFalse("A run refused for $kind kept its cooldown", coolingDownAfterARun(admission, "refused-$kind"))
+        }
+    }
+
+    /** Admission let it in, but the task was already running and Abort new skipped it. */
+    @Test
+    fun aRunTheCollisionPolicySkipsGivesTheCooldownBack() = runBlocking {
+        assertEquals(CollisionMode.ABORT_NEW, task.collisionMode)
+        val finish = CompletableDeferred<Unit>()
+        val running = launch(start = CoroutineStart.UNDISPATCHED) {
+            TaskCollisionCoordinator.Default.execute(task) { finish.await() }
+        }
+        try {
+            assertFalse(coolingDownAfterARun(ExecutionAdmissionController(limits()), "collision"))
+        } finally {
+            finish.complete(Unit)
+            running.join()
         }
     }
 

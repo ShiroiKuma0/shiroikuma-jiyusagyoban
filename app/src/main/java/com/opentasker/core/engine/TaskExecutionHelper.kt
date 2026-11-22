@@ -58,7 +58,10 @@ suspend fun executeAndLogTask(
     profileFallbackTaskId: Long? = null,
     allowFallback: Boolean = true,
     execution: ExecutionEnvelope = ExecutionEnvelope.create(task, source, profileId = profileId),
-    /** Called once admission accepts the run, before any of the task starts. */
+    /**
+     * Called once the task starts: past admission, the journal and the collision policy, before
+     * its first action. A run skipped at any of those never calls it.
+     */
     onAdmitted: () -> Unit = {},
 ): TaskExecutionResult = withContext(Dispatchers.IO) {
     if (execution.mode == ExecutionMode.SIMULATION) {
@@ -120,7 +123,6 @@ suspend fun executeAndLogTask(
         )
     }
     val admissionLease = requireNotNull(admission.lease)
-    onAdmitted()
     // Only admitted work becomes a causal parent. A capacity or collision skip must not make a
     // later unrelated profile appear to be a child of work that never ran.
     ExecutionCausality.remember(execution)
@@ -202,6 +204,7 @@ suspend fun executeAndLogTask(
     var executionId: Long? = null
     val collisionOutcome = try {
         collisionCoordinator.execute(task) {
+            onAdmitted()
             // Publish only admitted work. A WAIT invocation is not shown as active until it owns
             // the task slot, and ABORT_NEW never flashes a run that will immediately be skipped.
             val admittedExecutionId = ActiveExecutionRegistry.register(
