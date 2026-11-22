@@ -145,13 +145,14 @@ val DEFAULT_EDITOR_EVENT_VARIABLES: List<EditorEventVariable> =
 
 /**
  * The event chips for [taskId]'s editor. A task some profile starts gets exactly what those
- * profiles' event contexts hand it, which is nothing for a task that only runs on exit. A task no
+ * profiles' event contexts hand it, which is nothing for a task that only runs on exit or as a
+ * profile's fallback (that run gets the failure's details, not the event's). A task no
  * profile uses yet keeps every event's chips, since it may still be attached to one. So does a
  * task another task runs (a sub-task reads its caller's event fields), and one started by an event
  * context with no event named, since that context fires on every event.
  */
 fun editorEventVariablesFor(taskId: Long, profiles: List<Profile>, tasks: List<Task> = emptyList()): List<EditorEventVariable> {
-    val usedBy = profiles.filter { it.enterTaskId == taskId || it.exitTaskId == taskId }
+    val usedBy = profiles.filter { it.enterTaskId == taskId || it.exitTaskId == taskId || it.fallbackTaskId == taskId }
     if (usedBy.isEmpty() || calledAsSubTask(taskId, tasks)) return DEFAULT_EDITOR_EVENT_VARIABLES
     val events = usedBy.asSequence()
         .filter { it.enterTaskId == taskId }

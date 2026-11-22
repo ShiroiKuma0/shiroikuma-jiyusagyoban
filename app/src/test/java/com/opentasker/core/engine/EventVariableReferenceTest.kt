@@ -138,12 +138,13 @@ class EventVariableReferenceTest {
     @Test
     fun aTaskThatOnlyRunsOnExitOrFromATimeProfileGetsNoEventChips() {
         val profiles = listOf(
-            Profile(id = 1, name = "Texts", contexts = listOf(eventSpec("sms_received")), enterTaskId = 20, exitTaskId = 30),
+            Profile(id = 1, name = "Texts", contexts = listOf(eventSpec("sms_received")), enterTaskId = 20, exitTaskId = 30, fallbackTaskId = 50),
             Profile(id = 2, name = "Morning", contexts = listOf(ContextSpec(ContextType.TIME, mapOf("from" to "08:00"))), enterTaskId = 40),
         )
 
         assertEquals(emptyList<Any>(), editorEventVariablesFor(30, profiles))
         assertEquals(emptyList<Any>(), editorEventVariablesFor(40, profiles))
+        assertEquals("a fallback run gets the failure, not the event", emptyList<Any>(), editorEventVariablesFor(50, profiles))
     }
 
     @Test
