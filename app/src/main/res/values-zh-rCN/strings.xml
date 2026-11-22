@@ -1111,6 +1111,7 @@
     <string name="scenes_canvas_element_description">%1$s、%2$s，位于 %3$d,%4$d dp，尺寸 %5$dx%6$d dp</string>
     <string name="scenes_unlabeled_element">未标签的元素</string>
     <string name="scenes_select_element_content_description">选择元素</string>
+    <string name="scenes_deselect_element_content_description">取消选择元素</string>
     <string name="scenes_resize_handle_content_description">调整元素大小</string>
     <string name="scenes_resize_narrower_content_description">将元素变窄 1 dp</string>
     <string name="scenes_resize_wider_content_description">将元素变宽 1 dp</string>

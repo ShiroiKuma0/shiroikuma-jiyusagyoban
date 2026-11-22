@@ -207,7 +207,9 @@ private fun SceneCanvasElement(
     val selectionState = stringResource(
         if (selected) R.string.a11y_selected else R.string.a11y_not_selected,
     )
-    val selectActionLabel = stringResource(R.string.scenes_select_element_content_description)
+    val selectActionLabel = stringResource(
+        if (selected) R.string.scenes_deselect_element_content_description else R.string.scenes_select_element_content_description,
+    )
     val moveLeftActionLabel = stringResource(R.string.scenes_move_left_content_description)
     val moveUpActionLabel = stringResource(R.string.scenes_move_up_content_description)
     val moveDownActionLabel = stringResource(R.string.scenes_move_down_content_description)
@@ -247,13 +249,11 @@ private fun SceneCanvasElement(
         CustomAccessibilityAction(resizeTallerActionLabel) { resizeBy(0, 1) },
     )
     val elementAccessibilityActions = listOf(
+        // Toggles like a tap. Add-only, a screen reader could grow a selection it never shrank, and
+        // every move after that moved the whole group.
         CustomAccessibilityAction(selectActionLabel) {
-            if (selected) {
-                false
-            } else {
-                onSelect()
-                true
-            }
+            onSelect()
+            true
         },
         CustomAccessibilityAction(moveLeftActionLabel) { moveBy(-1, 0) },
         CustomAccessibilityAction(moveUpActionLabel) { moveBy(0, -1) },

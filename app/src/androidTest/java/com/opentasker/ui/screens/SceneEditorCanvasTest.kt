@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -89,6 +90,19 @@ class SceneEditorCanvasTest {
         assertEquals(180, b.yDp)
     }
 
+    /** The screen reader's action only added, so a selected element never came out of the group. */
+    @Test
+    fun theScreenReaderActionTakesAnElementOutOfTheSelection() {
+        showCard()
+        screenReaderAction("Alpha", R.string.scenes_select_element_content_description)
+        screenReaderAction("Bravo", R.string.scenes_select_element_content_description)
+        assertSelected("Alpha", true)
+
+        screenReaderAction("Alpha", R.string.scenes_deselect_element_content_description)
+        assertSelected("Alpha", false)
+        assertSelected("Bravo", true)
+    }
+
     private fun showCard() {
         composeTestRule.setContent {
             OpenTaskerTheme {
@@ -134,6 +148,13 @@ class SceneEditorCanvasTest {
             repeat(10) { moveBy(Offset(10.dp.toPx(), 0f), delayMillis = 16) }
             up()
         }
+        composeTestRule.waitForIdle()
+    }
+
+    private fun screenReaderAction(label: String, actionLabel: Int) {
+        val name = composeTestRule.activity.getString(actionLabel)
+        val action = element(label).fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == name }
+        composeTestRule.runOnUiThread { action.action() }
         composeTestRule.waitForIdle()
     }
 
