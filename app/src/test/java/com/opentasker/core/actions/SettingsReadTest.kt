@@ -30,4 +30,13 @@ class SettingsReadTest {
         assertTrue(refusal("table" to "secure", "key" to "location_mode").contains("variable"))
         assertTrue(refusal("table" to "secure", "key" to "location_mode", "var" to "%1bad").contains("variable"))
     }
+
+    @Test
+    fun aReadTheProviderRefusesFailsTheStepInsteadOfThrowing() {
+        // On the JVM every Settings call throws, which stands in for Android refusing the read.
+        listOf("global", "secure", "system").forEach { table ->
+            val message = refusal("table" to table, "key" to "location_mode", "var" to "%Out")
+            assertTrue(message, message.startsWith("Android won't let this app read $table/location_mode"))
+        }
+    }
 }

@@ -96,6 +96,16 @@ class TaskerSystemSwitchImportTest {
     }
 
     @Test
+    fun aSetValueOutsideOffOnAndToggleStaysAPlaceholder() {
+        listOf("3", "-1").forEach { set ->
+            val step = step("808", """<Int sr="arg0" val="$set"/>""")
+
+            assertEquals(set, TaskerXmlImporter.TASKER_UNSUPPORTED_ACTION_ID, step.type)
+            assertTrue(step.args.getValue("summary"), "isn't off, on or toggle" in step.args.getValue("summary"))
+        }
+    }
+
+    @Test
     fun theWrittenSettingExportsAsCustomSettingAndComesBackTheSame() {
         val imported = step("808", """<Int sr="arg0" val="1"/>""")
         val report = TaskerXmlExporter.export(emptyList(), listOf(Task(id = 1, name = "Switch", actions = listOf(imported))))
