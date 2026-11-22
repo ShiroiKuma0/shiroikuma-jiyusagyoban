@@ -260,7 +260,10 @@ internal fun selectCalendarEvents(
     }
     .toList()
 
-/** At most [max] characters, one fewer when the cut would split an emoji or another surrogate pair. */
+/**
+ * At most [max] characters, cut back to the last whole character a person sees, so it can come out
+ * a few shorter. Android's BreakIterator follows ICU's grapheme rules.
+ */
 private fun String.cutAt(max: Int): String {
     if (length <= max) return this
     // The last break between characters as a person sees them, so an emoji, a flag or a letter

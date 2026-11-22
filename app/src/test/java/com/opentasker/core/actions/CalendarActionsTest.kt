@@ -19,6 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
@@ -313,6 +314,9 @@ class CalendarActionsTest {
 
     @Test
     fun aCutTitleKeepsAFlagWhole() {
+        // The JDK's BreakIterator keeps a flag's two letters together only from Java 20, where it took
+        // up the grapheme rules Android's ICU one always had, so an older test JVM can't check this.
+        assumeTrue(System.getProperty("java.specification.version").substringAfter("1.").toInt() >= 20)
         // A flag is two regional indicator letters, four chars, and this one runs from the 1023rd to the 1026th.
         val title = "x".repeat(1022) + "\ud83c\uddfa\ud83c\uddf8" + "tail"
         val rows = listOf(CalendarEventRow(1, 2, title, now + 60_000L, now + 120_000L, allDay = false, location = ""))
