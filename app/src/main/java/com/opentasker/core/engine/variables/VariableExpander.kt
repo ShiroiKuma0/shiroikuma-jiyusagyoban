@@ -367,7 +367,9 @@ class VariableExpander {
         // Ahead of the joiner fallback below, which would read `+=` or `*` as the text to join with.
         when (pick) {
             TaskerJoinOrPick.AtRandom -> return if (size == 0) "" else arrays.get(name, Random.nextInt(size))
-            is TaskerJoinOrPick.Join -> return storedRange(name, pick.range, size, arrays)?.joinToString(pick.separator).orEmpty()
+            // A `1,3` list isn't one of the stored array's forms, so it joins with all of it, as before.
+            is TaskerJoinOrPick.Join -> return storedRange(name, pick.range, size, arrays)?.joinToString(pick.separator)
+                ?: arrays.join(name, "${pick.separator}+${pick.range}")
             null -> Unit
         }
         return when {
@@ -414,7 +416,8 @@ class VariableExpander {
         val split = if ("+\$?" in rest) rest.indexOf("+\$?") else rest.lastIndexOf('+')
         val range = rest.substring(split + 1)
         // A range Tasker reads that isn't read here yet, like `$?pattern`, still joins with all of it.
-        return if (TASKER_RANGE_FORM.matches(range)) TaskerJoinOrPick.Join(rest.substring(0, split), range) else TaskerJoinOrPick.Join(rest, "")
+        val readable = TASKER_RANGE_FORM.matches(range) || isTaskerIndexList(range)
+        return if (readable) TaskerJoinOrPick.Join(rest.substring(0, split), range) else TaskerJoinOrPick.Join(rest, "")
     }
 
     /**
@@ -468,7 +471,7 @@ class VariableExpander {
         val expanded = if ('%' in op) expandText(op, store, arrays) { it } else op
         val form = expanded.trim()
         val pick = taskerJoinOrPick(expanded)
-        if (pick == null && !TASKER_ARRAY_FORM.matches(form)) return null
+        if (pick == null && !TASKER_ARRAY_FORM.matches(form) && !isTaskerIndexList(form)) return null
         val items = store.numberedItems(name)
         // A plain variable with no elements keeps its own operators, like `%n(+5)` adding 5. Tasker's
         // counts aren't among them: they count elements whatever the base holds (`dq.V`), so 0.
@@ -493,8 +496,21 @@ class VariableExpander {
         }
     }
 
-    /** The numbered elements a `a:b`, `:b`, `a:`, `:`, empty or single-index [form] names; null when it isn't one. */
+    /**
+     * Tasker's list of positions, `%arr(1,3)` (decompiled 6.7.8, `fr.h0`), which any other form with
+     * a comma is there. One that starts with a letter stays this app's own operator, like
+     * `%text(split:,)`, and Tasker's `#?` and `$?` searches aren't read yet.
+     */
+    private fun isTaskerIndexList(form: String): Boolean =
+        ',' in form && form.first().let { !it.isLetter() && it != '#' && it != '$' }
+
+    /**
+     * The numbered elements a `a:b`, `:b`, `a:`, `:`, empty or single-index [form] names, or a
+     * `1,3` list in its order, where a part that isn't a whole number, spaces and all, names
+     * nothing, as in Tasker; null when it isn't one.
+     */
     private fun numberedRange(items: java.util.NavigableMap<Int, String>, form: String): List<String>? {
+        if (isTaskerIndexList(form)) return form.split(',').mapNotNull { part -> part.toIntOrNull()?.let { items[it] } }
         if (form.isNotEmpty() && ':' !in form) return listOfNotNull(items[form.toIntOrNull() ?: return null])
         val lastIndex = if (items.isEmpty()) 0 else items.lastKey()
         val from = form.substringBefore(':').ifEmpty { "1" }.toIntOrNull() ?: return null
