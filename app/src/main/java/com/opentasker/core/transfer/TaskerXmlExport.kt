@@ -1103,9 +1103,18 @@ object TaskerXmlExporter {
         if (trimmed.toIntOrNull() != null) {
             sb.appendLine("""      <Int sr="arg$index" val="$trimmed"/>""")
         } else {
-            sb.appendLine("""      <Int sr="arg$index"><var>${escapeXml(trimmed)}</var></Int>""")
+            sb.appendLine("""      <Int sr="arg$index"><var>${escapeXml(taskerIntSum(trimmed) ?: trimmed)}</var></Int>""")
         }
     }
+
+    /**
+     * A sum the import made a template of, `{{ i | add:1 | floor }}`, written back as Tasker's
+     * `%i+1`, which Tasker works out in a field that takes a whole number and cuts to its whole part.
+     */
+    private fun taskerIntSum(template: String): String? =
+        TEMPLATE_SUM.matchEntire(template)?.destructured?.let { (name, operation, amount) ->
+            "%$name${TEMPLATE_SUM_OPERATORS.getValue(operation)}$amount"
+        }
 
     private fun appendApp(sb: StringBuilder, index: Int, packageName: String) {
         sb.appendLine("""      <App sr="arg$index">""")
@@ -1316,6 +1325,10 @@ object TaskerXmlExporter {
     )
 
     private val BEEP_PITCH_TEMPLATE = Regex("""\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\|\s*div:4\s*\}\}""")
+
+    private val TEMPLATE_SUM = Regex("""\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\|\s*(add|sub|mul|div):(\d+(?:\.\d+)?)(?:\s*\|\s*floor)?\s*\}\}""")
+
+    private val TEMPLATE_SUM_OPERATORS = mapOf("add" to "+", "sub" to "-", "mul" to "*", "div" to "/")
 
     private val TEMPLATE_ARRAY = Regex("""\{\{\s*array\.([A-Za-z][A-Za-z0-9_]*)\s*\}\}""")
 

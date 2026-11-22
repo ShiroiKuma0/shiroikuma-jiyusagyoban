@@ -1069,13 +1069,15 @@ object TaskerXmlImporter {
      * they run, and `%x + 1` becomes a template. A null result is anything harder than that.
      * [factor] converts the field's unit, so `%x` seconds can arrive as milliseconds, and [divisor]
      * scales it down the same way. [unsetAsZero] reads an unset or empty variable as 0, the way
-     * Tasker's Do Maths does.
+     * Tasker's Do Maths does. [wholeNumber] keeps the whole part, the way Tasker reads a sum in a
+     * field that takes a whole number (decompiled 6.7.8, `i.F`), for any result from 1.
      */
     private fun taskerNumberTemplate(
         text: String,
         factor: Long = 1L,
         divisor: Long = 1L,
         unsetAsZero: Boolean = false,
+        wholeNumber: Boolean = false,
     ): String? {
         val trimmed = text.trim()
         val filters = mutableListOf<String>()
@@ -1089,6 +1091,7 @@ object TaskerXmlImporter {
         }
         if (factor != 1L) filters += "mul:$factor"
         if (divisor != 1L) filters += "div:$divisor"
+        if (wholeNumber) filters += "floor"
         return if (filters.isEmpty()) "%$name" else "{{ $name | ${filters.joinToString(" | ")} }}"
     }
 
@@ -1816,7 +1819,11 @@ object TaskerXmlImporter {
         val tasker = TASKER_ARRAY_ACTIONS.getValue(code)
         val name = byIndex[0].orEmpty()
         val toVar = byIndex[2].orEmptyIfBlank().takeIf { code == "356" }
-        val position = variables[1] ?: (ints[1] ?: 1).toString()
+        val writtenPosition = variables[1] ?: (ints[1] ?: 1).toString()
+        // Tasker works out a sum in Position, like `%i+1`, filled in (decompiled 6.7.8, `i.F` and `Expr.d`).
+        val positionSum = writtenPosition.takeIf { (code == "355" || code == "356") && TASKER_SIMPLE_SUM.matches(it.trim()) }
+            ?.let { taskerNumberTemplate(it, wholeNumber = true) }
+        val position = positionSum ?: writtenPosition
         val regexSplitter = element.rawActionString(1).takeIf { code == "590" && (ints[3] ?: 0) != 0 && it.isNotEmpty() }
         val processType = ints[1]?.let(ArrayProcessAction.TYPES::getOrNull).takeIf { code == "369" && variables[1] == null }
         val refusal = when {
@@ -1825,7 +1832,7 @@ object TaskerXmlImporter {
                 "Tasker ${tasker.first}'s ${if (code.startsWith("59")) "name" else "array"} $name isn't one plain variable"
             code == "369" && processType == null ->
                 "Tasker Array Process's type ${variables[1] ?: ints[1]} isn't one of its 14 operations"
-            (code == "355" || code == "356") && !(TASKER_PLAIN_VARIABLE.matches(position) || position.toIntOrNull()?.let { it >= 1 } == true) ->
+            (code == "355" || code == "356") && positionSum == null && !(TASKER_PLAIN_VARIABLE.matches(position) || position.toIntOrNull()?.let { it >= 1 } == true) ->
                 "Tasker ${tasker.first}'s Position $position isn't a number or one plain variable"
             toVar != null && !TASKER_PLAIN_VARIABLE.matches(toVar) -> "Tasker Array Pop stores into $toVar, which isn't one plain variable"
             // The editor drops a blank field on save, and Variable Split with no Values splits the

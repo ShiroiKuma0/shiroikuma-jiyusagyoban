@@ -906,11 +906,42 @@ class TaskerRealExportLayoutTest {
     }
 
     @Test
-    fun aPositionSumOrAPopTargetBuiltFromPartsStaysAPlaceholder() {
+    fun aPositionSumOfTwoVariablesOrAPopTargetBuiltFromPartsStaysAPlaceholder() {
         listOf(
-            """<code>355</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>%i+1</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>""",
+            """<code>355</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1"><var>%i+%j</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>""",
             """<code>356</code><Str sr="arg0" ve="3">%list</Str><Int sr="arg1" val="1"/><Str sr="arg2" ve="3">%out%n</Str>""",
         ).forEach { assertEquals(it, placeholder, action(it).type) }
+    }
+
+    @Test
+    fun aPositionSumIsWorkedOutWhenTheStepRuns() {
+        // Tasker fills the sum in and keeps the whole part (decompiled 6.7.8, `i.F` and `Expr.d`).
+        fun push(position: String) =
+            """<code>355</code><Str sr="arg0" ve="3">%Arr</Str><Int sr="arg1"><var>$position</var></Int><Str sr="arg2" ve="3">x</Str><Int sr="arg3" val="0"/>"""
+        val pop = """<code>356</code><Str sr="arg0" ve="3">%Arr</Str><Int sr="arg1"><var>%Idx - 1</var></Int><Str sr="arg2" ve="3">%Got</Str>"""
+        fun run(idx: String?, vararg steps: String): Pair<Boolean, VariableStore> {
+            val variables = VariableStore().apply {
+                listOf("a", "b", "c").forEachIndexed { index, value -> set("Arr${index + 1}", value) }
+                idx?.let { set("Idx", it) }
+            }
+            val task = parse(*steps).bundle.tasks.single()
+            return runBlocking { TaskRunner(ActionContext(ContextWrapper(null), variables)).run(task) }.success to variables
+        }
+
+        assertEquals("{{ Idx | add:1 | floor }}", action(push("%Idx+1")).args["position"])
+        val (pushed, afterPush) = run("2", push("%Idx+1"))
+        assertTrue(pushed)
+        assertEquals(mapOf(1 to "a", 2 to "b", 3 to "x", 4 to "c"), afterPush.numberedItems("Arr").toMap())
+        val (popped, afterPop) = run("2", pop)
+        assertTrue(popped)
+        assertEquals("a", afterPop.get("Got"))
+        assertEquals(mapOf(1 to "b", 2 to "c"), afterPop.numberedItems("Arr").toMap())
+        // 2.5 + 1 is 3.5, and Tasker uses 3.
+        assertEquals("x", run("2.5", push("%Idx+1")).second.get("Arr3"))
+        // Unset, Tasker can't work the sum out and stops the step.
+        val (stopped, untouched) = run(null, push("%Idx+1"))
+        assertFalse(stopped)
+        assertEquals(mapOf(1 to "a", 2 to "b", 3 to "c"), untouched.numberedItems("Arr").toMap())
     }
 
     @Test

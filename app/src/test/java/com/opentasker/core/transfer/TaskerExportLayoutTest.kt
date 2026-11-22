@@ -372,6 +372,10 @@ class TaskerExportLayoutTest {
             """<Str sr="arg2" ve="3"></Str>""",
             """<Int sr="arg3" val="1"/>""",
         )
+        // A Position sum the import made a template of goes back as the sum Tasker works out.
+        val pushAfter = mapOf("array" to "%Log", "position" to "{{ Idx | add:1 | floor }}", "value" to "x", "fill_spaces" to "false")
+        assertHas(xml("array.push", *pushAfter.toList().toTypedArray()), "<code>355</code>", "<var>%Idx+1</var>")
+        assertEquals(pushAfter, roundTrip("array.push", *pushAfter.toList().toTypedArray()).args)
         val unknown = export(ActionSpec(type = "var.convert", args = mapOf("name" to "%x", "function" to "rot13")))
         assertHas(unknown.xml, "<code>596</code>", "<var>rot13</var>")
         assertTrue(unknown.warnings.toString(), unknown.warnings.any { "'rot13'" in it })
