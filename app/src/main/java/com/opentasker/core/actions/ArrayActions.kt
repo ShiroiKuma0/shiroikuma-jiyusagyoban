@@ -8,9 +8,10 @@ import com.opentasker.core.engine.isArgumentSensitive
 import com.opentasker.core.model.VariableNamePolicy
 
 // Tasker's arrays are numbered variables: %arr1, %arr2, ... in the scope %arr belongs to. These
-// actions work on those elements, not on the arrays text.split and text.match store. The two that
-// set a whole new array (Variable Split, Array Clear) drop a stored one of the same name, which
-// would otherwise hide the new elements from %arr(#), Join Text and For Each.
+// actions work on those elements. Variable Split, Array Clear, Push, Pop and Process drop a list
+// text.split or text.match kept under the same name, which would otherwise hide the new elements from
+// Join Text and For Each, and the last three read such a list as elements 1..n while the name has
+// none of its own.
 
 internal const val MAX_ELEMENTS = 10_000
 
@@ -26,9 +27,25 @@ private fun position(args: Map<String, String>): Int? {
 internal fun elementName(base: String, index: Int): String? =
     "$base$index".takeIf { it.length <= VariableNamePolicy.MAX_LENGTH }
 
-/** [base]'s elements by index, each with its own secret flag so moving it keeps the flag. */
-private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int, Pair<String, Boolean>> =
-    numberedItems(base).mapValuesTo(java.util.TreeMap()) { (index, value) -> value to isSensitive("$base$index") }
+/**
+ * [base]'s elements by index, each with its own secret flag so moving it keeps the flag. With none,
+ * a list Split Text or Match Text kept under the name counts as elements 1..n.
+ */
+private fun VariableStore.elementsWithFlags(base: String): java.util.TreeMap<Int, Pair<String, Boolean>> {
+    val numbered = numberedItems(base)
+    val kept = if (numbered.isEmpty()) getArrayItems(base) else null
+    if (kept != null) {
+        val secret = isArraySensitive(base)
+        return kept.withIndex().associateTo(java.util.TreeMap()) { (index, value) -> index + 1 to (value to secret) }
+    }
+    return numbered.mapValuesTo(java.util.TreeMap()) { (index, value) -> value to isSensitive("$base$index") }
+}
+
+/** Writes [items] as [base]'s elements and drops a kept list of that name, so they're what reads see. */
+private fun VariableStore.replaceElements(base: String, items: Map<Int, Pair<String, Boolean>>) {
+    removeArray(base)
+    replaceNumberedItems(base, items)
+}
 
 /**
  * Tasker's Variable Split. Args: `name`, `splitter`, `regex`, `delete_base`, `values`. Splits %name
@@ -109,7 +126,7 @@ class ArrayPushAction : DeclaredAction(ActionCatalog.require("array.push")) {
             return ActionResult.Failure("%$base element names would pass ${VariableNamePolicy.MAX_LENGTH} characters")
         }
         moved[at] = args["value"].orEmpty() to false
-        ctx.variables.replaceNumberedItems(base, moved)
+        ctx.variables.replaceElements(base, moved)
         ctx.logger("array.push -> %$base($at)")
         return ActionResult.Success
     }
@@ -136,7 +153,7 @@ class ArrayPopAction : DeclaredAction(ActionCatalog.require("array.pop")) {
         val popped = items[at]
         val moved = java.util.TreeMap<Int, Pair<String, Boolean>>()
         items.forEach { (index, item) -> if (index != at) moved[if (index > at) index - 1 else index] = item }
-        ctx.variables.replaceNumberedItems(base, moved)
+        ctx.variables.replaceElements(base, moved)
         if (toVar != null) {
             if (popped == null) ctx.variables.remove(toVar) else ctx.variables.set(toVar, popped.first, sensitive = popped.second)
         }
@@ -179,7 +196,7 @@ class ArrayProcessAction : DeclaredAction(ActionCatalog.require("array.process")
             "squash" -> values.filter { it.first.isNotEmpty() }.withIndex().associate { (index, item) -> index + 1 to item }
             else -> items.keys.zip(reorder(type, values)).toMap()
         }
-        ctx.variables.replaceNumberedItems(base, processed)
+        ctx.variables.replaceElements(base, processed)
         ctx.logger("array.process -> %$base ($type, ${processed.size} element(s))")
         return ActionResult.Success
     }
