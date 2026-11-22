@@ -93,14 +93,15 @@ object TaskShortcutHelper {
     /**
      * Brings the app's task shortcuts in line with [taskNames], every task's id and name.
      * [previousNames] is the list as this process last saw it, or null on the first call, and
-     * [afterRestore] says a restore replaced the database at this start. See [plan].
+     * [afterRestore] says a restore replaced the database at this start. See [plan]. False when
+     * the shortcuts couldn't be read or changed, so the caller keeps what it would compare with.
      */
     fun reconcile(
         context: Context,
         taskNames: Map<Long, String>,
         previousNames: Map<Long, String>? = null,
         afterRestore: Boolean = false,
-    ) {
+    ): Boolean =
         runCatching {
             val shortcuts = ShortcutManagerCompat.getShortcuts(
                 context,
@@ -133,9 +134,11 @@ object TaskShortcutHelper {
                     plan.update.map { taskShortcut(context, it.id, it.taskId, it.label, it.kind, it.madeFor) },
                 )
                 if (!updated) AppLogger.warn(TAG, "Android held back renaming task shortcuts; the next change tries again")
+                updated
+            } else {
+                true
             }
-        }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }
-    }
+        }.onFailure { AppLogger.error(TAG, "Could not update task shortcuts", it) }.getOrDefault(false)
 
     /**
      * A shortcut keeps the task id and label it was made with. One for a task that's gone is
@@ -144,10 +147,13 @@ object TaskShortcutHelper {
      * that's only dynamic, so only a pinned one is left to come back.
      *
      * A rename gives the ones Pin made the task's new name, and a label picked through the publish
-     * action stays. A shortcut from an older version doesn't say which it is, so a `task_<id>` one
-     * follows a rename only when its label was the task's old name in [previousNames]. A restore
-     * swaps every task at once, so after one ([afterRestore]) a new name under the same id may be
-     * another task, and the shortcut is turned off instead.
+     * action stays. A restore swaps every task at once, so after one ([afterRestore]) a new name
+     * under the same id may be another task, and the shortcut is turned off instead.
+     *
+     * A shortcut from an older version doesn't say which kind it is or what it was made for, so
+     * the first pass that finds its task records both: a `task_<id>` one whose label is the task's
+     * name, or was its name in [previousNames], follows it from then on, and any other keeps its
+     * label. Until then its label is the best guess at the name it was made for.
      */
     internal fun plan(
         shortcuts: List<ShortcutState>,
@@ -164,24 +170,24 @@ object TaskShortcutHelper {
                 if (shortcut.enabled) disable += shortcut.id
                 continue
             }
-            // An older shortcut doesn't say what it was made for; unless it's a picked label, its label is the best guess.
-            val madeFor = shortcut.madeFor ?: shortcut.label.takeIf { shortcut.kind != ShortcutKind.PICKED }
-            if (madeFor == name) {
-                if (!shortcut.enabled) enable += shortcut.id
-                continue
-            }
-            if (!shortcut.enabled) continue
-            if (afterRestore) {
+            val madeFor = if (shortcut.kind == ShortcutKind.LEGACY) shortcut.label else shortcut.madeFor
+            if (!shortcut.enabled) {
+                if (madeFor != name) continue
+                enable += shortcut.id
+            } else if (afterRestore && madeFor != name) {
                 disable += shortcut.id
                 continue
             }
             when (shortcut.kind) {
-                ShortcutKind.FOLLOWS -> update += shortcut.copy(label = name, madeFor = name)
-                ShortcutKind.PICKED -> update += shortcut.copy(madeFor = name)
-                ShortcutKind.LEGACY -> if (
-                    shortcut.id == defaultId(shortcut.taskId) && previousNames?.get(shortcut.taskId) == shortcut.label
+                ShortcutKind.FOLLOWS -> if (madeFor != name) update += shortcut.copy(label = name, madeFor = name)
+                ShortcutKind.PICKED -> if (madeFor != name) update += shortcut.copy(madeFor = name)
+                ShortcutKind.LEGACY -> update += if (
+                    shortcut.id == defaultId(shortcut.taskId) &&
+                    (shortcut.label == name || previousNames?.get(shortcut.taskId) == shortcut.label)
                 ) {
-                    update += shortcut.copy(label = name, kind = ShortcutKind.FOLLOWS, madeFor = name)
+                    shortcut.copy(label = name, kind = ShortcutKind.FOLLOWS, madeFor = name)
+                } else {
+                    shortcut.copy(kind = ShortcutKind.PICKED, madeFor = name)
                 }
             }
         }

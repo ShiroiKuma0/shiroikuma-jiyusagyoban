@@ -216,9 +216,11 @@ class OpenTaskerApp_NoHilt : Application() {
                     .map { rows -> rows.associate { it.id to it.name } }
                     .distinctUntilChanged()
                     .collect { names ->
-                        TaskShortcutHelper.reconcile(this, names, previous, afterRestore)
-                        previous = names
-                        afterRestore = false
+                        // A pass that didn't apply keeps the restore's caution and the names it compares with.
+                        if (TaskShortcutHelper.reconcile(this, names, previous, afterRestore)) {
+                            previous = names
+                            afterRestore = false
+                        }
                     }
                 return
             } catch (error: CancellationException) {

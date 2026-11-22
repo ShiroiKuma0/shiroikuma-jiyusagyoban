@@ -71,7 +71,8 @@ class TaskShortcutPlanTest {
 
     /**
      * Shortcuts from older versions carry no kind. One published with its own label used to be
-     * renamed to its task's name on the first start after an update.
+     * renamed to its task's name on the first start after an update. The first pass that finds
+     * the task now records what each is for and keeps a label that isn't the task's name.
      */
     @Test
     fun anOlderShortcutKeepsItsLabelUnlessItWasTheTasksName() {
@@ -79,15 +80,33 @@ class TaskShortcutPlanTest {
         val pinnedEarlier = older(5, "Old")
         val names = mapOf(4L to "Morning routine", 5L to "Old")
 
-        // The first list this process sees has nothing to compare with, so nothing is renamed.
-        assertEquals(emptyList<ShortcutState>(), TaskShortcutHelper.plan(listOf(publishedEarlier, pinnedEarlier), names).update)
+        assertEquals(
+            listOf(picked(4, "Wake up", madeFor = "Morning routine"), pinned(5, "Old")),
+            TaskShortcutHelper.plan(listOf(publishedEarlier, pinnedEarlier), names).update,
+        )
 
+        // Renamed before Android took that record, the one named after its task still follows.
         val renamed = mapOf(4L to "Early routine", 5L to "New")
         val plan = TaskShortcutHelper.plan(listOf(publishedEarlier, pinnedEarlier), renamed, previousNames = names)
+        assertEquals(listOf(picked(4, "Wake up", madeFor = "Early routine"), pinned(5, "New")), plan.update)
+    }
+
+    /**
+     * An older shortcut with its own label used to stay gray for good after its task's delete was
+     * undone, and a restore of the same tasks turned it off too. Recorded, it acts like a new one.
+     */
+    @Test
+    fun anOlderPickedLabelComesBackAfterAnUndoOrARestore() {
+        val recorded = TaskShortcutHelper.plan(listOf(older(4, "Wake up")), mapOf(4L to "Morning routine")).update.single()
+
+        assertEquals(listOf("task_4"), TaskShortcutHelper.plan(listOf(recorded), emptyMap()).disable)
         assertEquals(
-            listOf(ShortcutState("task_5", 5, "New", enabled = true, ShortcutKind.FOLLOWS, madeFor = "New")),
-            plan.update,
+            listOf("task_4"),
+            TaskShortcutHelper.plan(listOf(recorded.copy(enabled = false)), mapOf(4L to "Morning routine")).enable,
         )
+        val restored = TaskShortcutHelper.plan(listOf(recorded), mapOf(4L to "Morning routine"), afterRestore = true)
+        assertEquals(emptyList<String>(), restored.disable)
+        assertEquals(emptyList<ShortcutState>(), restored.update)
     }
 
     /** A restore swaps every task at once, so a new name under a shortcut's id may be another task. */

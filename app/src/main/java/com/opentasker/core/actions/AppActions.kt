@@ -56,8 +56,16 @@ class ShortcutPublishAction : DeclaredAction(ActionCatalog.require("shortcut.pub
         val validation = TaskShortcutHelper.validatePublish(shortcutId, taskId, label, mode)
         if (!validation.isValid) return ActionResult.Failure(validation.error ?: "invalid shortcut")
         val publishMode = TaskShortcutHelper.PublishMode.valueOf(mode.uppercase())
-        // The task's name now lets the shortcut come back with it after a delete is undone.
-        val taskName = runCatching { OpenTaskerApp_NoHilt.readyDb?.taskDao()?.getById(taskId)?.name }.getOrNull()
+        // The task's name now lets the shortcut come back with it after a delete is undone. Without
+        // it the shortcut is still published, and the app records the name the first time it looks.
+        val taskName = try {
+            OpenTaskerApp_NoHilt.readyDb?.taskDao()?.getById(taskId)?.name
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            ctx.logger("Shortcut $shortcutId: couldn't read the task's name (${error.message})")
+            null
+        }
         return if (TaskShortcutHelper.publishShortcut(ctx.app, shortcutId, taskId, label, publishMode, taskName)) {
             ctx.logger("Shortcut published: $shortcutId ($mode)")
             ActionResult.Success
