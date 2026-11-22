@@ -138,18 +138,11 @@ abstract class VerifyReleaseTruthTask : DefaultTask() {
             "room" to catalogValue(versions, "room"),
             "composeBom" to catalogValue(versions, "composeBom"),
             "work" to catalogValue(versions, "work"),
-            "registeredActions" to Regex("(?m)^\\s*define\\(\\\"")
-                .findAll(actionCatalog)
-                .count()
-                .toString(),
+            "registeredActions" to ReleaseTruthSources.registeredActionCount(actionCatalog).toString(),
             // Counted like registeredActions, since task.run is no longer the only engine step
             // outside FlowControl.
-            "engineHandledActions" to Regex("(?m)^\\s*defineEngine\\(\\\"")
-                .findAll(actionCatalog)
-                .count()
-                .toString(),
-            "contextFamilies" to sourceValue(contextSpec, Regex("(?s)enum class ContextType\\s*\\{(.*?)\\}"), "context type enum")
-                .let { body -> Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count().toString() },
+            "engineHandledActions" to ReleaseTruthSources.engineHandledActionCount(actionCatalog).toString(),
+            "contextFamilies" to ReleaseTruthSources.contextFamilyCount(contextSpec).toString(),
             "bundleSchemaVersion" to sourceValue(
                 bundle,
                 Regex("(?m)^\\s*const val OPEN_TASKER_BUNDLE_SCHEMA_VERSION\\s*=\\s*(\\d+)"),

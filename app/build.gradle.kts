@@ -21,6 +21,7 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import com.opentasker.build.ReleaseTruthSources
 import com.opentasker.build.VerifyLocaleResourcesTask
 import com.opentasker.build.VerifyReleaseTruthTask
 import com.opentasker.build.VerifyRoomSchemaTask
@@ -35,22 +36,6 @@ private val JVM_TEST_FLOOR = 1490
 
 /** The modules that own JVM tests `:app:testDebugUnitTest` does not run. */
 private val JVM_TEST_MODULES = listOf(":core:storage", ":core:engine", ":core:common")
-
-private fun deriveSourceValue(file: java.io.File, pattern: String, name: String): String =
-    Regex(pattern).find(file.readText())?.groupValues?.get(1)
-        ?: error("Could not derive $name from ${file.path}.")
-
-private fun deriveRegisteredActionCount(file: java.io.File): Int =
-    Regex("(?m)^\\s*define\\(\\\"").findAll(file.readText()).count()
-
-private fun deriveContextFamilyCount(file: java.io.File): Int {
-    val body = deriveSourceValue(
-        file,
-        "(?s)enum class ContextType\\s*\\{(.*?)\\}",
-        "context type enum",
-    )
-    return Regex("(?m)^\\s+[A-Z][A-Z_]+\\s*(,|//)").findAll(body).count()
-}
 
 private val LOCALE_COMPLETION_THRESHOLD = 0.80
 
@@ -1591,8 +1576,8 @@ val verifyDocumentationTruth = tasks.register<VerifyDocumentationTruthTask>("ver
     readmeFile.set(readmeFilePath)
     currentDocumentation.from(currentDocumentationPaths)
     versionName.set(appVersionName)
-    actionCount.set(deriveRegisteredActionCount(actionCatalogFilePath))
-    contextFamilyCount.set(deriveContextFamilyCount(contextSpecFilePath))
+    actionCount.set(ReleaseTruthSources.registeredActionCount(actionCatalogFilePath.readText()))
+    contextFamilyCount.set(ReleaseTruthSources.contextFamilyCount(contextSpecFilePath.readText()))
     repositoryRoot.set(repositoryRootPath)
 }
 
